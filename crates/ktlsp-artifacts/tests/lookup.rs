@@ -118,6 +118,12 @@ fn invalid_coordinates_are_unconstructible() {
         "release",
         "1-SNAPSHOT",
         "1-snapshot",
+        "SNAPSHOT",
+        "1SNAPSHOT",
+        "snapshot",
+        "1.snapshot",
+        "1.0-20261012.123456-1",
+        "1.0-00000000.000000-01",
         "[1,2)",
         "1.+",
         "+",
@@ -140,6 +146,14 @@ fn invalid_coordinates_are_unconstructible() {
         .is_err()
     );
     assert!(Coordinate::new("g", "COM10", "1.0-rc_1", Some("linux-x86_64"), "tar.gz").is_ok());
+    for version in [
+        "1.0-2026101.123456-1",
+        "1.0-20261012.12345-1",
+        "1.0-20261012x123456-1",
+        "1.0-20261012.123456-x",
+    ] {
+        assert!(Coordinate::new("g", "a", version, None, "jar").is_ok());
+    }
 }
 
 #[test]

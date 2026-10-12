@@ -46,7 +46,7 @@ impl Coordinate {
             validate_segment("classifier", classifier)?;
         }
         let upper = version.to_ascii_uppercase();
-        if matches!(upper.as_str(), "LATEST" | "RELEASE") || upper.ends_with("-SNAPSHOT") {
+        if matches!(upper.as_str(), "LATEST" | "RELEASE") || is_snapshot(&upper) {
             return Err(invalid(
                 "version",
                 "dynamic and snapshot versions unsupported",
@@ -108,6 +108,26 @@ impl Coordinate {
         path.push(self.filename());
         path
     }
+}
+
+fn is_snapshot(version: &str) -> bool {
+    if version.ends_with("SNAPSHOT") {
+        return true;
+    }
+    let Some((prefix, build)) = version.rsplit_once('-') else {
+        return false;
+    };
+    let Some((_, timestamp)) = prefix.rsplit_once('-') else {
+        return false;
+    };
+    !build.is_empty()
+        && build.bytes().all(|b| b.is_ascii_digit())
+        && timestamp.len() == 15
+        && timestamp.as_bytes()[8] == b'.'
+        && timestamp
+            .bytes()
+            .enumerate()
+            .all(|(i, b)| i == 8 || b.is_ascii_digit())
 }
 
 fn validate_segment(field: &'static str, value: &str) -> Result<(), LookupError> {
@@ -340,6 +360,7 @@ pub fn lookup(coordinate: &Coordinate, roots: &[PathBuf]) -> Result<Artifact, Lo
     let Some((root, path, length)) = candidates.pop() else {
         return Err(LookupError::Missing { searched_roots });
     };
+    // shortcut: pathname checks require a trusted quiescent cache; use handle-relative no-follow I/O before accepting untrusted writers.
     let file = File::open(&path).map_err(|e| io_error(&path, e))?;
     let opened = file.metadata().map_err(|e| io_error(&path, e))?;
     if !opened.is_file() || opened.len() != length {

@@ -21,8 +21,10 @@ Fields use conservative ASCII letters/digits plus internal `.`, `-`, `_`, start
 and end with a letter/digit, and are at most 128 bytes. Windows device basenames
 are rejected case-insensitively. Group has at most 256 bytes/32 dot-separated
 segments; aggregate field bytes at most 512; generated filename at most 255.
-Dynamic versions/ranges and `*-SNAPSHOT` indirection are unsupported. Exact
-classifier/extension are required; no packaging/type aliases are inferred.
+Dynamic versions/ranges, versions ending in `SNAPSHOT` (case-insensitively),
+and timestamped snapshot forms (`base-YYYYMMDD.HHMMSS-build`) are unsupported.
+Snapshot rejection follows [Maven's classification](https://maven.apache.org/ref/3.9.9/maven-artifact/xref/org/apache/maven/artifact/ArtifactUtils.html#L36).
+Exact classifier/extension are required; no packaging/type aliases are inferred.
 
 At most 16 explicit roots are accepted. Each must be absolute, have no parent
 traversal, and use at most 4,096 encoded native-path bytes/256 components. Duplicate

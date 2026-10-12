@@ -25,6 +25,7 @@ name = "ktlsp-server"
 version = "0.1.0"
 dependencies = [
  "ktlsp-protocol",
+ "ktlsp-syntax",
  "ktlsp-text",
  "serde",
  "serde_json",

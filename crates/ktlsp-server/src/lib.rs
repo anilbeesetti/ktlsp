@@ -1,6 +1,7 @@
-//! Native LSP lifecycle and bounded document synchronization, without language
-//! providers or project import. Unsupported requests return method-not-found.
+//! Native LSP lifecycle, bounded document synchronization and lexical/structural
+//! providers. Semantic analysis and project import remain unsupported.
 
+mod structure;
 mod uri;
 use ktlsp_protocol::{read_frame, write_frame};
 use ktlsp_text::{Document, MAX_CHANGES, TextChange};
@@ -31,11 +32,26 @@ pub struct WorkspaceFolder {
     pub name: String,
 }
 /// Stored client configuration, not evidence of a successful workspace import.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Configuration {
     pub process_id: Option<Number>,
     pub root_uri: Option<String>,
     pub workspace_folders: Vec<WorkspaceFolder>,
+    pub line_folding_only: bool,
+    pub folding_range_limit: usize,
+    pub diagnostic_version_support: bool,
+}
+impl Default for Configuration {
+    fn default() -> Self {
+        Self {
+            process_id: None,
+            root_uri: None,
+            workspace_folders: Vec::new(),
+            line_folding_only: false,
+            folding_range_limit: structure::MAX_FOLDS,
+            diagnostic_version_support: false,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -166,8 +182,7 @@ impl Session {
         }
         let params = map.get("params");
         if notification {
-            self.notification(method, params);
-            return Vec::new();
+            return self.notification(method, params);
         }
         let id = map.get("id").expect("request id presence checked");
         if !valid_id(id) {
@@ -195,7 +210,7 @@ impl Session {
             self.configuration = configuration;
             self.state = State::Initializing;
             return Ok(
-                json!({"capabilities":{"positionEncoding":"utf-16", "textDocumentSync":{"openClose":true,"change":2,"save":false}}, "serverInfo":{"name":"ktlsp","version":env!("CARGO_PKG_VERSION")}}),
+                json!({"capabilities":{"positionEncoding":"utf-16", "foldingRangeProvider":true, "textDocumentSync":{"openClose":true,"change":2,"save":false}}, "serverInfo":{"name":"ktlsp","version":env!("CARGO_PKG_VERSION")}}),
             );
         }
         if self.state != State::Running {
@@ -207,33 +222,53 @@ impl Session {
                 self.state = State::Shutdown;
                 Ok(Value::Null)
             }
+            "textDocument/foldingRange" => {
+                let map = params
+                    .ok_or((-32602, "folding params missing"))
+                    .and_then(|p| object(p).map_err(|e| (-32602, e)))?;
+                let uri = required(map, "textDocument")
+                    .and_then(object)
+                    .and_then(|d| required(d, "uri"))
+                    .and_then(uri_value)
+                    .map_err(|e| (-32602, e))?;
+                let document = self
+                    .documents
+                    .get(uri)
+                    .ok_or((-32602, "folding refers to unopened document"))?;
+                let analysis =
+                    structure::analyze(document.text(), self.configuration.folding_range_limit)
+                        .map_err(|e| (-32803, e))?;
+                let (folds, _) =
+                    analysis.render(document.text(), self.configuration.line_folding_only);
+                Ok(json!(folds))
+            }
             _ => Err((-32601, "Method not found")),
         }
     }
-    fn notification(&mut self, method: &str, params: Option<&Value>) {
+    fn notification(&mut self, method: &str, params: Option<&Value>) -> Vec<Value> {
         if method == "exit" {
             if let Err(error) = empty_params(params) {
                 self.record(error);
-                return;
+                return Vec::new();
             }
             self.exit_code = Some(if self.state == State::Shutdown { 0 } else { 1 });
             self.state = State::Exited;
-            return;
+            return Vec::new();
         }
         if self.state == State::Shutdown {
-            return;
+            return Vec::new();
         }
         if method == "initialized" {
             if self.state != State::Initializing {
                 self.record("initialized notification out of order");
-                return;
+                return Vec::new();
             }
             if let Err(error) = params.ok_or("initialized params missing").and_then(object) {
                 self.record(error);
-                return;
+                return Vec::new();
             }
             self.state = State::Running;
-            return;
+            return Vec::new();
         }
         if !matches!(
             method,
@@ -243,11 +278,11 @@ impl Session {
                 | "textDocument/didSave"
                 | "$/cancelRequest"
         ) {
-            return;
+            return Vec::new();
         }
         if self.state != State::Running {
             self.record("document notification before initialized");
-            return;
+            return Vec::new();
         }
         let result = match method {
             "textDocument/didOpen" => self.did_open(params),
@@ -269,7 +304,32 @@ impl Session {
         };
         if let Err(error) = result {
             self.record(error);
+            return Vec::new();
         }
+        if matches!(
+            method,
+            "textDocument/didOpen" | "textDocument/didChange" | "textDocument/didClose"
+        ) {
+            let uri = params.expect("validated notification params")["textDocument"]["uri"]
+                .as_str()
+                .expect("validated URI");
+            let document = self.documents.get(uri);
+            let diagnostics =
+                document.map_or_else(Vec::new, |doc| match structure::analyze(doc.text(), 0) {
+                    Ok(analysis) => analysis.render(doc.text(), false).1,
+                    Err(error) => structure::limit_diagnostic(error),
+                });
+            let mut params = json!({"uri":uri,"diagnostics":diagnostics});
+            if self.configuration.diagnostic_version_support
+                && let Some(doc) = document
+            {
+                params["version"] = json!(doc.version());
+            }
+            return vec![
+                json!({"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":params}),
+            ];
+        }
+        Vec::new()
     }
     fn did_open(&mut self, params: Option<&Value>) -> Result<(), String> {
         let map = object(params.ok_or("open params missing")?)?;
@@ -388,6 +448,30 @@ fn parse_initialize(params: Option<&Value>) -> Result<Configuration, &'static st
         }
     }
     let mut configuration = Configuration::default();
+    if let Some(text_document) = capabilities.get("textDocument") {
+        let text_document = object(text_document)?;
+        if let Some(folding) = text_document.get("foldingRange") {
+            let folding = object(folding)?;
+            if let Some(value) = folding.get("lineFoldingOnly") {
+                configuration.line_folding_only =
+                    value.as_bool().ok_or("lineFoldingOnly must be boolean")?;
+            }
+            if let Some(value) = folding.get("rangeLimit") {
+                let limit = value
+                    .as_u64()
+                    .filter(|n| *n <= i32::MAX as u64)
+                    .ok_or("rangeLimit must be an LSP uinteger")?;
+                configuration.folding_range_limit = limit.min(structure::MAX_FOLDS as u64) as usize;
+            }
+        }
+        if let Some(diagnostics) = text_document.get("publishDiagnostics") {
+            let diagnostics = object(diagnostics)?;
+            if let Some(value) = diagnostics.get("versionSupport") {
+                configuration.diagnostic_version_support =
+                    value.as_bool().ok_or("versionSupport must be boolean")?;
+            }
+        }
+    }
     if let Some(value) = map.get("processId").filter(|v| !v.is_null()) {
         let Some(number) = value.as_number().filter(|n| n.is_i64() || n.is_u64()) else {
             return Err("processId must be an integer or null");

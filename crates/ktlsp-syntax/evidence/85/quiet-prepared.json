@@ -1,0 +1,23 @@
+{
+  "revisions": {
+    "historical": "0d54973ce66f59362829360261fde6e46b4fc420",
+    "current": "08a56b7e6abbe746d3342fc2db4ae1db09060ef3",
+    "candidate": "fdb9370a25d2e7a8031bbf50333a48e46e11e4fc"
+  },
+  "counting": false,
+  "profile": "release",
+  "hashes": {
+    "historical_lexer": "9c069f18a7db01e3ae5e72dd03edf39be3a74591c2b372d434e82bf31c6903fb",
+    "historical_probe": "e3ca3bd41354c93bd6749df6bf741c63d8f3271e2a73a77aba79d49f57109c6f",
+    "historical_binary": "3d0b908e1ad5852eacdd5bc02ca52850ade0320eea742adf41a64fcb1eb88161",
+    "current_lexer": "9c069f18a7db01e3ae5e72dd03edf39be3a74591c2b372d434e82bf31c6903fb",
+    "current_probe": "e3ca3bd41354c93bd6749df6bf741c63d8f3271e2a73a77aba79d49f57109c6f",
+    "current_binary": "395dee9df149b9825f6f50975e0c1f099ae803198240990a4f26e54c683c394c",
+    "candidate_lexer": "69e155a744eeeec28b515d71cf0130dcac8ffc85a1a40ae41cce327fc2f77f08",
+    "candidate_probe": "e3ca3bd41354c93bd6749df6bf741c63d8f3271e2a73a77aba79d49f57109c6f",
+    "candidate_binary": "17eb9a86da6cd050125ea3ca83e20c922d19797d5d8a1224477c8099bf147bec"
+  },
+  "runner_source_sha256": "758e8f66aea9e30a3d22c44cb3a549e2bcde17bf1b2676f9f74b54a252a5e867",
+  "runner_executable_sha256": "ff9261b21a69fcd98a9781a40f8256f9ed458773ee7ba584d018c4e4dfd072ab",
+  "preparation_correction": "First granted window closed before any inventory/timing execution: prepared inventory lacked abort guard. Added fail-closed counts.is_empty guard outside that window. Benchmark binaries, fixtures, matrix and criterion unchanged; independent guard recheck passed: real unexpected-test process detected; runner aborted before measured child/timing output; no primary/window files created."
+}

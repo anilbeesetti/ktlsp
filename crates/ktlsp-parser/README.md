@@ -120,11 +120,16 @@ bounds/annotations remain outside this positive contract; ordinary parsing stays
 in effect for them. #83/#7 and T008a require the remaining acceptance audit.
 
 Scratch prefix parsing preserves live state and respects existing truncation;
-256 raw tokens/4096 bytes per attempt and 4096 charged raw tokens per class list
-bound probing. Exceeding these declines recovery without changing global budgets,
+256 raw tokens/4096 bytes per attempt and 4096 copied raw tokens per class list
+bound scratch parsing. Leading trivia inspection is outside the copied-token
+charge and remains bounded by the input limit and advancing parser cursor.
+Exceeding the scratch limits declines recovery without changing global budgets,
 Coverage rejection, snapshot identity, strict result validation or the 500 ms
 worker deadline. No server provider or semantic API changes. Exact independent
-regressions are in declarations.rs/recovery_limits.rs. Runtime acceptance is
-pending the candidate's authorized Linux CI and independent behavioral rechecks;
-local format/Clippy and ordered patch/hash replay have passed. This draft text is
-not a completed-delivery claim. Issue #96 remains unresolved.
+regressions are in declarations.rs/recovery_limits.rs. Authorized Linux CI and
+both independent behavioral reviews passed for candidate054e352 on the actual
+synthetic merge86bbd04: 169 active tests, zero failures, two exercised helper
+fixtures and 19 worker fault cases. Exact checkout/tree evidence is in REVIEW.md.
+Local format/Clippy and ordered patch/hash replay also passed. Stable integration,
+final-head CI/reviews and coordinator merge grant remain required; this is not a
+completed-delivery claim. Issue #96 remains unresolved.

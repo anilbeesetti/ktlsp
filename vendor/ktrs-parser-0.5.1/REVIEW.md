@@ -62,4 +62,8 @@ from the archive and both ordered patches, with the unchanged Rust dependency
 graph. Production exact-head Linux execution is the behavioral authority; the
 standalone recovery tests compile locally but are not run by root workspace CI.
 The first Linux failure was a new test's blanket nested-FUN prohibition; corrected
-parent/range assertions require another reviewed head. No runtime approval yet.
+parent/range assertions passed on candidate054e352 in Linux
+run38285975233/job114934324677, actual synthetic checkout86bbd04/treead10ce11
+(full identities in the production parser REVIEW.md). Both independent reviewers
+approve after inspecting all169 active passes/zero failures, two exercised helper
+fixtures and19 worker fault cases. Final integrated-head rechecks remain required.

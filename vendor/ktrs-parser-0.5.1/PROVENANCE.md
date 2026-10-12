@@ -81,7 +81,9 @@ production, diagnostic, newline/join or layer state is changed by a probe.
 
 The scratch slice stops at the minimum nonnegative active truncation endpoint,
 256 complete raw tokens including trivia, or 4096 bytes. All attempts are charged
-against 4096 raw tokens per classifier list; exhaustion declines further recovery.
+against 4096 copied raw tokens per classifier list; exhaustion declines recovery.
+Leading trivia inspection is bounded separately by input size and the advancing
+live cursor; nested scratch probes return before scanning it.
 These are recovery-coverage bounds, not new worker failures or larger global limits.
 The existing recursion-suppression flag disables nested parameter/generic probes.
 Scratch byte limits do not bound RSS: the existing builder pool can reuse larger

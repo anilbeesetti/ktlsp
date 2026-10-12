@@ -220,5 +220,19 @@ reviewers independently traced annotation/value-argument parsing. Corrected
 assertions require VALUE_ARGUMENT parent, exact nested name/function and damaged
 class/list ranges, and forbid a KT_FILE sibling. No production fix was indicated,
 no unchanged-head retry was used, and later recovery-limit tests were not reached.
-Exact corrected-head Linux behavior and final reviews remain pending. No Darwin
-runtime or JVM/oracle execution occurred; issue #96 remains unresolved.
+Corrected candidate054e352e1903250f44b5e3a418a7b1719f004844 passed Linux
+run38285975233/job114934324677. Actions tested synthetic merge
+86bbd04fe50de7e28d68fb34dd6ce3d3cec73eec, tree
+ad10ce11498b068785296334144365325649dae4, with parents
+b7ba65b849c2e1be681c88bd7bba7dc66a14f78d and candidate054e352.
+This is actual combined-tree evidence, not a claim that CI checked the bare head.
+All three unchanged pinned commands passed: 169 active tests, zero failures,
+two ignored helper fixtures exercised by parent tests and 19 worker fault cases.
+All 16 declarations and five recovery-limit tests passed. Both independent
+reviewers inspected these logs and approve bounded functionality/resource behavior;
+production source matches the independently replayed86c0b97 source. Leading trivia
+scans are input-bounded and monotonic; the aggregate budget covers copied tokens.
+
+Stable integration, final-head behavioral rechecks/CI and coordinator expected-head
+merge grant remain required. No Darwin runtime or JVM/oracle execution occurred;
+issue #96 remains unresolved.

@@ -85,8 +85,6 @@ dependencies = [
 [[package]]
 name = "ktrs-parser"
 version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec8d43d9549490689477385c7678bbd22ecbc445973ab364e8ecb69dd4882bcc"
 dependencies = [
  "ktrs-lexer",
  "ktrs-syntax",

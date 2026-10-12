@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-ktrs-parser = "=0.5.1"
+ktrs-parser = { version = "=0.5.1", path = "../../vendor/ktrs-parser-0.5.1" }
 ktrs-syntax = "=0.5.1"
 ktlsp-text = { path = "../ktlsp-text" }
 serde.workspace = true

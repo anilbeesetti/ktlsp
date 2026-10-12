@@ -12,8 +12,10 @@ Each call starts one Rust worker, concurrently transfers input and drains stdout
 checks cancellation/deadline every 2 ms, and terminates/reaps before scoped I/O
 threads join on every exit path. Worker stderr is discarded (may contain source
 on upstream panics); no document is logged. The shipped trusted worker never
-spawns descendants. Callers must limit concurrent parse requests, install the
-matching worker, and preserve immutable source/version identity. This synchronous
+spawns descendants. Callers must limit concurrent parse requests and install the matching worker.
+Editor consumers use `SourceSnapshot` and `Parser::parse_snapshot`; accepted
+`SnapshotResult::tree_for` rejects a changed document/revision/source/file kind.
+See [the exact declaration corpus and unresolved recovery gates](CORPUS.md). This synchronous
 API has no detached task or future whose drop could leave parsing running.
 
 Limits are enforced independently in parent and worker where applicable:
@@ -55,13 +57,19 @@ explicitly, never presented as a lossless tree.
 
 ## Adoption audit
 
-Only approved registry ktrs-parser/ktrs-syntax `=0.5.1` are direct dependencies.
-Locked additions are ktrs-lexer 0.5.1 and text-size 1.1.1. `cargo tree --locked
+The direct parser dependency is the audited local fork of ktrs-parser `=0.5.1`
+under `vendor/ktrs-parser-0.5.1`; ktrs-syntax `=0.5.1` remains a registry dependency.
+Locked transitive packages remain ktrs-lexer 0.5.1 and text-size 1.1.1. `cargo tree --locked
 -p ktlsp-parser -e normal,build` contains these plus existing Rust serde/text
 packages; all four new crate manifests have no build script or normal/build
 native/JVM dependencies. Upstream dev dependencies (mimalloc/expect-test), facade
 (stacker), CLI and Java integration are excluded. No upstream tests are imported
-as runnable dependencies. Registry SHA-256 values match Cargo.lock:
+as runnable dependencies. The root workspace excludes the standalone vendor workspace; production parser
+regressions run in this crate. No upstream dev dependencies enter native tests.
+The parser's original archive checksum and all 54 source hashes remain in vendor
+provenance; recovery.patch followed by formatting.patch reproduces final source
+bytes, recorded in formatted-sha256.json. Formatting has no opt-out. Other registry SHA-256 values
+match Cargo.lock:
 
 | Archive | SHA-256 |
 | --- | --- |
@@ -87,16 +95,13 @@ research; the small harness and additional fixtures here are independently writt
 
 ## Remaining accepted child proposals
 
-T007b accepted declaration corpus and validated parser-result/CST contract (next,
-not implemented here): kinds, hierarchy, original ranges, diagnostics and explicit
-failures; exact source partition and parent-child ranges; valid and incomplete
-package/import/class/interface/object/function/property/typealias/modifier/
-annotation/generic/receiver/nested-local fixtures; declaration retention after
-recovery; actual-worker CRLF/lone-CR/Unicode/revision/resource tests; upstream
-grammar rejection distinguished from budget rejection, and this gate's 64 KiB vs
-existing 8 MiB document ceiling explicit. Include Kotlin 2.3 baseline/version gaps
-and isolated-oracle comparisons where available. Do not close T007 until its full
-acceptance works; this containment gate alone does not unlock T008.
+T007b/#83 remains pending. Child #86 adds immutable snapshot/result validation and
+an exact named declaration corpus. Child #87 supplies a source-local parameter-list
+boundary repair and production snapshot recovery controls; generic/default/type/
+annotation recovery gaps remain explicit. It does not unlock T008a or establish the full #83
+recovery/resource contract. See CORPUS.md for each tested outcome and gap.
+The parent gate needs joint assessment of #86/#87 and remaining recovery/resource
+gaps before T008a can proceed.
 
 T008a declaration HIR child follows the accepted result/recovery gate: lower named
 declarations/package/imports to stable revisioned HIR; preserve parents, names,

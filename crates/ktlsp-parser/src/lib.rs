@@ -1,0 +1,525 @@
+//! Isolated, bounded parser adoption gate. No grammar or semantic parity claim.
+use serde::{Deserialize, Serialize};
+use std::{
+    io::{Read, Write},
+    path::{Path, PathBuf},
+    process::{Child, Command, Stdio},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
+    thread,
+    time::{Duration, Instant},
+};
+
+pub const MAX_SOURCE_BYTES: usize = 64 * 1024;
+pub const MAX_OUTPUT_BYTES: usize = 4 * 1024 * 1024;
+pub const MAX_ELEMENTS: usize = 16_384;
+pub const MAX_DIAGNOSTICS: usize = 256;
+pub const MAX_NESTING: usize = 128;
+pub const MAX_ALLOCATION_BYTES: usize = 64 * 1024 * 1024;
+pub const TIMEOUT: Duration = Duration::from_millis(500);
+
+#[derive(Debug, Clone, Copy)]
+pub enum FileKind {
+    Source,
+    Script,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParserError {
+    InputLimit,
+    NestingLimit,
+    OutputLimit,
+    Coverage,
+    InvalidTree,
+    Cancelled,
+    Timeout,
+    WorkerFailed,
+    Io,
+}
+impl std::fmt::Display for ParserError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "parser rejected request: {self:?}")
+    }
+}
+impl std::error::Error for ParserError {}
+
+/// Flat preorder CST element. Offsets refer to the original source bytes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Element {
+    pub kind: String,
+    pub start: usize,
+    pub end: usize,
+    pub parent: Option<usize>,
+    pub subtree_end: usize,
+    pub token: bool,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Diagnostic {
+    pub start: usize,
+    pub end: usize,
+    pub message: String,
+}
+
+#[doc(hidden)]
+#[derive(Serialize, Deserialize)]
+pub enum Reply {
+    Tree {
+        #[serde(deserialize_with = "read_elements")]
+        elements: Vec<Element>,
+        #[serde(deserialize_with = "read_diagnostics")]
+        diagnostics: Vec<Diagnostic>,
+    },
+    Coverage,
+    OutputLimit,
+    NestingLimit,
+}
+
+fn read_elements<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<Element>, D::Error> {
+    read_bounded::<Element, D, MAX_ELEMENTS>(d)
+}
+fn read_diagnostics<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<Diagnostic>, D::Error> {
+    read_bounded::<Diagnostic, D, MAX_DIAGNOSTICS>(d)
+}
+fn read_bounded<'de, T: Deserialize<'de>, D: serde::Deserializer<'de>, const MAX: usize>(
+    d: D,
+) -> Result<Vec<T>, D::Error> {
+    struct Bounded<T, const MAX: usize>(std::marker::PhantomData<T>);
+    impl<'de, T: Deserialize<'de>, const MAX: usize> serde::de::Visitor<'de> for Bounded<T, MAX> {
+        type Value = Vec<T>;
+        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("bounded parser sequence")
+        }
+        fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Vec<T>, A::Error> {
+            let mut values = Vec::new();
+            while let Some(value) = seq.next_element()? {
+                if values.len() == MAX {
+                    return Err(serde::de::Error::custom("parser sequence limit"));
+                }
+                values.push(value);
+            }
+            Ok(values)
+        }
+    }
+    d.deserialize_seq(Bounded::<T, MAX>(std::marker::PhantomData))
+}
+
+#[derive(Debug)]
+pub struct Parsed {
+    source: String,
+    elements: Vec<Element>,
+    diagnostics: Vec<Diagnostic>,
+}
+impl Parsed {
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+    pub fn elements(&self) -> &[Element] {
+        &self.elements
+    }
+    pub fn diagnostics(&self) -> &[Diagnostic] {
+        &self.diagnostics
+    }
+    pub fn position(
+        &self,
+        original_offset: usize,
+    ) -> Result<ktlsp_text::Position, ktlsp_text::TextError> {
+        ktlsp_text::offset_to_position(&self.source, original_offset)
+    }
+}
+
+/// Caller supplies the trusted installed Rust worker's absolute path.
+/// Each call owns exactly one child; concurrent calls need caller-side admission.
+pub struct Parser {
+    worker: PathBuf,
+}
+impl Parser {
+    pub fn new(worker: impl AsRef<Path>) -> Result<Self, ParserError> {
+        if !worker.as_ref().is_absolute() {
+            return Err(ParserError::Io);
+        }
+        Ok(Self {
+            worker: worker.as_ref().to_owned(),
+        })
+    }
+    pub fn parse(
+        &self,
+        source: &str,
+        kind: FileKind,
+        cancelled: &AtomicBool,
+    ) -> Result<Parsed, ParserError> {
+        if source.len() > MAX_SOURCE_BYTES {
+            return Err(ParserError::InputLimit);
+        }
+        if cancelled.load(Ordering::Relaxed) {
+            return Err(ParserError::Cancelled);
+        }
+        preflight(source)?;
+        let (normalized, map) = normalize(source);
+        let mut command = Command::new(&self.worker);
+        command.arg(match kind {
+            FileKind::Source => "--source",
+            FileKind::Script => "--script",
+        });
+        let bytes = supervise(command, &normalized, cancelled)?;
+        if cancelled.load(Ordering::Relaxed) {
+            return Err(ParserError::Cancelled);
+        }
+        let reply: Reply = serde_json::from_slice(&bytes).map_err(|_| ParserError::InvalidTree)?;
+        validate(source, &normalized, &map, reply)
+    }
+}
+fn supervise(
+    mut command: Command,
+    normalized: &str,
+    cancelled: &AtomicBool,
+) -> Result<Vec<u8>, ParserError> {
+    let deadline = Instant::now() + TIMEOUT;
+    let child = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .env_clear()
+        .spawn()
+        .map_err(|_| ParserError::Io)?;
+    thread::scope(|scope| {
+        let mut guard = ChildGuard(child);
+        let mut stdin = guard.0.stdin.take().ok_or(ParserError::Io)?;
+        let stdout = guard.0.stdout.take().ok_or(ParserError::Io)?;
+        let input = normalized;
+        let writer = thread::Builder::new()
+            .spawn_scoped(scope, move || stdin.write_all(input.as_bytes()))
+            .map_err(|_| ParserError::Io)?;
+        let (sender, receiver) = mpsc::sync_channel(1);
+        let reader = thread::Builder::new()
+            .spawn_scoped(scope, move || {
+                let mut bytes = Vec::new();
+                let result = stdout
+                    .take(MAX_OUTPUT_BYTES as u64 + 1)
+                    .read_to_end(&mut bytes)
+                    .map_err(|_| ParserError::Io)
+                    .and({
+                        if bytes.len() > MAX_OUTPUT_BYTES {
+                            Err(ParserError::OutputLimit)
+                        } else {
+                            Ok(bytes)
+                        }
+                    });
+                let _ = sender.send(result);
+            })
+            .map_err(|_| ParserError::Io)?;
+        let mut output = None;
+        let status = loop {
+            if cancelled.load(Ordering::Relaxed) {
+                return Err(ParserError::Cancelled);
+            }
+            if Instant::now() >= deadline {
+                return Err(ParserError::Timeout);
+            }
+            if output.is_none() {
+                match receiver.try_recv() {
+                    Ok(result) => output = Some(result?),
+                    Err(mpsc::TryRecvError::Empty) => {}
+                    Err(mpsc::TryRecvError::Disconnected) => return Err(ParserError::Io),
+                }
+            }
+            if let Some(status) = guard.0.try_wait().map_err(|_| ParserError::Io)? {
+                break status;
+            }
+            thread::sleep(Duration::from_millis(2));
+        };
+        if !status.success() {
+            return Err(ParserError::WorkerFailed);
+        }
+        writer
+            .join()
+            .map_err(|_| ParserError::Io)?
+            .map_err(|_| ParserError::Io)?;
+        reader.join().map_err(|_| ParserError::Io)?;
+        output
+            .map(Ok)
+            .unwrap_or_else(|| receiver.recv().map_err(|_| ParserError::Io)?)
+    })
+}
+struct ChildGuard(Child);
+impl Drop for ChildGuard {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+/// Conservative raw delimiter depth, including strings/comments and ambiguous `<`.
+/// shortcut: can reject valid text, replace with accepted grammar-aware preflight in T007 follow-up.
+#[doc(hidden)]
+pub fn preflight(source: &str) -> Result<(), ParserError> {
+    let mut depth = 0usize;
+    for b in source.bytes() {
+        match b {
+            b'(' | b'[' | b'{' | b'<' => {
+                depth += 1;
+                if depth > MAX_NESTING {
+                    return Err(ParserError::NestingLimit);
+                }
+            }
+            b')' | b']' | b'}' | b'>' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    Ok(())
+}
+fn normalize(source: &str) -> (String, Vec<usize>) {
+    let mut bytes = Vec::with_capacity(source.len());
+    let mut map = Vec::with_capacity(source.len() + 1);
+    let mut offset = 0;
+    while offset < source.len() {
+        map.push(offset);
+        let b = source.as_bytes()[offset];
+        if b == b'\r' {
+            bytes.push(b'\n');
+            offset += 1;
+            if source.as_bytes().get(offset) == Some(&b'\n') {
+                offset += 1;
+            }
+        } else {
+            bytes.push(b);
+            offset += 1;
+        }
+    }
+    map.push(source.len());
+    (
+        String::from_utf8(bytes).expect("newline replacement preserves UTF-8"),
+        map,
+    )
+}
+
+fn validate(
+    source: &str,
+    normalized: &str,
+    map: &[usize],
+    reply: Reply,
+) -> Result<Parsed, ParserError> {
+    let (mut elements, mut diagnostics) = match reply {
+        Reply::Coverage => return Err(ParserError::Coverage),
+        Reply::OutputLimit => return Err(ParserError::OutputLimit),
+        Reply::NestingLimit => return Err(ParserError::NestingLimit),
+        Reply::Tree {
+            elements,
+            diagnostics,
+        } => (elements, diagnostics),
+    };
+    if elements.is_empty() || elements.len() > MAX_ELEMENTS || diagnostics.len() > MAX_DIAGNOSTICS {
+        return Err(ParserError::InvalidTree);
+    }
+    let mut ancestors: Vec<usize> = Vec::new();
+    let mut cursor = 0;
+    for (i, e) in elements.iter().enumerate() {
+        while ancestors
+            .last()
+            .is_some_and(|&p| elements[p].subtree_end == i)
+        {
+            ancestors.pop();
+        }
+        if e.start > e.end
+            || e.end > normalized.len()
+            || !normalized.is_char_boundary(e.start)
+            || !normalized.is_char_boundary(e.end)
+            || e.kind.is_empty()
+            || e.kind.len() > 128
+            || e.subtree_end <= i
+            || e.subtree_end > elements.len()
+            || e.parent != ancestors.last().copied()
+            || (i == 0
+                && (e.start != 0
+                    || e.end != normalized.len()
+                    || e.subtree_end != elements.len()
+                    || e.token))
+        {
+            return Err(ParserError::InvalidTree);
+        }
+        if let Some(&p) = ancestors.last() {
+            let parent = &elements[p];
+            if e.start < parent.start || e.end > parent.end || e.subtree_end > parent.subtree_end {
+                return Err(ParserError::InvalidTree);
+            }
+        }
+        if e.token {
+            if e.subtree_end != i + 1 || e.start != cursor || e.start == e.end {
+                return Err(ParserError::Coverage);
+            }
+            cursor = e.end;
+        } else if e.subtree_end > i + 1 {
+            ancestors.push(i);
+            if ancestors.len() > MAX_NESTING {
+                return Err(ParserError::NestingLimit);
+            }
+        }
+    }
+    if cursor != normalized.len() {
+        return Err(ParserError::Coverage);
+    }
+    for d in &mut diagnostics {
+        if d.start > d.end
+            || d.end > normalized.len()
+            || !normalized.is_char_boundary(d.start)
+            || !normalized.is_char_boundary(d.end)
+            || d.message.len() > 4096
+        {
+            return Err(ParserError::InvalidTree);
+        }
+        d.start = map[d.start];
+        d.end = map[d.end];
+    }
+    for e in &mut elements {
+        e.start = map[e.start];
+        e.end = map[e.end];
+    }
+    Ok(Parsed {
+        source: source.to_owned(),
+        elements,
+        diagnostics,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn normalization_preserves_original_boundaries() {
+        let source = "😀\r\n\r\nx\ry\n";
+        let (normalized, map) = normalize(source);
+        assert_eq!(normalized, "😀\n\nx\ny\n");
+        assert_eq!(map[4], 4);
+        assert_eq!(map[5], 6);
+        assert_eq!(map[6], 8);
+        assert_eq!(map[normalized.len()], source.len());
+        assert!(!normalized.is_char_boundary(1));
+    }
+    #[test]
+    fn rejects_untrusted_tree_shapes_and_spans() {
+        let root = Element {
+            kind: "ROOT".into(),
+            start: 0,
+            end: 1,
+            parent: None,
+            subtree_end: 2,
+            token: false,
+        };
+        let token = Element {
+            kind: "IDENTIFIER".into(),
+            start: 0,
+            end: 1,
+            parent: Some(0),
+            subtree_end: 2,
+            token: true,
+        };
+        let reply = |elements| Reply::Tree {
+            elements,
+            diagnostics: vec![],
+        };
+        assert!(validate("a", "a", &[0, 1], reply(vec![root.clone(), token.clone()])).is_ok());
+        for invalid in [
+            Element {
+                parent: Some(1),
+                ..token.clone()
+            },
+            Element {
+                end: 2,
+                ..token.clone()
+            },
+            Element {
+                subtree_end: usize::MAX,
+                ..token.clone()
+            },
+            Element {
+                start: 1,
+                ..token.clone()
+            },
+        ] {
+            assert!(validate("a", "a", &[0, 1], reply(vec![root.clone(), invalid])).is_err());
+        }
+        let invalid = Element {
+            start: 1,
+            end: 4,
+            ..token
+        };
+        assert!(
+            validate(
+                "😀",
+                "😀",
+                &[0, 1, 2, 3, 4],
+                reply(vec![Element { end: 4, ..root }, invalid])
+            )
+            .is_err()
+        );
+    }
+    #[test]
+    fn supervised_faults_terminate_and_allow_next_request() {
+        for (mode, expected) in [
+            ("hang", ParserError::Timeout),
+            ("no-read", ParserError::Timeout),
+            ("oversize", ParserError::OutputLimit),
+            ("crash", ParserError::WorkerFailed),
+        ] {
+            let mut command = Command::new(std::env::current_exe().unwrap());
+            command.args(["--exact", "tests::fault_worker", "--ignored", "--nocapture"]);
+            let source = if mode == "no-read" {
+                "x".repeat(MAX_SOURCE_BYTES)
+            } else {
+                mode.into()
+            };
+            let start = Instant::now();
+            assert_eq!(
+                supervise(command, &source, &AtomicBool::new(false)),
+                Err(expected)
+            );
+            assert!(start.elapsed() < Duration::from_secs(3));
+        }
+        let cancel = AtomicBool::new(false);
+        thread::scope(|scope| {
+            scope.spawn(|| {
+                thread::sleep(Duration::from_millis(30));
+                cancel.store(true, Ordering::Relaxed);
+            });
+            let mut command = Command::new(std::env::current_exe().unwrap());
+            command.args(["--exact", "tests::fault_worker", "--ignored", "--nocapture"]);
+            assert_eq!(
+                supervise(command, "hang", &cancel),
+                Err(ParserError::Cancelled)
+            );
+        });
+        let mut command = Command::new(std::env::current_exe().unwrap());
+        command.args(["--exact", "tests::fault_worker", "--ignored", "--nocapture"]);
+        assert!(supervise(command, "healthy", &AtomicBool::new(false)).is_ok());
+    }
+    #[test]
+    #[ignore = "subprocess fault fixture"]
+    fn fault_worker() {
+        let mut source = String::new();
+        // The no-read fixture fills the input pipe before the parent can close it.
+        let mut first = [0u8; 1];
+        std::io::stdin().read_exact(&mut first).unwrap();
+        if first[0] == b'x' {
+            loop {
+                thread::sleep(Duration::from_secs(1));
+            }
+        }
+        source.push(first[0] as char);
+        std::io::stdin().read_to_string(&mut source).unwrap();
+        match source.as_str() {
+            "hang" => loop {
+                thread::sleep(Duration::from_secs(1));
+            },
+            "oversize" => {
+                std::io::stdout()
+                    .write_all(&vec![b'x'; MAX_OUTPUT_BYTES + 1])
+                    .unwrap();
+            }
+            "crash" => std::process::abort(),
+            _ => {}
+        }
+    }
+}

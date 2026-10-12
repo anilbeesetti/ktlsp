@@ -1,0 +1,3555 @@
+diff --git a/src/builder/binders.rs b/src/builder/binders.rs
+index 99ef61c..eae4c78 100644
+--- a/src/builder/binders.rs
++++ b/src/builder/binders.rs
+@@ -47,7 +47,10 @@ impl EdgeBinder {
+                 if tokens.is_empty() {
+                     return 0;
+                 }
+-                tokens.iter().rposition(|&t| t == DOC_COMMENT).unwrap_or(tokens.len())
++                tokens
++                    .iter()
++                    .rposition(|&t| t == DOC_COMMENT)
++                    .unwrap_or(tokens.len())
+             }
+             EdgeBinder::TrailingComments => trailing_comments(tokens, getter),
+             EdgeBinder::PrecedingAllComments => all_comments(tokens, false),
+@@ -55,7 +58,11 @@ impl EdgeBinder {
+             EdgeBinder::DoNotBindAnything => 0,
+             EdgeBinder::BindFirstShebangWithWhitespaceOnly => {
+                 if tokens.first() == Some(&SHEBANG_COMMENT) {
+-                    return if tokens.get(1) == Some(&WHITE_SPACE) { 2 } else { 1 };
++                    return if tokens.get(1) == Some(&WHITE_SPACE) {
++                        2
++                    } else {
++                        1
++                    };
+                 }
+                 0
+             }
+diff --git a/src/builder/chameleon_cache.rs b/src/builder/chameleon_cache.rs
+index 83138d8..b357d2c 100644
+--- a/src/builder/chameleon_cache.rs
++++ b/src/builder/chameleon_cache.rs
+@@ -23,7 +23,9 @@ impl ChameleonCache {
+ 
+     pub(super) fn get(&self, kind: SyntaxKind, text: &str) -> Option<&Tree> {
+         let bucket = self.subtrees.get(&hash(kind, text))?;
+-        bucket.iter().find(|t| t.kind(Tree::ROOT) == kind && t.text() == text)
++        bucket
++            .iter()
++            .find(|t| t.kind(Tree::ROOT) == kind && t.text() == text)
+     }
+ 
+     pub(super) fn insert(&mut self, subtree: Tree) {
+diff --git a/src/builder/layers.rs b/src/builder/layers.rs
+index 366429b..8be8045 100644
+--- a/src/builder/layers.rs
++++ b/src/builder/layers.rs
+@@ -98,7 +98,10 @@ impl SemanticWhitespaceAwarePsiBuilder {
+         }
+ 
+         let raw_look_ahead_steps = self.raw_look_ahead(steps);
+-        if is_offset_beyond_eof(eof_position, self.psi.raw_token_type_start(raw_look_ahead_steps)) {
++        if is_offset_beyond_eof(
++            eof_position,
++            self.psi.raw_token_type_start(raw_look_ahead_steps),
++        ) {
+             return None;
+         }
+ 
+diff --git a/src/builder/marker.rs b/src/builder/marker.rs
+index 4c7f4da..0b82fd9 100644
+--- a/src/builder/marker.rs
++++ b/src/builder/marker.rs
+@@ -49,21 +49,40 @@ impl Marker {
+         builder.mark_collapsed(self);
+     }
+ 
+-    pub fn done_before<H: MarkerHost + ?Sized>(self, host: &mut H, kind: SyntaxKind, before: Marker) {
+-        host.psi_builder().process_done(self, kind, None, Some(before));
++    pub fn done_before<H: MarkerHost + ?Sized>(
++        self,
++        host: &mut H,
++        kind: SyntaxKind,
++        before: Marker,
++    ) {
++        host.psi_builder()
++            .process_done(self, kind, None, Some(before));
+     }
+ 
+     /// `doneBefore(type, before, errorMessage)`.
+-    pub fn done_before_3<H: MarkerHost + ?Sized>(self, host: &mut H, kind: SyntaxKind, before: Marker, error_message: &str) {
+-        host.psi_builder().done_before_with_error_item(self, kind, before, error_message);
++    pub fn done_before_3<H: MarkerHost + ?Sized>(
++        self,
++        host: &mut H,
++        kind: SyntaxKind,
++        before: Marker,
++        error_message: &str,
++    ) {
++        host.psi_builder()
++            .done_before_with_error_item(self, kind, before, error_message);
+     }
+ 
+     pub fn error<H: MarkerHost + ?Sized>(self, host: &mut H, message: &str) {
+-        host.psi_builder().process_done(self, SyntaxKind::ERROR_ELEMENT, Some(message), None);
++        host.psi_builder()
++            .process_done(self, SyntaxKind::ERROR_ELEMENT, Some(message), None);
+     }
+ 
+     pub fn error_before<H: MarkerHost + ?Sized>(self, host: &mut H, message: &str, before: Marker) {
+-        host.psi_builder().process_done(self, SyntaxKind::ERROR_ELEMENT, Some(message), Some(before));
++        host.psi_builder().process_done(
++            self,
++            SyntaxKind::ERROR_ELEMENT,
++            Some(message),
++            Some(before),
++        );
+     }
+ 
+     /// `None` keeps the current binder for that edge (Java passes `null`).
+diff --git a/src/builder/mod.rs b/src/builder/mod.rs
+index d3899a2..4b23843 100644
+--- a/src/builder/mod.rs
++++ b/src/builder/mod.rs
+@@ -42,9 +42,9 @@ mod tests;
+ 
+ pub use binders::{EdgeBinder, GREEDY_LEFT_BINDER, GREEDY_RIGHT_BINDER};
+ pub use chameleon_cache::ChameleonCache;
++pub use layers::Layer;
+ pub use marker::{Marker, MarkerHost};
+ pub use psi_builder::PsiBuilder;
+-pub use layers::Layer;
+ pub use semantic::SemanticWhitespaceAwarePsiBuilder;
+ pub use sink::TreeSink;
+ pub use tree::{LazyLeaf, LazyReparse};
+diff --git a/src/builder/pool.rs b/src/builder/pool.rs
+index b3b0cd7..dbc0090 100644
+--- a/src/builder/pool.rs
++++ b/src/builder/pool.rs
+@@ -31,11 +31,14 @@ struct Buffers {
+ 
+ impl Buffers {
+     fn take() -> Buffers {
+-        POOL.with(|pool| pool.borrow_mut().pop()).unwrap_or_default()
++        POOL.with(|pool| pool.borrow_mut().pop())
++            .unwrap_or_default()
+     }
+ 
+     fn give_back(mut self) {
+-        if self.lex_types.capacity() > MAX_POOLED_LEXEMES || self.production.markers.capacity() > 4 * MAX_POOLED_LEXEMES {
++        if self.lex_types.capacity() > MAX_POOLED_LEXEMES
++            || self.production.markers.capacity() > 4 * MAX_POOLED_LEXEMES
++        {
+             return;
+         }
+         self.text.clear();
+@@ -87,8 +90,19 @@ impl PsiBuilder {
+     }
+ 
+     fn from_buffers(text: &str, buffers: Buffers) -> PsiBuilder {
+-        let Buffers { text: mut own_text, lex_starts, lex_types, mut orig_types, production, skipped_errors } = buffers;
+-        assert_eq!(lex_starts.last().copied(), Some(text.len() as u32), "token lengths must sum to the text length");
++        let Buffers {
++            text: mut own_text,
++            lex_starts,
++            lex_types,
++            mut orig_types,
++            production,
++            skipped_errors,
++        } = buffers;
++        assert_eq!(
++            lex_starts.last().copied(),
++            Some(text.len() as u32),
++            "token lengths must sum to the text length"
++        );
+         own_text.push_str(text);
+         orig_types.extend_from_slice(&lex_types);
+         PsiBuilder {
+diff --git a/src/builder/production.rs b/src/builder/production.rs
+index 7c4a2ec..4a6fd8f 100644
+--- a/src/builder/production.rs
++++ b/src/builder/production.rs
+@@ -112,8 +112,18 @@ impl ProductionVecs {
+ impl Production {
+     /// Over (empty, possibly recycled) vectors; see `pool.rs`.
+     pub(crate) fn from_vecs(vecs: ProductionVecs) -> Production {
+-        let ProductionVecs { markers, list, free_start_markers, free_error_items } = vecs;
+-        debug_assert!(markers.is_empty() && list.is_empty() && free_start_markers.is_empty() && free_error_items.is_empty());
++        let ProductionVecs {
++            markers,
++            list,
++            free_start_markers,
++            free_error_items,
++        } = vecs;
++        debug_assert!(
++            markers.is_empty()
++                && list.is_empty()
++                && free_start_markers.is_empty()
++                && free_error_items.is_empty()
++        );
+         Production {
+             markers,
+             list,
+@@ -157,14 +167,20 @@ impl Production {
+     }
+ 
+     pub(crate) fn message(&self, id: i32) -> Option<&str> {
+-        self.marker(id).message.map(|i| self.messages[i.get() as usize - 1].as_str())
++        self.marker(id)
++            .message
++            .map(|i| self.messages[i.get() as usize - 1].as_str())
+     }
+ 
+     /// `MarkerPool.allocateStartMarker` / `allocateErrorItem`.
+     #[inline]
+     pub(crate) fn allocate(&mut self, is_error_item: bool, lexeme: i32) -> i32 {
+         self.error_items += u32::from(is_error_item);
+-        let free = if is_error_item { &mut self.free_error_items } else { &mut self.free_start_markers };
++        let free = if is_error_item {
++            &mut self.free_error_items
++        } else {
++            &mut self.free_start_markers
++        };
+         if let Some(id) = free.pop() {
+             *self.marker_mut(id) = MarkerData::new(is_error_item, lexeme);
+             return id;
+@@ -196,7 +212,10 @@ impl Production {
+ 
+     /// The upstream linear-then-binary search finds the unique `+id` entry; so does this.
+     fn index_of(&self, id: i32) -> usize {
+-        self.list.iter().rposition(|&x| x == id).expect("Dropped or rolled-back marker")
++        self.list
++            .iter()
++            .rposition(|&x| x == id)
++            .expect("Dropped or rolled-back marker")
+     }
+ 
+     pub(crate) fn add_marker(&mut self, id: i32) {
+@@ -219,14 +238,19 @@ impl Production {
+             let m = self.list[i];
+             m > 0 && {
+                 let data = self.marker(m);
+-                data.is_error_item || data.kind == Some(SyntaxKind::ERROR_ELEMENT) && data.has_message()
++                data.is_error_item
++                    || data.kind == Some(SyntaxKind::ERROR_ELEMENT) && data.has_message()
+             }
+         })
+     }
+ 
+     pub(crate) fn drop_marker(&mut self, id: i32) {
+         if self.marker(id).is_done() {
+-            let idx = self.list.iter().rposition(|&x| x == -id).expect("done entry");
++            let idx = self
++                .list
++                .iter()
++                .rposition(|&x| x == -id)
++                .expect("done entry");
+             self.list.remove(idx);
+         }
+         let idx = self.index_of(id);
+@@ -264,6 +288,10 @@ impl Production {
+         if let Some(message) = data.message.take() {
+             self.free_messages.push(message);
+         }
+-        if is_error_item { self.free_error_items.push(id) } else { self.free_start_markers.push(id) }
++        if is_error_item {
++            self.free_error_items.push(id)
++        } else {
++            self.free_start_markers.push(id)
++        }
+     }
+ }
+diff --git a/src/builder/psi_builder.rs b/src/builder/psi_builder.rs
+index 74c90a7..d60cc5a 100644
+--- a/src/builder/psi_builder.rs
++++ b/src/builder/psi_builder.rs
+@@ -34,7 +34,11 @@ impl PsiBuilder {
+     /// No remapper is ever installed for Kotlin, so the cached-type machinery reduces to this.
+     #[inline]
+     pub fn get_token_type(&mut self) -> Option<SyntaxKind> {
+-        if self.eof() { None } else { Some(self.lex_types[self.current_lexeme]) }
++        if self.eof() {
++            None
++        } else {
++            Some(self.lex_types[self.current_lexeme])
++        }
+     }
+ 
+     /// Whitespace = `KtTokens.WHITESPACES`, comments = `KtTokens.COMMENTS` (KotlinParserDefinition);
+@@ -59,7 +63,9 @@ impl PsiBuilder {
+ 
+     pub(crate) fn shift_over_whitespace_forward(&self, lex_index: usize) -> usize {
+         let mut lex_index = lex_index;
+-        while lex_index < self.lexeme_count() && self.is_whitespace_or_comment(self.lex_types[lex_index]) {
++        while lex_index < self.lexeme_count()
++            && self.is_whitespace_or_comment(self.lex_types[lex_index])
++        {
+             lex_index += 1;
+         }
+         lex_index
+@@ -67,7 +73,11 @@ impl PsiBuilder {
+ 
+     pub fn raw_lookup(&self, steps: i32) -> Option<SyntaxKind> {
+         let cur = self.current_lexeme as i64 + steps as i64;
+-        if cur >= 0 && (cur as usize) < self.lexeme_count() { Some(self.lex_types[cur as usize]) } else { None }
++        if cur >= 0 && (cur as usize) < self.lexeme_count() {
++            Some(self.lex_types[cur as usize])
++        } else {
++            None
++        }
+     }
+ 
+     pub fn raw_token_type_start(&self, steps: i32) -> i32 {
+@@ -86,7 +96,10 @@ impl PsiBuilder {
+     }
+ 
+     pub fn raw_advance_lexer(&mut self, steps: i32) {
+-        assert!(steps >= 0, "Steps must be a positive integer - lexer can only be advanced.");
++        assert!(
++            steps >= 0,
++            "Steps must be a positive integer - lexer can only be advanced."
++        );
+         if steps == 0 {
+             return;
+         }
+@@ -121,7 +134,10 @@ impl PsiBuilder {
+         if self.eof() {
+             return None;
+         }
+-        let (start, end) = (self.lex_starts[self.current_lexeme], self.lex_starts[self.current_lexeme + 1]);
++        let (start, end) = (
++            self.lex_starts[self.current_lexeme],
++            self.lex_starts[self.current_lexeme + 1],
++        );
+         Some(&self.text[start as usize..end as usize])
+     }
+ 
+@@ -148,7 +164,10 @@ impl PsiBuilder {
+     /// error at the same lexeme right after the first is ignored.
+     pub fn error(&mut self, message: &str) {
+         let size = self.production.size();
+-        if let Some(last) = size.checked_sub(1).and_then(|i| self.production.get_start_marker_at(i)) {
++        if let Some(last) = size
++            .checked_sub(1)
++            .and_then(|i| self.production.get_start_marker_at(i))
++        {
+             let last = self.production.marker(last);
+             if last.is_error_item && last.lexeme == self.current_lexeme as i32 {
+                 return;
+@@ -193,7 +212,10 @@ impl PsiBuilder {
+         before: Option<Marker>,
+     ) {
+         let id = marker.0;
+-        assert!(!self.production.marker(id).is_done(), "Marker already done.");
++        assert!(
++            !self.production.marker(id).is_done(),
++            "Marker already done."
++        );
+         let done_lexeme = match before {
+             None => self.current_lexeme as i32,
+             Some(before) => self.production.marker(before.0).lexeme,
+@@ -213,7 +235,8 @@ impl PsiBuilder {
+     }
+ 
+     fn is_empty(&self, start_idx: i32, end_idx: i32) -> bool {
+-        (start_idx.max(0)..end_idx.max(0)).all(|i| self.is_whitespace_or_comment(self.lex_types[i as usize]))
++        (start_idx.max(0)..end_idx.max(0))
++            .all(|i| self.is_whitespace_or_comment(self.lex_types[i as usize]))
+     }
+ 
+     /// `doneBefore(type, before, errorMessage)`: an error item at `before`, then the done.
+@@ -255,6 +278,8 @@ impl PsiBuilder {
+ fn is_left_bound(kind: SyntaxKind) -> bool {
+     matches!(
+         kind,
+-        SyntaxKind::ERROR_ELEMENT | SyntaxKind::CONSTRUCTOR_DELEGATION_CALL | SyntaxKind::CONSTRUCTOR_DELEGATION_REFERENCE
++        SyntaxKind::ERROR_ELEMENT
++            | SyntaxKind::CONSTRUCTOR_DELEGATION_CALL
++            | SyntaxKind::CONSTRUCTOR_DELEGATION_REFERENCE
+     )
+ }
+diff --git a/src/builder/semantic.rs b/src/builder/semantic.rs
+index cb9a2fa..a473aa4 100644
+--- a/src/builder/semantic.rs
++++ b/src/builder/semantic.rs
+@@ -31,7 +31,10 @@ struct BoolStack {
+ 
+ impl BoolStack {
+     fn new(initial: bool) -> BoolStack {
+-        BoolStack { top: Some(initial), below: Vec::new() }
++        BoolStack {
++            top: Some(initial),
++            below: Vec::new(),
++        }
+     }
+ 
+     fn push(&mut self, value: bool) {
+@@ -157,20 +160,30 @@ impl SemanticWhitespaceAwarePsiBuilder {
+     #[inline(never)]
+     fn impl_get_token_type_uncached(&mut self) -> Option<SyntaxKind> {
+         let raw = self.psi.get_token_type();
+-        let tt = if self.join_complex_tokens() { self.get_joined_token_type(raw, 1) } else { raw };
++        let tt = if self.join_complex_tokens() {
++            self.get_joined_token_type(raw, 1)
++        } else {
++            raw
++        };
+         (self.tt_lexeme, self.tt) = (self.psi.current_lexeme, tt);
+         tt
+     }
+ 
+     #[inline]
+-    fn get_joined_token_type(&self, raw_token_type: Option<SyntaxKind>, raw_lookup_steps: i32) -> Option<SyntaxKind> {
++    fn get_joined_token_type(
++        &self,
++        raw_token_type: Option<SyntaxKind>,
++        raw_lookup_steps: i32,
++    ) -> Option<SyntaxKind> {
+         match raw_token_type {
+             Some(QUEST) => match self.psi.raw_lookup(raw_lookup_steps) {
+                 Some(DOT) => return Some(SAFE_ACCESS),
+                 Some(COLON) => return Some(ELVIS),
+                 _ => {}
+             },
+-            Some(EXCL) if self.psi.raw_lookup(raw_lookup_steps) == Some(EXCL) => return Some(EXCLEXCL),
++            Some(EXCL) if self.psi.raw_lookup(raw_lookup_steps) == Some(EXCL) => {
++                return Some(EXCLEXCL);
++            }
+             _ => {}
+         }
+         raw_token_type
+diff --git a/src/builder/sink.rs b/src/builder/sink.rs
+index 5da28b7..04c98d2 100644
+--- a/src/builder/sink.rs
++++ b/src/builder/sink.rs
+@@ -23,11 +23,18 @@ impl TreeSink {
+     pub(crate) fn for_file(builder: &PsiBuilder, cache: Option<ChameleonCache>) -> TreeSink {
+         // Chameleons re-cut the file's own lexemes, so leaves <= lexemes; nodes are fewer in practice.
+         let elements = 2 * builder.lexeme_count() + 1;
+-        TreeSink { tree: TreeBuilder::with_capacity(elements, builder.text.len()), cache, ..TreeSink::default() }
++        TreeSink {
++            tree: TreeBuilder::with_capacity(elements, builder.text.len()),
++            cache,
++            ..TreeSink::default()
++        }
+     }
+ 
+     pub fn with_cache(cache: ChameleonCache) -> TreeSink {
+-        TreeSink { cache: Some(cache), ..TreeSink::default() }
++        TreeSink {
++            cache: Some(cache),
++            ..TreeSink::default()
++        }
+     }
+ 
+     pub fn take_cache(&mut self) -> Option<ChameleonCache> {
+@@ -35,13 +42,19 @@ impl TreeSink {
+     }
+ 
+     pub fn finish(self) -> Parse {
+-        Parse { tree: self.tree.finish().into(), error_messages: self.errors, missed_tokens: self.missed_tokens }
++        Parse {
++            tree: self.tree.finish().into(),
++            error_messages: self.errors,
++            missed_tokens: self.missed_tokens,
++        }
+     }
+ 
+     /// Emits the expanded chameleon `kind` over `text`: the cached subtree if there is one, else
+     /// whatever `build` emits (one root node of `kind`), remembered when it added no errors.
+     pub fn chameleon(&mut self, kind: SyntaxKind, text: &str, build: impl FnOnce(&mut TreeSink)) {
+-        let Some(cache) = &self.cache else { return build(self) };
++        let Some(cache) = &self.cache else {
++            return build(self);
++        };
+         if let Some(subtree) = cache.get(kind, text) {
+             self.tree.push_tree(subtree);
+             return;
+diff --git a/src/builder/tests/binding.rs b/src/builder/tests/binding.rs
+index 8dc1d31..e073e7c 100644
+--- a/src/builder/tests/binding.rs
++++ b/src/builder/tests/binding.rs
+@@ -7,7 +7,14 @@ use crate::builder::{EdgeBinder, LazyLeaf, TreeSink};
+ 
+ #[test]
+ fn default_edges_exclude_surrounding_trivia() {
+-    let mut b = builder(&[(IDENTIFIER, "a"), (WHITE_SPACE, " "), (BLOCK_COMMENT, "/*c*/"), (WHITE_SPACE, " "), (IDENTIFIER, "b"), (WHITE_SPACE, " ")]);
++    let mut b = builder(&[
++        (IDENTIFIER, "a"),
++        (WHITE_SPACE, " "),
++        (BLOCK_COMMENT, "/*c*/"),
++        (WHITE_SPACE, " "),
++        (IDENTIFIER, "b"),
++        (WHITE_SPACE, " "),
++    ]);
+     let root = b.mark();
+     b.advance_lexer();
+     let m = b.mark();
+@@ -108,7 +115,11 @@ fn declaration_comment_binders() {
+     let m = b.mark();
+     b.advance_lexer();
+     m.done(&mut b, FUN);
+-    m.set_custom_edge_token_binders(&mut b, Some(EdgeBinder::PrecedingComments), Some(EdgeBinder::TrailingComments));
++    m.set_custom_edge_token_binders(
++        &mut b,
++        Some(EdgeBinder::PrecedingComments),
++        Some(EdgeBinder::TrailingComments),
++    );
+     b.advance_lexer();
+     root.done(&mut b, KT_FILE);
+     expect![[r#"
+@@ -156,7 +167,13 @@ fn preceding_doc_comments_binder_takes_last_doc_and_after() {
+ 
+ #[test]
+ fn precede_rollback_drop_collapse() {
+-    let mut b = builder(&[(IDENTIFIER, "a"), (DOT, "."), (IDENTIFIER, "b"), (WHITE_SPACE, " "), (IDENTIFIER, "c")]);
++    let mut b = builder(&[
++        (IDENTIFIER, "a"),
++        (DOT, "."),
++        (IDENTIFIER, "b"),
++        (WHITE_SPACE, " "),
++        (IDENTIFIER, "c"),
++    ]);
+     let root = b.mark();
+     let m1 = b.mark();
+     b.advance_lexer();
+@@ -192,7 +209,13 @@ fn precede_rollback_drop_collapse() {
+ 
+ #[test]
+ fn done_before_variants() {
+-    let mut b = builder(&[(IDENTIFIER, "a"), (WHITE_SPACE, " "), (IDENTIFIER, "b"), (WHITE_SPACE, " "), (IDENTIFIER, "c")]);
++    let mut b = builder(&[
++        (IDENTIFIER, "a"),
++        (WHITE_SPACE, " "),
++        (IDENTIFIER, "b"),
++        (WHITE_SPACE, " "),
++        (IDENTIFIER, "c"),
++    ]);
+     let root = b.mark();
+     let m = b.mark();
+     b.advance_lexer();
+@@ -222,8 +245,13 @@ fn done_before_variants() {
+ /// A collapsed lazy node is replaced by its reparse; error messages stay in tree preorder.
+ #[test]
+ fn lazy_leaf_is_reparsed_and_spliced() {
+-    const BLOCK_TOKENS: &[(SyntaxKind, &str)] =
+-        &[(LBRACE, "{"), (WHITE_SPACE, " "), (IDENTIFIER, "x"), (WHITE_SPACE, " "), (RBRACE, "}")];
++    const BLOCK_TOKENS: &[(SyntaxKind, &str)] = &[
++        (LBRACE, "{"),
++        (WHITE_SPACE, " "),
++        (IDENTIFIER, "x"),
++        (WHITE_SPACE, " "),
++        (RBRACE, "}"),
++    ];
+     fn reparse(leaf: &LazyLeaf<'_>, sink: &mut TreeSink) -> bool {
+         if leaf.kind != BLOCK {
+             return false;
+diff --git a/src/builder/tests/mod.rs b/src/builder/tests/mod.rs
+index 39377d5..8ea9a7d 100644
+--- a/src/builder/tests/mod.rs
++++ b/src/builder/tests/mod.rs
+@@ -10,7 +10,13 @@ use super::{LazyLeaf, PsiBuilder, TreeSink};
+ 
+ fn builder(tokens: &[(SyntaxKind, &str)]) -> PsiBuilder {
+     let text: String = tokens.iter().map(|(_, t)| *t).collect();
+-    let tokens: Vec<Token> = tokens.iter().map(|&(kind, t)| Token { kind, len: t.len() as u32 }).collect();
++    let tokens: Vec<Token> = tokens
++        .iter()
++        .map(|&(kind, t)| Token {
++            kind,
++            len: t.len() as u32,
++        })
++        .collect();
+     PsiBuilder::new(&text, &tokens)
+ }
+ 
+diff --git a/src/builder/tests/semantic.rs b/src/builder/tests/semantic.rs
+index ad084d0..f302714 100644
+--- a/src/builder/tests/semantic.rs
++++ b/src/builder/tests/semantic.rs
+@@ -13,7 +13,10 @@ fn semantic(tokens: &[(SyntaxKind, &str)]) -> SemanticWhitespaceAwarePsiBuilder
+ fn walk(b: &mut SemanticWhitespaceAwarePsiBuilder) -> Vec<(SyntaxKind, String)> {
+     let mut seen = Vec::new();
+     while !b.eof() {
+-        seen.push((b.get_token_type().unwrap(), b.get_token_text().unwrap().to_owned()));
++        seen.push((
++            b.get_token_type().unwrap(),
++            b.get_token_text().unwrap().to_owned(),
++        ));
+         b.advance_lexer();
+     }
+     seen
+@@ -89,7 +92,12 @@ fn joining_can_be_disabled() {
+ 
+ #[test]
+ fn newline_before_current_token_skips_comments() {
+-    let mut b = semantic(&[(IDENTIFIER, "a"), (WHITE_SPACE, "\n"), (BLOCK_COMMENT, "/**/"), (IDENTIFIER, "b")]);
++    let mut b = semantic(&[
++        (IDENTIFIER, "a"),
++        (WHITE_SPACE, "\n"),
++        (BLOCK_COMMENT, "/**/"),
++        (IDENTIFIER, "b"),
++    ]);
+     assert!(!b.newline_before_current_token());
+     b.advance_lexer();
+     assert!(b.newline_before_current_token());
+@@ -106,7 +114,13 @@ fn newline_before_current_token_skips_comments() {
+ 
+ #[test]
+ fn truncated_layer_hides_tokens_from_eof_position() {
+-    let mut b = semantic(&[(IDENTIFIER, "a"), (WHITE_SPACE, " "), (IDENTIFIER, "b"), (WHITE_SPACE, " "), (IDENTIFIER, "c")]);
++    let mut b = semantic(&[
++        (IDENTIFIER, "a"),
++        (WHITE_SPACE, " "),
++        (IDENTIFIER, "b"),
++        (WHITE_SPACE, " "),
++        (IDENTIFIER, "c"),
++    ]);
+     b.push_layer(Layer::Truncated { eof_position: 4 });
+     assert_eq!(b.look_ahead(1), Some(IDENTIFIER));
+     assert_eq!(b.look_ahead(2), None);
+@@ -124,7 +138,13 @@ fn by_clause_layers_count_newline_state_changes() {
+     b.enable_newlines();
+     let inner = b.push_layer(Layer::ForByClause { stack_size: 0 });
+     b.disable_newlines();
+-    assert_eq!((b.for_by_clause_stack_size(outer), b.for_by_clause_stack_size(inner)), (2, 1));
++    assert_eq!(
++        (
++            b.for_by_clause_stack_size(outer),
++            b.for_by_clause_stack_size(inner)
++        ),
++        (2, 1)
++    );
+     b.restore_newlines_state();
+     b.pop_layer();
+     b.restore_newlines_state();
+diff --git a/src/builder/tree.rs b/src/builder/tree.rs
+index 31422c7..3b2db48 100644
+--- a/src/builder/tree.rs
++++ b/src/builder/tree.rs
+@@ -34,7 +34,11 @@ impl LazyLeaf<'_> {
+     /// counting agrees with `advanceBalancedBlock`.
+     pub(crate) fn relexed_builder(&self) -> PsiBuilder {
+         let (start, end) = (self.start, self.end);
+-        PsiBuilder::from_lexemes(self.text, &self.outer.lex_starts[start..=end], &self.outer.orig_types[start..end])
++        PsiBuilder::from_lexemes(
++            self.text,
++            &self.outer.lex_starts[start..=end],
++            &self.outer.orig_types[start..end],
++        )
+     }
+ }
+ 
+@@ -46,7 +50,12 @@ impl PsiBuilder {
+     }
+ 
+     /// `getTreeBuilt` into a shared sink; the root node gets `root_kind` if given.
+-    pub fn build_tree_into(&mut self, root_kind: Option<SyntaxKind>, sink: &mut TreeSink, lazy: &impl LazyReparse) {
++    pub fn build_tree_into(
++        &mut self,
++        root_kind: Option<SyntaxKind>,
++        sink: &mut TreeSink,
++        lazy: &impl LazyReparse,
++    ) {
+         assert!(!self.production.is_empty(), "Parser produced no markers");
+         self.balance_white_spaces();
+         let mut skipped_errors = std::mem::take(&mut self.skipped_errors);
+@@ -55,8 +64,15 @@ impl PsiBuilder {
+         self.bind(root_kind, &skipped_errors, sink, lazy);
+         self.skipped_errors = skipped_errors;
+         if self.current_lexeme < self.lexeme_count() {
+-            let tokens = self.lex_types[self.current_lexeme..].iter().map(|kind| kind.debug_name()).collect();
+-            sink.missed_tokens.push(MissedTokens { element: root, tokens, text: self.text.to_string() });
++            let tokens = self.lex_types[self.current_lexeme..]
++                .iter()
++                .map(|kind| kind.debug_name())
++                .collect();
++            sink.missed_tokens.push(MissedTokens {
++                element: root,
++                tokens,
++                text: self.text.to_string(),
++            });
+         }
+     }
+ 
+@@ -69,16 +85,25 @@ impl PsiBuilder {
+             let id = self.production.list[i];
+             let done = id < 0;
+             let item = self.production.marker(id);
+-            assert!(done || item.is_error_item || item.is_done(), "Unbalanced tree: marker not done");
++            assert!(
++                done || item.is_error_item || item.is_done(),
++                "Unbalanced tree: marker not done"
++            );
+ 
+-            let binder = if item.is_error_item { EdgeBinder::DefaultRight } else { item.get_binder(done) };
++            let binder = if item.is_error_item {
++                EdgeBinder::DefaultRight
++            } else {
++                item.get_binder(done)
++            };
+             let mut lexeme_index = item.get_lexeme_index(done);
+ 
+             // The default binders always land on the run's end (left) or start (right), so they
+             // skip scanning the other side; the result equals the general path's.
+             if binder == EdgeBinder::DefaultLeft {
+                 lexeme_index = self.shift_over_whitespace_forward(lexeme_index as usize) as i32;
+-                self.production.marker_mut(id).set_lexeme_index(lexeme_index, done);
++                self.production
++                    .marker_mut(id)
++                    .set_lexeme_index(lexeme_index, done);
+                 (last_index, prev_index) = (lexeme_index, lexeme_index);
+                 continue;
+             }
+@@ -90,7 +115,9 @@ impl PsiBuilder {
+                 ws_start_index -= 1;
+             }
+             if binder == EdgeBinder::DefaultRight {
+-                self.production.marker_mut(id).set_lexeme_index(ws_start_index, done);
++                self.production
++                    .marker_mut(id)
++                    .set_lexeme_index(ws_start_index, done);
+                 (last_index, prev_index) = (ws_start_index, ws_start_index);
+                 continue;
+             }
+@@ -104,10 +131,14 @@ impl PsiBuilder {
+                 let getter = |i: usize| self.token_text(start + i);
+                 let edge = binder.get_edge_position(&self.lex_types[start..end], at_end, &getter);
+                 lexeme_index = ws_start_index + edge as i32;
+-                self.production.marker_mut(id).set_lexeme_index(lexeme_index, done);
++                self.production
++                    .marker_mut(id)
++                    .set_lexeme_index(lexeme_index, done);
+             } else if lexeme_index < ws_start_index {
+                 lexeme_index = ws_start_index;
+-                self.production.marker_mut(id).set_lexeme_index(ws_start_index, done);
++                self.production
++                    .marker_mut(id)
++                    .set_lexeme_index(ws_start_index, done);
+             }
+ 
+             last_index = lexeme_index;
+@@ -137,7 +168,13 @@ impl PsiBuilder {
+     }
+ 
+     /// Walks the production in order; equivalent to `bind` over the light tree.
+-    fn bind(&self, root_kind: Option<SyntaxKind>, skipped_errors: &[bool], out: &mut TreeSink, lazy: &impl LazyReparse) {
++    fn bind(
++        &self,
++        root_kind: Option<SyntaxKind>,
++        skipped_errors: &[bool],
++        out: &mut TreeSink,
++        lazy: &impl LazyReparse,
++    ) {
+         let list = &self.production.list;
+         let root = self.production.marker(list[0]);
+         out.start_node(root_kind.unwrap_or_else(|| kind_of(root.kind)));
+@@ -159,19 +196,34 @@ impl PsiBuilder {
+             } else if item.is_error_item {
+                 if !skipped_errors[i] {
+                     lex_index = self.insert_leaves(lex_index, item.lexeme, out, lazy);
+-                    out.errors.push(self.production.message(id).unwrap_or_default().to_owned());
++                    out.errors
++                        .push(self.production.message(id).unwrap_or_default().to_owned());
+                     out.start_node(SyntaxKind::ERROR_ELEMENT);
+                     out.finish_node();
+                 }
+             } else {
+                 lex_index = self.insert_leaves(lex_index, item.lexeme, out, lazy);
+                 if item.collapsed {
+-                    lex_index = self.collapse_leaves(item.lexeme, item.done_lexeme, kind_of(item.kind), out, lazy);
+-                    i = list[i..].iter().position(|&x| x == -id).map_or(list.len(), |p| i + p);
++                    lex_index = self.collapse_leaves(
++                        item.lexeme,
++                        item.done_lexeme,
++                        kind_of(item.kind),
++                        out,
++                        lazy,
++                    );
++                    i = list[i..]
++                        .iter()
++                        .position(|&x| x == -id)
++                        .map_or(list.len(), |p| i + p);
+                 } else {
+                     let kind = kind_of(item.kind);
+                     if kind == SyntaxKind::ERROR_ELEMENT {
+-                        out.errors.push(self.production.message(id).expect("error marker without message").to_owned());
++                        out.errors.push(
++                            self.production
++                                .message(id)
++                                .expect("error marker without message")
++                                .to_owned(),
++                        );
+                     }
+                     out.start_node(kind);
+                     depth += 1;
+@@ -185,7 +237,13 @@ impl PsiBuilder {
+         }
+     }
+ 
+-    fn insert_leaves(&self, cur_token: usize, last_idx: i32, out: &mut TreeSink, lazy: &impl LazyReparse) -> usize {
++    fn insert_leaves(
++        &self,
++        cur_token: usize,
++        last_idx: i32,
++        out: &mut TreeSink,
++        lazy: &impl LazyReparse,
++    ) -> usize {
+         let last_idx = (last_idx.max(0) as usize).min(self.lexeme_count());
+         if cur_token >= last_idx {
+             return cur_token;
+@@ -202,7 +260,14 @@ impl PsiBuilder {
+         last_idx
+     }
+ 
+-    fn collapse_leaves(&self, start: i32, end: i32, kind: SyntaxKind, out: &mut TreeSink, lazy: &impl LazyReparse) -> usize {
++    fn collapse_leaves(
++        &self,
++        start: i32,
++        end: i32,
++        kind: SyntaxKind,
++        out: &mut TreeSink,
++        lazy: &impl LazyReparse,
++    ) -> usize {
+         let (start, end) = (start as usize, end as usize);
+         let text = &self.text[self.lex_starts[start] as usize..self.lex_starts[end] as usize];
+         self.create_leaf(kind, start, end, text, out, lazy);
+@@ -219,7 +284,13 @@ impl PsiBuilder {
+         out: &mut TreeSink,
+         lazy: &impl LazyReparse,
+     ) {
+-        let leaf = LazyLeaf { kind, text, outer: self, start, end };
++        let leaf = LazyLeaf {
++            kind,
++            text,
++            outer: self,
++            start,
++            end,
++        };
+         if !lazy(&leaf, out) {
+             out.token(kind, leaf.text);
+         }
+diff --git a/src/kdoc/kdoc_known_tag.rs b/src/kdoc/kdoc_known_tag.rs
+index 3a80462..2e27e25 100644
+--- a/src/kdoc/kdoc_known_tag.rs
++++ b/src/kdoc/kdoc_known_tag.rs
+@@ -23,7 +23,10 @@ impl KDocKnownTag {
+ 
+     /// `valueOf(name.toUpperCaseAsciiOnly())` after stripping one leading `@`.
+     pub(crate) fn find_by_tag_name(tag_name: &str) -> Option<KDocKnownTag> {
+-        let name = tag_name.strip_prefix('@').unwrap_or(tag_name).to_ascii_uppercase();
++        let name = tag_name
++            .strip_prefix('@')
++            .unwrap_or(tag_name)
++            .to_ascii_uppercase();
+         Some(match name.as_str() {
+             "AUTHOR" => KDocKnownTag::Author,
+             "THROWS" => KDocKnownTag::Throws,
+diff --git a/src/kdoc/tests.rs b/src/kdoc/tests.rs
+index e7d2802..dda9e12 100644
+--- a/src/kdoc/tests.rs
++++ b/src/kdoc/tests.rs
+@@ -17,7 +17,9 @@ fn kdoc_subtrees_match_fixtures() {
+ 
+     let (mut total, mut failures) = (0, Vec::new());
+     for source in &fixtures {
+-        let expected_dump = fs::read_to_string(source.with_extension("txt")).unwrap().replace("\r\n", "\n");
++        let expected_dump = fs::read_to_string(source.with_extension("txt"))
++            .unwrap()
++            .replace("\r\n", "\n");
+         let expected = kdoc_subtrees(&expected_dump);
+         if expected.is_empty() {
+             continue;
+@@ -26,19 +28,30 @@ fn kdoc_subtrees_match_fixtures() {
+         let comments = doc_comments(text.trim_end_matches('\n'));
+         let name = source.strip_prefix(&psi_dir).unwrap().display().to_string();
+         if comments.len() != expected.len() {
+-            failures.push(format!("{name}: {} DOC_COMMENT tokens vs {} KDoc nodes", comments.len(), expected.len()));
++            failures.push(format!(
++                "{name}: {} DOC_COMMENT tokens vs {} KDoc nodes",
++                comments.len(),
++                expected.len()
++            ));
+             continue;
+         }
+         for (i, (comment, expected)) in comments.iter().zip(&expected).enumerate() {
+             total += 1;
+             let actual = dump_kdoc(comment);
+             if &actual != expected {
+-                failures.push(format!("{name} #{i}\n--- expected\n{expected}\n--- actual\n{actual}"));
++                failures.push(format!(
++                    "{name} #{i}\n--- expected\n{expected}\n--- actual\n{actual}"
++                ));
+             }
+         }
+     }
+     println!("KDoc subtrees: {}/{total} match", total - failures.len());
+-    assert!(failures.is_empty(), "{} mismatch(es):\n{}", failures.len(), failures.join("\n\n"));
++    assert!(
++        failures.is_empty(),
++        "{} mismatch(es):\n{}",
++        failures.len(),
++        failures.join("\n\n")
++    );
+ }
+ 
+ fn collect_fixtures(dir: &Path, out: &mut Vec<PathBuf>) {
+@@ -46,8 +59,10 @@ fn collect_fixtures(dir: &Path, out: &mut Vec<PathBuf>) {
+         let path = entry.unwrap().path();
+         if path.is_dir() {
+             collect_fixtures(&path, out);
+-        } else if matches!(path.extension().and_then(|e| e.to_str()), Some("kt" | "kts"))
+-            && path.with_extension("txt").is_file()
++        } else if matches!(
++            path.extension().and_then(|e| e.to_str()),
++            Some("kt" | "kts")
++        ) && path.with_extension("txt").is_file()
+         {
+             out.push(path);
+         }
+@@ -77,8 +92,17 @@ fn kdoc_subtrees(dump: &str) -> Vec<String> {
+             continue;
+         }
+         let depth = indent_of(line);
+-        let end = lines[i + 1..].iter().position(|l| indent_of(l) <= depth).map_or(lines.len(), |p| i + 1 + p);
+-        out.push(lines[i..end].iter().map(|l| &l[depth..]).collect::<Vec<_>>().join("\n"));
++        let end = lines[i + 1..]
++            .iter()
++            .position(|l| indent_of(l) <= depth)
++            .map_or(lines.len(), |p| i + 1 + p);
++        out.push(
++            lines[i..end]
++                .iter()
++                .map(|l| &l[depth..])
++                .collect::<Vec<_>>()
++                .join("\n"),
++        );
+     }
+     out
+ }
+@@ -93,6 +117,17 @@ fn dump_kdoc(text: &str) -> String {
+     }
+     tree.finish_node();
+     tree.finish_node();
+-    let dump = psi_dump(&Parse { tree: tree.finish().into(), error_messages: parse.error_messages, missed_tokens: Vec::new() }, "");
+-    dump.lines().skip(1).map(|l| &l[2..]).collect::<Vec<_>>().join("\n")
++    let dump = psi_dump(
++        &Parse {
++            tree: tree.finish().into(),
++            error_messages: parse.error_messages,
++            missed_tokens: Vec::new(),
++        },
++        "",
++    );
++    dump.lines()
++        .skip(1)
++        .map(|l| &l[2..])
++        .collect::<Vec<_>>()
++        .join("\n")
+ }
+diff --git a/src/kt_tokens.rs b/src/kt_tokens.rs
+index 16d7ba5..22ecb86 100644
+--- a/src/kt_tokens.rs
++++ b/src/kt_tokens.rs
+@@ -17,40 +17,109 @@ pub fn is_soft_keyword(kind: SyntaxKind) -> bool {
+ 
+ /// `AbstractKotlinParsing.SOFT_KEYWORD_TEXTS.get(text)`.
+ pub fn soft_keyword_by_text(text: Option<&str>) -> Option<SyntaxKind> {
+-    text.and_then(SyntaxKind::soft_keyword).filter(|&k| SOFT_KEYWORDS.contains(k))
++    text.and_then(SyntaxKind::soft_keyword)
++        .filter(|&k| SOFT_KEYWORDS.contains(k))
+ }
+ 
+ pub const KEYWORDS: TokenSet = TokenSet::create(&[
+-    PACKAGE_KEYWORD, AS_KEYWORD, TYPE_ALIAS_KEYWORD, CLASS_KEYWORD, INTERFACE_KEYWORD,
+-    THIS_KEYWORD, SUPER_KEYWORD, VAL_KEYWORD, VAR_KEYWORD, FUN_KEYWORD, FOR_KEYWORD,
++    PACKAGE_KEYWORD,
++    AS_KEYWORD,
++    TYPE_ALIAS_KEYWORD,
++    CLASS_KEYWORD,
++    INTERFACE_KEYWORD,
++    THIS_KEYWORD,
++    SUPER_KEYWORD,
++    VAL_KEYWORD,
++    VAR_KEYWORD,
++    FUN_KEYWORD,
++    FOR_KEYWORD,
+     NULL_KEYWORD,
+-    TRUE_KEYWORD, FALSE_KEYWORD, IS_KEYWORD,
+-    IN_KEYWORD, THROW_KEYWORD, RETURN_KEYWORD, BREAK_KEYWORD, CONTINUE_KEYWORD, OBJECT_KEYWORD, IF_KEYWORD,
+-    ELSE_KEYWORD, WHILE_KEYWORD, DO_KEYWORD, TRY_KEYWORD, WHEN_KEYWORD,
+-    NOT_IN, NOT_IS, AS_SAFE,
++    TRUE_KEYWORD,
++    FALSE_KEYWORD,
++    IS_KEYWORD,
++    IN_KEYWORD,
++    THROW_KEYWORD,
++    RETURN_KEYWORD,
++    BREAK_KEYWORD,
++    CONTINUE_KEYWORD,
++    OBJECT_KEYWORD,
++    IF_KEYWORD,
++    ELSE_KEYWORD,
++    WHILE_KEYWORD,
++    DO_KEYWORD,
++    TRY_KEYWORD,
++    WHEN_KEYWORD,
++    NOT_IN,
++    NOT_IS,
++    AS_SAFE,
+     TYPEOF_KEYWORD,
+ ]);
+ 
+ pub const SOFT_KEYWORDS: TokenSet = TokenSet::create(&[
+-    FILE_KEYWORD, IMPORT_KEYWORD, WHERE_KEYWORD, BY_KEYWORD, GET_KEYWORD,
+-    SET_KEYWORD, ABSTRACT_KEYWORD, ENUM_KEYWORD, CONTRACT_KEYWORD, OPEN_KEYWORD, INNER_KEYWORD,
+-    OVERRIDE_KEYWORD, PRIVATE_KEYWORD, PUBLIC_KEYWORD, INTERNAL_KEYWORD, PROTECTED_KEYWORD,
+-    CATCH_KEYWORD, FINALLY_KEYWORD, OUT_KEYWORD, FINAL_KEYWORD, VARARG_KEYWORD, REIFIED_KEYWORD,
+-    DYNAMIC_KEYWORD, COMPANION_KEYWORD, CONSTRUCTOR_KEYWORD, INIT_KEYWORD, SEALED_KEYWORD,
+-    FIELD_KEYWORD, PROPERTY_KEYWORD, RECEIVER_KEYWORD, PARAM_KEYWORD, SETPARAM_KEYWORD,
+-    DELEGATE_KEYWORD, ALL_KEYWORD,
++    FILE_KEYWORD,
++    IMPORT_KEYWORD,
++    WHERE_KEYWORD,
++    BY_KEYWORD,
++    GET_KEYWORD,
++    SET_KEYWORD,
++    ABSTRACT_KEYWORD,
++    ENUM_KEYWORD,
++    CONTRACT_KEYWORD,
++    OPEN_KEYWORD,
++    INNER_KEYWORD,
++    OVERRIDE_KEYWORD,
++    PRIVATE_KEYWORD,
++    PUBLIC_KEYWORD,
++    INTERNAL_KEYWORD,
++    PROTECTED_KEYWORD,
++    CATCH_KEYWORD,
++    FINALLY_KEYWORD,
++    OUT_KEYWORD,
++    FINAL_KEYWORD,
++    VARARG_KEYWORD,
++    REIFIED_KEYWORD,
++    DYNAMIC_KEYWORD,
++    COMPANION_KEYWORD,
++    CONSTRUCTOR_KEYWORD,
++    INIT_KEYWORD,
++    SEALED_KEYWORD,
++    FIELD_KEYWORD,
++    PROPERTY_KEYWORD,
++    RECEIVER_KEYWORD,
++    PARAM_KEYWORD,
++    SETPARAM_KEYWORD,
++    DELEGATE_KEYWORD,
++    ALL_KEYWORD,
+     LATEINIT_KEYWORD,
+-    DATA_KEYWORD, INLINE_KEYWORD, NOINLINE_KEYWORD, TAILREC_KEYWORD, EXTERNAL_KEYWORD,
+-    ANNOTATION_KEYWORD, CROSSINLINE_KEYWORD, CONST_KEYWORD, OPERATOR_KEYWORD, INFIX_KEYWORD,
+-    SUSPEND_KEYWORD, EXPECT_KEYWORD, ACTUAL_KEYWORD,
+-    VALUE_KEYWORD, CONTEXT_KEYWORD,
++    DATA_KEYWORD,
++    INLINE_KEYWORD,
++    NOINLINE_KEYWORD,
++    TAILREC_KEYWORD,
++    EXTERNAL_KEYWORD,
++    ANNOTATION_KEYWORD,
++    CROSSINLINE_KEYWORD,
++    CONST_KEYWORD,
++    OPERATOR_KEYWORD,
++    INFIX_KEYWORD,
++    SUSPEND_KEYWORD,
++    EXPECT_KEYWORD,
++    ACTUAL_KEYWORD,
++    VALUE_KEYWORD,
++    CONTEXT_KEYWORD,
+ ]);
+ 
+ /// Canonical order matters upstream (stub serialization); keep it.
+ pub const MODIFIER_KEYWORDS_ARRAY: &[SyntaxKind] = &[
+-    PUBLIC_KEYWORD, PROTECTED_KEYWORD, PRIVATE_KEYWORD, INTERNAL_KEYWORD,
+-    EXPECT_KEYWORD, ACTUAL_KEYWORD,
+-    FINAL_KEYWORD, OPEN_KEYWORD, ABSTRACT_KEYWORD, SEALED_KEYWORD,
++    PUBLIC_KEYWORD,
++    PROTECTED_KEYWORD,
++    PRIVATE_KEYWORD,
++    INTERNAL_KEYWORD,
++    EXPECT_KEYWORD,
++    ACTUAL_KEYWORD,
++    FINAL_KEYWORD,
++    OPEN_KEYWORD,
++    ABSTRACT_KEYWORD,
++    SEALED_KEYWORD,
+     CONST_KEYWORD,
+     EXTERNAL_KEYWORD,
+     OVERRIDE_KEYWORD,
+@@ -59,14 +128,17 @@ pub const MODIFIER_KEYWORDS_ARRAY: &[SyntaxKind] = &[
+     VARARG_KEYWORD,
+     SUSPEND_KEYWORD,
+     INNER_KEYWORD,
+-    ENUM_KEYWORD, ANNOTATION_KEYWORD, FUN_KEYWORD,
++    ENUM_KEYWORD,
++    ANNOTATION_KEYWORD,
++    FUN_KEYWORD,
+     COMPANION_KEYWORD,
+     INLINE_KEYWORD,
+     VALUE_KEYWORD,
+     INFIX_KEYWORD,
+     OPERATOR_KEYWORD,
+     DATA_KEYWORD,
+-    OUT_KEYWORD, IN_KEYWORD,
++    OUT_KEYWORD,
++    IN_KEYWORD,
+     REIFIED_KEYWORD,
+     NOINLINE_KEYWORD,
+     CROSSINLINE_KEYWORD,
+@@ -76,30 +148,75 @@ pub const MODIFIER_KEYWORDS: TokenSet = TokenSet::create(MODIFIER_KEYWORDS_ARRAY
+ 
+ pub const TYPE_MODIFIER_KEYWORDS: TokenSet = TokenSet::create(&[SUSPEND_KEYWORD]);
+ pub const TYPE_ARGUMENT_MODIFIER_KEYWORDS: TokenSet = TokenSet::create(&[IN_KEYWORD, OUT_KEYWORD]);
+-pub const RESERVED_VALUE_PARAMETER_MODIFIER_KEYWORDS: TokenSet = TokenSet::create(&[OUT_KEYWORD, VARARG_KEYWORD]);
+-
+-pub const VISIBILITY_MODIFIERS: TokenSet =
+-    TokenSet::create(&[PRIVATE_KEYWORD, PUBLIC_KEYWORD, INTERNAL_KEYWORD, PROTECTED_KEYWORD]);
+-pub const MODALITY_MODIFIERS: TokenSet = TokenSet::create(&[ABSTRACT_KEYWORD, FINAL_KEYWORD, SEALED_KEYWORD, OPEN_KEYWORD]);
++pub const RESERVED_VALUE_PARAMETER_MODIFIER_KEYWORDS: TokenSet =
++    TokenSet::create(&[OUT_KEYWORD, VARARG_KEYWORD]);
++
++pub const VISIBILITY_MODIFIERS: TokenSet = TokenSet::create(&[
++    PRIVATE_KEYWORD,
++    PUBLIC_KEYWORD,
++    INTERNAL_KEYWORD,
++    PROTECTED_KEYWORD,
++]);
++pub const MODALITY_MODIFIERS: TokenSet = TokenSet::create(&[
++    ABSTRACT_KEYWORD,
++    FINAL_KEYWORD,
++    SEALED_KEYWORD,
++    OPEN_KEYWORD,
++]);
+ 
+ pub const WHITESPACES: TokenSet = TokenSet::create(&[WHITE_SPACE]);
+ 
+-pub const COMMENTS: TokenSet = TokenSet::create(&[EOL_COMMENT, BLOCK_COMMENT, DOC_COMMENT, SHEBANG_COMMENT]);
++pub const COMMENTS: TokenSet =
++    TokenSet::create(&[EOL_COMMENT, BLOCK_COMMENT, DOC_COMMENT, SHEBANG_COMMENT]);
+ pub const WHITE_SPACE_OR_COMMENT_BIT_SET: TokenSet = TokenSet::or_set(&[COMMENTS, WHITESPACES]);
+ 
+ pub const STRINGS: TokenSet = TokenSet::create(&[CHARACTER_LITERAL, REGULAR_STRING_PART]);
+ 
+ pub const OPERATIONS: TokenSet = TokenSet::create(&[
+-    AS_KEYWORD, AS_SAFE, IS_KEYWORD, IN_KEYWORD, DOT, PLUSPLUS, MINUSMINUS, EXCLEXCL, MUL, PLUS,
+-    MINUS, EXCL, DIV, PERC, LT, GT, LTEQ, GTEQ, EQEQEQ, EXCLEQEQEQ, EQEQ, EXCLEQ, ANDAND, OROR,
+-    SAFE_ACCESS, ELVIS,
+-    RANGE, RANGE_UNTIL, EQ, MULTEQ, DIVEQ, PERCEQ, PLUSEQ, MINUSEQ,
+-    NOT_IN, NOT_IS,
++    AS_KEYWORD,
++    AS_SAFE,
++    IS_KEYWORD,
++    IN_KEYWORD,
++    DOT,
++    PLUSPLUS,
++    MINUSMINUS,
++    EXCLEXCL,
++    MUL,
++    PLUS,
++    MINUS,
++    EXCL,
++    DIV,
++    PERC,
++    LT,
++    GT,
++    LTEQ,
++    GTEQ,
++    EQEQEQ,
++    EXCLEQEQEQ,
++    EQEQ,
++    EXCLEQ,
++    ANDAND,
++    OROR,
++    SAFE_ACCESS,
++    ELVIS,
++    RANGE,
++    RANGE_UNTIL,
++    EQ,
++    MULTEQ,
++    DIVEQ,
++    PERCEQ,
++    PLUSEQ,
++    MINUSEQ,
++    NOT_IN,
++    NOT_IS,
+     IDENTIFIER,
+ ]);
+ 
+-pub const AUGMENTED_ASSIGNMENTS: TokenSet = TokenSet::create(&[PLUSEQ, MINUSEQ, MULTEQ, PERCEQ, DIVEQ]);
+-pub const ALL_ASSIGNMENTS: TokenSet = TokenSet::create(&[EQ, PLUSEQ, MINUSEQ, MULTEQ, PERCEQ, DIVEQ]);
++pub const AUGMENTED_ASSIGNMENTS: TokenSet =
++    TokenSet::create(&[PLUSEQ, MINUSEQ, MULTEQ, PERCEQ, DIVEQ]);
++pub const ALL_ASSIGNMENTS: TokenSet =
++    TokenSet::create(&[EQ, PLUSEQ, MINUSEQ, MULTEQ, PERCEQ, DIVEQ]);
+ pub const INCREMENT_AND_DECREMENT: TokenSet = TokenSet::create(&[PLUSPLUS, MINUSMINUS]);
+-pub const QUALIFIED_ACCESS: TokenSet = TokenSet::create(&[DOT_QUALIFIED_EXPRESSION, SAFE_ACCESS_EXPRESSION]);
++pub const QUALIFIED_ACCESS: TokenSet =
++    TokenSet::create(&[DOT_QUALIFIED_EXPRESSION, SAFE_ACCESS_EXPRESSION]);
+ pub const VAL_VAR: TokenSet = TokenSet::create(&[VAL_KEYWORD, VAR_KEYWORD]);
+diff --git a/src/lib.rs b/src/lib.rs
+index df2cf82..4313fc3 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -13,8 +13,8 @@ use ktrs_syntax::Parse;
+ pub use builder::ChameleonCache;
+ 
+ pub use parsing::kotlin_parser::{
+-    parse_block_code_fragment, parse_block_expression, parse_expression_code_fragment, parse_lambda_expression,
+-    parse_type_code_fragment,
++    parse_block_code_fragment, parse_block_expression, parse_expression_code_fragment,
++    parse_lambda_expression, parse_type_code_fragment,
+ };
+ 
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+diff --git a/src/parsing/abstract_kotlin_parsing.rs b/src/parsing/abstract_kotlin_parsing.rs
+index a26d808..53da914 100644
+--- a/src/parsing/abstract_kotlin_parsing.rs
++++ b/src/parsing/abstract_kotlin_parsing.rs
+@@ -11,7 +11,9 @@ impl Parser {
+     pub(crate) fn get_last_token(&mut self) -> Option<SyntaxKind> {
+         let mut i = 1;
+         let current_offset = self.my_builder.get_current_offset();
+-        while i <= current_offset && WHITE_SPACE_OR_COMMENT_BIT_SET.contains(self.my_builder.raw_lookup(-i)) {
++        while i <= current_offset
++            && WHITE_SPACE_OR_COMMENT_BIT_SET.contains(self.my_builder.raw_lookup(-i))
++        {
+             i += 1;
+         }
+         self.my_builder.raw_lookup(-i)
+@@ -29,7 +31,12 @@ impl Parser {
+         self.my_builder.error(message);
+     }
+ 
+-    pub(crate) fn expect_3(&mut self, expectation: SyntaxKind, message: &str, recovery_set: Option<TokenSet>) -> bool {
++    pub(crate) fn expect_3(
++        &mut self,
++        expectation: SyntaxKind,
++        message: &str,
++        recovery_set: Option<TokenSet>,
++    ) -> bool {
+         if self.expect(expectation) {
+             return true;
+         }
+@@ -70,7 +77,9 @@ impl Parser {
+                     || tt == Some(LBRACE)
+                     || tt == Some(RBRACE)
+                     || (set.contains(EOL_OR_SEMICOLON)
+-                        && (self.eof() || tt == Some(SEMICOLON) || self.my_builder.newline_before_current_token()))
++                        && (self.eof()
++                            || tt == Some(SEMICOLON)
++                            || self.my_builder.newline_before_current_token()))
+             }
+         };
+         if recover {
+@@ -152,7 +161,10 @@ impl Parser {
+             return true;
+         }
+         // Inlined so a constant `expectation` folds this away; the rest can only match in these cases.
+-        if expectation != EOL_OR_SEMICOLON && expectation != IDENTIFIER && !kt_tokens::is_soft_keyword(expectation) {
++        if expectation != EOL_OR_SEMICOLON
++            && expectation != IDENTIFIER
++            && !kt_tokens::is_soft_keyword(expectation)
++        {
+             return false;
+         }
+         self.at_rest(token, expectation)
+@@ -210,7 +222,10 @@ impl Parser {
+             return true;
+         }
+         // As in `at`: folds away for a constant `set`.
+-        if !set.contains(EOL_OR_SEMICOLON) && !set.contains(IDENTIFIER) && !set.intersects(kt_tokens::SOFT_KEYWORDS) {
++        if !set.contains(EOL_OR_SEMICOLON)
++            && !set.contains(IDENTIFIER)
++            && !set.intersects(kt_tokens::SOFT_KEYWORDS)
++        {
+             return false;
+         }
+         self.at_set_rest(token, set)
+@@ -268,8 +283,14 @@ impl Parser {
+     }
+ 
+     pub(crate) fn error_until(&mut self, message: &str, token_set: TokenSet) {
+-        debug_assert!(token_set.contains(LBRACE), "Cannot include LBRACE into error element!");
+-        debug_assert!(token_set.contains(RBRACE), "Cannot include RBRACE into error element!");
++        debug_assert!(
++            token_set.contains(LBRACE),
++            "Cannot include LBRACE into error element!"
++        );
++        debug_assert!(
++            token_set.contains(RBRACE),
++            "Cannot include RBRACE into error element!"
++        );
+         let error = self.mark();
+         self.skip_until(token_set);
+         error.error(self, message);
+@@ -296,16 +317,28 @@ impl Parser {
+         preceding_non_doc_comments: bool,
+     ) {
+         marker.done(self, element_type);
+-        let preceding =
+-            if preceding_non_doc_comments { EdgeBinder::PrecedingComments } else { EdgeBinder::PrecedingDocComments };
+-        marker.set_custom_edge_token_binders(self, Some(preceding), Some(EdgeBinder::TrailingComments));
++        let preceding = if preceding_non_doc_comments {
++            EdgeBinder::PrecedingComments
++        } else {
++            EdgeBinder::PrecedingDocComments
++        };
++        marker.set_custom_edge_token_binders(
++            self,
++            Some(preceding),
++            Some(EdgeBinder::TrailingComments),
++        );
+     }
+ 
+     /// `createTruncatedBuilder(eofPosition)` followed by a call on the created parser. Only
+     /// `KotlinParsing` calls it, so `create` is `KotlinParsing.create` = `createForTopLevel`
+     /// (lazy, top-level) even inside a by-clause.
+-    pub(crate) fn create_truncated_builder<R>(&mut self, eof_position: i32, f: impl FnOnce(&mut Parser) -> R) -> R {
+-        self.my_builder.push_layer(Layer::Truncated { eof_position });
++    pub(crate) fn create_truncated_builder<R>(
++        &mut self,
++        eof_position: i32,
++        f: impl FnOnce(&mut Parser) -> R,
++    ) -> R {
++        self.my_builder
++            .push_layer(Layer::Truncated { eof_position });
+         self.with_context(true, None, f)
+     }
+ 
+@@ -325,4 +358,3 @@ fn floor_char_boundary(text: &str, mut index: usize) -> usize {
+     }
+     index
+ }
+-
+diff --git a/src/parsing/declarations/accessors.rs b/src/parsing/declarations/accessors.rs
+index bbe69a7..97a70f4 100644
+--- a/src/parsing/declarations/accessors.rs
++++ b/src/parsing/declarations/accessors.rs
+@@ -4,8 +4,8 @@
+ use ktrs_syntax::SyntaxKind::*;
+ 
+ use super::{
+-    ACCESSOR_FIRST_OR_PROPERTY_END, COMMA_COLON_RPAR_SET, COMMA_RPAR_RBRACKET_COLON_EQ_SET, RPAR_COLON_LBRACE_EQ_SET,
+-    RPAR_IDENTIFIER_COLON_LBRACE_EQ_SET,
++    ACCESSOR_FIRST_OR_PROPERTY_END, COMMA_COLON_RPAR_SET, COMMA_RPAR_RBRACKET_COLON_EQ_SET,
++    RPAR_COLON_LBRACE_EQ_SET, RPAR_IDENTIFIER_COLON_LBRACE_EQ_SET,
+ };
+ use crate::parsing::Parser;
+ use crate::token_set::TokenSet;
+@@ -77,7 +77,10 @@ impl Parser {
+                     if self.at(VAL_KEYWORD) || self.at(VAR_KEYWORD) {
+                         self.advance();
+                     } else {
+-                        self.error_with_recovery("Expecting val or var keyword", Some(recovery_set));
++                        self.error_with_recovery(
++                            "Expecting val or var keyword",
++                            Some(recovery_set),
++                        );
+                     }
+                 } else if mode == MultiDeclarationMode::FullValOnly {
+                     if self.at(VAL_KEYWORD) {
+@@ -114,7 +117,15 @@ impl Parser {
+             }
+         }
+ 
+-        self.expect_3(closing_brace, if is_parentheses { "Expecting ')'" } else { "Expecting ']'" }, Some(follow));
++        self.expect_3(
++            closing_brace,
++            if is_parentheses {
++                "Expecting ')'"
++            } else {
++                "Expecting ']'"
++            },
++            Some(follow),
++        );
+         self.my_builder.restore_newlines_state();
+     }
+ 
+@@ -161,10 +172,17 @@ impl Parser {
+             if !self.at_set(ACCESSOR_FIRST_OR_PROPERTY_END) {
+                 self.error_until(
+                     "Accessor body expected",
+-                    TokenSet::or_set(&[ACCESSOR_FIRST_OR_PROPERTY_END, TokenSet::create(&[LBRACE, LPAR, EQ])]),
++                    TokenSet::or_set(&[
++                        ACCESSOR_FIRST_OR_PROPERTY_END,
++                        TokenSet::create(&[LBRACE, LPAR, EQ]),
++                    ]),
+                 );
+             } else {
+-                self.close_declaration_with_comment_binders(property_component, PROPERTY_ACCESSOR, true);
++                self.close_declaration_with_comment_binders(
++                    property_component,
++                    PROPERTY_ACCESSOR,
++                    true,
++                );
+                 return Some(property_component_kind);
+             }
+         }
+@@ -173,11 +191,19 @@ impl Parser {
+ 
+         if property_component_kind != PropertyComponentKind::Field {
+             let parameter_list = self.mark();
+-            self.expect_3(LPAR, "Expecting '('", Some(RPAR_IDENTIFIER_COLON_LBRACE_EQ_SET));
++            self.expect_3(
++                LPAR,
++                "Expecting '('",
++                Some(RPAR_IDENTIFIER_COLON_LBRACE_EQ_SET),
++            );
+             if property_component_kind == PropertyComponentKind::Set {
+                 let setter_parameter = self.mark();
+                 self.parse_modifier_list(COMMA_COLON_RPAR_SET);
+-                self.expect_3(IDENTIFIER, "Expecting parameter name", Some(RPAR_COLON_LBRACE_EQ_SET));
++                self.expect_3(
++                    IDENTIFIER,
++                    "Expecting parameter name",
++                    Some(RPAR_COLON_LBRACE_EQ_SET),
++                );
+ 
+                 if self.at(COLON) {
+                     self.advance(); // COLON
+@@ -189,7 +215,10 @@ impl Parser {
+                 }
+             }
+             if !self.at(RPAR) {
+-                self.error_until("Expecting ')'", TokenSet::create(&[RPAR, COLON, LBRACE, RBRACE, EQ, EOL_OR_SEMICOLON]));
++                self.error_until(
++                    "Expecting ')'",
++                    TokenSet::create(&[RPAR, COLON, LBRACE, RBRACE, EQ, EOL_OR_SEMICOLON]),
++                );
+             }
+             if self.at(RPAR) {
+                 self.advance();
+@@ -216,7 +245,11 @@ impl Parser {
+         if property_component_kind == PropertyComponentKind::Field {
+             self.close_declaration_with_comment_binders(property_component, BACKING_FIELD, true);
+         } else {
+-            self.close_declaration_with_comment_binders(property_component, PROPERTY_ACCESSOR, true);
++            self.close_declaration_with_comment_binders(
++                property_component,
++                PROPERTY_ACCESSOR,
++                true,
++            );
+         }
+ 
+         Some(property_component_kind)
+diff --git a/src/parsing/declarations/annotations.rs b/src/parsing/declarations/annotations.rs
+index 141adfa..6feeb1e 100644
+--- a/src/parsing/declarations/annotations.rs
++++ b/src/parsing/declarations/annotations.rs
+@@ -14,7 +14,10 @@ impl Parser {
+      *   ;
+      */
+     pub(super) fn parse_file_annotation_list(&mut self, mode: AnnotationParsingMode) {
+-        debug_assert!(mode.is_file_annotation_parsing_mode(), "expected file annotation parsing mode, but:{mode:?}");
++        debug_assert!(
++            mode.is_file_annotation_parsing_mode(),
++            "expected file annotation parsing mode, but:{mode:?}"
++        );
+ 
+         let file_annotations_list = self.mark();
+ 
+@@ -137,7 +140,11 @@ impl Parser {
+             return true;
+         }
+ 
+-        let target_keyword = if self.at_set(ANNOTATION_TARGETS) { self.my_builder.get_token_type() } else { None };
++        let target_keyword = if self.at_set(ANNOTATION_TARGETS) {
++            self.my_builder.get_token_type()
++        } else {
++            None
++        };
+         if mode == AnnotationParsingMode::FileAnnotationsWhenPackageOmitted
+             && !(target_keyword == Some(FILE_KEYWORD) && self.lookahead(1) == Some(COLON))
+         {
+diff --git a/src/parsing/declarations/classes.rs b/src/parsing/declarations/classes.rs
+index 9cc7532..6b0de11 100644
+--- a/src/parsing/declarations/classes.rs
++++ b/src/parsing/declarations/classes.rs
+@@ -52,7 +52,10 @@ impl Parser {
+             }
+             self.advance(); // CLASS_KEYWORD, INTERFACE_KEYWORD or OBJECT_KEYWORD
+         } else {
+-            debug_assert!(enum_class, "Currently classifiers without class/interface/object are only allowed for enums");
++            debug_assert!(
++                enum_class,
++                "Currently classifiers without class/interface/object are only allowed for enums"
++            );
+             self.error("'class' keyword is expected after 'enum'");
+         }
+ 
+@@ -70,7 +73,8 @@ impl Parser {
+             }
+         }
+ 
+-        let type_parameters_declared = self.parse_type_parameter_list(TYPE_PARAMETER_GT_RECOVERY_SET);
++        let type_parameters_declared =
++            self.parse_type_parameter_list(TYPE_PARAMETER_GT_RECOVERY_SET);
+ 
+         let before_constructor_modifiers = self.mark();
+         let primary_constructor_marker = self.mark();
+@@ -91,7 +95,12 @@ impl Parser {
+         }
+ 
+         if self.at(LPAR) {
+-            self.parse_value_parameter_list(false, /* typeRequired  = */ true, LBRACE_RBRACE_SET, false);
++            self.parse_value_parameter_list(
++                false,
++                /* typeRequired  = */ true,
++                LBRACE_RBRACE_SET,
++                false,
++            );
+             primary_constructor_marker.done(self, PRIMARY_CONSTRUCTOR);
+         } else if has_constructor_modifiers || has_constructor_keyword {
+             // A comprehensive error message for cases like:
+@@ -132,8 +141,18 @@ impl Parser {
+         if object { OBJECT_DECLARATION } else { CLASS }
+     }
+ 
+-    pub(super) fn parse_class(&mut self, enum_class: bool, expect_kind_keyword: bool) -> SyntaxKind {
+-        self.parse_class_or_object(false, NameParsingMode::Required, true, enum_class, expect_kind_keyword)
++    pub(super) fn parse_class(
++        &mut self,
++        enum_class: bool,
++        expect_kind_keyword: bool,
++    ) -> SyntaxKind {
++        self.parse_class_or_object(
++            false,
++            NameParsingMode::Required,
++            true,
++            enum_class,
++            expect_kind_keyword,
++        )
+     }
+ 
+     pub(crate) fn parse_object(&mut self, name_parsing_mode: NameParsingMode, optional_body: bool) {
+@@ -247,5 +266,4 @@ impl Parser {
+             ParseEnumEntryResult::Failed
+         }
+     }
+-
+ }
+diff --git a/src/parsing/declarations/functions.rs b/src/parsing/declarations/functions.rs
+index bf54505..3f48c6f 100644
+--- a/src/parsing/declarations/functions.rs
++++ b/src/parsing/declarations/functions.rs
+@@ -13,7 +13,8 @@ use crate::token_set::TokenSet;
+ 
+ impl Parser {
+     pub(super) fn parse_function(&mut self) -> SyntaxKind {
+-        self.parse_function_1(false).expect("parseFunction(false) is never null")
++        self.parse_function_1(false)
++            .expect("parseFunction(false) is never null")
+     }
+ 
+     /*
+@@ -26,7 +27,10 @@ impl Parser {
+      *       functionBody?
+      *   ;
+      */
+-    pub(crate) fn parse_function_1(&mut self, fail_if_identifier_exists: bool) -> Option<SyntaxKind> {
++    pub(crate) fn parse_function_1(
++        &mut self,
++        fail_if_identifier_exists: bool,
++    ) -> Option<SyntaxKind> {
+         debug_assert!(self._at(FUN_KEYWORD));
+ 
+         self.advance(); // FUN_KEYWORD
+@@ -72,7 +76,10 @@ impl Parser {
+                 error = self.mark();
+                 let count = finish_index - self.my_builder.raw_token_index();
+                 self.advance_1(count);
+-                error.error(self, "Only one type parameter list is allowed for a function");
++                error.error(
++                    self,
++                    "Only one type parameter list is allowed for a function",
++                );
+             } else {
+                 error.drop(self);
+             }
+@@ -80,7 +87,12 @@ impl Parser {
+         }
+ 
+         if self.at(LPAR) {
+-            self.parse_value_parameter_list(false, /* typeRequired  = */ false, VALUE_PARAMETERS_FOLLOW_SET, true);
++            self.parse_value_parameter_list(
++                false,
++                /* typeRequired  = */ false,
++                VALUE_PARAMETERS_FOLLOW_SET,
++                true,
++            );
+         } else {
+             self.error("Expecting '('");
+         }
+@@ -135,7 +147,10 @@ impl Parser {
+         if self.at_set(RECEIVER_TYPE_TERMINATORS) {
+             self.advance(); // expectation
+         } else {
+-            self.error_with_recovery(&format!("Expecting '.' before a {title} name"), Some(name_follow));
++            self.error_with_recovery(
++                &format!("Expecting '.' before a {title} name"),
++                Some(name_follow),
++            );
+         }
+         true
+     }
+@@ -197,7 +212,14 @@ impl Parser {
+         }
+ 
+         self.error_with_recovery(
+-            &format!("Expecting {title} name{}", if !receiver_found { " or receiver type" } else { "" }),
++            &format!(
++                "Expecting {title} name{}",
++                if !receiver_found {
++                    " or receiver type"
++                } else {
++                    ""
++                }
++            ),
+             Some(recovery_set),
+         );
+     }
+diff --git a/src/parsing/declarations/members.rs b/src/parsing/declarations/members.rs
+index f971bec..49c5274 100644
+--- a/src/parsing/declarations/members.rs
++++ b/src/parsing/declarations/members.rs
+@@ -6,8 +6,9 @@ use ktrs_syntax::SyntaxKind::{self, *};
+ use super::parameters::ModifierDetector;
+ use super::properties::DeclarationParsingMode;
+ use super::{
+-    LT_EQ_SEMICOLON_TOP_LEVEL_DECLARATION_FIRST_SET, NameParsingMode, TOP_LEVEL_DECLARATION_FIRST_SEMICOLON_SET,
+-    TYPE_PARAMETER_GT_RECOVERY_SET, VALUE_ARGS_RECOVERY_SET,
++    LT_EQ_SEMICOLON_TOP_LEVEL_DECLARATION_FIRST_SET, NameParsingMode,
++    TOP_LEVEL_DECLARATION_FIRST_SEMICOLON_SET, TYPE_PARAMETER_GT_RECOVERY_SET,
++    VALUE_ARGS_RECOVERY_SET,
+ };
+ use crate::parsing::Parser;
+ use crate::token_set::TokenSet;
+@@ -67,10 +68,17 @@ impl Parser {
+         let is_companion_block = self.at(COMPANION_KEYWORD) && self.lookahead(1) == Some(LBRACE);
+ 
+         let mut detector = ModifierDetector::default();
+-        self.parse_modifier_list_3(Some(&mut detector), TokenSet::EMPTY, /* localDeclaration = */ false);
++        self.parse_modifier_list_3(
++            Some(&mut detector),
++            TokenSet::EMPTY,
++            /* localDeclaration = */ false,
++        );
+ 
+-        let decl_type =
+-            if is_companion_block { Some(self.parse_companion_block()) } else { self.parse_member_declaration_rest(&detector) };
++        let decl_type = if is_companion_block {
++            Some(self.parse_companion_block())
++        } else {
++            self.parse_member_declaration_rest(&detector)
++        };
+ 
+         match decl_type {
+             None => {
+@@ -81,10 +89,17 @@ impl Parser {
+         }
+     }
+ 
+-    fn parse_member_declaration_rest(&mut self, modifier_detector: &ModifierDetector) -> Option<SyntaxKind> {
++    fn parse_member_declaration_rest(
++        &mut self,
++        modifier_detector: &ModifierDetector,
++    ) -> Option<SyntaxKind> {
+         let mut decl_type = self.parse_common_declaration(
+             modifier_detector,
+-            if modifier_detector.is_companion_detected() { NameParsingMode::Allowed } else { NameParsingMode::Required },
++            if modifier_detector.is_companion_detected() {
++                NameParsingMode::Allowed
++            } else {
++                NameParsingMode::Required
++            },
+             DeclarationParsingMode::MemberOrToplevel,
+         );
+ 
+@@ -130,11 +145,19 @@ impl Parser {
+         self.advance(); // CONSTRUCTOR_KEYWORD
+ 
+         if self.at(LPAR) {
+-            self.parse_value_parameter_list(false, /*typeRequired = */ true, VALUE_ARGS_RECOVERY_SET, false);
++            self.parse_value_parameter_list(
++                false,
++                /*typeRequired = */ true,
++                VALUE_ARGS_RECOVERY_SET,
++                false,
++            );
+         } else {
+             self.error_with_recovery(
+                 "Expecting '('",
+-                Some(TokenSet::or_set(&[VALUE_ARGS_RECOVERY_SET, TokenSet::create(&[COLON])])),
++                Some(TokenSet::or_set(&[
++                    VALUE_ARGS_RECOVERY_SET,
++                    TokenSet::create(&[COLON]),
++                ])),
+             );
+         }
+ 
+@@ -197,7 +220,11 @@ impl Parser {
+ 
+         self.advance(); // TYPE_ALIAS_KEYWORD
+ 
+-        self.expect_3(IDENTIFIER, "Type name expected", Some(LT_EQ_SEMICOLON_TOP_LEVEL_DECLARATION_FIRST_SET));
++        self.expect_3(
++            IDENTIFIER,
++            "Type name expected",
++            Some(LT_EQ_SEMICOLON_TOP_LEVEL_DECLARATION_FIRST_SET),
++        );
+ 
+         self.parse_type_parameter_list(TYPE_PARAMETER_GT_RECOVERY_SET);
+ 
+@@ -207,7 +234,11 @@ impl Parser {
+             error.error(self, "Type alias parameters can't have bounds");
+         }
+ 
+-        self.expect_3(EQ, "Expecting '='", Some(TOP_LEVEL_DECLARATION_FIRST_SEMICOLON_SET));
++        self.expect_3(
++            EQ,
++            "Expecting '='",
++            Some(TOP_LEVEL_DECLARATION_FIRST_SEMICOLON_SET),
++        );
+ 
+         self.parse_type_ref();
+ 
+diff --git a/src/parsing/declarations/mod.rs b/src/parsing/declarations/mod.rs
+index 5e82ab2..31adf13 100644
+--- a/src/parsing/declarations/mod.rs
++++ b/src/parsing/declarations/mod.rs
+@@ -17,7 +17,9 @@ mod user_types;
+ 
+ pub(crate) use accessors::MultiDeclarationMode;
+ pub(crate) use annotations::NameParsingMode;
+-pub(crate) use parameters::{AnnotationParsingMode, EXPRESSION_FIRST, EXPRESSION_FOLLOW, ModifierDetector};
++pub(crate) use parameters::{
++    AnnotationParsingMode, EXPRESSION_FIRST, EXPRESSION_FOLLOW, ModifierDetector,
++};
+ pub(crate) use properties::DeclarationParsingMode;
+ 
+ use ktrs_syntax::SyntaxKind::*;
+@@ -30,29 +32,44 @@ use crate::token_set::TokenSet;
+ const GT_COMMA_COLON_SET: TokenSet = TokenSet::create(&[GT, COMMA, COLON]);
+ 
+ const TOP_LEVEL_DECLARATION_FIRST: TokenSet = TokenSet::create(&[
+-    TYPE_ALIAS_KEYWORD, INTERFACE_KEYWORD, CLASS_KEYWORD, OBJECT_KEYWORD,
+-    FUN_KEYWORD, VAL_KEYWORD, VAR_KEYWORD, PACKAGE_KEYWORD,
++    TYPE_ALIAS_KEYWORD,
++    INTERFACE_KEYWORD,
++    CLASS_KEYWORD,
++    OBJECT_KEYWORD,
++    FUN_KEYWORD,
++    VAL_KEYWORD,
++    VAR_KEYWORD,
++    PACKAGE_KEYWORD,
+ ]);
+ const TOP_LEVEL_DECLARATION_FIRST_SEMICOLON_SET: TokenSet =
+     TokenSet::or_set(&[TOP_LEVEL_DECLARATION_FIRST, TokenSet::create(&[SEMICOLON])]);
+-const LT_EQ_SEMICOLON_TOP_LEVEL_DECLARATION_FIRST_SET: TokenSet =
+-    TokenSet::or_set(&[TokenSet::create(&[LT, EQ, SEMICOLON]), TOP_LEVEL_DECLARATION_FIRST]);
++const LT_EQ_SEMICOLON_TOP_LEVEL_DECLARATION_FIRST_SET: TokenSet = TokenSet::or_set(&[
++    TokenSet::create(&[LT, EQ, SEMICOLON]),
++    TOP_LEVEL_DECLARATION_FIRST,
++]);
+ const DECLARATION_FIRST: TokenSet = TokenSet::or_set(&[
+     TOP_LEVEL_DECLARATION_FIRST,
+     TokenSet::create(&[INIT_KEYWORD, GET_KEYWORD, SET_KEYWORD, CONSTRUCTOR_KEYWORD]),
+ ]);
+ 
+-const CLASS_NAME_RECOVERY_SET: TokenSet =
+-    TokenSet::or_set(&[TokenSet::create(&[LT, LPAR, COLON, LBRACE]), TOP_LEVEL_DECLARATION_FIRST]);
+-const TYPE_PARAMETER_GT_RECOVERY_SET: TokenSet = TokenSet::create(&[WHERE_KEYWORD, LPAR, COLON, LBRACE, GT]);
++const CLASS_NAME_RECOVERY_SET: TokenSet = TokenSet::or_set(&[
++    TokenSet::create(&[LT, LPAR, COLON, LBRACE]),
++    TOP_LEVEL_DECLARATION_FIRST,
++]);
++const TYPE_PARAMETER_GT_RECOVERY_SET: TokenSet =
++    TokenSet::create(&[WHERE_KEYWORD, LPAR, COLON, LBRACE, GT]);
+ pub(crate) const PARAMETER_NAME_RECOVERY_SET: TokenSet =
+     TokenSet::create(&[COLON, EQ, COMMA, RPAR, VAL_KEYWORD, VAR_KEYWORD]);
+ const PACKAGE_NAME_RECOVERY_SET: TokenSet = TokenSet::create(&[DOT, EOL_OR_SEMICOLON]);
+ const IMPORT_RECOVERY_SET: TokenSet = TokenSet::create(&[AS_KEYWORD, DOT, EOL_OR_SEMICOLON]);
+-const TYPE_REF_FIRST: TokenSet = TokenSet::create(&[LBRACKET, IDENTIFIER, LPAR, HASH, DYNAMIC_KEYWORD]);
+-const LBRACE_RBRACE_TYPE_REF_FIRST_SET: TokenSet = TokenSet::or_set(&[TokenSet::create(&[LBRACE, RBRACE]), TYPE_REF_FIRST]);
+-const COLON_COMMA_LBRACE_RBRACE_TYPE_REF_FIRST_SET: TokenSet =
+-    TokenSet::or_set(&[TokenSet::create(&[COLON, COMMA, LBRACE, RBRACE]), TYPE_REF_FIRST]);
++const TYPE_REF_FIRST: TokenSet =
++    TokenSet::create(&[LBRACKET, IDENTIFIER, LPAR, HASH, DYNAMIC_KEYWORD]);
++const LBRACE_RBRACE_TYPE_REF_FIRST_SET: TokenSet =
++    TokenSet::or_set(&[TokenSet::create(&[LBRACE, RBRACE]), TYPE_REF_FIRST]);
++const COLON_COMMA_LBRACE_RBRACE_TYPE_REF_FIRST_SET: TokenSet = TokenSet::or_set(&[
++    TokenSet::create(&[COLON, COMMA, LBRACE, RBRACE]),
++    TYPE_REF_FIRST,
++]);
+ const RECEIVER_TYPE_TERMINATORS: TokenSet = TokenSet::create(&[DOT, SAFE_ACCESS]);
+ const VALUE_PARAMETER_FIRST: TokenSet = TokenSet::or_set(&[
+     TokenSet::create(&[IDENTIFIER, LBRACKET, VAL_KEYWORD, VAR_KEYWORD]),
+@@ -62,50 +79,94 @@ const LAMBDA_VALUE_PARAMETER_FIRST: TokenSet = TokenSet::or_set(&[
+     TokenSet::create(&[IDENTIFIER, LBRACKET]),
+     TokenSet::and_not(MODIFIER_KEYWORDS, TokenSet::create(&[FUN_KEYWORD])),
+ ]);
+-const SOFT_KEYWORDS_AT_MEMBER_START: TokenSet = TokenSet::create(&[CONSTRUCTOR_KEYWORD, INIT_KEYWORD]);
++const SOFT_KEYWORDS_AT_MEMBER_START: TokenSet =
++    TokenSet::create(&[CONSTRUCTOR_KEYWORD, INIT_KEYWORD]);
+ const ANNOTATION_TARGETS: TokenSet = TokenSet::create(&[
+-    ALL_KEYWORD, FILE_KEYWORD, FIELD_KEYWORD, GET_KEYWORD, SET_KEYWORD, PROPERTY_KEYWORD,
+-    RECEIVER_KEYWORD, PARAM_KEYWORD, SETPARAM_KEYWORD, DELEGATE_KEYWORD,
++    ALL_KEYWORD,
++    FILE_KEYWORD,
++    FIELD_KEYWORD,
++    GET_KEYWORD,
++    SET_KEYWORD,
++    PROPERTY_KEYWORD,
++    RECEIVER_KEYWORD,
++    PARAM_KEYWORD,
++    SETPARAM_KEYWORD,
++    DELEGATE_KEYWORD,
+ ]);
+ const BLOCK_DOC_COMMENT_SET: TokenSet = TokenSet::create(&[BLOCK_COMMENT, DOC_COMMENT]);
+ const SEMICOLON_SET: TokenSet = TokenSet::create(&[SEMICOLON]);
+ const COMMA_COLON_GT_SET: TokenSet = TokenSet::create(&[COMMA, COLON, GT]);
+-const IDENTIFIER_RBRACKET_LBRACKET_SET: TokenSet = TokenSet::create(&[IDENTIFIER, RBRACKET, LBRACKET]);
++const IDENTIFIER_RBRACKET_LBRACKET_SET: TokenSet =
++    TokenSet::create(&[IDENTIFIER, RBRACKET, LBRACKET]);
+ const LBRACE_RBRACE_SET: TokenSet = TokenSet::create(&[LBRACE, RBRACE]);
+ const COMMA_SEMICOLON_RBRACE_SET: TokenSet = TokenSet::create(&[COMMA, SEMICOLON, RBRACE]);
+-const VALUE_ARGS_RECOVERY_SET: TokenSet = TokenSet::create(&[LBRACE, SEMICOLON, RPAR, EOL_OR_SEMICOLON, RBRACE]);
+-const PROPERTY_NAME_FOLLOW_SET: TokenSet =
+-    TokenSet::create(&[COLON, EQ, LBRACE, RBRACE, SEMICOLON, VAL_KEYWORD, VAR_KEYWORD, FUN_KEYWORD, CLASS_KEYWORD]);
+-const DESTRUCTURING_PROPERTY_NAME_FOLLOW_SET: TokenSet = TokenSet::and_not(PROPERTY_NAME_FOLLOW_SET, VAL_VAR);
++const VALUE_ARGS_RECOVERY_SET: TokenSet =
++    TokenSet::create(&[LBRACE, SEMICOLON, RPAR, EOL_OR_SEMICOLON, RBRACE]);
++const PROPERTY_NAME_FOLLOW_SET: TokenSet = TokenSet::create(&[
++    COLON,
++    EQ,
++    LBRACE,
++    RBRACE,
++    SEMICOLON,
++    VAL_KEYWORD,
++    VAR_KEYWORD,
++    FUN_KEYWORD,
++    CLASS_KEYWORD,
++]);
++const DESTRUCTURING_PROPERTY_NAME_FOLLOW_SET: TokenSet =
++    TokenSet::and_not(PROPERTY_NAME_FOLLOW_SET, VAL_VAR);
+ const PROPERTY_NAME_FOLLOW_MULTI_DECLARATION_RECOVERY_SET: TokenSet =
+     TokenSet::or_set(&[PROPERTY_NAME_FOLLOW_SET, PARAMETER_NAME_RECOVERY_SET]);
+-const PROPERTY_NAME_FOLLOW_FUNCTION_OR_PROPERTY_RECOVERY_SET: TokenSet =
+-    TokenSet::or_set(&[PROPERTY_NAME_FOLLOW_SET, LBRACE_RBRACE_SET, TOP_LEVEL_DECLARATION_FIRST]);
+-const IDENTIFIER_EQ_COLON_SEMICOLON_SET: TokenSet = TokenSet::create(&[IDENTIFIER, EQ, COLON, SEMICOLON]);
+-const COMMA_RPAR_RBRACKET_COLON_EQ_SET: TokenSet = TokenSet::create(&[COMMA, RPAR, RBRACKET, COLON, EQ]);
++const PROPERTY_NAME_FOLLOW_FUNCTION_OR_PROPERTY_RECOVERY_SET: TokenSet = TokenSet::or_set(&[
++    PROPERTY_NAME_FOLLOW_SET,
++    LBRACE_RBRACE_SET,
++    TOP_LEVEL_DECLARATION_FIRST,
++]);
++const IDENTIFIER_EQ_COLON_SEMICOLON_SET: TokenSet =
++    TokenSet::create(&[IDENTIFIER, EQ, COLON, SEMICOLON]);
++const COMMA_RPAR_RBRACKET_COLON_EQ_SET: TokenSet =
++    TokenSet::create(&[COMMA, RPAR, RBRACKET, COLON, EQ]);
+ const ACCESSOR_FIRST_OR_PROPERTY_END: TokenSet = TokenSet::or_set(&[
+     MODIFIER_KEYWORDS,
+-    TokenSet::create(&[AT, GET_KEYWORD, SET_KEYWORD, FIELD_KEYWORD, EOL_OR_SEMICOLON, RBRACE]),
++    TokenSet::create(&[
++        AT,
++        GET_KEYWORD,
++        SET_KEYWORD,
++        FIELD_KEYWORD,
++        EOL_OR_SEMICOLON,
++        RBRACE,
++    ]),
+ ]);
+-const RPAR_IDENTIFIER_COLON_LBRACE_EQ_SET: TokenSet = TokenSet::create(&[RPAR, IDENTIFIER, COLON, LBRACE, EQ]);
++const RPAR_IDENTIFIER_COLON_LBRACE_EQ_SET: TokenSet =
++    TokenSet::create(&[RPAR, IDENTIFIER, COLON, LBRACE, EQ]);
+ const COMMA_COLON_RPAR_SET: TokenSet = TokenSet::create(&[COMMA, COLON, RPAR]);
+ const RPAR_COLON_LBRACE_EQ_SET: TokenSet = TokenSet::create(&[RPAR, COLON, LBRACE, EQ]);
+-const LBRACKET_LBRACE_RBRACE_LPAR_SET: TokenSet = TokenSet::create(&[LBRACKET, LBRACE, RBRACE, LPAR]);
++const LBRACKET_LBRACE_RBRACE_LPAR_SET: TokenSet =
++    TokenSet::create(&[LBRACKET, LBRACE, RBRACE, LPAR]);
+ const FUNCTION_NAME_FOLLOW_SET: TokenSet = TokenSet::create(&[LT, LPAR, RPAR, COLON, EQ]);
+ const FUNCTION_NAME_RECOVERY_SET: TokenSet = TokenSet::or_set(&[
+     TokenSet::create(&[LT, LPAR, RPAR, COLON, EQ]),
+     LBRACE_RBRACE_SET,
+     TOP_LEVEL_DECLARATION_FIRST,
+ ]);
+-const VALUE_PARAMETERS_FOLLOW_SET: TokenSet = TokenSet::create(&[EQ, LBRACE, RBRACE, SEMICOLON, RPAR]);
+-const CONTEXT_PARAMETERS_FOLLOW_SET: TokenSet =
+-    TokenSet::create(&[CLASS_KEYWORD, OBJECT_KEYWORD, FUN_KEYWORD, VAL_KEYWORD, VAR_KEYWORD]);
++const VALUE_PARAMETERS_FOLLOW_SET: TokenSet =
++    TokenSet::create(&[EQ, LBRACE, RBRACE, SEMICOLON, RPAR]);
++const CONTEXT_PARAMETERS_FOLLOW_SET: TokenSet = TokenSet::create(&[
++    CLASS_KEYWORD,
++    OBJECT_KEYWORD,
++    FUN_KEYWORD,
++    VAL_KEYWORD,
++    VAR_KEYWORD,
++]);
+ const LPAR_VALUE_PARAMETERS_FOLLOW_SET: TokenSet =
+     TokenSet::or_set(&[TokenSet::create(&[LPAR]), VALUE_PARAMETERS_FOLLOW_SET]);
+-const LPAR_LBRACE_COLON_CONSTRUCTOR_KEYWORD_SET: TokenSet = TokenSet::create(&[LPAR, LBRACE, COLON, CONSTRUCTOR_KEYWORD]);
++const LPAR_LBRACE_COLON_CONSTRUCTOR_KEYWORD_SET: TokenSet =
++    TokenSet::create(&[LPAR, LBRACE, COLON, CONSTRUCTOR_KEYWORD]);
+ #[allow(non_upper_case_globals)]
+-const definitelyOutOfReceiverSet: TokenSet =
+-    TokenSet::or_set(&[TokenSet::create(&[EQ, COLON, LBRACE, RBRACE, BY_KEYWORD]), TOP_LEVEL_DECLARATION_FIRST]);
++const definitelyOutOfReceiverSet: TokenSet = TokenSet::or_set(&[
++    TokenSet::create(&[EQ, COLON, LBRACE, RBRACE, BY_KEYWORD]),
++    TOP_LEVEL_DECLARATION_FIRST,
++]);
+ const EOL_OR_SEMICOLON_RBRACE_SET: TokenSet = TokenSet::create(&[EOL_OR_SEMICOLON, RBRACE]);
+ const CLASS_INTERFACE_SET: TokenSet = TokenSet::create(&[CLASS_KEYWORD, INTERFACE_KEYWORD]);
+ 
+@@ -168,7 +229,10 @@ impl Parser {
+         if self.at(PACKAGE_KEYWORD) || self.at(IMPORT_KEYWORD) {
+             let err = self.mark();
+             self.parse_preamble();
+-            err.error(self, "Package directive and imports are forbidden in code fragments");
++            err.error(
++                self,
++                "Package directive and imports are forbidden in code fragments",
++            );
+         }
+ 
+         self.parse_statements();
+@@ -201,10 +265,18 @@ impl Parser {
+         self.check_for_unexpected_symbols();
+ 
+         block_marker.done(self, BLOCK);
+-        block_marker.set_custom_edge_token_binders(self, Some(EdgeBinder::PrecedingAll), Some(EdgeBinder::TrailingAll));
++        block_marker.set_custom_edge_token_binders(
++            self,
++            Some(EdgeBinder::PrecedingAll),
++            Some(EdgeBinder::TrailingAll),
++        );
+ 
+         script_marker.done(self, SCRIPT);
+-        script_marker.set_custom_edge_token_binders(self, Some(EdgeBinder::PrecedingAll), Some(EdgeBinder::TrailingAll));
++        script_marker.set_custom_edge_token_binders(
++            self,
++            Some(EdgeBinder::PrecedingAll),
++            Some(EdgeBinder::TrailingAll),
++        );
+ 
+         file_marker.done(self, KT_FILE);
+     }
+diff --git a/src/parsing/declarations/modifiers.rs b/src/parsing/declarations/modifiers.rs
+index 220bb52..9631a85 100644
+--- a/src/parsing/declarations/modifiers.rs
++++ b/src/parsing/declarations/modifiers.rs
+@@ -4,7 +4,10 @@ use ktrs_syntax::SyntaxKind::{self, *};
+ 
+ use super::parameters::{AnnotationParsingMode, NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER};
+ use super::{COMMA_COLON_GT_SET, CONTEXT_PARAMETERS_FOLLOW_SET};
+-use crate::kt_tokens::{MODIFIER_KEYWORDS, RESERVED_VALUE_PARAMETER_MODIFIER_KEYWORDS, TYPE_ARGUMENT_MODIFIER_KEYWORDS, TYPE_MODIFIER_KEYWORDS};
++use crate::kt_tokens::{
++    MODIFIER_KEYWORDS, RESERVED_VALUE_PARAMETER_MODIFIER_KEYWORDS, TYPE_ARGUMENT_MODIFIER_KEYWORDS,
++    TYPE_MODIFIER_KEYWORDS,
++};
+ use crate::parsing::{Consumer, Parser};
+ use crate::token_set::TokenSet;
+ 
+@@ -13,7 +16,11 @@ impl Parser {
+      * (modifier | annotation)*
+      */
+     pub(crate) fn parse_modifier_list(&mut self, no_modifiers_before: TokenSet) -> bool {
+-        self.parse_modifier_list_3(None, no_modifiers_before, /* localDeclaration = */ false)
++        self.parse_modifier_list_3(
++            None,
++            no_modifiers_before,
++            /* localDeclaration = */ false,
++        )
+     }
+ 
+     pub(crate) fn parse_annotations_list(&mut self, no_modifiers_before: TokenSet) {
+@@ -88,7 +95,9 @@ impl Parser {
+ 
+                 let is_annotation_parsed = self.parse_annotation_or_list(annotation_parsing_mode);
+ 
+-                if !is_annotation_parsed && !annotation_parsing_mode.with_significant_whitespace_before_arguments() {
++                if !is_annotation_parsed
++                    && !annotation_parsing_mode.with_significant_whitespace_before_arguments()
++                {
+                     before_annotation_marker.rollback_to(self);
+                     // try parse again, but with significant whitespace
+                     let new_mode = if annotation_parsing_mode.allow_context_list() {
+@@ -121,7 +130,11 @@ impl Parser {
+                 } else {
+                     context_marker.drop(self);
+                 }
+-            } else if self.try_parse_modifier(reborrow(&mut token_consumer),no_modifiers_before, modifier_keywords) {
++            } else if self.try_parse_modifier(
++                reborrow(&mut token_consumer),
++                no_modifiers_before,
++                modifier_keywords,
++            ) {
+                 // modifier advanced
+             } else {
+                 break;
+@@ -193,7 +206,10 @@ impl Parser {
+     ///
+     /// Returns `true` if it parsed a context with value parameters; `false` for a context with
+     /// type refs (that work as receivers) or on a syntax error.
+-    pub(super) fn parse_context_parameter_or_receiver_list(&mut self, in_function_type: bool) -> bool {
++    pub(super) fn parse_context_parameter_or_receiver_list(
++        &mut self,
++        in_function_type: bool,
++    ) -> bool {
+         debug_assert!(self._at(CONTEXT_KEYWORD));
+         let value_parameter_or_type_ref_list = self.mark();
+         self.advance(); // CONTEXT_KEYWORD
+@@ -211,9 +227,12 @@ impl Parser {
+             // Treat parsing of context receivers (deprecated syntax) as an error,
+             // But an outer caller decides if the entire list should be dropped:
+             // If we're trying to parse a local declaration, we should drop it to prevent unexpected parsing of ahead declarations
+-            no_error = self.value_parameter_loop(in_function_type, false, CONTEXT_PARAMETERS_FOLLOW_SET, &mut |p: &mut Parser| {
+-                p.parse_value_parameter_or_type_ref(in_function_type)
+-            });
++            no_error = self.value_parameter_loop(
++                in_function_type,
++                false,
++                CONTEXT_PARAMETERS_FOLLOW_SET,
++                &mut |p: &mut Parser| p.parse_value_parameter_or_type_ref(in_function_type),
++            );
+         }
+ 
+         value_parameter_or_type_ref_list.done(self, CONTEXT_PARAMETER_LIST);
+@@ -240,7 +259,9 @@ impl Parser {
+ }
+ 
+ /// `Option::as_deref_mut` can't shorten the trait-object lifetime behind `&mut`; this can.
+-fn reborrow<'a>(consumer: &'a mut Option<&mut dyn Consumer<SyntaxKind>>) -> Option<&'a mut dyn Consumer<SyntaxKind>> {
++fn reborrow<'a>(
++    consumer: &'a mut Option<&mut dyn Consumer<SyntaxKind>>,
++) -> Option<&'a mut dyn Consumer<SyntaxKind>> {
+     match consumer {
+         Some(consumer) => Some(&mut **consumer),
+         None => None,
+diff --git a/src/parsing/declarations/parameters.rs b/src/parsing/declarations/parameters.rs
+index aa896a3..54e4616 100644
+--- a/src/parsing/declarations/parameters.rs
++++ b/src/parsing/declarations/parameters.rs
+@@ -3,31 +3,43 @@
+ 
+ use ktrs_syntax::SyntaxKind::{self, *};
+ 
+-use super::{DECLARATION_FIRST, LAMBDA_VALUE_PARAMETER_FIRST, PARAMETER_NAME_RECOVERY_SET, VALUE_PARAMETER_FIRST};
++use super::{
++    DECLARATION_FIRST, LAMBDA_VALUE_PARAMETER_FIRST, PARAMETER_NAME_RECOVERY_SET,
++    VALUE_PARAMETER_FIRST,
++};
+ use crate::parsing::{Consumer, Parser};
+ use crate::token_set::TokenSet;
+ 
+-pub(super) const NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER: TokenSet = TokenSet::create(&[COMMA, COLON, EQ, RPAR]);
++pub(super) const NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER: TokenSet =
++    TokenSet::create(&[COMMA, COLON, EQ, RPAR]);
+ 
+ pub(crate) const EXPRESSION_FIRST: TokenSet = TokenSet::create(&[
+     // Prefix
+-    MINUS, PLUS, MINUSMINUS, PLUSPLUS,
+-    EXCL, EXCLEXCL, // Joining complex tokens makes it necessary to put EXCLEXCL here
++    MINUS,
++    PLUS,
++    MINUSMINUS,
++    PLUSPLUS,
++    EXCL,
++    EXCLEXCL, // Joining complex tokens makes it necessary to put EXCLEXCL here
+     // Atomic
+     COLONCOLON, // callable reference
+-    LPAR, // parenthesized
++    LPAR,       // parenthesized
+     // literal constant
+-    TRUE_KEYWORD, FALSE_KEYWORD,
+-    INTERPOLATION_PREFIX, OPEN_QUOTE,
+-    INTEGER_LITERAL, CHARACTER_LITERAL, FLOAT_LITERAL,
++    TRUE_KEYWORD,
++    FALSE_KEYWORD,
++    INTERPOLATION_PREFIX,
++    OPEN_QUOTE,
++    INTEGER_LITERAL,
++    CHARACTER_LITERAL,
++    FLOAT_LITERAL,
+     NULL_KEYWORD,
+-    LBRACE, // functionLiteral
+-    FUN_KEYWORD, // expression function
+-    THIS_KEYWORD, // this
+-    SUPER_KEYWORD, // super
+-    IF_KEYWORD, // if
+-    WHEN_KEYWORD, // when
+-    TRY_KEYWORD, // try
++    LBRACE,         // functionLiteral
++    FUN_KEYWORD,    // expression function
++    THIS_KEYWORD,   // this
++    SUPER_KEYWORD,  // super
++    IF_KEYWORD,     // if
++    WHEN_KEYWORD,   // when
++    TRY_KEYWORD,    // try
+     OBJECT_KEYWORD, // object
+     // jump
+     THROW_KEYWORD,
+@@ -39,11 +51,12 @@ pub(crate) const EXPRESSION_FIRST: TokenSet = TokenSet::create(&[
+     WHILE_KEYWORD,
+     DO_KEYWORD,
+     IDENTIFIER, // SimpleName
+-    AT, // Just for better recovery and maybe for annotations
+-    LBRACKET, // Collection literal expression
++    AT,         // Just for better recovery and maybe for annotations
++    LBRACKET,   // Collection literal expression
+ ]);
+ 
+-pub(crate) const EXPRESSION_FOLLOW: TokenSet = TokenSet::create(&[EOL_OR_SEMICOLON, ARROW, COMMA, RBRACE, RPAR, RBRACKET]);
++pub(crate) const EXPRESSION_FOLLOW: TokenSet =
++    TokenSet::create(&[EOL_OR_SEMICOLON, ARROW, COMMA, RBRACE, RPAR, RBRACKET]);
+ 
+ pub(super) const USER_TYPE_NAME_RECOVERY_SET: TokenSet =
+     TokenSet::or_set(&[EXPRESSION_FIRST, EXPRESSION_FOLLOW, DECLARATION_FIRST]);
+@@ -74,19 +87,28 @@ impl Parser {
+ 
+         self.my_builder.disable_newlines();
+ 
+-        self.value_parameter_loop(is_function_type_contents, recover_declarations, recovery_set, &mut |p: &mut Parser| {
+-            if is_function_type_contents {
+-                if !p.try_parse_value_parameter(type_required) {
+-                    let value_parameter = p.mark();
+-                    p.parse_function_type_value_parameter_modifier_list();
+-                    p.parse_type_ref();
+-                    p.close_declaration_with_comment_binders(value_parameter, VALUE_PARAMETER, false);
++        self.value_parameter_loop(
++            is_function_type_contents,
++            recover_declarations,
++            recovery_set,
++            &mut |p: &mut Parser| {
++                if is_function_type_contents {
++                    if !p.try_parse_value_parameter(type_required) {
++                        let value_parameter = p.mark();
++                        p.parse_function_type_value_parameter_modifier_list();
++                        p.parse_type_ref();
++                        p.close_declaration_with_comment_binders(
++                            value_parameter,
++                            VALUE_PARAMETER,
++                            false,
++                        );
++                    }
++                } else {
++                    p.parse_value_parameter(type_required);
+                 }
+-            } else {
+-                p.parse_value_parameter(type_required);
+-            }
+-            true
+-        });
++                true
++            },
++        );
+ 
+         self.my_builder.restore_newlines_state();
+ 
+@@ -134,7 +156,11 @@ impl Parser {
+                         self.error("Expecting comma or ')'");
+                         no_error = false;
+                     }
+-                    if !self.at_set(if in_function_type_context { LAMBDA_VALUE_PARAMETER_FIRST } else { VALUE_PARAMETER_FIRST }) {
++                    if !self.at_set(if in_function_type_context {
++                        LAMBDA_VALUE_PARAMETER_FIRST
++                    } else {
++                        VALUE_PARAMETER_FIRST
++                    }) {
+                         break;
+                     }
+                     if offset_before == self.my_builder.get_current_offset() {
+@@ -218,7 +244,11 @@ impl Parser {
+             self.advance(); // COLON
+             self.parse_type_ref();
+         } else {
+-            self.expect_3(IDENTIFIER, "Parameter name expected", Some(PARAMETER_NAME_RECOVERY_SET));
++            self.expect_3(
++                IDENTIFIER,
++                "Parameter name expected",
++                Some(PARAMETER_NAME_RECOVERY_SET),
++            );
+ 
+             if self.at(COLON) {
+                 self.advance(); // COLON
+@@ -232,7 +262,10 @@ impl Parser {
+ 
+                 self.parse_type_ref();
+             } else if type_required {
+-                self.error_with_recovery("Parameters must have type annotation", Some(PARAMETER_NAME_RECOVERY_SET));
++                self.error_with_recovery(
++                    "Parameters must have type annotation",
++                    Some(PARAMETER_NAME_RECOVERY_SET),
++                );
+                 no_errors = false;
+             }
+         }
+diff --git a/src/parsing/declarations/preamble.rs b/src/parsing/declarations/preamble.rs
+index 6fdcce1..7b63ec0 100644
+--- a/src/parsing/declarations/preamble.rs
++++ b/src/parsing/declarations/preamble.rs
+@@ -47,11 +47,17 @@ impl Parser {
+             // So, we rollback the parsing position and reparse file annotation list without report error on non-file annotations.
+             first_entry.rollback_to(self);
+ 
+-            self.parse_file_annotation_list(AnnotationParsingMode::FileAnnotationsWhenPackageOmitted);
++            self.parse_file_annotation_list(
++                AnnotationParsingMode::FileAnnotationsWhenPackageOmitted,
++            );
+             package_directive = self.mark();
+             package_directive.done(self, PACKAGE_DIRECTIVE);
+             // Need to skip everything but shebang comment to allow comments at the start of the file to be bound to the first declaration.
+-            package_directive.set_custom_edge_token_binders(self, Some(EdgeBinder::BindFirstShebangWithWhitespaceOnly), None);
++            package_directive.set_custom_edge_token_binders(
++                self,
++                Some(EdgeBinder::BindFirstShebangWithWhitespaceOnly),
++                None,
++            );
+         }
+ 
+         self.parse_import_directives();
+@@ -72,7 +78,8 @@ impl Parser {
+ 
+             if self.at(DOT) {
+                 self.advance(); // DOT
+-                qualified_expression.error(self, "Package name must be a '.'-separated identifier list");
++                qualified_expression
++                    .error(self, "Package name must be a '.'-separated identifier list");
+                 qualified_expression = self.mark();
+                 continue;
+             }
+@@ -121,7 +128,11 @@ impl Parser {
+         let import_directive = self.mark();
+         self.advance(); // IMPORT_KEYWORD
+ 
+-        if self.close_import_with_error_if_newline(import_directive, None, "Expecting qualified name") {
++        if self.close_import_with_error_if_newline(
++            import_directive,
++            None,
++            "Expecting qualified name",
++        ) {
+             return;
+         }
+ 
+@@ -142,13 +153,21 @@ impl Parser {
+         while self.at(DOT) && self.lookahead(1) != Some(MUL) {
+             self.advance(); // DOT
+ 
+-            if self.close_import_with_error_if_newline(import_directive, None, "Import must be placed on a single line") {
++            if self.close_import_with_error_if_newline(
++                import_directive,
++                None,
++                "Import must be placed on a single line",
++            ) {
+                 qualified_name.drop(self);
+                 return;
+             }
+ 
+             reference = self.mark();
+-            if self.expect_3(IDENTIFIER, "Qualified name must be a '.'-separated identifier list", Some(IMPORT_RECOVERY_SET)) {
++            if self.expect_3(
++                IDENTIFIER,
++                "Qualified name must be a '.'-separated identifier list",
++                Some(IMPORT_RECOVERY_SET),
++            ) {
+                 reference.done(self, REFERENCE_EXPRESSION);
+             } else {
+                 reference.drop(self);
+@@ -167,7 +186,11 @@ impl Parser {
+             if self.at(AS_KEYWORD) {
+                 let as_ = self.mark();
+                 self.advance(); // AS_KEYWORD
+-                if self.close_import_with_error_if_newline(import_directive, None, "Expecting identifier") {
++                if self.close_import_with_error_if_newline(
++                    import_directive,
++                    None,
++                    "Expecting identifier",
++                ) {
+                     as_.drop(self);
+                     return;
+                 }
+@@ -180,7 +203,11 @@ impl Parser {
+         if self.at(AS_KEYWORD) {
+             let alias = self.mark();
+             self.advance(); // AS_KEYWORD
+-            if self.close_import_with_error_if_newline(import_directive, Some(alias), "Expecting identifier") {
++            if self.close_import_with_error_if_newline(
++                import_directive,
++                Some(alias),
++                "Expecting identifier",
++            ) {
+                 return;
+             }
+             self.expect_3(IDENTIFIER, "Expecting identifier", Some(SEMICOLON_SET));
+@@ -188,7 +215,11 @@ impl Parser {
+         }
+         self.consume_if(SEMICOLON);
+         import_directive.done(self, IMPORT_DIRECTIVE);
+-        import_directive.set_custom_edge_token_binders(self, None, Some(EdgeBinder::TrailingComments));
++        import_directive.set_custom_edge_token_binders(
++            self,
++            None,
++            Some(EdgeBinder::TrailingComments),
++        );
+     }
+ 
+     fn close_import_with_error_if_newline(
+@@ -212,7 +243,11 @@ impl Parser {
+         let import_list = self.mark();
+         if !self.at(IMPORT_KEYWORD) {
+             // this is necessary to allow comments at the start of the file to be bound to the first declaration
+-            import_list.set_custom_edge_token_binders(self, Some(EdgeBinder::DoNotBindAnything), None);
++            import_list.set_custom_edge_token_binders(
++                self,
++                Some(EdgeBinder::DoNotBindAnything),
++                None,
++            );
+         }
+         while self.at(IMPORT_KEYWORD) {
+             self.parse_import_directive();
+@@ -239,10 +274,17 @@ impl Parser {
+         let decl = self.mark();
+ 
+         let mut detector = ModifierDetector::default();
+-        self.parse_modifier_list_3(Some(&mut detector), TokenSet::EMPTY, /* localDeclaration = */ false);
+-
+-        let mut decl_type =
+-            self.parse_common_declaration(&detector, NameParsingMode::Required, DeclarationParsingMode::MemberOrToplevel);
++        self.parse_modifier_list_3(
++            Some(&mut detector),
++            TokenSet::EMPTY,
++            /* localDeclaration = */ false,
++        );
++
++        let mut decl_type = self.parse_common_declaration(
++            &detector,
++            NameParsingMode::Required,
++            DeclarationParsingMode::MemberOrToplevel,
++        );
+ 
+         if decl_type.is_none() && self.at(LBRACE) {
+             self.error("Expecting a top level declaration");
+@@ -269,9 +311,13 @@ impl Parser {
+         declaration_parsing_mode: DeclarationParsingMode,
+     ) -> Option<SyntaxKind> {
+         match self.get_token_id() {
+-            Some(CLASS_KEYWORD | INTERFACE_KEYWORD) => return Some(self.parse_class(detector.is_enum_detected(), true)),
++            Some(CLASS_KEYWORD | INTERFACE_KEYWORD) => {
++                return Some(self.parse_class(detector.is_enum_detected(), true));
++            }
+             Some(FUN_KEYWORD) => return Some(self.parse_function()),
+-            Some(VAL_KEYWORD | VAR_KEYWORD) => return Some(self.parse_property(declaration_parsing_mode)),
++            Some(VAL_KEYWORD | VAR_KEYWORD) => {
++                return Some(self.parse_property(declaration_parsing_mode));
++            }
+             Some(LPAR | LBRACKET) => {
+                 let lookahead = self.lookahead(1);
+                 return if lookahead == Some(VAL_KEYWORD) || lookahead == Some(VAR_KEYWORD) {
+@@ -286,7 +332,9 @@ impl Parser {
+                 return Some(OBJECT_DECLARATION);
+             }
+             Some(IDENTIFIER) => {
+-                if detector.is_enum_detected() && declaration_parsing_mode.can_be_enum_used_as_soft_keyword() {
++                if detector.is_enum_detected()
++                    && declaration_parsing_mode.can_be_enum_used_as_soft_keyword()
++                {
+                     return Some(self.parse_class(true, false));
+                 }
+             }
+diff --git a/src/parsing/declarations/properties.rs b/src/parsing/declarations/properties.rs
+index 316ace8..5444a8f 100644
+--- a/src/parsing/declarations/properties.rs
++++ b/src/parsing/declarations/properties.rs
+@@ -20,11 +20,17 @@ pub(crate) enum DeclarationParsingMode {
+ 
+ impl DeclarationParsingMode {
+     pub(crate) fn destructuring_allowed(self) -> bool {
+-        matches!(self, DeclarationParsingMode::Local | DeclarationParsingMode::ScriptToplevel)
++        matches!(
++            self,
++            DeclarationParsingMode::Local | DeclarationParsingMode::ScriptToplevel
++        )
+     }
+ 
+     pub(crate) fn accessors_allowed(self) -> bool {
+-        matches!(self, DeclarationParsingMode::MemberOrToplevel | DeclarationParsingMode::ScriptToplevel)
++        matches!(
++            self,
++            DeclarationParsingMode::MemberOrToplevel | DeclarationParsingMode::ScriptToplevel
++        )
+     }
+ 
+     pub(crate) fn can_be_enum_used_as_soft_keyword(self) -> bool {
+@@ -54,7 +60,8 @@ impl Parser {
+             self.advance();
+         }
+ 
+-        let type_parameters_declared = self.at(LT) && self.parse_type_parameter_list(IDENTIFIER_EQ_COLON_SEMICOLON_SET);
++        let type_parameters_declared =
++            self.at(LT) && self.parse_type_parameter_list(IDENTIFIER_EQ_COLON_SEMICOLON_SET);
+ 
+         self.my_builder.disable_joining_complex_tokens();
+ 
+@@ -75,9 +82,17 @@ impl Parser {
+         if multi_declaration {
+             let multi_decl = self.mark();
+             self.parse_multi_declaration_entry(
+-                if is_short_form { PROPERTY_NAME_FOLLOW_SET } else { DESTRUCTURING_PROPERTY_NAME_FOLLOW_SET },
++                if is_short_form {
++                    PROPERTY_NAME_FOLLOW_SET
++                } else {
++                    DESTRUCTURING_PROPERTY_NAME_FOLLOW_SET
++                },
+                 PROPERTY_NAME_FOLLOW_MULTI_DECLARATION_RECOVERY_SET,
+-                if is_short_form { MultiDeclarationMode::Short } else { MultiDeclarationMode::Full },
++                if is_short_form {
++                    MultiDeclarationMode::Short
++                } else {
++                    MultiDeclarationMode::Full
++                },
+             );
+             self.error_if(
+                 multi_decl,
+@@ -102,7 +117,11 @@ impl Parser {
+             let type_ = self.mark();
+             self.advance(); // COLON
+             self.parse_type_ref();
+-            self.error_if(type_, multi_declaration, "Type annotations are not allowed on destructuring declarations");
++            self.error_if(
++                type_,
++                multi_declaration,
++                "Type annotations are not allowed on destructuring declarations",
++            );
+         }
+ 
+         self.parse_type_constraints_guarded(type_parameters_declared);
+@@ -121,7 +140,11 @@ impl Parser {
+                 before_name.drop(self);
+             }
+ 
+-            return if multi_declaration { DESTRUCTURING_DECLARATION } else { PROPERTY };
++            return if multi_declaration {
++                DESTRUCTURING_DECLARATION
++            } else {
++                PROPERTY
++            };
+         }
+ 
+         before_name.drop(self);
+@@ -131,7 +154,8 @@ impl Parser {
+             // "val a = 1; b" must not be an infix call of b on "val ...;"
+ 
+             self.my_builder.enable_newlines();
+-            let has_new_line_with_semicolon = self.consume_if(SEMICOLON) && self.my_builder.newline_before_current_token();
++            let has_new_line_with_semicolon =
++                self.consume_if(SEMICOLON) && self.my_builder.newline_before_current_token();
+             self.my_builder.restore_newlines_state();
+ 
+             if !has_new_line_with_semicolon {
+@@ -147,7 +171,10 @@ impl Parser {
+                     if self.get_last_token() != Some(SEMICOLON) {
+                         self.error_until(
+                             "Property getter or setter expected",
+-                            TokenSet::or_set(&[DECLARATION_FIRST, TokenSet::create(&[EOL_OR_SEMICOLON, LBRACE, RBRACE])]),
++                            TokenSet::or_set(&[
++                                DECLARATION_FIRST,
++                                TokenSet::create(&[EOL_OR_SEMICOLON, LBRACE, RBRACE]),
++                            ]),
+                         );
+                     }
+                 } else {
+@@ -156,7 +183,11 @@ impl Parser {
+             }
+         }
+ 
+-        if multi_declaration { DESTRUCTURING_DECLARATION } else { PROPERTY }
++        if multi_declaration {
++            DESTRUCTURING_DECLARATION
++        } else {
++            PROPERTY
++        }
+     }
+ 
+     fn parse_property_delegate_or_assignment(&mut self) -> bool {
+diff --git a/src/parsing/declarations/type_parameters.rs b/src/parsing/declarations/type_parameters.rs
+index ed5f476..641a825 100644
+--- a/src/parsing/declarations/type_parameters.rs
++++ b/src/parsing/declarations/type_parameters.rs
+@@ -4,8 +4,8 @@ use ktrs_syntax::SyntaxKind::*;
+ 
+ use super::parameters::AnnotationParsingMode;
+ use super::{
+-    COLON_COMMA_LBRACE_RBRACE_TYPE_REF_FIRST_SET, GT_COMMA_COLON_SET, LBRACE_RBRACE_TYPE_REF_FIRST_SET,
+-    TYPE_PARAMETER_GT_RECOVERY_SET,
++    COLON_COMMA_LBRACE_RBRACE_TYPE_REF_FIRST_SET, GT_COMMA_COLON_SET,
++    LBRACE_RBRACE_TYPE_REF_FIRST_SET, TYPE_PARAMETER_GT_RECOVERY_SET,
+ };
+ use crate::parsing::Parser;
+ use crate::token_set::TokenSet;
+@@ -106,13 +106,21 @@ impl Parser {
+         self.parse_annotations(AnnotationParsingMode::Default);
+ 
+         let reference = self.mark();
+-        if self.expect_3(IDENTIFIER, "Expecting type parameter name", Some(COLON_COMMA_LBRACE_RBRACE_TYPE_REF_FIRST_SET)) {
++        if self.expect_3(
++            IDENTIFIER,
++            "Expecting type parameter name",
++            Some(COLON_COMMA_LBRACE_RBRACE_TYPE_REF_FIRST_SET),
++        ) {
+             reference.done(self, REFERENCE_EXPRESSION);
+         } else {
+             reference.drop(self);
+         }
+ 
+-        self.expect_3(COLON, "Expecting ':' before the upper bound", Some(LBRACE_RBRACE_TYPE_REF_FIRST_SET));
++        self.expect_3(
++            COLON,
++            "Expecting ':' before the upper bound",
++            Some(LBRACE_RBRACE_TYPE_REF_FIRST_SET),
++        );
+ 
+         self.parse_type_ref();
+ 
+@@ -142,7 +150,11 @@ impl Parser {
+ 
+         self.parse_modifier_list(GT_COMMA_COLON_SET);
+ 
+-        self.expect_3(IDENTIFIER, "Type parameter name expected", Some(TokenSet::EMPTY));
++        self.expect_3(
++            IDENTIFIER,
++            "Type parameter name expected",
++            Some(TokenSet::EMPTY),
++        );
+ 
+         if self.at(COLON) {
+             self.advance(); // COLON
+diff --git a/src/parsing/declarations/types.rs b/src/parsing/declarations/types.rs
+index 4ddf9f2..4babb55 100644
+--- a/src/parsing/declarations/types.rs
++++ b/src/parsing/declarations/types.rs
+@@ -29,21 +29,36 @@ impl Parser {
+     }
+ 
+     pub(crate) fn parse_type_ref_without_intersections(&mut self) {
+-        self.parse_type_ref_2(TokenSet::EMPTY, /* allowSimpleIntersectionTypes */ false);
++        self.parse_type_ref_2(
++            TokenSet::EMPTY,
++            /* allowSimpleIntersectionTypes */ false,
++        );
+     }
+ 
+     pub(crate) fn parse_type_ref_1(&mut self, extra_recovery_set: TokenSet) {
+-        self.parse_type_ref_2(extra_recovery_set, /* allowSimpleIntersectionTypes */ true);
++        self.parse_type_ref_2(
++            extra_recovery_set,
++            /* allowSimpleIntersectionTypes */ true,
++        );
+     }
+ 
+-    fn parse_type_ref_2(&mut self, extra_recovery_set: TokenSet, allow_simple_intersection_types: bool) {
+-        let type_ref_marker = self.parse_type_ref_contents(extra_recovery_set, allow_simple_intersection_types);
++    fn parse_type_ref_2(
++        &mut self,
++        extra_recovery_set: TokenSet,
++        allow_simple_intersection_types: bool,
++    ) {
++        let type_ref_marker =
++            self.parse_type_ref_contents(extra_recovery_set, allow_simple_intersection_types);
+         type_ref_marker.done(self, TYPE_REFERENCE);
+     }
+ 
+     // The extraRecoverySet is needed for the foo(bar<x, 1, y>(z)) case, to tell whether we should stop
+     // on expression-indicating symbols or not
+-    fn parse_type_ref_contents(&mut self, extra_recovery_set: TokenSet, allow_simple_intersection_types: bool) -> Marker {
++    fn parse_type_ref_contents(
++        &mut self,
++        extra_recovery_set: TokenSet,
++        allow_simple_intersection_types: bool,
++    ) -> Marker {
+         let type_ref_marker = self.mark();
+ 
+         self.parse_type_modifier_list();
+@@ -70,7 +85,10 @@ impl Parser {
+             let dynamic_type = self.mark();
+             self.advance(); // DYNAMIC_KEYWORD
+             dynamic_type.done(self, DYNAMIC_TYPE);
+-        } else if self.at(IDENTIFIER) || self.at(PACKAGE_KEYWORD) || self.at_parenthesized_mutable_for_platform_types(0) {
++        } else if self.at(IDENTIFIER)
++            || self.at(PACKAGE_KEYWORD)
++            || self.at_parenthesized_mutable_for_platform_types(0)
++        {
+             self.parse_user_type();
+         } else if self.at(LPAR) {
+             let function_or_parenthesized_type = self.mark();
+@@ -78,7 +96,10 @@ impl Parser {
+             // This may be a function parameter list or just a parenthesized type
+             self.advance(); // LPAR
+             // parenthesized types, no reference element around it is needed
+-            let contents = self.parse_type_ref_contents(TokenSet::EMPTY, /* allowSimpleIntersectionTypes */ true);
++            let contents = self.parse_type_ref_contents(
++                TokenSet::EMPTY,
++                /* allowSimpleIntersectionTypes */ true,
++            );
+             contents.drop(self);
+ 
+             if self.at(RPAR) && self.lookahead(1) != Some(ARROW) {
+@@ -101,7 +122,9 @@ impl Parser {
+                 "Type expected",
+                 Some(TokenSet::or_set(&[
+                     TOP_LEVEL_DECLARATION_FIRST,
+-                    TokenSet::create(&[EQ, COMMA, GT, RBRACKET, DOT, RPAR, RBRACE, LBRACE, SEMICOLON]),
++                    TokenSet::create(&[
++                        EQ, COMMA, GT, RBRACKET, DOT, RPAR, RBRACE, LBRACE, SEMICOLON,
++                    ]),
+                     extra_recovery_set,
+                 ])),
+             );
+@@ -124,7 +147,10 @@ impl Parser {
+             left_type_ref.done(self, TYPE_REFERENCE);
+ 
+             self.advance(); // &
+-            self.parse_type_ref_2(extra_recovery_set, /* allowSimpleIntersectionTypes */ true);
++            self.parse_type_ref_2(
++                extra_recovery_set,
++                /* allowSimpleIntersectionTypes */ true,
++            );
+ 
+             intersection_type.done(self, INTERSECTION_TYPE);
+             was_intersection = true;
+@@ -159,7 +185,9 @@ impl Parser {
+                 "Function type expected expected",
+                 Some(TokenSet::or_set(&[
+                     TOP_LEVEL_DECLARATION_FIRST,
+-                    TokenSet::create(&[EQ, COMMA, GT, RBRACKET, DOT, RPAR, RBRACE, LBRACE, SEMICOLON]),
++                    TokenSet::create(&[
++                        EQ, COMMA, GT, RBRACKET, DOT, RPAR, RBRACE, LBRACE, SEMICOLON,
++                    ]),
+                     extra_recovery_set,
+                 ])),
+             );
+diff --git a/src/parsing/declarations/user_types.rs b/src/parsing/declarations/user_types.rs
+index 3747b72..ce8689b 100644
+--- a/src/parsing/declarations/user_types.rs
++++ b/src/parsing/declarations/user_types.rs
+@@ -27,14 +27,22 @@ impl Parser {
+             let keyword = self.mark();
+             self.advance(); // PACKAGE_KEYWORD
+             keyword.error(self, "Expecting an element");
+-            self.expect_3(DOT, "Expecting '.'", Some(TokenSet::create(&[IDENTIFIER, LBRACE, RBRACE])));
++            self.expect_3(
++                DOT,
++                "Expecting '.'",
++                Some(TokenSet::create(&[IDENTIFIER, LBRACE, RBRACE])),
++            );
+         }
+ 
+         let mut reference = self.mark();
+         loop {
+             self.recover_on_parenthesized_word_for_platform_types(0, "Mutable", true);
+ 
+-            if self.expect_3(IDENTIFIER, "Expecting type name", Some(USER_TYPE_NAME_RECOVERY_SET)) {
++            if self.expect_3(
++                IDENTIFIER,
++                "Expecting type name",
++                Some(USER_TYPE_NAME_RECOVERY_SET),
++            ) {
+                 reference.done(self, REFERENCE_EXPRESSION);
+             } else {
+                 reference.drop(self);
+@@ -48,7 +56,9 @@ impl Parser {
+             if !self.at(DOT) {
+                 break;
+             }
+-            if self.lookahead(1) == Some(LPAR) && !self.at_parenthesized_mutable_for_platform_types(1) {
++            if self.lookahead(1) == Some(LPAR)
++                && !self.at_parenthesized_mutable_for_platform_types(1)
++            {
+                 // This may be a receiver for a function type
+                 //   Int.(Int) -> Int
+                 break;
+@@ -69,7 +79,12 @@ impl Parser {
+         self.recover_on_parenthesized_word_for_platform_types(offset, "Mutable", false)
+     }
+ 
+-    fn recover_on_parenthesized_word_for_platform_types(&mut self, offset: i32, word: &str, consume: bool) -> bool {
++    fn recover_on_parenthesized_word_for_platform_types(
++        &mut self,
++        offset: i32,
++        word: &str,
++        consume: bool,
++    ) -> bool {
+         // Array<(out) Foo>! or (Mutable)List<Bar>!
+         if self.lookahead(offset) == Some(LPAR)
+             && self.lookahead(offset + 1) == Some(IDENTIFIER)
+@@ -176,9 +191,18 @@ impl Parser {
+     fn parse_function_type_contents(&mut self, function_type: Marker) -> Marker {
+         debug_assert!(self._at(LPAR), "{:?}", self.tt());
+ 
+-        self.parse_value_parameter_list(true, /* typeRequired  = */ true, TokenSet::EMPTY, false);
+-
+-        self.expect_3(ARROW, "Expecting '->' to specify return type of a function type", Some(TYPE_REF_FIRST));
++        self.parse_value_parameter_list(
++            true,
++            /* typeRequired  = */ true,
++            TokenSet::EMPTY,
++            false,
++        );
++
++        self.expect_3(
++            ARROW,
++            "Expecting '->' to specify return type of a function type",
++            Some(TYPE_REF_FIRST),
++        );
+         self.parse_type_ref();
+ 
+         function_type
+diff --git a/src/parsing/expressions/atomic.rs b/src/parsing/expressions/atomic.rs
+index 3fc1f89..2f03fe5 100644
+--- a/src/parsing/expressions/atomic.rs
++++ b/src/parsing/expressions/atomic.rs
+@@ -73,8 +73,12 @@ impl Parser {
+             Some(CHARACTER_LITERAL) => self.parse_one_token_expression(CHARACTER_CONSTANT),
+             Some(FLOAT_LITERAL) => self.parse_one_token_expression(FLOAT_CONSTANT),
+             Some(NULL_KEYWORD) => self.parse_one_token_expression(NULL),
+-            Some(CLASS_KEYWORD | INTERFACE_KEYWORD | FUN_KEYWORD | VAL_KEYWORD | VAR_KEYWORD | TYPE_ALIAS_KEYWORD) => {
+-                let rollback_if_definitely_not_expression = self.my_builder.newline_before_current_token();
++            Some(
++                CLASS_KEYWORD | INTERFACE_KEYWORD | FUN_KEYWORD | VAL_KEYWORD | VAR_KEYWORD
++                | TYPE_ALIAS_KEYWORD,
++            ) => {
++                let rollback_if_definitely_not_expression =
++                    self.my_builder.newline_before_current_token();
+                 if !self.parse_local_declaration(rollback_if_definitely_not_expression, false) {
+                     ok = false;
+                 }
+@@ -87,7 +91,10 @@ impl Parser {
+             // TODO: better recovery if FIRST(element) did not match
+             self.error_with_recovery(
+                 "Expecting an element",
+-                Some(TokenSet::or_set(&[EXPRESSION_FOLLOW, TokenSet::create(&[LONG_TEMPLATE_ENTRY_END])])),
++                Some(TokenSet::or_set(&[
++                    EXPRESSION_FOLLOW,
++                    TokenSet::create(&[LONG_TEMPLATE_ENTRY_END]),
++                ])),
+             );
+         }
+ 
+diff --git a/src/parsing/expressions/binary_operation_precedence.rs b/src/parsing/expressions/binary_operation_precedence.rs
+index b7a68d0..db5c3d4 100644
+--- a/src/parsing/expressions/binary_operation_precedence.rs
++++ b/src/parsing/expressions/binary_operation_precedence.rs
+@@ -25,8 +25,18 @@ use BinaryOperationPrecedence as P;
+ 
+ impl BinaryOperationPrecedence {
+     pub(crate) const ENTRIES: [BinaryOperationPrecedence; 12] = [
+-        P::As, P::Multiplicative, P::Additive, P::Range, P::Infix, P::Elvis, P::InOrIs, P::Comparison, P::Equality,
+-        P::Conjunction, P::Disjunction, P::Assignment,
++        P::As,
++        P::Multiplicative,
++        P::Additive,
++        P::Range,
++        P::Infix,
++        P::Elvis,
++        P::InOrIs,
++        P::Comparison,
++        P::Equality,
++        P::Conjunction,
++        P::Disjunction,
++        P::Assignment,
+     ];
+ 
+     pub(crate) fn ordinal(self) -> usize {
+@@ -56,10 +66,14 @@ impl BinaryOperationPrecedence {
+ 
+     /// `TOKEN_TO_BINARY_PRECEDENCE_MAP_WITH_SOFT_IDENTIFIERS.get(token)`: soft keywords map like
+     /// `IDENTIFIER` (INFIX).
+-    pub(crate) fn token_to_binary_precedence_map_with_soft_identifiers(token: SyntaxKind) -> Option<BinaryOperationPrecedence> {
++    pub(crate) fn token_to_binary_precedence_map_with_soft_identifiers(
++        token: SyntaxKind,
++    ) -> Option<BinaryOperationPrecedence> {
+         if SOFT_KEYWORDS.contains(token) {
+             return Some(P::Infix);
+         }
+-        Self::ENTRIES.into_iter().find(|p| p.tokens().contains(&token))
++        Self::ENTRIES
++            .into_iter()
++            .find(|p| p.tokens().contains(&token))
+     }
+ }
+diff --git a/src/parsing/expressions/calls.rs b/src/parsing/expressions/calls.rs
+index 036690b..3861986 100644
+--- a/src/parsing/expressions/calls.rs
++++ b/src/parsing/expressions/calls.rs
+@@ -40,7 +40,11 @@ impl Parser {
+             } else if self.parse_call_suffix() {
+                 expression.done(self, CALL_EXPRESSION);
+             } else if self.at(DOT) || self.at(SAFE_ACCESS) {
+-                let expression_type = if self.at(DOT) { DOT_QUALIFIED_EXPRESSION } else { SAFE_ACCESS_EXPRESSION };
++                let expression_type = if self.at(DOT) {
++                    DOT_QUALIFIED_EXPRESSION
++                } else {
++                    SAFE_ACCESS_EXPRESSION
++                };
+                 self.advance(); // DOT or SAFE_ACCESS
+ 
+                 if !first_expression_parsed {
+diff --git a/src/parsing/expressions/collections.rs b/src/parsing/expressions/collections.rs
+index df948c0..6947672 100644
+--- a/src/parsing/expressions/collections.rs
++++ b/src/parsing/expressions/collections.rs
+@@ -20,7 +20,11 @@ impl Parser {
+      *   ;
+      */
+     pub(crate) fn parse_collection_literal_expression(&mut self) {
+-        self.parse_as_collection_literal_expression(COLLECTION_LITERAL_EXPRESSION, true, "Expecting an element");
++        self.parse_as_collection_literal_expression(
++            COLLECTION_LITERAL_EXPRESSION,
++            true,
++            "Expecting an element",
++        );
+     }
+ 
+     pub(crate) fn parse_as_collection_literal_expression(
+diff --git a/src/parsing/expressions/control.rs b/src/parsing/expressions/control.rs
+index c67a908..b4b9982 100644
+--- a/src/parsing/expressions/control.rs
++++ b/src/parsing/expressions/control.rs
+@@ -121,7 +121,11 @@ impl Parser {
+     pub(crate) fn parse_condition(&mut self) {
+         self.my_builder.disable_newlines();
+ 
+-        if self.expect_3(LPAR, "Expecting a condition in parentheses '(...)'", Some(EXPRESSION_FIRST)) {
++        if self.expect_3(
++            LPAR,
++            "Expecting a condition in parentheses '(...)'",
++            Some(EXPRESSION_FIRST),
++        ) {
+             let condition = self.mark();
+             self.parse_expression();
+             condition.done(self, CONDITION);
+diff --git a/src/parsing/expressions/lambdas.rs b/src/parsing/expressions/lambdas.rs
+index 9758b26..8cb4422 100644
+--- a/src/parsing/expressions/lambdas.rs
++++ b/src/parsing/expressions/lambdas.rs
+@@ -24,13 +24,24 @@ impl Parser {
+     /*
+      * modifiers declarationRest
+      */
+-    pub(crate) fn parse_local_declaration(&mut self, rollback_if_definitely_not_expression: bool, is_script_top_level: bool) -> bool {
++    pub(crate) fn parse_local_declaration(
++        &mut self,
++        rollback_if_definitely_not_expression: bool,
++        is_script_top_level: bool,
++    ) -> bool {
+         let decl = self.mark();
+         let mut detector = ModifierDetector::default();
+-        self.parse_modifier_list_3(Some(&mut detector), TokenSet::EMPTY, /* localDeclaration = */ true);
+-
+-        let decl_type =
+-            self.parse_local_declaration_rest(&mut detector, rollback_if_definitely_not_expression, is_script_top_level);
++        self.parse_modifier_list_3(
++            Some(&mut detector),
++            TokenSet::EMPTY,
++            /* localDeclaration = */ true,
++        );
++
++        let decl_type = self.parse_local_declaration_rest(
++            &mut detector,
++            rollback_if_definitely_not_expression,
++            is_script_top_level,
++        );
+ 
+         if let Some(decl_type) = decl_type {
+             // we do not attach preceding comments (non-doc) to local variables because they are likely commenting a few statements below
+@@ -83,7 +94,8 @@ impl Parser {
+             //   {(a, b) -> ... }
+             let rollback_marker = self.mark();
+             let next_token = self.lookahead(1);
+-            let prefer_params_to_expressions = next_token == Some(COMMA) || next_token == Some(COLON);
++            let prefer_params_to_expressions =
++                next_token == Some(COMMA) || next_token == Some(COLON);
+             self.parse_function_literal_parameter_list();
+ 
+             params_found = if prefer_params_to_expressions {
+@@ -126,7 +138,11 @@ impl Parser {
+         self.my_builder.restore_newlines_state();
+     }
+ 
+-    pub(crate) fn rollback_or_drop_at(&mut self, rollback_marker: Marker, drop_at: SyntaxKind) -> bool {
++    pub(crate) fn rollback_or_drop_at(
++        &mut self,
++        rollback_marker: Marker,
++        drop_at: SyntaxKind,
++    ) -> bool {
+         if self.at(drop_at) {
+             self.advance(); // dropAt
+             rollback_marker.drop(self);
+diff --git a/src/parsing/expressions/loops.rs b/src/parsing/expressions/loops.rs
+index 3bd5f76..bbfd193 100644
+--- a/src/parsing/expressions/loops.rs
++++ b/src/parsing/expressions/loops.rs
+@@ -3,8 +3,8 @@
+ use ktrs_syntax::SyntaxKind::*;
+ 
+ use super::{
+-    COLON_IN_KEYWORD_SET, IN_KEYWORD_L_BRACE_RECOVERY_SET, IN_KEYWORD_L_BRACE_SET, IN_KEYWORD_R_PAR_COLON_SET,
+-    IN_KEYWORD_SET, L_PAR_L_BRACE_R_PAR_SET,
++    COLON_IN_KEYWORD_SET, IN_KEYWORD_L_BRACE_RECOVERY_SET, IN_KEYWORD_L_BRACE_SET,
++    IN_KEYWORD_R_PAR_COLON_SET, IN_KEYWORD_SET, L_PAR_L_BRACE_R_PAR_SET,
+ };
+ use crate::parsing::Parser;
+ use crate::parsing::declarations::{EXPRESSION_FIRST, MultiDeclarationMode};
+@@ -26,7 +26,10 @@ impl Parser {
+             self.parse_loop_body();
+         }
+ 
+-        if self.expect_2(WHILE_KEYWORD, "Expecting 'while' followed by a post-condition") {
++        if self.expect_2(
++            WHILE_KEYWORD,
++            "Expecting 'while' followed by a post-condition",
++        ) {
+             self.parse_condition();
+         }
+ 
+@@ -66,7 +69,11 @@ impl Parser {
+ 
+         self.advance(); // FOR_KEYWORD
+ 
+-        if self.expect_3(LPAR, "Expecting '(' to open a loop range", Some(EXPRESSION_FIRST)) {
++        if self.expect_3(
++            LPAR,
++            "Expecting '(' to open a loop range",
++            Some(EXPRESSION_FIRST),
++        ) {
+             self.my_builder.disable_newlines();
+ 
+             if !self.at(RPAR) {
+@@ -88,10 +95,18 @@ impl Parser {
+                     } else {
+                         MultiDeclarationMode::Short
+                     };
+-                    self.parse_multi_declaration_entry(IN_KEYWORD_L_BRACE_SET, IN_KEYWORD_L_BRACE_RECOVERY_SET, mode);
++                    self.parse_multi_declaration_entry(
++                        IN_KEYWORD_L_BRACE_SET,
++                        IN_KEYWORD_L_BRACE_RECOVERY_SET,
++                        mode,
++                    );
+                     destructuring_declaration.done(self, DESTRUCTURING_DECLARATION);
+                 } else {
+-                    self.expect_3(IDENTIFIER, "Expecting a variable name", Some(COLON_IN_KEYWORD_SET));
++                    self.expect_3(
++                        IDENTIFIER,
++                        "Expecting a variable name",
++                        Some(COLON_IN_KEYWORD_SET),
++                    );
+ 
+                     if self.at(COLON) {
+                         self.advance(); // COLON
+diff --git a/src/parsing/expressions/mod.rs b/src/parsing/expressions/mod.rs
+index 7130617..b8e88bd 100644
+--- a/src/parsing/expressions/mod.rs
++++ b/src/parsing/expressions/mod.rs
+@@ -24,34 +24,100 @@ pub(crate) use binary_operation_precedence::BinaryOperationPrecedence;
+ 
+ const WHEN_CONDITION_RECOVERY_SET: TokenSet =
+     TokenSet::create(&[RBRACE, IN_KEYWORD, NOT_IN, IS_KEYWORD, NOT_IS, ELSE_KEYWORD]);
+-const WHEN_CONDITION_RECOVERY_SET_WITH_ARROW: TokenSet =
+-    TokenSet::create(&[RBRACE, IN_KEYWORD, NOT_IN, IS_KEYWORD, NOT_IS, ELSE_KEYWORD, ARROW, DOT]);
++const WHEN_CONDITION_RECOVERY_SET_WITH_ARROW: TokenSet = TokenSet::create(&[
++    RBRACE,
++    IN_KEYWORD,
++    NOT_IN,
++    IS_KEYWORD,
++    NOT_IS,
++    ELSE_KEYWORD,
++    ARROW,
++    DOT,
++]);
+ // `KEYWORD_TEXTS.get(text)` is `keyword_texts_get` in strings.rs.
+ 
+-const TOKEN_SET_TO_FOLLOW_AFTER_DESTRUCTURING_DECLARATION_IN_LAMBDA: TokenSet = TokenSet::create(&[ARROW, COMMA, COLON]);
++const TOKEN_SET_TO_FOLLOW_AFTER_DESTRUCTURING_DECLARATION_IN_LAMBDA: TokenSet =
++    TokenSet::create(&[ARROW, COMMA, COLON]);
+ const TOKEN_SET_TO_FOLLOW_AFTER_DESTRUCTURING_DECLARATION_IN_LAMBDA_RECOVERY: TokenSet =
+-    TokenSet::or_set(&[TOKEN_SET_TO_FOLLOW_AFTER_DESTRUCTURING_DECLARATION_IN_LAMBDA, PARAMETER_NAME_RECOVERY_SET]);
++    TokenSet::or_set(&[
++        TOKEN_SET_TO_FOLLOW_AFTER_DESTRUCTURING_DECLARATION_IN_LAMBDA,
++        PARAMETER_NAME_RECOVERY_SET,
++    ]);
+ const EQ_RPAR_SET: TokenSet = TokenSet::create(&[EQ, RPAR]);
+ const ARROW_SET: TokenSet = TokenSet::create(&[ARROW]);
+ const ARROW_COMMA_SET: TokenSet = TokenSet::create(&[ARROW, COMMA]);
+ const IN_KEYWORD_R_PAR_COLON_SET: TokenSet = TokenSet::create(&[IN_KEYWORD, RPAR, COLON]);
+ const IN_KEYWORD_L_BRACE_SET: TokenSet = TokenSet::create(&[IN_KEYWORD, LBRACE]);
+-const IN_KEYWORD_L_BRACE_RECOVERY_SET: TokenSet = TokenSet::or_set(&[IN_KEYWORD_L_BRACE_SET, PARAMETER_NAME_RECOVERY_SET]);
++const IN_KEYWORD_L_BRACE_RECOVERY_SET: TokenSet =
++    TokenSet::or_set(&[IN_KEYWORD_L_BRACE_SET, PARAMETER_NAME_RECOVERY_SET]);
+ const COLON_IN_KEYWORD_SET: TokenSet = TokenSet::create(&[COLON, IN_KEYWORD]);
+ const L_PAR_L_BRACE_R_PAR_SET: TokenSet = TokenSet::create(&[LPAR, LBRACE, RPAR]);
+ const IN_KEYWORD_SET: TokenSet = TokenSet::create(&[IN_KEYWORD]);
+-const TRY_CATCH_RECOVERY_TOKEN_SET: TokenSet = TokenSet::create(&[LBRACE, RBRACE, FINALLY_KEYWORD, CATCH_KEYWORD]);
++const TRY_CATCH_RECOVERY_TOKEN_SET: TokenSet =
++    TokenSet::create(&[LBRACE, RBRACE, FINALLY_KEYWORD, CATCH_KEYWORD]);
+ 
+ const TYPE_ARGUMENT_LIST_STOPPERS: TokenSet = TokenSet::create(&[
+-    INTEGER_LITERAL, FLOAT_LITERAL, CHARACTER_LITERAL, INTERPOLATION_PREFIX, OPEN_QUOTE,
+-    PACKAGE_KEYWORD, AS_KEYWORD, TYPE_ALIAS_KEYWORD, INTERFACE_KEYWORD, CLASS_KEYWORD, THIS_KEYWORD, VAL_KEYWORD, VAR_KEYWORD,
+-    FUN_KEYWORD, FOR_KEYWORD, NULL_KEYWORD,
+-    TRUE_KEYWORD, FALSE_KEYWORD, IS_KEYWORD, THROW_KEYWORD, RETURN_KEYWORD, BREAK_KEYWORD,
+-    CONTINUE_KEYWORD, OBJECT_KEYWORD, IF_KEYWORD, TRY_KEYWORD, ELSE_KEYWORD, WHILE_KEYWORD, DO_KEYWORD,
+-    WHEN_KEYWORD, RBRACKET, RBRACE, RPAR, PLUSPLUS, MINUSMINUS, EXCLEXCL,
+-    PLUS, MINUS, EXCL, DIV, PERC, LTEQ,
+-    EQEQEQ, EXCLEQEQEQ, EQEQ, EXCLEQ, ANDAND, OROR, SAFE_ACCESS, ELVIS,
+-    SEMICOLON, RANGE, RANGE_UNTIL, EQ, MULTEQ, DIVEQ, PERCEQ, PLUSEQ, MINUSEQ, NOT_IN, NOT_IS,
++    INTEGER_LITERAL,
++    FLOAT_LITERAL,
++    CHARACTER_LITERAL,
++    INTERPOLATION_PREFIX,
++    OPEN_QUOTE,
++    PACKAGE_KEYWORD,
++    AS_KEYWORD,
++    TYPE_ALIAS_KEYWORD,
++    INTERFACE_KEYWORD,
++    CLASS_KEYWORD,
++    THIS_KEYWORD,
++    VAL_KEYWORD,
++    VAR_KEYWORD,
++    FUN_KEYWORD,
++    FOR_KEYWORD,
++    NULL_KEYWORD,
++    TRUE_KEYWORD,
++    FALSE_KEYWORD,
++    IS_KEYWORD,
++    THROW_KEYWORD,
++    RETURN_KEYWORD,
++    BREAK_KEYWORD,
++    CONTINUE_KEYWORD,
++    OBJECT_KEYWORD,
++    IF_KEYWORD,
++    TRY_KEYWORD,
++    ELSE_KEYWORD,
++    WHILE_KEYWORD,
++    DO_KEYWORD,
++    WHEN_KEYWORD,
++    RBRACKET,
++    RBRACE,
++    RPAR,
++    PLUSPLUS,
++    MINUSMINUS,
++    EXCLEXCL,
++    PLUS,
++    MINUS,
++    EXCL,
++    DIV,
++    PERC,
++    LTEQ,
++    EQEQEQ,
++    EXCLEQEQEQ,
++    EQEQ,
++    EXCLEQ,
++    ANDAND,
++    OROR,
++    SAFE_ACCESS,
++    ELVIS,
++    SEMICOLON,
++    RANGE,
++    RANGE_UNTIL,
++    EQ,
++    MULTEQ,
++    DIVEQ,
++    PERCEQ,
++    PLUSEQ,
++    MINUSEQ,
++    NOT_IN,
++    NOT_IS,
+     COLONCOLON,
+     COLON,
+ ]);
+@@ -61,7 +127,8 @@ pub(crate) const STATEMENT_FIRST: TokenSet = TokenSet::or_set(&[
+     TokenSet::create(&[
+         // declaration
+         FUN_KEYWORD,
+-        VAL_KEYWORD, VAR_KEYWORD,
++        VAL_KEYWORD,
++        VAR_KEYWORD,
+         INTERFACE_KEYWORD,
+         CLASS_KEYWORD,
+         TYPE_ALIAS_KEYWORD,
+@@ -70,18 +137,25 @@ pub(crate) const STATEMENT_FIRST: TokenSet = TokenSet::or_set(&[
+ ]);
+ 
+ const STATEMENT_NEW_LINE_QUICK_RECOVERY_SET: TokenSet = TokenSet::or_set(&[
+-    TokenSet::and_set(STATEMENT_FIRST, TokenSet::and_not(KEYWORDS, TokenSet::create(&[IN_KEYWORD]))),
++    TokenSet::and_set(
++        STATEMENT_FIRST,
++        TokenSet::and_not(KEYWORDS, TokenSet::create(&[IN_KEYWORD])),
++    ),
+     TokenSet::create(&[EOL_OR_SEMICOLON]),
+ ]);
+ 
+-const MIN_BINARY_OPERATION_PRECEDENCE: BinaryOperationPrecedence = BinaryOperationPrecedence::ENTRIES[0];
++const MIN_BINARY_OPERATION_PRECEDENCE: BinaryOperationPrecedence =
++    BinaryOperationPrecedence::ENTRIES[0];
+ 
+ const MAX_BINARY_OPERATION_PRECEDENCE: BinaryOperationPrecedence =
+     BinaryOperationPrecedence::ENTRIES[BinaryOperationPrecedence::ENTRIES.len() - 1];
+ 
+ const ALLOW_NEWLINE_OPERATIONS: TokenSet = TokenSet::create(&[
+-    DOT, SAFE_ACCESS,
+-    COLON, AS_KEYWORD, AS_SAFE,
++    DOT,
++    SAFE_ACCESS,
++    COLON,
++    AS_KEYWORD,
++    AS_SAFE,
+     ELVIS,
+     // Can't allow `is` and `!is` because of when entry conditions: IS_KEYWORD, NOT_IS,
+     ANDAND,
+@@ -91,7 +165,8 @@ const ALLOW_NEWLINE_OPERATIONS: TokenSet = TokenSet::create(&[
+ /// `KtTokenSets.PREFIX_OPERATIONS` (psi-api).
+ const PREFIX_OPERATIONS: TokenSet = TokenSet::create(&[MINUS, PLUS, MINUSMINUS, PLUSPLUS, EXCL]);
+ /// `KtTokenSets.POSTFIX_OPERATIONS` (psi-api).
+-const POSTFIX_OPERATIONS: TokenSet = TokenSet::create(&[PLUSPLUS, MINUSMINUS, EXCLEXCL, DOT, SAFE_ACCESS]);
++const POSTFIX_OPERATIONS: TokenSet =
++    TokenSet::create(&[PLUSPLUS, MINUSMINUS, EXCLEXCL, DOT, SAFE_ACCESS]);
+ 
+ impl Parser {
+     /*
+diff --git a/src/parsing/expressions/operations.rs b/src/parsing/expressions/operations.rs
+index 99b6d1d..64a19a3 100644
+--- a/src/parsing/expressions/operations.rs
++++ b/src/parsing/expressions/operations.rs
+@@ -3,7 +3,8 @@
+ use ktrs_syntax::SyntaxKind::*;
+ 
+ use super::{
+-    BinaryOperationPrecedence, MIN_BINARY_OPERATION_PRECEDENCE, PREFIX_OPERATIONS, TYPE_ARGUMENT_LIST_STOPPERS,
++    BinaryOperationPrecedence, MIN_BINARY_OPERATION_PRECEDENCE, PREFIX_OPERATIONS,
++    TYPE_ARGUMENT_LIST_STOPPERS,
+ };
+ use crate::builder::Marker;
+ use crate::kt_tokens::SOFT_KEYWORDS;
+@@ -30,15 +31,21 @@ impl Parser {
+             let Some(operation) = self.tt() else { break };
+ 
+             let Some(next_precedence) =
+-                BinaryOperationPrecedence::token_to_binary_precedence_map_with_soft_identifiers(operation)
++                BinaryOperationPrecedence::token_to_binary_precedence_map_with_soft_identifiers(
++                    operation,
++                )
+             else {
+                 break;
+             };
+-            if next_precedence.ordinal() > max_precedence.ordinal() || next_precedence.ordinal() < min_precedence.ordinal() {
++            if next_precedence.ordinal() > max_precedence.ordinal()
++                || next_precedence.ordinal() < min_precedence.ordinal()
++            {
+                 break;
+             }
+ 
+-            if next_precedence == BinaryOperationPrecedence::Infix && SOFT_KEYWORDS.contains(operation) {
++            if next_precedence == BinaryOperationPrecedence::Infix
++                && SOFT_KEYWORDS.contains(operation)
++            {
+                 // Remap soft keywords and modifiers that are treated as infix functions since there is no mutating `atSetWithRemap` call
+                 self.my_builder.remap_current_token(IDENTIFIER);
+             }
+@@ -59,7 +66,8 @@ impl Parser {
+                     IS_EXPRESSION
+                 }
+                 _ => {
+-                    min_precedence = self.parse_binary_expression(next_precedence.get_higher_priority());
++                    min_precedence =
++                        self.parse_binary_expression(next_precedence.get_higher_priority());
+                     BINARY_EXPRESSION
+                 }
+             };
+@@ -88,7 +96,9 @@ impl Parser {
+      */
+     pub(crate) fn parse_prefix_expression(&mut self) {
+         if self.at(AT) {
+-            if !self.parse_local_declaration(/* rollbackIfDefinitelyNotExpression = */ false, false) {
++            if !self.parse_local_declaration(
++                /* rollbackIfDefinitelyNotExpression = */ false, false,
++            ) {
+                 let expression = self.mark();
+                 self.parse_annotations(AnnotationParsingMode::Default);
+                 self.parse_prefix_expression();
+diff --git a/src/parsing/expressions/statements.rs b/src/parsing/expressions/statements.rs
+index f2d4fa2..dd63b84 100644
+--- a/src/parsing/expressions/statements.rs
++++ b/src/parsing/expressions/statements.rs
+@@ -5,7 +5,8 @@ use ktrs_syntax::SyntaxKind::{self, *};
+ use super::{STATEMENT_FIRST, STATEMENT_NEW_LINE_QUICK_RECOVERY_SET};
+ use crate::parsing::Parser;
+ use crate::parsing::declarations::{
+-    AnnotationParsingMode, DeclarationParsingMode, EXPRESSION_FIRST, ModifierDetector, NameParsingMode,
++    AnnotationParsingMode, DeclarationParsingMode, EXPRESSION_FIRST, ModifierDetector,
++    NameParsingMode,
+ };
+ use crate::token_set::TokenSet;
+ 
+@@ -40,12 +41,16 @@ impl Parser {
+             } else if self.at(RBRACE) {
+                 break;
+             } else if !is_script_top_level && !self.my_builder.newline_before_current_token() {
+-                let several_statements_error = "Unexpected tokens (use ';' to separate expressions on the same line)";
++                let several_statements_error =
++                    "Unexpected tokens (use ';' to separate expressions on the same line)";
+ 
+                 if self.at_set(STATEMENT_NEW_LINE_QUICK_RECOVERY_SET) {
+                     self.error(several_statements_error);
+                 } else {
+-                    self.error_until(several_statements_error, TokenSet::create(&[EOL_OR_SEMICOLON, LBRACE, RBRACE]));
++                    self.error_until(
++                        several_statements_error,
++                        TokenSet::create(&[EOL_OR_SEMICOLON, LBRACE, RBRACE]),
++                    );
+                 }
+             }
+         }
+@@ -58,7 +63,10 @@ impl Parser {
+      *  ;
+      */
+     pub(crate) fn parse_statement(&mut self, is_script_top_level: bool) {
+-        if !self.parse_local_declaration(/* rollbackIfDefinitelyNotExpression = */ false, is_script_top_level) {
++        if !self.parse_local_declaration(
++            /* rollbackIfDefinitelyNotExpression = */ false,
++            is_script_top_level,
++        ) {
+             if !self.at_set(EXPRESSION_FIRST) {
+                 self.error_and_advance("Expecting a statement");
+             } else if is_script_top_level {
+@@ -137,7 +145,11 @@ impl Parser {
+         self.parse_common_declaration(
+             modifier_detector,
+             NameParsingMode::Required,
+-            if is_script_top_level { DeclarationParsingMode::ScriptToplevel } else { DeclarationParsingMode::Local },
++            if is_script_top_level {
++                DeclarationParsingMode::ScriptToplevel
++            } else {
++                DeclarationParsingMode::Local
++            },
+         )
+     }
+ }
+diff --git a/src/parsing/expressions/strings.rs b/src/parsing/expressions/strings.rs
+index 6cf20db..753e8ce 100644
+--- a/src/parsing/expressions/strings.rs
++++ b/src/parsing/expressions/strings.rs
+@@ -7,7 +7,8 @@ use crate::parsing::Parser;
+ 
+ /// `KEYWORD_TEXTS.get(text)`: `KEYWORDS` keyed by their text.
+ fn keyword_texts_get(text: Option<&str>) -> Option<SyntaxKind> {
+-    text.and_then(SyntaxKind::hard_keyword).filter(|&k| KEYWORDS.contains(k))
++    text.and_then(SyntaxKind::hard_keyword)
++        .filter(|&k| KEYWORDS.contains(k))
+ }
+ 
+ impl Parser {
+diff --git a/src/parsing/expressions/when.rs b/src/parsing/expressions/when.rs
+index a832b6e..4c60081 100644
+--- a/src/parsing/expressions/when.rs
++++ b/src/parsing/expressions/when.rs
+@@ -78,7 +78,10 @@ impl Parser {
+             self.parse_when_entry_guard_or_suggest();
+ 
+             if !self.at(ARROW) {
+-                self.error_until("Expecting '->'", TokenSet::create(&[ARROW, LBRACE, RBRACE, EOL_OR_SEMICOLON]));
++                self.error_until(
++                    "Expecting '->'",
++                    TokenSet::create(&[ARROW, LBRACE, RBRACE, EOL_OR_SEMICOLON]),
++                );
+             }
+ 
+             if self.at(ARROW) {
+diff --git a/src/parsing/kotlin_parser.rs b/src/parsing/kotlin_parser.rs
+index cd96e06..4584ce8 100644
+--- a/src/parsing/kotlin_parser.rs
++++ b/src/parsing/kotlin_parser.rs
+@@ -5,7 +5,9 @@ use ktrs_syntax::{Parse, SyntaxKind};
+ 
+ use super::Parser;
+ use crate::FileKind;
+-use crate::builder::{ChameleonCache, LazyLeaf, PsiBuilder, SemanticWhitespaceAwarePsiBuilder, TreeSink};
++use crate::builder::{
++    ChameleonCache, LazyLeaf, PsiBuilder, SemanticWhitespaceAwarePsiBuilder, TreeSink,
++};
+ 
+ /// `KotlinParser.parse(psiBuilder, psiFile)`: `parseFile` or `parseScript` by file kind.
+ pub fn parse(text: &str, kind: FileKind) -> Parse {
+@@ -16,7 +18,12 @@ pub fn parse(text: &str, kind: FileKind) -> Parse {
+ pub fn parse_cached(text: &str, kind: FileKind, cache: &mut ChameleonCache) -> Parse {
+     let psi = PsiBuilder::lex_kotlin(text);
+     let mut sink = TreeSink::for_file(&psi, Some(std::mem::take(cache)));
+-    run_into(psi, |kt_parsing| parse_by_kind(kt_parsing, kind), None, &mut sink);
++    run_into(
++        psi,
++        |kt_parsing| parse_by_kind(kt_parsing, kind),
++        None,
++        &mut sink,
++    );
+     *cache = sink.take_cache().expect("sink keeps its cache");
+     sink.finish()
+ }
+@@ -59,10 +66,18 @@ fn run_top_level(text: &str, parse: impl FnOnce(&mut Parser)) -> Parse {
+     sink.finish()
+ }
+ 
+-fn run_into(psi: PsiBuilder, parse: impl FnOnce(&mut Parser), root_kind: Option<SyntaxKind>, sink: &mut TreeSink) {
++fn run_into(
++    psi: PsiBuilder,
++    parse: impl FnOnce(&mut Parser),
++    root_kind: Option<SyntaxKind>,
++    sink: &mut TreeSink,
++) {
+     let mut kt_parsing = Parser::create_for_top_level(SemanticWhitespaceAwarePsiBuilder::new(psi));
+     parse(&mut kt_parsing);
+-    kt_parsing.my_builder.psi.build_tree_into(root_kind, sink, &reparse_lazy);
++    kt_parsing
++        .my_builder
++        .psi
++        .build_tree_into(root_kind, sink, &reparse_lazy);
+ }
+ 
+ /// Expands a lazy-parseable leaf: its kind's `parseContents` over its own text. The reparsed
+@@ -73,15 +88,27 @@ pub(crate) fn reparse_lazy(leaf: &LazyLeaf<'_>, sink: &mut TreeSink) -> bool {
+     let (kind, text) = (leaf.kind, leaf.text);
+     match kind {
+         SyntaxKind::BLOCK => sink.chameleon(kind, text, |sink| {
+-            run_into(leaf.relexed_builder(), Parser::parse_block_expression, Some(kind), sink)
++            run_into(
++                leaf.relexed_builder(),
++                Parser::parse_block_expression,
++                Some(kind),
++                sink,
++            )
+         }),
+         SyntaxKind::LAMBDA_EXPRESSION => sink.chameleon(kind, text, |sink| {
+-            run_into(leaf.relexed_builder(), Parser::parse_lambda_expression, Some(kind), sink)
++            run_into(
++                leaf.relexed_builder(),
++                Parser::parse_lambda_expression,
++                Some(kind),
++                sink,
++            )
+         }),
+-        SyntaxKind::DOC_COMMENT => sink.chameleon(kind, text, |sink| crate::kdoc::parse_kdoc_into(text, sink)),
+-        SyntaxKind::KDOC_MARKDOWN_LINK => {
+-            sink.chameleon(kind, text, |sink| crate::kdoc::parse_markdown_link_into(text, sink))
++        SyntaxKind::DOC_COMMENT => {
++            sink.chameleon(kind, text, |sink| crate::kdoc::parse_kdoc_into(text, sink))
+         }
++        SyntaxKind::KDOC_MARKDOWN_LINK => sink.chameleon(kind, text, |sink| {
++            crate::kdoc::parse_markdown_link_into(text, sink)
++        }),
+         _ => return false,
+     }
+     true
+diff --git a/src/parsing/mod.rs b/src/parsing/mod.rs
+index 23b1f74..ee76668 100644
+--- a/src/parsing/mod.rs
++++ b/src/parsing/mod.rs
+@@ -54,7 +54,8 @@ mod token_stream;
+ 
+ pub use optional_marker::OptionalMarker;
+ pub use token_stream::{
+-    AbstractTokenStreamPattern, At, AtSet, FirstBefore, LastBefore, Or, TokenStreamPattern, TokenStreamPredicate,
++    AbstractTokenStreamPattern, At, AtSet, FirstBefore, LastBefore, Or, TokenStreamPattern,
++    TokenStreamPredicate,
+ };
+ 
+ use crate::builder::{Layer, MarkerHost, PsiBuilder, SemanticWhitespaceAwarePsiBuilder};
+@@ -82,29 +83,53 @@ impl MarkerHost for Parser {
+ impl Parser {
+     /// `KotlinParsing.createForTopLevel`.
+     pub(crate) fn create_for_top_level(builder: SemanticWhitespaceAwarePsiBuilder) -> Parser {
+-        Parser { my_builder: builder, is_lazy: true, by_clause_layer: None, in_parameter_recovery_probe: false }
++        Parser {
++            my_builder: builder,
++            is_lazy: true,
++            by_clause_layer: None,
++            in_parameter_recovery_probe: false,
++        }
+     }
+ 
+     /// `KotlinParsing.createForTopLevelNonLazy`.
+     #[allow(dead_code)] // TODO: only `KotlinLightParser` uses it upstream; not ported yet.
+-    pub(crate) fn create_for_top_level_non_lazy(builder: SemanticWhitespaceAwarePsiBuilder) -> Parser {
+-        Parser { my_builder: builder, is_lazy: false, by_clause_layer: None, in_parameter_recovery_probe: false }
++    pub(crate) fn create_for_top_level_non_lazy(
++        builder: SemanticWhitespaceAwarePsiBuilder,
++    ) -> Parser {
++        Parser {
++            my_builder: builder,
++            is_lazy: false,
++            by_clause_layer: None,
++            in_parameter_recovery_probe: false,
++        }
+     }
+ 
+     /// `KotlinParsing.createForByClause(myBuilder, isLazy)`: runs `f` on a non-top-level parser
+     /// over a `SemanticWhitespaceAwarePsiBuilderForByClause` wrapping the current builder.
+-    pub(crate) fn create_for_by_clause<R>(&mut self, is_lazy: bool, f: impl FnOnce(&mut Parser) -> R) -> R {
+-        let layer = self.my_builder.push_layer(Layer::ForByClause { stack_size: 0 });
++    pub(crate) fn create_for_by_clause<R>(
++        &mut self,
++        is_lazy: bool,
++        f: impl FnOnce(&mut Parser) -> R,
++    ) -> R {
++        let layer = self
++            .my_builder
++            .push_layer(Layer::ForByClause { stack_size: 0 });
+         self.with_context(is_lazy, Some(layer), f)
+     }
+ 
+     /// `getStackSize()` of the by-clause builder if this is a by-clause parser, else `None`.
+     pub(crate) fn by_clause_stack_size(&self) -> Option<i32> {
+-        self.by_clause_layer.map(|layer| self.my_builder.for_by_clause_stack_size(layer))
++        self.by_clause_layer
++            .map(|layer| self.my_builder.for_by_clause_stack_size(layer))
+     }
+ 
+     /// Runs `f` with a new parser context, then pops the layer pushed by the caller and restores.
+-    fn with_context<R>(&mut self, is_lazy: bool, by_clause_layer: Option<usize>, f: impl FnOnce(&mut Parser) -> R) -> R {
++    fn with_context<R>(
++        &mut self,
++        is_lazy: bool,
++        by_clause_layer: Option<usize>,
++        f: impl FnOnce(&mut Parser) -> R,
++    ) -> R {
+         let saved = (self.is_lazy, self.by_clause_layer);
+         self.is_lazy = is_lazy;
+         self.by_clause_layer = by_clause_layer;
+diff --git a/src/parsing/optional_marker.rs b/src/parsing/optional_marker.rs
+index ba1bf96..6c2ee45 100644
+--- a/src/parsing/optional_marker.rs
++++ b/src/parsing/optional_marker.rs
+@@ -13,7 +13,10 @@ pub struct OptionalMarker {
+ impl OptionalMarker {
+     pub fn new(p: &mut Parser, actually_mark: bool) -> OptionalMarker {
+         let marker = actually_mark.then(|| p.mark());
+-        OptionalMarker { marker, offset: p.my_builder.get_current_offset() }
++        OptionalMarker {
++            marker,
++            offset: p.my_builder.get_current_offset(),
++        }
+     }
+ 
+     pub fn done(&self, p: &mut Parser, element_type: SyntaxKind) {
+diff --git a/src/parsing/token_stream.rs b/src/parsing/token_stream.rs
+index a57c537..8765712 100644
+--- a/src/parsing/token_stream.rs
++++ b/src/parsing/token_stream.rs
+@@ -10,7 +10,10 @@ use crate::token_set::TokenSet;
+ 
+ impl Parser {
+     /// `AbstractKotlinParsing.matchTokenStreamPredicate`.
+-    pub(crate) fn match_token_stream_predicate(&mut self, pattern: &mut dyn TokenStreamPattern) -> i32 {
++    pub(crate) fn match_token_stream_predicate(
++        &mut self,
++        pattern: &mut dyn TokenStreamPattern,
++    ) -> i32 {
+         let current_position = self.mark();
+         let mut opens: Vec<SyntaxKind> = Vec::new();
+         let mut open_angle_brackets = 0;
+@@ -19,7 +22,12 @@ impl Parser {
+         let mut open_brackets = 0;
+         while !self.eof() {
+             let offset = self.my_builder.get_current_offset();
+-            let top_level = pattern.is_top_level(open_angle_brackets, open_brackets, open_braces, open_parentheses);
++            let top_level = pattern.is_top_level(
++                open_angle_brackets,
++                open_brackets,
++                open_braces,
++                open_parentheses,
++            );
+             if pattern.process_token(self, offset, top_level) {
+                 break;
+             }
+@@ -100,7 +108,13 @@ pub trait TokenStreamPattern {
+     /// The offset where the pattern matched, -1 if none.
+     fn result(&self) -> i32;
+ 
+-    fn is_top_level(&self, open_angle_brackets: i32, open_brackets: i32, open_braces: i32, open_parentheses: i32) -> bool {
++    fn is_top_level(
++        &self,
++        open_angle_brackets: i32,
++        open_brackets: i32,
++        open_braces: i32,
++        open_parentheses: i32,
++    ) -> bool {
+         open_braces == 0 && open_brackets == 0 && open_parentheses == 0 && open_angle_brackets == 0
+     }
+ 
+@@ -118,7 +132,9 @@ pub struct AbstractTokenStreamPattern {
+ 
+ impl Default for AbstractTokenStreamPattern {
+     fn default() -> Self {
+-        AbstractTokenStreamPattern { last_occurrence: -1 }
++        AbstractTokenStreamPattern {
++            last_occurrence: -1,
++        }
+     }
+ }
+ 
+@@ -140,7 +156,11 @@ pub struct FirstBefore<L, S> {
+ 
+ impl<L: TokenStreamPredicate, S: TokenStreamPredicate> FirstBefore<L, S> {
+     pub fn new(look_for: L, stop_at: S) -> Self {
+-        FirstBefore { base: AbstractTokenStreamPattern::default(), look_for, stop_at }
++        FirstBefore {
++            base: AbstractTokenStreamPattern::default(),
++            look_for,
++            stop_at,
++        }
+     }
+ 
+     pub fn reset(&mut self) {
+@@ -228,7 +248,10 @@ impl At {
+     }
+ 
+     pub fn new_2(look_for: SyntaxKind, top_level_only: bool) -> At {
+-        At { look_for, top_level_only }
++        At {
++            look_for,
++            top_level_only,
++        }
+     }
+ }
+ 
+@@ -250,7 +273,10 @@ impl AtSet {
+     }
+ 
+     pub fn new_2(look_for: TokenSet, top_level_only: TokenSet) -> AtSet {
+-        AtSet { look_for, top_level_only }
++        AtSet {
++            look_for,
++            top_level_only,
++        }
+     }
+ }
+ 
+diff --git a/src/token_set.rs b/src/token_set.rs
+index bac9f53..432cd55 100644
+--- a/src/token_set.rs
++++ b/src/token_set.rs
+@@ -3,7 +3,10 @@
+ use ktrs_syntax::SyntaxKind;
+ 
+ const WORDS: usize = 8;
+-const _: () = assert!((SyntaxKind::DUMMY_HOLDER as usize) < WORDS * 64, "grow TokenSet::WORDS");
++const _: () = assert!(
++    (SyntaxKind::DUMMY_HOLDER as usize) < WORDS * 64,
++    "grow TokenSet::WORDS"
++);
+ 
+ #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+ pub struct TokenSet([u64; WORDS]);

@@ -157,3 +157,16 @@ fn actual_worker_output_count_limits_reject_without_partial_tree() {
     );
     check("val healthy = 1", FileKind::Source);
 }
+
+#[test]
+fn exact_input_boundary_and_actual_diagnostic_limit() {
+    check(&" ".repeat(MAX_SOURCE_BYTES), FileKind::Source);
+    let source = "?\n".repeat(257);
+    assert_eq!(
+        parser()
+            .parse(&source, FileKind::Source, &AtomicBool::new(false))
+            .unwrap_err(),
+        ParserError::OutputLimit
+    );
+    check("val healthy = 1", FileKind::Source);
+}

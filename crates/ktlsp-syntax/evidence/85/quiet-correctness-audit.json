@@ -1,0 +1,147 @@
+{
+  "primary_rows": 270,
+  "replica_rows": 48,
+  "primary_elapsed_s": 11.179895958,
+  "replica_elapsed_s": 1.4007820830011042,
+  "primary_median_groups_pass": 18,
+  "primary_per_round_groups_pass": 90,
+  "both_current_and_historical_bases_pass": true,
+  "replica_groups_pass": 8,
+  "max_primary_paired_ratio": [
+    1.1666666666666667,
+    "empty",
+    "default",
+    3,
+    {
+      "candidate": 7,
+      "current": 6,
+      "historical": 6
+    }
+  ],
+  "primary_median_ratio_range_both_bases": [
+    0.9156626506024096,
+    1.0189221098660837
+  ],
+  "historical_current_max_median_relative_difference": 0.027161290879378797,
+  "hashes_order_counts_deadlines_match": true,
+  "acceptance": "bounded predeclared median gate accepted; no112-call latency,p95,platform-general conclusion",
+  "replica_per_round_groups_pass": 24,
+  "replica_paired_ratio_range": [
+    0.9496315917206948,
+    1.038820519176548
+  ],
+  "replica_ranges_ns": [
+    [
+      "large",
+      "default",
+      "current",
+      6349709,
+      6565167
+    ],
+    [
+      "large",
+      "default",
+      "candidate",
+      6227958,
+      6596208
+    ],
+    [
+      "large",
+      "0",
+      "current",
+      6573625,
+      6704417
+    ],
+    [
+      "large",
+      "0",
+      "candidate",
+      6469041,
+      6823833
+    ],
+    [
+      "short_tokens",
+      "default",
+      "current",
+      10816125,
+      11864334
+    ],
+    [
+      "short_tokens",
+      "default",
+      "candidate",
+      10271334,
+      11502750
+    ],
+    [
+      "short_tokens",
+      "0",
+      "current",
+      11287166,
+      11652209
+    ],
+    [
+      "short_tokens",
+      "0",
+      "candidate",
+      11119917,
+      11466334
+    ],
+    [
+      "dense_sparse",
+      "default",
+      "current",
+      10931834,
+      11142875
+    ],
+    [
+      "dense_sparse",
+      "default",
+      "candidate",
+      10802041,
+      11154708
+    ],
+    [
+      "dense_sparse",
+      "0",
+      "current",
+      10949375,
+      11183041
+    ],
+    [
+      "dense_sparse",
+      "0",
+      "candidate",
+      10923542,
+      11328833
+    ],
+    [
+      "sparse_dense",
+      "default",
+      "current",
+      21842625,
+      22003917
+    ],
+    [
+      "sparse_dense",
+      "default",
+      "candidate",
+      21634875,
+      22301750
+    ],
+    [
+      "sparse_dense",
+      "0",
+      "current",
+      21887250,
+      22450542
+    ],
+    [
+      "sparse_dense",
+      "0",
+      "candidate",
+      21663834,
+      23004292
+    ]
+  ]
+}

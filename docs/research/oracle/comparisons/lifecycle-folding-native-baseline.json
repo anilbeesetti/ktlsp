@@ -1,0 +1,694 @@
+{
+  "command": [
+    "./target/debug/ktlsp"
+  ],
+  "declaredNativeRevision": "0d54973ce66f59362829360261fde6e46b4fc420",
+  "exit": {
+    "actual": 0,
+    "expected": 0,
+    "matches": true
+  },
+  "fixtureDirectory": "docs/research/oracle/lifecycle-folding",
+  "limits": {
+    "deadlines": {
+      "operationMs": 5000,
+      "sessionMs": 30000
+    },
+    "stderrBytes": 65536,
+    "stdoutBytes": 8388608,
+    "stdoutMessages": 1024
+  },
+  "matches": false,
+  "normalization": "none; original IDs, URIs and array order retained",
+  "notifications": {
+    "actual": [],
+    "coverage": "decoded observations only; original shutdown tail may be incomplete",
+    "expectedCaptured": [
+      {
+        "jsonrpc": "2.0",
+        "method": "window/logMessage",
+        "params": {
+          "message": "Process started with\nServerLaunchConfig(protocolConfig=StdioServer(out=java.io.PrintStream@424055f6), systemPath=/workspace/research/official-oracle/capture-cache, defaultLogLevel=INFO, logCategories={}, dataSharing=NONE, region=APAC, caCertificates=[/usr/local/share/ca-certificates/environment-proxy-ca.crt], eulaHash=null, workspaceRoot=null, idleShutdownTimeout=null)",
+          "type": 3
+        }
+      },
+      {
+        "jsonrpc": "2.0",
+        "method": "window/logMessage",
+        "params": {
+          "message": "System Info\n  os.name: Linux\n  os.version: 6.18.44\n  cpu.arch: X86_64\n  cpu.number: 4\n  java.home: /workspace/research/official-oracle/distribution/kotlin-server-263.6379.0/jbr\n  java.version: = 25.0.4.1+1-b601.61\n  java.vm.vendor: JetBrains s.r.o.\n  ram.xmx: 2048MB\n",
+          "type": 3
+        }
+      },
+      {
+        "jsonrpc": "2.0",
+        "method": "window/logMessage",
+        "params": {
+          "message": "Log file: /workspace/research/official-oracle/capture-cache/system/log/intellij-server.log",
+          "type": 3
+        }
+      },
+      {
+        "jsonrpc": "2.0",
+        "method": "intellij/workspaceImportStatus",
+        "params": {
+          "blockedFolders": [
+            {
+              "candidates": [],
+              "dismissed": false,
+              "folderUri": "file:///workspace/research/official-oracle/fixture/",
+              "reason": "noBuildSystemFound"
+            }
+          ]
+        }
+      },
+      {
+        "jsonrpc": "2.0",
+        "method": "window/showMessage",
+        "params": {
+          "message": "Project import skipped for file:///workspace/research/official-oracle/fixture: no supported build system found in the project root",
+          "type": 3
+        }
+      },
+      {
+        "jsonrpc": "2.0",
+        "method": "intellij/workspaceImportStatus",
+        "params": {
+          "blockedFolders": [
+            {
+              "candidates": [],
+              "dismissed": false,
+              "folderUri": "file:///workspace/research/official-oracle/fixture/",
+              "reason": "noBuildSystemFound"
+            }
+          ]
+        }
+      },
+      {
+        "jsonrpc": "2.0",
+        "method": "window/logMessage",
+        "params": {
+          "message": "No projects to import: checked 1 workspace folder(s)",
+          "type": 3
+        }
+      }
+    ],
+    "matchesCapturedSequence": false
+  },
+  "officialMetadata": {
+    "args": [
+      "/workspace/research/official-oracle/distribution/kotlin-server-263.6379.0/bin/intellij-server",
+      "--stdio",
+      "--data-sharing=none",
+      "--region=apac",
+      "--system-path=/workspace/research/official-oracle/capture-cache"
+    ],
+    "fixtureMode": "standalone source, empty configured project list",
+    "jvmScope": "isolated user-authorized research only",
+    "observedDate": "2026-10-12",
+    "platform": "linux-amd64",
+    "release": "kotlin-lsp/v263.6379.0",
+    "returncode": 0,
+    "sha256": "ab8ca4455dc2fc5fe1a24db2bccc46c104254d2c465155c4251ee65df8f3f7cc"
+  },
+  "outcome": "mismatch",
+  "responses": [
+    {
+      "actual": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "result": {
+          "capabilities": {
+            "positionEncoding": "utf-16",
+            "textDocumentSync": {
+              "change": 2,
+              "openClose": true,
+              "save": false
+            }
+          },
+          "serverInfo": {
+            "name": "ktlsp",
+            "version": "0.1.0"
+          }
+        }
+      },
+      "differences": [
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": true,
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/callHierarchyProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": {
+            "codeActionKinds": [
+              "source.organizeImports",
+              "quickfix",
+              "refactor",
+              "refactor.inline.variable",
+              "refactor.extract.variable"
+            ],
+            "resolveProvider": false,
+            "workDoneProgress": false
+          },
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/codeActionProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": {
+            "resolveProvider": false,
+            "workDoneProgress": false
+          },
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/codeLensProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": {
+            "resolveProvider": true,
+            "triggerCharacters": [
+              "."
+            ]
+          },
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/completionProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": true,
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/definitionProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": {
+            "interFileDependencies": true,
+            "workDoneProgress": false,
+            "workspaceDiagnostics": false
+          },
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/diagnosticProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": true,
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/documentFormattingProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": true,
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/documentHighlightProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": true,
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/documentRangeFormattingProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": true,
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/documentSymbolProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": {
+            "commands": [
+              "decompile",
+              "applyModCommand",
+              "resolveModCommand",
+              "interpolateFileTemplate",
+              "set-highwatermark-file",
+              "wait-for-highwatermark",
+              "resolveLocation",
+              "start_debug_server",
+              "intellij.java.resolveLaunch",
+              "intellij.java.resolveBuildToolLaunch",
+              "intellij.java.resolveBuildCommand",
+              "intellij.java.resolveClassDocument",
+              "kotlin.organize.imports",
+              "jetbrains.kotlin.completion.apply",
+              "kotlin.applyCompilerDiagnosticFix",
+              "kotlin.inline.variable",
+              "refactor.extract.variable",
+              "exportWorkspace"
+            ]
+          },
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/executeCommandProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": {
+            "indexDir": "/workspace/research/official-oracle/capture-cache/workspaces/eb823c43b8f4937d7413412f9df0acfa/index/kotlin-server",
+            "licensing": true,
+            "workspaceImport": true
+          },
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/experimental"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": true,
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/foldingRangeProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": true,
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/hoverProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": true,
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/implementationProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": {
+            "resolveProvider": true
+          },
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/inlayHintProvider"
+        },
+        {
+          "actual": "utf-16",
+          "actualPresent": true,
+          "expected": null,
+          "expectedPresent": false,
+          "pointer": "/result/capabilities/positionEncoding"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": true,
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/referencesProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": {
+            "prepareProvider": true
+          },
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/renameProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": {
+            "full": true,
+            "legend": {
+              "tokenModifiers": [
+                "declaration",
+                "definition",
+                "readonly",
+                "static",
+                "deprecated",
+                "abstract",
+                "async",
+                "modification",
+                "documentation",
+                "defaultLibrary"
+              ],
+              "tokenTypes": [
+                "namespace",
+                "class",
+                "enum",
+                "interface",
+                "struct",
+                "typeParameter",
+                "type",
+                "parameter",
+                "variable",
+                "property",
+                "enumMember",
+                "event",
+                "function",
+                "method",
+                "macro",
+                "keyword",
+                "modifier",
+                "comment",
+                "string",
+                "number",
+                "regexp",
+                "operator",
+                "decorator"
+              ]
+            },
+            "range": true
+          },
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/semanticTokensProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": {
+            "retriggerCharacters": [
+              ","
+            ],
+            "triggerCharacters": [
+              "(",
+              ","
+            ],
+            "workDoneProgress": false
+          },
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/signatureHelpProvider"
+        },
+        {
+          "actual": false,
+          "actualPresent": true,
+          "expected": {
+            "includeText": false
+          },
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/textDocumentSync/save"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": true,
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/typeDefinitionProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": true,
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/typeHierarchyProvider"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": {
+            "fileOperations": {
+              "willRename": {
+                "filters": [
+                  {
+                    "pattern": {
+                      "glob": "**/*"
+                    }
+                  }
+                ]
+              }
+            },
+            "workspaceFolders": {
+              "changeNotifications": true,
+              "supported": true
+            }
+          },
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/workspace"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": {
+            "resolveProvider": false,
+            "workDoneProgress": true
+          },
+          "expectedPresent": true,
+          "pointer": "/result/capabilities/workspaceSymbolProvider"
+        },
+        {
+          "actual": "ktlsp",
+          "actualPresent": true,
+          "expected": "IntelliJ Language Server by JetBrains",
+          "expectedPresent": true,
+          "pointer": "/result/serverInfo/name"
+        },
+        {
+          "actual": "0.1.0",
+          "actualPresent": true,
+          "expected": "ILS-263.6379.0",
+          "expectedPresent": true,
+          "pointer": "/result/serverInfo/version"
+        }
+      ],
+      "expected": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "result": {
+          "capabilities": {
+            "callHierarchyProvider": true,
+            "codeActionProvider": {
+              "codeActionKinds": [
+                "source.organizeImports",
+                "quickfix",
+                "refactor",
+                "refactor.inline.variable",
+                "refactor.extract.variable"
+              ],
+              "resolveProvider": false,
+              "workDoneProgress": false
+            },
+            "codeLensProvider": {
+              "resolveProvider": false,
+              "workDoneProgress": false
+            },
+            "completionProvider": {
+              "resolveProvider": true,
+              "triggerCharacters": [
+                "."
+              ]
+            },
+            "definitionProvider": true,
+            "diagnosticProvider": {
+              "interFileDependencies": true,
+              "workDoneProgress": false,
+              "workspaceDiagnostics": false
+            },
+            "documentFormattingProvider": true,
+            "documentHighlightProvider": true,
+            "documentRangeFormattingProvider": true,
+            "documentSymbolProvider": true,
+            "executeCommandProvider": {
+              "commands": [
+                "decompile",
+                "applyModCommand",
+                "resolveModCommand",
+                "interpolateFileTemplate",
+                "set-highwatermark-file",
+                "wait-for-highwatermark",
+                "resolveLocation",
+                "start_debug_server",
+                "intellij.java.resolveLaunch",
+                "intellij.java.resolveBuildToolLaunch",
+                "intellij.java.resolveBuildCommand",
+                "intellij.java.resolveClassDocument",
+                "kotlin.organize.imports",
+                "jetbrains.kotlin.completion.apply",
+                "kotlin.applyCompilerDiagnosticFix",
+                "kotlin.inline.variable",
+                "refactor.extract.variable",
+                "exportWorkspace"
+              ]
+            },
+            "experimental": {
+              "indexDir": "/workspace/research/official-oracle/capture-cache/workspaces/eb823c43b8f4937d7413412f9df0acfa/index/kotlin-server",
+              "licensing": true,
+              "workspaceImport": true
+            },
+            "foldingRangeProvider": true,
+            "hoverProvider": true,
+            "implementationProvider": true,
+            "inlayHintProvider": {
+              "resolveProvider": true
+            },
+            "referencesProvider": true,
+            "renameProvider": {
+              "prepareProvider": true
+            },
+            "semanticTokensProvider": {
+              "full": true,
+              "legend": {
+                "tokenModifiers": [
+                  "declaration",
+                  "definition",
+                  "readonly",
+                  "static",
+                  "deprecated",
+                  "abstract",
+                  "async",
+                  "modification",
+                  "documentation",
+                  "defaultLibrary"
+                ],
+                "tokenTypes": [
+                  "namespace",
+                  "class",
+                  "enum",
+                  "interface",
+                  "struct",
+                  "typeParameter",
+                  "type",
+                  "parameter",
+                  "variable",
+                  "property",
+                  "enumMember",
+                  "event",
+                  "function",
+                  "method",
+                  "macro",
+                  "keyword",
+                  "modifier",
+                  "comment",
+                  "string",
+                  "number",
+                  "regexp",
+                  "operator",
+                  "decorator"
+                ]
+              },
+              "range": true
+            },
+            "signatureHelpProvider": {
+              "retriggerCharacters": [
+                ","
+              ],
+              "triggerCharacters": [
+                "(",
+                ","
+              ],
+              "workDoneProgress": false
+            },
+            "textDocumentSync": {
+              "change": 2,
+              "openClose": true,
+              "save": {
+                "includeText": false
+              }
+            },
+            "typeDefinitionProvider": true,
+            "typeHierarchyProvider": true,
+            "workspace": {
+              "fileOperations": {
+                "willRename": {
+                  "filters": [
+                    {
+                      "pattern": {
+                        "glob": "**/*"
+                      }
+                    }
+                  ]
+                }
+              },
+              "workspaceFolders": {
+                "changeNotifications": true,
+                "supported": true
+              }
+            },
+            "workspaceSymbolProvider": {
+              "resolveProvider": false,
+              "workDoneProgress": true
+            }
+          },
+          "serverInfo": {
+            "name": "IntelliJ Language Server by JetBrains",
+            "version": "ILS-263.6379.0"
+          }
+        }
+      },
+      "id": 1,
+      "matches": false
+    },
+    {
+      "actual": {
+        "error": {
+          "code": -32601,
+          "message": "Method not found"
+        },
+        "id": 2,
+        "jsonrpc": "2.0"
+      },
+      "differences": [
+        {
+          "actual": {
+            "code": -32601,
+            "message": "Method not found"
+          },
+          "actualPresent": true,
+          "expected": null,
+          "expectedPresent": false,
+          "pointer": "/error"
+        },
+        {
+          "actual": null,
+          "actualPresent": false,
+          "expected": [
+            {
+              "collapsedText": "{...}",
+              "endCharacter": 1,
+              "endLine": 2,
+              "kind": "region",
+              "startCharacter": 11,
+              "startLine": 0
+            }
+          ],
+          "expectedPresent": true,
+          "pointer": "/result"
+        }
+      ],
+      "expected": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "result": [
+          {
+            "collapsedText": "{...}",
+            "endCharacter": 1,
+            "endLine": 2,
+            "kind": "region",
+            "startCharacter": 11,
+            "startLine": 0
+          }
+        ]
+      },
+      "id": 2,
+      "matches": false
+    },
+    {
+      "actual": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": null
+      },
+      "differences": [],
+      "expected": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": null
+      },
+      "id": 3,
+      "matches": true
+    }
+  ],
+  "stderrUtf8Lossy": ""
+}

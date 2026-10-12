@@ -67,3 +67,49 @@ executable sandbox, aggregate concurrent-worker admission or packaging validatio
 Hosted CI and exact final head are recorded on the PR; local tests are not hosted
 CI. This gate alone does not unlock T008. Next: T007b accepted declaration corpus
 and validated parser-result/recovery contract, then accepted T008a HIR identity.
+
+# #86 revisioned result and declaration corpus review (2026-10-12)
+
+Partial child of #83/#7. Architect reproduced missing-parameter-list recovery
+failures and recommended splitting result/corpus validation from coordinated
+upstream recovery repair. CORPUS.md records all four known recovery counterexamples
+and individual unaccepted grammar areas. #83/T008a remain gated.
+
+Two independent slots were allocated by coordinator. Functionality reviewer
+passed the parser suite and independently exercised 22 Kotlin source cases plus
+script through public parse_snapshot: KDoc/file annotations, constructors, enum,
+companion/anonymous object, delegation/destructuring, string templates/raw strings,
+generic constraints, default lambda, typealias, Unicode CRLF, and incomplete
+declarations. These probes verify structural acceptance only; they do not expand
+the named accepted declaration corpus or establish semantic/version parity.
+
+Adversarial reviewer found P2: parent depth validation missed tokens/childless
+nodes at depth129. Fixed the shared validator to check every element's depth.
+Both reviewers independently rechecked: separate public-API probes for token and
+empty-node chains at 2/3/127/128/129/130 accepted through128 and rejected129/130.
+Permanent custom protocol cases assert both exact boundaries. Thirteen additional
+independent malformed replies (cycles/overflow/subtree/range/token gaps/overlaps/
+diagnostics/UTF-8/trailing JSON), each followed by healthy parsing, also passed.
+Original LF/loneCR/CRLF malformed Unicode EOF diagnostic mapping was rechecked.
+
+Inherited abort fixture could yield Timeout instead of WorkerFailed because the
+supervisor checks deadline before exit status. Architect approved accepting only
+these two failures for abort. Added normal process::exit(1) fixtures that strictly
+require WorkerFailed; all other expected errors/healthy results remain strict.
+Both independent reviewers rechecked this test-only correction using stable
+already-built executables. Production deadline/exit ordering did not change.
+
+One healthy real-worker followup returned unexpected Io during overlapping Cargo
+and reviewer jobs. Io still fails the test. Three sequential stable-artifact
+custom suite runs and independent reviewer runs did not reproduce it. Concurrent
+relinking is a possible cause, not proven; no retry-on-Io production behavior or
+relaxed healthy-success assertion was added.
+
+Pinned native checks pass on the initial base09b77a3: fmt, locked workspace clippy
+with warnings denied, full workspace tests (136 active +2 exercised helper
+fixtures), plus assert-based custom protocol suite (19 fault cases, exact depth
+boundaries, cancellation and real-worker healthy followups). Final head, hosted CI
+and integration evidence are recorded on the PR. No dependency/lock/limit change,
+JVM/Gradle/Maven/official oracle, full grammar, semantic HIR/provider, hard RSS or
+packaging claim. Allocation abort remains generic WorkerFailed, possibly Timeout;
+source snapshots require caller-managed document incarnation and publication.

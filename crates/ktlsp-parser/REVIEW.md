@@ -55,7 +55,8 @@ No production logic changed.
 ## Native checks and limits
 
 Pinned fmt, locked workspace clippy with warnings denied, and locked workspace
-tests pass. Final workspace: 89 active tests; two ignored helper fixtures are
+tests pass. Initial reviewed workspace: 89 active tests; later integration counts
+are recorded on the PR. Two ignored helper fixtures are
 intentionally launched by active subprocess tests. Parser: 13 active tests.
 Release parser suite also passes. Generated parser corpus has 64 deterministic
 UTF-8 fixtures, separately from upstream-regression depth 8/10/12/32 cases.

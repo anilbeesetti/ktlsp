@@ -10,3 +10,7 @@ ktrs-syntax = "=0.5.1"
 ktlsp-text = { path = "../ktlsp-text" }
 serde.workspace = true
 serde_json.workspace = true
+
+[[test]]
+name = "worker_protocol"
+harness = false

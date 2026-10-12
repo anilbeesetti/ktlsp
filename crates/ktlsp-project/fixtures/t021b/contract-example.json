@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 2,
+  "modules": [{
+    "id": "app",
+    "sourceRoots": [],
+    "dependencies": [
+      {"type": "module", "module": "core", "scope": "compile", "exported": false},
+      {"type": "library", "library": "stdlib", "scope": "test", "exported": true}
+    ]
+  }, {"id": "core", "sourceRoots": []}],
+  "libraries": [{"id": "stdlib", "binaries": ["lib/stdlib.jar"], "sources": []}],
+  "sdkArchives": []
+}

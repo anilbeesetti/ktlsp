@@ -148,6 +148,18 @@ fn stats(samples: Vec<f64>) -> Value {
         |p: f64| ordered[((ordered.len() as f64 * p).ceil() as usize).saturating_sub(1)];
     json!({"unit":"ns", "samples":samples, "median":percentile(0.5), "p95":percentile(0.95), "p99":percentile(0.99), "percentile_method":"nearest rank"})
 }
+fn memory(peaks: Vec<Option<u64>>, scope: &str) -> Value {
+    match peaks.into_iter().collect::<Option<Vec<_>>>() {
+        Some(peaks) => {
+            let mut summary = stats(peaks.into_iter().map(|v| v as f64).collect());
+            summary["unit"] = json!("bytes");
+            json!({"status":"measured", "metric":"whole-process peak RSS", "method":"Darwin arm64 wait4(WNOHANG), rusage.ru_maxrss in bytes at child reap", "scope":scope, "peak_rss":summary})
+        }
+        None => {
+            json!({"status":"unavailable", "reason":"RSS ABI implemented and checked only for macOS arm64", "scope":scope})
+        }
+    }
+}
 fn lexer(name: &str, repetitions: usize) -> Result<Value> {
     let owned = corpus(name);
     let sources: Vec<&str> = if name == "malformed" {
@@ -245,7 +257,7 @@ fn initialize(p: &mut Process) -> Result<()> {
     )?;
     p.send(&note("initialized", json!({})))
 }
-fn shutdown(p: &mut Process) -> Result<()> {
+fn shutdown(p: &mut Process) -> Result<Option<u64>> {
     p.send(&request(99999, "shutdown", Value::Null))?;
     let response = p.receive()?;
     ensure(
@@ -256,7 +268,8 @@ fn shutdown(p: &mut Process) -> Result<()> {
     )?;
     p.send(&note("exit", Value::Null))?;
     let (status, stderr) = p.finish()?;
-    ensure(status.success() && stderr == 0, "unclean server exit")
+    ensure(status.success() && stderr == 0, "unclean server exit")?;
+    Ok(p.peak_rss_bytes())
 }
 fn roundtrip(p: &mut Process, id: usize) -> Result<()> {
     p.send(&request(id, "bench/unsupported", json!({})))?;
@@ -298,12 +311,13 @@ fn server_checks(server: &Path) -> Result<()> {
 }
 fn server_times(server: &Path, repetitions: usize) -> Result<Vec<Value>> {
     let mut startup = Vec::new();
+    let mut startup_rss = Vec::new();
     for _ in 0..repetitions {
         let begin = Instant::now();
         let mut p = start(server)?;
         initialize(&mut p)?;
         startup.push(begin.elapsed().as_nanos() as f64);
-        shutdown(&mut p)?;
+        startup_rss.push(shutdown(&mut p)?);
     }
     let mut p = start(server)?;
     initialize(&mut p)?;
@@ -315,10 +329,10 @@ fn server_times(server: &Path, repetitions: usize) -> Result<Vec<Value>> {
             samples.push(start.elapsed().as_nanos() as f64);
         }
     }
-    shutdown(&mut p)?;
+    let steady_rss = shutdown(&mut p)?;
     Ok(vec![
-        json!({"workload":"server_startup_initialize","timing":"spawn through initialize response validation and initialized write; includes harness pipe/thread setup; excludes shutdown","warmup_operations":0,"latency":stats(startup)}),
-        json!({"workload":"server_framed_dispatch_roundtrip","timing":"serialized unknown request through matching -32601 response, including harness channels/JSON/framing; no semantic work","warmup_operations":WARMUP,"latency":stats(samples)}),
+        json!({"workload":"server_startup_initialize","timing":"spawn through initialize response validation and initialized write; includes harness pipe/thread setup; excludes shutdown","warmup_operations":0,"latency":stats(startup),"memory":memory(startup_rss,"each fresh server: complete spawn/initialize/shutdown lifetime; excludes parent harness")}),
+        json!({"workload":"server_framed_dispatch_roundtrip","timing":"serialized unknown request through matching -32601 response, including harness channels/JSON/framing; no semantic work","warmup_operations":WARMUP,"latency":stats(samples),"memory":memory(vec![steady_rss],"one server: initialization, warmup, all steady roundtrips and shutdown; excludes parent harness")}),
     ])
 }
 fn worker(args: &[String]) -> Result<Value> {
@@ -354,9 +368,13 @@ fn call_worker(args: &[&str]) -> Result<Value> {
     let mut command = Command::new(env::current_exe().map_err(|e| e.to_string())?);
     command.arg("--worker").args(args);
     let mut p = Process::spawn(&mut command, BUDGET)?;
-    let result = p.receive()?;
+    let mut result = p.receive()?;
     let (status, stderr) = p.finish()?;
     ensure(status.success() && stderr == 0, "worker failed")?;
+    result["memory"] = memory(
+        vec![p.peak_rss_bytes()],
+        "one worker: entire process lifetime including fixture/setup, warmup, measured repetitions, result serialization and exit; excludes parent harness",
+    );
     Ok(result)
 }
 fn run(args: &[String]) -> Result<Value> {
@@ -403,7 +421,7 @@ fn run(args: &[String]) -> Result<Value> {
     }
     results.extend(server_times(server, reps)?);
     Ok(
-        json!({"schema_version":1,"status":"passed","metadata":metadata,"repetitions":reps,"correctness":"core checks and server controlled failures passed before timing","memory":{"status":"unavailable","reason":"no portable standard-library peak RSS counter; no allocation or retained-memory claims"},"results":results}),
+        json!({"schema_version":1,"status":"passed","metadata":metadata,"repetitions":reps,"correctness":"core checks and server controlled failures passed before timing","memory_policy":"per-child whole-process peak RSS; see each workload scope; no per-operation allocation or retained-memory claims","results":results}),
     )
 }
 fn main() -> ExitCode {
@@ -454,6 +472,10 @@ mod tests {
         let value = stats(vec![5., 1., 3., 2., 4.]);
         assert_eq!(value["median"], 3.);
         assert_eq!(value["p95"], 5.);
+        let value = memory(vec![Some(1024), Some(2048)], "test lifetime");
+        assert_eq!(value["peak_rss"]["unit"], "bytes");
+        assert_eq!(value["peak_rss"]["median"], 1024.);
+        assert_eq!(memory(vec![None], "test")["status"], "unavailable");
         assert!(repetitions("0").is_err());
         assert!(repetitions("1002").is_err());
         assert!(repetitions("101").is_ok());

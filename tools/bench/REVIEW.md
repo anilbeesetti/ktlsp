@@ -2,18 +2,34 @@
 
 Product checkpoint: `0d54973ce66f59362829360261fde6e46b4fc420`. Scope is tools/bench only, independent workspace/lock; no product source/default native graph changes. Parent #44 remains open.
 
-Architect plan review required bounded writes/cleanup, isolated checkpoint dependencies, precise timing labels, stable edits and raw sample/percentile/batch evidence; implementation and README address these. Memory is explicitly unavailable.
+Architect plan review required bounded writes/cleanup, isolated checkpoint dependencies, precise timing labels, stable edits and raw sample/percentile/batch evidence; implementation and README address these. The later memory re-review below supersedes the initial unavailable result.
 
 Independent functionality reviewer read implementation, ran standalone fmt/clippy/all six tests, exercised the archived server's initialization, malformed JSON recovery, Unicode notifications, unknown dispatch, shutdown and four fatal framing cases. Rechecked all-ten-fixture malformed corpus timing and worker input fix. No unresolved actionable findings.
 
 Independent adversarial reviewer ran all six tests and separate supervisor probes: 100 ms finish deadlines returned in approximately 107–111 ms for silent/partial peers, noisy output failed promptly, oversized input rejected, cleanup bounded. Found minor worker argument acceptance mismatch (`check` extra args and edit corpus aliases); fixed with explicit validation and regression assertions, independently rechecked to exit 1. Validated missing metadata fails as JSON, ten malformed fixtures sum 66 bytes, and standalone locked package versions/checksums all exist in the product lock. No remaining actionable findings within direct-child contract.
 
-Both reviewers rechecked final main.rs SHA-256 `34b7166754b0cd50bc151d0be43fccc2121be0ee26e9e7b254047f66db16cf95`. process.rs SHA-256 `3601a552698b67e2470474ba1fc2123edec04e7a260555d81ec6b39c2cf1541e` was unchanged after review.
+Both reviewers rechecked the initial latency-only main.rs SHA-256 `34b7166754b0cd50bc151d0be43fccc2121be0ee26e9e7b254047f66db16cf95`. Initial process.rs SHA-256 `3601a552698b67e2470474ba1fc2123edec04e7a260555d81ec6b39c2cf1541e` was unchanged during that review.
 
 Local Rust 1.99.0 checks passed:
 
 - Product: cargo fmt --all -- --check; cargo clippy --locked --workspace --all-targets -- -D warnings; cargo test --locked --workspace (76 tests).
-- Standalone: cargo fmt --manifest-path tools/bench/Cargo.toml -- --check; cargo clippy --locked --manifest-path tools/bench/Cargo.toml --all-targets -- -D warnings; cargo test --locked --manifest-path tools/bench/Cargo.toml (six tests).
+- Standalone: cargo fmt --manifest-path tools/bench/Cargo.toml -- --check; cargo clippy --locked --manifest-path tools/bench/Cargo.toml --all-targets -- -D warnings; cargo test --locked --manifest-path tools/bench/Cargo.toml (eight tests after RSS integration).
 - Owned checkpoint archive release build and a five-repetition whole-harness smoke run passed. Smoke timings were contested/provisional and are not a recorded baseline.
 
-Quiet-window baseline and hosted CI are pending at this evidence checkpoint; neither is claimed passing. No official oracle, portable RSS counter, parser/semantic workload, confidence interval or performance gate was added.
+## Required memory completion and re-review
+
+Coordinator clarified that actual memory measurements are required for child #64. Architect approved a small native `wait4` collector instead of a platform `time` wrapper, preserving direct-child supervision and one reaping path. Support is restricted to verified Darwin arm64 SDK layout, with compile-time size/alignment/offset assertions. Missing-child status fails measurement and prevents later signalling; status/RSS are cached after successful or killed-child reap.
+
+Both independent reviewers rechecked the changed supervisor, memory schema/lifetime labels and tests. Functionality ran all eight tool tests plus fmt/clippy, inspected SDK definitions and found no actionable issues. Adversarial ran all five subprocess tests and independent probes with eight 32 MiB peers, cached finishes, killed children, no-zombie checks and all four failure cleanup modes; no actionable findings. Both observed the exact ABI and ECHILD policy.
+
+Current reviewed SHA-256:
+
+- main.rs: `d67665ae845f78d081c75069b68531cb3dd83832657ed8baa39138f7716c1294`
+- process.rs: `04591aa48024212435bf04adbeadc36c4d19ba8e5a3282933328516af4e980bd`
+- README.md: `663be7778cb101b1d94592e890ca21278108d679b28c8f8336d720f99735df07`
+
+An independent `/usr/bin/time -l` run of the 32 MiB touched-memory peer returned 35,487,744 bytes maximum RSS, matching the adversarial review's wait4 probes. The utility needed approved platform resource access outside the sandbox; the Rust wait4 tests and harness run inside it. An updated owned-checkpoint five-repetition smoke passed all eight latency workloads and returned positive measured RSS for each. Those contested smoke timings are not a baseline.
+
+Docs-only main integration `de9b6b1` introduced no tools/source change; pinned workspace fmt/clippy and 76 tests passed again. Hosted native CI passed that integration head `c922a9fd68e4a370d795d094bcb222f35eed3765` at https://github.com/anilbeesetti/ktlsp/actions/runs/38250558225/job/114815432642; it does not validate the later memory revision.
+
+Quiet-window collection and final-head hosted CI remain pending. No official oracle, other-platform RSS support, parser/semantic workload, retained/per-operation memory instrument, confidence interval or performance gate was added.

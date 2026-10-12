@@ -27,6 +27,15 @@ fn main() {
                 }
             }
         }
+        Some("memory") => {
+            let mut bytes = vec![0u8; 32 * 1024 * 1024];
+            for page in bytes.chunks_mut(4096) {
+                page[0] = std::hint::black_box(1);
+            }
+            std::hint::black_box(&bytes);
+            ktlsp_protocol::write_frame(&mut io::stdout().lock(), b"{}").unwrap();
+            std::hint::black_box(bytes);
+        }
         Some("exit") => (),
         Some("echo") => {
             let mut input = io::stdin().lock();

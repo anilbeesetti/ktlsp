@@ -1,6 +1,6 @@
 # Existing native checkpoint baseline (T044 preparation, #64)
 
-Standalone measurement tooling for product checkpoint `0d54973ce66f59362829360261fde6e46b4fc420`. Parent #44 stays open: parser/semantic indexing, incremental queries, cancellation, workspace scale, memory budgets and performance gates require later work. No official JVM comparison or faster-than-official claim. This workspace is outside the default native build/test graph and adds no third-party packages beyond those already locked in the product.
+Standalone measurement tooling for product checkpoint `0d54973ce66f59362829360261fde6e46b4fc420`. Parent #44 stays open: parser/semantic indexing, incremental queries, cancellation, workspace scale, retained-memory budgets and performance gates require later work. No official JVM comparison or faster-than-official claim. This workspace is outside the default native build/test graph and adds no third-party packages beyond those already locked in the product.
 
 ## Reproduce
 
@@ -53,11 +53,13 @@ All correctness gates run before timing: lossless spans/diagnostic boundaries, t
 - Startup: a fresh server each repetition, spawn through initialize validation and the `initialized` write. Includes parent pipe/thread setup, excludes shutdown; executable/filesystem caches are not flushed, so this is warm-cache process startup, not cold-boot latency.
 - Steady stdio: one initialized process, ten warmups, one unknown request and matching `-32601` per sample. Includes JSON/framing, pipe I/O, parent thread/channel scheduling and server dispatch; no language provider work.
 
-Raw nanosecond samples, nearest-rank median/p95/p99, warmup counts, repetitions and corpus byte counts are in JSON. Workload order is fixed; no randomized order or confidence interval. `memory.status: unavailable` is deliberate: std has no portable process peak RSS API. Nothing here estimates per-operation allocation, retained memory or official memory efficiency.
+Raw nanosecond samples, nearest-rank median/p95/p99, warmup counts, repetitions and corpus byte counts are in JSON. Workload order is fixed; no randomized order or confidence interval. Each workload now includes **whole-process peak RSS** for the directly spawned child, collected on macOS arm64 by the system `wait4(WNOHANG)` call's `rusage.ru_maxrss` at reap (bytes on Darwin). This is an OS API call from Rust; there is no C parser, C build step or added dependency. The ABI is narrowly gated to the verified platform, with layout assertions against the Darwin SDK. Other platforms retain bounded normal reaping and explicitly report memory unavailable; such a run cannot satisfy this child's measured-memory acceptance.
+
+Worker RSS covers its entire lifetime: fixture creation, validation, warmup, measured repetitions, serialization and exit. The startup workload records one peak for each fresh server's complete initialization/shutdown lifetime; steady-state RSS covers one server's initialization, warmup, every roundtrip and shutdown. The parent harness is excluded. None of these are memory attributable solely to the timed operation; no per-operation allocation, retained-memory or official memory-efficiency estimate follows. RSS includes runtime/executable/allocator state and OS residency behavior, so separate runs can differ.
 
 ## Bounds and checks
 
-Every measured worker/server has a 30-second **whole-process** deadline, including stdin writes and exit, rather than a timeout reset by progress. Output is capped at 1 MiB per stream; framing also retains the protocol library's 16 MiB maximum single-frame allocation. Input is capped at 2 MiB; queued events/unsolicited frames are bounded. Failure drops the input channel, kills the directly spawned child and polls to reap for up to two seconds; cleanup failure is explicitly reported. Reader/writer threads are not joined without a bound. These known Rust workers/server spawn no descendants; arbitrary wrapper/process-tree supervision is outside this harness contract. Use the server executable directly.
+Every measured worker/server has a 30-second **whole-process** deadline, including stdin writes and exit, rather than a timeout reset by progress. Output is capped at 1 MiB per stream; framing also retains the protocol library's 16 MiB maximum single-frame allocation. Input is capped at 2 MiB; queued events/unsolicited frames are bounded. Failure drops the input channel, kills the directly spawned child and polls to reap for up to two seconds; cleanup failure is explicitly reported. Reader/writer threads are not joined without a bound. Normal exit and failure cleanup share one reaper; cached status/RSS prevents double reaping. A missing child is an explicit measurement error and is never signalled again. These known Rust workers/server spawn no descendants; arbitrary wrapper/process-tree supervision is outside this harness contract. Use the server executable directly.
 
 ```sh
 cargo fmt --manifest-path tools/bench/Cargo.toml -- --check
@@ -65,6 +67,6 @@ cargo clippy --locked --manifest-path tools/bench/Cargo.toml --all-targets -- -D
 cargo test --locked --manifest-path tools/bench/Cargo.toml
 ```
 
-Tests include a Rust-only hostile test peer: blocked stdin, silent/partial output, noisy stderr/framed stdout, premature exit and clean framing/reap. `bench-test-peer` is a test utility, not a server. Run the repository's pinned fmt/clippy/workspace tests separately; they intentionally do not include this standalone workspace.
+Tests include a Rust-only hostile test peer: blocked stdin, silent/partial output, noisy stderr/framed stdout, premature exit and clean framing/reap. macOS arm64 tests also touch 32 MiB of memory and verify RSS scale, killed-child and cached reaps, and missing-child failure. `bench-test-peer` is a test utility, not a server. Run the repository's pinned fmt/clippy/workspace tests separately; they intentionally do not include this standalone workspace.
 
-Queued workloads for later children: bounded full-parser recovery/ambiguity, semantic indexing and invalidation, cancellation storms, multiple modules/dependency archives, measured process RSS and retained-memory instrumentation. They depend on real providers and cannot be manufactured from this checkpoint.
+Queued workloads for later children: bounded full-parser recovery/ambiguity, semantic indexing and invalidation, cancellation storms, multiple modules/dependency archives, additional platform RSS support and retained-memory instrumentation. They depend on real providers and cannot be manufactured from this checkpoint.

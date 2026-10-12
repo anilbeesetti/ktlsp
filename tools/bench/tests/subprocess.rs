@@ -44,7 +44,8 @@ fn framed_exchange_and_clean_reap() {
     assert!(status.success());
     assert_eq!(stderr, 0);
     assert!(p.reaped);
-    assert!(p.child.try_wait().unwrap().is_some());
+    assert!(p.try_exit().unwrap().is_some());
+    assert!(p.try_exit().unwrap().is_some());
 }
 #[test]
 fn missing_metadata_and_worker_failure_are_not_success() {
@@ -57,4 +58,38 @@ fn missing_metadata_and_worker_failure_are_not_success() {
     let (status, stderr) = p.finish().unwrap();
     assert!(!status.success());
     assert!(stderr > 0);
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[test]
+fn rss_covers_touched_memory_and_cached_reaps() {
+    let mut p = peer("memory");
+    assert_eq!(p.receive().unwrap(), serde_json::json!({}));
+    assert!(p.finish().unwrap().0.success());
+    let rss = p.peak_rss_bytes().unwrap();
+    assert!(
+        (32 * 1024 * 1024..128 * 1024 * 1024).contains(&rss),
+        "{rss}"
+    );
+    assert!(p.try_exit().unwrap().is_some());
+    assert_eq!(p.peak_rss_bytes(), Some(rss));
+    let mut p = peer("hang");
+    p.child.kill().unwrap();
+    let begin = Instant::now();
+    while p.try_exit().unwrap().is_none() {
+        assert!(begin.elapsed() < Duration::from_secs(2));
+        thread::sleep(Duration::from_millis(1));
+    }
+    assert!(p.reaped);
+    assert!(!p.try_exit().unwrap().unwrap().success());
+    assert!(p.peak_rss_bytes().unwrap() > 0);
+}
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[test]
+fn externally_reaped_child_is_a_measurement_error() {
+    let mut p = peer("exit");
+    p.child.wait().unwrap();
+    assert_eq!(p.try_exit().unwrap_err().raw_os_error(), Some(10));
+    assert!(p.reaped); // Drop must never signal this PID again.
+    assert!(p.peak_rss_bytes().is_none());
 }

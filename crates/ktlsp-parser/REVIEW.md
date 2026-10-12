@@ -177,3 +177,29 @@ control/evaluation/drop behavior, macro-token grammar or location/stringificatio
 hazard was found. Functionality review independently applied both ordered patches
 and matched all 54 final hashes. These reviews ran no Cargo/build/tests/probes.
 Final behavior must still be rechecked after coordinator-approved #89 integration.
+
+## Controlled final production validation
+
+Exact main758e53b17566e4fde908705fc090d516ba4b0065 (#89) integrated once at
+b3bdc97cd21c181582a31fdf541f3f3ca7c880d9. Both source-only integration reviews
+confirm the fork, inventories, strict corpus and approved three-file graph delta
+are unchanged from the reviewed formatting phase. Local pinned fmt and locked
+workspace Clippy pass on the integrated implementation; compiler output explicitly
+checks vendor/ktrs-parser-0.5.1. Locked metadata confirms nine workspace members,
+no vendor enrollment and the direct parser path. Normal/build/all-feature trees
+contain the existing pure Rust closure only.
+
+The final file audit verifies archive SHA256, all 54 pristine source hashes,
+unchanged licenses/notices, the seven-file behavioral patch, the 49-file separate
+formatting patch and all 54 final hashes. Applying both ordered patches exactly
+reproduces the final source set and bytes. No formatting opt-out is present.
+
+The coordinator authorized existing Linux Native Rust CI as the controlled
+executor of all three unchanged pinned commands on the exact published head.
+Final CI and both behavioral reviews/finished architect evidence are recorded
+on PR90; earlier source-local/pre-format/old-head passes are historical only.
+No new Darwin parser execution was used for a passing result. Reported Darwin
+supervisor timeout reliability remains issue #96 OPEN/UNKNOWN, with its cause
+unresolved. The 500 ms deadline and all failure assertions remain unchanged.
+No JVM/oracle ran. #7/#83/T008 acceptance remains unfinished, with generic,
+missing-default/deep-type/annotation recovery and Coverage gaps retained.

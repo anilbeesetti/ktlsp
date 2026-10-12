@@ -6,8 +6,8 @@ declaration-relative name offsets, immediate CST parents, nearest declaration
 parents, and diagnostic spans/messages live in `tests/declarations.rs`. Expectations
 are hand-authored, not captured worker snapshots. Every parse uses the real
 supervised Rust worker. The parser crate has no provider/HIR/server caller.
-The new #87 production expectations await execution and behavioral review in
-the coordinator-released check slot; source-only review is complete.
+The #87 delivery gate requires exact-head production execution and behavioral
+review; current evidence is recorded in REVIEW.md and PR90.
 
 ## Accepted fixtures
 

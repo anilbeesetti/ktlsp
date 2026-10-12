@@ -60,7 +60,7 @@ explicitly, never presented as a lossless tree.
 The direct parser dependency is the audited local fork of ktrs-parser `=0.5.1`
 under `vendor/ktrs-parser-0.5.1`; ktrs-syntax `=0.5.1` remains a registry dependency.
 Locked transitive packages remain ktrs-lexer 0.5.1 and text-size 1.1.1. `cargo tree --locked
--p ktlsp-parser -e normal,build` must contain these plus existing Rust serde/text
+-p ktlsp-parser -e normal,build` contains these plus existing Rust serde/text
 packages; all four new crate manifests have no build script or normal/build
 native/JVM dependencies. Upstream dev dependencies (mimalloc/expect-test), facade
 (stacker), CLI and Java integration are excluded. No upstream tests are imported

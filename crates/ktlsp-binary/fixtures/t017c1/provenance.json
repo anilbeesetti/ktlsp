@@ -1,0 +1,22 @@
+{
+  "artifact": "org.apache.commons:commons-lang3:3.17.0",
+  "origin": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-lang3/3.17.0/commons-lang3-3.17.0.jar",
+  "archive_sha256": "6ee731df5c8e5a2976a1ca023b6bb320ea8d3539fbe64c8a1d5cb765127c33b4",
+  "license": "Apache-2.0; bundled LICENSE.txt and NOTICE.txt unchanged",
+  "compiler": "Manifest Build-Jdk-Spec: 17; precise compiler version unknown; class major 52",
+  "obtained": "2026-10-12; downloaded/extracted as data only; no JVM/compiler executed",
+  "files": {
+    "AnnotationUtils$1.class.bin": {
+      "entry": "org/apache/commons/lang3/AnnotationUtils$1.class",
+      "sha256": "c6a52dbf0c43bfab4bc33295306f9fc277915faa01eae89ab365e65a42889612"
+    },
+    "CharRange$CharacterIterator.class.bin": {
+      "entry": "org/apache/commons/lang3/CharRange$CharacterIterator.class",
+      "sha256": "af8054dc0e3a919b0048aa3d496ea7b8dc14309206e9f430c8f93e0bd476ba96"
+    },
+    "AppendableJoiner$Builder.class.bin": {
+      "entry": "org/apache/commons/lang3/AppendableJoiner$Builder.class",
+      "sha256": "e288160745c56dff019f2af9393039558018308de89509bdd81a8535bfa9b03d"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+[workspace]
+[package]
+name = "ktlsp-allocation-probe"
+version = "0.1.0"
+edition = "2024"
+[features]
+counting = []
+[dependencies]
+ktlsp-syntax = { path = "../../.." }

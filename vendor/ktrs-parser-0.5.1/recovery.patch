@@ -1,0 +1,153 @@
+--- a/src/parsing/declarations/classes.rs
++++ b/src/parsing/declarations/classes.rs
+@@ -91,7 +91,7 @@
+         }
+ 
+         if self.at(LPAR) {
+-            self.parse_value_parameter_list(false, /* typeRequired  = */ true, LBRACE_RBRACE_SET);
++            self.parse_value_parameter_list(false, /* typeRequired  = */ true, LBRACE_RBRACE_SET, false);
+             primary_constructor_marker.done(self, PRIMARY_CONSTRUCTOR);
+         } else if has_constructor_modifiers || has_constructor_keyword {
+             // A comprehensive error message for cases like:
+--- a/src/parsing/declarations/functions.rs
++++ b/src/parsing/declarations/functions.rs
+@@ -80,7 +80,7 @@
+         }
+ 
+         if self.at(LPAR) {
+-            self.parse_value_parameter_list(false, /* typeRequired  = */ false, VALUE_PARAMETERS_FOLLOW_SET);
++            self.parse_value_parameter_list(false, /* typeRequired  = */ false, VALUE_PARAMETERS_FOLLOW_SET, true);
+         } else {
+             self.error("Expecting '('");
+         }
+--- a/src/parsing/declarations/members.rs
++++ b/src/parsing/declarations/members.rs
+@@ -130,7 +130,7 @@
+         self.advance(); // CONSTRUCTOR_KEYWORD
+ 
+         if self.at(LPAR) {
+-            self.parse_value_parameter_list(false, /*typeRequired = */ true, VALUE_ARGS_RECOVERY_SET);
++            self.parse_value_parameter_list(false, /*typeRequired = */ true, VALUE_ARGS_RECOVERY_SET, false);
+         } else {
+             self.error_with_recovery(
+                 "Expecting '('",
+--- a/src/parsing/declarations/modifiers.rs
++++ b/src/parsing/declarations/modifiers.rs
+@@ -211,7 +211,7 @@
+             // Treat parsing of context receivers (deprecated syntax) as an error,
+             // But an outer caller decides if the entire list should be dropped:
+             // If we're trying to parse a local declaration, we should drop it to prevent unexpected parsing of ahead declarations
+-            no_error = self.value_parameter_loop(in_function_type, CONTEXT_PARAMETERS_FOLLOW_SET, &mut |p: &mut Parser| {
++            no_error = self.value_parameter_loop(in_function_type, false, CONTEXT_PARAMETERS_FOLLOW_SET, &mut |p: &mut Parser| {
+                 p.parse_value_parameter_or_type_ref(in_function_type)
+             });
+         }
+--- a/src/parsing/declarations/parameters.rs
++++ b/src/parsing/declarations/parameters.rs
+@@ -67,13 +67,14 @@
+         is_function_type_contents: bool,
+         type_required: bool,
+         recovery_set: TokenSet,
++        recover_declarations: bool,
+     ) {
+         debug_assert!(self._at(LPAR));
+         let parameters = self.mark();
+ 
+         self.my_builder.disable_newlines();
+ 
+-        self.value_parameter_loop(is_function_type_contents, recovery_set, &mut |p: &mut Parser| {
++        self.value_parameter_loop(is_function_type_contents, recover_declarations, recovery_set, &mut |p: &mut Parser| {
+             if is_function_type_contents {
+                 if !p.try_parse_value_parameter(type_required) {
+                     let value_parameter = p.mark();
+@@ -97,6 +98,7 @@
+     pub(super) fn value_parameter_loop(
+         &mut self,
+         in_function_type_context: bool,
++        recover_declarations: bool,
+         recovery_set: TokenSet,
+         parse_parameter: &mut dyn FnMut(&mut Parser) -> bool,
+     ) -> bool {
+@@ -107,12 +109,20 @@
+         if !self.at(RPAR) && !self.at_set(recovery_set) {
+             loop {
+                 let offset_before = self.my_builder.get_current_offset();
+-                if self.at(RPAR) {
++                if self.at(RPAR) || (recover_declarations && self.at_set(recovery_set)) {
+                     break;
+                 }
++                if recover_declarations && self.at_parameter_list_declaration() {
++                    self.error("Expecting ')'");
++                    return false;
++                }
+ 
+                 no_error = parse_parameter(self) && no_error;
+ 
++                if recover_declarations && self.at_parameter_list_declaration() {
++                    self.error("Expecting ')'");
++                    return false;
++                }
+                 if self.at(COMMA) {
+                     self.advance(); // COMMA
+                 } else if self.at(COLON) {
+@@ -137,6 +147,23 @@
+         self.expect_3(RPAR, "Expecting ')'", Some(recovery_set)) && no_error
+     }
+ 
++    fn at_parameter_list_declaration(&mut self) -> bool {
++        // shortcut: malformed defaults/nested types need their own recovery corpus beyond parameter boundaries.
++        // Nested annotation functions must not recursively replay speculative probes.
++        if self.in_parameter_recovery_probe {
++            return false;
++        }
++        self.in_parameter_recovery_probe = true;
++        let probe = self.mark();
++        self.parse_modifier_list(NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER);
++        let declaration = self.at_set(super::TOP_LEVEL_DECLARATION_FIRST)
++            || (self.at(INIT_KEYWORD) && self.lookahead(1) == Some(LBRACE))
++            || (self.at(CONSTRUCTOR_KEYWORD) && self.lookahead(1) == Some(LPAR));
++        probe.rollback_to(self);
++        self.in_parameter_recovery_probe = false;
++        declaration
++    }
++
+     /*
+      * functionParameter
+      *   : modifiers ("val" | "var")? parameter ("=" element)?
+--- a/src/parsing/declarations/user_types.rs
++++ b/src/parsing/declarations/user_types.rs
+@@ -176,7 +176,7 @@
+     fn parse_function_type_contents(&mut self, function_type: Marker) -> Marker {
+         debug_assert!(self._at(LPAR), "{:?}", self.tt());
+ 
+-        self.parse_value_parameter_list(true, /* typeRequired  = */ true, TokenSet::EMPTY);
++        self.parse_value_parameter_list(true, /* typeRequired  = */ true, TokenSet::EMPTY, false);
+ 
+         self.expect_3(ARROW, "Expecting '->' to specify return type of a function type", Some(TYPE_REF_FIRST));
+         self.parse_type_ref();
+--- a/src/parsing/mod.rs
++++ b/src/parsing/mod.rs
+@@ -70,6 +70,7 @@
+     pub(crate) is_lazy: bool,
+     /// Index of this context's `ForByClause` builder layer; `None` for top-level parsers.
+     by_clause_layer: Option<usize>,
++    in_parameter_recovery_probe: bool,
+ }
+ 
+ impl MarkerHost for Parser {
+@@ -81,13 +82,13 @@
+ impl Parser {
+     /// `KotlinParsing.createForTopLevel`.
+     pub(crate) fn create_for_top_level(builder: SemanticWhitespaceAwarePsiBuilder) -> Parser {
+-        Parser { my_builder: builder, is_lazy: true, by_clause_layer: None }
++        Parser { my_builder: builder, is_lazy: true, by_clause_layer: None, in_parameter_recovery_probe: false }
+     }
+ 
+     /// `KotlinParsing.createForTopLevelNonLazy`.
+     #[allow(dead_code)] // TODO: only `KotlinLightParser` uses it upstream; not ported yet.
+     pub(crate) fn create_for_top_level_non_lazy(builder: SemanticWhitespaceAwarePsiBuilder) -> Parser {
+-        Parser { my_builder: builder, is_lazy: false, by_clause_layer: None }
++        Parser { my_builder: builder, is_lazy: false, by_clause_layer: None, in_parameter_recovery_probe: false }
+     }
+ 
+     /// `KotlinParsing.createForByClause(myBuilder, isLazy)`: runs `f` on a non-top-level parser

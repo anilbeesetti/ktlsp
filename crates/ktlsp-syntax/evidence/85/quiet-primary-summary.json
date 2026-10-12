@@ -1,0 +1,956 @@
+[
+  {
+    "corpus": "large",
+    "zone": "default",
+    "medians": {
+      "historical": 6452708,
+      "current": 6490722,
+      "candidate": 6437875
+    },
+    "ranges": {
+      "historical": [
+        6384708,
+        11209388
+      ],
+      "current": [
+        6334403,
+        10896055
+      ],
+      "candidate": [
+        6381013,
+        9781194
+      ]
+    },
+    "pass_gate": true,
+    "historical_current_ratio": 0.994143332590735,
+    "candidate_current_ratio": 0.9918580706429886,
+    "paired_round_ratios": [
+      {
+        "round": 0,
+        "candidate_current_ratio": 0.8976821427571722,
+        "historical_current_ratio": 1.0287565545511654
+      },
+      {
+        "round": 1,
+        "candidate_current_ratio": 1.007358230917736,
+        "historical_current_ratio": 1.0095794347154736
+      },
+      {
+        "round": 2,
+        "candidate_current_ratio": 1.0154376971608834,
+        "historical_current_ratio": 1.0446372239747634
+      },
+      {
+        "round": 3,
+        "candidate_current_ratio": 1.000252514281154,
+        "historical_current_ratio": 0.994143332590735
+      },
+      {
+        "round": 4,
+        "candidate_current_ratio": 0.9760762588074271,
+        "historical_current_ratio": 0.9711854282363059
+      }
+    ]
+  },
+  {
+    "corpus": "short_tokens",
+    "zone": "default",
+    "medians": {
+      "historical": 11484153,
+      "current": 11371403,
+      "candidate": 11420986
+    },
+    "ranges": {
+      "historical": [
+        11165055,
+        11754972
+      ],
+      "current": [
+        11147777,
+        11581764
+      ],
+      "candidate": [
+        11087889,
+        11526916
+      ]
+    },
+    "pass_gate": true,
+    "historical_current_ratio": 1.0099152233018212,
+    "candidate_current_ratio": 1.0043603238756027,
+    "paired_round_ratios": [
+      {
+        "round": 0,
+        "candidate_current_ratio": 0.9950401770684864,
+        "historical_current_ratio": 1.0015499054206054
+      },
+      {
+        "round": 1,
+        "candidate_current_ratio": 0.9750678082554984,
+        "historical_current_ratio": 0.9985953360372506
+      },
+      {
+        "round": 2,
+        "candidate_current_ratio": 0.9952642792583237,
+        "historical_current_ratio": 0.991572009237971
+      },
+      {
+        "round": 3,
+        "candidate_current_ratio": 1.0076810073822584,
+        "historical_current_ratio": 1.0251310886868015
+      },
+      {
+        "round": 4,
+        "candidate_current_ratio": 0.9943708291199729,
+        "historical_current_ratio": 1.019093284839809
+      }
+    ]
+  },
+  {
+    "corpus": "empty",
+    "zone": "default",
+    "medians": {
+      "historical": 6,
+      "current": 6,
+      "candidate": 6
+    },
+    "ranges": {
+      "historical": [
+        6,
+        6
+      ],
+      "current": [
+        6,
+        6
+      ],
+      "candidate": [
+        6,
+        7
+      ]
+    },
+    "pass_gate": true,
+    "historical_current_ratio": 1.0,
+    "candidate_current_ratio": 1.0,
+    "paired_round_ratios": [
+      {
+        "round": 0,
+        "candidate_current_ratio": 1.0,
+        "historical_current_ratio": 1.0
+      },
+      {
+        "round": 1,
+        "candidate_current_ratio": 1.0,
+        "historical_current_ratio": 1.0
+      },
+      {
+        "round": 2,
+        "candidate_current_ratio": 1.0,
+        "historical_current_ratio": 1.0
+      },
+      {
+        "round": 3,
+        "candidate_current_ratio": 1.1666666666666667,
+        "historical_current_ratio": 1.0
+      },
+      {
+        "round": 4,
+        "candidate_current_ratio": 1.0,
+        "historical_current_ratio": 1.0
+      }
+    ]
+  },
+  {
+    "corpus": "short",
+    "zone": "default",
+    "medians": {
+      "historical": 162,
+      "current": 166,
+      "candidate": 152
+    },
+    "ranges": {
+      "historical": [
+        160,
+        168
+      ],
+      "current": [
+        164,
+        167
+      ],
+      "candidate": [
+        150,
+        153
+      ]
+    },
+    "pass_gate": true,
+    "historical_current_ratio": 0.9759036144578314,
+    "candidate_current_ratio": 0.9156626506024096,
+    "paired_round_ratios": [
+      {
+        "round": 0,
+        "candidate_current_ratio": 0.9212121212121213,
+        "historical_current_ratio": 0.9818181818181818
+      },
+      {
+        "round": 1,
+        "candidate_current_ratio": 0.9036144578313253,
+        "historical_current_ratio": 0.963855421686747
+      },
+      {
+        "round": 2,
+        "candidate_current_ratio": 0.9161676646706587,
+        "historical_current_ratio": 0.9700598802395209
+      },
+      {
+        "round": 3,
+        "candidate_current_ratio": 0.8982035928143712,
+        "historical_current_ratio": 0.9940119760479041
+      },
+      {
+        "round": 4,
+        "candidate_current_ratio": 0.926829268292683,
+        "historical_current_ratio": 1.024390243902439
+      }
+    ]
+  },
+  {
+    "corpus": "whitespace",
+    "zone": "default",
+    "medians": {
+      "historical": 10785250,
+      "current": 10985459,
+      "candidate": 10985208
+    },
+    "ranges": {
+      "historical": [
+        10614625,
+        11146625
+      ],
+      "current": [
+        10540708,
+        11030541
+      ],
+      "candidate": [
+        10775708,
+        11076125
+      ]
+    },
+    "pass_gate": true,
+    "historical_current_ratio": 0.9817750901441624,
+    "candidate_current_ratio": 0.9999771516146936,
+    "paired_round_ratios": [
+      {
+        "round": 0,
+        "candidate_current_ratio": 1.02622376030149,
+        "historical_current_ratio": 1.0402961546795528
+      },
+      {
+        "round": 1,
+        "candidate_current_ratio": 0.9991577028096601,
+        "historical_current_ratio": 0.9842215779404925
+      },
+      {
+        "round": 2,
+        "candidate_current_ratio": 1.0082532737139158,
+        "historical_current_ratio": 0.9817750901441624
+      },
+      {
+        "round": 3,
+        "candidate_current_ratio": 1.0043862749781067,
+        "historical_current_ratio": 0.9806733312861806
+      },
+      {
+        "round": 4,
+        "candidate_current_ratio": 0.9958902287748171,
+        "historical_current_ratio": 1.0105238718572371
+      }
+    ]
+  },
+  {
+    "corpus": "comment",
+    "zone": "default",
+    "medians": {
+      "historical": 23837166,
+      "current": 23766834,
+      "candidate": 23419584
+    },
+    "ranges": {
+      "historical": [
+        23558083,
+        24093375
+      ],
+      "current": [
+        22823000,
+        24303917
+      ],
+      "candidate": [
+        23321208,
+        24064917
+      ]
+    },
+    "pass_gate": true,
+    "historical_current_ratio": 1.0029592498521258,
+    "candidate_current_ratio": 0.9853893034301497,
+    "paired_round_ratios": [
+      {
+        "round": 0,
+        "candidate_current_ratio": 0.9972623633552162,
+        "historical_current_ratio": 0.9999877490015436
+      },
+      {
+        "round": 1,
+        "candidate_current_ratio": 1.0218292073785216,
+        "historical_current_ratio": 1.0444361389826053
+      },
+      {
+        "round": 2,
+        "candidate_current_ratio": 0.9841938337498582,
+        "historical_current_ratio": 0.9931877627118458
+      },
+      {
+        "round": 3,
+        "candidate_current_ratio": 0.9636135607276802,
+        "historical_current_ratio": 0.9913371165643793
+      },
+      {
+        "round": 4,
+        "candidate_current_ratio": 1.0125419734071437,
+        "historical_current_ratio": 1.0067162921237216
+      }
+    ]
+  },
+  {
+    "corpus": "string",
+    "zone": "default",
+    "medians": {
+      "historical": 35249916,
+      "current": 34976458,
+      "candidate": 35161000
+    },
+    "ranges": {
+      "historical": [
+        34020084,
+        35867916
+      ],
+      "current": [
+        34381333,
+        35909583
+      ],
+      "candidate": [
+        34589083,
+        35874500
+      ]
+    },
+    "pass_gate": true,
+    "historical_current_ratio": 1.0078183445562154,
+    "candidate_current_ratio": 1.005276177479149,
+    "paired_round_ratios": [
+      {
+        "round": 0,
+        "candidate_current_ratio": 1.00604252313312,
+        "historical_current_ratio": 1.0004714186038104
+      },
+      {
+        "round": 1,
+        "candidate_current_ratio": 1.0279419184287517,
+        "historical_current_ratio": 1.0284436973641065
+      },
+      {
+        "round": 2,
+        "candidate_current_ratio": 0.9962963087914734,
+        "historical_current_ratio": 0.9726566366439964
+      },
+      {
+        "round": 3,
+        "candidate_current_ratio": 1.0154022607146103,
+        "historical_current_ratio": 1.0007606778005744
+      },
+      {
+        "round": 4,
+        "candidate_current_ratio": 0.9791536704840043,
+        "historical_current_ratio": 0.9816297783240758
+      }
+    ]
+  },
+  {
+    "corpus": "dense_sparse",
+    "zone": "default",
+    "medians": {
+      "historical": 11223917,
+      "current": 11083083,
+      "candidate": 10946542
+    },
+    "ranges": {
+      "historical": [
+        11108958,
+        11264500
+      ],
+      "current": [
+        10698000,
+        11334666
+      ],
+      "candidate": [
+        10829959,
+        11261416
+      ]
+    },
+    "pass_gate": true,
+    "historical_current_ratio": 1.0127071140764714,
+    "candidate_current_ratio": 0.9876802330181954,
+    "paired_round_ratios": [
+      {
+        "round": 0,
+        "candidate_current_ratio": 1.0123349224154048,
+        "historical_current_ratio": 1.0445371097401384
+      },
+      {
+        "round": 1,
+        "candidate_current_ratio": 1.01351360650102,
+        "historical_current_ratio": 1.0297682664800152
+      },
+      {
+        "round": 2,
+        "candidate_current_ratio": 0.9657577911867893,
+        "historical_current_ratio": 0.9938096102699453
+      },
+      {
+        "round": 3,
+        "candidate_current_ratio": 1.0069632679879057,
+        "historical_current_ratio": 0.9933309143024633
+      },
+      {
+        "round": 4,
+        "candidate_current_ratio": 0.9872704192506724,
+        "historical_current_ratio": 1.0127220918583755
+      }
+    ]
+  },
+  {
+    "corpus": "sparse_dense",
+    "zone": "default",
+    "medians": {
+      "historical": 22471666,
+      "current": 22098334,
+      "candidate": 21855250
+    },
+    "ranges": {
+      "historical": [
+        21776792,
+        22727792
+      ],
+      "current": [
+        22021792,
+        22290541
+      ],
+      "candidate": [
+        21791000,
+        22621958
+      ]
+    },
+    "pass_gate": true,
+    "historical_current_ratio": 1.0168941242357907,
+    "candidate_current_ratio": 0.9889998947431965,
+    "paired_round_ratios": [
+      {
+        "round": 0,
+        "candidate_current_ratio": 0.9921574048106531,
+        "historical_current_ratio": 0.9888746565220488
+      },
+      {
+        "round": 1,
+        "candidate_current_ratio": 1.023695179917183,
+        "historical_current_ratio": 1.0284844097297108
+      },
+      {
+        "round": 2,
+        "candidate_current_ratio": 0.9894999209269346,
+        "historical_current_ratio": 0.9898356815068224
+      },
+      {
+        "round": 3,
+        "candidate_current_ratio": 0.9775895524473811,
+        "historical_current_ratio": 1.0186383542687456
+      },
+      {
+        "round": 4,
+        "candidate_current_ratio": 0.9974072949911692,
+        "historical_current_ratio": 1.0161928523209987
+      }
+    ]
+  },
+  {
+    "corpus": "large",
+    "zone": "0",
+    "medians": {
+      "historical": 6783972,
+      "current": 6604583,
+      "candidate": 6611458
+    },
+    "ranges": {
+      "historical": [
+        6581361,
+        7129014
+      ],
+      "current": [
+        6529403,
+        6724097
+      ],
+      "candidate": [
+        6443583,
+        6845500
+      ]
+    },
+    "pass_gate": true,
+    "historical_current_ratio": 1.0271612908793788,
+    "candidate_current_ratio": 1.001040943841572,
+    "paired_round_ratios": [
+      {
+        "round": 0,
+        "candidate_current_ratio": 0.9834945682982276,
+        "historical_current_ratio": 1.0881130182263534
+      },
+      {
+        "round": 1,
+        "candidate_current_ratio": 1.0484113172368132,
+        "historical_current_ratio": 1.038988097380419
+      },
+      {
+        "round": 2,
+        "candidate_current_ratio": 0.9786711881164117,
+        "historical_current_ratio": 1.0038831979966976
+      },
+      {
+        "round": 3,
+        "candidate_current_ratio": 1.001040943841572,
+        "historical_current_ratio": 1.0538052137432448
+      },
+      {
+        "round": 4,
+        "candidate_current_ratio": 1.0160140558922897,
+        "historical_current_ratio": 0.9910321106305214
+      }
+    ]
+  },
+  {
+    "corpus": "short_tokens",
+    "zone": "0",
+    "medians": {
+      "historical": 11463680,
+      "current": 11392653,
+      "candidate": 11181083
+    },
+    "ranges": {
+      "historical": [
+        10810833,
+        11505152
+      ],
+      "current": [
+        11297083,
+        11423097
+      ],
+      "candidate": [
+        11015569,
+        11409514
+      ]
+    },
+    "pass_gate": true,
+    "historical_current_ratio": 1.0062344565396664,
+    "candidate_current_ratio": 0.9814292597167665,
+    "paired_round_ratios": [
+      {
+        "round": 0,
+        "candidate_current_ratio": 0.9809294639273223,
+        "historical_current_ratio": 1.0062344565396664
+      },
+      {
+        "round": 1,
+        "candidate_current_ratio": 0.965213791916614,
+        "historical_current_ratio": 0.9472742727776717
+      },
+      {
+        "round": 2,
+        "candidate_current_ratio": 1.001597268937864,
+        "historical_current_ratio": 0.9948121020928306
+      },
+      {
+        "round": 3,
+        "candidate_current_ratio": 0.9903711427100252,
+        "historical_current_ratio": 1.018360226263718
+      },
+      {
+        "round": 4,
+        "candidate_current_ratio": 0.9788136264622458,
+        "historical_current_ratio": 1.007183253368154
+      }
+    ]
+  },
+  {
+    "corpus": "empty",
+    "zone": "0",
+    "medians": {
+      "historical": 6,
+      "current": 6,
+      "candidate": 6
+    },
+    "ranges": {
+      "historical": [
+        6,
+        6
+      ],
+      "current": [
+        6,
+        7
+      ],
+      "candidate": [
+        6,
+        7
+      ]
+    },
+    "pass_gate": true,
+    "historical_current_ratio": 1.0,
+    "candidate_current_ratio": 1.0,
+    "paired_round_ratios": [
+      {
+        "round": 0,
+        "candidate_current_ratio": 1.0,
+        "historical_current_ratio": 1.0
+      },
+      {
+        "round": 1,
+        "candidate_current_ratio": 1.1666666666666667,
+        "historical_current_ratio": 1.0
+      },
+      {
+        "round": 2,
+        "candidate_current_ratio": 0.8571428571428571,
+        "historical_current_ratio": 0.8571428571428571
+      },
+      {
+        "round": 3,
+        "candidate_current_ratio": 1.0,
+        "historical_current_ratio": 1.0
+      },
+      {
+        "round": 4,
+        "candidate_current_ratio": 1.0,
+        "historical_current_ratio": 1.0
+      }
+    ]
+  },
+  {
+    "corpus": "short",
+    "zone": "0",
+    "medians": {
+      "historical": 177,
+      "current": 176,
+      "candidate": 168
+    },
+    "ranges": {
+      "historical": [
+        172,
+        179
+      ],
+      "current": [
+        167,
+        177
+      ],
+      "candidate": [
+        158,
+        170
+      ]
+    },
+    "pass_gate": true,
+    "historical_current_ratio": 1.0056818181818181,
+    "candidate_current_ratio": 0.9545454545454546,
+    "paired_round_ratios": [
+      {
+        "round": 0,
+        "candidate_current_ratio": 0.9491525423728814,
+        "historical_current_ratio": 1.0112994350282485
+      },
+      {
+        "round": 1,
+        "candidate_current_ratio": 0.9461077844311377,
+        "historical_current_ratio": 1.029940119760479
+      },
+      {
+        "round": 2,
+        "candidate_current_ratio": 0.9712643678160919,
+        "historical_current_ratio": 1.0172413793103448
+      },
+      {
+        "round": 3,
+        "candidate_current_ratio": 0.96045197740113,
+        "historical_current_ratio": 0.9774011299435028
+      },
+      {
+        "round": 4,
+        "candidate_current_ratio": 0.9375,
+        "historical_current_ratio": 1.0113636363636365
+      }
+    ]
+  },
+  {
+    "corpus": "whitespace",
+    "zone": "0",
+    "medians": {
+      "historical": 10865167,
+      "current": 10805916,
+      "candidate": 10834875
+    },
+    "ranges": {
+      "historical": [
+        10826167,
+        11333042
+      ],
+      "current": [
+        10668417,
+        11083625
+      ],
+      "candidate": [
+        10661417,
+        11268834
+      ]
+    },
+    "pass_gate": true,
+    "historical_current_ratio": 1.005483200128522,
+    "candidate_current_ratio": 1.0026799208877804,
+    "paired_round_ratios": [
+      {
+        "round": 0,
+        "candidate_current_ratio": 1.0156028771653751,
+        "historical_current_ratio": 1.015973878786328
+      },
+      {
+        "round": 1,
+        "candidate_current_ratio": 0.9914543770264012,
+        "historical_current_ratio": 1.0172611394163964
+      },
+      {
+        "round": 2,
+        "candidate_current_ratio": 0.9866277879635562,
+        "historical_current_ratio": 1.0018740660208723
+      },
+      {
+        "round": 3,
+        "candidate_current_ratio": 1.003792356248295,
+        "historical_current_ratio": 0.982043566452642
+      },
+      {
+        "round": 4,
+        "candidate_current_ratio": 1.016710146725462,
+        "historical_current_ratio": 1.022503197284282
+      }
+    ]
+  },
+  {
+    "corpus": "comment",
+    "zone": "0",
+    "medians": {
+      "historical": 23463792,
+      "current": 23557750,
+      "candidate": 23267500
+    },
+    "ranges": {
+      "historical": [
+        23009833,
+        24038834
+      ],
+      "current": [
+        23151875,
+        23903750
+      ],
+      "candidate": [
+        23118666,
+        23666375
+      ]
+    },
+    "pass_gate": true,
+    "historical_current_ratio": 0.9960115885430485,
+    "candidate_current_ratio": 0.9876792138468232,
+    "paired_round_ratios": [
+      {
+        "round": 0,
+        "candidate_current_ratio": 1.0049941959344546,
+        "historical_current_ratio": 1.0014559511918582
+      },
+      {
+        "round": 1,
+        "candidate_current_ratio": 0.9967442189408714,
+        "historical_current_ratio": 0.9862554595915218
+      },
+      {
+        "round": 2,
+        "candidate_current_ratio": 0.9814275941093832,
+        "historical_current_ratio": 0.9852768172018159
+      },
+      {
+        "round": 3,
+        "candidate_current_ratio": 0.9813613778905032,
+        "historical_current_ratio": 1.0118909912873684
+      },
+      {
+        "round": 4,
+        "candidate_current_ratio": 0.9900695497568374,
+        "historical_current_ratio": 1.0056511635203682
+      }
+    ]
+  },
+  {
+    "corpus": "string",
+    "zone": "0",
+    "medians": {
+      "historical": 35363917,
+      "current": 34949292,
+      "candidate": 34789167
+    },
+    "ranges": {
+      "historical": [
+        34841959,
+        35957458
+      ],
+      "current": [
+        34367833,
+        36102792
+      ],
+      "candidate": [
+        33852000,
+        35082541
+      ]
+    },
+    "pass_gate": true,
+    "historical_current_ratio": 1.0118636165791284,
+    "candidate_current_ratio": 0.9954183621230439,
+    "paired_round_ratios": [
+      {
+        "round": 0,
+        "candidate_current_ratio": 0.980961488307398,
+        "historical_current_ratio": 1.041973340288041
+      },
+      {
+        "round": 1,
+        "candidate_current_ratio": 0.9659375713399044,
+        "historical_current_ratio": 0.9818957752005375
+      },
+      {
+        "round": 2,
+        "candidate_current_ratio": 0.9795429618431183,
+        "historical_current_ratio": 0.9969288934379558
+      },
+      {
+        "round": 3,
+        "candidate_current_ratio": 1.0185541811728427,
+        "historical_current_ratio": 1.0323619181925145
+      },
+      {
+        "round": 4,
+        "candidate_current_ratio": 0.9717403850649556,
+        "historical_current_ratio": 0.9784654051132666
+      }
+    ]
+  },
+  {
+    "corpus": "dense_sparse",
+    "zone": "0",
+    "medians": {
+      "historical": 11168917,
+      "current": 10977000,
+      "candidate": 11184708
+    },
+    "ranges": {
+      "historical": [
+        10742375,
+        11426000
+      ],
+      "current": [
+        10913708,
+        11247166
+      ],
+      "candidate": [
+        10799375,
+        11395750
+      ]
+    },
+    "pass_gate": true,
+    "historical_current_ratio": 1.0174835565272844,
+    "candidate_current_ratio": 1.0189221098660837,
+    "paired_round_ratios": [
+      {
+        "round": 0,
+        "candidate_current_ratio": 0.9795499850201813,
+        "historical_current_ratio": 0.9743798386787356
+      },
+      {
+        "round": 1,
+        "candidate_current_ratio": 0.9898437281836634,
+        "historical_current_ratio": 1.019251670794869
+      },
+      {
+        "round": 2,
+        "candidate_current_ratio": 1.024831157293195,
+        "historical_current_ratio": 0.9982247096953666
+      },
+      {
+        "round": 3,
+        "candidate_current_ratio": 1.0258874920287875,
+        "historical_current_ratio": 1.0409037077525736
+      },
+      {
+        "round": 4,
+        "candidate_current_ratio": 1.013210794612616,
+        "historical_current_ratio": 1.001078138261674
+      }
+    ]
+  },
+  {
+    "corpus": "sparse_dense",
+    "zone": "0",
+    "medians": {
+      "historical": 21975333,
+      "current": 22196583,
+      "candidate": 21920167
+    },
+    "ranges": {
+      "historical": [
+        20695334,
+        22066000
+      ],
+      "current": [
+        21648333,
+        22363166
+      ],
+      "candidate": [
+        21353959,
+        22299917
+      ]
+    },
+    "pass_gate": true,
+    "historical_current_ratio": 0.9900322495584117,
+    "candidate_current_ratio": 0.9875469120629964,
+    "paired_round_ratios": [
+      {
+        "round": 0,
+        "candidate_current_ratio": 1.0046554012390105,
+        "historical_current_ratio": 0.9941169773744004
+      },
+      {
+        "round": 1,
+        "candidate_current_ratio": 0.9884307664770471,
+        "historical_current_ratio": 0.9791716924247255
+      },
+      {
+        "round": 2,
+        "candidate_current_ratio": 0.9864020014843637,
+        "historical_current_ratio": 1.015105089153978
+      },
+      {
+        "round": 3,
+        "candidate_current_ratio": 0.9972003540398225,
+        "historical_current_ratio": 0.999812343972543
+      },
+      {
+        "round": 4,
+        "candidate_current_ratio": 0.9572325313866561,
+        "historical_current_ratio": 0.925420577748249
+      }
+    ]
+  }
+]

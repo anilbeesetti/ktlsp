@@ -285,6 +285,13 @@ impl Lexer<'_> {
             } else {
                 self.punctuation()?
             };
+            if self.result.tokens.len() == self.result.tokens.capacity() {
+                // Avoid repeated realloc's high lifetime peak RSS on Darwin.
+                let capacity = (self.result.tokens.capacity().max(2) * 2).min(MAX_TOKENS);
+                let mut tokens = Vec::with_capacity(capacity);
+                tokens.append(&mut self.result.tokens);
+                self.result.tokens = tokens;
+            }
             self.result.tokens.push(Token {
                 kind,
                 start,

@@ -1,0 +1,16 @@
+[package]
+name = "ktrs-parser"
+version = "0.5.1"
+edition = "2024"
+rust-version = "1.90"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Hexay/ktrs"
+
+[workspace]
+
+[dependencies]
+ktrs-lexer = "=0.5.1"
+ktrs-syntax = "=0.5.1"
+
+[lib]
+test = false

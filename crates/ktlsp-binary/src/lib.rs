@@ -4,6 +4,8 @@ pub mod annotations;
 
 use std::fmt;
 
+pub mod signatures;
+
 pub const MAX_BYTES: usize = 16 * 1024 * 1024;
 pub const MAX_RECORDS: usize = 65_535;
 pub const MAX_VALIDATION_UNITS: usize = 64 * 1024 * 1024;

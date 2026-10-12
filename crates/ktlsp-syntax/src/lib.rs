@@ -101,9 +101,17 @@ struct Lexer<'a> {
 
 #[derive(Clone, Copy)]
 enum Context {
-    String { start: usize, raw: bool },
-    Template { start: usize },
-    BlockComment { start: usize },
+    String {
+        start: usize,
+        raw: bool,
+        dollars: usize,
+    },
+    Template {
+        start: usize,
+    },
+    BlockComment {
+        start: usize,
+    },
     LineComment,
 }
 
@@ -161,6 +169,17 @@ impl Lexer<'_> {
     fn tail(&self) -> &str {
         &self.source[self.pos..]
     }
+    // Prefix dollars choose the interpolation activation count. Unprefixed
+    // strings activate at one dollar. Inspect bytes only for ASCII prefixes.
+    fn string_opening(&self) -> Option<(usize, bool, usize)> {
+        let prefix = self.tail().bytes().take_while(|b| *b == b'$').count();
+        let quotes = &self.tail()[prefix..];
+        if !quotes.starts_with('"') {
+            return None;
+        }
+        let raw = quotes.starts_with("\"\"\"");
+        Some((prefix + if raw { 3 } else { 1 }, raw, prefix.max(1)))
+    }
     fn peek(&self) -> Option<char> {
         self.tail().chars().next()
     }
@@ -214,10 +233,13 @@ impl Lexer<'_> {
                 self.pos += 2;
                 self.scan_contexts(vec![Context::BlockComment { start }])?;
                 TokenKind::BlockComment
-            } else if c == '"' {
-                let raw = self.tail().starts_with("\"\"\"");
-                self.pos += if raw { 3 } else { 1 };
-                self.scan_contexts(vec![Context::String { start, raw }])?;
+            } else if let Some((opening, raw, dollars)) = self.string_opening() {
+                self.pos += opening;
+                self.scan_contexts(vec![Context::String {
+                    start,
+                    raw,
+                    dollars,
+                }])?;
                 if raw {
                     TokenKind::RawString
                 } else {
@@ -252,6 +274,14 @@ impl Lexer<'_> {
                 } else {
                     TokenKind::Identifier
                 }
+            } else if c == '$' {
+                // Consume the rejected prefix as a run, so repeated dollars do
+                // not rescan the same suffix quadratically.
+                while self.peek() == Some('$') {
+                    self.bump();
+                }
+                self.diagnostic(start, self.pos, "unrecognized dollar sequence")?;
+                TokenKind::Unknown
             } else {
                 self.punctuation()?
             };
@@ -305,7 +335,11 @@ impl Lexer<'_> {
                         self.bump();
                     }
                 }
-                Context::String { start, raw } => {
+                Context::String {
+                    start,
+                    raw,
+                    dollars,
+                } => {
                     if (raw && self.tail().starts_with("\"\"\""))
                         || (!raw && self.peek() == Some('"'))
                     {
@@ -322,9 +356,15 @@ impl Lexer<'_> {
                         stack.pop();
                     } else if !raw && self.peek() == Some('\\') {
                         self.escape()?;
-                    } else if self.tail().starts_with("${") {
-                        Self::push(&mut stack, Context::Template { start: self.pos })?;
-                        self.pos += 2;
+                    } else if self.peek() == Some('$') {
+                        let start = self.pos;
+                        while self.peek() == Some('$') {
+                            self.bump();
+                        }
+                        if self.pos - start >= dollars && self.peek() == Some('{') {
+                            Self::push(&mut stack, Context::Template { start })?;
+                            self.bump();
+                        }
                     } else {
                         self.bump();
                     }
@@ -336,16 +376,22 @@ impl Lexer<'_> {
                     } else if self.tail().starts_with("/*") {
                         Self::push(&mut stack, Context::BlockComment { start: self.pos })?;
                         self.pos += 2;
-                    } else if self.peek() == Some('"') {
-                        let raw = self.tail().starts_with("\"\"\"");
+                    } else if let Some((opening, raw, dollars)) = self.string_opening() {
                         Self::push(
                             &mut stack,
                             Context::String {
                                 start: self.pos,
                                 raw,
+                                dollars,
                             },
                         )?;
-                        self.pos += if raw { 3 } else { 1 };
+                        self.pos += opening;
+                    } else if self.peek() == Some('$') {
+                        // An unquoted dollar run is opaque expression text;
+                        // skip it once after checking for a prefixed string.
+                        while self.peek() == Some('$') {
+                            self.bump();
+                        }
                     } else if self.peek() == Some('\'') {
                         if stack.len() == MAX_NESTING {
                             return Err(SyntaxError::NestingTooDeep);

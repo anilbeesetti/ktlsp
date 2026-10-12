@@ -280,3 +280,45 @@ fn deterministic_generated_utf8_crash_and_partition_corpus() {
         }
     }
 }
+
+#[test]
+fn multi_dollar_strings_preserve_prefix_and_activation_count() {
+    for source in [
+        "$$\"literal ${unbalanced and $name}\"",
+        "$$\"literal ${ never closes\"",
+        "$$\"active $${f(\"nested\", { 1 })} literal ${ not active\"",
+        "$$\"\"\"literal ${not active} $${f(\"nested\")} end\"\"\"",
+        "$$$\"\"\"literal $${ never closes $$$${f(\"nested\")} end\"\"\"",
+        "\"${f($$\"literal ${not active\", $$\"$${g(\"inner\")}\")}\"",
+        "$$\"escaped \\$${not active} and $${1}\"",
+    ] {
+        let result = tokens(source);
+        assert_eq!(result.len(), 1, "{source:?}: {result:?}");
+        assert!(matches!(
+            result[0].0,
+            TokenKind::String | TokenKind::RawString
+        ));
+        assert_eq!(result[0].1, source);
+        let surrounded = format!("{{{source}}}");
+        let result = tokens(&surrounded);
+        assert_eq!(result.len(), 3, "{source:?}: {result:?}");
+    }
+    let source = "$$\"$${f(\"inner\")\"";
+    let result = lex(source).unwrap();
+    partition(source, &result);
+    assert_eq!(result.tokens.len(), 1);
+    assert!(!result.diagnostics.is_empty());
+}
+
+#[test]
+fn long_dollar_runs_have_linear_progress() {
+    let dollars = "$".repeat(256 * 1024);
+    let result = lex(&dollars).unwrap();
+    partition(&dollars, &result);
+    assert_eq!(result.tokens.len(), 1);
+    assert_eq!(result.diagnostics.len(), 1);
+    let template = format!("\"${{{dollars}}}\"");
+    assert_eq!(tokens(&template).len(), 1);
+    let prefixed = format!("{dollars}\"literal ${{ brace\"");
+    assert_eq!(tokens(&prefixed).len(), 1);
+}

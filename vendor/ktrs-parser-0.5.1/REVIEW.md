@@ -88,7 +88,7 @@ not proof of global linear parsing, total work or RSS. Existing internal-trivia
 threshold and failed-eligible aggregate exhaustion/reset fixtures remain relevant;
 they do not establish a precise aggregate acceptance threshold.
 
-One unpublished production-worker fixture places 4401 leading trivia tokens
+The focused production-worker fixture places 4401 leading trivia tokens
 (13204 bytes) directly after '<', then pins exact damaged class/list and sibling
 name/function/parent ranges, entry diagnostic, token partition, snapshot identity
 and healthy followup. Format and workspace test-source compilation pass; no
@@ -126,3 +126,16 @@ Owner architect approves this focused preparation: actual-predicate preservation
 large-leading-trivia fixture reach and honest accounting/EOF limitations match
 the root-amended contract. This is conditional preparation approval, not delivery
 or renewed runtime approval. Final integrated Linux checks and both reviews remain.
+
+## Authorized final integration
+
+Exact main ef120beebb45f96a60bf61866fe15dd228b674bc, tree
+f657f81e16237c1ba0903169ab94fd3e2747eafe, was integrated once into focused
+preparation f7d56979539cdda7c4216733fd6647bf75ef782f at merge
+78e9df525145df31a8dd6ef2b56d31dac53ce7af. The integration changed no owned
+parser/vendor source or test bytes and preserves current-main binary exports,
+shared docs, manifests and lock exactly. Ordered archive/patch/final-hash replay
+passed again. The authoritative combined-head Linux workflow, new leading-trivia
+runtime outcome and renewed separate reviews/finished architect remain pending.
+Root expected-head merge authorization and exact merged-main checks are still
+required. No local runtime or JVM/oracle ran; #7/#83/#96 remain open.

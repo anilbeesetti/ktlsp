@@ -130,9 +130,8 @@ regressions are in declarations.rs/recovery_limits.rs. Authorized Linux CI and
 both independent behavioral reviews passed for candidate054e352 on the actual
 synthetic merge86bbd04: 169 active tests, zero failures, two exercised helper
 fixtures and 19 worker fault cases. Exact checkout/tree evidence is in REVIEW.md.
-Local format/Clippy and ordered patch/hash replay also passed. Stable integration,
-final-head CI/reviews and coordinator merge grant remain required; this is not a
-completed-delivery claim. Issue #96 remains unresolved.
+Local format/Clippy and ordered patch/hash replay also passed. Authorized main ef120be was integrated once; final combined-head CI/reviews and
+coordinator merge grant remain required. This is not a completed-delivery claim. Issue #96 remains unresolved.
 
 The coordinator explicitly amended the accounting contract after a focused audit:
 leading trivia and cheap kind/modifier/EOF prefilter misses may remain outside

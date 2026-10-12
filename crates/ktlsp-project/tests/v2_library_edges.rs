@@ -13,6 +13,15 @@ fn minimal() -> Value {
 fn parse(value: Value) -> Result<v2::ProjectModel, v2::Error> {
     v2::from_json(base(), &serde_json::to_vec(&value).unwrap())
 }
+fn parse_short_base(value: Value) -> Result<v2::ProjectModel, v2::Error> {
+    let root = std::env::current_dir()
+        .unwrap()
+        .ancestors()
+        .last()
+        .unwrap()
+        .to_path_buf();
+    v2::from_json(root.join("m"), &serde_json::to_vec(&value).unwrap())
+}
 fn edge(kind: &str, target: &str, scope: &str, exported: bool) -> Value {
     json!({"type":kind, kind:target,"scope":scope,"exported":exported})
 }
@@ -381,7 +390,7 @@ fn exact_collection_preflight_boundaries_precede_typed_schema_allocation() {
         }
     }
     let value = json!({"schemaVersion":2,"modules":[],"libraries":[{"id":"l","binaries":vec!["a";MAX_ARCHIVE_PATHS/3],"sources":vec!["a";MAX_ARCHIVE_PATHS/3]}],"sdkArchives":vec!["a";MAX_ARCHIVE_PATHS-2*(MAX_ARCHIVE_PATHS/3)]});
-    assert!(parse(value.clone()).is_ok());
+    assert!(parse_short_base(value.clone()).is_ok());
     let mut excess = value;
     excess["sdkArchives"]
         .as_array_mut()
@@ -399,7 +408,7 @@ fn exact_collection_preflight_boundaries_precede_typed_schema_allocation() {
 #[test]
 fn valid_large_libraries_roots_and_mixed_edges_remain_bounded() {
     assert_eq!(parse(json!({"schemaVersion":2,"modules":[],"libraries":(0..MAX_LIBRARIES).map(|i|json!({"id":format!("l{i}"),"binaries":[]})).collect::<Vec<_>>()})).unwrap().libraries.len(), MAX_LIBRARIES);
-    assert_eq!(parse(json!({"schemaVersion":2,"modules":[{"id":"a","sourceRoots":(0..MAX_SOURCE_ROOTS).map(|i|json!({"path":format!("src/r{i}"),"kind":"production"})).collect::<Vec<_>>()}]})).unwrap().modules[0].source_roots.len(), MAX_SOURCE_ROOTS);
+    assert_eq!(parse_short_base(json!({"schemaVersion":2,"modules":[{"id":"a","sourceRoots":(0..MAX_SOURCE_ROOTS).map(|i|json!({"path":format!("src/r{i}"),"kind":"production"})).collect::<Vec<_>>()}]})).unwrap().modules[0].source_roots.len(), MAX_SOURCE_ROOTS);
     let libraries: Vec<_> = (0..2048)
         .map(|i| json!({"id":format!("l{i}"),"binaries":[]}))
         .collect();
@@ -443,7 +452,12 @@ fn caller_base_amplification_is_bounded_before_any_model_path_expansion() {
         json!({"schemaVersion":2,"modules":[],"sdkArchives":["a","b"]}),
     ] {
         let bytes = serde_json::to_vec(&value).unwrap();
-        assert!(v2::from_json(&path, &bytes).is_ok());
+        assert!(matches!(
+            v2::from_json(&path, &bytes),
+            Err(v2::Error::NormalizedOutputBudgetExceeded {
+                limit: MAX_MANIFEST_BYTES
+            })
+        ));
         let excess = long_manifest(limit / 2 - 1);
         assert!(
             matches!(v2::from_json(&excess, &bytes), Err(v2::Error::ExpandedPathBudgetExceeded { limit:l }) if l == limit)
@@ -473,28 +487,39 @@ fn caller_base_amplification_is_bounded_before_any_model_path_expansion() {
 }
 
 #[test]
-fn expanded_serialization_retains_data_but_reparse_applies_input_byte_limit() {
+fn short_input_with_oversized_normalized_output_rejects_during_load() {
     let path = std::env::temp_dir().join("b".repeat(80)).join("model.json");
     let input = serde_json::to_vec(&json!({"schemaVersion":2,"modules":[{"id":"a","dependencies":[edge("library","l","test",true)]}],"libraries":[{"id":"l","binaries":[]}],"sdkArchives":vec!["a";MAX_ARCHIVE_PATHS]})).unwrap();
     assert!(input.len() < MAX_MANIFEST_BYTES);
-    let model = v2::from_json(&path, &input).unwrap();
-    let serialized = serde_json::to_vec(&model).unwrap();
-    assert!(serialized.len() > MAX_MANIFEST_BYTES);
-    let value: Value = serde_json::from_slice(&serialized).unwrap();
-    assert_eq!(
-        value["sdkArchives"].as_array().unwrap().len(),
-        MAX_ARCHIVE_PATHS
-    );
-    assert_eq!(
-        value["modules"][0]["dependencies"][0],
-        edge("library", "l", "test", true)
-    );
     assert!(matches!(
-        v2::from_json(&path, &serialized),
-        Err(v2::Error::Validation(ProjectError::BudgetExceeded {
-            budget: Budget::ManifestBytes,
-            ..
-        }))
+        v2::from_json(&path, &input),
+        Err(v2::Error::NormalizedOutputBudgetExceeded {
+            limit: MAX_MANIFEST_BYTES
+        })
+    ));
+}
+
+#[test]
+fn exact_compact_output_boundary_counts_unicode_escaping_and_preserves_roundtrip() {
+    let mut value = json!({"schemaVersion":2,"modules":[{"id":"😀\n\t\"","dependencies":[edge("library","l","test",true)]}],"libraries":[{"id":"l","binaries":[]}]});
+    let seed = parse(value.clone()).unwrap();
+    let padding = MAX_MANIFEST_BYTES - serde_json::to_vec(&seed).unwrap().len();
+    let id = format!("😀\n\t\"{}", "a".repeat(padding));
+    value["modules"][0]["id"] = json!(id);
+    let bytes = serde_json::to_vec(&value).unwrap();
+    assert!(bytes.len() < MAX_MANIFEST_BYTES);
+    let model = v2::from_json(base(), &bytes).unwrap();
+    let serialized = serde_json::to_vec(&model).unwrap();
+    assert_eq!(serialized.len(), MAX_MANIFEST_BYTES);
+    assert_eq!(v2::from_json(base(), &serialized).unwrap(), model);
+    value["modules"][0]["id"] = json!(format!("{id}a"));
+    let excess = serde_json::to_vec(&value).unwrap();
+    assert!(excess.len() < MAX_MANIFEST_BYTES);
+    assert!(matches!(
+        v2::from_json(base(), &excess),
+        Err(v2::Error::NormalizedOutputBudgetExceeded {
+            limit: MAX_MANIFEST_BYTES
+        })
     ));
 }
 

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fmt;
 use std::fs::File;
-use std::io::Read;
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
 /// Conservative byte bound before joining caller-supplied bases to model paths.
@@ -17,6 +17,7 @@ pub enum Error {
     Validation(super::ProjectError),
     UnsupportedSchemaVersion(u64),
     ExpandedPathBudgetExceeded { limit: usize },
+    NormalizedOutputBudgetExceeded { limit: usize },
 }
 
 impl From<super::ProjectError> for Error {
@@ -38,6 +39,9 @@ impl fmt::Display for Error {
             Self::ExpandedPathBudgetExceeded { limit } => {
                 write!(f, "project expanded path byte budget exceeds {limit}")
             }
+            Self::NormalizedOutputBudgetExceeded { limit } => {
+                write!(f, "project normalized output byte budget exceeds {limit}")
+            }
         }
     }
 }
@@ -46,7 +50,9 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Validation(error) => Some(error),
-            Self::UnsupportedSchemaVersion(_) | Self::ExpandedPathBudgetExceeded { .. } => None,
+            Self::UnsupportedSchemaVersion(_)
+            | Self::ExpandedPathBudgetExceeded { .. }
+            | Self::NormalizedOutputBudgetExceeded { .. } => None,
         }
     }
 }
@@ -171,12 +177,39 @@ pub fn from_json(manifest_path: impl AsRef<Path>, bytes: &[u8]) -> Result<Projec
         module.source_roots = normalized.source_roots;
         module.language_settings = normalized.language_settings;
     }
-    Ok(ProjectModel {
+    let model = ProjectModel {
         schema_version: manifest.schema_version,
         modules: manifest.modules,
         libraries: shared.libraries,
         sdk_archives: shared.sdk_archives,
-    })
+    };
+    let mut output = OutputBudget(0);
+    if let Err(error) = serde_json::to_writer(&mut output, &model) {
+        if output.0 > super::MAX_MANIFEST_BYTES {
+            return Err(Error::NormalizedOutputBudgetExceeded {
+                limit: super::MAX_MANIFEST_BYTES,
+            });
+        }
+        return Err(super::ProjectError::Json(error).into());
+    }
+    Ok(model)
+}
+
+// Count the compact serialized bytes, including escaping, without storing output.
+struct OutputBudget(usize);
+impl Write for OutputBudget {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.0 = self.0.saturating_add(bytes.len());
+        if self.0 > super::MAX_MANIFEST_BYTES {
+            return Err(io::Error::other(
+                "normalized project output budget exceeded",
+            ));
+        }
+        Ok(bytes.len())
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 fn unicode_path(path: &Path) -> Result<(), Error> {

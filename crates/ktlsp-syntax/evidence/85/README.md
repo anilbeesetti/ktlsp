@@ -57,4 +57,30 @@ Owner pinned `cargo fmt --all -- --check`, `cargo clippy --locked --workspace --
 
 [timing-exploratory.json](timing-exploratory.json) preserves all 252 uninstrumented exploratory child averages (nine corpora, seven alternating rounds, two revisions, two allocator environments). Metadata records exact pass counts and timing binary hashes. These runs were **not coordinated quiet measurements and are not accepted**: some transition medians exceed the predefined limit, with large spreads. For example default-environment dense→sparse baseline median 26,942,683 ns (24,737,933–95,125,916), candidate 38,546,200 ns (26,305,525–58,605,016); the candidate exceeds 1.10× + 100 ns. This does not distinguish scheduling noise from a real regression. A quiet run must resolve it before this candidate can leave draft or merge; the gate is unchanged.
 
-No official JVM oracle or Linux/Windows residency experiment ran. Low Darwin RSS does not imply lower Rust requested peak, zero residency after drop, a proven allocator leak fix, or full performance/parity completion. Hosted CI, quiet latency and integration delivery evidence remain pending.
+## Coordinated quiet latency acceptance
+
+The coordinator held all local owners/reviewers idle and explicitly granted the frozen matrix. The first grant closed before any inventory/timing execution: I found the prepared runner recorded competing processes without stopping. Outside measurement I added the fail-closed guard, and the correctness reviewer independently spawned an owned Rust test helper, confirmed detection and rejection before any measured child/output, then stopped that helper. [The guard self-check](guard-selfcheck-inventory.txt) is preparation evidence, not a failed timing run. Benchmark binaries, fixtures and thresholds stayed frozen.
+
+The fresh second grant produced [270 primary observations](quiet-primary.jsonl) and [48 independent observations](quiet-independent.jsonl), kept separate. [Quiet metadata](quiet-metadata.json) records exact binary/source/driver/raw-data hashes, revisions, pass counts and timestamps. The current baseline is the frozen preparation-time main `08a56b7e6abbe746d3342fc2db4ae1db09060ef3`; historical is `0d54973`, candidate is `fdb9370`. Historical/current lexer hashes are identical. [One preflight inventory](quiet-preinventory.txt) found zero matching build/test processes; no inventory/build/test ran during loops. It recorded allocator override names, with no secret values.
+
+Primary runtime was 11.180 seconds; independent runtime was 1.401 seconds, sequentially after the primary. The final independent child ended 41.692 seconds after primary measured start, before the shared 110-second deadline. The coordinator release report followed approximately 98–102 seconds after measured start; the exact send timestamp was not instrumented. No incomplete rows, deadline failures or selectively discarded runs. [The executed Rust runner](quiet-runner.rs) enforces primary's 90-second cap; the independent driver enforced its own 20-second cap and the shared absolute deadline. Setup/reporting are outside child latency.
+
+Primary runs five fresh-child rounds over three revisions, both allocator environments and all nine existing corpora. Dense fixtures use three timed calls after validation, sparse/transition fixtures one, and empty/short 100,000. Revision/corpus/environment order rotates or reverses across rounds. The independent reviewer ran three paired rounds over dense and previously failing transition fixtures, both environments, one timed call after validation. [Primary summaries](quiet-primary-summary.json) include medians, ranges and paired-round ratios; [independent summaries](quiet-independent-summary.json) remain separate.
+
+All 18 primary median gates pass (candidate/current ratios 0.9157–1.0189); all eight independent gates pass (0.9749–1.0317). Every paired primary round also satisfies its applicable original threshold. Historical/current medians agree within 2.72% (empty equals). Correctness reviewer `/root/correctness`, adversarial reviewer `/root/adversarial` and architect `/root/architect` independently recomputed and approved the unchanged bounded median acceptance. No new measurements or pooled samples were used in these audits. The [correctness audit](quiet-correctness-audit.json) preserves its independently calculated checks; the adversarial reviewer additionally confirmed all source/runner/binary hashes and input/cap/deadline consistency.
+
+| Corpus | Current/candidate median ns, default | Current/candidate median ns, Nano=0 |
+| --- | --- | --- |
+| large | 6490722 / 6437875 | 6604583 / 6611458 |
+| short_tokens | 11371403 / 11420986 | 11392653 / 11181083 |
+| empty | 6 / 6 | 6 / 6 |
+| short | 166 / 152 | 176 / 168 |
+| 8 MiB whitespace | 10985459 / 10985208 | 10805916 / 10834875 |
+| 8 MiB comment | 23766834 / 23419584 | 23557750 / 23267500 |
+| 8 MiB string | 34976458 / 35161000 | 34949292 / 34789167 |
+| dense→sparse | 11083083 / 10946542 | 10977000 / 11184708 |
+| sparse→dense | 22098334 / 21855250 | 22196583 / 21920167 |
+
+The `large/default` first round is elevated for all three revisions (11.209/10.896/9.781 ms historical/current/candidate versus later roughly 6.4–6.6 ms). All values remain in raw data and ranges; no startup explanation is proven. Historical/current agreement, paired-round thresholds and independent replication support the predefined median regression gate, not a speed-improvement claim. The exploratory failures above remain preserved. This validates the named one/three-call batch-average workload, not 112-call latency, per-operation/tail latency or cross-platform performance.
+
+No official JVM oracle or Linux/Windows residency experiment ran. Low Darwin RSS does not imply lower Rust requested peak, zero residency after drop, a proven allocator leak fix, or full performance/parity completion. The 1.5× temporary requested-memory cost remains. Hosted CI on the final evidence head and coordinator integration remain pending.

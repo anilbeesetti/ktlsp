@@ -1,0 +1,59 @@
+{
+  "revisions": {
+    "historical": "0d54973ce66f59362829360261fde6e46b4fc420",
+    "current": "08a56b7e6abbe746d3342fc2db4ae1db09060ef3",
+    "candidate": "fdb9370a25d2e7a8031bbf50333a48e46e11e4fc"
+  },
+  "counting": false,
+  "profile": "release",
+  "hashes": {
+    "historical_lexer": "9c069f18a7db01e3ae5e72dd03edf39be3a74591c2b372d434e82bf31c6903fb",
+    "historical_probe": "e3ca3bd41354c93bd6749df6bf741c63d8f3271e2a73a77aba79d49f57109c6f",
+    "historical_binary": "3d0b908e1ad5852eacdd5bc02ca52850ade0320eea742adf41a64fcb1eb88161",
+    "current_lexer": "9c069f18a7db01e3ae5e72dd03edf39be3a74591c2b372d434e82bf31c6903fb",
+    "current_probe": "e3ca3bd41354c93bd6749df6bf741c63d8f3271e2a73a77aba79d49f57109c6f",
+    "current_binary": "395dee9df149b9825f6f50975e0c1f099ae803198240990a4f26e54c683c394c",
+    "candidate_lexer": "69e155a744eeeec28b515d71cf0130dcac8ffc85a1a40ae41cce327fc2f77f08",
+    "candidate_probe": "e3ca3bd41354c93bd6749df6bf741c63d8f3271e2a73a77aba79d49f57109c6f",
+    "candidate_binary": "17eb9a86da6cd050125ea3ca83e20c922d19797d5d8a1224477c8099bf147bec"
+  },
+  "runner_source_sha256": "758e8f66aea9e30a3d22c44cb3a549e2bcde17bf1b2676f9f74b54a252a5e867",
+  "runner_executable_sha256": "ff9261b21a69fcd98a9781a40f8256f9ed458773ee7ba584d018c4e4dfd072ab",
+  "preparation_correction": "First granted window closed before any inventory/timing execution: prepared inventory lacked abort guard. Added fail-closed counts.is_empty guard outside that window. Benchmark binaries, fixtures, matrix and criterion unchanged; independent guard recheck passed: real unexpected-test process detected; runner aborted before measured child/timing output; no primary/window files created.",
+  "quiet_attempt": 2,
+  "coordinator_grant": "Fresh explicit grant received from coordinator after all owners/reviewers acknowledged idle; attempt1 closed before inventory/timing execution",
+  "measured_start_epoch_ms": 1791814351793,
+  "shared_deadline_epoch_ms": 1791814461793,
+  "primary_children": 270,
+  "primary_duration_s": 11.179895958,
+  "independent_children": 48,
+  "independent_first_epoch": 1791814392.084598,
+  "independent_last_child_end_epoch": 1791814393.485265,
+  "last_measurement_from_start_s": 41.692265033721924,
+  "primary_hard_cap_s": 90,
+  "shared_hard_cap_s": 110,
+  "required_quiet_window_max_s": 120,
+  "window_release_report": "Sent WINDOWRELEASED to coordinator after all measurements, approximately98\u2013102s after measured start; exact report send timestamp not instrumented",
+  "frozen_primary_extra_calls": {
+    "large": 3,
+    "short_tokens": 3,
+    "empty": 100000,
+    "short": 100000,
+    "whitespace": 1,
+    "comment": 1,
+    "string": 1,
+    "dense_sparse": 1,
+    "sparse_dense": 1
+  },
+  "frozen_independent_extra_calls": 1,
+  "primary_rounds": 5,
+  "independent_rounds": 3,
+  "timing_limit": "This validates median batch average for one/three timed calls after one validation on larger corpora, not112-call latency, per-operation p95, or cross-platform timing",
+  "startup_spread": "All default large round0 observations elevated together; retained. Primary max/min wider than later rounds, so do not infer tail latency/superiority",
+  "independent_driver_source_sha256": "b716ea5f5fd799fc582d0905007fea729636b235453928912f79d12d2743813e",
+  "raw_hashes": {
+    "quiet-primary.jsonl": "58cdad37f9a5df269db94e6e329fe5ac399bb8a065a475c15618ea6c902af463",
+    "quiet-independent.jsonl": "742aa50c648f93d7bc32fda97e8ae5b173c05d668e4bec5863feb12ec10b8105",
+    "quiet-preinventory.txt": "0ea310923606da28052fc433e8719a871406ce79364422a608ae50a5a2b18920"
+  }
+}

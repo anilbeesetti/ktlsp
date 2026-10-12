@@ -108,3 +108,23 @@ declarations/package/imports to stable revisioned HIR; preserve parents, names,
 original spans and incomplete-declaration diagnostics, with explicit unsupported
 grammar. Byte offsets alone are not symbol identity. No resolution/provider claim
 without separately accepted semantics.
+
+## #100 classifier-generic recovery candidate
+
+The candidate recovers simple named sibling function headers after incomplete
+class/interface type-parameter lists at parameter entries or after completed
+parameters/bounds. Optional complete annotations/modifiers stay with the function.
+Newlines and keywords alone do not establish a recovery boundary. Generic and
+extension function headers, other sibling kinds, objects, and incomplete nested
+bounds/annotations remain outside this positive contract; ordinary parsing stays
+in effect for them. #83/#7 and T008a require the remaining acceptance audit.
+
+Scratch prefix parsing preserves live state and respects existing truncation;
+256 raw tokens/4096 bytes per attempt and 4096 charged raw tokens per class list
+bound probing. Exceeding these declines recovery without changing global budgets,
+Coverage rejection, snapshot identity, strict result validation or the 500 ms
+worker deadline. No server provider or semantic API changes. Exact independent
+regressions are in declarations.rs/recovery_limits.rs. Runtime acceptance is
+pending the candidate's authorized Linux CI and independent behavioral rechecks;
+local format/Clippy and ordered patch/hash replay have passed. This draft text is
+not a completed-delivery claim. Issue #96 remains unresolved.

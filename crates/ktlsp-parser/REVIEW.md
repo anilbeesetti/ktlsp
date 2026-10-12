@@ -121,3 +121,85 @@ healthy-followup checks. Verified explicit name offsets, original-source snapsho
 association, all-element depth and child/diagnostic validation. Parent recovery
 and resource gates remain open; local pinned/hosted/integration checks are owner
 evidence, not independently certified by this audit.
+
+# #87 parameter-boundary recovery integration (development)
+
+Coordinator handed ownership over after #86/PR92 merged. Product now selects the
+minimal source-local parser fork; lock delta only removes its registry source and
+checksum, while explicitly approved workspace exclusion keeps upstream dev/test
+packages out of default native tests. Original archive checksum, all54 Rust source
+hashes, seven-file recovery.patch and complete notices are retained in vendor.
+A separate pinned-rustfmt formatting.patch transforms that behavioral source into
+the final 54-file formatted-sha256 inventory; 49 files have formatting changes
+(including the seven behavioral files), with no formatting opt-out.
+No supervisor, common API, source mapping, kind validator or resource limit changed.
+
+Source-local implementation and independent reviews are recorded in vendor/REVIEW.
+Both reviewers found/rechecked a fixed exponential speculative annotation-probe
+regression; a scoped flag suppresses only recursive speculative probes. Committed
+nested parsing remains recovery-enabled. Remaining superlinear work is bounded
+by unchanged worker resource gates, not claimed as equivalent upstream performance.
+
+Production tests use the immutable snapshot API and real supervised worker. Exact
+checks replace three parameter-defect assertions; generic defect and Coverage
+remain. Read-only functionality review caught two new fixture errors before
+execution: repeated unmatched parentheses above128 would trigger preflight instead
+of diagnostics, and object declarations are wrapped by OBJECT_LITERAL. Corrected
+repeated recovery to100 and used balanced raw delimiters for diagnostic overflow;
+corrected immediate object parent. No production limits/expectations relaxed.
+
+Preparation integrated exact main583a0adc32c79c1a68257855c4ee7432f0088796
+once at merge8d833c12. Both independent source-only integration reviews approve
+the preserved corpus, strict assertions, authorized graph and provenance.
+
+Targeted production checks and both behavioral integration rechecks await the
+coordinator's local-check slot. Full-workspace checks, stable integration, hosted
+CI and architect finished review remain pending. No JVM/oracle/Gradle/Maven ran.
+
+First actual production-graph checks on cc4920d passed: locked offline metadata
+(nine workspace members, vendor excluded) and normal/build/all-feature parser
+inventory; pinned workspace clippy; parser tests (28 active + two invoked helper
+fixtures and 19 protocol faults). Functionality reviewer independently passed
+21 integration tests +19 protocol faults and 219 fixtures/438 worker parses with
+no unexplained lifecycle failure. These are observations on the behavioral source,
+not approval of the later formatting phase. Initial root fmt check found upstream
+style differences because --all traverses excluded local path dependencies.
+A temporary untracked formatting-disable experiment was removed; the architect
+approved a separate formatting-only phase instead. Both final behavioral reviews,
+full-workspace checks, final formatting and exact-head hosted CI remain pending.
+
+Both independent formatting semantic-preservation reviews approve the separate
+phase. They compared all 54 files to cc4920d: 49 changed and five pristine, with
+identifiers, literals and comments preserved. They inspected 147 added trailing
+commas and 17 other token edit hunks: one Layer re-export ordering change,
+diverging-return match-arm/let-else semicolons and block/closure reflow. No changed
+control/evaluation/drop behavior, macro-token grammar or location/stringification
+hazard was found. Functionality review independently applied both ordered patches
+and matched all 54 final hashes. These reviews ran no Cargo/build/tests/probes.
+Final behavior must still be rechecked after coordinator-approved #89 integration.
+
+## Controlled final production validation
+
+Exact main758e53b17566e4fde908705fc090d516ba4b0065 (#89) integrated once at
+b3bdc97cd21c181582a31fdf541f3f3ca7c880d9. Both source-only integration reviews
+confirm the fork, inventories, strict corpus and approved three-file graph delta
+are unchanged from the reviewed formatting phase. Local pinned fmt and locked
+workspace Clippy pass on the integrated implementation; compiler output explicitly
+checks vendor/ktrs-parser-0.5.1. Locked metadata confirms nine workspace members,
+no vendor enrollment and the direct parser path. Normal/build/all-feature trees
+contain the existing pure Rust closure only.
+
+The final file audit verifies archive SHA256, all 54 pristine source hashes,
+unchanged licenses/notices, the seven-file behavioral patch, the 49-file separate
+formatting patch and all 54 final hashes. Applying both ordered patches exactly
+reproduces the final source set and bytes. No formatting opt-out is present.
+
+The coordinator authorized existing Linux Native Rust CI as the controlled
+executor of all three unchanged pinned commands on the exact published head.
+Final CI and both behavioral reviews/finished architect evidence are recorded
+on PR90; earlier source-local/pre-format/old-head passes are historical only.
+No new Darwin parser execution was used for a passing result. Reported Darwin
+supervisor timeout reliability remains issue #96 OPEN/UNKNOWN, with its cause
+unresolved. The 500 ms deadline and all failure assertions remain unchanged.
+No JVM/oracle ran. #7/#83/T008 acceptance remains unfinished, with generic,
+missing-default/deep-type/annotation recovery and Coverage gaps retained.

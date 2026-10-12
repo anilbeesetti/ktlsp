@@ -33,6 +33,15 @@ type Decl<'a> = (
 );
 fn check(source: &str, expected: &[Decl<'_>], diagnostics: &[(usize, usize, &str)]) -> Parsed {
     let parsed = parse(source);
+    check_tree(&parsed, source, expected, diagnostics);
+    parsed
+}
+fn check_tree(
+    parsed: &Parsed,
+    source: &str,
+    expected: &[Decl<'_>],
+    diagnostics: &[(usize, usize, &str)],
+) {
     assert_eq!(parsed.source(), source);
     let elements = parsed.elements();
     let selected: Vec<_> = elements
@@ -98,7 +107,6 @@ fn check(source: &str, expected: &[Decl<'_>], diagnostics: &[(usize, usize, &str
         cursor = token.end;
     }
     assert_eq!(cursor, source.len());
-    parsed
 }
 
 #[test]
@@ -481,13 +489,9 @@ fn snapshots_reject_changed_revision_document_kind_and_reused_identity() {
 }
 
 #[test]
-fn unresolved_parameter_and_generic_recovery_gate_is_recorded() {
-    for source in [
-        "fun broken(\nval later = 1\nfun healthy() = 2\n",
-        "class C { fun broken(\nval later = 1\nfun healthy() = 2\n}",
-        "fun outer() { fun broken(\nval later = 1\nfun healthy() = 2\n}",
-        "class Box<T\nfun healthy() = 2\n",
-    ] {
+fn unresolved_generic_recovery_gate_is_recorded() {
+    {
+        let source = "class Box<T\nfun healthy() = 2\n";
         let parsed = parse(source);
         assert!(!parsed.diagnostics().is_empty());
         // This is a known defect assertion, not acceptance of ordinary recovery.
@@ -527,5 +531,257 @@ fn unresolved_parameter_and_generic_recovery_gate_is_recorded() {
             Some(("healthy", 4)),
         )],
         &[],
+    );
+}
+
+#[test]
+fn malformed_parameter_lists_restore_original_snapshot_declarations() {
+    for newline in ["\n", "\r\n", "\r"] {
+        for (prefix, suffix, outer_kind, immediate_parent) in [
+            ("", "", None, "KT_FILE"),
+            ("class C { ", "}", Some("CLASS"), "CLASS_BODY"),
+            ("fun outer() { ", "}", Some("FUN"), "BLOCK"),
+        ] {
+            let broken = "fun broken(";
+            let later = "val `later 🦀e\u{301}` = 1";
+            let healthy = "fun healthy() = 2";
+            let source =
+                format!("{prefix}{broken}{newline}{later}{newline}{healthy}{newline}{suffix}");
+            let snapshot =
+                SourceSnapshot::new("parameter-recovery", 7, FileKind::Source, source.as_str())
+                    .unwrap();
+            let result = parser()
+                .parse_snapshot(&snapshot, &AtomicBool::new(false))
+                .unwrap();
+            let parsed = result.tree_for(&snapshot).unwrap();
+            let owner = outer_kind.map(|_| 0);
+            let mut expected = vec![
+                ("FUN", broken, immediate_parent, owner, Some(("broken", 4))),
+                (
+                    "PROPERTY",
+                    later,
+                    immediate_parent,
+                    owner,
+                    Some(("`later 🦀e\u{301}`", 4)),
+                ),
+                (
+                    "FUN",
+                    healthy,
+                    immediate_parent,
+                    owner,
+                    Some(("healthy", 4)),
+                ),
+            ];
+            if let Some(kind) = outer_kind {
+                expected.insert(
+                    0,
+                    (
+                        kind,
+                        source.as_str(),
+                        "KT_FILE",
+                        None,
+                        Some(if kind == "CLASS" {
+                            ("C", 6)
+                        } else {
+                            ("outer", 4)
+                        }),
+                    ),
+                );
+            }
+            check_tree(
+                parsed,
+                &source,
+                &expected,
+                &[(
+                    prefix.len() + broken.len(),
+                    prefix.len() + broken.len(),
+                    "Expecting ')'",
+                )],
+            );
+            assert_eq!(
+                parsed.position(source.find(later).unwrap()).unwrap(),
+                ktlsp_text::Position {
+                    line: 1,
+                    character: 0
+                }
+            );
+            if newline == "\r\n" {
+                assert!(parsed.position(source.find('\r').unwrap() + 1).is_err());
+            }
+            assert_eq!(snapshot.source(), source);
+            assert_eq!(result.snapshot(), &snapshot);
+        }
+    }
+}
+
+#[test]
+fn repeated_parameter_recovery_retains_annotation_prefix_and_eof() {
+    let source = "fun broken(x: Int,\n@A public fun second(\ntypealias Later = String";
+    let snapshot = SourceSnapshot::new("repeated-recovery", 3, FileKind::Source, source).unwrap();
+    let result = parser()
+        .parse_snapshot(&snapshot, &AtomicBool::new(false))
+        .unwrap();
+    check_tree(
+        result.tree_for(&snapshot).unwrap(),
+        source,
+        &[
+            (
+                "FUN",
+                "fun broken(x: Int,",
+                "KT_FILE",
+                None,
+                Some(("broken", 4)),
+            ),
+            (
+                "FUN",
+                "@A public fun second(",
+                "KT_FILE",
+                None,
+                Some(("second", 14)),
+            ),
+            (
+                "TYPEALIAS",
+                "typealias Later = String",
+                "KT_FILE",
+                None,
+                Some(("Later", 10)),
+            ),
+        ],
+        &[(18, 18, "Expecting ')'"), (40, 40, "Expecting ')'")],
+    );
+    let source = "fun broken(";
+    let snapshot = SourceSnapshot::new("eof-recovery", 4, FileKind::Source, source).unwrap();
+    let result = parser()
+        .parse_snapshot(&snapshot, &AtomicBool::new(false))
+        .unwrap();
+    check_tree(
+        result.tree_for(&snapshot).unwrap(),
+        source,
+        &[("FUN", source, "KT_FILE", None, Some(("broken", 4)))],
+        &[
+            (11, 11, "Parameter name expected"),
+            (11, 11, "Expecting comma or ')'"),
+            (11, 11, "Expecting ')'"),
+        ],
+    );
+}
+
+#[test]
+fn valid_parameter_contexts_preserve_default_declarations() {
+    let source = "fun f(x: () -> Int = fun(): Int { val local = 1; return local }, y: Any = object { val member = 2 }) {}";
+    let snapshot = SourceSnapshot::new("nested-defaults", 1, FileKind::Source, source).unwrap();
+    let result = parser()
+        .parse_snapshot(&snapshot, &AtomicBool::new(false))
+        .unwrap();
+    check_tree(
+        result.tree_for(&snapshot).unwrap(),
+        source,
+        &[
+            ("FUN", source, "KT_FILE", None, Some(("f", 4))),
+            (
+                "FUN",
+                "fun(): Int { val local = 1; return local }",
+                "VALUE_PARAMETER",
+                Some(0),
+                None,
+            ),
+            (
+                "PROPERTY",
+                "val local = 1",
+                "BLOCK",
+                Some(1),
+                Some(("local", 4)),
+            ),
+            (
+                "OBJECT_DECLARATION",
+                "object { val member = 2 }",
+                "OBJECT_LITERAL",
+                Some(0),
+                None,
+            ),
+            (
+                "PROPERTY",
+                "val member = 2",
+                "CLASS_BODY",
+                Some(3),
+                Some(("member", 4)),
+            ),
+        ],
+        &[],
+    );
+    for source in [
+        "fun <T> T.ext(\n @A x: List<Map<String, T>>,\n crossinline action: (T) -> Unit = { value -> val local = value; action(local) },\n y: Int = nested(call(1, 2), 3)\n): T = this",
+        "fun f(x: Boolean = 1 < 2, y: Int = if (x) nested(1) else nested(2)) {}",
+        "class C(val first: Int, var second: String) { constructor(x: Int): this(x, \"\") }",
+        "fun f(x: (@A Int, String) -> Unit) {}",
+        "fun f(\nvararg x: String,\n@A y: Int = run { fun local() { }; local() },\n) {}",
+        "fun f(init: Int, constructor: String, public: Int, context: Int) {}",
+    ] {
+        let snapshot =
+            SourceSnapshot::new("valid-parameter-context", 2, FileKind::Source, source).unwrap();
+        let result = parser()
+            .parse_snapshot(&snapshot, &AtomicBool::new(false))
+            .unwrap();
+        let parsed = result.tree_for(&snapshot).unwrap();
+        assert_eq!(parsed.source(), source);
+        assert!(
+            parsed.diagnostics().is_empty(),
+            "{source:?}: {:?}",
+            parsed.diagnostics()
+        );
+        assert_eq!(
+            parsed
+                .elements()
+                .iter()
+                .filter(|e| e.token)
+                .map(|e| &source[e.start..e.end])
+                .collect::<String>(),
+            source
+        );
+    }
+}
+
+#[test]
+fn malformed_member_parameters_preserve_initializers_and_constructors() {
+    let source =
+        "class C { fun broken(\ninit { val local = 1 }\nconstructor() {}\nfun healthy() = 2\n}";
+    let snapshot = SourceSnapshot::new("member-recovery", 1, FileKind::Source, source).unwrap();
+    let result = parser()
+        .parse_snapshot(&snapshot, &AtomicBool::new(false))
+        .unwrap();
+    let parsed = result.tree_for(&snapshot).unwrap();
+    let elements = parsed.elements();
+    for (kind, text) in [
+        ("FUN", "fun broken("),
+        ("CLASS_INITIALIZER", "init { val local = 1 }"),
+        ("SECONDARY_CONSTRUCTOR", "constructor() {}"),
+        ("FUN", "fun healthy() = 2"),
+    ] {
+        let start = source.find(text).unwrap();
+        let e = elements
+            .iter()
+            .find(|e| !e.token && e.kind == kind && (e.start, e.end) == (start, start + text.len()))
+            .unwrap();
+        let body = &elements[e.parent.unwrap()];
+        assert_eq!(body.kind, "CLASS_BODY");
+        let class = &elements[body.parent.unwrap()];
+        assert_eq!(
+            (&*class.kind, class.start, class.end),
+            ("CLASS", 0, source.len())
+        );
+    }
+    let local = elements
+        .iter()
+        .find(|e| !e.token && e.kind == "PROPERTY")
+        .unwrap();
+    assert_eq!(&source[local.start..local.end], "val local = 1");
+    let block = &elements[local.parent.unwrap()];
+    assert_eq!(block.kind, "BLOCK");
+    assert_eq!(elements[block.parent.unwrap()].kind, "CLASS_INITIALIZER");
+    assert_eq!(parsed.diagnostics().len(), 1);
+    let d = &parsed.diagnostics()[0];
+    assert_eq!(
+        (d.start, d.end, d.message.as_str()),
+        (21, 21, "Expecting ')'")
     );
 }

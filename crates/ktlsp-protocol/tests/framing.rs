@@ -281,6 +281,23 @@ fn propagates_read_and_write_errors() {
     assert!(
         matches!(read_frame(&mut BrokenReader), Err(ProtocolError::Io(e)) if e.kind() == io::ErrorKind::BrokenPipe)
     );
+    struct BrokenBody(Cursor<Vec<u8>>);
+    impl Read for BrokenBody {
+        fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
+            Err(io::ErrorKind::ConnectionReset.into())
+        }
+    }
+    impl BufRead for BrokenBody {
+        fn fill_buf(&mut self) -> io::Result<&[u8]> {
+            self.0.fill_buf()
+        }
+        fn consume(&mut self, amount: usize) {
+            self.0.consume(amount);
+        }
+    }
+    assert!(
+        matches!(read_frame(&mut BrokenBody(Cursor::new(b"Content-Length: 1\r\n\r\n".to_vec()))), Err(ProtocolError::Io(e)) if e.kind() == io::ErrorKind::ConnectionReset)
+    );
     struct BrokenWriter {
         remaining: usize,
     }

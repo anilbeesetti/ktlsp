@@ -1,6 +1,6 @@
 # Parity status
 
-Baseline `kotlin-lsp/v263.6379.0`; isolated official runtime observations exist in docs/research/oracle, but no native differential verification has run. Status after the initial infrastructure/server wave (2026-10-12). Native verification and official comparison are separate:
+Baseline `kotlin-lsp/v263.6379.0`; isolated official runtime observations exist in docs/research/oracle, but no native differential verification has run at checkpoint `0d54973ce66f59362829360261fde6e46b4fc420` (2026-10-12). Active assignments and later evidence belong in [the development ledger](development.md); assignment does not deliver a provider. Native verification and official comparison are separate:
 
 | Requirement | Native status | Official comparison | Blocking work |
 | --- | --- | --- | --- |
@@ -8,7 +8,9 @@ Baseline `kotlin-lsp/v263.6379.0`; isolated official runtime observations exist 
 | UTF-16 document synchronization | native-tested for open documents | unverified | T001/T005 delivered; filesystem/watch integration remains |
 | Lossless bounded lexical classification | native-tested | unverified | T003 delivered; opaque templates are lexical only |
 | Complete Kotlin syntax/recovery | pending | unverified | T007, T008 |
-| Folding/document symbols | pending | unverified | T006, T008 |
+| Token-aware folding | pending | official block fixture observed; native comparison unverified | T006; broader folding coverage remains |
+| Lexical/delimiter diagnostics | pending | unverified | T006; distinct from compiler diagnostics |
+| Document symbols | pending | standalone declaration fixture observed; native comparison unverified | T008, T027 |
 | Scopes/imports/module resolution | pending | unverified | T009–T011 |
 | Kotlin types/overloads/smart casts | pending | unverified | T012–T016 |
 | Binary/Java/SDK/library symbols | pending | unverified | T017–T019 |
@@ -33,6 +35,8 @@ Ticket closure means its specified subset is delivered; it never implies broader
 
 ## Delivered ticket evidence
 
-T001–T005 deliver their explicitly scoped contracts ([T005 PR56](https://github.com/anilbeesetti/ktlsp/pull/56), merge `8ea54a9bee315713e7fc74c713eb1954901b5657`). Each code ticket passed separate functionality and adversarial review agents, locked native checks and hosted CI. The integrated workspace has 76 native tests, including 24 server tests; server subprocess tests remove Java environment variables and use an empty PATH. Independent generated probes are documented in crate review evidence; they do not prove all edge cases or official parity.
+T001–T005 deliver their explicitly scoped contracts ([T005 PR56](https://github.com/anilbeesetti/ktlsp/pull/56), merge `8ea54a9bee315713e7fc74c713eb1954901b5657`). Each code ticket passed separate functionality and adversarial review agents, locked native checks and hosted CI. At checkpoint `0d54973` the integrated workspace has 76 native tests, including 24 server tests; server subprocess tests remove Java environment variables and use an empty PATH. Independent generated probes are documented in crate review evidence; they do not prove all edge cases or official parity.
 
 No native provider has yet passed a recorded differential comparison with the official server. The oracle directory contains limited official observations, not a reusable full differential harness. T045 remains open. Linux execution is verified; macOS/Windows execution, packaging, native semantics and performance thresholds remain pending.
+
+No faster-execution or lower-memory comparison is established. Native baseline work and narrow fixture replay must retain their workload and evidence limits; see [verification](../specs/verification.md).

@@ -2,7 +2,7 @@
 
 ## Evidence levels
 
-`pending`: no implementation; `partial`: a defined subset is native-tested; `native-tested`: full declared subset passes local/integration tests; `oracle-verified`: matches the pinned official release corpus; `blocked`: cannot yet meet the required contract. These are separate from ticket closure. Closing a lexer ticket does not close language-parity requirements.
+`pending`: no delivered implementation; `partial`: a defined subset is native-tested; `native-tested`: full declared subset passes local/integration tests; `oracle-verified`: matches the pinned official release corpus for the named fixtures; `blocked`: cannot yet meet the required contract. Record native status and official comparison separately: replaying recorded observations does not establish fresh official execution or untested provider behavior. These are separate from ticket closure. Closing a lexer ticket does not close language-parity requirements.
 
 Each PR records issue, exact commit, code/behavior/edge cases reviewed, tests executed, limitations and reviewer findings/fixes. Reviewers must inspect code independently and exercise adversarial inputs; an implementer's statement that tests passed is insufficient evidence.
 
@@ -24,4 +24,8 @@ Fixtures use one directory per Kotlin/project case plus a sequence of JSON-RPC m
 
 ## CI and merge
 
-Run `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` using the pinned toolchain. Add subprocess stdio integration/crash tests when the binary exists. Rebase or merge current main into the ticket branch after dependencies land, and review/test any integration changes before merge. No force-push of main, no bypassing repository protection, no merging after unresolved P0/P1/P2 findings. Required hosted checks must pass; if hosted CI is unavailable, disclose it and do not describe local checks as hosted CI.
+Run `cargo fmt --all -- --check`, `cargo clippy --locked --workspace --all-targets -- -D warnings`, and `cargo test --locked --workspace` using pinned Rust 1.99.0 (declared MSRV 1.90). Add relevant subprocess stdio integration/crash checks. Rebase or merge current main into the ticket branch after dependencies land, and review/test any integration changes before merge. Require the coordinator's exclusive merge-window grant and merge with the expected reviewed head SHA; serialize shared Cargo.lock integration. No force-push of main, no bypassing repository protection, no merging after unresolved P0/P1/P2 findings. Required hosted checks must pass on that head; if hosted CI is unavailable, disclose it and do not describe local checks as hosted CI. Record exact commands, test counts, check URLs, reviewed head, merge SHA and residual limits in delivery evidence.
+
+## Performance evidence
+
+Native baseline measurements are not comparative parity evidence. Publish corpus, supported behavior, hardware/OS, toolchain/profile, process/cache state, measurement method and reproducible results. Claim faster execution or lower memory only after measuring equivalent supported workloads against the pinned official release under a documented comparable method. Coordinate a quiet measurement window rather than timing under concurrent builds. T044 remains pending until its full budgets and incremental workload requirements are verified.

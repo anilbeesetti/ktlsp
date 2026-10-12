@@ -57,7 +57,7 @@ Historical local macOS arm64 passes cover earlier declared subsets; current `758
 
 ## Pending delivery gate
 
-PR77/#64 native baseline, PR80/#66 signatures, PR81/#67 nesting, PR84/#78 v2 model and PR93/#88 SHA-256 integrity are pending at this cutoff; old reviewed/CI-ready heads are not merged delivery. #83/#7/T008 remain blocked by retained recovery failures. [PR90/#87](https://github.com/anilbeesetti/ktlsp/pull/90) remains a pending dependent recovery repair based on `758e53b`; final actual-fork validation/reviews/CI are still required, and old draft CI is historical rather than validation of the prepared production graph. PR98/#68 Kotlin metadata headers/d1 remains pending after its delivered annotation prerequisite; #71 parameter/type/default annotations remains pending.
+PR77/#64 native baseline, PR80/#66 signatures, PR81/#67 nesting, PR84/#78 v2 model and PR93/#88 SHA-256 integrity are pending at this cutoff; old reviewed/CI-ready heads are not merged delivery. #83/#7/T008 remain blocked by retained recovery failures. [PR90/#87](https://github.com/anilbeesetti/ktlsp/pull/90) remains a pending dependent recovery repair based on `758e53b`; final actual-fork validation/reviews/CI are still required, and old draft CI is historical rather than validation of the prepared production graph. PR98/#97 Kotlin metadata headers/d1 (child of #68/#18) remains pending after its delivered annotation prerequisite; #71 parameter/type/default annotations remains pending.
 
 PR94/#91 optional raw-wire recorder remains synthetic/fake-peer work, with no live JVM capture. Native baseline preparation does not establish comparative speed/memory or T044 completion.
 

@@ -483,3 +483,36 @@ fn symlink_aliases_are_retained_and_require_later_filesystem_validation() {
         directory.join("alias")
     );
 }
+
+#[test]
+fn load_manifest_reads_fixture_from_its_own_parent() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/multimodule.json");
+    let model = load_manifest(&path).unwrap();
+    assert_eq!(
+        model.modules[0].source_roots[0].path,
+        path.parent().unwrap().join("src/main/kotlin")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn unreadable_manifest_returns_io_error() {
+    use std::os::unix::fs::PermissionsExt;
+    let path = std::env::temp_dir().join(format!(
+        "ktlsp-project-{}-unreadable.json",
+        std::process::id()
+    ));
+    std::fs::write(&path, serde_json::to_vec(&minimal()).unwrap()).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
+    let result = load_manifest(&path);
+    // Restore permissions before cleanup, even if running with elevated OS rights.
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    std::fs::remove_file(path).unwrap();
+    // Unix root can read mode 000 files; success is allowed only when its OS
+    // permissions actually permit the read. Normal users must get PermissionDenied.
+    if let Err(error) = result {
+        assert!(
+            matches!(error, ProjectError::Io(e) if e.kind() == std::io::ErrorKind::PermissionDenied)
+        );
+    }
+}

@@ -527,3 +527,52 @@ fn precompiled_kotlin_data_only_annotations() {
         }
     }
 }
+
+#[test]
+fn nested_annotation_and_alternating_depth_boundaries() {
+    for alternating in [false, true] {
+        for wrappers in 0..=MAX_DEPTH {
+            let (mut c, attr, ty, name) = setup();
+            let mut v = scalar(b's', name);
+            let mut depth = 2; // Root annotation and its element_value.
+            for i in 0..wrappers {
+                let mut outer = if alternating && i % 2 == 0 {
+                    depth += 1;
+                    vec![b'[', 0, 1]
+                } else {
+                    depth += 2; // '@' element_value plus the nested annotation.
+                    let mut outer = scalar(b'@', ty);
+                    u2(&mut outer, 1);
+                    u2(&mut outer, name);
+                    outer
+                };
+                outer.extend(v);
+                v = outer;
+            }
+            let bytes = payload(ty, &[(name, v)]);
+            c.attributes = vec![Attribute {
+                name: attr,
+                bytes: &bytes,
+            }];
+            assert_eq!(decode(&c).is_ok(), depth <= MAX_DEPTH, "depth {depth}");
+        }
+    }
+}
+
+#[test]
+fn duplicate_comparisons_exhaust_shared_work_budget() {
+    let (mut c, attr, ty, _) = setup();
+    let int = add(&mut c, Constant::Integer(1));
+    let pairs: Vec<_> = (0..400)
+        .map(|i| {
+            let name = text(&mut c, &format!("{}{i}", "a".repeat(1024)));
+            (name, scalar(b'I', int))
+        })
+        .collect();
+    let bytes = payload(ty, &pairs);
+    c.attributes = vec![Attribute {
+        name: attr,
+        bytes: &bytes,
+    }];
+    assert_eq!(decode(&c).unwrap_err(), Error::Limit("annotation work"));
+}

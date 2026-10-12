@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "app",
+      "sourceRoots": [
+        {"path": "src/main/../main/kotlin", "kind": "production"},
+        {"path": "src/test/kotlin", "kind": "test"},
+        {"path": "build/generated", "kind": "production", "generated": true}
+      ],
+      "dependencies": [{"module": "core", "scope": "provided", "exported": true}],
+      "libraries": ["stdlib"],
+      "languageSettings": {"languageVersion": "2.3", "apiVersion": "2.2", "jvmTarget": "21"}
+    },
+    {"id": "core", "sourceRoots": [{"path": "../core/src", "kind": "production"}]}
+  ],
+  "libraries": [{"id": "stdlib", "binaries": ["lib/missing.jar"], "sources": ["lib/../sources/missing.zip"]}],
+  "sdkArchives": ["sdk/jdk-data.zip"]
+}

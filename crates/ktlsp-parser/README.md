@@ -12,8 +12,10 @@ Each call starts one Rust worker, concurrently transfers input and drains stdout
 checks cancellation/deadline every 2 ms, and terminates/reaps before scoped I/O
 threads join on every exit path. Worker stderr is discarded (may contain source
 on upstream panics); no document is logged. The shipped trusted worker never
-spawns descendants. Callers must limit concurrent parse requests, install the
-matching worker, and preserve immutable source/version identity. This synchronous
+spawns descendants. Callers must limit concurrent parse requests and install the matching worker.
+Editor consumers use `SourceSnapshot` and `Parser::parse_snapshot`; accepted
+`SnapshotResult::tree_for` rejects a changed document/revision/source/file kind.
+See [the exact declaration corpus and unresolved recovery gates](CORPUS.md). This synchronous
 API has no detached task or future whose drop could leave parsing running.
 
 Limits are enforced independently in parent and worker where applicable:
@@ -87,16 +89,12 @@ research; the small harness and additional fixtures here are independently writt
 
 ## Remaining accepted child proposals
 
-T007b accepted declaration corpus and validated parser-result/CST contract (next,
-not implemented here): kinds, hierarchy, original ranges, diagnostics and explicit
-failures; exact source partition and parent-child ranges; valid and incomplete
-package/import/class/interface/object/function/property/typealias/modifier/
-annotation/generic/receiver/nested-local fixtures; declaration retention after
-recovery; actual-worker CRLF/lone-CR/Unicode/revision/resource tests; upstream
-grammar rejection distinguished from budget rejection, and this gate's 64 KiB vs
-existing 8 MiB document ceiling explicit. Include Kotlin 2.3 baseline/version gaps
-and isolated-oracle comparisons where available. Do not close T007 until its full
-acceptance works; this containment gate alone does not unlock T008.
+T007b/#83 remains pending. Child #86 adds immutable snapshot/result validation and
+an exact named declaration corpus, including explicit missing-parameter/generic
+recovery counterexamples. It does not unlock T008a or establish the full #83
+recovery/resource contract. See CORPUS.md for each tested outcome and gap.
+A coordinated upstream/fork/vendor recovery repair must retain later declarations
+before the parent gate can pass.
 
 T008a declaration HIR child follows the accepted result/recovery gate: lower named
 declarations/package/imports to stable revisioned HIR; preserve parents, names,

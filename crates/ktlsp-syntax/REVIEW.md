@@ -1,0 +1,13 @@
+# T003 implementation and independent review evidence
+
+Behavioral candidate: `a1f4d0df357aba3eaf389ffff12d9db7fcfdb43f`. Ticket #3 implements bounded native lexical classification, not parser/semantic or official-server parity.
+
+Correctness/functionality reviewer `/root/lexer_ticket/lexer_correctness` approved this exact candidate with no unresolved P0/P1/P2 findings. Independently ran all 11 lexer tests, original normal/raw multi-dollar reproducers, 1,000 generated nested standard/multi-dollar strings/templates/comments/delimiters, and 100,000–800,000-dollar scaling probes. Verified opaque tokens, following declarations and lossless UTF-8 partitions.
+
+Adversarial reviewer `/root/lexer_ticket/lexer_adversarial` approved the same candidate with no unresolved P0/P1/P2 findings. Independently ran all 11 lexer tests, 200,000 malformed Unicode cases (33.24 seconds, no panic/partition/span failures), combined nesting depths 0–129, and three maximal 8 MiB identifier/string/comment scans (13.88 seconds total in debug). Dollar-run scaling from 32 KiB to 4 MiB was linear (2.27–288 ms in debug). Literal multi-dollar `${"}` and `${ /* literal }` cases preserved following declarations.
+
+Findings fixed and rechecked: dollar-prefixed normal/raw strings previously became unknown tokens and activated interpolation at the wrong dollar threshold, swallowing following declarations; prefix-aware string contexts now preserve the complete opaque token and correct threshold. The first fix introduced quadratic rescanning of unquoted dollar runs; consuming runs atomically restored linear progress. Both reviewers rechecked changed behavior independently. Owner regression coverage includes 256 KiB unquoted/prefixed dollar runs and multi-dollar nested, escaped, literal-brace and malformed-EOF cases.
+
+After behavioral approval, current main's reviewed text and framing implementations were integrated without changes to syntax code. Required owner checks: `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`. Hosted CI result belongs to the PR.
+
+Dependency audit: locked `unicode-general-category` 1.1.0 is Apache-2.0, pure Rust, has no dependencies, and its Rust build script only generates Unicode lookup tables. Runtime/build/tests invoke no JVM/JDK, Gradle/Maven, native parser or compiler. Native-only validation; no isolated official oracle was run. Remaining limits are documented in the crate README: opaque expressions, context-sensitive interpretation, numeric values/overflow, platform identifier rules and language-version gates.

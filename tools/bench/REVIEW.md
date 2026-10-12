@@ -32,4 +32,12 @@ An independent `/usr/bin/time -l` run of the 32 MiB touched-memory peer returned
 
 Docs-only main integration `de9b6b1` introduced no tools/source change; pinned workspace fmt/clippy and 76 tests passed again. Hosted native CI passed that integration head `c922a9fd68e4a370d795d094bcb222f35eed3765` at https://github.com/anilbeesetti/ktlsp/actions/runs/38250558225/job/114815432642; it does not validate the later memory revision.
 
-Quiet-window collection and final-head hosted CI remain pending. No official oracle, other-platform RSS support, parser/semantic workload, retained/per-operation memory instrument, confidence interval or performance gate was added.
+Quiet-window collection is recorded below; final results-head hosted CI remains the delivery gate. No official oracle, other-platform RSS support, parser/semantic workload, retained/per-operation memory instrument, confidence interval or performance gate was added.
+
+## Recorded quiet collection
+
+Coordinator granted a bounded quiet window and paused active source owners. The prepared archive run completed in 2.392 seconds at 2026-10-12 12:58 UTC. All eight workloads have 101 positive finite latency samples and positive whole-child RSS; startup has 101 lifetime peaks, workers/steady server have one each. Names/counts and load observations found no competing known build/test process. Metadata, byte/case counts, checksums, raw samples and scope limits are preserved in results/.
+
+Integrated main through `8fee6f438945e1c9394ecd7e948893ca6c179134` (classfile, replay, import additions) at `b4836508d686dcc7bd190a84621aacc29fde19ae`; no tools/bench or measured checkpoint-library source changed in that integration. Pinned native fmt/clippy and all 100 workspace tests passed; standalone fmt/clippy and all eight tool tests passed. Memory source head `0b43c7f` hosted CI passed at https://github.com/anilbeesetti/ktlsp/actions/runs/38251687235/job/114819342302. Final results/doc head still requires review and hosted CI before merge.
+
+Both independent reviewers validated the recorded data: all 808 finite positive latency samples, nearest-rank summaries/throughput/table rounding, byte/case counts, RSS observation counts/scopes, binary/source hashes and window observations. Functionality confirmed only provenance metadata was appended after capture. Adversarial also compared all 22 tracked product manifest/lock/toolchain and measured-crate files in the owned archive against checkpoint git objects byte-for-byte. No timing rerun was performed. Result SHA-256 `291a83aeeefd65b0d39b3a8d8fd520b0ea85e6ed6ec72683e67c3cfc50dba93e` is independently verified. Final data/doc-only commit changes no reviewed Rust behavior or native test graph.

@@ -1,0 +1,11 @@
+# Native lexical foundation
+
+`lex(&str) -> Result<Lexed, SyntaxError>` preserves every source byte in contiguous, nonempty token spans. Spans and diagnostics use UTF-8 byte boundaries. Whitespace/comments remain tokens, and braces/brackets/parentheses have distinct kinds for later syntax consumers. `Keyword` covers hard keywords; soft keywords remain identifiers.
+
+The scanner recognizes Unicode Letter categories plus underscore and Unicode Nd identifier continuations using `unicode-general-category` 1.1.0. Its Apache-2.0 dependency is pure Rust with no transitive dependencies; its Rust build script generates lookup tables without subprocesses or native code. Unicode table versions are not language-version gated yet.
+
+Normal/raw strings, characters and backtick identifiers are opaque tokens. Standard `${...}` templates balance nested braces and scan nested strings, raw strings, characters, backticks, comments and templates on an iterative stack. They expose no expression tokens or inner delimiters. Escaped dollars in normal strings and unescaped dollars in raw strings differ. A raw closing quote run belongs to the whole string token. Line-terminated malformed normal strings/characters/backticks recover before the newline; unfinished templates/comments consume through EOF with lexical diagnostics.
+
+Limits are 8 MiB UTF-8 source, 1,000,000 tokens, 256 diagnostics and 128 combined scanner contexts. Template braces and nested comments count toward the same nesting budget; exceeding a limit returns an explicit error with no partial successful partition. Flat source delimiters use no recursive stack. Allocations grow only within these bounds.
+
+This is lexical classification, not a parser, compiler error checker, semantic-token provider or full Kotlin language parity. It does not resolve labels, soft keywords, context-sensitive punctuation, identifier platform restrictions, numeric values/overflow or expressions inside templates. Modern multi-dollar string interpolation and language-version gates remain unsupported. Standard operators that Kotlin splits contextually (such as `?.`) have convenient combined lexical tokens for downstream parsing to interpret. No official-server oracle comparison has run.

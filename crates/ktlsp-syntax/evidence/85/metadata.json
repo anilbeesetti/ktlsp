@@ -1,0 +1,54 @@
+{
+  "historical_revision": "0d54973ce66f59362829360261fde6e46b4fc420",
+  "current_revision": "09b77a344ad61f8c17bdc47f6b60edd944010bc3",
+  "candidate": "current revision plus 7-line growth diff; source hashes below",
+  "date": "2026-10-12",
+  "profile": "default release",
+  "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "os": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0.1\nBuildVersion:\t\t26A434\n",
+  "kernel": "Darwin Anils-MacBook-Pro.local 27.0.0 Darwin Kernel Version 27.0.0: Tue Aug 11 21:02:57 PDT 2026; root:xnu-13432.1.9~1/RELEASE_ARM64_T8132 arm64\n",
+  "allocator": "std::alloc::System",
+  "inherited_malloc_dyld_variables": {
+    "MallocNanoZone": "0"
+  },
+  "competing_workload": "concurrent project chats/builds/tests possible during memory diagnostics; not timing evidence",
+  "probe": "standalone counting feature; one validation call plus 0/4/111 calls; each result dropped before next call",
+  "current_residency": "/bin/ps -o rss= -p <probe pid>, after result drop while source/args retained, KiB; recorded after allocator counters snapshotted",
+  "lifetime_peak": "/usr/bin/time -l maximum resident set size, bytes on Darwin, whole child incl setup/output/ps spawn",
+  "requested_peak": "successful Rust layout requests incl source/args; excludes allocator metadata and realloc old/new transient overlap",
+  "churn": "sum successful alloc/alloc_zeroed new size and realloc full new requested sizes, not bytes copied",
+  "hashes": {
+    "historical_lexer": "9c069f18a7db01e3ae5e72dd03edf39be3a74591c2b372d434e82bf31c6903fb",
+    "historical_probe_binary": "14848d5ac5185c63f7d1262f6d709457072fcb00a5ce31de44deafe357cb2eb5",
+    "current_lexer": "9c069f18a7db01e3ae5e72dd03edf39be3a74591c2b372d434e82bf31c6903fb",
+    "current_probe_binary": "d5ae2dd9f0687251e1771e6d8b295ee6d70c7ee1f83304f0196e03e19a8a27bd",
+    "candidate_lexer": "69e155a744eeeec28b515d71cf0130dcac8ffc85a1a40ae41cce327fc2f77f08",
+    "candidate_probe_binary": "9477957f7f37f77fb925eff61d97b13b057f1cc7107cde3d0e4f6d08eaf505f2",
+    "probe_source": "e3ca3bd41354c93bd6749df6bf741c63d8f3271e2a73a77aba79d49f57109c6f",
+    "current_timing_binary": "42e18a8879ca77963aaa71cb21e4b91f738dbf45e3941a6d6959a0499a53856b",
+    "candidate_timing_binary": "d2693e3b5635dc779f7222940b4e81cf43c49e4f7eac952b552ed68d2cb16e70"
+  },
+  "cpu": "Apple M4, 10 logical CPUs (sysctl observed)",
+  "exploratory_timing": {
+    "acceptance": "NOT accepted: uncoordinated competing workloads; some transition medians exceed predefined latency limit",
+    "rounds": 7,
+    "order": "alternate baseline/candidate per round",
+    "environments": [
+      "MallocNanoZone unset",
+      "MallocNanoZone=0"
+    ],
+    "extra_calls": {
+      "large": 111,
+      "short_tokens": 111,
+      "empty": 2000000,
+      "short": 2000000,
+      "whitespace": 5,
+      "comment": 5,
+      "string": 5,
+      "dense_sparse": 5,
+      "sparse_dense": 5
+    },
+    "counting_allocator": false,
+    "other_activity": "Possible concurrent project builds/tests; own standalone probe clippy ran early; ps snapshots saw other Cargo activity. No quiet-window grant."
+  }
+}

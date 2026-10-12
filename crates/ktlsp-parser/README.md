@@ -93,15 +93,21 @@ included. Preserve these files in later packaging. Regression input intent comes
 from the upstream backtracking_memory/missed_tokens tests documented in completed
 research; the small harness and additional fixtures here are independently written.
 
-## Remaining accepted child proposals
+## Remaining acceptance work
 
-T007b/#83 remains pending. Child #86 adds immutable snapshot/result validation and
-an exact named declaration corpus. Child #87 supplies a source-local parameter-list
+T007b/#83 remains pending. Delivered child #86 adds immutable snapshot/result validation and
+an exact named declaration corpus. Delivered child #87 supplies a source-local parameter-list
 boundary repair and production snapshot recovery controls; generic/default/type/
 annotation recovery gaps remain explicit. It does not unlock T008a or establish the full #83
 recovery/resource contract. See CORPUS.md for each tested outcome and gap.
-The parent gate needs joint assessment of #86/#87 and remaining recovery/resource
-gaps before T008a can proceed.
+Delivered PR102/#100 adds bounded classifier-generic sibling recovery. C17/#104
+records three complete known-defect inputs/outcomes for missing defaults, malformed
+parenthesized types and annotation arguments in `tests/recovery_residuals.rs`.
+See CORPUS.md for the finite ledger and reuse of existing excluded headers/bounds.
+Passing a defect assertion is not required recovery. C12 accepted-assertion delivery
+is not confirmed here; resource controls remain resource-only. The final refreshed
+[#83 audit](https://github.com/anilbeesetti/ktlsp/issues/83#issuecomment-6130232640)
+keeps #83/#7 open and T008/T008a blocked on remaining recovery/assertion/resource gaps.
 
 T008a declaration HIR child follows the accepted result/recovery gate: lower named
 declarations/package/imports to stable revisioned HIR; preserve parents, names,
@@ -109,9 +115,9 @@ original spans and incomplete-declaration diagnostics, with explicit unsupported
 grammar. Byte offsets alone are not symbol identity. No resolution/provider claim
 without separately accepted semantics.
 
-## #100 classifier-generic recovery candidate
+## Delivered #100 classifier-generic recovery
 
-The candidate recovers simple named sibling function headers after incomplete
+PR102 recovers simple named sibling function headers after incomplete
 class/interface type-parameter lists at parameter entries or after completed
 parameters/bounds. Optional complete annotations/modifiers stay with the function.
 Newlines and keywords alone do not establish a recovery boundary. Generic and
@@ -126,12 +132,19 @@ charge and remains bounded by the input limit and advancing parser cursor.
 Exceeding the scratch limits declines recovery without changing global budgets,
 Coverage rejection, snapshot identity, strict result validation or the 500 ms
 worker deadline. No server provider or semantic API changes. Exact independent
-regressions are in declarations.rs/recovery_limits.rs. Authorized Linux CI and
-both independent behavioral reviews passed for candidate054e352 on the actual
-synthetic merge86bbd04: 169 active tests, zero failures, two exercised helper
-fixtures and 19 worker fault cases. Exact checkout/tree evidence is in REVIEW.md.
-Local format/Clippy and ordered patch/hash replay also passed. Authorized main ef120be was integrated once; final combined-head CI/reviews and
-coordinator merge grant remain required. This is not a completed-delivery claim. Issue #96 remains unresolved.
+regressions are in declarations.rs/recovery_limits.rs. PR102/#100 was merged as
+`ab00d55557cfea9bcee87aa41fe2922f82770027`, reviewed head
+`d7da79ddeea95901327d774382a37740445a0ef7`; their tree equals final CI checkout
+`78c55c4bfb5629704bfdb11203f869af2e24781c`.
+[Exact merged-main Linux CI](https://github.com/anilbeesetti/ktlsp/actions/runs/38289885940/job/114947148613)
+passed all three pinned commands (192 active tests, two exercised helper fixtures,
+19 separate protocol fault cases), after renewed correctness/adversarial/architect
+approvals and the coordinator's guarded merge grant. CORPUS.md retains identities
+and evidence limits. This supersedes stale candidate/pending delivery prose in the
+historical review/provenance files; it does not reinterpret those old runs.
+C17 starts from main `4d27673f703fd3c7b0ee57fc7a3cf35c6c21f05f`, compatible with the
+frozen parser source above; no parser source/API/worker/dependency changes are made.
+Issue #96 remains OPEN/UNKNOWN; Linux passes do not establish Darwin correction.
 
 The coordinator explicitly amended the accounting contract after a focused audit:
 leading trivia and cheap kind/modifier/EOF prefilter misses may remain outside
@@ -139,8 +152,8 @@ the copied-token allowance. Every eligible scratch window is charged before
 grammar evaluation, including failure; a zero-copy eligible rejection debits one.
 The separate allocation-free leading scan is bounded by the 64 KiB input and
 local comma-consuming loop progress. This is not a bound on every examination,
-whole-parser complexity, RSS or total work. New leading-trivia regression evidence
-is prepared but not executed. Unconditional window-predicate checks compile
+whole-parser complexity, RSS or total work. The production leading-trivia regression passed
+final Linux CI. Unconditional window-predicate checks compile
 against the actual byte/EOF guard. These do not establish an end-to-end active-EOF
-recovery case; that gap remains for #83. Final Linux execution and renewed resource
-review remain required before final integration approval.
+recovery case; that gap remains for #83. Attributable production deadline/allocation/serialization-boundary evidence remains
+incomplete under #83. C17 adds no resource-boundary claim or grammar repair.

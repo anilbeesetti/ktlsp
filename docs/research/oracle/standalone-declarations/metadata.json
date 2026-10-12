@@ -1,0 +1,16 @@
+{
+  "release": "kotlin-lsp/v263.6379.0",
+  "sha256": "ab8ca4455dc2fc5fe1a24db2bccc46c104254d2c465155c4251ee65df8f3f7cc",
+  "platform": "linux-amd64",
+  "args": [
+    "/workspace/research/official-oracle/distribution/kotlin-server-263.6379.0/bin/intellij-server",
+    "--stdio",
+    "--data-sharing=none",
+    "--region=apac",
+    "--system-path=/workspace/research/official-oracle/capture-cache"
+  ],
+  "returncode": 0,
+  "observedDate": "2026-10-12",
+  "jvmScope": "isolated user-authorized research only",
+  "fixtureMode": "standalone source, empty configured project list"
+}

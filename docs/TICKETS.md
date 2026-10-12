@@ -49,10 +49,13 @@ Canonical acceptance text is in linked GitHub issues when created. Review and me
 | [T043](https://github.com/anilbeesetti/ktlsp/issues/43) | Incremental snapshots query invalidation and cancellation | T011,T028 |
 | [T044](https://github.com/anilbeesetti/ktlsp/issues/44) | Latency memory and malformed-input performance budgets | T007,T043 |
 | [T045](https://github.com/anilbeesetti/ktlsp/issues/45) | Isolated official oracle and differential protocol corpus | [T005](https://github.com/anilbeesetti/ktlsp/issues/5) |
-| [T046](https://github.com/anilbeesetti/ktlsp/issues/46) | Native cross-platform packaging and parity release audit | All required baseline tickets T001–T045, T047, T048; every parity row |
+| [T046](https://github.com/anilbeesetti/ktlsp/issues/46) | Native cross-platform packaging and parity release audit | All required baseline tickets T001–T045, T047, T048, T049; every parity row |
 | [T047](https://github.com/anilbeesetti/ktlsp/issues/47) | Kotlin main Run/Debug code lenses and initialization gating | T014,T019,T041 |
 | [T048](https://github.com/anilbeesetti/ktlsp/issues/48) | Registered-source JPS project model compatibility | T004,T021 |
+| [T049](https://github.com/anilbeesetti/ktlsp/issues/51) | Runtime-advertised type hierarchy | T012,T019,T027 |
 
-T041 acceptance explicitly includes decompile/JAR+jrt virtual docs, file templates, exportWorkspace, apply/resolveModCommand, highwatermark commands and client-extension initialization gates; wire names/payloads require pinned evidence. T047 includes `runMainCodeLens` gating and descriptors only, with JVM execution blocked separately.
+T041 acceptance explicitly includes decompile/JAR+jrt virtual docs, file templates, exportWorkspace, apply/resolveModCommand, highwatermark commands and client-extension initialization gates; wire names/payloads require pinned evidence. T047 includes `runMainCodeLens` gating and descriptors only, with JVM execution pending separately.
 
-These tickets are integration-sized contracts. Semantic/intentions/import tickets must be expanded into smaller fixture-specific child issues before their implementation starts. The first six tickets are ready to implement in dependency order; T007 has a research/adoption gate. T042 and unrestricted dynamic build import have unresolved Rust-only parity boundaries.
+These tickets are integration-sized contracts. Semantic/intentions/import tickets must be expanded into smaller fixture-specific child issues before their implementation starts. The first six tickets are ready to implement in dependency order; T007 has a research/adoption gate. T042 and unrestricted dynamic build import have external-tool implementation/verification gaps under the clarified runtime boundary.
+
+Current policy: user-existing JDK/build tools are permitted for optional import/build/run/debug. T004 stays data-only; T022/T023/T042 must include small native external-tool interoperability subtickets. No Java is bundled and no semantic engine is offloaded. See specs/runtime-boundary.md.

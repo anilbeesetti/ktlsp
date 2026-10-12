@@ -504,15 +504,16 @@ fn unreadable_manifest_returns_io_error() {
     ));
     std::fs::write(&path, serde_json::to_vec(&minimal()).unwrap()).unwrap();
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
+    let expected = std::fs::File::open(&path).map(|_| ()).map_err(|e| e.kind());
     let result = load_manifest(&path);
     // Restore permissions before cleanup, even if running with elevated OS rights.
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
     std::fs::remove_file(path).unwrap();
-    // Unix root can read mode 000 files; success is allowed only when its OS
-    // permissions actually permit the read. Normal users must get PermissionDenied.
-    if let Err(error) = result {
-        assert!(
-            matches!(error, ProjectError::Io(e) if e.kind() == std::io::ErrorKind::PermissionDenied)
-        );
-    }
+    // Unix root may read mode 000 files. Compare the loader result against the
+    // OS result instead of assuming the test process has restricted permissions.
+    let observed = result.map(|_| ()).map_err(|error| match error {
+        ProjectError::Io(error) => error.kind(),
+        other => panic!("expected I/O error, got {other}"),
+    });
+    assert_eq!(observed, expected);
 }

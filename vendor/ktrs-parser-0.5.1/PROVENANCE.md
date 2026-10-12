@@ -80,8 +80,11 @@ committed token kinds, then requires FUN/name/LPAR. No live cursor, token remap,
 production, diagnostic, newline/join or layer state is changed by a probe.
 
 The scratch slice stops at the minimum nonnegative active truncation endpoint,
-256 complete raw tokens including trivia, or 4096 bytes. All attempts are charged
-against 4096 copied raw tokens per classifier list; exhaustion declines recovery.
+256 copied complete raw tokens including internal/trailing trivia, or 4096 source
+bytes. Every eligible scratch window, including failed grammar, is charged before
+parsing against 4096 copied raw tokens per classifier list; zero-copy eligible
+rejection debits one and exhaustion declines recovery. Cheap kind/modifier/EOF
+prefilter misses remain uncharged under the coordinator-amended contract.
 Leading trivia inspection is bounded separately by input size and the advancing
 live cursor; nested scratch probes return before scanning it.
 These are recovery-coverage bounds, not new worker failures or larger global limits.
@@ -96,3 +99,18 @@ original newline mapping, valid controls, incomplete bounds/excluded headers,
 per-probe thresholds, aggregate decline and repeated recovery. Runtime evidence
 must come from the authorized exact-head Linux CI; no new Darwin runtime test is
 used for this ticket. Standalone vendor tests are not part of root CI.
+
+A focused post-candidate audit identified that the original all-trivia/all-failure
+reading was broader than the implemented copied-window counter. The coordinator
+explicitly amended the private contract to the accounting above after independent
+architect review; documentation alone did not resolve that original mismatch.
+The actual loop now uses a private const byte/EOF predicate with unconditional
+assertions for endpoints before/at/inside a token, absent EOF and independent
+4096/4097-byte boundaries. This extraction preserves the original subtraction,
+inclusive endpoint comparison and absent-EOF behavior. The minimum active EOF
+feeds that predicate; an empty window returns false before constructing scratch,
+and incomplete prefixes cannot satisfy FUN/name/LPAR. These are window-predicate
+checks, not annotation parsing, active-layer integration or end-to-end truncated
+recovery evidence; that remaining gap belongs to #83's acceptance audit.
+Large-leading-trivia runtime evidence and renewed resource reviews remain pending.
+No full-parser complexity or RSS bound is asserted.

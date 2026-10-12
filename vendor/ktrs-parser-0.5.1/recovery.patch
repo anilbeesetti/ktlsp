@@ -198,15 +198,36 @@
       *   : modifiers ("val" | "var")? parameter ("=" element)?
 --- a/src/parsing/declarations/type_parameters.rs
 +++ b/src/parsing/declarations/type_parameters.rs
-@@ -7,6 +7,7 @@
+@@ -7,8 +7,28 @@
      COLON_COMMA_LBRACE_RBRACE_TYPE_REF_FIRST_SET, GT_COMMA_COLON_SET, LBRACE_RBRACE_TYPE_REF_FIRST_SET,
      TYPE_PARAMETER_GT_RECOVERY_SET,
  };
 +use crate::builder::{PsiBuilder, SemanticWhitespaceAwarePsiBuilder};
  use crate::parsing::Parser;
  use crate::token_set::TokenSet;
++
++const fn generic_probe_token_fits(start: u32, end: u32, eof: Option<i32>) -> bool {
++    end - start <= 4096
++        && match eof {
++            Some(eof) => end <= eof as u32,
++            None => true,
++        }
++}
++
++const _: () = {
++    assert!(!generic_probe_token_fits(100, 103, Some(99)));
++    assert!(!generic_probe_token_fits(100, 103, Some(100)));
++    assert!(!generic_probe_token_fits(100, 103, Some(102)));
++    assert!(generic_probe_token_fits(100, 103, Some(103)));
++    assert!(generic_probe_token_fits(100, 103, None));
++    assert!(generic_probe_token_fits(100, 4196, None));
++    assert!(!generic_probe_token_fits(100, 4197, None));
++    assert!(!generic_probe_token_fits(100, 4197, Some(5000)));
++};
  
-@@ -17,18 +18,41 @@
+ impl Parser {
+     /*
+@@ -17,18 +37,41 @@
       *   ;
       */
      pub(super) fn parse_type_parameter_list(&mut self, recovery_set: TokenSet) -> bool {
@@ -249,7 +270,7 @@
  
                  if !self.at(COMMA) {
                      break;
-@@ -39,13 +63,112 @@
+@@ -39,13 +82,111 @@
                  }
              }
  
@@ -290,8 +311,7 @@
 +        let eof = self.my_builder.effective_truncated_eof_position();
 +        let mut end = start;
 +        while end < limit
-+            && psi.lex_starts[end + 1] - psi.lex_starts[start] <= 4096
-+            && eof.is_none_or(|eof| psi.lex_starts[end + 1] <= eof as u32)
++            && generic_probe_token_fits(psi.lex_starts[start], psi.lex_starts[end + 1], eof)
 +        {
 +            end += 1;
 +        }
@@ -364,7 +384,7 @@
      }
  
      /*
-@@ -132,23 +255,43 @@
+@@ -132,23 +273,43 @@
       *   : modifiers SimpleName (":" userType)?
       *   ;
       */

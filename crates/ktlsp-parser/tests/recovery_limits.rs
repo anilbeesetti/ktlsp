@@ -227,6 +227,99 @@ fn generic_prefix_probe_thresholds_decline_without_losing_source() {
 }
 
 #[test]
+fn large_leading_generic_trivia_keeps_copied_prefix_accounting() {
+    let parser = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
+    let trivia = "/*x*/ ".repeat(2200);
+    // Blank lines keep ordinary declaration comment binders outside the fixture's ranges.
+    let source = format!("class Box<\n\n{trivia}\n\nfun healthy() = 2");
+    let fun_start = 10 + trivia.len() + 4;
+    let snapshot = SourceSnapshot::new(
+        "leading-generic-trivia",
+        1,
+        FileKind::Source,
+        source.as_str(),
+    )
+    .unwrap();
+    let accepted = parser
+        .parse_snapshot(&snapshot, &AtomicBool::new(false))
+        .unwrap();
+    let tree = accepted.tree_for(&snapshot).unwrap();
+    assert_eq!(trivia.len(), 13200);
+    assert_eq!(
+        tree.elements()
+            .iter()
+            .filter(|e| e.token && e.start >= 10 && e.end <= fun_start)
+            .count(),
+        4401
+    );
+    let class_id = tree
+        .elements()
+        .iter()
+        .position(|e| !e.token && e.kind == "CLASS")
+        .unwrap();
+    for (kind, start, end, parent) in [
+        ("CLASS", 0, 10, Some(0)),
+        ("TYPE_PARAMETER_LIST", 9, 10, Some(class_id)),
+    ] {
+        let element = tree
+            .elements()
+            .iter()
+            .find(|e| !e.token && e.kind == kind)
+            .unwrap();
+        assert_eq!(
+            (element.start, element.end, element.parent),
+            (start, end, parent)
+        );
+    }
+    let (fun_id, fun) = tree
+        .elements()
+        .iter()
+        .enumerate()
+        .find(|(_, e)| !e.token && e.kind == "FUN")
+        .unwrap();
+    assert_eq!(
+        (fun.start, fun.end, fun.parent),
+        (fun_start, source.len(), Some(0))
+    );
+    assert!(tree.elements().iter().any(|e| e.token
+        && e.kind == "IDENTIFIER"
+        && e.parent == Some(fun_id)
+        && (e.start, e.end) == (fun_start + 4, fun_start + 11)));
+    assert_eq!(tree.diagnostics().len(), 1);
+    let error = &tree.diagnostics()[0];
+    assert_eq!(
+        (error.start, error.end, error.message.as_str()),
+        (10, 10, "Type parameter declaration expected")
+    );
+    assert_eq!(
+        tree.elements()
+            .iter()
+            .filter(|e| e.token)
+            .map(|e| &source[e.start..e.end])
+            .collect::<String>(),
+        source
+    );
+    assert_eq!(accepted.snapshot(), &snapshot);
+    assert_eq!(snapshot.source(), source);
+    let healthy = SourceSnapshot::new(
+        "healthy-after-leading-generic-trivia",
+        2,
+        FileKind::Source,
+        "fun healthy() = 1",
+    )
+    .unwrap();
+    assert!(
+        parser
+            .parse_snapshot(&healthy, &AtomicBool::new(false))
+            .unwrap()
+            .tree_for(&healthy)
+            .unwrap()
+            .diagnostics()
+            .is_empty()
+    );
+}
+
+#[test]
 fn repeated_generic_recovery_and_failed_probes_keep_resource_gates() {
     let parser = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
     for count in [2, 20, 100] {

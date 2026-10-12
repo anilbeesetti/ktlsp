@@ -32,7 +32,7 @@
   "src/parsing/declarations/parameters.rs": "09b215b9f21eec5d7c65015c731a5617f74e4cf9d7245e380cc7a04306904f7c",
   "src/parsing/declarations/preamble.rs": "e29f970f31c5affb571e2d80880d0d0b9093ce4f2cd51026f924763386af563d",
   "src/parsing/declarations/properties.rs": "ca851cb3e4ed8f1326a3e71379219a79b0bb37cb8cb8ba16126a810922a7282e",
-  "src/parsing/declarations/type_parameters.rs": "958076c23f5964ec0bcfd2db9bca3e9825052f977a378a5559adc0a3dcb4823b",
+  "src/parsing/declarations/type_parameters.rs": "35b8f2dc24fe13a496a05a91e48319c271ae4bca4e5f1985ff9cc9ba3e6aae63",
   "src/parsing/declarations/types.rs": "fd8a4ec7ab3975eea345056a4594a1b96ebe41b912a37d2c4220639cab3fd78b",
   "src/parsing/declarations/user_types.rs": "354b073fc631374da0cd2776af34ad076ebc514ae7deb980c3a3aba62e221fbe",
   "src/parsing/expressions/atomic.rs": "c1fe6febea47d40ef91c0dd89016a053c8001e5f527c369c91892fd878dccb4d",

@@ -11,6 +11,25 @@ use crate::builder::{PsiBuilder, SemanticWhitespaceAwarePsiBuilder};
 use crate::parsing::Parser;
 use crate::token_set::TokenSet;
 
+const fn generic_probe_token_fits(start: u32, end: u32, eof: Option<i32>) -> bool {
+    end - start <= 4096
+        && match eof {
+            Some(eof) => end <= eof as u32,
+            None => true,
+        }
+}
+
+const _: () = {
+    assert!(!generic_probe_token_fits(100, 103, Some(99)));
+    assert!(!generic_probe_token_fits(100, 103, Some(100)));
+    assert!(!generic_probe_token_fits(100, 103, Some(102)));
+    assert!(generic_probe_token_fits(100, 103, Some(103)));
+    assert!(generic_probe_token_fits(100, 103, None));
+    assert!(generic_probe_token_fits(100, 4196, None));
+    assert!(!generic_probe_token_fits(100, 4197, None));
+    assert!(!generic_probe_token_fits(100, 4197, Some(5000)));
+};
+
 impl Parser {
     /*
      * typeParameters
@@ -98,8 +117,7 @@ impl Parser {
         let eof = self.my_builder.effective_truncated_eof_position();
         let mut end = start;
         while end < limit
-            && psi.lex_starts[end + 1] - psi.lex_starts[start] <= 4096
-            && eof.is_none_or(|eof| psi.lex_starts[end + 1] <= eof as u32)
+            && generic_probe_token_fits(psi.lex_starts[start], psi.lex_starts[end + 1], eof)
         {
             end += 1;
         }

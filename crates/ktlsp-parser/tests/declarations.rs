@@ -955,9 +955,44 @@ fn failed_generic_probes_preserve_type_parameters_and_existing_recovery() {
         assert!(
             !parsed.elements().iter().any(|e| !e.token
                 && e.kind == "FUN"
+                && e.parent
+                    .is_some_and(|p| parsed.elements()[p].kind == "KT_FILE")
                 && &source[e.start..e.end] == "fun healthy() = 2"),
             "{source:?}"
         );
+        if broken.contains("@A") {
+            let (id, function) = parsed
+                .elements()
+                .iter()
+                .enumerate()
+                .find(|(_, e)| {
+                    !e.token && e.kind == "FUN" && &source[e.start..e.end] == "fun healthy() = 2"
+                })
+                .unwrap();
+            assert_eq!(
+                (function.start, function.end),
+                (broken.len() + 1, source.len())
+            );
+            assert_eq!(
+                parsed.elements()[function.parent.unwrap()].kind,
+                "VALUE_ARGUMENT"
+            );
+            assert!(parsed.elements().iter().any(|e| e.token
+                && e.parent == Some(id)
+                && e.kind == "IDENTIFIER"
+                && (e.start, e.end) == (broken.len() + 5, broken.len() + 12)));
+            for kind in ["CLASS", "TYPE_PARAMETER_LIST"] {
+                let node = parsed
+                    .elements()
+                    .iter()
+                    .find(|e| !e.token && e.kind == kind)
+                    .unwrap();
+                assert_eq!(
+                    (node.start, node.end),
+                    (if kind == "CLASS" { 0 } else { 9 }, source.len())
+                );
+            }
+        }
         assert_eq!(
             parsed
                 .elements()

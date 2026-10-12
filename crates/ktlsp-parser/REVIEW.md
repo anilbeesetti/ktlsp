@@ -203,3 +203,22 @@ supervisor timeout reliability remains issue #96 OPEN/UNKNOWN, with its cause
 unresolved. The 500 ms deadline and all failure assertions remain unchanged.
 No JVM/oracle ran. #7/#83/T008 acceptance remains unfinished, with generic,
 missing-default/deep-type/annotation recovery and Coverage gaps retained.
+
+## #100 controlled classifier-generic recovery review
+
+The candidate integrates prerequisite main73c03df once. Local pinned format and
+locked workspace Clippy pass; standalone vendor test sources compile without
+execution. The unchanged pure Rust graph and ordered archive/54-original-hash ->
+nine-file behavioral patch -> 49-file formatting patch -> 54-final-hash replay
+were verified. The adversarial reviewer independently replayed both artifacts
+in memory and confirmed exact bytes; notices/original inventory are unchanged.
+
+First controlled Linux head86c0b97, run38285596221/job114933082651: format and
+Clippy passed, 15/16 declarations tests passed, but an incorrect negative assertion
+for an incomplete annotation rejected a legitimate existing nested FUN. Both
+reviewers independently traced annotation/value-argument parsing. Corrected
+assertions require VALUE_ARGUMENT parent, exact nested name/function and damaged
+class/list ranges, and forbid a KT_FILE sibling. No production fix was indicated,
+no unchanged-head retry was used, and later recovery-limit tests were not reached.
+Exact corrected-head Linux behavior and final reviews remain pending. No Darwin
+runtime or JVM/oracle execution occurred; issue #96 remains unresolved.

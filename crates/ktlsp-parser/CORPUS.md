@@ -1,4 +1,4 @@
-# Kotlin 2.3 declaration baseline v1 — #86/#87, partial #83
+# Kotlin 2.3 declaration baseline v1 — #86/#87/#100, partial #83
 
 This independently authored native corpus pins the source-local ktrs-parser 0.5.1 fork and registry syntax 0.5.1, not
 compiler or official LSP parity. Source literals and exact expected extents,
@@ -45,11 +45,12 @@ constructor/function-type parameter contexts are controls. Member initializer
 and secondary-constructor boundaries have explicit original-span/parent checks.
 This does not accept all malformed syntax or complete #83/#7 recovery.
 
-`unresolved_generic_recovery_gate_is_recorded` retains the unclosed class generic
-parameter defect: `class Box<T` consumes the following function keyword despite
-lossless token coverage and diagnostics. `{fun<)]<T:@( {})` separately returns
-Coverage for upstream token loss. Original source stays authoritative, and each
-failure has a healthy-followup check.
+`unclosed_classifier_generics_restore_named_sibling_snapshots` replaces the recorded
+class-generic defect with exact proposed class/list, sibling kind/name/range/parent
+and diagnostic expectations. Entry-boundary errors retain same-offset deduplication.
+The candidate is not accepted until exact-head Linux execution and reviews pass.
+`token_loss_still_rejects_coverage_and_allows_healthy_followup` separately preserves
+Coverage rejection for `{fun<)]<T:@( {})` and its healthy followup.
 
 Other individually named upstream limits remain: a missing default (`x: Int =`
 followed by named `fun`), deeply malformed parenthesized type (`x: (@A`) and
@@ -58,7 +59,8 @@ inside those nested grammar productions is outside the parameter-boundary repair
 Missing simple types/open generic argument types may recover with upstream
 same-position diagnostic deduplication (e.g. only `Type expected`).
 
-#83/#7 remain open and T008a remains blocked, especially on generic recovery.
+#83/#7 remain open and T008a remains blocked on the remaining parent acceptance
+and individually named recovery/resource gaps.
 The Rust-only fork preserves archive/source inventory and notices under
 `vendor/ktrs-parser-0.5.1`; recovery.patch isolates the source change. No wrapper
 reconstructs declarations from text or patches returned CSTs. No oracle ran.

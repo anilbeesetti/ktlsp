@@ -49,3 +49,17 @@ https://github.com/anilbeesetti/ktlsp/actions/runs/38257790041/job/114840244988
 The hosted root checks do not execute either standalone vendor test workspace.
 Production pinned full-workspace checks, hosted CI and both integration
 rechecks and expected-head coordinator merge grant remain pending.
+
+## #100 review continuation
+
+The new classifier recovery uses isolated bounded scratch parsing and inspects
+specific completed type productions, preserving ordinary non-class behavior.
+Both independent reviewers supplied production regressions for annotation/operator
+state preservation, incomplete bounds, excluded headers, entry deduplication,
+exact raw-token/byte thresholds, repeated/aggregate exhaustion and recursion
+suppression. Adversarial review independently reproduced all54 final source bytes
+from the archive and both ordered patches, with the unchanged Rust dependency
+graph. Production exact-head Linux execution is the behavioral authority; the
+standalone recovery tests compile locally but are not run by root workspace CI.
+The first Linux failure was a new test's blanket nested-FUN prohibition; corrected
+parent/range assertions require another reviewed head. No runtime approval yet.

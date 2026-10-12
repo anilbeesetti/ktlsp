@@ -29,7 +29,7 @@ Source changes are recorded in two ordered phases:
 
 1. `recovery.patch` changes nine files from the pristine archive: parsing/mod.rs,
    builder/layers.rs and declarations/{classes,functions,members,modifiers,parameters,type_parameters,user_types}.rs.
-2. `formatting.patch` changes 49 files from the recovery phase at commit cc4920d,
+2. `formatting.patch` changes 49 files from the current recovery phase (extending historical cc4920d),
    using pinned Rust 1.99.0 rustfmt with edition 2024. All nine behavioral files
    are among those 49; the other 40 have formatting changes only. Five source
    files retain pristine bytes. Exact paths are the patch headers; the final

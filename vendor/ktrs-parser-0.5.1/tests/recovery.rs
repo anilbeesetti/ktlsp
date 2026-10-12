@@ -230,3 +230,47 @@ fn malformed_eof_keeps_upstream_diagnostics() {
     }
     partition(&parsed, source);
 }
+
+#[test]
+fn classifier_generic_recovery_retains_original_sibling_identity() {
+    for (broken, expected_error) in [
+        ("class Box<T", "Missing '>'"),
+        ("interface Box<T", "Missing '>'"),
+        ("class Box<", "Type parameter declaration expected"),
+        ("class Box<T,", "Type parameter declaration expected"),
+        ("class Box<T : Map<String, List<Int>>", "Missing '>'"),
+    ] {
+        let source = format!("{broken}\n@A public fun healthy() = 2");
+        let parsed = parse_file(&source, FileKind::Source);
+        assert_eq!(parsed.error_messages, [expected_error]);
+        let tree = &parsed.tree;
+        let declarations: Vec<_> = (0..tree.len() as u32)
+            .filter(|&id| declaration(tree.kind(id)))
+            .collect();
+        assert_eq!(declarations.len(), 2);
+        for (&id, (kind, start, end)) in declarations.iter().zip([
+            (CLASS, 0, broken.len()),
+            (FUN, broken.len() + 1, source.len()),
+        ]) {
+            assert_eq!(tree.kind(id), kind);
+            let range = tree.text_range(id);
+            assert_eq!(
+                (
+                    u32::from(range.start()) as usize,
+                    u32::from(range.end()) as usize
+                ),
+                (start, end)
+            );
+            assert_eq!(tree.kind(tree.parent(id).unwrap()), KT_FILE);
+        }
+        let fun = declarations[1];
+        let name_start = broken.len() + 15;
+        assert!(
+            (fun + 1..tree.subtree_end(fun)).any(|id| tree.parent(id) == Some(fun)
+                && tree.kind(id) == IDENTIFIER
+                && u32::from(tree.text_range(id).start()) as usize == name_start
+                && u32::from(tree.text_range(id).end()) as usize == name_start + 7)
+        );
+        partition(&parsed, &source);
+    }
+}

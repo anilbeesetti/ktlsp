@@ -1,6 +1,7 @@
 //! Bounded classfile structure reader; attribute contents are deliberately opaque.
 
 pub mod annotations;
+pub mod metadata;
 pub mod nesting;
 
 use std::fmt;

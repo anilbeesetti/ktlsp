@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/JetBrains/kotlin",
+  "tag": "v2.3.20",
+  "commit": "d57eb4a26ed01ab03cf195da686c8047032ff16f",
+  "license": "Apache-2.0",
+  "inspection": "GitHub contents API, source bytes only; no JVM/compiler execution",
+  "files": {
+    "core/metadata.jvm/src/org/jetbrains/kotlin/metadata/jvm/deserialization/BitEncoding.java": "a2a0f43653226313b277d3339534d584419117a073061e8d7532139fd8fb35ad",
+    "core/metadata.jvm/src/org/jetbrains/kotlin/metadata/jvm/deserialization/utfEncoding.kt": "c42cae1248f3caf4de2aa3e43fd61a074f61c62c8938ec914a0e20898972074c",
+    "libraries/stdlib/jvm/runtime/kotlin/Metadata.kt": "de29f4552d1c8c36e340d7b4459bd59faf96e1ae11dd73e6780582bb21142e69"
+  }
+}

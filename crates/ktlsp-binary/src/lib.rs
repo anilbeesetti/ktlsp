@@ -2,8 +2,11 @@
 
 pub mod annotations;
 pub mod metadata;
+pub mod nesting;
 
 use std::fmt;
+
+pub mod signatures;
 
 pub const MAX_BYTES: usize = 16 * 1024 * 1024;
 pub const MAX_RECORDS: usize = 65_535;

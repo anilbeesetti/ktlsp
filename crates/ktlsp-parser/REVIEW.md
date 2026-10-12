@@ -203,3 +203,108 @@ supervisor timeout reliability remains issue #96 OPEN/UNKNOWN, with its cause
 unresolved. The 500 ms deadline and all failure assertions remain unchanged.
 No JVM/oracle ran. #7/#83/T008 acceptance remains unfinished, with generic,
 missing-default/deep-type/annotation recovery and Coverage gaps retained.
+
+## #100 controlled classifier-generic recovery review
+
+The candidate integrates prerequisite main73c03df once. Local pinned format and
+locked workspace Clippy pass; standalone vendor test sources compile without
+execution. The unchanged pure Rust graph and ordered archive/54-original-hash ->
+nine-file behavioral patch -> 49-file formatting patch -> 54-final-hash replay
+were verified. The adversarial reviewer independently replayed both artifacts
+in memory and confirmed exact bytes; notices/original inventory are unchanged.
+
+First controlled Linux head86c0b97, run38285596221/job114933082651: format and
+Clippy passed, 15/16 declarations tests passed, but an incorrect negative assertion
+for an incomplete annotation rejected a legitimate existing nested FUN. Both
+reviewers independently traced annotation/value-argument parsing. Corrected
+assertions require VALUE_ARGUMENT parent, exact nested name/function and damaged
+class/list ranges, and forbid a KT_FILE sibling. No production fix was indicated,
+no unchanged-head retry was used, and later recovery-limit tests were not reached.
+Corrected candidate054e352e1903250f44b5e3a418a7b1719f004844 passed Linux
+run38285975233/job114934324677. Actions tested synthetic merge
+86bbd04fe50de7e28d68fb34dd6ce3d3cec73eec, tree
+ad10ce11498b068785296334144365325649dae4, with parents
+b7ba65b849c2e1be681c88bd7bba7dc66a14f78d and candidate054e352.
+This is actual combined-tree evidence, not a claim that CI checked the bare head.
+All three unchanged pinned commands passed: 169 active tests, zero failures,
+two ignored helper fixtures exercised by parent tests and 19 worker fault cases.
+All 16 declarations and five recovery-limit tests passed. Both independent
+reviewers inspected these logs and approve bounded functionality/resource behavior;
+production source matches the independently replayed86c0b97 source. Leading trivia
+scans are input-bounded and monotonic; the aggregate budget covers copied tokens.
+
+Stable integration, final-head behavioral rechecks/CI and coordinator expected-head
+merge grant remain required. No Darwin runtime or JVM/oracle execution occurred;
+issue #96 remains unresolved.
+
+## Focused accounting review and explicit contract amendment
+
+Both independent reviewers found that leading-trivia scans and cheap
+kind/modifier/EOF misses are uncharged, despite the original broader accounting
+reading. Their earlier candidate behavior approvals did not establish that
+broader contract. The coordinator explicitly amended it after independent
+architect review: at most 4096 copied scratch tokens per classifier list, counting
+internal/trailing copied trivia and charging every eligible window before grammar
+success/failure; a zero-copy eligible rejection debits one. Leading scans and
+cheap prefilter misses may remain outside the allowance. The 256 copied-token/
+4096-source-byte attempt caps, minimum active EOF and recursion guard are retained.
+
+The leading scan increments a raw index until nontrivia or lexeme end. Every list
+backedge requires and consumes a comma; ordinary token queries normalize skipped
+trivia before continuing. Scratch recursion returns before this scan. Together
+with the unchanged 64 KiB input limit, this is a local finite-progress argument,
+not proof of global linear parsing, total work or RSS. Existing internal-trivia
+threshold and failed-eligible aggregate exhaustion/reset fixtures remain relevant;
+they do not establish a precise aggregate acceptance threshold.
+
+The focused production-worker fixture places 4401 leading trivia tokens
+(13204 bytes) directly after '<', then pins exact damaged class/list and sibling
+name/function/parent ranges, entry diagnostic, token partition, snapshot identity
+and healthy followup. Format and workspace test-source compilation pass; no
+runtime execution has occurred for this addition. A public active-truncation
+control alone would not prove negative clipping. Root explicitly authorized a
+private const predicate extraction in the owned type-parameter module and accepts
+that narrow guard evidence. The actual window loop uses it unchanged; unconditional
+asserts cover EOF before/at/inside a token, exact endpoint, absent EOF and independent
+4096/4097-byte bounds. The minimum active EOF reaches this real guard; zero copied
+tokens return false before scratch construction, and a prefix cut before its
+required FUN/name/LPAR cannot pass. This is window-predicate evidence, not annotation
+parsing, active-layer integration or end-to-end truncated recovery. That limitation
+remains for #83; it does not admit T008 or broader acceptance.
+
+Ordered archive -> nine-file behavior -> 49-file formatting -> all54 final source
+hashes replay passed after extraction. Pinned format, locked workspace test-source
+compilation and Clippy pass without local runtime. The new worker regression still
+awaits final integrated Linux execution; separate resource/provenance and finished
+architect reviews remain required.
+
+Source-only correctness review caught an ordinary comment-binding fixture issue
+before execution: same-line block comments would bind to the damaged class. The
+fixture now brackets the comment/space run with blank lines, independently keeping
+class/list and bare sibling boundaries fixed. The leading scan still starts
+immediately after '<' and crosses the whole run before candidate copying.
+
+Both independent reviewers approve source preparation after rechecking the
+corrected blank-line fixture: 4401 raw trivia tokens/13204 bytes, FUN13214/name
+13218..13225, class0..10/list9..10 and entry diagnostic10. Adversarial review
+independently replayed the updated archive/ordered patches to all54 final source
+bytes; correctness checked the final hashes and actual guard call path. They
+withhold final behavior/resource approval until integrated Linux execution.
+
+Owner architect approves this focused preparation: actual-predicate preservation,
+large-leading-trivia fixture reach and honest accounting/EOF limitations match
+the root-amended contract. This is conditional preparation approval, not delivery
+or renewed runtime approval. Final integrated Linux checks and both reviews remain.
+
+## Authorized final integration
+
+Exact main ef120beebb45f96a60bf61866fe15dd228b674bc, tree
+f657f81e16237c1ba0903169ab94fd3e2747eafe, was integrated once into focused
+preparation f7d56979539cdda7c4216733fd6647bf75ef782f at merge
+78e9df525145df31a8dd6ef2b56d31dac53ce7af. The integration changed no owned
+parser/vendor source or test bytes and preserves current-main binary exports,
+shared docs, manifests and lock exactly. Ordered archive/patch/final-hash replay
+passed again. The authoritative combined-head Linux workflow, new leading-trivia
+runtime outcome and renewed separate reviews/finished architect remain pending.
+Root expected-head merge authorization and exact merged-main checks are still
+required. No local runtime or JVM/oracle ran; #7/#83/#96 remain open.

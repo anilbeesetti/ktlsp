@@ -1,0 +1,15 @@
+[package]
+name = "ktlsp-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "ktlsp"
+path = "src/main.rs"
+
+[dependencies]
+ktlsp-text = { path = "../ktlsp-text" }
+ktlsp-protocol = { path = "../ktlsp-protocol" }
+serde.workspace = true
+serde_json.workspace = true

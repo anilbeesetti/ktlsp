@@ -21,6 +21,16 @@ name = "ktlsp-protocol"
 version = "0.1.0"
 
 [[package]]
+name = "ktlsp-server"
+version = "0.1.0"
+dependencies = [
+ "ktlsp-protocol",
+ "ktlsp-text",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "ktlsp-syntax"
 version = "0.1.0"
 dependencies = [

@@ -15,9 +15,11 @@ With no arguments, `ktlsp` reads and writes Content-Length-framed LSP on stdio. 
 
 ## Current behavior
 
-The server implements initialization/shutdown/exit and bounded, versioned UTF-16 document synchronization, including atomic multi-edit rollback. It advertises synchronization only. Unsupported language requests return method-not-found; completion, hover, semantic diagnostics, navigation, formatting and refactoring remain unimplemented.
+The server implements initialization/shutdown/exit, bounded versioned UTF-16 document synchronization with atomic multi-edit rollback, and token-aware folding for multiline delimiters, block comments and raw strings. Accepted open/change notifications replace lexical/structural push diagnostics; close clears them. It advertises synchronization and folding. Unsupported language requests return method-not-found; document symbols, completion, hover, semantic diagnostics, navigation, formatting and refactoring remain unimplemented.
 
-Separate Rust libraries provide a bounded lossless Kotlin lexer, stdio framing and validated explicit project-model v1 loading. Lexer and project-model providers are not yet integrated into editor requests or live build import. Limits and residual gaps are documented in [parity status](docs/status/parity.md).
+Folding respects `lineFoldingOnly` and `rangeLimit`, with explicit resource limits. It covers a lexical subset; import/declaration folds and full official folding parity remain pending. See [server behavior and bounds](crates/ktlsp-server/README.md).
+
+A separate supervised parser safety adapter has a 64 KiB input ceiling and no server consumer; complete grammar/recovery remains pending. Separate Rust libraries provide bounded classfile structure and declaration-annotation reading and a pinned exported-workspace subset alongside the explicit project-model v1 loader. A bounded offline Maven-layout lookup returns retained bytes and unverified-checksum provenance. These data foundations have no server consumers or live build import. An optional standalone tool replays committed official observations; it does not run a fresh JVM oracle or establish semantic parity. Limits and merged evidence are documented in [parity status](docs/status/parity.md).
 
 The native server, build and core editor analysis require no JVM, JDK, Kotlin compiler, JNI or C/C++ parser. Optional future Gradle/Maven import/build/run/debug may use the user's existing Java tools; no Java is bundled. See [runtime boundary](docs/specs/runtime-boundary.md).
 

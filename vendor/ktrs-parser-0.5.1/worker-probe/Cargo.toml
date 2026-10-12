@@ -1,0 +1,28 @@
+[package]
+name = "t007b2-worker-probe"
+version = "0.0.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+ktlsp-parser = { path = "../../../crates/ktlsp-parser" }
+ktlsp-text = { path = "../../../crates/ktlsp-text" }
+ktrs-parser = { path = ".." }
+ktrs-syntax = "=0.5.1"
+serde_json = "=1.0.154"
+
+[patch.crates-io]
+ktrs-parser = { path = ".." }
+
+[[bin]]
+name = "ktlsp-parser-worker"
+path = "../../../crates/ktlsp-parser/src/bin/ktlsp-parser-worker.rs"
+
+[[test]]
+name = "existing_parser"
+path = "../../../crates/ktlsp-parser/tests/parser.rs"
+
+[[test]]
+name = "resources"
+path = "resources.rs"

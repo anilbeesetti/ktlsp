@@ -5,6 +5,7 @@ use std::{
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     sync::{
+        Arc, OnceLock,
         atomic::{AtomicBool, Ordering},
         mpsc,
     },
@@ -20,7 +21,7 @@ pub const MAX_NESTING: usize = 128;
 pub const MAX_ALLOCATION_BYTES: usize = 64 * 1024 * 1024;
 pub const TIMEOUT: Duration = Duration::from_millis(500);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileKind {
     Source,
     Script,
@@ -37,6 +38,7 @@ pub enum ParserError {
     Timeout,
     WorkerFailed,
     Io,
+    StaleSnapshot,
 }
 impl std::fmt::Display for ParserError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -66,6 +68,7 @@ pub struct Diagnostic {
 
 #[doc(hidden)]
 #[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub enum Reply {
     Tree {
         #[serde(deserialize_with = "read_elements")]
@@ -107,9 +110,68 @@ fn read_bounded<'de, T: Deserialize<'de>, D: serde::Deserializer<'de>, const MAX
     d.deserialize_seq(Bounded::<T, MAX>(std::marker::PhantomData))
 }
 
+/// Authoritative immutable input. The caller assigns a document identity and revision.
+/// Reopening a document must use a new identity or revision; byte offsets are not symbols.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceSnapshot {
+    document: Arc<str>,
+    revision: i64,
+    kind: FileKind,
+    source: Arc<str>,
+}
+impl SourceSnapshot {
+    pub fn new(
+        document: impl Into<Arc<str>>,
+        revision: i64,
+        kind: FileKind,
+        source: impl Into<Arc<str>>,
+    ) -> Result<Self, ParserError> {
+        let source = source.into();
+        if source.len() > MAX_SOURCE_BYTES {
+            return Err(ParserError::InputLimit);
+        }
+        Ok(Self {
+            document: document.into(),
+            revision,
+            kind,
+            source,
+        })
+    }
+    pub fn document(&self) -> &str {
+        &self.document
+    }
+    pub fn revision(&self) -> i64 {
+        self.revision
+    }
+    pub fn kind(&self) -> FileKind {
+        self.kind
+    }
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+}
+
+/// A validated tree can only be retrieved against its exact authoritative snapshot.
+#[derive(Debug)]
+pub struct SnapshotResult {
+    snapshot: SourceSnapshot,
+    parsed: Parsed,
+}
+impl SnapshotResult {
+    pub fn snapshot(&self) -> &SourceSnapshot {
+        &self.snapshot
+    }
+    pub fn tree_for(&self, current: &SourceSnapshot) -> Result<&Parsed, ParserError> {
+        if &self.snapshot != current {
+            return Err(ParserError::StaleSnapshot);
+        }
+        Ok(&self.parsed)
+    }
+}
+
 #[derive(Debug)]
 pub struct Parsed {
-    source: String,
+    source: Arc<str>,
     elements: Vec<Element>,
     diagnostics: Vec<Diagnostic>,
 }
@@ -145,6 +207,19 @@ impl Parser {
             worker: worker.as_ref().to_owned(),
         })
     }
+    pub fn parse_snapshot(
+        &self,
+        snapshot: &SourceSnapshot,
+        cancelled: &AtomicBool,
+    ) -> Result<SnapshotResult, ParserError> {
+        let mut parsed = self.parse(snapshot.source(), snapshot.kind, cancelled)?;
+        parsed.source = Arc::clone(&snapshot.source);
+        Ok(SnapshotResult {
+            snapshot: snapshot.clone(),
+            parsed,
+        })
+    }
+    /// Unversioned parser gate for standalone callers; editor consumers use parse_snapshot.
     pub fn parse(
         &self,
         source: &str,
@@ -314,6 +389,18 @@ fn validate(
     if elements.is_empty() || elements.len() > MAX_ELEMENTS || diagnostics.len() > MAX_DIAGNOSTICS {
         return Err(ParserError::InvalidTree);
     }
+    // Enumerate only the trusted pinned enum range, never an unchecked wire discriminant.
+    static KINDS: OnceLock<std::collections::HashMap<String, bool>> = OnceLock::new();
+    let kinds = KINDS.get_or_init(|| {
+        (0..=ktrs_syntax::SyntaxKind::DUMMY_HOLDER as u16)
+            .map(|raw| {
+                let kind = ktrs_syntax::SyntaxKind::from_raw(raw);
+                (format!("{kind:?}"), kind.is_token())
+            })
+            .collect()
+    });
+    let mut child_ends: Vec<usize> = elements.iter().map(|e| e.start).collect();
+    let mut error_spans = Vec::new();
     let mut ancestors: Vec<usize> = Vec::new();
     let mut cursor = 0;
     for (i, e) in elements.iter().enumerate() {
@@ -327,8 +414,7 @@ fn validate(
             || e.end > normalized.len()
             || !normalized.is_char_boundary(e.start)
             || !normalized.is_char_boundary(e.end)
-            || e.kind.is_empty()
-            || e.kind.len() > 128
+            || kinds.get(&e.kind) != Some(&e.token)
             || e.subtree_end <= i
             || e.subtree_end > elements.len()
             || e.parent != ancestors.last().copied()
@@ -336,15 +422,24 @@ fn validate(
                 && (e.start != 0
                     || e.end != normalized.len()
                     || e.subtree_end != elements.len()
+                    || e.kind != "KT_FILE"
                     || e.token))
         {
             return Err(ParserError::InvalidTree);
         }
         if let Some(&p) = ancestors.last() {
             let parent = &elements[p];
-            if e.start < parent.start || e.end > parent.end || e.subtree_end > parent.subtree_end {
+            if e.start != child_ends[p] || e.end > parent.end || e.subtree_end > parent.subtree_end
+            {
                 return Err(ParserError::InvalidTree);
             }
+            child_ends[p] = e.end;
+        }
+        if ancestors.len() + 1 > MAX_NESTING {
+            return Err(ParserError::NestingLimit);
+        }
+        if e.kind == "ERROR_ELEMENT" {
+            error_spans.push((e.start, e.end));
         }
         if e.token {
             if e.subtree_end != i + 1 || e.start != cursor || e.start == e.end {
@@ -353,20 +448,27 @@ fn validate(
             cursor = e.end;
         } else if e.subtree_end > i + 1 {
             ancestors.push(i);
-            if ancestors.len() > MAX_NESTING {
-                return Err(ParserError::NestingLimit);
-            }
         }
     }
     if cursor != normalized.len() {
         return Err(ParserError::Coverage);
     }
-    for d in &mut diagnostics {
+    if elements
+        .iter()
+        .enumerate()
+        .any(|(i, e)| !e.token && child_ends[i] != e.end)
+        || error_spans.len() != diagnostics.len()
+    {
+        return Err(ParserError::InvalidTree);
+    }
+    for (d, span) in diagnostics.iter_mut().zip(error_spans) {
         if d.start > d.end
             || d.end > normalized.len()
             || !normalized.is_char_boundary(d.start)
             || !normalized.is_char_boundary(d.end)
+            || d.message.is_empty()
             || d.message.len() > 4096
+            || (d.start, d.end) != span
         {
             return Err(ParserError::InvalidTree);
         }
@@ -378,7 +480,7 @@ fn validate(
         e.end = map[e.end];
     }
     Ok(Parsed {
-        source: source.to_owned(),
+        source: Arc::from(source),
         elements,
         diagnostics,
     })
@@ -401,7 +503,7 @@ mod tests {
     #[test]
     fn rejects_untrusted_tree_shapes_and_spans() {
         let root = Element {
-            kind: "ROOT".into(),
+            kind: "KT_FILE".into(),
             start: 0,
             end: 1,
             parent: None,
@@ -498,7 +600,7 @@ mod tests {
     fn immediate_parent_and_subtree_containment_are_required() {
         let elements = vec![
             Element {
-                kind: "ROOT".into(),
+                kind: "KT_FILE".into(),
                 start: 0,
                 end: 2,
                 parent: None,
@@ -506,7 +608,7 @@ mod tests {
                 token: false,
             },
             Element {
-                kind: "NODE".into(),
+                kind: "REFERENCE_EXPRESSION".into(),
                 start: 0,
                 end: 1,
                 parent: Some(0),
@@ -514,7 +616,7 @@ mod tests {
                 token: false,
             },
             Element {
-                kind: "A".into(),
+                kind: "IDENTIFIER".into(),
                 start: 0,
                 end: 1,
                 parent: Some(1),
@@ -522,7 +624,7 @@ mod tests {
                 token: true,
             },
             Element {
-                kind: "B".into(),
+                kind: "IDENTIFIER".into(),
                 start: 1,
                 end: 2,
                 parent: Some(0),
@@ -559,6 +661,7 @@ mod tests {
             ("no-read", ParserError::Timeout),
             ("oversize", ParserError::OutputLimit),
             ("crash", ParserError::WorkerFailed),
+            ("exit-failure", ParserError::WorkerFailed),
         ] {
             let mut command = Command::new(std::env::current_exe().unwrap());
             command.args(["--exact", "tests::fault_worker", "--ignored", "--nocapture"]);
@@ -568,10 +671,16 @@ mod tests {
                 mode.into()
             };
             let start = Instant::now();
-            assert_eq!(
-                supervise(command, &source, &AtomicBool::new(false)),
-                Err(expected)
-            );
+            let result = supervise(command, &source, &AtomicBool::new(false));
+            if mode == "crash" {
+                // Abort completion can cross the deadline checked before exit status.
+                assert!(matches!(
+                    result,
+                    Err(ParserError::WorkerFailed | ParserError::Timeout)
+                ));
+            } else {
+                assert_eq!(result, Err(expected));
+            }
             assert!(start.elapsed() < Duration::from_secs(3));
         }
         let cancel = AtomicBool::new(false);
@@ -615,6 +724,7 @@ mod tests {
                     .unwrap();
             }
             "crash" => std::process::abort(),
+            "exit-failure" => std::process::exit(1),
             _ => {}
         }
     }

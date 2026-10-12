@@ -1,5 +1,7 @@
 //! Bounded classfile structure reader; attribute contents are deliberately opaque.
 
+pub mod annotations;
+
 use std::fmt;
 
 pub const MAX_BYTES: usize = 16 * 1024 * 1024;

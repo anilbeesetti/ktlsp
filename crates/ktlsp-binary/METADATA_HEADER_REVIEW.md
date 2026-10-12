@@ -44,9 +44,23 @@ dependencies: `/private/tmp/ktlsp97-adversarial.rs` and
 `/private/tmp/ktlsp97-correctness.rs` (SHA256
 `d771783344583d1fc7267153e4eb04535cdc779f5a2d6d8ab3b37c96e2f4367f`).
 
-All three pinned full-workspace checks, exact head hosted CI and stable
-current-main integration/expected-SHA merge gate remain PENDING. Binary-only
-success does not resolve #96 or establish current checkpoint full verification.
+These results are historical evidence at `b9875cadf7fca6cd8eab412171eef97251117316`.
+That head also passed Linux native CI (163 tests, two ignored):
+https://github.com/anilbeesetti/ktlsp/actions/runs/38266799465/job/114870907784.
+They do not establish approval of later combined trees or resolve #96.
+
+Final integration uses coordinator-granted main
+`ab00d55557cfea9bcee87aa41fe2922f82770027`. Its only conflicting file was lib.rs;
+resolution preserves annotations/signatures/nesting with one additive metadata
+export. Metadata source/tests retain the hashes above. Current parser/vendor,
+Cargo/lock, workflow and shared documentation are unchanged from that base.
+No local Darwin runtime/build/checks or repeated reference probes are permitted
+in this stage. The unchanged Linux Native Rust workflow runs all three pinned
+workspace commands on the exact combined head. Final head/tree, CI counts and
+URLs, independent behavior/resource and architect approvals, expected-SHA merge
+grant and exact merged-main validation are recorded in
+https://github.com/anilbeesetti/ktlsp/pull/98. This record does not substitute
+historical passes for those final gates. #96 remains OPEN/UNKNOWN.
 
 Limits: d1/header data only; legacy incomplete trailing bits deliberately ignored.
 No protobuf/name resolution, declarations/types, other version/kind acceptance,

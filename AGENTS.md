@@ -2,7 +2,7 @@
 
 The user's goal is full official Kotlin LSP feature parity in Rust only. Read README, docs/PLAN.md, docs/specs/* and research/status before changing feature scope. Never claim full parity from a subset implementation.
 
-No JVM/JDK/compiler execution or C/C++ analysis dependency in runtime/build/tests. Do not execute Gradle/Maven. No tree-sitter C dependency. Data artifacts can be read. The user permits the official JVM oracle in a separate test environment only; oracle tooling must never enter the shipped server or required native build/test dependency graph. Coordinate isolated oracle work with root.
+Native core analysis/build/tests require no JVM/JDK/compiler or C/C++ analysis dependency. The user permits optional invocation of existing external JDK/Gradle/Maven/build/run/debug tools; never bundle Java or offload the semantic engine to a JVM. See docs/specs/runtime-boundary.md. T004 remains data-only. No tree-sitter C dependency. Data artifacts can be read. The user permits the official JVM oracle in a separate test environment only; oracle tooling must never enter the shipped server or required native build/test dependency graph. Coordinate isolated oracle work with root.
 
 Work in a ticket-specific git worktree/branch; never modify another agent's worktree. Coordinate Cargo workspace/dependency/lock changes with root. Keep public feature status honest and capabilities restricted to working providers.
 

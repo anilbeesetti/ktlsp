@@ -1,5 +1,7 @@
 # Community server and native Kotlin feasibility research
 
+Later evidence/policy update: [isolated checksummed binary observations](oracle/README.md) now exist, including runtime/source discrepancies. The user permits optional invocation of their existing JDK/build tools, with no bundled Java; [current boundary](../specs/runtime-boundary.md) supersedes earlier strict-zero-Java execution conclusions below. Source inventory and native-engine findings remain valid.
+
 Research date: 2026-10-12. All findings below are based on inspected primary-source snapshots; upstream fidelity/performance claims are distinguished from verified results. No JVM/JDK was installed or launched.
 
 ## Source snapshots

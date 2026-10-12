@@ -1,0 +1,13 @@
+# Isolated official-release runtime observations
+
+Observed 2026-10-12 against Linux amd64 `kotlin-lsp/v263.6379.0`, archive SHA-256 `ab8ca4455dc2fc5fe1a24db2bccc46c104254d2c465155c4251ee65df8f3f7cc`. The adjacent JetBrains-hosted checksum matched before extraction. Server reports `ILS-263.6379.0`. The user authorized this separate JVM oracle; no binary/runtime/launcher is committed or required by native build/tests.
+
+Each fixture contains original independently authored source, captured decoded unnormalized directional JSON messages (not raw-wire bytes or guaranteed complete shutdown-tail logs), and metadata with original command/fixture URI. Paths are provenance, not portable commands. This is recorded evidence, not yet a reusable differential runner. Only timing/opaque paths should be normalized in future comparisons, not meaningful ranges/actions/ranking.
+
+Verified: initialize with generic client/UTF-16 request, incremental synchronization advertisement, one block folding result, shutdown null, and normal exit status 0. Additional standalone source requests returned correct declaration symbols and Base hover. `prepareTypeHierarchy` returned null for a standalone class with this empty-project configuration. This does not establish complete semantic correctness.
+
+Important source/binary difference: this release binary advertises `typeHierarchyProvider: true`, although Kotlin-specific provider registration is only visible after the public release tag. Global advertisement may aggregate support from other languages; the null standalone Kotlin prepare result proves neither working nor absent Kotlin hierarchy support. Track type-hierarchy compatibility in the release-required matrix as advertised/runtime behavior-unverified. It also advertises pull diagnostics, full/range semantic tokens (no delta), inlay resolve, completion resolve, code-action resolve false, workspace-symbol resolve false, range formatting, and willRenameFiles. Capability advertisement is not proof every provider works.
+
+The semantic capture also includes `intellij/workspaceImportState` and `intellij/ready-for-test` notifications, although these contracts were absent from the public release-tag inventory. This establishes those observed payloads only; it does not prove every schema variant or request-direction support.
+
+The command inventory establishes previously opaque `resolveLocation` spelling. Type-hierarchy and editor test-runner source provenance remains separately documented in official.md. No Gradle/Maven build, DAP session, library-aware diagnostics, or official formatter comparison was executed.

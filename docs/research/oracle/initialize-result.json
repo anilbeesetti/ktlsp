@@ -1,0 +1,164 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "capabilities": {
+      "textDocumentSync": {
+        "openClose": true,
+        "change": 2,
+        "save": {
+          "includeText": false
+        }
+      },
+      "completionProvider": {
+        "triggerCharacters": [
+          "."
+        ],
+        "resolveProvider": true
+      },
+      "hoverProvider": true,
+      "signatureHelpProvider": {
+        "triggerCharacters": [
+          "(",
+          ","
+        ],
+        "retriggerCharacters": [
+          ","
+        ],
+        "workDoneProgress": false
+      },
+      "definitionProvider": true,
+      "typeDefinitionProvider": true,
+      "implementationProvider": true,
+      "referencesProvider": true,
+      "documentHighlightProvider": true,
+      "documentSymbolProvider": true,
+      "codeActionProvider": {
+        "codeActionKinds": [
+          "source.organizeImports",
+          "quickfix",
+          "refactor",
+          "refactor.inline.variable",
+          "refactor.extract.variable"
+        ],
+        "resolveProvider": false,
+        "workDoneProgress": false
+      },
+      "codeLensProvider": {
+        "workDoneProgress": false,
+        "resolveProvider": false
+      },
+      "documentFormattingProvider": true,
+      "documentRangeFormattingProvider": true,
+      "renameProvider": {
+        "prepareProvider": true
+      },
+      "foldingRangeProvider": true,
+      "executeCommandProvider": {
+        "commands": [
+          "decompile",
+          "applyModCommand",
+          "resolveModCommand",
+          "interpolateFileTemplate",
+          "set-highwatermark-file",
+          "wait-for-highwatermark",
+          "resolveLocation",
+          "start_debug_server",
+          "intellij.java.resolveLaunch",
+          "intellij.java.resolveBuildToolLaunch",
+          "intellij.java.resolveBuildCommand",
+          "intellij.java.resolveClassDocument",
+          "kotlin.organize.imports",
+          "jetbrains.kotlin.completion.apply",
+          "kotlin.applyCompilerDiagnosticFix",
+          "kotlin.inline.variable",
+          "refactor.extract.variable",
+          "exportWorkspace"
+        ]
+      },
+      "callHierarchyProvider": true,
+      "semanticTokensProvider": {
+        "legend": {
+          "tokenTypes": [
+            "namespace",
+            "class",
+            "enum",
+            "interface",
+            "struct",
+            "typeParameter",
+            "type",
+            "parameter",
+            "variable",
+            "property",
+            "enumMember",
+            "event",
+            "function",
+            "method",
+            "macro",
+            "keyword",
+            "modifier",
+            "comment",
+            "string",
+            "number",
+            "regexp",
+            "operator",
+            "decorator"
+          ],
+          "tokenModifiers": [
+            "declaration",
+            "definition",
+            "readonly",
+            "static",
+            "deprecated",
+            "abstract",
+            "async",
+            "modification",
+            "documentation",
+            "defaultLibrary"
+          ]
+        },
+        "range": true,
+        "full": true
+      },
+      "typeHierarchyProvider": true,
+      "inlayHintProvider": {
+        "resolveProvider": true
+      },
+      "diagnosticProvider": {
+        "interFileDependencies": true,
+        "workspaceDiagnostics": false,
+        "workDoneProgress": false
+      },
+      "workspaceSymbolProvider": {
+        "resolveProvider": false,
+        "workDoneProgress": true
+      },
+      "workspace": {
+        "workspaceFolders": {
+          "supported": true,
+          "changeNotifications": true
+        },
+        "fileOperations": {
+          "willRename": {
+            "filters": [
+              {
+                "pattern": {
+                  "glob": "**/*"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "experimental": {
+        "licensing": true,
+        "indexDir": "/workspace/research/official-oracle/capture-cache/workspaces/eb823c43b8f4937d7413412f9df0acfa/index/kotlin-server",
+        "workspaceImport": true
+      }
+    },
+    "serverInfo": {
+      "name": "IntelliJ Language Server by JetBrains",
+      "version": "ILS-263.6379.0"
+    }
+  }
+}

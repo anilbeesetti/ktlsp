@@ -14,7 +14,7 @@ Transport: fragmented reads, back-to-back frames, multibyte byte length, extra h
 
 Lexer/parser: nested/unclosed comments, escaped and raw strings, string templates, backticks, Unicode names, malformed numbers/characters, arbitrary UTF-8, deep delimiters and repeated type-argument ambiguity. Validate forward progress and exact token-span partition; run deterministic generated-input crash cases. Do not report unsupported syntax as compiler errors.
 
-Project: malformed/oversized JSON, missing/duplicate identifiers, unknown schema versions, dependency cycles and missing references, relative paths, source-root overlap, generated/test roots, missing artifacts, filesystem permissions and symlinks. No build-tool execution.
+Explicit project-model loader (T004, data-only): malformed/oversized JSON, missing/duplicate identifiers, unknown schema versions, dependency cycles and missing references, relative paths, source-root overlap, generated/test roots, missing artifacts, filesystem permissions and symlinks. No build-tool execution.
 
 Semantic providers: shadowing, duplicate names, aliases/star/default imports, module visibility, overloads, extension/member precedence, generics/variance/nullability, smart casts, incomplete code, cross-file edits and stale versions. Unresolved/ambiguous symbols must not drive rename/refactoring.
 

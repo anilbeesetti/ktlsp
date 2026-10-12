@@ -1,0 +1,25 @@
+{
+  "modules": [
+    {
+      "name": "app😀",
+      "dependencies": [
+        {"type": "library", "name": "stdlib", "scope": "compile"},
+        {"type": "moduleSource"},
+        {"type": "module", "name": "core", "scope": "test", "isExported": true}
+      ],
+      "contentRoots": [
+        {"path": "<WORKSPACE>/app", "sourceRoots": [
+          {"path": "<WORKSPACE>/app/src/../src/kotlin", "type": "kotlin-source"},
+          {"path": "<WORKSPACE>/app/test", "type": "java-test"}
+        ]}
+      ]
+    },
+    {"name": "core", "contentRoots": [
+      {"path": "<WORKSPACE>/core", "sourceRoots": [{"path": "<WORKSPACE>/core/src", "type": "java-source"}]}
+    ]}
+  ],
+  "libraries": [{"name": "stdlib", "type": null, "roots": [
+    {"path": "<WORKSPACE>/lib/sources.zip", "type": "SOURCES"},
+    {"path": "<WORKSPACE>/lib/classes.jar"}
+  ]}]
+}

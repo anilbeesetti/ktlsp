@@ -13,6 +13,15 @@ name = "ktlsp-binary"
 version = "0.1.0"
 
 [[package]]
+name = "ktlsp-import"
+version = "0.1.0"
+dependencies = [
+ "ktlsp-project",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "ktlsp-project"
 version = "0.1.0"
 dependencies = [

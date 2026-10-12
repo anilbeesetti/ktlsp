@@ -206,3 +206,27 @@ fn annotation_probes_do_not_recursively_replay_recovery() {
     assert!(parsed.error_messages.is_empty());
     partition(&parsed, &source);
 }
+
+#[test]
+fn malformed_eof_keeps_upstream_diagnostics() {
+    let source = "fun broken(";
+    let parsed = parse_file(source, FileKind::Source);
+    assert_eq!(
+        parsed.error_messages,
+        [
+            "Parameter name expected",
+            "Expecting comma or ')'",
+            "Expecting ')'"
+        ]
+    );
+    for id in 0..parsed.tree.len() as u32 {
+        if parsed.tree.kind(id) == ERROR_ELEMENT {
+            let r = parsed.tree.text_range(id);
+            assert_eq!(
+                (u32::from(r.start()) as usize, u32::from(r.end()) as usize),
+                (source.len(), source.len())
+            );
+        }
+    }
+    partition(&parsed, source);
+}

@@ -39,3 +39,10 @@ upstream diagnostic deduplication (e.g. only `Type expected` at one offset).
 
 Run the bounded source-local checks with:
 `cargo test --offline --locked --manifest-path vendor/ktrs-parser-0.5.1/Cargo.toml --test recovery`
+
+`worker-probe/` preserves the isolated production-source experiment without code
+duplication: its manifest references existing production worker/library/tests and
+patches ktrs-parser only in its standalone graph. Run:
+`cargo test --offline --locked --manifest-path vendor/ktrs-parser-0.5.1/worker-probe/Cargo.toml --tests`
+Neither standalone workspace is run by root workspace tests. Equivalent production
+regressions must run after the explicit integration handoff before #87 can close.

@@ -19,15 +19,15 @@ functions. Fixed with scoped probe suppression; both rechecked the exact cases,
 valid tree equality and nested malformed recovery. No remaining source-local
 blocker reported; both require production integration recheck.
 
-Five source-local tests pass (cargo test --offline --locked --manifest-path
+Six source-local tests pass (cargo test --offline --locked --manifest-path
 vendor/ktrs-parser-0.5.1/Cargo.toml --test recovery), checking original malformed
 function boundaries, later names/kinds/nearest parents, diagnostics, annotation
 prefixes, repeated recovery, constructor/initializer recovery and valid defaults.
-The depth-20 annotation regression finishes without recursive branching; production
+EOF retains exact upstream diagnostics. The depth-20 annotation regression finishes without recursive branching; production
 acceptance is constrained by unchanged 128 tree-depth limit.
 
 Read-only production-source experiment: standalone /private/tmp/ktlsp-t007b2-worker
-manifest uses ktlsp-parser path dependency, the unchanged production worker source
+manifest (now preserved portably as worker-probe/Cargo.toml) uses ktlsp-parser path dependency, the unchanged production worker source
 as its binary path, and a local crates.io parser patch. No production manifest or
 lock changes. Two worker unit checks plus six existing parser integration checks
 and two original test probes pass. Worker allocation-denial child was invoked by
@@ -40,5 +40,12 @@ a healthy parse. These are observed local checks, not a performance guarantee,
 final integrated #86 API evidence, hosted CI, or product-graph delivery.
 
 Residual recovery examples and version/full-grammar limits are in PROVENANCE.md.
-Pinned full-workspace checks, hosted CI, architect finished review, both integration
+Architect finished review approves the source-local phase/draft PR. Root fmt and
+clippy pass on the unchanged product graph; full-workspace tests initially hit
+sandbox-denied mkfifo in artifact tests, then passed with actual escalation:
+137 active tests plus two invoked helper subprocess fixtures. Hosted Native Rust
+CI passed source-local draft head 2534c83e783d8b4e4b2ea2b688a751c5e51c05cc:
+https://github.com/anilbeesetti/ktlsp/actions/runs/38257790041/job/114840244988
+The hosted root checks do not execute either standalone vendor test workspace.
+Production pinned full-workspace checks, hosted CI and both integration
 rechecks and expected-head coordinator merge grant remain pending.

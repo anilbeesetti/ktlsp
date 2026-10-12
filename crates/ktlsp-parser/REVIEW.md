@@ -113,3 +113,11 @@ and integration evidence are recorded on the PR. No dependency/lock/limit change
 JVM/Gradle/Maven/official oracle, full grammar, semantic HIR/provider, hard RSS or
 packaging claim. Allocation abort remains generic WorkerFailed, possibly Timeout;
 source snapshots require caller-managed document incarnation and publication.
+
+Finished architect audit of production90c142c found no blocking findings for #86.
+Reviewed complete diff and corpus/protocol expectations; direct already-built
+executables passed8 declaration tests and19 protocol faults with boundary/cancel/
+healthy-followup checks. Verified explicit name offsets, original-source snapshot
+association, all-element depth and child/diagnostic validation. Parent recovery
+and resource gates remain open; local pinned/hosted/integration checks are owner
+evidence, not independently certified by this audit.

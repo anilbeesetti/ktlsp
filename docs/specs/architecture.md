@@ -22,7 +22,7 @@ Tree-sitter Kotlin builds C, violating the literal language requirement. `ktrs` 
 
 ## Agent ownership
 
-Each ticket owns explicit files and an isolated git worktree. Workspace/root dependency changes are coordinated through the root agent. Implementers spawn two independent reviewers (correctness/functionality and adversarial/edge/crash), fix findings, rerun the relevant checks, then push, open and attach a PR, and merge only the reviewed head after CI/integration checks pass. Obtain a review-slot allocation from root before spawning to stay within seven concurrent agents. The user already authorized pushes, PRs and passing merges. No approval prompt is needed for routine delivery.
+Each ticket owns explicit files and an isolated git worktree. Workspace/root dependency changes are coordinated through the root agent. Implementers obtain two review slots from root, spawn independent reviewers (correctness/functionality and adversarial/edge/crash), fix findings and have changed behavior rechecked, then push, open and attach a PR. Merge only with the coordinator's exclusive merge-window grant, passing hosted CI/integration checks and the expected reviewed head SHA. Serialize shared Cargo.lock integration at that gate. Discover capacity and reserve reviewers before admitting owners; do not hard-code a previous environment's agent ceiling. Record actual admission and resource observations in [the development ledger](../status/development.md). The user already authorized pushes, PRs and passing merges; routine delivery still respects sandbox approvals.
 
 ## Concrete initial resource and lexical contracts
 

@@ -3,31 +3,43 @@
 
 use ktrs_syntax::SyntaxKind::{self, *};
 
-use super::{DECLARATION_FIRST, LAMBDA_VALUE_PARAMETER_FIRST, PARAMETER_NAME_RECOVERY_SET, VALUE_PARAMETER_FIRST};
+use super::{
+    DECLARATION_FIRST, LAMBDA_VALUE_PARAMETER_FIRST, PARAMETER_NAME_RECOVERY_SET,
+    VALUE_PARAMETER_FIRST,
+};
 use crate::parsing::{Consumer, Parser};
 use crate::token_set::TokenSet;
 
-pub(super) const NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER: TokenSet = TokenSet::create(&[COMMA, COLON, EQ, RPAR]);
+pub(super) const NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER: TokenSet =
+    TokenSet::create(&[COMMA, COLON, EQ, RPAR]);
 
 pub(crate) const EXPRESSION_FIRST: TokenSet = TokenSet::create(&[
     // Prefix
-    MINUS, PLUS, MINUSMINUS, PLUSPLUS,
-    EXCL, EXCLEXCL, // Joining complex tokens makes it necessary to put EXCLEXCL here
+    MINUS,
+    PLUS,
+    MINUSMINUS,
+    PLUSPLUS,
+    EXCL,
+    EXCLEXCL, // Joining complex tokens makes it necessary to put EXCLEXCL here
     // Atomic
     COLONCOLON, // callable reference
-    LPAR, // parenthesized
+    LPAR,       // parenthesized
     // literal constant
-    TRUE_KEYWORD, FALSE_KEYWORD,
-    INTERPOLATION_PREFIX, OPEN_QUOTE,
-    INTEGER_LITERAL, CHARACTER_LITERAL, FLOAT_LITERAL,
+    TRUE_KEYWORD,
+    FALSE_KEYWORD,
+    INTERPOLATION_PREFIX,
+    OPEN_QUOTE,
+    INTEGER_LITERAL,
+    CHARACTER_LITERAL,
+    FLOAT_LITERAL,
     NULL_KEYWORD,
-    LBRACE, // functionLiteral
-    FUN_KEYWORD, // expression function
-    THIS_KEYWORD, // this
-    SUPER_KEYWORD, // super
-    IF_KEYWORD, // if
-    WHEN_KEYWORD, // when
-    TRY_KEYWORD, // try
+    LBRACE,         // functionLiteral
+    FUN_KEYWORD,    // expression function
+    THIS_KEYWORD,   // this
+    SUPER_KEYWORD,  // super
+    IF_KEYWORD,     // if
+    WHEN_KEYWORD,   // when
+    TRY_KEYWORD,    // try
     OBJECT_KEYWORD, // object
     // jump
     THROW_KEYWORD,
@@ -39,11 +51,12 @@ pub(crate) const EXPRESSION_FIRST: TokenSet = TokenSet::create(&[
     WHILE_KEYWORD,
     DO_KEYWORD,
     IDENTIFIER, // SimpleName
-    AT, // Just for better recovery and maybe for annotations
-    LBRACKET, // Collection literal expression
+    AT,         // Just for better recovery and maybe for annotations
+    LBRACKET,   // Collection literal expression
 ]);
 
-pub(crate) const EXPRESSION_FOLLOW: TokenSet = TokenSet::create(&[EOL_OR_SEMICOLON, ARROW, COMMA, RBRACE, RPAR, RBRACKET]);
+pub(crate) const EXPRESSION_FOLLOW: TokenSet =
+    TokenSet::create(&[EOL_OR_SEMICOLON, ARROW, COMMA, RBRACE, RPAR, RBRACKET]);
 
 pub(super) const USER_TYPE_NAME_RECOVERY_SET: TokenSet =
     TokenSet::or_set(&[EXPRESSION_FIRST, EXPRESSION_FOLLOW, DECLARATION_FIRST]);
@@ -74,19 +87,28 @@ impl Parser {
 
         self.my_builder.disable_newlines();
 
-        self.value_parameter_loop(is_function_type_contents, recover_declarations, recovery_set, &mut |p: &mut Parser| {
-            if is_function_type_contents {
-                if !p.try_parse_value_parameter(type_required) {
-                    let value_parameter = p.mark();
-                    p.parse_function_type_value_parameter_modifier_list();
-                    p.parse_type_ref();
-                    p.close_declaration_with_comment_binders(value_parameter, VALUE_PARAMETER, false);
+        self.value_parameter_loop(
+            is_function_type_contents,
+            recover_declarations,
+            recovery_set,
+            &mut |p: &mut Parser| {
+                if is_function_type_contents {
+                    if !p.try_parse_value_parameter(type_required) {
+                        let value_parameter = p.mark();
+                        p.parse_function_type_value_parameter_modifier_list();
+                        p.parse_type_ref();
+                        p.close_declaration_with_comment_binders(
+                            value_parameter,
+                            VALUE_PARAMETER,
+                            false,
+                        );
+                    }
+                } else {
+                    p.parse_value_parameter(type_required);
                 }
-            } else {
-                p.parse_value_parameter(type_required);
-            }
-            true
-        });
+                true
+            },
+        );
 
         self.my_builder.restore_newlines_state();
 
@@ -134,7 +156,11 @@ impl Parser {
                         self.error("Expecting comma or ')'");
                         no_error = false;
                     }
-                    if !self.at_set(if in_function_type_context { LAMBDA_VALUE_PARAMETER_FIRST } else { VALUE_PARAMETER_FIRST }) {
+                    if !self.at_set(if in_function_type_context {
+                        LAMBDA_VALUE_PARAMETER_FIRST
+                    } else {
+                        VALUE_PARAMETER_FIRST
+                    }) {
                         break;
                     }
                     if offset_before == self.my_builder.get_current_offset() {
@@ -218,7 +244,11 @@ impl Parser {
             self.advance(); // COLON
             self.parse_type_ref();
         } else {
-            self.expect_3(IDENTIFIER, "Parameter name expected", Some(PARAMETER_NAME_RECOVERY_SET));
+            self.expect_3(
+                IDENTIFIER,
+                "Parameter name expected",
+                Some(PARAMETER_NAME_RECOVERY_SET),
+            );
 
             if self.at(COLON) {
                 self.advance(); // COLON
@@ -232,7 +262,10 @@ impl Parser {
 
                 self.parse_type_ref();
             } else if type_required {
-                self.error_with_recovery("Parameters must have type annotation", Some(PARAMETER_NAME_RECOVERY_SET));
+                self.error_with_recovery(
+                    "Parameters must have type annotation",
+                    Some(PARAMETER_NAME_RECOVERY_SET),
+                );
                 no_errors = false;
             }
         }

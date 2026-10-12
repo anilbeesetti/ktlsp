@@ -13,7 +13,10 @@ pub struct OptionalMarker {
 impl OptionalMarker {
     pub fn new(p: &mut Parser, actually_mark: bool) -> OptionalMarker {
         let marker = actually_mark.then(|| p.mark());
-        OptionalMarker { marker, offset: p.my_builder.get_current_offset() }
+        OptionalMarker {
+            marker,
+            offset: p.my_builder.get_current_offset(),
+        }
     }
 
     pub fn done(&self, p: &mut Parser, element_type: SyntaxKind) {

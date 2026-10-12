@@ -3,7 +3,10 @@
 use ktrs_syntax::SyntaxKind;
 
 const WORDS: usize = 8;
-const _: () = assert!((SyntaxKind::DUMMY_HOLDER as usize) < WORDS * 64, "grow TokenSet::WORDS");
+const _: () = assert!(
+    (SyntaxKind::DUMMY_HOLDER as usize) < WORDS * 64,
+    "grow TokenSet::WORDS"
+);
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TokenSet([u64; WORDS]);

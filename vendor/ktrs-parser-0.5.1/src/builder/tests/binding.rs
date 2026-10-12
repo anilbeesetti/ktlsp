@@ -7,7 +7,14 @@ use crate::builder::{EdgeBinder, LazyLeaf, TreeSink};
 
 #[test]
 fn default_edges_exclude_surrounding_trivia() {
-    let mut b = builder(&[(IDENTIFIER, "a"), (WHITE_SPACE, " "), (BLOCK_COMMENT, "/*c*/"), (WHITE_SPACE, " "), (IDENTIFIER, "b"), (WHITE_SPACE, " ")]);
+    let mut b = builder(&[
+        (IDENTIFIER, "a"),
+        (WHITE_SPACE, " "),
+        (BLOCK_COMMENT, "/*c*/"),
+        (WHITE_SPACE, " "),
+        (IDENTIFIER, "b"),
+        (WHITE_SPACE, " "),
+    ]);
     let root = b.mark();
     b.advance_lexer();
     let m = b.mark();
@@ -108,7 +115,11 @@ fn declaration_comment_binders() {
     let m = b.mark();
     b.advance_lexer();
     m.done(&mut b, FUN);
-    m.set_custom_edge_token_binders(&mut b, Some(EdgeBinder::PrecedingComments), Some(EdgeBinder::TrailingComments));
+    m.set_custom_edge_token_binders(
+        &mut b,
+        Some(EdgeBinder::PrecedingComments),
+        Some(EdgeBinder::TrailingComments),
+    );
     b.advance_lexer();
     root.done(&mut b, KT_FILE);
     expect![[r#"
@@ -156,7 +167,13 @@ fn preceding_doc_comments_binder_takes_last_doc_and_after() {
 
 #[test]
 fn precede_rollback_drop_collapse() {
-    let mut b = builder(&[(IDENTIFIER, "a"), (DOT, "."), (IDENTIFIER, "b"), (WHITE_SPACE, " "), (IDENTIFIER, "c")]);
+    let mut b = builder(&[
+        (IDENTIFIER, "a"),
+        (DOT, "."),
+        (IDENTIFIER, "b"),
+        (WHITE_SPACE, " "),
+        (IDENTIFIER, "c"),
+    ]);
     let root = b.mark();
     let m1 = b.mark();
     b.advance_lexer();
@@ -192,7 +209,13 @@ fn precede_rollback_drop_collapse() {
 
 #[test]
 fn done_before_variants() {
-    let mut b = builder(&[(IDENTIFIER, "a"), (WHITE_SPACE, " "), (IDENTIFIER, "b"), (WHITE_SPACE, " "), (IDENTIFIER, "c")]);
+    let mut b = builder(&[
+        (IDENTIFIER, "a"),
+        (WHITE_SPACE, " "),
+        (IDENTIFIER, "b"),
+        (WHITE_SPACE, " "),
+        (IDENTIFIER, "c"),
+    ]);
     let root = b.mark();
     let m = b.mark();
     b.advance_lexer();
@@ -222,8 +245,13 @@ fn done_before_variants() {
 /// A collapsed lazy node is replaced by its reparse; error messages stay in tree preorder.
 #[test]
 fn lazy_leaf_is_reparsed_and_spliced() {
-    const BLOCK_TOKENS: &[(SyntaxKind, &str)] =
-        &[(LBRACE, "{"), (WHITE_SPACE, " "), (IDENTIFIER, "x"), (WHITE_SPACE, " "), (RBRACE, "}")];
+    const BLOCK_TOKENS: &[(SyntaxKind, &str)] = &[
+        (LBRACE, "{"),
+        (WHITE_SPACE, " "),
+        (IDENTIFIER, "x"),
+        (WHITE_SPACE, " "),
+        (RBRACE, "}"),
+    ];
     fn reparse(leaf: &LazyLeaf<'_>, sink: &mut TreeSink) -> bool {
         if leaf.kind != BLOCK {
             return false;

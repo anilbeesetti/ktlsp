@@ -29,21 +29,36 @@ impl Parser {
     }
 
     pub(crate) fn parse_type_ref_without_intersections(&mut self) {
-        self.parse_type_ref_2(TokenSet::EMPTY, /* allowSimpleIntersectionTypes */ false);
+        self.parse_type_ref_2(
+            TokenSet::EMPTY,
+            /* allowSimpleIntersectionTypes */ false,
+        );
     }
 
     pub(crate) fn parse_type_ref_1(&mut self, extra_recovery_set: TokenSet) {
-        self.parse_type_ref_2(extra_recovery_set, /* allowSimpleIntersectionTypes */ true);
+        self.parse_type_ref_2(
+            extra_recovery_set,
+            /* allowSimpleIntersectionTypes */ true,
+        );
     }
 
-    fn parse_type_ref_2(&mut self, extra_recovery_set: TokenSet, allow_simple_intersection_types: bool) {
-        let type_ref_marker = self.parse_type_ref_contents(extra_recovery_set, allow_simple_intersection_types);
+    fn parse_type_ref_2(
+        &mut self,
+        extra_recovery_set: TokenSet,
+        allow_simple_intersection_types: bool,
+    ) {
+        let type_ref_marker =
+            self.parse_type_ref_contents(extra_recovery_set, allow_simple_intersection_types);
         type_ref_marker.done(self, TYPE_REFERENCE);
     }
 
     // The extraRecoverySet is needed for the foo(bar<x, 1, y>(z)) case, to tell whether we should stop
     // on expression-indicating symbols or not
-    fn parse_type_ref_contents(&mut self, extra_recovery_set: TokenSet, allow_simple_intersection_types: bool) -> Marker {
+    fn parse_type_ref_contents(
+        &mut self,
+        extra_recovery_set: TokenSet,
+        allow_simple_intersection_types: bool,
+    ) -> Marker {
         let type_ref_marker = self.mark();
 
         self.parse_type_modifier_list();
@@ -70,7 +85,10 @@ impl Parser {
             let dynamic_type = self.mark();
             self.advance(); // DYNAMIC_KEYWORD
             dynamic_type.done(self, DYNAMIC_TYPE);
-        } else if self.at(IDENTIFIER) || self.at(PACKAGE_KEYWORD) || self.at_parenthesized_mutable_for_platform_types(0) {
+        } else if self.at(IDENTIFIER)
+            || self.at(PACKAGE_KEYWORD)
+            || self.at_parenthesized_mutable_for_platform_types(0)
+        {
             self.parse_user_type();
         } else if self.at(LPAR) {
             let function_or_parenthesized_type = self.mark();
@@ -78,7 +96,10 @@ impl Parser {
             // This may be a function parameter list or just a parenthesized type
             self.advance(); // LPAR
             // parenthesized types, no reference element around it is needed
-            let contents = self.parse_type_ref_contents(TokenSet::EMPTY, /* allowSimpleIntersectionTypes */ true);
+            let contents = self.parse_type_ref_contents(
+                TokenSet::EMPTY,
+                /* allowSimpleIntersectionTypes */ true,
+            );
             contents.drop(self);
 
             if self.at(RPAR) && self.lookahead(1) != Some(ARROW) {
@@ -101,7 +122,9 @@ impl Parser {
                 "Type expected",
                 Some(TokenSet::or_set(&[
                     TOP_LEVEL_DECLARATION_FIRST,
-                    TokenSet::create(&[EQ, COMMA, GT, RBRACKET, DOT, RPAR, RBRACE, LBRACE, SEMICOLON]),
+                    TokenSet::create(&[
+                        EQ, COMMA, GT, RBRACKET, DOT, RPAR, RBRACE, LBRACE, SEMICOLON,
+                    ]),
                     extra_recovery_set,
                 ])),
             );
@@ -124,7 +147,10 @@ impl Parser {
             left_type_ref.done(self, TYPE_REFERENCE);
 
             self.advance(); // &
-            self.parse_type_ref_2(extra_recovery_set, /* allowSimpleIntersectionTypes */ true);
+            self.parse_type_ref_2(
+                extra_recovery_set,
+                /* allowSimpleIntersectionTypes */ true,
+            );
 
             intersection_type.done(self, INTERSECTION_TYPE);
             was_intersection = true;
@@ -159,7 +185,9 @@ impl Parser {
                 "Function type expected expected",
                 Some(TokenSet::or_set(&[
                     TOP_LEVEL_DECLARATION_FIRST,
-                    TokenSet::create(&[EQ, COMMA, GT, RBRACKET, DOT, RPAR, RBRACE, LBRACE, SEMICOLON]),
+                    TokenSet::create(&[
+                        EQ, COMMA, GT, RBRACKET, DOT, RPAR, RBRACE, LBRACE, SEMICOLON,
+                    ]),
                     extra_recovery_set,
                 ])),
             );

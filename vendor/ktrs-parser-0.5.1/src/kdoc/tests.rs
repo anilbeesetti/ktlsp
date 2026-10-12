@@ -17,7 +17,9 @@ fn kdoc_subtrees_match_fixtures() {
 
     let (mut total, mut failures) = (0, Vec::new());
     for source in &fixtures {
-        let expected_dump = fs::read_to_string(source.with_extension("txt")).unwrap().replace("\r\n", "\n");
+        let expected_dump = fs::read_to_string(source.with_extension("txt"))
+            .unwrap()
+            .replace("\r\n", "\n");
         let expected = kdoc_subtrees(&expected_dump);
         if expected.is_empty() {
             continue;
@@ -26,19 +28,30 @@ fn kdoc_subtrees_match_fixtures() {
         let comments = doc_comments(text.trim_end_matches('\n'));
         let name = source.strip_prefix(&psi_dir).unwrap().display().to_string();
         if comments.len() != expected.len() {
-            failures.push(format!("{name}: {} DOC_COMMENT tokens vs {} KDoc nodes", comments.len(), expected.len()));
+            failures.push(format!(
+                "{name}: {} DOC_COMMENT tokens vs {} KDoc nodes",
+                comments.len(),
+                expected.len()
+            ));
             continue;
         }
         for (i, (comment, expected)) in comments.iter().zip(&expected).enumerate() {
             total += 1;
             let actual = dump_kdoc(comment);
             if &actual != expected {
-                failures.push(format!("{name} #{i}\n--- expected\n{expected}\n--- actual\n{actual}"));
+                failures.push(format!(
+                    "{name} #{i}\n--- expected\n{expected}\n--- actual\n{actual}"
+                ));
             }
         }
     }
     println!("KDoc subtrees: {}/{total} match", total - failures.len());
-    assert!(failures.is_empty(), "{} mismatch(es):\n{}", failures.len(), failures.join("\n\n"));
+    assert!(
+        failures.is_empty(),
+        "{} mismatch(es):\n{}",
+        failures.len(),
+        failures.join("\n\n")
+    );
 }
 
 fn collect_fixtures(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -46,8 +59,10 @@ fn collect_fixtures(dir: &Path, out: &mut Vec<PathBuf>) {
         let path = entry.unwrap().path();
         if path.is_dir() {
             collect_fixtures(&path, out);
-        } else if matches!(path.extension().and_then(|e| e.to_str()), Some("kt" | "kts"))
-            && path.with_extension("txt").is_file()
+        } else if matches!(
+            path.extension().and_then(|e| e.to_str()),
+            Some("kt" | "kts")
+        ) && path.with_extension("txt").is_file()
         {
             out.push(path);
         }
@@ -77,8 +92,17 @@ fn kdoc_subtrees(dump: &str) -> Vec<String> {
             continue;
         }
         let depth = indent_of(line);
-        let end = lines[i + 1..].iter().position(|l| indent_of(l) <= depth).map_or(lines.len(), |p| i + 1 + p);
-        out.push(lines[i..end].iter().map(|l| &l[depth..]).collect::<Vec<_>>().join("\n"));
+        let end = lines[i + 1..]
+            .iter()
+            .position(|l| indent_of(l) <= depth)
+            .map_or(lines.len(), |p| i + 1 + p);
+        out.push(
+            lines[i..end]
+                .iter()
+                .map(|l| &l[depth..])
+                .collect::<Vec<_>>()
+                .join("\n"),
+        );
     }
     out
 }
@@ -93,6 +117,17 @@ fn dump_kdoc(text: &str) -> String {
     }
     tree.finish_node();
     tree.finish_node();
-    let dump = psi_dump(&Parse { tree: tree.finish().into(), error_messages: parse.error_messages, missed_tokens: Vec::new() }, "");
-    dump.lines().skip(1).map(|l| &l[2..]).collect::<Vec<_>>().join("\n")
+    let dump = psi_dump(
+        &Parse {
+            tree: tree.finish().into(),
+            error_messages: parse.error_messages,
+            missed_tokens: Vec::new(),
+        },
+        "",
+    );
+    dump.lines()
+        .skip(1)
+        .map(|l| &l[2..])
+        .collect::<Vec<_>>()
+        .join("\n")
 }

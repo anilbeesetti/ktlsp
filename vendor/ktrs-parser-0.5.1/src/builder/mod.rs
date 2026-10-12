@@ -42,9 +42,9 @@ mod tests;
 
 pub use binders::{EdgeBinder, GREEDY_LEFT_BINDER, GREEDY_RIGHT_BINDER};
 pub use chameleon_cache::ChameleonCache;
+pub use layers::Layer;
 pub use marker::{Marker, MarkerHost};
 pub use psi_builder::PsiBuilder;
-pub use layers::Layer;
 pub use semantic::SemanticWhitespaceAwarePsiBuilder;
 pub use sink::TreeSink;
 pub use tree::{LazyLeaf, LazyReparse};

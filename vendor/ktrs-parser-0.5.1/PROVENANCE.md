@@ -22,10 +22,27 @@ tests. Production regressions live in crates/ktlsp-parser and traverse the actua
 supervised worker through parse_snapshot/tree_for. Standalone tests alone do not
 establish delivery; integrated review/checks/CI remain required. Direct upstream
 parse_file requires LF; CRLF/lone CR production tests exercise the existing
-normalized-to-original mapping through the supervised worker. Original source is never
-modified by this repair. Full Kotlin grammar and semantic parity remain pending.
+normalized-to-original mapping through the supervised worker. Original input source
+is never modified by this repair. Full Kotlin grammar and semantic parity remain pending.
 
-The patch checks ordinary function parameter boundaries, probes existing modifier
+Source changes are recorded in two ordered phases:
+
+1. `recovery.patch` changes seven files from the pristine archive: parsing/mod.rs
+   and declarations/{classes,functions,members,modifiers,parameters,user_types}.rs.
+2. `formatting.patch` changes 49 files from the recovery phase at commit cc4920d,
+   using pinned Rust 1.99.0 rustfmt with edition 2024. All seven behavioral files
+   are among those 49; the other 42 have formatting changes only. Five source
+   files retain pristine bytes. Exact paths are the patch headers; the final
+   54-file byte inventory is `formatted-sha256.json`. No formatting opt-out or
+   changed root formatting command is used.
+
+Applying recovery.patch then formatting.patch to the inventoried pristine source
+reproduces all final source bytes. Formatting-only review and production rechecks
+are separate from the earlier behavioral evidence; commas and import order need
+explicit review in addition to whitespace. Original archive hashes and notices
+remain unchanged.
+
+The behavioral patch checks ordinary function parameter boundaries, probes existing modifier
 and annotation grammar with rollback, and reports a missing ')' without consuming
 a following declaration. Nested type/default parsing remains with existing grammar.
 Constructor, function-type and context parameter loops keep their original context.

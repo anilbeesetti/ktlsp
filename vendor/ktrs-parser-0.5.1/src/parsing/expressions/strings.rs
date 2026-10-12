@@ -7,7 +7,8 @@ use crate::parsing::Parser;
 
 /// `KEYWORD_TEXTS.get(text)`: `KEYWORDS` keyed by their text.
 fn keyword_texts_get(text: Option<&str>) -> Option<SyntaxKind> {
-    text.and_then(SyntaxKind::hard_keyword).filter(|&k| KEYWORDS.contains(k))
+    text.and_then(SyntaxKind::hard_keyword)
+        .filter(|&k| KEYWORDS.contains(k))
 }
 
 impl Parser {

@@ -4,7 +4,10 @@ use ktrs_syntax::SyntaxKind::{self, *};
 
 use super::parameters::{AnnotationParsingMode, NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER};
 use super::{COMMA_COLON_GT_SET, CONTEXT_PARAMETERS_FOLLOW_SET};
-use crate::kt_tokens::{MODIFIER_KEYWORDS, RESERVED_VALUE_PARAMETER_MODIFIER_KEYWORDS, TYPE_ARGUMENT_MODIFIER_KEYWORDS, TYPE_MODIFIER_KEYWORDS};
+use crate::kt_tokens::{
+    MODIFIER_KEYWORDS, RESERVED_VALUE_PARAMETER_MODIFIER_KEYWORDS, TYPE_ARGUMENT_MODIFIER_KEYWORDS,
+    TYPE_MODIFIER_KEYWORDS,
+};
 use crate::parsing::{Consumer, Parser};
 use crate::token_set::TokenSet;
 
@@ -13,7 +16,11 @@ impl Parser {
      * (modifier | annotation)*
      */
     pub(crate) fn parse_modifier_list(&mut self, no_modifiers_before: TokenSet) -> bool {
-        self.parse_modifier_list_3(None, no_modifiers_before, /* localDeclaration = */ false)
+        self.parse_modifier_list_3(
+            None,
+            no_modifiers_before,
+            /* localDeclaration = */ false,
+        )
     }
 
     pub(crate) fn parse_annotations_list(&mut self, no_modifiers_before: TokenSet) {
@@ -88,7 +95,9 @@ impl Parser {
 
                 let is_annotation_parsed = self.parse_annotation_or_list(annotation_parsing_mode);
 
-                if !is_annotation_parsed && !annotation_parsing_mode.with_significant_whitespace_before_arguments() {
+                if !is_annotation_parsed
+                    && !annotation_parsing_mode.with_significant_whitespace_before_arguments()
+                {
                     before_annotation_marker.rollback_to(self);
                     // try parse again, but with significant whitespace
                     let new_mode = if annotation_parsing_mode.allow_context_list() {
@@ -121,7 +130,11 @@ impl Parser {
                 } else {
                     context_marker.drop(self);
                 }
-            } else if self.try_parse_modifier(reborrow(&mut token_consumer),no_modifiers_before, modifier_keywords) {
+            } else if self.try_parse_modifier(
+                reborrow(&mut token_consumer),
+                no_modifiers_before,
+                modifier_keywords,
+            ) {
                 // modifier advanced
             } else {
                 break;
@@ -193,7 +206,10 @@ impl Parser {
     ///
     /// Returns `true` if it parsed a context with value parameters; `false` for a context with
     /// type refs (that work as receivers) or on a syntax error.
-    pub(super) fn parse_context_parameter_or_receiver_list(&mut self, in_function_type: bool) -> bool {
+    pub(super) fn parse_context_parameter_or_receiver_list(
+        &mut self,
+        in_function_type: bool,
+    ) -> bool {
         debug_assert!(self._at(CONTEXT_KEYWORD));
         let value_parameter_or_type_ref_list = self.mark();
         self.advance(); // CONTEXT_KEYWORD
@@ -211,9 +227,12 @@ impl Parser {
             // Treat parsing of context receivers (deprecated syntax) as an error,
             // But an outer caller decides if the entire list should be dropped:
             // If we're trying to parse a local declaration, we should drop it to prevent unexpected parsing of ahead declarations
-            no_error = self.value_parameter_loop(in_function_type, false, CONTEXT_PARAMETERS_FOLLOW_SET, &mut |p: &mut Parser| {
-                p.parse_value_parameter_or_type_ref(in_function_type)
-            });
+            no_error = self.value_parameter_loop(
+                in_function_type,
+                false,
+                CONTEXT_PARAMETERS_FOLLOW_SET,
+                &mut |p: &mut Parser| p.parse_value_parameter_or_type_ref(in_function_type),
+            );
         }
 
         value_parameter_or_type_ref_list.done(self, CONTEXT_PARAMETER_LIST);
@@ -240,7 +259,9 @@ impl Parser {
 }
 
 /// `Option::as_deref_mut` can't shorten the trait-object lifetime behind `&mut`; this can.
-fn reborrow<'a>(consumer: &'a mut Option<&mut dyn Consumer<SyntaxKind>>) -> Option<&'a mut dyn Consumer<SyntaxKind>> {
+fn reborrow<'a>(
+    consumer: &'a mut Option<&mut dyn Consumer<SyntaxKind>>,
+) -> Option<&'a mut dyn Consumer<SyntaxKind>> {
     match consumer {
         Some(consumer) => Some(&mut **consumer),
         None => None,

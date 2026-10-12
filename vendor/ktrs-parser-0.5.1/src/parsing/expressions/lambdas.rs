@@ -24,13 +24,24 @@ impl Parser {
     /*
      * modifiers declarationRest
      */
-    pub(crate) fn parse_local_declaration(&mut self, rollback_if_definitely_not_expression: bool, is_script_top_level: bool) -> bool {
+    pub(crate) fn parse_local_declaration(
+        &mut self,
+        rollback_if_definitely_not_expression: bool,
+        is_script_top_level: bool,
+    ) -> bool {
         let decl = self.mark();
         let mut detector = ModifierDetector::default();
-        self.parse_modifier_list_3(Some(&mut detector), TokenSet::EMPTY, /* localDeclaration = */ true);
+        self.parse_modifier_list_3(
+            Some(&mut detector),
+            TokenSet::EMPTY,
+            /* localDeclaration = */ true,
+        );
 
-        let decl_type =
-            self.parse_local_declaration_rest(&mut detector, rollback_if_definitely_not_expression, is_script_top_level);
+        let decl_type = self.parse_local_declaration_rest(
+            &mut detector,
+            rollback_if_definitely_not_expression,
+            is_script_top_level,
+        );
 
         if let Some(decl_type) = decl_type {
             // we do not attach preceding comments (non-doc) to local variables because they are likely commenting a few statements below
@@ -83,7 +94,8 @@ impl Parser {
             //   {(a, b) -> ... }
             let rollback_marker = self.mark();
             let next_token = self.lookahead(1);
-            let prefer_params_to_expressions = next_token == Some(COMMA) || next_token == Some(COLON);
+            let prefer_params_to_expressions =
+                next_token == Some(COMMA) || next_token == Some(COLON);
             self.parse_function_literal_parameter_list();
 
             params_found = if prefer_params_to_expressions {
@@ -126,7 +138,11 @@ impl Parser {
         self.my_builder.restore_newlines_state();
     }
 
-    pub(crate) fn rollback_or_drop_at(&mut self, rollback_marker: Marker, drop_at: SyntaxKind) -> bool {
+    pub(crate) fn rollback_or_drop_at(
+        &mut self,
+        rollback_marker: Marker,
+        drop_at: SyntaxKind,
+    ) -> bool {
         if self.at(drop_at) {
             self.advance(); // dropAt
             rollback_marker.drop(self);

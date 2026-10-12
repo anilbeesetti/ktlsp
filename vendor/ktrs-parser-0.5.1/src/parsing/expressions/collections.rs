@@ -20,7 +20,11 @@ impl Parser {
      *   ;
      */
     pub(crate) fn parse_collection_literal_expression(&mut self) {
-        self.parse_as_collection_literal_expression(COLLECTION_LITERAL_EXPRESSION, true, "Expecting an element");
+        self.parse_as_collection_literal_expression(
+            COLLECTION_LITERAL_EXPRESSION,
+            true,
+            "Expecting an element",
+        );
     }
 
     pub(crate) fn parse_as_collection_literal_expression(

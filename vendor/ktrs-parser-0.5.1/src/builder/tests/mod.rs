@@ -10,7 +10,13 @@ use super::{LazyLeaf, PsiBuilder, TreeSink};
 
 fn builder(tokens: &[(SyntaxKind, &str)]) -> PsiBuilder {
     let text: String = tokens.iter().map(|(_, t)| *t).collect();
-    let tokens: Vec<Token> = tokens.iter().map(|&(kind, t)| Token { kind, len: t.len() as u32 }).collect();
+    let tokens: Vec<Token> = tokens
+        .iter()
+        .map(|&(kind, t)| Token {
+            kind,
+            len: t.len() as u32,
+        })
+        .collect();
     PsiBuilder::new(&text, &tokens)
 }
 

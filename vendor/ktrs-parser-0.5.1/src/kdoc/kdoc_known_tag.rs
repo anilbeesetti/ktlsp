@@ -23,7 +23,10 @@ impl KDocKnownTag {
 
     /// `valueOf(name.toUpperCaseAsciiOnly())` after stripping one leading `@`.
     pub(crate) fn find_by_tag_name(tag_name: &str) -> Option<KDocKnownTag> {
-        let name = tag_name.strip_prefix('@').unwrap_or(tag_name).to_ascii_uppercase();
+        let name = tag_name
+            .strip_prefix('@')
+            .unwrap_or(tag_name)
+            .to_ascii_uppercase();
         Some(match name.as_str() {
             "AUTHOR" => KDocKnownTag::Author,
             "THROWS" => KDocKnownTag::Throws,

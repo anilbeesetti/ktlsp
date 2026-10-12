@@ -34,7 +34,11 @@ impl PsiBuilder {
     /// No remapper is ever installed for Kotlin, so the cached-type machinery reduces to this.
     #[inline]
     pub fn get_token_type(&mut self) -> Option<SyntaxKind> {
-        if self.eof() { None } else { Some(self.lex_types[self.current_lexeme]) }
+        if self.eof() {
+            None
+        } else {
+            Some(self.lex_types[self.current_lexeme])
+        }
     }
 
     /// Whitespace = `KtTokens.WHITESPACES`, comments = `KtTokens.COMMENTS` (KotlinParserDefinition);
@@ -59,7 +63,9 @@ impl PsiBuilder {
 
     pub(crate) fn shift_over_whitespace_forward(&self, lex_index: usize) -> usize {
         let mut lex_index = lex_index;
-        while lex_index < self.lexeme_count() && self.is_whitespace_or_comment(self.lex_types[lex_index]) {
+        while lex_index < self.lexeme_count()
+            && self.is_whitespace_or_comment(self.lex_types[lex_index])
+        {
             lex_index += 1;
         }
         lex_index
@@ -67,7 +73,11 @@ impl PsiBuilder {
 
     pub fn raw_lookup(&self, steps: i32) -> Option<SyntaxKind> {
         let cur = self.current_lexeme as i64 + steps as i64;
-        if cur >= 0 && (cur as usize) < self.lexeme_count() { Some(self.lex_types[cur as usize]) } else { None }
+        if cur >= 0 && (cur as usize) < self.lexeme_count() {
+            Some(self.lex_types[cur as usize])
+        } else {
+            None
+        }
     }
 
     pub fn raw_token_type_start(&self, steps: i32) -> i32 {
@@ -86,7 +96,10 @@ impl PsiBuilder {
     }
 
     pub fn raw_advance_lexer(&mut self, steps: i32) {
-        assert!(steps >= 0, "Steps must be a positive integer - lexer can only be advanced.");
+        assert!(
+            steps >= 0,
+            "Steps must be a positive integer - lexer can only be advanced."
+        );
         if steps == 0 {
             return;
         }
@@ -121,7 +134,10 @@ impl PsiBuilder {
         if self.eof() {
             return None;
         }
-        let (start, end) = (self.lex_starts[self.current_lexeme], self.lex_starts[self.current_lexeme + 1]);
+        let (start, end) = (
+            self.lex_starts[self.current_lexeme],
+            self.lex_starts[self.current_lexeme + 1],
+        );
         Some(&self.text[start as usize..end as usize])
     }
 
@@ -148,7 +164,10 @@ impl PsiBuilder {
     /// error at the same lexeme right after the first is ignored.
     pub fn error(&mut self, message: &str) {
         let size = self.production.size();
-        if let Some(last) = size.checked_sub(1).and_then(|i| self.production.get_start_marker_at(i)) {
+        if let Some(last) = size
+            .checked_sub(1)
+            .and_then(|i| self.production.get_start_marker_at(i))
+        {
             let last = self.production.marker(last);
             if last.is_error_item && last.lexeme == self.current_lexeme as i32 {
                 return;
@@ -193,7 +212,10 @@ impl PsiBuilder {
         before: Option<Marker>,
     ) {
         let id = marker.0;
-        assert!(!self.production.marker(id).is_done(), "Marker already done.");
+        assert!(
+            !self.production.marker(id).is_done(),
+            "Marker already done."
+        );
         let done_lexeme = match before {
             None => self.current_lexeme as i32,
             Some(before) => self.production.marker(before.0).lexeme,
@@ -213,7 +235,8 @@ impl PsiBuilder {
     }
 
     fn is_empty(&self, start_idx: i32, end_idx: i32) -> bool {
-        (start_idx.max(0)..end_idx.max(0)).all(|i| self.is_whitespace_or_comment(self.lex_types[i as usize]))
+        (start_idx.max(0)..end_idx.max(0))
+            .all(|i| self.is_whitespace_or_comment(self.lex_types[i as usize]))
     }
 
     /// `doneBefore(type, before, errorMessage)`: an error item at `before`, then the done.
@@ -255,6 +278,8 @@ impl PsiBuilder {
 fn is_left_bound(kind: SyntaxKind) -> bool {
     matches!(
         kind,
-        SyntaxKind::ERROR_ELEMENT | SyntaxKind::CONSTRUCTOR_DELEGATION_CALL | SyntaxKind::CONSTRUCTOR_DELEGATION_REFERENCE
+        SyntaxKind::ERROR_ELEMENT
+            | SyntaxKind::CONSTRUCTOR_DELEGATION_CALL
+            | SyntaxKind::CONSTRUCTOR_DELEGATION_REFERENCE
     )
 }

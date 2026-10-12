@@ -13,7 +13,10 @@ fn semantic(tokens: &[(SyntaxKind, &str)]) -> SemanticWhitespaceAwarePsiBuilder 
 fn walk(b: &mut SemanticWhitespaceAwarePsiBuilder) -> Vec<(SyntaxKind, String)> {
     let mut seen = Vec::new();
     while !b.eof() {
-        seen.push((b.get_token_type().unwrap(), b.get_token_text().unwrap().to_owned()));
+        seen.push((
+            b.get_token_type().unwrap(),
+            b.get_token_text().unwrap().to_owned(),
+        ));
         b.advance_lexer();
     }
     seen
@@ -89,7 +92,12 @@ fn joining_can_be_disabled() {
 
 #[test]
 fn newline_before_current_token_skips_comments() {
-    let mut b = semantic(&[(IDENTIFIER, "a"), (WHITE_SPACE, "\n"), (BLOCK_COMMENT, "/**/"), (IDENTIFIER, "b")]);
+    let mut b = semantic(&[
+        (IDENTIFIER, "a"),
+        (WHITE_SPACE, "\n"),
+        (BLOCK_COMMENT, "/**/"),
+        (IDENTIFIER, "b"),
+    ]);
     assert!(!b.newline_before_current_token());
     b.advance_lexer();
     assert!(b.newline_before_current_token());
@@ -106,7 +114,13 @@ fn newline_before_current_token_skips_comments() {
 
 #[test]
 fn truncated_layer_hides_tokens_from_eof_position() {
-    let mut b = semantic(&[(IDENTIFIER, "a"), (WHITE_SPACE, " "), (IDENTIFIER, "b"), (WHITE_SPACE, " "), (IDENTIFIER, "c")]);
+    let mut b = semantic(&[
+        (IDENTIFIER, "a"),
+        (WHITE_SPACE, " "),
+        (IDENTIFIER, "b"),
+        (WHITE_SPACE, " "),
+        (IDENTIFIER, "c"),
+    ]);
     b.push_layer(Layer::Truncated { eof_position: 4 });
     assert_eq!(b.look_ahead(1), Some(IDENTIFIER));
     assert_eq!(b.look_ahead(2), None);
@@ -124,7 +138,13 @@ fn by_clause_layers_count_newline_state_changes() {
     b.enable_newlines();
     let inner = b.push_layer(Layer::ForByClause { stack_size: 0 });
     b.disable_newlines();
-    assert_eq!((b.for_by_clause_stack_size(outer), b.for_by_clause_stack_size(inner)), (2, 1));
+    assert_eq!(
+        (
+            b.for_by_clause_stack_size(outer),
+            b.for_by_clause_stack_size(inner)
+        ),
+        (2, 1)
+    );
     b.restore_newlines_state();
     b.pop_layer();
     b.restore_newlines_state();

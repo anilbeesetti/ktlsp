@@ -121,7 +121,11 @@ impl Parser {
     pub(crate) fn parse_condition(&mut self) {
         self.my_builder.disable_newlines();
 
-        if self.expect_3(LPAR, "Expecting a condition in parentheses '(...)'", Some(EXPRESSION_FIRST)) {
+        if self.expect_3(
+            LPAR,
+            "Expecting a condition in parentheses '(...)'",
+            Some(EXPRESSION_FIRST),
+        ) {
             let condition = self.mark();
             self.parse_expression();
             condition.done(self, CONDITION);

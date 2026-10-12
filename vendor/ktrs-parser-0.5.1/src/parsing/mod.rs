@@ -54,7 +54,8 @@ mod token_stream;
 
 pub use optional_marker::OptionalMarker;
 pub use token_stream::{
-    AbstractTokenStreamPattern, At, AtSet, FirstBefore, LastBefore, Or, TokenStreamPattern, TokenStreamPredicate,
+    AbstractTokenStreamPattern, At, AtSet, FirstBefore, LastBefore, Or, TokenStreamPattern,
+    TokenStreamPredicate,
 };
 
 use crate::builder::{Layer, MarkerHost, PsiBuilder, SemanticWhitespaceAwarePsiBuilder};
@@ -82,29 +83,53 @@ impl MarkerHost for Parser {
 impl Parser {
     /// `KotlinParsing.createForTopLevel`.
     pub(crate) fn create_for_top_level(builder: SemanticWhitespaceAwarePsiBuilder) -> Parser {
-        Parser { my_builder: builder, is_lazy: true, by_clause_layer: None, in_parameter_recovery_probe: false }
+        Parser {
+            my_builder: builder,
+            is_lazy: true,
+            by_clause_layer: None,
+            in_parameter_recovery_probe: false,
+        }
     }
 
     /// `KotlinParsing.createForTopLevelNonLazy`.
     #[allow(dead_code)] // TODO: only `KotlinLightParser` uses it upstream; not ported yet.
-    pub(crate) fn create_for_top_level_non_lazy(builder: SemanticWhitespaceAwarePsiBuilder) -> Parser {
-        Parser { my_builder: builder, is_lazy: false, by_clause_layer: None, in_parameter_recovery_probe: false }
+    pub(crate) fn create_for_top_level_non_lazy(
+        builder: SemanticWhitespaceAwarePsiBuilder,
+    ) -> Parser {
+        Parser {
+            my_builder: builder,
+            is_lazy: false,
+            by_clause_layer: None,
+            in_parameter_recovery_probe: false,
+        }
     }
 
     /// `KotlinParsing.createForByClause(myBuilder, isLazy)`: runs `f` on a non-top-level parser
     /// over a `SemanticWhitespaceAwarePsiBuilderForByClause` wrapping the current builder.
-    pub(crate) fn create_for_by_clause<R>(&mut self, is_lazy: bool, f: impl FnOnce(&mut Parser) -> R) -> R {
-        let layer = self.my_builder.push_layer(Layer::ForByClause { stack_size: 0 });
+    pub(crate) fn create_for_by_clause<R>(
+        &mut self,
+        is_lazy: bool,
+        f: impl FnOnce(&mut Parser) -> R,
+    ) -> R {
+        let layer = self
+            .my_builder
+            .push_layer(Layer::ForByClause { stack_size: 0 });
         self.with_context(is_lazy, Some(layer), f)
     }
 
     /// `getStackSize()` of the by-clause builder if this is a by-clause parser, else `None`.
     pub(crate) fn by_clause_stack_size(&self) -> Option<i32> {
-        self.by_clause_layer.map(|layer| self.my_builder.for_by_clause_stack_size(layer))
+        self.by_clause_layer
+            .map(|layer| self.my_builder.for_by_clause_stack_size(layer))
     }
 
     /// Runs `f` with a new parser context, then pops the layer pushed by the caller and restores.
-    fn with_context<R>(&mut self, is_lazy: bool, by_clause_layer: Option<usize>, f: impl FnOnce(&mut Parser) -> R) -> R {
+    fn with_context<R>(
+        &mut self,
+        is_lazy: bool,
+        by_clause_layer: Option<usize>,
+        f: impl FnOnce(&mut Parser) -> R,
+    ) -> R {
         let saved = (self.is_lazy, self.by_clause_layer);
         self.is_lazy = is_lazy;
         self.by_clause_layer = by_clause_layer;

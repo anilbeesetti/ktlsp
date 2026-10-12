@@ -20,11 +20,17 @@ pub(crate) enum DeclarationParsingMode {
 
 impl DeclarationParsingMode {
     pub(crate) fn destructuring_allowed(self) -> bool {
-        matches!(self, DeclarationParsingMode::Local | DeclarationParsingMode::ScriptToplevel)
+        matches!(
+            self,
+            DeclarationParsingMode::Local | DeclarationParsingMode::ScriptToplevel
+        )
     }
 
     pub(crate) fn accessors_allowed(self) -> bool {
-        matches!(self, DeclarationParsingMode::MemberOrToplevel | DeclarationParsingMode::ScriptToplevel)
+        matches!(
+            self,
+            DeclarationParsingMode::MemberOrToplevel | DeclarationParsingMode::ScriptToplevel
+        )
     }
 
     pub(crate) fn can_be_enum_used_as_soft_keyword(self) -> bool {
@@ -54,7 +60,8 @@ impl Parser {
             self.advance();
         }
 
-        let type_parameters_declared = self.at(LT) && self.parse_type_parameter_list(IDENTIFIER_EQ_COLON_SEMICOLON_SET);
+        let type_parameters_declared =
+            self.at(LT) && self.parse_type_parameter_list(IDENTIFIER_EQ_COLON_SEMICOLON_SET);
 
         self.my_builder.disable_joining_complex_tokens();
 
@@ -75,9 +82,17 @@ impl Parser {
         if multi_declaration {
             let multi_decl = self.mark();
             self.parse_multi_declaration_entry(
-                if is_short_form { PROPERTY_NAME_FOLLOW_SET } else { DESTRUCTURING_PROPERTY_NAME_FOLLOW_SET },
+                if is_short_form {
+                    PROPERTY_NAME_FOLLOW_SET
+                } else {
+                    DESTRUCTURING_PROPERTY_NAME_FOLLOW_SET
+                },
                 PROPERTY_NAME_FOLLOW_MULTI_DECLARATION_RECOVERY_SET,
-                if is_short_form { MultiDeclarationMode::Short } else { MultiDeclarationMode::Full },
+                if is_short_form {
+                    MultiDeclarationMode::Short
+                } else {
+                    MultiDeclarationMode::Full
+                },
             );
             self.error_if(
                 multi_decl,
@@ -102,7 +117,11 @@ impl Parser {
             let type_ = self.mark();
             self.advance(); // COLON
             self.parse_type_ref();
-            self.error_if(type_, multi_declaration, "Type annotations are not allowed on destructuring declarations");
+            self.error_if(
+                type_,
+                multi_declaration,
+                "Type annotations are not allowed on destructuring declarations",
+            );
         }
 
         self.parse_type_constraints_guarded(type_parameters_declared);
@@ -121,7 +140,11 @@ impl Parser {
                 before_name.drop(self);
             }
 
-            return if multi_declaration { DESTRUCTURING_DECLARATION } else { PROPERTY };
+            return if multi_declaration {
+                DESTRUCTURING_DECLARATION
+            } else {
+                PROPERTY
+            };
         }
 
         before_name.drop(self);
@@ -131,7 +154,8 @@ impl Parser {
             // "val a = 1; b" must not be an infix call of b on "val ...;"
 
             self.my_builder.enable_newlines();
-            let has_new_line_with_semicolon = self.consume_if(SEMICOLON) && self.my_builder.newline_before_current_token();
+            let has_new_line_with_semicolon =
+                self.consume_if(SEMICOLON) && self.my_builder.newline_before_current_token();
             self.my_builder.restore_newlines_state();
 
             if !has_new_line_with_semicolon {
@@ -147,7 +171,10 @@ impl Parser {
                     if self.get_last_token() != Some(SEMICOLON) {
                         self.error_until(
                             "Property getter or setter expected",
-                            TokenSet::or_set(&[DECLARATION_FIRST, TokenSet::create(&[EOL_OR_SEMICOLON, LBRACE, RBRACE])]),
+                            TokenSet::or_set(&[
+                                DECLARATION_FIRST,
+                                TokenSet::create(&[EOL_OR_SEMICOLON, LBRACE, RBRACE]),
+                            ]),
                         );
                     }
                 } else {
@@ -156,7 +183,11 @@ impl Parser {
             }
         }
 
-        if multi_declaration { DESTRUCTURING_DECLARATION } else { PROPERTY }
+        if multi_declaration {
+            DESTRUCTURING_DECLARATION
+        } else {
+            PROPERTY
+        }
     }
 
     fn parse_property_delegate_or_assignment(&mut self) -> bool {

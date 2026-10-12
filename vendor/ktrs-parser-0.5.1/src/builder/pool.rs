@@ -31,11 +31,14 @@ struct Buffers {
 
 impl Buffers {
     fn take() -> Buffers {
-        POOL.with(|pool| pool.borrow_mut().pop()).unwrap_or_default()
+        POOL.with(|pool| pool.borrow_mut().pop())
+            .unwrap_or_default()
     }
 
     fn give_back(mut self) {
-        if self.lex_types.capacity() > MAX_POOLED_LEXEMES || self.production.markers.capacity() > 4 * MAX_POOLED_LEXEMES {
+        if self.lex_types.capacity() > MAX_POOLED_LEXEMES
+            || self.production.markers.capacity() > 4 * MAX_POOLED_LEXEMES
+        {
             return;
         }
         self.text.clear();
@@ -87,8 +90,19 @@ impl PsiBuilder {
     }
 
     fn from_buffers(text: &str, buffers: Buffers) -> PsiBuilder {
-        let Buffers { text: mut own_text, lex_starts, lex_types, mut orig_types, production, skipped_errors } = buffers;
-        assert_eq!(lex_starts.last().copied(), Some(text.len() as u32), "token lengths must sum to the text length");
+        let Buffers {
+            text: mut own_text,
+            lex_starts,
+            lex_types,
+            mut orig_types,
+            production,
+            skipped_errors,
+        } = buffers;
+        assert_eq!(
+            lex_starts.last().copied(),
+            Some(text.len() as u32),
+            "token lengths must sum to the text length"
+        );
         own_text.push_str(text);
         orig_types.extend_from_slice(&lex_types);
         PsiBuilder {

@@ -5,7 +5,9 @@ use ktrs_syntax::{Parse, SyntaxKind};
 
 use super::Parser;
 use crate::FileKind;
-use crate::builder::{ChameleonCache, LazyLeaf, PsiBuilder, SemanticWhitespaceAwarePsiBuilder, TreeSink};
+use crate::builder::{
+    ChameleonCache, LazyLeaf, PsiBuilder, SemanticWhitespaceAwarePsiBuilder, TreeSink,
+};
 
 /// `KotlinParser.parse(psiBuilder, psiFile)`: `parseFile` or `parseScript` by file kind.
 pub fn parse(text: &str, kind: FileKind) -> Parse {
@@ -16,7 +18,12 @@ pub fn parse(text: &str, kind: FileKind) -> Parse {
 pub fn parse_cached(text: &str, kind: FileKind, cache: &mut ChameleonCache) -> Parse {
     let psi = PsiBuilder::lex_kotlin(text);
     let mut sink = TreeSink::for_file(&psi, Some(std::mem::take(cache)));
-    run_into(psi, |kt_parsing| parse_by_kind(kt_parsing, kind), None, &mut sink);
+    run_into(
+        psi,
+        |kt_parsing| parse_by_kind(kt_parsing, kind),
+        None,
+        &mut sink,
+    );
     *cache = sink.take_cache().expect("sink keeps its cache");
     sink.finish()
 }
@@ -59,10 +66,18 @@ fn run_top_level(text: &str, parse: impl FnOnce(&mut Parser)) -> Parse {
     sink.finish()
 }
 
-fn run_into(psi: PsiBuilder, parse: impl FnOnce(&mut Parser), root_kind: Option<SyntaxKind>, sink: &mut TreeSink) {
+fn run_into(
+    psi: PsiBuilder,
+    parse: impl FnOnce(&mut Parser),
+    root_kind: Option<SyntaxKind>,
+    sink: &mut TreeSink,
+) {
     let mut kt_parsing = Parser::create_for_top_level(SemanticWhitespaceAwarePsiBuilder::new(psi));
     parse(&mut kt_parsing);
-    kt_parsing.my_builder.psi.build_tree_into(root_kind, sink, &reparse_lazy);
+    kt_parsing
+        .my_builder
+        .psi
+        .build_tree_into(root_kind, sink, &reparse_lazy);
 }
 
 /// Expands a lazy-parseable leaf: its kind's `parseContents` over its own text. The reparsed
@@ -73,15 +88,27 @@ pub(crate) fn reparse_lazy(leaf: &LazyLeaf<'_>, sink: &mut TreeSink) -> bool {
     let (kind, text) = (leaf.kind, leaf.text);
     match kind {
         SyntaxKind::BLOCK => sink.chameleon(kind, text, |sink| {
-            run_into(leaf.relexed_builder(), Parser::parse_block_expression, Some(kind), sink)
+            run_into(
+                leaf.relexed_builder(),
+                Parser::parse_block_expression,
+                Some(kind),
+                sink,
+            )
         }),
         SyntaxKind::LAMBDA_EXPRESSION => sink.chameleon(kind, text, |sink| {
-            run_into(leaf.relexed_builder(), Parser::parse_lambda_expression, Some(kind), sink)
+            run_into(
+                leaf.relexed_builder(),
+                Parser::parse_lambda_expression,
+                Some(kind),
+                sink,
+            )
         }),
-        SyntaxKind::DOC_COMMENT => sink.chameleon(kind, text, |sink| crate::kdoc::parse_kdoc_into(text, sink)),
-        SyntaxKind::KDOC_MARKDOWN_LINK => {
-            sink.chameleon(kind, text, |sink| crate::kdoc::parse_markdown_link_into(text, sink))
+        SyntaxKind::DOC_COMMENT => {
+            sink.chameleon(kind, text, |sink| crate::kdoc::parse_kdoc_into(text, sink))
         }
+        SyntaxKind::KDOC_MARKDOWN_LINK => sink.chameleon(kind, text, |sink| {
+            crate::kdoc::parse_markdown_link_into(text, sink)
+        }),
         _ => return false,
     }
     true

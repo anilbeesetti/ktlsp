@@ -47,11 +47,17 @@ impl Parser {
             // So, we rollback the parsing position and reparse file annotation list without report error on non-file annotations.
             first_entry.rollback_to(self);
 
-            self.parse_file_annotation_list(AnnotationParsingMode::FileAnnotationsWhenPackageOmitted);
+            self.parse_file_annotation_list(
+                AnnotationParsingMode::FileAnnotationsWhenPackageOmitted,
+            );
             package_directive = self.mark();
             package_directive.done(self, PACKAGE_DIRECTIVE);
             // Need to skip everything but shebang comment to allow comments at the start of the file to be bound to the first declaration.
-            package_directive.set_custom_edge_token_binders(self, Some(EdgeBinder::BindFirstShebangWithWhitespaceOnly), None);
+            package_directive.set_custom_edge_token_binders(
+                self,
+                Some(EdgeBinder::BindFirstShebangWithWhitespaceOnly),
+                None,
+            );
         }
 
         self.parse_import_directives();
@@ -72,7 +78,8 @@ impl Parser {
 
             if self.at(DOT) {
                 self.advance(); // DOT
-                qualified_expression.error(self, "Package name must be a '.'-separated identifier list");
+                qualified_expression
+                    .error(self, "Package name must be a '.'-separated identifier list");
                 qualified_expression = self.mark();
                 continue;
             }
@@ -121,7 +128,11 @@ impl Parser {
         let import_directive = self.mark();
         self.advance(); // IMPORT_KEYWORD
 
-        if self.close_import_with_error_if_newline(import_directive, None, "Expecting qualified name") {
+        if self.close_import_with_error_if_newline(
+            import_directive,
+            None,
+            "Expecting qualified name",
+        ) {
             return;
         }
 
@@ -142,13 +153,21 @@ impl Parser {
         while self.at(DOT) && self.lookahead(1) != Some(MUL) {
             self.advance(); // DOT
 
-            if self.close_import_with_error_if_newline(import_directive, None, "Import must be placed on a single line") {
+            if self.close_import_with_error_if_newline(
+                import_directive,
+                None,
+                "Import must be placed on a single line",
+            ) {
                 qualified_name.drop(self);
                 return;
             }
 
             reference = self.mark();
-            if self.expect_3(IDENTIFIER, "Qualified name must be a '.'-separated identifier list", Some(IMPORT_RECOVERY_SET)) {
+            if self.expect_3(
+                IDENTIFIER,
+                "Qualified name must be a '.'-separated identifier list",
+                Some(IMPORT_RECOVERY_SET),
+            ) {
                 reference.done(self, REFERENCE_EXPRESSION);
             } else {
                 reference.drop(self);
@@ -167,7 +186,11 @@ impl Parser {
             if self.at(AS_KEYWORD) {
                 let as_ = self.mark();
                 self.advance(); // AS_KEYWORD
-                if self.close_import_with_error_if_newline(import_directive, None, "Expecting identifier") {
+                if self.close_import_with_error_if_newline(
+                    import_directive,
+                    None,
+                    "Expecting identifier",
+                ) {
                     as_.drop(self);
                     return;
                 }
@@ -180,7 +203,11 @@ impl Parser {
         if self.at(AS_KEYWORD) {
             let alias = self.mark();
             self.advance(); // AS_KEYWORD
-            if self.close_import_with_error_if_newline(import_directive, Some(alias), "Expecting identifier") {
+            if self.close_import_with_error_if_newline(
+                import_directive,
+                Some(alias),
+                "Expecting identifier",
+            ) {
                 return;
             }
             self.expect_3(IDENTIFIER, "Expecting identifier", Some(SEMICOLON_SET));
@@ -188,7 +215,11 @@ impl Parser {
         }
         self.consume_if(SEMICOLON);
         import_directive.done(self, IMPORT_DIRECTIVE);
-        import_directive.set_custom_edge_token_binders(self, None, Some(EdgeBinder::TrailingComments));
+        import_directive.set_custom_edge_token_binders(
+            self,
+            None,
+            Some(EdgeBinder::TrailingComments),
+        );
     }
 
     fn close_import_with_error_if_newline(
@@ -212,7 +243,11 @@ impl Parser {
         let import_list = self.mark();
         if !self.at(IMPORT_KEYWORD) {
             // this is necessary to allow comments at the start of the file to be bound to the first declaration
-            import_list.set_custom_edge_token_binders(self, Some(EdgeBinder::DoNotBindAnything), None);
+            import_list.set_custom_edge_token_binders(
+                self,
+                Some(EdgeBinder::DoNotBindAnything),
+                None,
+            );
         }
         while self.at(IMPORT_KEYWORD) {
             self.parse_import_directive();
@@ -239,10 +274,17 @@ impl Parser {
         let decl = self.mark();
 
         let mut detector = ModifierDetector::default();
-        self.parse_modifier_list_3(Some(&mut detector), TokenSet::EMPTY, /* localDeclaration = */ false);
+        self.parse_modifier_list_3(
+            Some(&mut detector),
+            TokenSet::EMPTY,
+            /* localDeclaration = */ false,
+        );
 
-        let mut decl_type =
-            self.parse_common_declaration(&detector, NameParsingMode::Required, DeclarationParsingMode::MemberOrToplevel);
+        let mut decl_type = self.parse_common_declaration(
+            &detector,
+            NameParsingMode::Required,
+            DeclarationParsingMode::MemberOrToplevel,
+        );
 
         if decl_type.is_none() && self.at(LBRACE) {
             self.error("Expecting a top level declaration");
@@ -269,9 +311,13 @@ impl Parser {
         declaration_parsing_mode: DeclarationParsingMode,
     ) -> Option<SyntaxKind> {
         match self.get_token_id() {
-            Some(CLASS_KEYWORD | INTERFACE_KEYWORD) => return Some(self.parse_class(detector.is_enum_detected(), true)),
+            Some(CLASS_KEYWORD | INTERFACE_KEYWORD) => {
+                return Some(self.parse_class(detector.is_enum_detected(), true));
+            }
             Some(FUN_KEYWORD) => return Some(self.parse_function()),
-            Some(VAL_KEYWORD | VAR_KEYWORD) => return Some(self.parse_property(declaration_parsing_mode)),
+            Some(VAL_KEYWORD | VAR_KEYWORD) => {
+                return Some(self.parse_property(declaration_parsing_mode));
+            }
             Some(LPAR | LBRACKET) => {
                 let lookahead = self.lookahead(1);
                 return if lookahead == Some(VAL_KEYWORD) || lookahead == Some(VAR_KEYWORD) {
@@ -286,7 +332,9 @@ impl Parser {
                 return Some(OBJECT_DECLARATION);
             }
             Some(IDENTIFIER) => {
-                if detector.is_enum_detected() && declaration_parsing_mode.can_be_enum_used_as_soft_keyword() {
+                if detector.is_enum_detected()
+                    && declaration_parsing_mode.can_be_enum_used_as_soft_keyword()
+                {
                     return Some(self.parse_class(true, false));
                 }
             }

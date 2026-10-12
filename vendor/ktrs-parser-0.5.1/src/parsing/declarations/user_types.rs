@@ -27,14 +27,22 @@ impl Parser {
             let keyword = self.mark();
             self.advance(); // PACKAGE_KEYWORD
             keyword.error(self, "Expecting an element");
-            self.expect_3(DOT, "Expecting '.'", Some(TokenSet::create(&[IDENTIFIER, LBRACE, RBRACE])));
+            self.expect_3(
+                DOT,
+                "Expecting '.'",
+                Some(TokenSet::create(&[IDENTIFIER, LBRACE, RBRACE])),
+            );
         }
 
         let mut reference = self.mark();
         loop {
             self.recover_on_parenthesized_word_for_platform_types(0, "Mutable", true);
 
-            if self.expect_3(IDENTIFIER, "Expecting type name", Some(USER_TYPE_NAME_RECOVERY_SET)) {
+            if self.expect_3(
+                IDENTIFIER,
+                "Expecting type name",
+                Some(USER_TYPE_NAME_RECOVERY_SET),
+            ) {
                 reference.done(self, REFERENCE_EXPRESSION);
             } else {
                 reference.drop(self);
@@ -48,7 +56,9 @@ impl Parser {
             if !self.at(DOT) {
                 break;
             }
-            if self.lookahead(1) == Some(LPAR) && !self.at_parenthesized_mutable_for_platform_types(1) {
+            if self.lookahead(1) == Some(LPAR)
+                && !self.at_parenthesized_mutable_for_platform_types(1)
+            {
                 // This may be a receiver for a function type
                 //   Int.(Int) -> Int
                 break;
@@ -69,7 +79,12 @@ impl Parser {
         self.recover_on_parenthesized_word_for_platform_types(offset, "Mutable", false)
     }
 
-    fn recover_on_parenthesized_word_for_platform_types(&mut self, offset: i32, word: &str, consume: bool) -> bool {
+    fn recover_on_parenthesized_word_for_platform_types(
+        &mut self,
+        offset: i32,
+        word: &str,
+        consume: bool,
+    ) -> bool {
         // Array<(out) Foo>! or (Mutable)List<Bar>!
         if self.lookahead(offset) == Some(LPAR)
             && self.lookahead(offset + 1) == Some(IDENTIFIER)
@@ -176,9 +191,18 @@ impl Parser {
     fn parse_function_type_contents(&mut self, function_type: Marker) -> Marker {
         debug_assert!(self._at(LPAR), "{:?}", self.tt());
 
-        self.parse_value_parameter_list(true, /* typeRequired  = */ true, TokenSet::EMPTY, false);
+        self.parse_value_parameter_list(
+            true,
+            /* typeRequired  = */ true,
+            TokenSet::EMPTY,
+            false,
+        );
 
-        self.expect_3(ARROW, "Expecting '->' to specify return type of a function type", Some(TYPE_REF_FIRST));
+        self.expect_3(
+            ARROW,
+            "Expecting '->' to specify return type of a function type",
+            Some(TYPE_REF_FIRST),
+        );
         self.parse_type_ref();
 
         function_type

@@ -6,8 +6,9 @@ use ktrs_syntax::SyntaxKind::{self, *};
 use super::parameters::ModifierDetector;
 use super::properties::DeclarationParsingMode;
 use super::{
-    LT_EQ_SEMICOLON_TOP_LEVEL_DECLARATION_FIRST_SET, NameParsingMode, TOP_LEVEL_DECLARATION_FIRST_SEMICOLON_SET,
-    TYPE_PARAMETER_GT_RECOVERY_SET, VALUE_ARGS_RECOVERY_SET,
+    LT_EQ_SEMICOLON_TOP_LEVEL_DECLARATION_FIRST_SET, NameParsingMode,
+    TOP_LEVEL_DECLARATION_FIRST_SEMICOLON_SET, TYPE_PARAMETER_GT_RECOVERY_SET,
+    VALUE_ARGS_RECOVERY_SET,
 };
 use crate::parsing::Parser;
 use crate::token_set::TokenSet;
@@ -67,10 +68,17 @@ impl Parser {
         let is_companion_block = self.at(COMPANION_KEYWORD) && self.lookahead(1) == Some(LBRACE);
 
         let mut detector = ModifierDetector::default();
-        self.parse_modifier_list_3(Some(&mut detector), TokenSet::EMPTY, /* localDeclaration = */ false);
+        self.parse_modifier_list_3(
+            Some(&mut detector),
+            TokenSet::EMPTY,
+            /* localDeclaration = */ false,
+        );
 
-        let decl_type =
-            if is_companion_block { Some(self.parse_companion_block()) } else { self.parse_member_declaration_rest(&detector) };
+        let decl_type = if is_companion_block {
+            Some(self.parse_companion_block())
+        } else {
+            self.parse_member_declaration_rest(&detector)
+        };
 
         match decl_type {
             None => {
@@ -81,10 +89,17 @@ impl Parser {
         }
     }
 
-    fn parse_member_declaration_rest(&mut self, modifier_detector: &ModifierDetector) -> Option<SyntaxKind> {
+    fn parse_member_declaration_rest(
+        &mut self,
+        modifier_detector: &ModifierDetector,
+    ) -> Option<SyntaxKind> {
         let mut decl_type = self.parse_common_declaration(
             modifier_detector,
-            if modifier_detector.is_companion_detected() { NameParsingMode::Allowed } else { NameParsingMode::Required },
+            if modifier_detector.is_companion_detected() {
+                NameParsingMode::Allowed
+            } else {
+                NameParsingMode::Required
+            },
             DeclarationParsingMode::MemberOrToplevel,
         );
 
@@ -130,11 +145,19 @@ impl Parser {
         self.advance(); // CONSTRUCTOR_KEYWORD
 
         if self.at(LPAR) {
-            self.parse_value_parameter_list(false, /*typeRequired = */ true, VALUE_ARGS_RECOVERY_SET, false);
+            self.parse_value_parameter_list(
+                false,
+                /*typeRequired = */ true,
+                VALUE_ARGS_RECOVERY_SET,
+                false,
+            );
         } else {
             self.error_with_recovery(
                 "Expecting '('",
-                Some(TokenSet::or_set(&[VALUE_ARGS_RECOVERY_SET, TokenSet::create(&[COLON])])),
+                Some(TokenSet::or_set(&[
+                    VALUE_ARGS_RECOVERY_SET,
+                    TokenSet::create(&[COLON]),
+                ])),
             );
         }
 
@@ -197,7 +220,11 @@ impl Parser {
 
         self.advance(); // TYPE_ALIAS_KEYWORD
 
-        self.expect_3(IDENTIFIER, "Type name expected", Some(LT_EQ_SEMICOLON_TOP_LEVEL_DECLARATION_FIRST_SET));
+        self.expect_3(
+            IDENTIFIER,
+            "Type name expected",
+            Some(LT_EQ_SEMICOLON_TOP_LEVEL_DECLARATION_FIRST_SET),
+        );
 
         self.parse_type_parameter_list(TYPE_PARAMETER_GT_RECOVERY_SET);
 
@@ -207,7 +234,11 @@ impl Parser {
             error.error(self, "Type alias parameters can't have bounds");
         }
 
-        self.expect_3(EQ, "Expecting '='", Some(TOP_LEVEL_DECLARATION_FIRST_SEMICOLON_SET));
+        self.expect_3(
+            EQ,
+            "Expecting '='",
+            Some(TOP_LEVEL_DECLARATION_FIRST_SEMICOLON_SET),
+        );
 
         self.parse_type_ref();
 

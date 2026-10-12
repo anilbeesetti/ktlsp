@@ -52,7 +52,10 @@ impl Parser {
             }
             self.advance(); // CLASS_KEYWORD, INTERFACE_KEYWORD or OBJECT_KEYWORD
         } else {
-            debug_assert!(enum_class, "Currently classifiers without class/interface/object are only allowed for enums");
+            debug_assert!(
+                enum_class,
+                "Currently classifiers without class/interface/object are only allowed for enums"
+            );
             self.error("'class' keyword is expected after 'enum'");
         }
 
@@ -70,7 +73,8 @@ impl Parser {
             }
         }
 
-        let type_parameters_declared = self.parse_type_parameter_list(TYPE_PARAMETER_GT_RECOVERY_SET);
+        let type_parameters_declared =
+            self.parse_type_parameter_list(TYPE_PARAMETER_GT_RECOVERY_SET);
 
         let before_constructor_modifiers = self.mark();
         let primary_constructor_marker = self.mark();
@@ -91,7 +95,12 @@ impl Parser {
         }
 
         if self.at(LPAR) {
-            self.parse_value_parameter_list(false, /* typeRequired  = */ true, LBRACE_RBRACE_SET, false);
+            self.parse_value_parameter_list(
+                false,
+                /* typeRequired  = */ true,
+                LBRACE_RBRACE_SET,
+                false,
+            );
             primary_constructor_marker.done(self, PRIMARY_CONSTRUCTOR);
         } else if has_constructor_modifiers || has_constructor_keyword {
             // A comprehensive error message for cases like:
@@ -132,8 +141,18 @@ impl Parser {
         if object { OBJECT_DECLARATION } else { CLASS }
     }
 
-    pub(super) fn parse_class(&mut self, enum_class: bool, expect_kind_keyword: bool) -> SyntaxKind {
-        self.parse_class_or_object(false, NameParsingMode::Required, true, enum_class, expect_kind_keyword)
+    pub(super) fn parse_class(
+        &mut self,
+        enum_class: bool,
+        expect_kind_keyword: bool,
+    ) -> SyntaxKind {
+        self.parse_class_or_object(
+            false,
+            NameParsingMode::Required,
+            true,
+            enum_class,
+            expect_kind_keyword,
+        )
     }
 
     pub(crate) fn parse_object(&mut self, name_parsing_mode: NameParsingMode, optional_body: bool) {
@@ -247,5 +266,4 @@ impl Parser {
             ParseEnumEntryResult::Failed
         }
     }
-
 }

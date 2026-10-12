@@ -129,6 +129,9 @@ minimal source-local parser fork; lock delta only removes its registry source an
 checksum, while explicitly approved workspace exclusion keeps upstream dev/test
 packages out of default native tests. Original archive checksum, all54 Rust source
 hashes, seven-file recovery.patch and complete notices are retained in vendor.
+A separate pinned-rustfmt formatting.patch transforms that behavioral source into
+the final 54-file formatted-sha256 inventory; 49 files have formatting changes
+(including the seven behavioral files), with no formatting opt-out.
 No supervisor, common API, source mapping, kind validator or resource limit changed.
 
 Source-local implementation and independent reviews are recorded in vendor/REVIEW.
@@ -152,3 +155,25 @@ the preserved corpus, strict assertions, authorized graph and provenance.
 Targeted production checks and both behavioral integration rechecks await the
 coordinator's local-check slot. Full-workspace checks, stable integration, hosted
 CI and architect finished review remain pending. No JVM/oracle/Gradle/Maven ran.
+
+First actual production-graph checks on cc4920d passed: locked offline metadata
+(nine workspace members, vendor excluded) and normal/build/all-feature parser
+inventory; pinned workspace clippy; parser tests (28 active + two invoked helper
+fixtures and 19 protocol faults). Functionality reviewer independently passed
+21 integration tests +19 protocol faults and 219 fixtures/438 worker parses with
+no unexplained lifecycle failure. These are observations on the behavioral source,
+not approval of the later formatting phase. Initial root fmt check found upstream
+style differences because --all traverses excluded local path dependencies.
+A temporary untracked formatting-disable experiment was removed; the architect
+approved a separate formatting-only phase instead. Both final behavioral reviews,
+full-workspace checks, final formatting and exact-head hosted CI remain pending.
+
+Both independent formatting semantic-preservation reviews approve the separate
+phase. They compared all 54 files to cc4920d: 49 changed and five pristine, with
+identifiers, literals and comments preserved. They inspected 147 added trailing
+commas and 17 other token edit hunks: one Layer re-export ordering change,
+diverging-return match-arm/let-else semicolons and block/closure reflow. No changed
+control/evaluation/drop behavior, macro-token grammar or location/stringification
+hazard was found. Functionality review independently applied both ordered patches
+and matched all 54 final hashes. These reviews ran no Cargo/build/tests/probes.
+Final behavior must still be rechecked after coordinator-approved #89 integration.

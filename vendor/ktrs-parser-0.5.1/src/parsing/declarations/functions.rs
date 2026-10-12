@@ -13,7 +13,8 @@ use crate::token_set::TokenSet;
 
 impl Parser {
     pub(super) fn parse_function(&mut self) -> SyntaxKind {
-        self.parse_function_1(false).expect("parseFunction(false) is never null")
+        self.parse_function_1(false)
+            .expect("parseFunction(false) is never null")
     }
 
     /*
@@ -26,7 +27,10 @@ impl Parser {
      *       functionBody?
      *   ;
      */
-    pub(crate) fn parse_function_1(&mut self, fail_if_identifier_exists: bool) -> Option<SyntaxKind> {
+    pub(crate) fn parse_function_1(
+        &mut self,
+        fail_if_identifier_exists: bool,
+    ) -> Option<SyntaxKind> {
         debug_assert!(self._at(FUN_KEYWORD));
 
         self.advance(); // FUN_KEYWORD
@@ -72,7 +76,10 @@ impl Parser {
                 error = self.mark();
                 let count = finish_index - self.my_builder.raw_token_index();
                 self.advance_1(count);
-                error.error(self, "Only one type parameter list is allowed for a function");
+                error.error(
+                    self,
+                    "Only one type parameter list is allowed for a function",
+                );
             } else {
                 error.drop(self);
             }
@@ -80,7 +87,12 @@ impl Parser {
         }
 
         if self.at(LPAR) {
-            self.parse_value_parameter_list(false, /* typeRequired  = */ false, VALUE_PARAMETERS_FOLLOW_SET, true);
+            self.parse_value_parameter_list(
+                false,
+                /* typeRequired  = */ false,
+                VALUE_PARAMETERS_FOLLOW_SET,
+                true,
+            );
         } else {
             self.error("Expecting '('");
         }
@@ -135,7 +147,10 @@ impl Parser {
         if self.at_set(RECEIVER_TYPE_TERMINATORS) {
             self.advance(); // expectation
         } else {
-            self.error_with_recovery(&format!("Expecting '.' before a {title} name"), Some(name_follow));
+            self.error_with_recovery(
+                &format!("Expecting '.' before a {title} name"),
+                Some(name_follow),
+            );
         }
         true
     }
@@ -197,7 +212,14 @@ impl Parser {
         }
 
         self.error_with_recovery(
-            &format!("Expecting {title} name{}", if !receiver_found { " or receiver type" } else { "" }),
+            &format!(
+                "Expecting {title} name{}",
+                if !receiver_found {
+                    " or receiver type"
+                } else {
+                    ""
+                }
+            ),
             Some(recovery_set),
         );
     }

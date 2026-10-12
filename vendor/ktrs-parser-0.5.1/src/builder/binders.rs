@@ -47,7 +47,10 @@ impl EdgeBinder {
                 if tokens.is_empty() {
                     return 0;
                 }
-                tokens.iter().rposition(|&t| t == DOC_COMMENT).unwrap_or(tokens.len())
+                tokens
+                    .iter()
+                    .rposition(|&t| t == DOC_COMMENT)
+                    .unwrap_or(tokens.len())
             }
             EdgeBinder::TrailingComments => trailing_comments(tokens, getter),
             EdgeBinder::PrecedingAllComments => all_comments(tokens, false),
@@ -55,7 +58,11 @@ impl EdgeBinder {
             EdgeBinder::DoNotBindAnything => 0,
             EdgeBinder::BindFirstShebangWithWhitespaceOnly => {
                 if tokens.first() == Some(&SHEBANG_COMMENT) {
-                    return if tokens.get(1) == Some(&WHITE_SPACE) { 2 } else { 1 };
+                    return if tokens.get(1) == Some(&WHITE_SPACE) {
+                        2
+                    } else {
+                        1
+                    };
                 }
                 0
             }

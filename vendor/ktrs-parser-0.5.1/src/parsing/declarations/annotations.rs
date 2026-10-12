@@ -14,7 +14,10 @@ impl Parser {
      *   ;
      */
     pub(super) fn parse_file_annotation_list(&mut self, mode: AnnotationParsingMode) {
-        debug_assert!(mode.is_file_annotation_parsing_mode(), "expected file annotation parsing mode, but:{mode:?}");
+        debug_assert!(
+            mode.is_file_annotation_parsing_mode(),
+            "expected file annotation parsing mode, but:{mode:?}"
+        );
 
         let file_annotations_list = self.mark();
 
@@ -137,7 +140,11 @@ impl Parser {
             return true;
         }
 
-        let target_keyword = if self.at_set(ANNOTATION_TARGETS) { self.my_builder.get_token_type() } else { None };
+        let target_keyword = if self.at_set(ANNOTATION_TARGETS) {
+            self.my_builder.get_token_type()
+        } else {
+            None
+        };
         if mode == AnnotationParsingMode::FileAnnotationsWhenPackageOmitted
             && !(target_keyword == Some(FILE_KEYWORD) && self.lookahead(1) == Some(COLON))
         {

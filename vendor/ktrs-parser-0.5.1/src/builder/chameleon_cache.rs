@@ -23,7 +23,9 @@ impl ChameleonCache {
 
     pub(super) fn get(&self, kind: SyntaxKind, text: &str) -> Option<&Tree> {
         let bucket = self.subtrees.get(&hash(kind, text))?;
-        bucket.iter().find(|t| t.kind(Tree::ROOT) == kind && t.text() == text)
+        bucket
+            .iter()
+            .find(|t| t.kind(Tree::ROOT) == kind && t.text() == text)
     }
 
     pub(super) fn insert(&mut self, subtree: Tree) {

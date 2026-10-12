@@ -3,7 +3,8 @@
 use ktrs_syntax::SyntaxKind::*;
 
 use super::{
-    BinaryOperationPrecedence, MIN_BINARY_OPERATION_PRECEDENCE, PREFIX_OPERATIONS, TYPE_ARGUMENT_LIST_STOPPERS,
+    BinaryOperationPrecedence, MIN_BINARY_OPERATION_PRECEDENCE, PREFIX_OPERATIONS,
+    TYPE_ARGUMENT_LIST_STOPPERS,
 };
 use crate::builder::Marker;
 use crate::kt_tokens::SOFT_KEYWORDS;
@@ -30,15 +31,21 @@ impl Parser {
             let Some(operation) = self.tt() else { break };
 
             let Some(next_precedence) =
-                BinaryOperationPrecedence::token_to_binary_precedence_map_with_soft_identifiers(operation)
+                BinaryOperationPrecedence::token_to_binary_precedence_map_with_soft_identifiers(
+                    operation,
+                )
             else {
                 break;
             };
-            if next_precedence.ordinal() > max_precedence.ordinal() || next_precedence.ordinal() < min_precedence.ordinal() {
+            if next_precedence.ordinal() > max_precedence.ordinal()
+                || next_precedence.ordinal() < min_precedence.ordinal()
+            {
                 break;
             }
 
-            if next_precedence == BinaryOperationPrecedence::Infix && SOFT_KEYWORDS.contains(operation) {
+            if next_precedence == BinaryOperationPrecedence::Infix
+                && SOFT_KEYWORDS.contains(operation)
+            {
                 // Remap soft keywords and modifiers that are treated as infix functions since there is no mutating `atSetWithRemap` call
                 self.my_builder.remap_current_token(IDENTIFIER);
             }
@@ -59,7 +66,8 @@ impl Parser {
                     IS_EXPRESSION
                 }
                 _ => {
-                    min_precedence = self.parse_binary_expression(next_precedence.get_higher_priority());
+                    min_precedence =
+                        self.parse_binary_expression(next_precedence.get_higher_priority());
                     BINARY_EXPRESSION
                 }
             };
@@ -88,7 +96,9 @@ impl Parser {
      */
     pub(crate) fn parse_prefix_expression(&mut self) {
         if self.at(AT) {
-            if !self.parse_local_declaration(/* rollbackIfDefinitelyNotExpression = */ false, false) {
+            if !self.parse_local_declaration(
+                /* rollbackIfDefinitelyNotExpression = */ false, false,
+            ) {
                 let expression = self.mark();
                 self.parse_annotations(AnnotationParsingMode::Default);
                 self.parse_prefix_expression();

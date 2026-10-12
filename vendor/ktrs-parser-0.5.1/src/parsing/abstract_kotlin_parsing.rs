@@ -11,7 +11,9 @@ impl Parser {
     pub(crate) fn get_last_token(&mut self) -> Option<SyntaxKind> {
         let mut i = 1;
         let current_offset = self.my_builder.get_current_offset();
-        while i <= current_offset && WHITE_SPACE_OR_COMMENT_BIT_SET.contains(self.my_builder.raw_lookup(-i)) {
+        while i <= current_offset
+            && WHITE_SPACE_OR_COMMENT_BIT_SET.contains(self.my_builder.raw_lookup(-i))
+        {
             i += 1;
         }
         self.my_builder.raw_lookup(-i)
@@ -29,7 +31,12 @@ impl Parser {
         self.my_builder.error(message);
     }
 
-    pub(crate) fn expect_3(&mut self, expectation: SyntaxKind, message: &str, recovery_set: Option<TokenSet>) -> bool {
+    pub(crate) fn expect_3(
+        &mut self,
+        expectation: SyntaxKind,
+        message: &str,
+        recovery_set: Option<TokenSet>,
+    ) -> bool {
         if self.expect(expectation) {
             return true;
         }
@@ -70,7 +77,9 @@ impl Parser {
                     || tt == Some(LBRACE)
                     || tt == Some(RBRACE)
                     || (set.contains(EOL_OR_SEMICOLON)
-                        && (self.eof() || tt == Some(SEMICOLON) || self.my_builder.newline_before_current_token()))
+                        && (self.eof()
+                            || tt == Some(SEMICOLON)
+                            || self.my_builder.newline_before_current_token()))
             }
         };
         if recover {
@@ -152,7 +161,10 @@ impl Parser {
             return true;
         }
         // Inlined so a constant `expectation` folds this away; the rest can only match in these cases.
-        if expectation != EOL_OR_SEMICOLON && expectation != IDENTIFIER && !kt_tokens::is_soft_keyword(expectation) {
+        if expectation != EOL_OR_SEMICOLON
+            && expectation != IDENTIFIER
+            && !kt_tokens::is_soft_keyword(expectation)
+        {
             return false;
         }
         self.at_rest(token, expectation)
@@ -210,7 +222,10 @@ impl Parser {
             return true;
         }
         // As in `at`: folds away for a constant `set`.
-        if !set.contains(EOL_OR_SEMICOLON) && !set.contains(IDENTIFIER) && !set.intersects(kt_tokens::SOFT_KEYWORDS) {
+        if !set.contains(EOL_OR_SEMICOLON)
+            && !set.contains(IDENTIFIER)
+            && !set.intersects(kt_tokens::SOFT_KEYWORDS)
+        {
             return false;
         }
         self.at_set_rest(token, set)
@@ -268,8 +283,14 @@ impl Parser {
     }
 
     pub(crate) fn error_until(&mut self, message: &str, token_set: TokenSet) {
-        debug_assert!(token_set.contains(LBRACE), "Cannot include LBRACE into error element!");
-        debug_assert!(token_set.contains(RBRACE), "Cannot include RBRACE into error element!");
+        debug_assert!(
+            token_set.contains(LBRACE),
+            "Cannot include LBRACE into error element!"
+        );
+        debug_assert!(
+            token_set.contains(RBRACE),
+            "Cannot include RBRACE into error element!"
+        );
         let error = self.mark();
         self.skip_until(token_set);
         error.error(self, message);
@@ -296,16 +317,28 @@ impl Parser {
         preceding_non_doc_comments: bool,
     ) {
         marker.done(self, element_type);
-        let preceding =
-            if preceding_non_doc_comments { EdgeBinder::PrecedingComments } else { EdgeBinder::PrecedingDocComments };
-        marker.set_custom_edge_token_binders(self, Some(preceding), Some(EdgeBinder::TrailingComments));
+        let preceding = if preceding_non_doc_comments {
+            EdgeBinder::PrecedingComments
+        } else {
+            EdgeBinder::PrecedingDocComments
+        };
+        marker.set_custom_edge_token_binders(
+            self,
+            Some(preceding),
+            Some(EdgeBinder::TrailingComments),
+        );
     }
 
     /// `createTruncatedBuilder(eofPosition)` followed by a call on the created parser. Only
     /// `KotlinParsing` calls it, so `create` is `KotlinParsing.create` = `createForTopLevel`
     /// (lazy, top-level) even inside a by-clause.
-    pub(crate) fn create_truncated_builder<R>(&mut self, eof_position: i32, f: impl FnOnce(&mut Parser) -> R) -> R {
-        self.my_builder.push_layer(Layer::Truncated { eof_position });
+    pub(crate) fn create_truncated_builder<R>(
+        &mut self,
+        eof_position: i32,
+        f: impl FnOnce(&mut Parser) -> R,
+    ) -> R {
+        self.my_builder
+            .push_layer(Layer::Truncated { eof_position });
         self.with_context(true, None, f)
     }
 
@@ -325,4 +358,3 @@ fn floor_char_boundary(text: &str, mut index: usize) -> usize {
     }
     index
 }
-

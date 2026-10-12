@@ -40,7 +40,11 @@ impl Parser {
             } else if self.parse_call_suffix() {
                 expression.done(self, CALL_EXPRESSION);
             } else if self.at(DOT) || self.at(SAFE_ACCESS) {
-                let expression_type = if self.at(DOT) { DOT_QUALIFIED_EXPRESSION } else { SAFE_ACCESS_EXPRESSION };
+                let expression_type = if self.at(DOT) {
+                    DOT_QUALIFIED_EXPRESSION
+                } else {
+                    SAFE_ACCESS_EXPRESSION
+                };
                 self.advance(); // DOT or SAFE_ACCESS
 
                 if !first_expression_parsed {

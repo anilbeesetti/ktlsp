@@ -23,11 +23,18 @@ impl TreeSink {
     pub(crate) fn for_file(builder: &PsiBuilder, cache: Option<ChameleonCache>) -> TreeSink {
         // Chameleons re-cut the file's own lexemes, so leaves <= lexemes; nodes are fewer in practice.
         let elements = 2 * builder.lexeme_count() + 1;
-        TreeSink { tree: TreeBuilder::with_capacity(elements, builder.text.len()), cache, ..TreeSink::default() }
+        TreeSink {
+            tree: TreeBuilder::with_capacity(elements, builder.text.len()),
+            cache,
+            ..TreeSink::default()
+        }
     }
 
     pub fn with_cache(cache: ChameleonCache) -> TreeSink {
-        TreeSink { cache: Some(cache), ..TreeSink::default() }
+        TreeSink {
+            cache: Some(cache),
+            ..TreeSink::default()
+        }
     }
 
     pub fn take_cache(&mut self) -> Option<ChameleonCache> {
@@ -35,13 +42,19 @@ impl TreeSink {
     }
 
     pub fn finish(self) -> Parse {
-        Parse { tree: self.tree.finish().into(), error_messages: self.errors, missed_tokens: self.missed_tokens }
+        Parse {
+            tree: self.tree.finish().into(),
+            error_messages: self.errors,
+            missed_tokens: self.missed_tokens,
+        }
     }
 
     /// Emits the expanded chameleon `kind` over `text`: the cached subtree if there is one, else
     /// whatever `build` emits (one root node of `kind`), remembered when it added no errors.
     pub fn chameleon(&mut self, kind: SyntaxKind, text: &str, build: impl FnOnce(&mut TreeSink)) {
-        let Some(cache) = &self.cache else { return build(self) };
+        let Some(cache) = &self.cache else {
+            return build(self);
+        };
         if let Some(subtree) = cache.get(kind, text) {
             self.tree.push_tree(subtree);
             return;

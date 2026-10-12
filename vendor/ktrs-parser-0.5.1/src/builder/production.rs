@@ -112,8 +112,18 @@ impl ProductionVecs {
 impl Production {
     /// Over (empty, possibly recycled) vectors; see `pool.rs`.
     pub(crate) fn from_vecs(vecs: ProductionVecs) -> Production {
-        let ProductionVecs { markers, list, free_start_markers, free_error_items } = vecs;
-        debug_assert!(markers.is_empty() && list.is_empty() && free_start_markers.is_empty() && free_error_items.is_empty());
+        let ProductionVecs {
+            markers,
+            list,
+            free_start_markers,
+            free_error_items,
+        } = vecs;
+        debug_assert!(
+            markers.is_empty()
+                && list.is_empty()
+                && free_start_markers.is_empty()
+                && free_error_items.is_empty()
+        );
         Production {
             markers,
             list,
@@ -157,14 +167,20 @@ impl Production {
     }
 
     pub(crate) fn message(&self, id: i32) -> Option<&str> {
-        self.marker(id).message.map(|i| self.messages[i.get() as usize - 1].as_str())
+        self.marker(id)
+            .message
+            .map(|i| self.messages[i.get() as usize - 1].as_str())
     }
 
     /// `MarkerPool.allocateStartMarker` / `allocateErrorItem`.
     #[inline]
     pub(crate) fn allocate(&mut self, is_error_item: bool, lexeme: i32) -> i32 {
         self.error_items += u32::from(is_error_item);
-        let free = if is_error_item { &mut self.free_error_items } else { &mut self.free_start_markers };
+        let free = if is_error_item {
+            &mut self.free_error_items
+        } else {
+            &mut self.free_start_markers
+        };
         if let Some(id) = free.pop() {
             *self.marker_mut(id) = MarkerData::new(is_error_item, lexeme);
             return id;
@@ -196,7 +212,10 @@ impl Production {
 
     /// The upstream linear-then-binary search finds the unique `+id` entry; so does this.
     fn index_of(&self, id: i32) -> usize {
-        self.list.iter().rposition(|&x| x == id).expect("Dropped or rolled-back marker")
+        self.list
+            .iter()
+            .rposition(|&x| x == id)
+            .expect("Dropped or rolled-back marker")
     }
 
     pub(crate) fn add_marker(&mut self, id: i32) {
@@ -219,14 +238,19 @@ impl Production {
             let m = self.list[i];
             m > 0 && {
                 let data = self.marker(m);
-                data.is_error_item || data.kind == Some(SyntaxKind::ERROR_ELEMENT) && data.has_message()
+                data.is_error_item
+                    || data.kind == Some(SyntaxKind::ERROR_ELEMENT) && data.has_message()
             }
         })
     }
 
     pub(crate) fn drop_marker(&mut self, id: i32) {
         if self.marker(id).is_done() {
-            let idx = self.list.iter().rposition(|&x| x == -id).expect("done entry");
+            let idx = self
+                .list
+                .iter()
+                .rposition(|&x| x == -id)
+                .expect("done entry");
             self.list.remove(idx);
         }
         let idx = self.index_of(id);
@@ -264,6 +288,10 @@ impl Production {
         if let Some(message) = data.message.take() {
             self.free_messages.push(message);
         }
-        if is_error_item { self.free_error_items.push(id) } else { self.free_start_markers.push(id) }
+        if is_error_item {
+            self.free_error_items.push(id)
+        } else {
+            self.free_start_markers.push(id)
+        }
     }
 }

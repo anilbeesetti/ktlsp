@@ -4,8 +4,8 @@
 use ktrs_syntax::SyntaxKind::*;
 
 use super::{
-    ACCESSOR_FIRST_OR_PROPERTY_END, COMMA_COLON_RPAR_SET, COMMA_RPAR_RBRACKET_COLON_EQ_SET, RPAR_COLON_LBRACE_EQ_SET,
-    RPAR_IDENTIFIER_COLON_LBRACE_EQ_SET,
+    ACCESSOR_FIRST_OR_PROPERTY_END, COMMA_COLON_RPAR_SET, COMMA_RPAR_RBRACKET_COLON_EQ_SET,
+    RPAR_COLON_LBRACE_EQ_SET, RPAR_IDENTIFIER_COLON_LBRACE_EQ_SET,
 };
 use crate::parsing::Parser;
 use crate::token_set::TokenSet;
@@ -77,7 +77,10 @@ impl Parser {
                     if self.at(VAL_KEYWORD) || self.at(VAR_KEYWORD) {
                         self.advance();
                     } else {
-                        self.error_with_recovery("Expecting val or var keyword", Some(recovery_set));
+                        self.error_with_recovery(
+                            "Expecting val or var keyword",
+                            Some(recovery_set),
+                        );
                     }
                 } else if mode == MultiDeclarationMode::FullValOnly {
                     if self.at(VAL_KEYWORD) {
@@ -114,7 +117,15 @@ impl Parser {
             }
         }
 
-        self.expect_3(closing_brace, if is_parentheses { "Expecting ')'" } else { "Expecting ']'" }, Some(follow));
+        self.expect_3(
+            closing_brace,
+            if is_parentheses {
+                "Expecting ')'"
+            } else {
+                "Expecting ']'"
+            },
+            Some(follow),
+        );
         self.my_builder.restore_newlines_state();
     }
 
@@ -161,10 +172,17 @@ impl Parser {
             if !self.at_set(ACCESSOR_FIRST_OR_PROPERTY_END) {
                 self.error_until(
                     "Accessor body expected",
-                    TokenSet::or_set(&[ACCESSOR_FIRST_OR_PROPERTY_END, TokenSet::create(&[LBRACE, LPAR, EQ])]),
+                    TokenSet::or_set(&[
+                        ACCESSOR_FIRST_OR_PROPERTY_END,
+                        TokenSet::create(&[LBRACE, LPAR, EQ]),
+                    ]),
                 );
             } else {
-                self.close_declaration_with_comment_binders(property_component, PROPERTY_ACCESSOR, true);
+                self.close_declaration_with_comment_binders(
+                    property_component,
+                    PROPERTY_ACCESSOR,
+                    true,
+                );
                 return Some(property_component_kind);
             }
         }
@@ -173,11 +191,19 @@ impl Parser {
 
         if property_component_kind != PropertyComponentKind::Field {
             let parameter_list = self.mark();
-            self.expect_3(LPAR, "Expecting '('", Some(RPAR_IDENTIFIER_COLON_LBRACE_EQ_SET));
+            self.expect_3(
+                LPAR,
+                "Expecting '('",
+                Some(RPAR_IDENTIFIER_COLON_LBRACE_EQ_SET),
+            );
             if property_component_kind == PropertyComponentKind::Set {
                 let setter_parameter = self.mark();
                 self.parse_modifier_list(COMMA_COLON_RPAR_SET);
-                self.expect_3(IDENTIFIER, "Expecting parameter name", Some(RPAR_COLON_LBRACE_EQ_SET));
+                self.expect_3(
+                    IDENTIFIER,
+                    "Expecting parameter name",
+                    Some(RPAR_COLON_LBRACE_EQ_SET),
+                );
 
                 if self.at(COLON) {
                     self.advance(); // COLON
@@ -189,7 +215,10 @@ impl Parser {
                 }
             }
             if !self.at(RPAR) {
-                self.error_until("Expecting ')'", TokenSet::create(&[RPAR, COLON, LBRACE, RBRACE, EQ, EOL_OR_SEMICOLON]));
+                self.error_until(
+                    "Expecting ')'",
+                    TokenSet::create(&[RPAR, COLON, LBRACE, RBRACE, EQ, EOL_OR_SEMICOLON]),
+                );
             }
             if self.at(RPAR) {
                 self.advance();
@@ -216,7 +245,11 @@ impl Parser {
         if property_component_kind == PropertyComponentKind::Field {
             self.close_declaration_with_comment_binders(property_component, BACKING_FIELD, true);
         } else {
-            self.close_declaration_with_comment_binders(property_component, PROPERTY_ACCESSOR, true);
+            self.close_declaration_with_comment_binders(
+                property_component,
+                PROPERTY_ACCESSOR,
+                true,
+            );
         }
 
         Some(property_component_kind)

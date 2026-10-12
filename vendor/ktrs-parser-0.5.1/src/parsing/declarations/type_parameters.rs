@@ -4,8 +4,8 @@ use ktrs_syntax::SyntaxKind::*;
 
 use super::parameters::AnnotationParsingMode;
 use super::{
-    COLON_COMMA_LBRACE_RBRACE_TYPE_REF_FIRST_SET, GT_COMMA_COLON_SET, LBRACE_RBRACE_TYPE_REF_FIRST_SET,
-    TYPE_PARAMETER_GT_RECOVERY_SET,
+    COLON_COMMA_LBRACE_RBRACE_TYPE_REF_FIRST_SET, GT_COMMA_COLON_SET,
+    LBRACE_RBRACE_TYPE_REF_FIRST_SET, TYPE_PARAMETER_GT_RECOVERY_SET,
 };
 use crate::parsing::Parser;
 use crate::token_set::TokenSet;
@@ -106,13 +106,21 @@ impl Parser {
         self.parse_annotations(AnnotationParsingMode::Default);
 
         let reference = self.mark();
-        if self.expect_3(IDENTIFIER, "Expecting type parameter name", Some(COLON_COMMA_LBRACE_RBRACE_TYPE_REF_FIRST_SET)) {
+        if self.expect_3(
+            IDENTIFIER,
+            "Expecting type parameter name",
+            Some(COLON_COMMA_LBRACE_RBRACE_TYPE_REF_FIRST_SET),
+        ) {
             reference.done(self, REFERENCE_EXPRESSION);
         } else {
             reference.drop(self);
         }
 
-        self.expect_3(COLON, "Expecting ':' before the upper bound", Some(LBRACE_RBRACE_TYPE_REF_FIRST_SET));
+        self.expect_3(
+            COLON,
+            "Expecting ':' before the upper bound",
+            Some(LBRACE_RBRACE_TYPE_REF_FIRST_SET),
+        );
 
         self.parse_type_ref();
 
@@ -142,7 +150,11 @@ impl Parser {
 
         self.parse_modifier_list(GT_COMMA_COLON_SET);
 
-        self.expect_3(IDENTIFIER, "Type parameter name expected", Some(TokenSet::EMPTY));
+        self.expect_3(
+            IDENTIFIER,
+            "Type parameter name expected",
+            Some(TokenSet::EMPTY),
+        );
 
         if self.at(COLON) {
             self.advance(); // COLON

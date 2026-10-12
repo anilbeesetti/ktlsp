@@ -73,8 +73,12 @@ impl Parser {
             Some(CHARACTER_LITERAL) => self.parse_one_token_expression(CHARACTER_CONSTANT),
             Some(FLOAT_LITERAL) => self.parse_one_token_expression(FLOAT_CONSTANT),
             Some(NULL_KEYWORD) => self.parse_one_token_expression(NULL),
-            Some(CLASS_KEYWORD | INTERFACE_KEYWORD | FUN_KEYWORD | VAL_KEYWORD | VAR_KEYWORD | TYPE_ALIAS_KEYWORD) => {
-                let rollback_if_definitely_not_expression = self.my_builder.newline_before_current_token();
+            Some(
+                CLASS_KEYWORD | INTERFACE_KEYWORD | FUN_KEYWORD | VAL_KEYWORD | VAR_KEYWORD
+                | TYPE_ALIAS_KEYWORD,
+            ) => {
+                let rollback_if_definitely_not_expression =
+                    self.my_builder.newline_before_current_token();
                 if !self.parse_local_declaration(rollback_if_definitely_not_expression, false) {
                     ok = false;
                 }
@@ -87,7 +91,10 @@ impl Parser {
             // TODO: better recovery if FIRST(element) did not match
             self.error_with_recovery(
                 "Expecting an element",
-                Some(TokenSet::or_set(&[EXPRESSION_FOLLOW, TokenSet::create(&[LONG_TEMPLATE_ENTRY_END])])),
+                Some(TokenSet::or_set(&[
+                    EXPRESSION_FOLLOW,
+                    TokenSet::create(&[LONG_TEMPLATE_ENTRY_END]),
+                ])),
             );
         }
 

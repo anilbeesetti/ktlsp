@@ -13,8 +13,8 @@ use ktrs_syntax::Parse;
 pub use builder::ChameleonCache;
 
 pub use parsing::kotlin_parser::{
-    parse_block_code_fragment, parse_block_expression, parse_expression_code_fragment, parse_lambda_expression,
-    parse_type_code_fragment,
+    parse_block_code_fragment, parse_block_expression, parse_expression_code_fragment,
+    parse_lambda_expression, parse_type_code_fragment,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

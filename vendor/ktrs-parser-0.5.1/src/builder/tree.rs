@@ -34,7 +34,11 @@ impl LazyLeaf<'_> {
     /// counting agrees with `advanceBalancedBlock`.
     pub(crate) fn relexed_builder(&self) -> PsiBuilder {
         let (start, end) = (self.start, self.end);
-        PsiBuilder::from_lexemes(self.text, &self.outer.lex_starts[start..=end], &self.outer.orig_types[start..end])
+        PsiBuilder::from_lexemes(
+            self.text,
+            &self.outer.lex_starts[start..=end],
+            &self.outer.orig_types[start..end],
+        )
     }
 }
 
@@ -46,7 +50,12 @@ impl PsiBuilder {
     }
 
     /// `getTreeBuilt` into a shared sink; the root node gets `root_kind` if given.
-    pub fn build_tree_into(&mut self, root_kind: Option<SyntaxKind>, sink: &mut TreeSink, lazy: &impl LazyReparse) {
+    pub fn build_tree_into(
+        &mut self,
+        root_kind: Option<SyntaxKind>,
+        sink: &mut TreeSink,
+        lazy: &impl LazyReparse,
+    ) {
         assert!(!self.production.is_empty(), "Parser produced no markers");
         self.balance_white_spaces();
         let mut skipped_errors = std::mem::take(&mut self.skipped_errors);
@@ -55,8 +64,15 @@ impl PsiBuilder {
         self.bind(root_kind, &skipped_errors, sink, lazy);
         self.skipped_errors = skipped_errors;
         if self.current_lexeme < self.lexeme_count() {
-            let tokens = self.lex_types[self.current_lexeme..].iter().map(|kind| kind.debug_name()).collect();
-            sink.missed_tokens.push(MissedTokens { element: root, tokens, text: self.text.to_string() });
+            let tokens = self.lex_types[self.current_lexeme..]
+                .iter()
+                .map(|kind| kind.debug_name())
+                .collect();
+            sink.missed_tokens.push(MissedTokens {
+                element: root,
+                tokens,
+                text: self.text.to_string(),
+            });
         }
     }
 
@@ -69,16 +85,25 @@ impl PsiBuilder {
             let id = self.production.list[i];
             let done = id < 0;
             let item = self.production.marker(id);
-            assert!(done || item.is_error_item || item.is_done(), "Unbalanced tree: marker not done");
+            assert!(
+                done || item.is_error_item || item.is_done(),
+                "Unbalanced tree: marker not done"
+            );
 
-            let binder = if item.is_error_item { EdgeBinder::DefaultRight } else { item.get_binder(done) };
+            let binder = if item.is_error_item {
+                EdgeBinder::DefaultRight
+            } else {
+                item.get_binder(done)
+            };
             let mut lexeme_index = item.get_lexeme_index(done);
 
             // The default binders always land on the run's end (left) or start (right), so they
             // skip scanning the other side; the result equals the general path's.
             if binder == EdgeBinder::DefaultLeft {
                 lexeme_index = self.shift_over_whitespace_forward(lexeme_index as usize) as i32;
-                self.production.marker_mut(id).set_lexeme_index(lexeme_index, done);
+                self.production
+                    .marker_mut(id)
+                    .set_lexeme_index(lexeme_index, done);
                 (last_index, prev_index) = (lexeme_index, lexeme_index);
                 continue;
             }
@@ -90,7 +115,9 @@ impl PsiBuilder {
                 ws_start_index -= 1;
             }
             if binder == EdgeBinder::DefaultRight {
-                self.production.marker_mut(id).set_lexeme_index(ws_start_index, done);
+                self.production
+                    .marker_mut(id)
+                    .set_lexeme_index(ws_start_index, done);
                 (last_index, prev_index) = (ws_start_index, ws_start_index);
                 continue;
             }
@@ -104,10 +131,14 @@ impl PsiBuilder {
                 let getter = |i: usize| self.token_text(start + i);
                 let edge = binder.get_edge_position(&self.lex_types[start..end], at_end, &getter);
                 lexeme_index = ws_start_index + edge as i32;
-                self.production.marker_mut(id).set_lexeme_index(lexeme_index, done);
+                self.production
+                    .marker_mut(id)
+                    .set_lexeme_index(lexeme_index, done);
             } else if lexeme_index < ws_start_index {
                 lexeme_index = ws_start_index;
-                self.production.marker_mut(id).set_lexeme_index(ws_start_index, done);
+                self.production
+                    .marker_mut(id)
+                    .set_lexeme_index(ws_start_index, done);
             }
 
             last_index = lexeme_index;
@@ -137,7 +168,13 @@ impl PsiBuilder {
     }
 
     /// Walks the production in order; equivalent to `bind` over the light tree.
-    fn bind(&self, root_kind: Option<SyntaxKind>, skipped_errors: &[bool], out: &mut TreeSink, lazy: &impl LazyReparse) {
+    fn bind(
+        &self,
+        root_kind: Option<SyntaxKind>,
+        skipped_errors: &[bool],
+        out: &mut TreeSink,
+        lazy: &impl LazyReparse,
+    ) {
         let list = &self.production.list;
         let root = self.production.marker(list[0]);
         out.start_node(root_kind.unwrap_or_else(|| kind_of(root.kind)));
@@ -159,19 +196,34 @@ impl PsiBuilder {
             } else if item.is_error_item {
                 if !skipped_errors[i] {
                     lex_index = self.insert_leaves(lex_index, item.lexeme, out, lazy);
-                    out.errors.push(self.production.message(id).unwrap_or_default().to_owned());
+                    out.errors
+                        .push(self.production.message(id).unwrap_or_default().to_owned());
                     out.start_node(SyntaxKind::ERROR_ELEMENT);
                     out.finish_node();
                 }
             } else {
                 lex_index = self.insert_leaves(lex_index, item.lexeme, out, lazy);
                 if item.collapsed {
-                    lex_index = self.collapse_leaves(item.lexeme, item.done_lexeme, kind_of(item.kind), out, lazy);
-                    i = list[i..].iter().position(|&x| x == -id).map_or(list.len(), |p| i + p);
+                    lex_index = self.collapse_leaves(
+                        item.lexeme,
+                        item.done_lexeme,
+                        kind_of(item.kind),
+                        out,
+                        lazy,
+                    );
+                    i = list[i..]
+                        .iter()
+                        .position(|&x| x == -id)
+                        .map_or(list.len(), |p| i + p);
                 } else {
                     let kind = kind_of(item.kind);
                     if kind == SyntaxKind::ERROR_ELEMENT {
-                        out.errors.push(self.production.message(id).expect("error marker without message").to_owned());
+                        out.errors.push(
+                            self.production
+                                .message(id)
+                                .expect("error marker without message")
+                                .to_owned(),
+                        );
                     }
                     out.start_node(kind);
                     depth += 1;
@@ -185,7 +237,13 @@ impl PsiBuilder {
         }
     }
 
-    fn insert_leaves(&self, cur_token: usize, last_idx: i32, out: &mut TreeSink, lazy: &impl LazyReparse) -> usize {
+    fn insert_leaves(
+        &self,
+        cur_token: usize,
+        last_idx: i32,
+        out: &mut TreeSink,
+        lazy: &impl LazyReparse,
+    ) -> usize {
         let last_idx = (last_idx.max(0) as usize).min(self.lexeme_count());
         if cur_token >= last_idx {
             return cur_token;
@@ -202,7 +260,14 @@ impl PsiBuilder {
         last_idx
     }
 
-    fn collapse_leaves(&self, start: i32, end: i32, kind: SyntaxKind, out: &mut TreeSink, lazy: &impl LazyReparse) -> usize {
+    fn collapse_leaves(
+        &self,
+        start: i32,
+        end: i32,
+        kind: SyntaxKind,
+        out: &mut TreeSink,
+        lazy: &impl LazyReparse,
+    ) -> usize {
         let (start, end) = (start as usize, end as usize);
         let text = &self.text[self.lex_starts[start] as usize..self.lex_starts[end] as usize];
         self.create_leaf(kind, start, end, text, out, lazy);
@@ -219,7 +284,13 @@ impl PsiBuilder {
         out: &mut TreeSink,
         lazy: &impl LazyReparse,
     ) {
-        let leaf = LazyLeaf { kind, text, outer: self, start, end };
+        let leaf = LazyLeaf {
+            kind,
+            text,
+            outer: self,
+            start,
+            end,
+        };
         if !lazy(&leaf, out) {
             out.token(kind, leaf.text);
         }

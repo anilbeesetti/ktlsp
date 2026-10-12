@@ -98,7 +98,10 @@ impl SemanticWhitespaceAwarePsiBuilder {
         }
 
         let raw_look_ahead_steps = self.raw_look_ahead(steps);
-        if is_offset_beyond_eof(eof_position, self.psi.raw_token_type_start(raw_look_ahead_steps)) {
+        if is_offset_beyond_eof(
+            eof_position,
+            self.psi.raw_token_type_start(raw_look_ahead_steps),
+        ) {
             return None;
         }
 

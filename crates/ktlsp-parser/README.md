@@ -67,7 +67,8 @@ native/JVM dependencies. Upstream dev dependencies (mimalloc/expect-test), facad
 as runnable dependencies. The root workspace excludes the standalone vendor workspace; production parser
 regressions run in this crate. No upstream dev dependencies enter native tests.
 The parser's original archive checksum and all 54 source hashes remain in vendor
-provenance; recovery.patch reproduces all changes. Other registry SHA-256 values
+provenance; recovery.patch followed by formatting.patch reproduces final source
+bytes, recorded in formatted-sha256.json. Formatting has no opt-out. Other registry SHA-256 values
 match Cargo.lock:
 
 | Archive | SHA-256 |

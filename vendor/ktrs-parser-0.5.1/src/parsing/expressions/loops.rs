@@ -3,8 +3,8 @@
 use ktrs_syntax::SyntaxKind::*;
 
 use super::{
-    COLON_IN_KEYWORD_SET, IN_KEYWORD_L_BRACE_RECOVERY_SET, IN_KEYWORD_L_BRACE_SET, IN_KEYWORD_R_PAR_COLON_SET,
-    IN_KEYWORD_SET, L_PAR_L_BRACE_R_PAR_SET,
+    COLON_IN_KEYWORD_SET, IN_KEYWORD_L_BRACE_RECOVERY_SET, IN_KEYWORD_L_BRACE_SET,
+    IN_KEYWORD_R_PAR_COLON_SET, IN_KEYWORD_SET, L_PAR_L_BRACE_R_PAR_SET,
 };
 use crate::parsing::Parser;
 use crate::parsing::declarations::{EXPRESSION_FIRST, MultiDeclarationMode};
@@ -26,7 +26,10 @@ impl Parser {
             self.parse_loop_body();
         }
 
-        if self.expect_2(WHILE_KEYWORD, "Expecting 'while' followed by a post-condition") {
+        if self.expect_2(
+            WHILE_KEYWORD,
+            "Expecting 'while' followed by a post-condition",
+        ) {
             self.parse_condition();
         }
 
@@ -66,7 +69,11 @@ impl Parser {
 
         self.advance(); // FOR_KEYWORD
 
-        if self.expect_3(LPAR, "Expecting '(' to open a loop range", Some(EXPRESSION_FIRST)) {
+        if self.expect_3(
+            LPAR,
+            "Expecting '(' to open a loop range",
+            Some(EXPRESSION_FIRST),
+        ) {
             self.my_builder.disable_newlines();
 
             if !self.at(RPAR) {
@@ -88,10 +95,18 @@ impl Parser {
                     } else {
                         MultiDeclarationMode::Short
                     };
-                    self.parse_multi_declaration_entry(IN_KEYWORD_L_BRACE_SET, IN_KEYWORD_L_BRACE_RECOVERY_SET, mode);
+                    self.parse_multi_declaration_entry(
+                        IN_KEYWORD_L_BRACE_SET,
+                        IN_KEYWORD_L_BRACE_RECOVERY_SET,
+                        mode,
+                    );
                     destructuring_declaration.done(self, DESTRUCTURING_DECLARATION);
                 } else {
-                    self.expect_3(IDENTIFIER, "Expecting a variable name", Some(COLON_IN_KEYWORD_SET));
+                    self.expect_3(
+                        IDENTIFIER,
+                        "Expecting a variable name",
+                        Some(COLON_IN_KEYWORD_SET),
+                    );
 
                     if self.at(COLON) {
                         self.advance(); // COLON

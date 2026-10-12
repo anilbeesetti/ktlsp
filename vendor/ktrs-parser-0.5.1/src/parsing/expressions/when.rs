@@ -78,7 +78,10 @@ impl Parser {
             self.parse_when_entry_guard_or_suggest();
 
             if !self.at(ARROW) {
-                self.error_until("Expecting '->'", TokenSet::create(&[ARROW, LBRACE, RBRACE, EOL_OR_SEMICOLON]));
+                self.error_until(
+                    "Expecting '->'",
+                    TokenSet::create(&[ARROW, LBRACE, RBRACE, EOL_OR_SEMICOLON]),
+                );
             }
 
             if self.at(ARROW) {

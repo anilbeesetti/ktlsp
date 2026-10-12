@@ -5,7 +5,8 @@ use ktrs_syntax::SyntaxKind::{self, *};
 use super::{STATEMENT_FIRST, STATEMENT_NEW_LINE_QUICK_RECOVERY_SET};
 use crate::parsing::Parser;
 use crate::parsing::declarations::{
-    AnnotationParsingMode, DeclarationParsingMode, EXPRESSION_FIRST, ModifierDetector, NameParsingMode,
+    AnnotationParsingMode, DeclarationParsingMode, EXPRESSION_FIRST, ModifierDetector,
+    NameParsingMode,
 };
 use crate::token_set::TokenSet;
 
@@ -40,12 +41,16 @@ impl Parser {
             } else if self.at(RBRACE) {
                 break;
             } else if !is_script_top_level && !self.my_builder.newline_before_current_token() {
-                let several_statements_error = "Unexpected tokens (use ';' to separate expressions on the same line)";
+                let several_statements_error =
+                    "Unexpected tokens (use ';' to separate expressions on the same line)";
 
                 if self.at_set(STATEMENT_NEW_LINE_QUICK_RECOVERY_SET) {
                     self.error(several_statements_error);
                 } else {
-                    self.error_until(several_statements_error, TokenSet::create(&[EOL_OR_SEMICOLON, LBRACE, RBRACE]));
+                    self.error_until(
+                        several_statements_error,
+                        TokenSet::create(&[EOL_OR_SEMICOLON, LBRACE, RBRACE]),
+                    );
                 }
             }
         }
@@ -58,7 +63,10 @@ impl Parser {
      *  ;
      */
     pub(crate) fn parse_statement(&mut self, is_script_top_level: bool) {
-        if !self.parse_local_declaration(/* rollbackIfDefinitelyNotExpression = */ false, is_script_top_level) {
+        if !self.parse_local_declaration(
+            /* rollbackIfDefinitelyNotExpression = */ false,
+            is_script_top_level,
+        ) {
             if !self.at_set(EXPRESSION_FIRST) {
                 self.error_and_advance("Expecting a statement");
             } else if is_script_top_level {
@@ -137,7 +145,11 @@ impl Parser {
         self.parse_common_declaration(
             modifier_detector,
             NameParsingMode::Required,
-            if is_script_top_level { DeclarationParsingMode::ScriptToplevel } else { DeclarationParsingMode::Local },
+            if is_script_top_level {
+                DeclarationParsingMode::ScriptToplevel
+            } else {
+                DeclarationParsingMode::Local
+            },
         )
     }
 }

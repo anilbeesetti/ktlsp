@@ -31,7 +31,10 @@ struct BoolStack {
 
 impl BoolStack {
     fn new(initial: bool) -> BoolStack {
-        BoolStack { top: Some(initial), below: Vec::new() }
+        BoolStack {
+            top: Some(initial),
+            below: Vec::new(),
+        }
     }
 
     fn push(&mut self, value: bool) {
@@ -157,20 +160,30 @@ impl SemanticWhitespaceAwarePsiBuilder {
     #[inline(never)]
     fn impl_get_token_type_uncached(&mut self) -> Option<SyntaxKind> {
         let raw = self.psi.get_token_type();
-        let tt = if self.join_complex_tokens() { self.get_joined_token_type(raw, 1) } else { raw };
+        let tt = if self.join_complex_tokens() {
+            self.get_joined_token_type(raw, 1)
+        } else {
+            raw
+        };
         (self.tt_lexeme, self.tt) = (self.psi.current_lexeme, tt);
         tt
     }
 
     #[inline]
-    fn get_joined_token_type(&self, raw_token_type: Option<SyntaxKind>, raw_lookup_steps: i32) -> Option<SyntaxKind> {
+    fn get_joined_token_type(
+        &self,
+        raw_token_type: Option<SyntaxKind>,
+        raw_lookup_steps: i32,
+    ) -> Option<SyntaxKind> {
         match raw_token_type {
             Some(QUEST) => match self.psi.raw_lookup(raw_lookup_steps) {
                 Some(DOT) => return Some(SAFE_ACCESS),
                 Some(COLON) => return Some(ELVIS),
                 _ => {}
             },
-            Some(EXCL) if self.psi.raw_lookup(raw_lookup_steps) == Some(EXCL) => return Some(EXCLEXCL),
+            Some(EXCL) if self.psi.raw_lookup(raw_lookup_steps) == Some(EXCL) => {
+                return Some(EXCLEXCL);
+            }
             _ => {}
         }
         raw_token_type

@@ -49,21 +49,40 @@ impl Marker {
         builder.mark_collapsed(self);
     }
 
-    pub fn done_before<H: MarkerHost + ?Sized>(self, host: &mut H, kind: SyntaxKind, before: Marker) {
-        host.psi_builder().process_done(self, kind, None, Some(before));
+    pub fn done_before<H: MarkerHost + ?Sized>(
+        self,
+        host: &mut H,
+        kind: SyntaxKind,
+        before: Marker,
+    ) {
+        host.psi_builder()
+            .process_done(self, kind, None, Some(before));
     }
 
     /// `doneBefore(type, before, errorMessage)`.
-    pub fn done_before_3<H: MarkerHost + ?Sized>(self, host: &mut H, kind: SyntaxKind, before: Marker, error_message: &str) {
-        host.psi_builder().done_before_with_error_item(self, kind, before, error_message);
+    pub fn done_before_3<H: MarkerHost + ?Sized>(
+        self,
+        host: &mut H,
+        kind: SyntaxKind,
+        before: Marker,
+        error_message: &str,
+    ) {
+        host.psi_builder()
+            .done_before_with_error_item(self, kind, before, error_message);
     }
 
     pub fn error<H: MarkerHost + ?Sized>(self, host: &mut H, message: &str) {
-        host.psi_builder().process_done(self, SyntaxKind::ERROR_ELEMENT, Some(message), None);
+        host.psi_builder()
+            .process_done(self, SyntaxKind::ERROR_ELEMENT, Some(message), None);
     }
 
     pub fn error_before<H: MarkerHost + ?Sized>(self, host: &mut H, message: &str, before: Marker) {
-        host.psi_builder().process_done(self, SyntaxKind::ERROR_ELEMENT, Some(message), Some(before));
+        host.psi_builder().process_done(
+            self,
+            SyntaxKind::ERROR_ELEMENT,
+            Some(message),
+            Some(before),
+        );
     }
 
     /// `None` keeps the current binder for that edge (Java passes `null`).

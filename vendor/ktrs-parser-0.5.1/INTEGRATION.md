@@ -4,9 +4,10 @@ Coordinator transferred parser ownership after #86/PR92 delivery at0ac012fd;
 consumer development integrated main19e6242, then the explicitly released
 preparation target583a0adc32c79c1a68257855c4ee7432f0088796 once (merge8d833c12).
 Both source-only integration reviews approve the original corpus, graph and
-provenance. Execution remains reserved for #95: actual dependency resolution,
-production checks, behavioral reviews, hosted CI and expected-head merge grant
-remain pending. No parser lib.rs or shared status document was edited.
+provenance. Initial dependency resolution and production checks passed on the behavioral
+source. Execution is now reserved for #89 while formatting/provenance reviews
+proceed; final integration/checks, both behavioral reviews, hosted CI and
+expected-head merge grant remain pending. No parser lib.rs or shared status document was edited.
 
 Authorized graph changes:
 - `crates/ktlsp-parser/Cargo.toml` direct dependency becomes
@@ -20,7 +21,8 @@ No new package/external dependency, syntax/server/common API/limit change. Exist
 supervised worker stays the sole product invocation. The fork and optional
 worker-probe have standalone workspaces/locks; default native tests do not enroll
 upstream dev dependencies or tests. Original source inventory/checksum/notices
-remain preserved. Verify actual resolved normal/build/default-test graph and
+remain preserved. recovery.patch plus the separate formatting.patch reproduces
+all 54 final source hashes; no formatting opt-out is used. Verify actual resolved normal/build/default-test graph and
 workspace membership after the coordinator grants a local check slot.
 
 Production declaration tests replace three parameter-list known-defect assertions

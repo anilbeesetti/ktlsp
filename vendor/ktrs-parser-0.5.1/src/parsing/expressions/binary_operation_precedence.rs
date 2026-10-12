@@ -25,8 +25,18 @@ use BinaryOperationPrecedence as P;
 
 impl BinaryOperationPrecedence {
     pub(crate) const ENTRIES: [BinaryOperationPrecedence; 12] = [
-        P::As, P::Multiplicative, P::Additive, P::Range, P::Infix, P::Elvis, P::InOrIs, P::Comparison, P::Equality,
-        P::Conjunction, P::Disjunction, P::Assignment,
+        P::As,
+        P::Multiplicative,
+        P::Additive,
+        P::Range,
+        P::Infix,
+        P::Elvis,
+        P::InOrIs,
+        P::Comparison,
+        P::Equality,
+        P::Conjunction,
+        P::Disjunction,
+        P::Assignment,
     ];
 
     pub(crate) fn ordinal(self) -> usize {
@@ -56,10 +66,14 @@ impl BinaryOperationPrecedence {
 
     /// `TOKEN_TO_BINARY_PRECEDENCE_MAP_WITH_SOFT_IDENTIFIERS.get(token)`: soft keywords map like
     /// `IDENTIFIER` (INFIX).
-    pub(crate) fn token_to_binary_precedence_map_with_soft_identifiers(token: SyntaxKind) -> Option<BinaryOperationPrecedence> {
+    pub(crate) fn token_to_binary_precedence_map_with_soft_identifiers(
+        token: SyntaxKind,
+    ) -> Option<BinaryOperationPrecedence> {
         if SOFT_KEYWORDS.contains(token) {
             return Some(P::Infix);
         }
-        Self::ENTRIES.into_iter().find(|p| p.tokens().contains(&token))
+        Self::ENTRIES
+            .into_iter()
+            .find(|p| p.tokens().contains(&token))
     }
 }

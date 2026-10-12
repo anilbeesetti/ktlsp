@@ -10,7 +10,10 @@ use crate::token_set::TokenSet;
 
 impl Parser {
     /// `AbstractKotlinParsing.matchTokenStreamPredicate`.
-    pub(crate) fn match_token_stream_predicate(&mut self, pattern: &mut dyn TokenStreamPattern) -> i32 {
+    pub(crate) fn match_token_stream_predicate(
+        &mut self,
+        pattern: &mut dyn TokenStreamPattern,
+    ) -> i32 {
         let current_position = self.mark();
         let mut opens: Vec<SyntaxKind> = Vec::new();
         let mut open_angle_brackets = 0;
@@ -19,7 +22,12 @@ impl Parser {
         let mut open_brackets = 0;
         while !self.eof() {
             let offset = self.my_builder.get_current_offset();
-            let top_level = pattern.is_top_level(open_angle_brackets, open_brackets, open_braces, open_parentheses);
+            let top_level = pattern.is_top_level(
+                open_angle_brackets,
+                open_brackets,
+                open_braces,
+                open_parentheses,
+            );
             if pattern.process_token(self, offset, top_level) {
                 break;
             }
@@ -100,7 +108,13 @@ pub trait TokenStreamPattern {
     /// The offset where the pattern matched, -1 if none.
     fn result(&self) -> i32;
 
-    fn is_top_level(&self, open_angle_brackets: i32, open_brackets: i32, open_braces: i32, open_parentheses: i32) -> bool {
+    fn is_top_level(
+        &self,
+        open_angle_brackets: i32,
+        open_brackets: i32,
+        open_braces: i32,
+        open_parentheses: i32,
+    ) -> bool {
         open_braces == 0 && open_brackets == 0 && open_parentheses == 0 && open_angle_brackets == 0
     }
 
@@ -118,7 +132,9 @@ pub struct AbstractTokenStreamPattern {
 
 impl Default for AbstractTokenStreamPattern {
     fn default() -> Self {
-        AbstractTokenStreamPattern { last_occurrence: -1 }
+        AbstractTokenStreamPattern {
+            last_occurrence: -1,
+        }
     }
 }
 
@@ -140,7 +156,11 @@ pub struct FirstBefore<L, S> {
 
 impl<L: TokenStreamPredicate, S: TokenStreamPredicate> FirstBefore<L, S> {
     pub fn new(look_for: L, stop_at: S) -> Self {
-        FirstBefore { base: AbstractTokenStreamPattern::default(), look_for, stop_at }
+        FirstBefore {
+            base: AbstractTokenStreamPattern::default(),
+            look_for,
+            stop_at,
+        }
     }
 
     pub fn reset(&mut self) {
@@ -228,7 +248,10 @@ impl At {
     }
 
     pub fn new_2(look_for: SyntaxKind, top_level_only: bool) -> At {
-        At { look_for, top_level_only }
+        At {
+            look_for,
+            top_level_only,
+        }
     }
 }
 
@@ -250,7 +273,10 @@ impl AtSet {
     }
 
     pub fn new_2(look_for: TokenSet, top_level_only: TokenSet) -> AtSet {
-        AtSet { look_for, top_level_only }
+        AtSet {
+            look_for,
+            top_level_only,
+        }
     }
 }
 

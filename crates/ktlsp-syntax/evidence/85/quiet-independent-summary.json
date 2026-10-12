@@ -1,0 +1,192 @@
+{
+  "complete": true,
+  "children": 48,
+  "elapsed_s": 1.400922749999154,
+  "timing": "uninstrumented batch average, one measured call after validation per fresh child",
+  "comparisons": [
+    {
+      "corpus": "large",
+      "malloc_nano_zone": "default",
+      "raw_ns": {
+        "current": [
+          6354583,
+          6565167,
+          6349709
+        ],
+        "candidate": [
+          6227958,
+          6556125,
+          6596208
+        ]
+      },
+      "median_ns": {
+        "current": 6354583,
+        "candidate": 6556125
+      },
+      "candidate_ratio": 1.031716007171517,
+      "gate_ns": 6990041.300000001,
+      "passes_gate": true
+    },
+    {
+      "corpus": "large",
+      "malloc_nano_zone": "0",
+      "raw_ns": {
+        "current": [
+          6614417,
+          6704417,
+          6573625
+        ],
+        "candidate": [
+          6469041,
+          6823833,
+          6603833
+        ]
+      },
+      "median_ns": {
+        "current": 6614417,
+        "candidate": 6603833
+      },
+      "candidate_ratio": 0.9983998589747214,
+      "gate_ns": 7275858.7,
+      "passes_gate": true
+    },
+    {
+      "corpus": "short_tokens",
+      "malloc_nano_zone": "default",
+      "raw_ns": {
+        "current": [
+          10816125,
+          11864334,
+          11627292
+        ],
+        "candidate": [
+          10271334,
+          11502750,
+          11335583
+        ]
+      },
+      "median_ns": {
+        "current": 11627292,
+        "candidate": 11335583
+      },
+      "candidate_ratio": 0.9749116991299436,
+      "gate_ns": 12790021.200000001,
+      "passes_gate": true
+    },
+    {
+      "corpus": "short_tokens",
+      "malloc_nano_zone": "0",
+      "raw_ns": {
+        "current": [
+          11287166,
+          11652209,
+          11312459
+        ],
+        "candidate": [
+          11466334,
+          11119917,
+          11208875
+        ]
+      },
+      "median_ns": {
+        "current": 11312459,
+        "candidate": 11208875
+      },
+      "candidate_ratio": 0.9908433701284575,
+      "gate_ns": 12443704.9,
+      "passes_gate": true
+    },
+    {
+      "corpus": "dense_sparse",
+      "malloc_nano_zone": "default",
+      "raw_ns": {
+        "current": [
+          10931834,
+          11142875,
+          10973208
+        ],
+        "candidate": [
+          10802041,
+          11154708,
+          11147208
+        ]
+      },
+      "median_ns": {
+        "current": 10973208,
+        "candidate": 11147208
+      },
+      "candidate_ratio": 1.015856803224727,
+      "gate_ns": 12070628.8,
+      "passes_gate": true
+    },
+    {
+      "corpus": "dense_sparse",
+      "malloc_nano_zone": "0",
+      "raw_ns": {
+        "current": [
+          11183041,
+          10949375,
+          10962000
+        ],
+        "candidate": [
+          10923542,
+          11328833,
+          11147250
+        ]
+      },
+      "median_ns": {
+        "current": 10962000,
+        "candidate": 11147250
+      },
+      "candidate_ratio": 1.0168992884510126,
+      "gate_ns": 12058300.000000002,
+      "passes_gate": true
+    },
+    {
+      "corpus": "sparse_dense",
+      "malloc_nano_zone": "default",
+      "raw_ns": {
+        "current": [
+          21869000,
+          22003917,
+          21842625
+        ],
+        "candidate": [
+          21881625,
+          22301750,
+          21634875
+        ]
+      },
+      "median_ns": {
+        "current": 21869000,
+        "candidate": 21881625
+      },
+      "candidate_ratio": 1.0005773012026156,
+      "gate_ns": 24056000.000000004,
+      "passes_gate": true
+    },
+    {
+      "corpus": "sparse_dense",
+      "malloc_nano_zone": "0",
+      "raw_ns": {
+        "current": [
+          22450542,
+          21887250,
+          22168083
+        ],
+        "candidate": [
+          21942959,
+          21663834,
+          23004292
+        ]
+      },
+      "median_ns": {
+        "current": 22168083,
+        "candidate": 21942959
+      },
+      "candidate_ratio": 0.9898446789467542,
+      "gate_ns": 24384991.3,
+      "passes_gate": true
+    }
+  ]
+}

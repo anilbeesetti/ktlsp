@@ -8,11 +8,10 @@ fn request(session: &mut Session, id: Value, method: &str, params: Value) -> Val
     responses.into_iter().next().unwrap()
 }
 fn notify(session: &mut Session, method: &str, params: Value) {
-    assert!(
-        session
-            .handle(json!({"jsonrpc":"2.0","method":method,"params":params}))
-            .is_empty()
-    );
+    for output in session.handle(json!({"jsonrpc":"2.0","method":method,"params":params})) {
+        assert_eq!(output["method"], "textDocument/publishDiagnostics");
+        assert!(output.get("id").is_none());
+    }
 }
 fn initialize(session: &mut Session) -> Value {
     request(session, json!(1), "initialize", json!({"capabilities":{}}))
@@ -52,7 +51,7 @@ fn lifecycle_states_and_honest_capabilities() {
     let result = initialize(&mut session);
     assert_eq!(
         result["result"]["capabilities"],
-        json!({"positionEncoding":"utf-16","textDocumentSync":{"openClose":true,"change":2,"save":false}})
+        json!({"positionEncoding":"utf-16","foldingRangeProvider":true,"textDocumentSync":{"openClose":true,"change":2,"save":false}})
     );
     assert_eq!(
         result["result"]["serverInfo"],

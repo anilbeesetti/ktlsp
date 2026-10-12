@@ -1,0 +1,7 @@
+inventory_epoch_ms=1791814134536
+matching_process_count=2
+process_name="Python" count=1
+process_name="unexpected-test" count=1
+distinct_names=2 displayed_limit=64
+inherited_MallocNanoZone=0
+allocator_override_name="MallocNanoZone" value_not_recorded

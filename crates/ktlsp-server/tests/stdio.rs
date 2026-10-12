@@ -86,7 +86,14 @@ fn native_subprocess_lifecycle_unicode_changes_and_stdout_cleanliness() {
     assert!(output.status.success());
     assert!(output.stderr.is_empty());
     let responses = decode(&output.stdout);
-    assert_eq!(responses.len(), 4);
+    assert_eq!(responses.len(), 6);
+    for response in &responses[2..4] {
+        assert_eq!(response["method"], "textDocument/publishDiagnostics");
+    }
+    let responses: Vec<_> = responses
+        .into_iter()
+        .filter(|r| r.get("id").is_some())
+        .collect();
     assert_eq!(responses[0]["error"]["code"], -32002);
     assert_eq!(responses[1]["id"], 0);
     assert_eq!(responses[2]["id"], json!(u64::MAX));
@@ -260,4 +267,63 @@ fn write_and_flush_errors_are_controlled() {
         ),
         1
     );
+}
+
+#[test]
+fn syntax_providers_work_over_fragmented_native_stdio_and_clear_after_changes_and_close() {
+    let mut messages = start();
+    messages.extend([
+        notification("textDocument/didOpen", json!({"textDocument":{"uri":"untitled:folding","languageId":"kotlin","version":1,"text":"val s = \"😀 }\"; {\r\n}\r\n]"}})),
+        request(json!("fold"), "textDocument/foldingRange", json!({"textDocument":{"uri":"untitled:folding"}})),
+        notification("textDocument/didChange", json!({"textDocument":{"uri":"untitled:folding","version":2},"contentChanges":[{"range":{"start":{"line":2,"character":0},"end":{"line":2,"character":1}},"text":""}]})),
+        notification("textDocument/didChange", json!({"textDocument":{"uri":"untitled:folding","version":3},"contentChanges":[{"text":"\"unterminated"}]})),
+        notification("textDocument/didClose", json!({"textDocument":{"uri":"untitled:folding"}})),
+        request(json!("closed"), "textDocument/foldingRange", json!({"textDocument":{"uri":"untitled:folding"}})),
+    ]);
+    messages.extend(end());
+    let output = execute(encode(&messages), true);
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let responses = decode(&output.stdout);
+    assert_eq!(responses.len(), 8);
+    assert_eq!(
+        responses[1]["params"]["diagnostics"][0]["code"],
+        "structural"
+    );
+    assert_eq!(
+        responses[2]["result"],
+        json!([{"startLine":0,"endLine":1,"startCharacter":16,"endCharacter":1,"kind":"region"}])
+    );
+    assert_eq!(responses[3]["params"]["diagnostics"], json!([]));
+    assert_eq!(responses[4]["params"]["diagnostics"][0]["code"], "lexical");
+    assert_eq!(responses[5]["params"]["diagnostics"], json!([]));
+    assert_eq!(responses[6]["error"]["code"], -32602);
+    assert_eq!(responses[7]["id"], "shutdown");
+}
+
+#[test]
+fn provider_limits_and_large_source_recover_over_native_stdio() {
+    let mut messages = start();
+    messages.extend([
+        notification("textDocument/didOpen", json!({"textDocument":{"uri":"untitled:large-folding","languageId":"kotlin","version":1,"text":"{\n}\n".repeat(30_000)}})),
+        request(json!("many"), "textDocument/foldingRange", json!({"textDocument":{"uri":"untitled:large-folding"}})),
+        notification("textDocument/didChange", json!({"textDocument":{"uri":"untitled:large-folding","version":2},"contentChanges":[{"text":"{".repeat(1025)}]})),
+        request(json!("limit"), "textDocument/foldingRange", json!({"textDocument":{"uri":"untitled:large-folding"}})),
+        notification("textDocument/didChange", json!({"textDocument":{"uri":"untitled:large-folding","version":3},"contentChanges":[{"text":"{\n}\n"}]})),
+        request(json!("recovered"), "textDocument/foldingRange", json!({"textDocument":{"uri":"untitled:large-folding"}})),
+    ]);
+    messages.extend(end());
+    let output = execute(encode(&messages), false);
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let responses = decode(&output.stdout);
+    assert_eq!(responses.len(), 8);
+    assert_eq!(responses[2]["result"].as_array().unwrap().len(), 10_000);
+    assert_eq!(
+        responses[3]["params"]["diagnostics"][0]["code"],
+        "analysis-limit"
+    );
+    assert_eq!(responses[4]["error"]["code"], -32803);
+    assert_eq!(responses[5]["params"]["diagnostics"], json!([]));
+    assert_eq!(responses[6]["result"].as_array().unwrap().len(), 1);
 }

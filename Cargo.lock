@@ -9,6 +9,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
+name = "ktlsp-artifacts"
+version = "0.1.0"
+
+[[package]]
 name = "ktlsp-binary"
 version = "0.1.0"
 
@@ -17,6 +21,17 @@ name = "ktlsp-import"
 version = "0.1.0"
 dependencies = [
  "ktlsp-project",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "ktlsp-parser"
+version = "0.1.0"
+dependencies = [
+ "ktlsp-text",
+ "ktrs-parser",
+ "ktrs-syntax",
  "serde",
  "serde_json",
 ]
@@ -38,6 +53,7 @@ name = "ktlsp-server"
 version = "0.1.0"
 dependencies = [
  "ktlsp-protocol",
+ "ktlsp-syntax",
  "ktlsp-text",
  "serde",
  "serde_json",
@@ -55,6 +71,32 @@ name = "ktlsp-text"
 version = "0.1.0"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "ktrs-lexer"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e085425e4b01ec2d56f4159051bf9152f149b5501ce13f7d05eb3a895c721f58"
+dependencies = [
+ "ktrs-syntax",
+]
+
+[[package]]
+name = "ktrs-parser"
+version = "0.5.1"
+dependencies = [
+ "ktrs-lexer",
+ "ktrs-syntax",
+]
+
+[[package]]
+name = "ktrs-syntax"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b29166c66ba5e9edb079497726eae48b28a5dc405b5e189d54ff96ddbd38e4f"
+dependencies = [
+ "text-size",
 ]
 
 [[package]]
@@ -134,6 +176,12 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "text-size"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f18aa187839b2bdb1ad2fa35ead8c4c2976b64e4363c386d45ac0f7ee85c9233"
 
 [[package]]
 name = "unicode-general-category"

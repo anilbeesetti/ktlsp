@@ -57,13 +57,18 @@ explicitly, never presented as a lossless tree.
 
 ## Adoption audit
 
-Only approved registry ktrs-parser/ktrs-syntax `=0.5.1` are direct dependencies.
-Locked additions are ktrs-lexer 0.5.1 and text-size 1.1.1. `cargo tree --locked
--p ktlsp-parser -e normal,build` contains these plus existing Rust serde/text
+The direct parser dependency is the audited local fork of ktrs-parser `=0.5.1`
+under `vendor/ktrs-parser-0.5.1`; ktrs-syntax `=0.5.1` remains a registry dependency.
+Locked transitive packages remain ktrs-lexer 0.5.1 and text-size 1.1.1. `cargo tree --locked
+-p ktlsp-parser -e normal,build` must contain these plus existing Rust serde/text
 packages; all four new crate manifests have no build script or normal/build
 native/JVM dependencies. Upstream dev dependencies (mimalloc/expect-test), facade
 (stacker), CLI and Java integration are excluded. No upstream tests are imported
-as runnable dependencies. Registry SHA-256 values match Cargo.lock:
+as runnable dependencies. The root workspace excludes the standalone vendor workspace; production parser
+regressions run in this crate. No upstream dev dependencies enter native tests.
+The parser's original archive checksum and all 54 source hashes remain in vendor
+provenance; recovery.patch reproduces all changes. Other registry SHA-256 values
+match Cargo.lock:
 
 | Archive | SHA-256 |
 | --- | --- |
@@ -90,11 +95,12 @@ research; the small harness and additional fixtures here are independently writt
 ## Remaining accepted child proposals
 
 T007b/#83 remains pending. Child #86 adds immutable snapshot/result validation and
-an exact named declaration corpus, including explicit missing-parameter/generic
-recovery counterexamples. It does not unlock T008a or establish the full #83
+an exact named declaration corpus. Child #87 supplies a source-local parameter-list
+boundary repair and production snapshot recovery controls; generic/default/type/
+annotation recovery gaps remain explicit. It does not unlock T008a or establish the full #83
 recovery/resource contract. See CORPUS.md for each tested outcome and gap.
-A coordinated upstream/fork/vendor recovery repair must retain later declarations
-before the parent gate can pass.
+The parent gate needs joint assessment of #86/#87 and remaining recovery/resource
+gaps before T008a can proceed.
 
 T008a declaration HIR child follows the accepted result/recovery gate: lower named
 declarations/package/imports to stable revisioned HIR; preserve parents, names,

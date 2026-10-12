@@ -1,7 +1,7 @@
-# Source-local review evidence — #87
+# Historical source-local review evidence — #87
 
-Not product delivery: #86 and explicit coordinator graph/parser handoff remain
-required. No JVM/oracle/Gradle/Maven or forbidden native dependency ran. Exact
+This records the source-local phase before #86 delivery and coordinator handoff.
+The handoff is now complete; production checks/reviews/CI remain required. No JVM/oracle/Gradle/Maven or forbidden native dependency ran. Exact
 source patch is recovery.patch; upstream-sha256.json fingerprints pristine source.
 
 Architect plan review identified shared-loop contexts, terminal recovery consuming

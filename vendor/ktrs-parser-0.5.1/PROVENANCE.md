@@ -1,6 +1,6 @@
 # T007b2 source-local parser repair
 
-Child #87 of #83/#7; integration depends on #86 and coordinator handoff.
+Child #87 of #83/#7; production development follows merged #86 and explicit coordinator handoff.
 
 Sources copied from the crates.io `ktrs-parser` 0.5.1 archive, SHA256
 `ec8d43d9549490689477385c7678bbd22ecbc445973ab364e8ecb69dd4882bcc`.
@@ -16,10 +16,13 @@ dependency is `text-size` 1.1.1. No external dependency addition. Upstream lib u
 tests depend on expect-test and are not run by this standalone harness; no
 mimalloc or facade/native parser dependencies are added. Ticket tests are original.
 
-The fork is currently standalone, outside the product graph. Standalone tests do
-not establish supervised-worker delivery. Direct upstream parse_file requires LF;
-CRLF/lone CR acceptance must exercise production's existing normalized-to-original
-mapping through the supervised worker after handoff. Original source is never
+The product parser selects this fork as a path dependency. The root workspace
+excludes the vendor workspace, keeping upstream dev dependencies out of default
+tests. Production regressions live in crates/ktlsp-parser and traverse the actual
+supervised worker through parse_snapshot/tree_for. Standalone tests alone do not
+establish delivery; integrated review/checks/CI remain required. Direct upstream
+parse_file requires LF; CRLF/lone CR production tests exercise the existing
+normalized-to-original mapping through the supervised worker. Original source is never
 modified by this repair. Full Kotlin grammar and semantic parity remain pending.
 
 The patch checks ordinary function parameter boundaries, probes existing modifier
@@ -45,4 +48,5 @@ duplication: its manifest references existing production worker/library/tests an
 patches ktrs-parser only in its standalone graph. Run:
 `cargo test --offline --locked --manifest-path vendor/ktrs-parser-0.5.1/worker-probe/Cargo.toml --tests`
 Neither standalone workspace is run by root workspace tests. Equivalent production
-regressions must run after the explicit integration handoff before #87 can close.
+regressions now live in the parser crate and must pass integrated review/checks/CI
+before #87 can close.

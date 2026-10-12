@@ -15,7 +15,7 @@ Nested annotation depth <=16 is accepted; tested deeper trees return NestingLimi
 and every case has a healthy followup. These are bounded observations, not
 performance guarantees or full grammar/official parity.
 
-This remains isolated evidence, not delivered production integration. After #86
-and coordinator handoff, durable equivalent regressions must run against the
-actual root dependency graph, with both integration reviews and hosted CI. Root
+This remains isolated evidence, not delivered production integration. Equivalent
+regressions now live in the parser crate and await execution against the actual
+root dependency graph, both integration reviews and hosted CI. Root
 cargo test --workspace does not run these standalone tests.

@@ -121,3 +121,34 @@ healthy-followup checks. Verified explicit name offsets, original-source snapsho
 association, all-element depth and child/diagnostic validation. Parent recovery
 and resource gates remain open; local pinned/hosted/integration checks are owner
 evidence, not independently certified by this audit.
+
+# #87 parameter-boundary recovery integration (development)
+
+Coordinator handed ownership over after #86/PR92 merged. Product now selects the
+minimal source-local parser fork; lock delta only removes its registry source and
+checksum, while explicitly approved workspace exclusion keeps upstream dev/test
+packages out of default native tests. Original archive checksum, all54 Rust source
+hashes, seven-file recovery.patch and complete notices are retained in vendor.
+No supervisor, common API, source mapping, kind validator or resource limit changed.
+
+Source-local implementation and independent reviews are recorded in vendor/REVIEW.
+Both reviewers found/rechecked a fixed exponential speculative annotation-probe
+regression; a scoped flag suppresses only recursive speculative probes. Committed
+nested parsing remains recovery-enabled. Remaining superlinear work is bounded
+by unchanged worker resource gates, not claimed as equivalent upstream performance.
+
+Production tests use the immutable snapshot API and real supervised worker. Exact
+checks replace three parameter-defect assertions; generic defect and Coverage
+remain. Read-only functionality review caught two new fixture errors before
+execution: repeated unmatched parentheses above128 would trigger preflight instead
+of diagnostics, and object declarations are wrapped by OBJECT_LITERAL. Corrected
+repeated recovery to100 and used balanced raw delimiters for diagnostic overflow;
+corrected immediate object parent. No production limits/expectations relaxed.
+
+Preparation integrated exact main583a0adc32c79c1a68257855c4ee7432f0088796
+once at merge8d833c12. Both independent source-only integration reviews approve
+the preserved corpus, strict assertions, authorized graph and provenance.
+
+Targeted production checks and both behavioral integration rechecks await the
+coordinator's local-check slot. Full-workspace checks, stable integration, hosted
+CI and architect finished review remain pending. No JVM/oracle/Gradle/Maven ran.

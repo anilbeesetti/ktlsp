@@ -1,5 +1,7 @@
 # Official Kotlin LSP research baseline
 
+Later evidence/policy update: [isolated checksummed binary observations](oracle/README.md) now exist, including runtime/source discrepancies. The user permits optional invocation of their existing JDK/build tools, with no bundled Java; [current boundary](../specs/runtime-boundary.md) supersedes earlier strict-zero-Java execution conclusions below. Source inventory and native-engine findings remain valid.
+
 Research date: 2026-10-12. This is a source/release-metadata inventory, **not a runtime parity certificate**. The official server was not built, downloaded, or executed during this research. No initialize response or actual diagnostic/completion output has been captured.
 
 ## Pinned evidence and version policy

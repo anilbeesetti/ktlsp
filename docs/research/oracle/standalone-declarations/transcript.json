@@ -1,0 +1,575 @@
+[
+  {
+    "direction": "client",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "initialize",
+      "params": {
+        "processId": null,
+        "clientInfo": {
+          "name": "ktlsp-research",
+          "version": "0.1"
+        },
+        "rootUri": "file:///workspace/research/official-oracle/fixture",
+        "workspaceFolders": [
+          {
+            "uri": "file:///workspace/research/official-oracle/fixture",
+            "name": "fixture"
+          }
+        ],
+        "capabilities": {
+          "general": {
+            "positionEncodings": [
+              "utf-16"
+            ]
+          },
+          "textDocument": {
+            "hover": {
+              "contentFormat": [
+                "markdown",
+                "plaintext"
+              ]
+            },
+            "foldingRange": {
+              "lineFoldingOnly": true
+            },
+            "diagnostic": {
+              "dynamicRegistration": false,
+              "relatedDocumentSupport": false
+            }
+          },
+          "workspace": {
+            "configuration": true,
+            "workspaceFolders": true
+          }
+        },
+        "initializationOptions": {
+          "projects": [],
+          "runMainCodeLens": false,
+          "intellijExtensions": false
+        }
+      }
+    }
+  },
+  {
+    "direction": "server",
+    "message": {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "Process started with\nServerLaunchConfig(protocolConfig=StdioServer(out=java.io.PrintStream@316ef56e), systemPath=/workspace/research/official-oracle/capture-cache, defaultLogLevel=INFO, logCategories={}, dataSharing=NONE, region=APAC, caCertificates=[/usr/local/share/ca-certificates/environment-proxy-ca.crt], eulaHash=null, workspaceRoot=null, idleShutdownTimeout=null)"
+      }
+    }
+  },
+  {
+    "direction": "server",
+    "message": {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "System Info\n  os.name: Linux\n  os.version: 6.18.44\n  cpu.arch: X86_64\n  cpu.number: 4\n  java.home: /workspace/research/official-oracle/distribution/kotlin-server-263.6379.0/jbr\n  java.version: = 25.0.4.1+1-b601.61\n  java.vm.vendor: JetBrains s.r.o.\n  ram.xmx: 2048MB\n"
+      }
+    }
+  },
+  {
+    "direction": "server",
+    "message": {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "Log file: /workspace/research/official-oracle/capture-cache/system/log/intellij-server.log"
+      }
+    }
+  },
+  {
+    "direction": "server",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "capabilities": {
+          "textDocumentSync": {
+            "openClose": true,
+            "change": 2,
+            "save": {
+              "includeText": false
+            }
+          },
+          "completionProvider": {
+            "triggerCharacters": [
+              "."
+            ],
+            "resolveProvider": true
+          },
+          "hoverProvider": true,
+          "signatureHelpProvider": {
+            "triggerCharacters": [
+              "(",
+              ","
+            ],
+            "retriggerCharacters": [
+              ","
+            ],
+            "workDoneProgress": false
+          },
+          "definitionProvider": true,
+          "typeDefinitionProvider": true,
+          "implementationProvider": true,
+          "referencesProvider": true,
+          "documentHighlightProvider": true,
+          "documentSymbolProvider": true,
+          "codeActionProvider": {
+            "codeActionKinds": [
+              "source.organizeImports",
+              "quickfix",
+              "refactor",
+              "refactor.inline.variable",
+              "refactor.extract.variable"
+            ],
+            "resolveProvider": false,
+            "workDoneProgress": false
+          },
+          "codeLensProvider": {
+            "workDoneProgress": false,
+            "resolveProvider": false
+          },
+          "documentFormattingProvider": true,
+          "documentRangeFormattingProvider": true,
+          "renameProvider": {
+            "prepareProvider": true
+          },
+          "foldingRangeProvider": true,
+          "executeCommandProvider": {
+            "commands": [
+              "decompile",
+              "applyModCommand",
+              "resolveModCommand",
+              "interpolateFileTemplate",
+              "set-highwatermark-file",
+              "wait-for-highwatermark",
+              "resolveLocation",
+              "start_debug_server",
+              "intellij.java.resolveLaunch",
+              "intellij.java.resolveBuildToolLaunch",
+              "intellij.java.resolveBuildCommand",
+              "intellij.java.resolveClassDocument",
+              "kotlin.organize.imports",
+              "jetbrains.kotlin.completion.apply",
+              "kotlin.applyCompilerDiagnosticFix",
+              "kotlin.inline.variable",
+              "refactor.extract.variable",
+              "exportWorkspace"
+            ]
+          },
+          "callHierarchyProvider": true,
+          "semanticTokensProvider": {
+            "legend": {
+              "tokenTypes": [
+                "namespace",
+                "class",
+                "enum",
+                "interface",
+                "struct",
+                "typeParameter",
+                "type",
+                "parameter",
+                "variable",
+                "property",
+                "enumMember",
+                "event",
+                "function",
+                "method",
+                "macro",
+                "keyword",
+                "modifier",
+                "comment",
+                "string",
+                "number",
+                "regexp",
+                "operator",
+                "decorator"
+              ],
+              "tokenModifiers": [
+                "declaration",
+                "definition",
+                "readonly",
+                "static",
+                "deprecated",
+                "abstract",
+                "async",
+                "modification",
+                "documentation",
+                "defaultLibrary"
+              ]
+            },
+            "range": true,
+            "full": true
+          },
+          "typeHierarchyProvider": true,
+          "inlayHintProvider": {
+            "resolveProvider": true
+          },
+          "diagnosticProvider": {
+            "interFileDependencies": true,
+            "workspaceDiagnostics": false,
+            "workDoneProgress": false
+          },
+          "workspaceSymbolProvider": {
+            "resolveProvider": false,
+            "workDoneProgress": true
+          },
+          "workspace": {
+            "workspaceFolders": {
+              "supported": true,
+              "changeNotifications": true
+            },
+            "fileOperations": {
+              "willRename": {
+                "filters": [
+                  {
+                    "pattern": {
+                      "glob": "**/*"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "experimental": {
+            "licensing": true,
+            "indexDir": "/workspace/research/official-oracle/capture-cache/workspaces/eb823c43b8f4937d7413412f9df0acfa/index/kotlin-server",
+            "workspaceImport": true
+          }
+        },
+        "serverInfo": {
+          "name": "IntelliJ Language Server by JetBrains",
+          "version": "ILS-263.6379.0"
+        }
+      }
+    }
+  },
+  {
+    "direction": "client",
+    "message": {
+      "jsonrpc": "2.0",
+      "method": "initialized",
+      "params": {}
+    }
+  },
+  {
+    "direction": "client",
+    "message": {
+      "jsonrpc": "2.0",
+      "method": "textDocument/didOpen",
+      "params": {
+        "textDocument": {
+          "uri": "file:///workspace/research/official-oracle/fixture/Main.kt",
+          "languageId": "kotlin",
+          "version": 1,
+          "text": "open class Base\nclass Child : Base()\n\nfun main() {\n    println(\"hello\")\n}\n"
+        }
+      }
+    }
+  },
+  {
+    "direction": "client",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "method": "textDocument/foldingRange",
+      "params": {
+        "textDocument": {
+          "uri": "file:///workspace/research/official-oracle/fixture/Main.kt"
+        }
+      }
+    }
+  },
+  {
+    "direction": "server",
+    "message": {
+      "jsonrpc": "2.0",
+      "method": "intellij/workspaceImportStatus",
+      "params": {
+        "blockedFolders": [
+          {
+            "folderUri": "file:///workspace/research/official-oracle/fixture/",
+            "reason": "noBuildSystemFound",
+            "candidates": [],
+            "dismissed": false
+          }
+        ]
+      }
+    }
+  },
+  {
+    "direction": "server",
+    "message": {
+      "jsonrpc": "2.0",
+      "method": "window/showMessage",
+      "params": {
+        "type": 3,
+        "message": "Project import skipped for file:///workspace/research/official-oracle/fixture: no supported build system found in the project root"
+      }
+    }
+  },
+  {
+    "direction": "server",
+    "message": {
+      "jsonrpc": "2.0",
+      "method": "intellij/workspaceImportStatus",
+      "params": {
+        "blockedFolders": [
+          {
+            "folderUri": "file:///workspace/research/official-oracle/fixture/",
+            "reason": "noBuildSystemFound",
+            "candidates": [],
+            "dismissed": false
+          }
+        ]
+      }
+    }
+  },
+  {
+    "direction": "server",
+    "message": {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "No projects to import: checked 1 workspace folder(s)"
+      }
+    }
+  },
+  {
+    "direction": "server",
+    "message": {
+      "jsonrpc": "2.0",
+      "method": "intellij/workspaceImportState",
+      "params": {
+        "phase": "FINISHED",
+        "folders": [
+          {
+            "folderUri": "file:///workspace/research/official-oracle/fixture/",
+            "status": "BLOCKED",
+            "message": "noBuildSystemFound"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "direction": "server",
+    "message": {
+      "jsonrpc": "2.0",
+      "method": "intellij/ready-for-test",
+      "params": {}
+    }
+  },
+  {
+    "direction": "server",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "result": [
+        {
+          "startLine": 3,
+          "endLine": 5,
+          "startCharacter": 11,
+          "endCharacter": 1,
+          "kind": "region",
+          "collapsedText": "{...}"
+        }
+      ]
+    }
+  },
+  {
+    "direction": "client",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": 10,
+      "method": "textDocument/documentSymbol",
+      "params": {
+        "textDocument": {
+          "uri": "file:///workspace/research/official-oracle/fixture/Main.kt"
+        }
+      }
+    }
+  },
+  {
+    "direction": "server",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": 10,
+      "result": [
+        {
+          "name": "Base",
+          "kind": 5,
+          "deprecated": false,
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 0
+            },
+            "end": {
+              "line": 0,
+              "character": 15
+            }
+          },
+          "selectionRange": {
+            "start": {
+              "line": 0,
+              "character": 11
+            },
+            "end": {
+              "line": 0,
+              "character": 15
+            }
+          }
+        },
+        {
+          "name": "Child",
+          "kind": 5,
+          "deprecated": false,
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 0
+            },
+            "end": {
+              "line": 1,
+              "character": 20
+            }
+          },
+          "selectionRange": {
+            "start": {
+              "line": 1,
+              "character": 6
+            },
+            "end": {
+              "line": 1,
+              "character": 11
+            }
+          }
+        },
+        {
+          "name": "main",
+          "kind": 12,
+          "deprecated": false,
+          "range": {
+            "start": {
+              "line": 3,
+              "character": 0
+            },
+            "end": {
+              "line": 5,
+              "character": 1
+            }
+          },
+          "selectionRange": {
+            "start": {
+              "line": 3,
+              "character": 4
+            },
+            "end": {
+              "line": 3,
+              "character": 8
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "direction": "client",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": 11,
+      "method": "textDocument/hover",
+      "params": {
+        "textDocument": {
+          "uri": "file:///workspace/research/official-oracle/fixture/Main.kt"
+        },
+        "position": {
+          "line": 0,
+          "character": 12
+        }
+      }
+    }
+  },
+  {
+    "direction": "server",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": 11,
+      "result": {
+        "contents": {
+          "kind": "markdown",
+          "value": "````kotlin\nopen class Base\n````\n"
+        },
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 11
+          },
+          "end": {
+            "line": 0,
+            "character": 15
+          }
+        }
+      }
+    }
+  },
+  {
+    "direction": "client",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": 12,
+      "method": "textDocument/prepareTypeHierarchy",
+      "params": {
+        "textDocument": {
+          "uri": "file:///workspace/research/official-oracle/fixture/Main.kt"
+        },
+        "position": {
+          "line": 0,
+          "character": 12
+        }
+      }
+    }
+  },
+  {
+    "direction": "server",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": 12,
+      "result": null
+    }
+  },
+  {
+    "direction": "client",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "method": "shutdown",
+      "params": null
+    }
+  },
+  {
+    "direction": "server",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "result": null
+    }
+  },
+  {
+    "direction": "client",
+    "message": {
+      "jsonrpc": "2.0",
+      "method": "exit"
+    }
+  }
+]

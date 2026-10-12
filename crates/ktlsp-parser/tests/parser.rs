@@ -144,3 +144,16 @@ fn preflight_limits_and_cancel_do_not_launch_work() {
         ParserError::Io
     );
 }
+
+#[test]
+fn actual_worker_output_count_limits_reject_without_partial_tree() {
+    let source = "val x = 0\n".repeat(2000);
+    assert!(source.len() < MAX_SOURCE_BYTES);
+    assert_eq!(
+        parser()
+            .parse(&source, FileKind::Source, &AtomicBool::new(false))
+            .unwrap_err(),
+        ParserError::OutputLimit
+    );
+    check("val healthy = 1", FileKind::Source);
+}

@@ -457,6 +457,102 @@ mod tests {
         );
     }
     #[test]
+    fn bounded_decode_rejects_truncation_unknown_variants_and_counts() {
+        for bytes in [
+            br#"{"Tree":{"elements":["#.as_slice(),
+            br#""Unsupported""#.as_slice(),
+            br#"{"Tree":{"elements":0,"diagnostics":[]}}"#.as_slice(),
+        ] {
+            assert!(serde_json::from_slice::<Reply>(bytes).is_err());
+        }
+        let element = Element {
+            kind: "X".into(),
+            start: 0,
+            end: 0,
+            parent: None,
+            subtree_end: 1,
+            token: false,
+        };
+        let too_many_elements = Reply::Tree {
+            elements: vec![element; MAX_ELEMENTS + 1],
+            diagnostics: vec![],
+        };
+        let too_many_diagnostics = Reply::Tree {
+            elements: vec![],
+            diagnostics: vec![
+                Diagnostic {
+                    start: 0,
+                    end: 0,
+                    message: String::new()
+                };
+                MAX_DIAGNOSTICS + 1
+            ],
+        };
+        for reply in [too_many_elements, too_many_diagnostics] {
+            let bytes = serde_json::to_vec(&reply).unwrap();
+            assert!(bytes.len() < MAX_OUTPUT_BYTES);
+            assert!(serde_json::from_slice::<Reply>(&bytes).is_err());
+        }
+    }
+    #[test]
+    fn immediate_parent_and_subtree_containment_are_required() {
+        let elements = vec![
+            Element {
+                kind: "ROOT".into(),
+                start: 0,
+                end: 2,
+                parent: None,
+                subtree_end: 4,
+                token: false,
+            },
+            Element {
+                kind: "NODE".into(),
+                start: 0,
+                end: 1,
+                parent: Some(0),
+                subtree_end: 3,
+                token: false,
+            },
+            Element {
+                kind: "A".into(),
+                start: 0,
+                end: 1,
+                parent: Some(1),
+                subtree_end: 3,
+                token: true,
+            },
+            Element {
+                kind: "B".into(),
+                start: 1,
+                end: 2,
+                parent: Some(0),
+                subtree_end: 4,
+                token: true,
+            },
+        ];
+        let check = |elements| {
+            validate(
+                "ab",
+                "ab",
+                &[0, 1, 2],
+                Reply::Tree {
+                    elements,
+                    diagnostics: vec![],
+                },
+            )
+        };
+        assert!(check(elements.clone()).is_ok());
+        for mutation in 0..3 {
+            let mut invalid = elements.clone();
+            match mutation {
+                0 => invalid[2].end = 2,
+                1 => invalid[2].subtree_end = 4,
+                _ => invalid[2].parent = Some(0),
+            }
+            assert_eq!(check(invalid).unwrap_err(), ParserError::InvalidTree);
+        }
+    }
+    #[test]
     fn supervised_faults_terminate_and_allow_next_request() {
         for (mode, expected) in [
             ("hang", ParserError::Timeout),

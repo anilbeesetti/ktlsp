@@ -87,14 +87,19 @@ research; the small harness and additional fixtures here are independently writt
 
 ## Remaining accepted child proposals
 
-T007 grammar child: published source/script acceptance corpus for Kotlin 2.3
-baseline covering declarations, expressions, strings/templates, comments/KDoc,
-malformed recovery and explicit ktrs-version gaps; measured rejection envelopes
-and oracle syntax comparisons in the isolated lane. Do not close T007 until its
-full acceptance works.
+T007b accepted declaration corpus and validated parser-result/CST contract (next,
+not implemented here): kinds, hierarchy, original ranges, diagnostics and explicit
+failures; exact source partition and parent-child ranges; valid and incomplete
+package/import/class/interface/object/function/property/typealias/modifier/
+annotation/generic/receiver/nested-local fixtures; declaration retention after
+recovery; actual-worker CRLF/lone-CR/Unicode/revision/resource tests; upstream
+grammar rejection distinguished from budget rejection, and this gate's 64 KiB vs
+existing 8 MiB document ceiling explicit. Include Kotlin 2.3 baseline/version gaps
+and isolated-oracle comparisons where available. Do not close T007 until its full
+acceptance works; this containment gate alone does not unlock T008.
 
-T008 declaration child (depends on that accepted corpus and this gate): lower
-checked CST for named top-level/nested classes, objects, functions, properties,
-type aliases and package/import declarations to stable revisioned HIR; preserve
-parents, names, original spans and incomplete-declaration diagnostics, with
-explicit unsupported grammar and no symbol-resolution/provider claim.
+T008a declaration HIR child follows the accepted result/recovery gate: lower named
+declarations/package/imports to stable revisioned HIR; preserve parents, names,
+original spans and incomplete-declaration diagnostics, with explicit unsupported
+grammar. Byte offsets alone are not symbol identity. No resolution/provider claim
+without separately accepted semantics.

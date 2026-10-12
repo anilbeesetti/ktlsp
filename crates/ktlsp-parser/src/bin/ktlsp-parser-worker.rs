@@ -56,7 +56,6 @@ static ALLOCATOR: LimitedAllocator = LimitedAllocator;
 
 fn main() {
     let result = run();
-    // Do not unwind/drop potentially damaged third-party parse state after a failure.
     std::process::exit(if result.is_ok() { 0 } else { 1 });
 }
 fn run() -> Result<(), Box<dyn std::error::Error>> {

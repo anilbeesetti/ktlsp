@@ -13,6 +13,10 @@ name = "ktlsp-artifacts"
 version = "0.1.0"
 
 [[package]]
+name = "ktlsp-binary"
+version = "0.1.0"
+
+[[package]]
 name = "ktlsp-project"
 version = "0.1.0"
 dependencies = [

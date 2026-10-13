@@ -96,26 +96,15 @@ fn check(source: &str, expected: Vec<Declaration<'_>>, diagnostics: &[(usize, us
 }
 
 #[test]
-fn missing_default_consumes_later_function_as_parameter_expression() {
-    // shortcut: C14 must restore healthy as a sibling before this becomes recovery acceptance.
+fn missing_default_restores_later_function_as_sibling() {
     let source = "fun broken(x: Int =\nfun healthy() = 2";
     check(
         source,
         vec![
-            ("FUN", 0, 37, "KT_FILE", None, vec![("broken", 4, 10)]),
-            (
-                "FUN",
-                20,
-                37,
-                "VALUE_PARAMETER",
-                Some((0, 37)),
-                vec![("healthy", 24, 31)],
-            ),
+            ("FUN", 0, 19, "KT_FILE", None, vec![("broken", 4, 10)]),
+            ("FUN", 20, 37, "KT_FILE", None, vec![("healthy", 24, 31)]),
         ],
-        &[
-            (37, 37, "Expecting comma or ')'"),
-            (37, 37, "Expecting ')'"),
-        ],
+        &[(19, 19, "Expecting an expression")],
     );
 }
 

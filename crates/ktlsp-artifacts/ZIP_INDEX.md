@@ -7,7 +7,9 @@ uncompressed sizes and local-header offsets. The archive comment is a raw slice.
 All bytes come from the retained verified allocation: no filesystem read,
 provenance update, archive/name copy or unverified byte-slice entry point.
 Caller-provided SHA256 equality does not authenticate the digest, coordinate or
-publisher. This index does not provide payload access, extraction or name lookup.
+publisher. `index_zip_directory` validates directory metadata only. The separate
+[`stored_payload`](ZIP_STORED.md) operation validates one selected supported
+stored entry; neither operation provides extraction or name lookup.
 
 ## Acceptance policy
 
@@ -125,8 +127,11 @@ Referenced layout only, no copied specification prose or implementation source.
 The restrictions above are this finite child's compatibility policies, not a
 claim that all rejected ZIPs violate the broader format.
 
-Local-header/central agreement, descriptor/payload span and overlap validation,
-CRC, bounded decompression/output/ratio/aggregate limits, JAR manifest,
+Selected supported stored-entry local/central agreement, payload spans,
+declared-envelope overlap and CRC checks belong to the separate
+[`stored_payload`](ZIP_STORED.md) operation, with its held-source/runtime limits
+documented there. Descriptor tails, archive-wide span/overlap validation,
+bounded decompression/output/ratio/aggregate limits, JAR manifest,
 multi-release/signature behavior, duplicate selection and safe consumers,
 ZIP64/wider compatibility and authenticated digest acquisition require separately
 reviewed children. No extraction safety, whole-archive/JAR validity, library

@@ -1,0 +1,3744 @@
+{
+  "schema": 1,
+  "source": "a1887d43905cdb37479fe4b54f1d7b24cbfc4df7",
+  "authorship": "Independent source/data-only preparation, 2026-10-13; no ktlsp/JVM/compiler/zip writer",
+  "crc_vectors": [
+    {
+      "hex": "",
+      "crc32": 0
+    },
+    {
+      "hex": "313233343536373839",
+      "crc32": 3421780262
+    }
+  ],
+  "cases": [
+    {
+      "file": "fixtures/stored-vector.bin",
+      "bytes": 109,
+      "sha256": "3db4eed18731dd159cf39f37d1ed5fd00cd650e1279596ad2ecc84cc2bb13ce1",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "payload_range": [
+          31,
+          40
+        ],
+        "payload_hex": "313233343536373839",
+        "crc32": 3421780262
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/empty-at-directory.bin",
+      "bytes": 100,
+      "sha256": "a1dd4ac92c528fedaca841bc08934bf3df78fa9755c7b9e11e2128bb5888b568",
+      "authored_layout": {
+        "directory_start": 31,
+        "central_offsets": [
+          31
+        ],
+        "eocd": 78,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 31,
+            "payload": [
+              31,
+              31
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "payload_range": [
+          31,
+          31
+        ],
+        "payload_hex": "",
+        "crc32": 0
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/empty-nonzero-crc.bin",
+      "bytes": 100,
+      "sha256": "30cadd1c4de0e1a1310430dae618905c64bf1c7af98d9a67953ac33780998082",
+      "authored_layout": {
+        "directory_start": 31,
+        "central_offsets": [
+          31
+        ],
+        "eocd": 78,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 31,
+            "payload": [
+              31,
+              31
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "CrcMismatch",
+        "offset": 31,
+        "expected": 1,
+        "actual": 0
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/matching-version-10.bin",
+      "bytes": 109,
+      "sha256": "191a83abb18351c951fe1789b2be122d62426c31f91e11b2eaf6f8b02defd379",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "payload_range": [
+          31,
+          40
+        ],
+        "payload_hex": "313233343536373839",
+        "crc32": 3421780262
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/matching-version-11.bin",
+      "bytes": 109,
+      "sha256": "f7a8d5ff5a276f9c486e5cb6e2382f4f0216d69731ae71a08d857b978f81f994",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "payload_range": [
+          31,
+          40
+        ],
+        "payload_hex": "313233343536373839",
+        "crc32": 3421780262
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/matching-version-19.bin",
+      "bytes": 109,
+      "sha256": "f89839584bcc55b29193f18efb67b03341c021169bf9e691b352940f4c4d3f5b",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "payload_range": [
+          31,
+          40
+        ],
+        "payload_hex": "313233343536373839",
+        "crc32": 3421780262
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/matching-version-20.bin",
+      "bytes": 109,
+      "sha256": "3db4eed18731dd159cf39f37d1ed5fd00cd650e1279596ad2ecc84cc2bb13ce1",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "payload_range": [
+          31,
+          40
+        ],
+        "payload_hex": "313233343536373839",
+        "crc32": 3421780262
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/raw-name-2e2e2f61005c62.bin",
+      "bytes": 121,
+      "sha256": "3acdc0b6a89a868bd1b7749d43d7dc4dfa06dc749eb432c80e275da1efda03ff",
+      "authored_layout": {
+        "directory_start": 46,
+        "central_offsets": [
+          46
+        ],
+        "eocd": 99,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 46,
+            "payload": [
+              37,
+              46
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "payload_range": [
+          37,
+          46
+        ],
+        "payload_hex": "313233343536373839",
+        "crc32": 3421780262
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/raw-name-ff.bin",
+      "bytes": 109,
+      "sha256": "d5f494b029bff28fb17f667c2dbe58240cf76be7830d52296b977d4c2d319e0b",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "payload_range": [
+          31,
+          40
+        ],
+        "payload_hex": "313233343536373839",
+        "crc32": 3421780262
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/raw-name-c3a9.bin",
+      "bytes": 111,
+      "sha256": "49ebb8a71de088a031fe1824a33335eb956e97dfe632d5572a9bc1a86a89a45f",
+      "authored_layout": {
+        "directory_start": 41,
+        "central_offsets": [
+          41
+        ],
+        "eocd": 89,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 41,
+            "payload": [
+              32,
+              41
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "payload_range": [
+          32,
+          41
+        ],
+        "payload_hex": "313233343536373839",
+        "crc32": 3421780262
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/different-unknown-repeated-extras-prefix.bin",
+      "bytes": 134,
+      "sha256": "e3d283e899dac2e102b2fe94ab30adb41dbd1fd2b88356816a1b7baf14ccd248",
+      "authored_layout": {
+        "directory_start": 59,
+        "central_offsets": [
+          59
+        ],
+        "eocd": 112,
+        "physical_records": [
+          {
+            "header": 6,
+            "physical_end": 59,
+            "payload": [
+              50,
+              59
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "payload_range": [
+          50,
+          59
+        ],
+        "payload_hex": "313233343536373839",
+        "crc32": 3421780262
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/ignored-dos-time-disagreement.bin",
+      "bytes": 109,
+      "sha256": "fc803e0f54e21c1e1e15a5af14bd8badef00ae184c27376d56565fa206f1089b",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "payload_range": [
+          31,
+          40
+        ],
+        "payload_hex": "313233343536373839",
+        "crc32": 3421780262
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/duplicate-name-first.bin",
+      "bytes": 192,
+      "sha256": "f5604f420db179d164ad9ca9ecc06e10ded43b92baf8b5d22d8516a7929893b9",
+      "authored_layout": {
+        "directory_start": 70,
+        "central_offsets": [
+          70,
+          120
+        ],
+        "eocd": 170,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 35,
+            "payload": [
+              34,
+              35
+            ]
+          },
+          {
+            "header": 35,
+            "physical_end": 70,
+            "payload": [
+              69,
+              70
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0,
+          1
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "payload_range": [
+          34,
+          35
+        ],
+        "payload_hex": "41",
+        "crc32": 3554254475
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/duplicate-name-second.bin",
+      "bytes": 192,
+      "sha256": "f5604f420db179d164ad9ca9ecc06e10ded43b92baf8b5d22d8516a7929893b9",
+      "authored_layout": {
+        "directory_start": 70,
+        "central_offsets": [
+          70,
+          120
+        ],
+        "eocd": 170,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 35,
+            "payload": [
+              34,
+              35
+            ]
+          },
+          {
+            "header": 35,
+            "physical_end": 70,
+            "payload": [
+              69,
+              70
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0,
+          1
+        ]
+      },
+      "ordinal": 1,
+      "stage": "stored_payload",
+      "expected": {
+        "payload_range": [
+          69,
+          70
+        ],
+        "payload_hex": "42",
+        "crc32": 1255198513
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/reversed-central-order-empty-adjacent.bin",
+      "bytes": 179,
+      "sha256": "a969c24b82336c5497cb95a4fa87ad876181178319b424e32a85dc26f91094ae",
+      "authored_layout": {
+        "directory_start": 63,
+        "central_offsets": [
+          63,
+          110
+        ],
+        "eocd": 157,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 31,
+            "payload": [
+              31,
+              31
+            ]
+          },
+          {
+            "header": 31,
+            "physical_end": 63,
+            "payload": [
+              62,
+              63
+            ]
+          }
+        ],
+        "central_physical_order": [
+          1,
+          0
+        ]
+      },
+      "ordinal": 1,
+      "stage": "stored_payload",
+      "expected": {
+        "payload_range": [
+          31,
+          31
+        ],
+        "payload_hex": "",
+        "crc32": 0
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/ordinal-1.bin",
+      "bytes": 109,
+      "sha256": "3db4eed18731dd159cf39f37d1ed5fd00cd650e1279596ad2ecc84cc2bb13ce1",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 1,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "InvalidOrdinal",
+        "ordinal": 1,
+        "entries": 1
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/ordinal-usize_max.bin",
+      "bytes": 109,
+      "sha256": "3db4eed18731dd159cf39f37d1ed5fd00cd650e1279596ad2ecc84cc2bb13ce1",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": "usize_max",
+      "stage": "stored_payload",
+      "expected": {
+        "error": "InvalidOrdinal",
+        "ordinal": "usize_max",
+        "entries": 1
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/empty-index-ordinal.bin",
+      "bytes": 22,
+      "sha256": "8739c76e681f900923b900c9df0ef75cf421d39cabb54650c4b9ad19b6a76d85",
+      "authored_layout": {
+        "directory_start": 0,
+        "central_offsets": [],
+        "eocd": 0,
+        "physical_records": [],
+        "central_physical_order": []
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "InvalidOrdinal",
+        "ordinal": 0,
+        "entries": 0
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/bad-signature-before-crc.bin",
+      "bytes": 109,
+      "sha256": "b60bc8f8f0c601daf12aeb91e4a1733e61afd5a7558844ddd43fc1948b7d9478",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "local header signature"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/bad-zip64-compressed-before-crc.bin",
+      "bytes": 109,
+      "sha256": "1c572a110c6481584eeb42685e03f6865e9bcce9e338f2a74d226a791a53b14d",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedZip64",
+        "offset": 0
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/bad-zip64-uncompressed-before-crc.bin",
+      "bytes": 109,
+      "sha256": "f8eb3463ee10d33086960179453a9d6e0c119f1394954c5c466bdc5ae454b923",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedZip64",
+        "offset": 0
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/bad-method-before-crc.bin",
+      "bytes": 109,
+      "sha256": "889bc3354b5e091545fb5c5ae9f088e8517ba1ce2187a6c9e69b603212ca80b4",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedMethod",
+        "offset": 8,
+        "method": 8
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/bad-version-high-before-crc.bin",
+      "bytes": 109,
+      "sha256": "0f4ae24f341db6ec44848c5233bb103dce0f53e1afe7bcdffbeab88d3374d16f",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedVersion",
+        "offset": 4,
+        "version": 21
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/bad-version-low-before-crc.bin",
+      "bytes": 109,
+      "sha256": "9c7cac6acf9c8112242d592217c8acc64fcf6d4774eeb2c7f22935506698f9b4",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedVersion",
+        "offset": 4,
+        "version": 9
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/bad-version-high-byte-before-crc.bin",
+      "bytes": 109,
+      "sha256": "02aa2056a41adeb4aa397ab2769c173833b013a89bdc304014af11b964ba9742",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedVersion",
+        "offset": 4,
+        "version": 276
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/bad-version-agreement-before-crc.bin",
+      "bytes": 109,
+      "sha256": "5f7c9a204b35119cb944b463347a1850070b13b53c38bd884ee3d7f7a9bed881",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Disagreement",
+        "offset": 4,
+        "field": "version"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/bad-flags-agreement-before-crc.bin",
+      "bytes": 109,
+      "sha256": "24f1caaedbd9c54f3a96b7bb9a5713d60be90dcfef045b2f85cd8701f58004f6",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Disagreement",
+        "offset": 6,
+        "field": "flags"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/bad-crc-agreement-before-crc.bin",
+      "bytes": 109,
+      "sha256": "7efcf483f0040a82b73aae015ed68fd1db4a37432aca9612d945a6c7181e21dd",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Disagreement",
+        "offset": 14,
+        "field": "crc32"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/bad-compressed-agreement-before-crc.bin",
+      "bytes": 109,
+      "sha256": "c62c36a2b912eafb07440f7a01f2e09c9e2f0ad53529e335a9a6d03f1df5ce42",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Disagreement",
+        "offset": 18,
+        "field": "compressed size"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/bad-uncompressed-agreement-before-crc.bin",
+      "bytes": 109,
+      "sha256": "62d1006625518d59b30df6977b6ff1e75c80286e1e5257fe9131b8759b79f426",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Disagreement",
+        "offset": 22,
+        "field": "uncompressed size"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/bad-empty-name-before-crc.bin",
+      "bytes": 109,
+      "sha256": "2607318d6174c55c928cd572b97779123ca9d14dac88b26253960ab02fd084a9",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 26,
+        "reason": "empty name"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/bad-name-limit-before-bounds-before-crc.bin",
+      "bytes": 109,
+      "sha256": "ecd420b18a41bb869ba15676ca0737a7e48679fee4397c4e465ed0449a7f23e5",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Limit",
+        "offset": 26,
+        "field": "local name bytes",
+        "limit": 4096
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/bad-extra-limit-before-bounds-before-crc.bin",
+      "bytes": 109,
+      "sha256": "d523bc8780f55a69a1ed61c5f6ec98c2feea7a42d1c64f9aa7621391034a9892",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Limit",
+        "offset": 28,
+        "field": "local extra bytes",
+        "limit": 16384
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-flag-bit-0.bin",
+      "bytes": 109,
+      "sha256": "5fb7f6b463012b4b8c3e8123b306ca5482cb5436a4562dc0610e630d44dbcc91",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedEncryption",
+        "offset": 6
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-flag-bit-1.bin",
+      "bytes": 109,
+      "sha256": "aca03015a6237df453f2d7d72acc3c5562d6a07a7a0dae89d14949eb0ce00be3",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedFlags",
+        "offset": 6,
+        "flags": 2
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-flag-bit-2.bin",
+      "bytes": 109,
+      "sha256": "0b870b2e4cf10c310207585cc1460143a9fdf35342d710ec5697f6813c44b13e",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedFlags",
+        "offset": 6,
+        "flags": 4
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-flag-bit-3.bin",
+      "bytes": 109,
+      "sha256": "73327ce538903c1e25424ab82e0f025c882bd903812ebcd0480b16e1f5ce0169",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedFlags",
+        "offset": 6,
+        "flags": 8
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-flag-bit-4.bin",
+      "bytes": 109,
+      "sha256": "627308d66f1c4a1e35b56b037f38a251bed9592a93bfaa68b59a6f584b3c238a",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedFlags",
+        "offset": 6,
+        "flags": 16
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-flag-bit-5.bin",
+      "bytes": 109,
+      "sha256": "9da261cacac97f43eaf9fe9e60ac05339189eda5aa975f5166dc3d735d66a3b9",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedFlags",
+        "offset": 6,
+        "flags": 32
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-flag-bit-6.bin",
+      "bytes": 109,
+      "sha256": "6f2a92935dbbe62708d35bcb5bbc15cf8f0ae91c555c7f792a8c0deb7527a42b",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedEncryption",
+        "offset": 6
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-flag-bit-7.bin",
+      "bytes": 109,
+      "sha256": "bfef86681a11745290d5c9b04a2046c005acdcac486b60d3aca120e97b56f6ce",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedFlags",
+        "offset": 6,
+        "flags": 128
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-flag-bit-8.bin",
+      "bytes": 109,
+      "sha256": "1e872c5d4e3e50de83198b102fd676bad30010f8953e7c83f711d746761046f9",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedFlags",
+        "offset": 6,
+        "flags": 256
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-flag-bit-9.bin",
+      "bytes": 109,
+      "sha256": "739bb8fc69e30b8958d640236ba3875ef80eac57e17a9c078ce12e1eb9082048",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedFlags",
+        "offset": 6,
+        "flags": 512
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-flag-bit-10.bin",
+      "bytes": 109,
+      "sha256": "5d58df51f2aa61ad04be085bd944ff10da6c25487493d5cc7dc100223a771070",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedFlags",
+        "offset": 6,
+        "flags": 1024
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-flag-bit-12.bin",
+      "bytes": 109,
+      "sha256": "aa3a1964df4b8b06dacffdfcc785006de91c16a03cddad336b2d34c82bac10ba",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedFlags",
+        "offset": 6,
+        "flags": 4096
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-flag-bit-13.bin",
+      "bytes": 109,
+      "sha256": "82a39bc6a9412654fcc293393b668bd1db718545a9cbab187f6ca724ca5f8293",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedEncryption",
+        "offset": 6
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-flag-bit-14.bin",
+      "bytes": 109,
+      "sha256": "8d04bad8be72cf7be9d0273b36e9e534d1e2431172836afdaabdaa5f16ba5ce4",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedFlags",
+        "offset": 6,
+        "flags": 16384
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-flag-bit-15.bin",
+      "bytes": 109,
+      "sha256": "ef39fbb95639d74c7fd7e62042cd6852738a079ccbfb7632983d9e34a49cc68b",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedFlags",
+        "offset": 6,
+        "flags": 32768
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/bad-name-before-crc.bin",
+      "bytes": 109,
+      "sha256": "58457a83dba16cc18f686303acd1a8f24be050ca6a33b3cb8caebba9b30a24af",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Disagreement",
+        "offset": 30,
+        "field": "name"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/bad-name-length.bin",
+      "bytes": 109,
+      "sha256": "1a19765754abb0d55cb06d5bb2d0c42956e9d36e943f2a1ccd5dfb95e587fc18",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Disagreement",
+        "offset": 26,
+        "field": "name length"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/payload-bit-corruption.bin",
+      "bytes": 109,
+      "sha256": "cb3e8d67824f666383d449c27c239f24e246ee3fde867bb56edc6d592c84b4be",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "CrcMismatch",
+        "offset": 31,
+        "expected": 3421780262,
+        "actual": 3700370789
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/agreed-wrong-crc.bin",
+      "bytes": 109,
+      "sha256": "01b296079b3ccd603e3a2f335fc4ec50b9be2bc2990ed21bcf0bee78e6aea2e5",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "CrcMismatch",
+        "offset": 31,
+        "expected": 0,
+        "actual": 3421780262
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/agreed-unequal-stored-sizes.bin",
+      "bytes": 109,
+      "sha256": "3f962fe9252f263c49062e8fb836f5edda25b4477e0b0c01b7339d362bba013a",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 22,
+        "reason": "stored sizes differ"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/huge-stored-size-before-addition.bin",
+      "bytes": 109,
+      "sha256": "d0fe8f6c96b783290c76c99677b28fe95d558f06e1ef823bd6ac4d3d417814d8",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 31,
+        "reason": "payload crosses directory"
+      },
+      "note": "Remaining-span rejection before addition: same expected boundary error on32/64-bit."
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-1.bin",
+      "bytes": 70,
+      "sha256": "fe7e915a7de6aaef486050ee049cdc1d45a1c6a429eaae4f5ad12bc4af8bc076",
+      "authored_layout": {
+        "directory_start": 1,
+        "central_offsets": [
+          1
+        ],
+        "eocd": 48,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 1,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-2.bin",
+      "bytes": 71,
+      "sha256": "301ed50e694f3fabd7237d5ae1f094205dccc7e25f6c71d874a7ee183c28578e",
+      "authored_layout": {
+        "directory_start": 2,
+        "central_offsets": [
+          2
+        ],
+        "eocd": 49,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 2,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-3.bin",
+      "bytes": 72,
+      "sha256": "44ae11e0ff3c3739c38ff86721d12e265f719584346049c289c0b54b86a296a1",
+      "authored_layout": {
+        "directory_start": 3,
+        "central_offsets": [
+          3
+        ],
+        "eocd": 50,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 3,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-4.bin",
+      "bytes": 73,
+      "sha256": "85b367101bc44d0d953529f91886bd5dfbee2508ae25d15f96feeda5528c681b",
+      "authored_layout": {
+        "directory_start": 4,
+        "central_offsets": [
+          4
+        ],
+        "eocd": 51,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 4,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-5.bin",
+      "bytes": 74,
+      "sha256": "1641e2c3d684864d22fc18104b9b3013e0f63b270f4716956d9bf38b5bbe7e42",
+      "authored_layout": {
+        "directory_start": 5,
+        "central_offsets": [
+          5
+        ],
+        "eocd": 52,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 5,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-6.bin",
+      "bytes": 75,
+      "sha256": "15c4b9d9be1dc9aee109111f95ff7f726a80767774457e7e16e656fbbe776223",
+      "authored_layout": {
+        "directory_start": 6,
+        "central_offsets": [
+          6
+        ],
+        "eocd": 53,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 6,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-7.bin",
+      "bytes": 76,
+      "sha256": "ba8c0562cf2cc9bb73cc3454c7558b42a30ea91d2692563b88e478a83605129c",
+      "authored_layout": {
+        "directory_start": 7,
+        "central_offsets": [
+          7
+        ],
+        "eocd": 54,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 7,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-8.bin",
+      "bytes": 77,
+      "sha256": "cc65b50362f17123935a586ce4b6cff38337f0532485e93fb16df954cc0ef763",
+      "authored_layout": {
+        "directory_start": 8,
+        "central_offsets": [
+          8
+        ],
+        "eocd": 55,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 8,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-9.bin",
+      "bytes": 78,
+      "sha256": "bb776fc9985d8e39c8f0e2648157b1690876e61f5e476bb3f68c62472cf616c9",
+      "authored_layout": {
+        "directory_start": 9,
+        "central_offsets": [
+          9
+        ],
+        "eocd": 56,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 9,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-10.bin",
+      "bytes": 79,
+      "sha256": "bfb79dd9637dd3c64dbf1b4ef3645343d8520418dbfd3e04a5c2815cfcbc3c84",
+      "authored_layout": {
+        "directory_start": 10,
+        "central_offsets": [
+          10
+        ],
+        "eocd": 57,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 10,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-11.bin",
+      "bytes": 80,
+      "sha256": "ef6ca3f7f44979b3e99d353e2786c0b916f06dd54ec70dd855db5dcd874eadaf",
+      "authored_layout": {
+        "directory_start": 11,
+        "central_offsets": [
+          11
+        ],
+        "eocd": 58,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 11,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-12.bin",
+      "bytes": 81,
+      "sha256": "2e3840298f4891c98913254fccdd1a4f10a877884db3123bf02fa19735ae909b",
+      "authored_layout": {
+        "directory_start": 12,
+        "central_offsets": [
+          12
+        ],
+        "eocd": 59,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 12,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-13.bin",
+      "bytes": 82,
+      "sha256": "70c940491195c1d0b13c92723b604a6c31acc0c64f19166ebccb64cd9eb0b332",
+      "authored_layout": {
+        "directory_start": 13,
+        "central_offsets": [
+          13
+        ],
+        "eocd": 60,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 13,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-14.bin",
+      "bytes": 83,
+      "sha256": "2d8dc8e2d3e51eebe6755be8b516368ac463fa7206e6f5b3beaf594776b2dd30",
+      "authored_layout": {
+        "directory_start": 14,
+        "central_offsets": [
+          14
+        ],
+        "eocd": 61,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 14,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-15.bin",
+      "bytes": 84,
+      "sha256": "384c727158a976d6ef3e90e3a928a2dbb7bb8123b1921c40de828998d57813bd",
+      "authored_layout": {
+        "directory_start": 15,
+        "central_offsets": [
+          15
+        ],
+        "eocd": 62,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 15,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-16.bin",
+      "bytes": 85,
+      "sha256": "e667047c5910a20e2be2fbf7834aeb93dd4b3fd8379fcf894da2fbc8f4f69130",
+      "authored_layout": {
+        "directory_start": 16,
+        "central_offsets": [
+          16
+        ],
+        "eocd": 63,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 16,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-17.bin",
+      "bytes": 86,
+      "sha256": "b22a69a3813f5b75647da585f3a9c5d336b7493a4b789a6a84f87cdb790593ea",
+      "authored_layout": {
+        "directory_start": 17,
+        "central_offsets": [
+          17
+        ],
+        "eocd": 64,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 17,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-18.bin",
+      "bytes": 87,
+      "sha256": "b44b1b3a722389bca7789d6600207349c73b5cc1e3dcf5d6fe1c2a092e0cd910",
+      "authored_layout": {
+        "directory_start": 18,
+        "central_offsets": [
+          18
+        ],
+        "eocd": 65,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 18,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-19.bin",
+      "bytes": 88,
+      "sha256": "2c10d479ce05db16305ad1271efcce5d53a06cbf364f366872c3a0832f4ffb0f",
+      "authored_layout": {
+        "directory_start": 19,
+        "central_offsets": [
+          19
+        ],
+        "eocd": 66,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 19,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-20.bin",
+      "bytes": 89,
+      "sha256": "a060ad5247ad0e2f9b2033852e80eb6d7eca44a9953137383b90304418a558df",
+      "authored_layout": {
+        "directory_start": 20,
+        "central_offsets": [
+          20
+        ],
+        "eocd": 67,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 20,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-21.bin",
+      "bytes": 90,
+      "sha256": "6a12c0af629c7c2678609e062d06c66e720d1018c77d62a44ac143d6c2c6c268",
+      "authored_layout": {
+        "directory_start": 21,
+        "central_offsets": [
+          21
+        ],
+        "eocd": 68,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 21,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-22.bin",
+      "bytes": 91,
+      "sha256": "c76a4286eda70c463665589edc0c945a2fe980a7d4d7460dfbd0803c853a1ac6",
+      "authored_layout": {
+        "directory_start": 22,
+        "central_offsets": [
+          22
+        ],
+        "eocd": 69,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 22,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-23.bin",
+      "bytes": 92,
+      "sha256": "71b858376d1a9ab53ab00c3f388fd0b3da17291f681355a5d7da49c2d8802860",
+      "authored_layout": {
+        "directory_start": 23,
+        "central_offsets": [
+          23
+        ],
+        "eocd": 70,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 23,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-24.bin",
+      "bytes": 93,
+      "sha256": "956763bb820ed59cae118f1321d00f6b3d8f85503252a8b1d9d530020e5842e0",
+      "authored_layout": {
+        "directory_start": 24,
+        "central_offsets": [
+          24
+        ],
+        "eocd": 71,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 24,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-25.bin",
+      "bytes": 94,
+      "sha256": "3215e4210e2ed3f7f4dc6339bf1bedbdf03a3e6a94fbedf4c69d27be526aa306",
+      "authored_layout": {
+        "directory_start": 25,
+        "central_offsets": [
+          25
+        ],
+        "eocd": 72,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 25,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-26.bin",
+      "bytes": 95,
+      "sha256": "b461eaf54eef6ee8fb2c0b73842cf8031ac5e0640e8a45a72f4fb07c9b727777",
+      "authored_layout": {
+        "directory_start": 26,
+        "central_offsets": [
+          26
+        ],
+        "eocd": 73,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 26,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-27.bin",
+      "bytes": 96,
+      "sha256": "d6ed4b19b8ab24462a4cfdf2a0a07d16244ccb3d82a279d8e8ad9af494bc41ef",
+      "authored_layout": {
+        "directory_start": 27,
+        "central_offsets": [
+          27
+        ],
+        "eocd": 74,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 27,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-28.bin",
+      "bytes": 97,
+      "sha256": "30f4aa587263ddcf55aea13784cb629aa8202ba2538b68ff5cff1aca6b4458b5",
+      "authored_layout": {
+        "directory_start": 28,
+        "central_offsets": [
+          28
+        ],
+        "eocd": 75,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 28,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-fixed-prefix-29.bin",
+      "bytes": 98,
+      "sha256": "2609b0ae56081a52d1b307605d1199dc09455743d5c5759e4fc9ac421eca344e",
+      "authored_layout": {
+        "directory_start": 29,
+        "central_offsets": [
+          29
+        ],
+        "eocd": 76,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 29,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 0,
+        "reason": "truncated local header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-truncated-name.bin",
+      "bytes": 99,
+      "sha256": "ef70951dfe1389fb78b6d3b6b073344cc0ceee60a5cfdad0a3f09eea2e9d203d",
+      "authored_layout": {
+        "directory_start": 30,
+        "central_offsets": [
+          30
+        ],
+        "eocd": 77,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 30,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 30,
+        "reason": "truncated local name"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-truncated-payload-empty.bin",
+      "bytes": 100,
+      "sha256": "847b14f8b4de11510a9e748cc231912e2c37f2b587905735d6e2ea47e12b85c0",
+      "authored_layout": {
+        "directory_start": 31,
+        "central_offsets": [
+          31
+        ],
+        "eocd": 78,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 31,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 31,
+        "reason": "payload crosses directory"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-truncated-payload-one-short.bin",
+      "bytes": 108,
+      "sha256": "c415341762c81ececeecabb0709423f9f43b43812f7e94ba1046a16a661ca937",
+      "authored_layout": {
+        "directory_start": 39,
+        "central_offsets": [
+          39
+        ],
+        "eocd": 86,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 39,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 31,
+        "reason": "payload crosses directory"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-truncated-extra.bin",
+      "bytes": 100,
+      "sha256": "c72d529871973b1c8f7dae9fc48d91b7649f2d3f5e63034bb96e04056e02ac75",
+      "authored_layout": {
+        "directory_start": 31,
+        "central_offsets": [
+          31
+        ],
+        "eocd": 78,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 31,
+            "payload": [
+              31,
+              31
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 31,
+        "reason": "truncated local extra"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-extra-header-one-before-crc.bin",
+      "bytes": 110,
+      "sha256": "78aeb9efbd85817be4855fe359a3fba9e3a5a150fc27d90f82eebed8247ebb17",
+      "authored_layout": {
+        "directory_start": 41,
+        "central_offsets": [
+          41
+        ],
+        "eocd": 88,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 41,
+            "payload": [
+              32,
+              41
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 31,
+        "reason": "truncated extra header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-extra-header-three-before-crc.bin",
+      "bytes": 112,
+      "sha256": "559f6af20c9801daf1c8c6c58512a2eb39b4131e29f44422556419daf51d0472",
+      "authored_layout": {
+        "directory_start": 43,
+        "central_offsets": [
+          43
+        ],
+        "eocd": 90,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 43,
+            "payload": [
+              34,
+              43
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 31,
+        "reason": "truncated extra header"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-extra-body-before-crc.bin",
+      "bytes": 113,
+      "sha256": "fee2dffc0ea3effce9330e5cac4fe029fcab1a6c4a91040a9e24fcc027f1a998",
+      "authored_layout": {
+        "directory_start": 44,
+        "central_offsets": [
+          44
+        ],
+        "eocd": 91,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 44,
+            "payload": [
+              35,
+              44
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 31,
+        "reason": "truncated extra body"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-extra-zip64-body-framing-first-before-crc.bin",
+      "bytes": 113,
+      "sha256": "e0573e1779eef3a9737ed9e525d8215516383a156c353d919c5e47e7dda212d5",
+      "authored_layout": {
+        "directory_start": 44,
+        "central_offsets": [
+          44
+        ],
+        "eocd": 91,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 44,
+            "payload": [
+              35,
+              44
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 31,
+        "reason": "truncated extra body"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-extra-zip64-before-crc.bin",
+      "bytes": 113,
+      "sha256": "d7d92949a7fcc3d9b5640ca2e2060caca1e026220c5db64cbbdcfc40a6fa0d29",
+      "authored_layout": {
+        "directory_start": 44,
+        "central_offsets": [
+          44
+        ],
+        "eocd": 91,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 44,
+            "payload": [
+              35,
+              44
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedZip64",
+        "offset": 31
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-extra-encryption-17-before-crc.bin",
+      "bytes": 113,
+      "sha256": "d67cefdfea79015a45b4daf49d7f6dc287136f878f6432878197bbe6ddcccb01",
+      "authored_layout": {
+        "directory_start": 44,
+        "central_offsets": [
+          44
+        ],
+        "eocd": 91,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 44,
+            "payload": [
+              35,
+              44
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedEncryption",
+        "offset": 31
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-extra-encryption-19-before-crc.bin",
+      "bytes": 113,
+      "sha256": "8d0d0755ab6b28da6f56bc9439199ccdcfb2e3293d7c43ecd522e9530d3089f7",
+      "authored_layout": {
+        "directory_start": 44,
+        "central_offsets": [
+          44
+        ],
+        "eocd": 91,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 44,
+            "payload": [
+              35,
+              44
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedEncryption",
+        "offset": 31
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/local-extra-encryption-9901-before-crc.bin",
+      "bytes": 113,
+      "sha256": "d88131ca9acc4877c15dff6b603dfbd853ccc65b23267a66555c4dd4b18bff88",
+      "authored_layout": {
+        "directory_start": 44,
+        "central_offsets": [
+          44
+        ],
+        "eocd": 91,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 44,
+            "payload": [
+              35,
+              44
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedEncryption",
+        "offset": 31
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/central-method-before-descriptor-before-local-signature.bin",
+      "bytes": 109,
+      "sha256": "5d30476c2bb47da0497ac5cb6bc7c92f1a3f4b505b4d119f329df3388e5d3b4d",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedMethod",
+        "offset": 50,
+        "method": 8
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/central-descriptor-before-local-signature.bin",
+      "bytes": 109,
+      "sha256": "803d9a3194c0ccd24d0443c657e02e1058d0f1186728ba1679acb1f9e06d16d5",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.UnsupportedFlags",
+        "offset": 48,
+        "flags": 8
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/alias-local-offset.bin",
+      "bytes": 196,
+      "sha256": "0da35522a42c229f5c91071afc59f306f9021418ac04580f9e7e3b844edc79eb",
+      "authored_layout": {
+        "directory_start": 80,
+        "central_offsets": [
+          80,
+          127
+        ],
+        "eocd": 174,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          },
+          {
+            "header": 40,
+            "physical_end": 80,
+            "payload": [
+              71,
+              80
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0,
+          1
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Overlap",
+        "offset": 0,
+        "other_ordinal": 1
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/selected-encloses-later-header.bin",
+      "bytes": 179,
+      "sha256": "41c96f3bd8cb9d6e50520618517ad35caeedef3e035c7332e602a8efac8f9665",
+      "authored_layout": {
+        "directory_start": 63,
+        "central_offsets": [
+          63,
+          110
+        ],
+        "eocd": 157,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 63,
+            "payload": [
+              31,
+              63
+            ]
+          },
+          {
+            "header": 31,
+            "physical_end": 63,
+            "payload": [
+              62,
+              63
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0,
+          1
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Overlap",
+        "offset": 0,
+        "other_ordinal": 1
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/earlier-payload-encloses-selected-header.bin",
+      "bytes": 179,
+      "sha256": "41c96f3bd8cb9d6e50520618517ad35caeedef3e035c7332e602a8efac8f9665",
+      "authored_layout": {
+        "directory_start": 63,
+        "central_offsets": [
+          63,
+          110
+        ],
+        "eocd": 157,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 63,
+            "payload": [
+              31,
+              63
+            ]
+          },
+          {
+            "header": 31,
+            "physical_end": 63,
+            "payload": [
+              62,
+              63
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0,
+          1
+        ]
+      },
+      "ordinal": 1,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Overlap",
+        "offset": 31,
+        "other_ordinal": 0
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/competing-signature-before-crc.bin",
+      "bytes": 196,
+      "sha256": "0f455e52080ac47aa82341d662ae9163eb856161609184ddd22f0922d62d6660",
+      "authored_layout": {
+        "directory_start": 80,
+        "central_offsets": [
+          80,
+          127
+        ],
+        "eocd": 174,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          },
+          {
+            "header": 40,
+            "physical_end": 80,
+            "payload": [
+              71,
+              80
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0,
+          1
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 40,
+        "reason": "competing local header signature"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/competing-span-before-crc.bin",
+      "bytes": 196,
+      "sha256": "2dfc91401f46d378f882dd245b2ca5785c18ca43ad9b478c33e1b42c6eed4950",
+      "authored_layout": {
+        "directory_start": 80,
+        "central_offsets": [
+          80,
+          127
+        ],
+        "eocd": 174,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          },
+          {
+            "header": 40,
+            "physical_end": 80,
+            "payload": [
+              71,
+              80
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0,
+          1
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 40,
+        "reason": "competing local span crosses directory"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/huge-competing-size-before-addition.bin",
+      "bytes": 196,
+      "sha256": "e26dff4d3d6a9198a1087820d005988cce3e2da3311bc9abde6168d3ba5f16f1",
+      "authored_layout": {
+        "directory_start": 80,
+        "central_offsets": [
+          80,
+          127
+        ],
+        "eocd": 174,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          },
+          {
+            "header": 40,
+            "physical_end": 80,
+            "payload": [
+              71,
+              80
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0,
+          1
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "error": "Structure.Malformed",
+        "offset": 40,
+        "reason": "competing local span crosses directory"
+      },
+      "note": "Competing local size claims are not agreement-checked; central size is bounds-checked before adding on32/64-bit."
+    },
+    {
+      "file": "fixtures/unselected-deflate-descriptor-envelope.bin",
+      "bytes": 193,
+      "sha256": "4e6b99f74f4b4ea64a89d3671017c35d99d2a6f0794af3a2d4c89cc9c34be93b",
+      "authored_layout": {
+        "directory_start": 77,
+        "central_offsets": [
+          77,
+          124
+        ],
+        "eocd": 171,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          },
+          {
+            "header": 40,
+            "physical_end": 77,
+            "payload": [
+              71,
+              77
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0,
+          1
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "payload_range": [
+          31,
+          40
+        ],
+        "payload_hex": "313233343536373839",
+        "crc32": 3421780262
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/unselected-aliases-disjoint-from-selected.bin",
+      "bytes": 259,
+      "sha256": "67567711f467de6e749efb83ac0ba75d76ed9973dff6c5017a9c32276dcc22f6",
+      "authored_layout": {
+        "directory_start": 96,
+        "central_offsets": [
+          96,
+          143,
+          190
+        ],
+        "eocd": 237,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 32,
+            "payload": [
+              31,
+              32
+            ]
+          },
+          {
+            "header": 32,
+            "physical_end": 64,
+            "payload": [
+              63,
+              64
+            ]
+          },
+          {
+            "header": 64,
+            "physical_end": 96,
+            "payload": [
+              95,
+              96
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0,
+          1,
+          2
+        ]
+      },
+      "ordinal": 0,
+      "stage": "stored_payload",
+      "expected": {
+        "payload_range": [
+          31,
+          32
+        ],
+        "payload_hex": "56",
+        "crc32": 1342839628
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/descriptor-tail-overlaps-selected-header-gap.bin",
+      "bytes": 199,
+      "sha256": "d218558d1d3ea63bcc5d3ae3a021d44be3a9bd45d1e690a2c5ef7adede9e47cc",
+      "authored_layout": {
+        "directory_start": 83,
+        "central_offsets": [
+          83,
+          130
+        ],
+        "eocd": 177,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 51,
+            "payload": [
+              31,
+              51
+            ]
+          },
+          {
+            "header": 51,
+            "physical_end": 83,
+            "payload": [
+              82,
+              83
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0,
+          1
+        ]
+      },
+      "ordinal": 1,
+      "stage": "stored_payload",
+      "expected": {
+        "payload_range": [
+          82,
+          83
+        ],
+        "payload_hex": "42",
+        "crc32": 1255198513
+      },
+      "note": "Unselected compressed envelope ends at51; unchecked descriptor [51,63) overlaps selected header [51,81). No valid deflate stream/whole-archive claim."
+    },
+    {
+      "file": "fixtures/claimed-header-at-directory.bin",
+      "bytes": 109,
+      "sha256": "a4e06083817383da48be9fb326fda18a97bb95fb9ab41d510569f87bb7c90632",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "index_zip_directory",
+      "expected": {
+        "error": "ZipIndexError.Malformed",
+        "offset": 82,
+        "reason": "claimed local header must precede directory"
+      },
+      "note": ""
+    },
+    {
+      "file": "fixtures/central-zip64-local-offset.bin",
+      "bytes": 109,
+      "sha256": "59c66b886b41285bbbb6095dbf4a4e6967ea74e97357902d31a831f3b119b0b0",
+      "authored_layout": {
+        "directory_start": 40,
+        "central_offsets": [
+          40
+        ],
+        "eocd": 87,
+        "physical_records": [
+          {
+            "header": 0,
+            "physical_end": 40,
+            "payload": [
+              31,
+              40
+            ]
+          }
+        ],
+        "central_physical_order": [
+          0
+        ]
+      },
+      "ordinal": 0,
+      "stage": "index_zip_directory",
+      "expected": {
+        "error": "ZipIndexError.UnsupportedZip64",
+        "offset": 40
+      },
+      "note": ""
+    }
+  ]
+}

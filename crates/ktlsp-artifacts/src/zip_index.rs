@@ -1,5 +1,9 @@
 use crate::{MAX_ARTIFACT_BYTES, VerifiedArtifact};
 
+#[path = "zip_stored.rs"]
+mod zip_stored;
+pub use zip_stored::ZipStoredError;
+
 const MAX_DIRECTORY: usize = 8 * 1024 * 1024;
 const MAX_ENTRIES: usize = 16_384;
 const MAX_NAME: usize = 4096;
@@ -43,10 +47,20 @@ const LOCATOR: &[u8] = b"PK\x06\x07";
 ///     index_zip_directory(&artifact).unwrap()
 /// }
 /// ```
-#[derive(Debug)]
 pub struct ZipDirectoryIndex<'a> {
     entries: Vec<ZipDirectoryEntry<'a>>,
     archive_comment: &'a [u8],
+    bytes: &'a [u8],
+    directory_start: usize,
+}
+
+impl std::fmt::Debug for ZipDirectoryIndex<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ZipDirectoryIndex")
+            .field("entries", &self.entries)
+            .field("archive_comment", &self.archive_comment)
+            .finish()
+    }
 }
 
 impl<'a> ZipDirectoryIndex<'a> {
@@ -72,7 +86,11 @@ pub struct ZipDirectoryEntry<'a> {
     compressed_size: u32,
     uncompressed_size: u32,
     local_header_offset: u32,
+    version_needed: u16,
+    central_offset: usize,
 }
+
+const _: () = assert!(MAX_ENTRIES * std::mem::size_of::<ZipDirectoryEntry<'_>>() <= MAX_METADATA);
 
 impl<'a> ZipDirectoryEntry<'a> {
     pub fn raw_name(&self) -> &'a [u8] {
@@ -452,6 +470,8 @@ pub fn index_zip_directory(
             compressed_size,
             uncompressed_size,
             local_header_offset,
+            version_needed: version,
+            central_offset: offset,
         });
         cursor = record_end;
     }
@@ -473,6 +493,8 @@ pub fn index_zip_directory(
     Ok(ZipDirectoryIndex {
         entries,
         archive_comment: &bytes[eocd + 22..],
+        bytes,
+        directory_start: start,
     })
 }
 

@@ -1978,7 +1978,7 @@
          None => None,
 --- a/src/parsing/declarations/parameters.rs
 +++ b/src/parsing/declarations/parameters.rs
-@@ -3,31 +3,43 @@
+@@ -3,32 +3,44 @@
  
  use ktrs_syntax::SyntaxKind::{self, *};
  
@@ -1987,6 +1987,7 @@
 +    DECLARATION_FIRST, LAMBDA_VALUE_PARAMETER_FIRST, PARAMETER_NAME_RECOVERY_SET,
 +    VALUE_PARAMETER_FIRST,
 +};
+ use crate::builder::{PsiBuilder, SemanticWhitespaceAwarePsiBuilder};
  use crate::parsing::{Consumer, Parser};
  use crate::token_set::TokenSet;
  
@@ -2037,7 +2038,7 @@
      OBJECT_KEYWORD, // object
      // jump
      THROW_KEYWORD,
-@@ -39,11 +51,12 @@
+@@ -40,11 +52,12 @@
      WHILE_KEYWORD,
      DO_KEYWORD,
      IDENTIFIER, // SimpleName
@@ -2053,7 +2054,7 @@
  
  pub(super) const USER_TYPE_NAME_RECOVERY_SET: TokenSet =
      TokenSet::or_set(&[EXPRESSION_FIRST, EXPRESSION_FOLLOW, DECLARATION_FIRST]);
-@@ -74,19 +87,28 @@
+@@ -75,19 +88,28 @@
  
          self.my_builder.disable_newlines();
  
@@ -2066,7 +2067,7 @@
 -                    p.close_declaration_with_comment_binders(value_parameter, VALUE_PARAMETER, false);
 -                }
 -            } else {
--                p.parse_value_parameter(type_required);
+-                p.parse_value_parameter_2(false, type_required, recover_declarations);
 -            }
 -            true
 -        });
@@ -2087,7 +2088,7 @@
 +                        );
 +                    }
 +                } else {
-+                    p.parse_value_parameter(type_required);
++                    p.parse_value_parameter_2(false, type_required, recover_declarations);
 +                }
 +                true
 +            },
@@ -2095,7 +2096,7 @@
  
          self.my_builder.restore_newlines_state();
  
-@@ -134,7 +156,11 @@
+@@ -135,7 +157,11 @@
                          self.error("Expecting comma or ')'");
                          no_error = false;
                      }
@@ -2108,7 +2109,31 @@
                          break;
                      }
                      if offset_before == self.my_builder.get_current_offset() {
-@@ -218,7 +244,11 @@
+@@ -192,7 +218,9 @@
+             self.advance(); // VAR_KEYWORD | VAL_KEYWORD
+         }
+ 
+-        if !self.parse_function_parameter_rest(type_required, recover_default) && rollback_on_failure {
++        if !self.parse_function_parameter_rest(type_required, recover_default)
++            && rollback_on_failure
++        {
+             parameter.rollback_to(self);
+             return false;
+         }
+@@ -248,7 +276,11 @@
+      *   : parameter ("=" element)?
+      *   ;
+      */
+-    fn parse_function_parameter_rest(&mut self, type_required: bool, recover_default: bool) -> bool {
++    fn parse_function_parameter_rest(
++        &mut self,
++        type_required: bool,
++        recover_default: bool,
++    ) -> bool {
+         let mut no_errors = true;
+ 
+         if self.at(COMMA) || self.at(RPAR) {
+@@ -266,7 +298,11 @@
              self.advance(); // COLON
              self.parse_type_ref();
          } else {
@@ -2121,7 +2146,7 @@
  
              if self.at(COLON) {
                  self.advance(); // COLON
-@@ -232,7 +262,10 @@
+@@ -280,7 +316,10 @@
  
                  self.parse_type_ref();
              } else if type_required {

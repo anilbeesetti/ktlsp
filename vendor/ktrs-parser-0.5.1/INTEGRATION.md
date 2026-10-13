@@ -85,3 +85,29 @@ is prepared but not executed. Unconditional window-predicate checks compile
 against the actual byte/EOF guard. These do not establish an end-to-end active-EOF
 recovery case; that gap remains for #83. Final Linux execution and renewed resource
 review remain required before final integration approval.
+
+## C14 / #121 finite ordinary-default recovery
+
+This child changes only parameters.rs and its ordered patch/hash provenance.
+Production tests in recovery_defaults.rs freeze the exact top-level LF/CRLF/CR
+seed, full declaration/parameter/type/annotation projection, names/owners,
+original partition/UTF-16/newlines, snapshot identity and healthy revision followup.
+Four valid LF default controls plus declined nonempty-header/scratch-limit cases
+preserve existing expression ownership. C14 alone in recovery_residuals.rs becomes
+positive sibling acceptance; C15/C16 stay unchanged. Constructor/function-type and
+existing resource tests remain in the unchanged C12/production suite.
+
+The local ordinary recovery argument is scoped by calls, independent of recursive
+probe suppression. Read-only scratch construction copies at most256 complete raw
+tokens/4096 bytes, stops after four nontrivia tokens, respects active truncated EOF,
+and performs exactly four grammar expect calls. Ordinary expression parsing runs
+when the complete simple zero-parameter named header is not recognized. No source,
+worker, API, dependency, graph, limit or diagnostic-dedup policy outside that finite
+entry is changed. Ordered replay still reproduces54 final source hashes across
+9 behavior/49 formatting files; archive/upstream hashes and notices are retained.
+
+See ../../crates/ktlsp-parser/reviews/c14-default-recovery.md for pre-runtime
+expectations and review/controlled-validation gates. Exact reviewed combined-head
+and merged-main Linux all-three evidence must be retained in the PR/receipt before
+completed delivery. No local native/parser/performance/JVM run is authorized;
+#96 remains unresolved, #83/#7 remain open and full semantic parity is unfinished.

@@ -148,9 +148,7 @@ fn compatibility(tree: &Parsed, case: &Value) {
                 "{id}"
             );
         }
-        "class-end-greater-than-11"
-        | "scratch-declines-without-LPAR"
-        => {
+        "class-end-greater-than-11" | "scratch-declines-without-LPAR" => {
             assert!(!tree.diagnostics().is_empty(), "{id}");
             let class = elements
                 .iter()

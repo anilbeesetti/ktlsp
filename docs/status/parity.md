@@ -25,7 +25,7 @@ Historical source checkpoint `4d27673f703fd3c7b0ee57fc7a3cf35c6c21f05f` (PR98) p
 | Binary/Java/SDK/library symbols | pending | unverified | T017–T019 |
 | Explicit project-model loaders | v1 and separate v2 ordered scoped/exported edge representation native-tested; data-only libraries | unverified | T004/#78 delivered; v2 does not migrate importer or establish semantic visibility; v1 path amplification #111/PR117 pending, symlink discovery/live import remain |
 | Exported workspace.json model | partial; #63 pinned data-only subset native-tested; ordered sidecar retained | pinned source contract only; runtime unverified | #21 open; SDK/resources/scoped-exported libraries/facets/compiler/build metadata block atomically; no server wiring |
-| Offline artifact lookup/integrity | exact Maven-layout lookup plus separate immutable caller-SHA-256 VerifiedArtifact helper native-tested; lookup provenance remains unverified until verification | unverified | #61/#88 delivered; no archive validity/digest authentication/resolver semantics; #114/PR116 ZIP directory pending; #20 OPEN |
+| Offline artifact lookup/integrity | exact Maven-layout lookup plus separate immutable caller-SHA-256 VerifiedArtifact helper native-tested; lookup provenance remains `Unverified`; the separate immutable wrapper records caller-digest equality | unverified | #61/#88 delivered; no archive validity/digest authentication/resolver semantics; #114/PR116 ZIP directory pending; #20 OPEN |
 | Gradle/Maven/Android imports | pending | unverified | T004, T020–T023; existing-tool orchestration not implemented |
 | JPS .idea/.iml compatibility | pending | source registered; runtime unverified | T048 |
 | Completion/resolve | pending | unverified | T024 |

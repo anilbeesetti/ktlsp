@@ -3,6 +3,7 @@
 pub mod annotation_extensions;
 pub mod annotations;
 pub mod metadata;
+pub mod method_type_annotations;
 pub mod nesting;
 pub mod type_annotations;
 

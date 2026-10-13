@@ -56,8 +56,8 @@ Known bounded repair limits: missing defaults outside C14's complete simple zero
 malformed parenthesized types outside C15's finite ordinary-parameter/simple-zero-parameter-header
 contract, malformed annotation arguments outside C16's direct ordinary-parameter/simple-zero-parameter-header
 contract, and unclosed class generic lists
-outside the bounded #100 simple-function-header
-contract can still consume later declarations. These are
+outside the bounded #100 simple-function-header and finite C13b
+lexically simple extension-function-header contracts can still consume later declarations. These are
 upstream grammar/recovery gaps, not accepted recovery or full grammar parity.
 Missing simple types and open generic argument types improve recovery but retain
 upstream diagnostic deduplication (e.g. only `Type expected` at one offset).
@@ -188,3 +188,38 @@ Initial local preparation retained an automatic-approval publication hold; the
 coordinator later published child #126 after direct human authorization. Integrated
 Linux validation remains pending. #83/#7 remain open, T008/T008a held, #96 unresolved;
 no full parser or semantic parity is claimed.
+
+## C13b / #136 simple extension sibling headers — source preparation
+
+This child changes only declarations/type_parameters.rs behavior: existing scratch
+FUN/IDENTIFIER/LPAR recognition also permits one DOT and required IDENTIFIER before
+LPAR. The exact prior FUN/IDENTIFIER/LPAR branch, class/interface callsites, completed
+bound gate, isolated builder, recursive-probe suppression, minimum active EOF and
+256-raw-token/4096-byte/4096-copied-tokens-per-list accounting are unchanged. Generic,
+qualified, nullable and parenthesized receivers and other sibling kinds remain
+outside positive acceptance. Bare dynamic uses DYNAMIC_TYPE; get, backticks and
+single-token suspend retain normal USER_TYPE parsing. DOT-truncated lookahead is
+None for suspend, so the modifier-consumption guard declines; no semantic type
+validity is inferred. No receiver/type/function callback is added to the probe.
+
+The focused production test embeds a direct selected-field copy of the final
+source-authored contract JSON (SHA-256
+5ea819780683402160c821c6e058d07a652c155a09bce80842e5ddaf28ae3097):
+70 exact sources, 38 complete selected projections and 779 original-source UTF-16
+endpoint expectations. Remaining cases assert explicitly limited declined-header,
+incomplete-bound, annotation-owned-function, copied-window/aggregate/reset and
+malformed-parameter compatibility invariants. No complete declined AST is invented.
+Only the previous String-extension exclusion member is removed from declarations.rs;
+all other C13a/C14/C15/C16/resource tests remain unchanged. Every case checks original
+token partition, snapshot identity, stale revision rejection and healthy followup.
+These assertions have not run locally; no runtime or behavior acceptance is claimed.
+
+Data-only archive/ordered-patch replay verifies all 54 final source files: 14
+behavior files, 50 formatting files, four pristine survivors. Exactly one final
+Rust source differs from the frozen initial37bfe388 source. Original crate archive
+SHA-256 ec8d43d9549490689477385c7678bbd22ecbc445973ab364e8ecb69dd4882bcc,
+upstream inventory, manifests/locks and third-party notices are unchanged.
+Current source-stage review and compile-only receipts are recorded in
+../../crates/ktlsp-parser/reviews/c13b-generic-extension-recovery.md. Push/PR/CI,
+integration and merge remain coordinator-gated. #83/#7 OPEN, C13 aggregate GAP,
+T008/T008a HOLD, B3/B4 GAP, B11 UNVERIFIED and #96 OPEN/UNKNOWN remain unchanged.

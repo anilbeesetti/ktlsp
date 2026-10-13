@@ -1,4 +1,4 @@
-# Kotlin 2.3 declaration baseline v1 — #86/#87, partial #83
+# Kotlin 2.3 declaration baseline v1 — #86/#87/#100, partial #83
 
 This independently authored native corpus pins the source-local ktrs-parser 0.5.1 fork and registry syntax 0.5.1, not
 compiler or official LSP parity. Source literals and exact expected extents,
@@ -45,11 +45,12 @@ constructor/function-type parameter contexts are controls. Member initializer
 and secondary-constructor boundaries have explicit original-span/parent checks.
 This does not accept all malformed syntax or complete #83/#7 recovery.
 
-`unresolved_generic_recovery_gate_is_recorded` retains the unclosed class generic
-parameter defect: `class Box<T` consumes the following function keyword despite
-lossless token coverage and diagnostics. `{fun<)]<T:@( {})` separately returns
-Coverage for upstream token loss. Original source stays authoritative, and each
-failure has a healthy-followup check.
+`unclosed_classifier_generics_restore_named_sibling_snapshots` replaces the recorded
+class-generic defect with exact class/list, sibling kind/name/range/parent
+and diagnostic expectations. Entry-boundary errors retain same-offset deduplication.
+Candidate Linux execution and both reviews passed; stable integration remains required.
+`token_loss_still_rejects_coverage_and_allows_healthy_followup` separately preserves
+Coverage rejection for `{fun<)]<T:@( {})` and its healthy followup.
 
 Other individually named upstream limits remain: a missing default (`x: Int =`
 followed by named `fun`), deeply malformed parenthesized type (`x: (@A`) and
@@ -58,7 +59,8 @@ inside those nested grammar productions is outside the parameter-boundary repair
 Missing simple types/open generic argument types may recover with upstream
 same-position diagnostic deduplication (e.g. only `Type expected`).
 
-#83/#7 remain open and T008a remains blocked, especially on generic recovery.
+#83/#7 remain open and T008a remains blocked on the remaining parent acceptance
+and individually named recovery/resource gaps.
 The Rust-only fork preserves archive/source inventory and notices under
 `vendor/ktrs-parser-0.5.1`; recovery.patch isolates the source change. No wrapper
 reconstructs declarations from text or patches returned CSTs. No oracle ran.
@@ -109,3 +111,39 @@ oracle ran for this corpus; the #87 dependency change selects the audited local 
 Abort fixtures allow WorkerFailed or Timeout: the supervisor checks the deadline
 before observing exit status, and abort completion can cross it. Normal nonzero
 exit, hang/no-read, output, and healthy-followup assertions remain strict.
+
+## #100 classifier-generic recovery candidate
+
+The candidate recovers simple named sibling function headers after incomplete
+class/interface type-parameter lists at parameter entries or after completed
+parameters/bounds. Optional complete annotations/modifiers stay with the function.
+Newlines and keywords alone do not establish a recovery boundary. Generic and
+extension function headers, other sibling kinds, objects, and incomplete nested
+bounds/annotations remain outside this positive contract; ordinary parsing stays
+in effect for them. #83/#7 and T008a require the remaining acceptance audit.
+
+Scratch prefix parsing preserves live state and respects existing truncation;
+256 copied raw tokens/4096 source bytes per attempt and 4096 copied raw tokens per class list
+bound scratch parsing. Leading trivia inspection is outside the copied-token
+charge and remains bounded by the input limit and advancing parser cursor.
+Exceeding the scratch limits declines recovery without changing global budgets,
+Coverage rejection, snapshot identity, strict result validation or the 500 ms
+worker deadline. No server provider or semantic API changes. Exact independent
+regressions are in declarations.rs/recovery_limits.rs. Authorized Linux CI and
+both independent behavioral reviews passed for candidate054e352 on the actual
+synthetic merge86bbd04: 169 active tests, zero failures, two exercised helper
+fixtures and 19 worker fault cases. Exact checkout/tree evidence is in REVIEW.md.
+Local format/Clippy and ordered patch/hash replay also passed. Authorized main ef120be was integrated once; final combined-head CI/reviews and
+coordinator merge grant remain required. This is not a completed-delivery claim. Issue #96 remains unresolved.
+
+The coordinator explicitly amended the accounting contract after a focused audit:
+leading trivia and cheap kind/modifier/EOF prefilter misses may remain outside
+the copied-token allowance. Every eligible scratch window is charged before
+grammar evaluation, including failure; a zero-copy eligible rejection debits one.
+The separate allocation-free leading scan is bounded by the 64 KiB input and
+local comma-consuming loop progress. This is not a bound on every examination,
+whole-parser complexity, RSS or total work. New leading-trivia regression evidence
+is prepared but not executed. Unconditional window-predicate checks compile
+against the actual byte/EOF guard. These do not establish an end-to-end active-EOF
+recovery case; that gap remains for #83. Final Linux execution and renewed resource
+review remain required before final integration approval.

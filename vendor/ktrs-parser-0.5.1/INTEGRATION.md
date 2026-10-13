@@ -49,3 +49,39 @@ Pinned fmt/clippy/workspace tests run in exact-head Linux Native Rust CI during
 the coordinator-approved validation turn. #83/#7/T008 remain gated on joint recovery assessment, especially
 unfixed generic/default/deep type/annotation recovery; this repair alone is no
 syntax/parity unlock.
+
+## #100 classifier-generic recovery candidate
+
+The candidate recovers simple named sibling function headers after incomplete
+class/interface type-parameter lists at parameter entries or after completed
+parameters/bounds. Optional complete annotations/modifiers stay with the function.
+Newlines and keywords alone do not establish a recovery boundary. Generic and
+extension function headers, other sibling kinds, objects, and incomplete nested
+bounds/annotations remain outside this positive contract; ordinary parsing stays
+in effect for them. #83/#7 and T008a require the remaining acceptance audit.
+
+Scratch prefix parsing preserves live state and respects existing truncation;
+256 copied raw tokens/4096 source bytes per attempt and 4096 copied raw tokens per class list
+bound scratch parsing. Leading trivia inspection is outside the copied-token
+charge and remains bounded by the input limit and advancing parser cursor.
+Exceeding the scratch limits declines recovery without changing global budgets,
+Coverage rejection, snapshot identity, strict result validation or the 500 ms
+worker deadline. No server provider or semantic API changes. Exact independent
+regressions are in declarations.rs/recovery_limits.rs. Authorized Linux CI and
+both independent behavioral reviews passed for candidate054e352 on the actual
+synthetic merge86bbd04: 169 active tests, zero failures, two exercised helper
+fixtures and 19 worker fault cases. Exact checkout/tree evidence is in REVIEW.md.
+Local format/Clippy and ordered patch/hash replay also passed. Authorized main ef120be was integrated once; final combined-head CI/reviews and
+coordinator merge grant remain required. This is not a completed-delivery claim. Issue #96 remains unresolved.
+
+The coordinator explicitly amended the accounting contract after a focused audit:
+leading trivia and cheap kind/modifier/EOF prefilter misses may remain outside
+the copied-token allowance. Every eligible scratch window is charged before
+grammar evaluation, including failure; a zero-copy eligible rejection debits one.
+The separate allocation-free leading scan is bounded by the 64 KiB input and
+local comma-consuming loop progress. This is not a bound on every examination,
+whole-parser complexity, RSS or total work. New leading-trivia regression evidence
+is prepared but not executed. Unconditional window-predicate checks compile
+against the actual byte/EOF guard. These do not establish an end-to-end active-EOF
+recovery case; that gap remains for #83. Final Linux execution and renewed resource
+review remain required before final integration approval.

@@ -8,7 +8,7 @@ use super::{
     VALUE_PARAMETER_FIRST,
 };
 use crate::builder::{PsiBuilder, SemanticWhitespaceAwarePsiBuilder};
-use crate::parsing::{Consumer, Parser};
+use crate::parsing::{Consumer, ParameterAnnotationContext, Parser};
 use crate::token_set::TokenSet;
 
 pub(super) const NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER: TokenSet =
@@ -210,9 +210,43 @@ impl Parser {
         type_required: bool,
         recover_declarations: bool,
     ) -> bool {
+        let recover_annotations = recover_declarations
+            && !self.in_parameter_recovery_probe
+            && self.parameter_annotation_context != ParameterAnnotationContext::Nested;
+        self.with_parameter_annotation_context(ParameterAnnotationContext::Nested, |p| {
+            p.parse_value_parameter_contents(
+                rollback_on_failure,
+                type_required,
+                recover_declarations,
+                recover_annotations,
+            )
+        })
+    }
+
+    fn parse_value_parameter_contents(
+        &mut self,
+        rollback_on_failure: bool,
+        type_required: bool,
+        recover_declarations: bool,
+        recover_annotations: bool,
+    ) -> bool {
         let parameter = self.mark();
 
-        self.parse_modifier_list(NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER);
+        let context = if recover_annotations {
+            ParameterAnnotationContext::Modifiers
+        } else {
+            ParameterAnnotationContext::Nested
+        };
+        let recovered = self.with_parameter_annotation_context(context, |p| {
+            p.parse_modifier_list(NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER);
+            p.parameter_annotation_context == ParameterAnnotationContext::Recovered
+        });
+        if recovered {
+            let missing_name = self.mark();
+            missing_name.error(self, "Parameter name expected");
+            self.close_declaration_with_comment_binders(parameter, VALUE_PARAMETER, false);
+            return true;
+        }
 
         if self.at(VAR_KEYWORD) || self.at(VAL_KEYWORD) {
             self.advance(); // VAR_KEYWORD | VAL_KEYWORD
@@ -229,7 +263,7 @@ impl Parser {
         true
     }
 
-    pub(super) fn at_simple_function_header(&self) -> bool {
+    pub(crate) fn at_simple_function_header(&self) -> bool {
         if self.in_parameter_recovery_probe {
             return false;
         }

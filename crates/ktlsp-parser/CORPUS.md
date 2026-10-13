@@ -76,7 +76,9 @@ partition. Revision 18 parses `fun healthy() = 2` with exact FUN/name/parent/ran
 and no diagnostics, then rechecks the original result. No tree is reconstructed.
 These known-defect assertions are **required recovery GAPs**, not accepted recovery.
 The exact diagnostic tuples are independently authored in the test, not whole-tree
-snapshots. This candidate still requires controlled Linux execution and reviews.
+snapshots. Exact-head execution/review/delivery status is recorded in
+[PR109](https://github.com/anilbeesetti/ktlsp/pull/109); this source-authored contract
+does not substitute for that controlled Linux evidence.
 
 | Audit family / exact source literal | Named assertion / expected current defect |
 | --- | --- |

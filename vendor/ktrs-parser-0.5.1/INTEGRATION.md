@@ -215,3 +215,42 @@ HOLD. Exact frozen fixture/ordered-patch hashes and limits are in
 ../../crates/ktlsp-parser/reviews/c13-qualified-extension-recovery.md.
 #83/#7 OPEN; C13 GAP; T008/T008a HOLD; B3/B4 GAP; B11 UNVERIFIED;96 UNKNOWN;
 historical45/32/10/3 unchanged. No semantic/server/RSS/official-performance claim.
+
+## C13 single nullable receiver — held source preparation
+
+Root admitted the reviewed finite contractv3 on frozen source
+6365dcdf58ecd58b0a4715eba10d60307edddb15. Only private
+`declarations/type_parameters.rs` changes vendor Rust behavior: after FUN and the
+first identifier, accept joined SAFE_ACCESS or QUEST with required DOT/name;
+otherwise preserve the existing plain/qualified branch and final LPAR check.
+No joining-state mutation/type-parser callback/new boundary is introduced.
+Qualified-nullable/generic/parenthesized/annotated/larger receiver families remain
+excluded. Complete zero-parameter fixtures do not imply the recognizer requires
+RPAR/body; the incomplete-LPAR case explicitly preserves header-only recovery.
+
+New focused production assertions freeze32 selected positive projections,
+53 finite compatibility/header/resource controls and491 original UTF16 literals,
+including NULLABLE_TYPE and separate original QUEST/DOT parents. Historical70
+C13b source payload remains byte-identical; only decline-header-10 dispatch is
+superseded. Prior decline-header-8 dispatch and the entire qualified59 test remain
+unchanged. Every new case checks original token reconstruction, snapshot id/kind/
+revision/source identity, stale/mismatched id/source/kind rejection, all retained
+elements/diagnostics after exact healthy followup on the same Parser. Each call
+starts a separate supervised worker, not worker reuse.
+
+Owner independent pristine archive→recovery.patch→formatting.patch data replay
+verifies all54 final Rust files with zero fuzz/offsets; rederived14 behavior/
+50 formatting/four pristine survivors. Original archive/upstream inventory and
+notices are unchanged. Adversarial reviewer must independently perform its own
+fresh replay; historical/owner receipts cannot substitute. Exact ordered hashes,
+source scope, fixtures and current verification are in
+../../crates/ktlsp-parser/reviews/c13-nullable-extension-recovery.md.
+
+Pinned formatting and compile-only offline locked workspace all-target Clippy
+passed; no local parser/native/test/JVM runtime ran. Compile success is not
+behavior acceptance. At this source preparation checkpoint, issue publication is
+pending actual SAME2+architect held-source approval. Final integration, push/PR/CI/
+merge remain HOLD for one root-assigned base after ZIP158's actual squash; merge
+also waits owner+root exact-main clear. No new executor/retry-to-green/deadline
+relaxation. C13/B3/B4 GAP, B11 UNVERIFIED, T008/T008a HOLD, #7/#83/#96 OPEN and
+Darwin96 UNKNOWN remain. No semantic/full-parity/RSS/official-performance claim.

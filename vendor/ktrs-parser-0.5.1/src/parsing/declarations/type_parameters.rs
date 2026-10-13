@@ -138,9 +138,15 @@ impl Parser {
         let found = !probe.my_builder.psi.has_errors_after(marker)
             && probe.expect(FUN_KEYWORD)
             && probe.expect(IDENTIFIER)
-            && (!probe.consume_if(DOT)
-                || (probe.expect(IDENTIFIER)
-                    && (!probe.consume_if(DOT) || probe.expect(IDENTIFIER))))
+            && (if probe.consume_if(SAFE_ACCESS) {
+                probe.expect(IDENTIFIER)
+            } else if probe.consume_if(QUEST) {
+                probe.expect(DOT) && probe.expect(IDENTIFIER)
+            } else {
+                !probe.consume_if(DOT)
+                    || (probe.expect(IDENTIFIER)
+                        && (!probe.consume_if(DOT) || probe.expect(IDENTIFIER)))
+            })
             && probe.at(LPAR);
         marker.drop(&mut probe);
         found

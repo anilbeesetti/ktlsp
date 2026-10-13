@@ -4,8 +4,8 @@
 use ktrs_syntax::SyntaxKind::{self, *};
 
 use super::ALLOW_NEWLINE_OPERATIONS;
-use crate::parsing::Parser;
 use crate::parsing::declarations::{EXPRESSION_FIRST, EXPRESSION_FOLLOW, NameParsingMode};
+use crate::parsing::{ParameterAnnotationContext, Parser};
 
 impl Parser {
     /*
@@ -152,13 +152,28 @@ impl Parser {
      *   ;
      */
     pub(crate) fn parse_value_argument_list(&mut self) {
+        self.parse_value_argument_list_1(false);
+    }
+
+    pub(crate) fn parse_value_argument_list_1(&mut self, recover_declarations: bool) -> bool {
+        self.with_parameter_annotation_context(ParameterAnnotationContext::Nested, |p| {
+            p.parse_value_argument_list_contents(recover_declarations)
+        })
+    }
+
+    fn parse_value_argument_list_contents(&mut self, recover_declarations: bool) -> bool {
         let list = self.mark();
+        let mut recovered = false;
 
         self.my_builder.disable_newlines();
 
         if self.expect_3(LPAR, "Expecting an argument list", Some(EXPRESSION_FOLLOW)) {
             if !self.at(RPAR) {
                 loop {
+                    if recover_declarations && self.at_simple_function_header() {
+                        recovered = true;
+                        break;
+                    }
                     self.parse_value_argument();
                     if self.at(COLON) && self.lookahead(1) == Some(IDENTIFIER) {
                         self.error_and_advance_2("Unexpected type specification", 2);
@@ -178,12 +193,17 @@ impl Parser {
                 }
             }
 
-            self.expect_3(RPAR, "Expecting ')'", Some(EXPRESSION_FOLLOW));
+            if recovered {
+                self.error("Expecting ')'");
+            } else {
+                self.expect_3(RPAR, "Expecting ')'", Some(EXPRESSION_FOLLOW));
+            }
         }
 
         self.my_builder.restore_newlines_state();
 
         list.done(self, VALUE_ARGUMENT_LIST);
+        recovered
     }
 
     /*

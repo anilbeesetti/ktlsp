@@ -1430,6 +1430,37 @@
          if mode == AnnotationParsingMode::FileAnnotationsWhenPackageOmitted
              && !(target_keyword == Some(FILE_KEYWORD) && self.lookahead(1) == Some(COLON))
          {
+@@ -188,19 +195,25 @@
+      *   ;
+      */
+     fn parse_annotation(&mut self, mode: AnnotationParsingMode) -> bool {
+-        let recover_arguments = self.parameter_annotation_context == ParameterAnnotationContext::Modifiers
++        let recover_arguments = self.parameter_annotation_context
++            == ParameterAnnotationContext::Modifiers
+             && mode == AnnotationParsingMode::Default
+             && !self.in_parameter_recovery_probe;
+-        let (parsed, recovered) = self.with_parameter_annotation_context(ParameterAnnotationContext::Nested, |p| {
+-            p.parse_annotation_2(mode, recover_arguments)
+-        });
++        let (parsed, recovered) = self
++            .with_parameter_annotation_context(ParameterAnnotationContext::Nested, |p| {
++                p.parse_annotation_2(mode, recover_arguments)
++            });
+         if recovered {
+             self.parameter_annotation_context = ParameterAnnotationContext::Recovered;
+         }
+         parsed
+     }
+ 
+-    fn parse_annotation_2(&mut self, mode: AnnotationParsingMode, recover_arguments: bool) -> (bool, bool) {
++    fn parse_annotation_2(
++        &mut self,
++        mode: AnnotationParsingMode,
++        recover_arguments: bool,
++    ) -> (bool, bool) {
+         debug_assert!(
+             self._at(IDENTIFIER)
+                 // We have "@ann" or "@:ann" or "@ :ann", but not "@ ann"
 --- a/src/parsing/declarations/classes.rs
 +++ b/src/parsing/declarations/classes.rs
 @@ -52,7 +52,10 @@
@@ -1865,7 +1896,7 @@
          }
  
          self.parse_statements();
-@@ -201,10 +265,18 @@
+@@ -205,10 +269,18 @@
          self.check_for_unexpected_symbols();
  
          block_marker.done(self, BLOCK);
@@ -1988,7 +2019,7 @@
 +    VALUE_PARAMETER_FIRST,
 +};
  use crate::builder::{PsiBuilder, SemanticWhitespaceAwarePsiBuilder};
- use crate::parsing::{Consumer, Parser};
+ use crate::parsing::{Consumer, ParameterAnnotationContext, Parser};
  use crate::token_set::TokenSet;
  
 -pub(super) const NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER: TokenSet = TokenSet::create(&[COMMA, COLON, EQ, RPAR]);
@@ -2109,7 +2140,7 @@
                          break;
                      }
                      if offset_before == self.my_builder.get_current_offset() {
-@@ -192,7 +218,9 @@
+@@ -226,7 +252,9 @@
              self.advance(); // VAR_KEYWORD | VAL_KEYWORD
          }
  
@@ -2120,7 +2151,7 @@
              parameter.rollback_to(self);
              return false;
          }
-@@ -248,7 +276,11 @@
+@@ -282,7 +310,11 @@
       *   : parameter ("=" element)?
       *   ;
       */
@@ -2133,7 +2164,7 @@
          let mut no_errors = true;
  
          if self.at(COMMA) || self.at(RPAR) {
-@@ -266,7 +298,11 @@
+@@ -300,7 +332,11 @@
              self.advance(); // COLON
              self.parse_parameter_type_ref(recover_declarations);
          } else {
@@ -2146,7 +2177,7 @@
  
              if self.at(COLON) {
                  self.advance(); // COLON
-@@ -280,7 +316,10 @@
+@@ -314,7 +350,10 @@
  
                  self.parse_parameter_type_ref(recover_declarations);
              } else if type_required {
@@ -3121,6 +3152,18 @@
                  let expression = self.mark();
                  self.parse_annotations(AnnotationParsingMode::Default);
                  self.parse_prefix_expression();
+--- a/src/parsing/expressions/primary.rs
++++ b/src/parsing/expressions/primary.rs
+@@ -4,8 +4,8 @@
+ use ktrs_syntax::SyntaxKind::{self, *};
+ 
+ use super::ALLOW_NEWLINE_OPERATIONS;
++use crate::parsing::declarations::{EXPRESSION_FIRST, EXPRESSION_FOLLOW, NameParsingMode};
+ use crate::parsing::{ParameterAnnotationContext, Parser};
+-use crate::parsing::declarations::{EXPRESSION_FIRST, EXPRESSION_FOLLOW, NameParsingMode};
+ 
+ impl Parser {
+     /*
 --- a/src/parsing/expressions/statements.rs
 +++ b/src/parsing/expressions/statements.rs
 @@ -5,7 +5,8 @@
@@ -3296,23 +3339,26 @@
  };
  
  use crate::builder::{Layer, MarkerHost, PsiBuilder, SemanticWhitespaceAwarePsiBuilder};
-@@ -82,29 +83,53 @@
- impl Parser {
+@@ -102,31 +103,55 @@
+ 
      /// `KotlinParsing.createForTopLevel`.
      pub(crate) fn create_for_top_level(builder: SemanticWhitespaceAwarePsiBuilder) -> Parser {
--        Parser { my_builder: builder, is_lazy: true, by_clause_layer: None, in_parameter_recovery_probe: false }
+-        Parser { my_builder: builder, is_lazy: true, by_clause_layer: None, in_parameter_recovery_probe: false,
+-            parameter_annotation_context: ParameterAnnotationContext::Outside, }
 +        Parser {
 +            my_builder: builder,
 +            is_lazy: true,
 +            by_clause_layer: None,
 +            in_parameter_recovery_probe: false,
++            parameter_annotation_context: ParameterAnnotationContext::Outside,
 +        }
      }
  
      /// `KotlinParsing.createForTopLevelNonLazy`.
      #[allow(dead_code)] // TODO: only `KotlinLightParser` uses it upstream; not ported yet.
 -    pub(crate) fn create_for_top_level_non_lazy(builder: SemanticWhitespaceAwarePsiBuilder) -> Parser {
--        Parser { my_builder: builder, is_lazy: false, by_clause_layer: None, in_parameter_recovery_probe: false }
+-        Parser { my_builder: builder, is_lazy: false, by_clause_layer: None, in_parameter_recovery_probe: false,
+-            parameter_annotation_context: ParameterAnnotationContext::Outside, }
 +    pub(crate) fn create_for_top_level_non_lazy(
 +        builder: SemanticWhitespaceAwarePsiBuilder,
 +    ) -> Parser {
@@ -3321,6 +3367,7 @@
 +            is_lazy: false,
 +            by_clause_layer: None,
 +            in_parameter_recovery_probe: false,
++            parameter_annotation_context: ParameterAnnotationContext::Outside,
 +        }
      }
  

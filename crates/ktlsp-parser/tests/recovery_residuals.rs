@@ -122,26 +122,17 @@ fn malformed_parenthesized_type_restores_later_function_as_sibling() {
 }
 
 #[test]
-fn malformed_parameter_annotation_consumes_later_function_as_argument() {
-    // shortcut: C16 must recover from the unclosed annotation argument list.
+fn malformed_parameter_annotation_restores_later_function_as_sibling() {
     let source = "fun broken(@A(\nfun healthy() = 2";
     check(
         source,
         vec![
-            ("FUN", 0, 32, "KT_FILE", None, vec![("broken", 4, 10)]),
-            (
-                "FUN",
-                15,
-                32,
-                "VALUE_ARGUMENT",
-                Some((0, 32)),
-                vec![("healthy", 19, 26)],
-            ),
+            ("FUN", 0, 14, "KT_FILE", None, vec![("broken", 4, 10)]),
+            ("FUN", 15, 32, "KT_FILE", None, vec![("healthy", 19, 26)]),
         ],
         &[
-            (32, 32, "Expecting ')'"),
-            (32, 32, "Parameter name expected"),
-            (32, 32, "Expecting ')'"),
+            (14, 14, "Expecting ')'"),
+            (14, 14, "Parameter name expected"),
         ],
     );
 }

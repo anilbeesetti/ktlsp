@@ -65,6 +65,14 @@ pub trait Consumer<T> {
     fn consume(&mut self, item: T);
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ParameterAnnotationContext {
+    Outside,
+    Modifiers,
+    Recovered,
+    Nested,
+}
+
 /// The state shared by one `KotlinParsing` + `KotlinExpressionParsing` pair.
 pub struct Parser {
     pub(crate) my_builder: SemanticWhitespaceAwarePsiBuilder,
@@ -72,6 +80,7 @@ pub struct Parser {
     /// Index of this context's `ForByClause` builder layer; `None` for top-level parsers.
     by_clause_layer: Option<usize>,
     in_parameter_recovery_probe: bool,
+    parameter_annotation_context: ParameterAnnotationContext,
 }
 
 impl MarkerHost for Parser {
@@ -81,6 +90,17 @@ impl MarkerHost for Parser {
 }
 
 impl Parser {
+    fn with_parameter_annotation_context<R>(
+        &mut self,
+        context: ParameterAnnotationContext,
+        f: impl FnOnce(&mut Parser) -> R,
+    ) -> R {
+        let saved = std::mem::replace(&mut self.parameter_annotation_context, context);
+        let result = f(self);
+        self.parameter_annotation_context = saved;
+        result
+    }
+
     /// `KotlinParsing.createForTopLevel`.
     pub(crate) fn create_for_top_level(builder: SemanticWhitespaceAwarePsiBuilder) -> Parser {
         Parser {
@@ -88,6 +108,7 @@ impl Parser {
             is_lazy: true,
             by_clause_layer: None,
             in_parameter_recovery_probe: false,
+            parameter_annotation_context: ParameterAnnotationContext::Outside,
         }
     }
 
@@ -101,6 +122,7 @@ impl Parser {
             is_lazy: false,
             by_clause_layer: None,
             in_parameter_recovery_probe: false,
+            parameter_annotation_context: ParameterAnnotationContext::Outside,
         }
     }
 

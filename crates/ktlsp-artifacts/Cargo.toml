@@ -3,3 +3,6 @@ name = "ktlsp-artifacts"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+
+[dependencies]
+sha2 = { version = "=0.10.9", default-features = false, features = ["std", "force-soft"] }

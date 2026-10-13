@@ -15,20 +15,23 @@ failures and does not repair them, close #83/#7, admit T008 or establish parity.
 ## Independently authored expectations
 
 The three fixed source literals end at their final `2` without a terminal newline.
-Expected declarations and diagnostic tuples were derived from parser control flow
-before runtime execution, not captured CST snapshots. Correctness review independently
-traced the same paths:
+Initial declaration and diagnostic expectations were authored from parser control
+flow before the first runtime execution, not captured CST snapshots. Diagnostic
+corrections after the failed CI were independently rederived from source as
+recorded below. Both reviewers traced the following corrected paths:
 
 - C14: `parameters.rs` default expression enters `atomic.rs` local FUN parsing with
   newlines disabled. The later FUN is nested under VALUE_PARAMETER through EOF;
-  outer parameter-loop EOF gives the retained missing-comma/RPAR diagnostic.
+  outer parameter-loop EOF gives a missing-comma error item and a distinct
+  missing-RPAR error marker; both remain.
 - C15: `types.rs` tentative parenthesized type rolls back to function-type parsing.
-  Fallback `Type expected` at FUN18, missing RPAR consumes18..21, missing arrow
-  at healthy22, return USER_TYPE ends29. Outer missing comma/RPAR consumes29..30;
+  Fallback `Type expected` binds before trivia at17, missing RPAR consumes18..21,
+  missing arrow binds before trivia at21, return USER_TYPE ends29. Outer missing comma/RPAR consumes29..30;
   remaining RPAR/EQ/2 get exact top-level errors. No healthy FUN survives.
 - C16: annotation value-argument parsing disables newlines and accepts local FUN
-  under VALUE_ARGUMENT. Same-offset error deduplication retains the annotation's
-  missing-RPAR EOF diagnostic over the outer parameter failures.
+  under VALUE_ARGUMENT. The annotation's missing-RPAR EOF error item is followed
+  by distinct error markers for parameter-name and outer missing-RPAR failures.
+  All three remain even though their source ranges are equal.
 
 All declaration projections include exact kind, original start/end, immediate
 parent, nearest declaration extent and all direct identifier spelling/spans.
@@ -64,3 +67,32 @@ pending here. Final exact-head identities/check URLs/counts and integration/revi
 rechecks belong in the PR/coordinator delivery report, without relabeling this
 preparation checkpoint. #96 remains OPEN/UNKNOWN; Linux success cannot establish
 Darwin reliability or a cause/correction.
+
+
+## First controlled candidate failure and source correction
+
+[Run38292883243/job114956922744](https://github.com/anilbeesetti/ktlsp/actions/runs/38292883243/job/114956922744)
+checked out `dc3bd555e342a27c497722e83657222ba6106c4a` (merge of base4d27673 and
+reviewed head72d8dd3); formatting and Clippy passed, tests failed at all three new
+exact diagnostic assertions. All declaration projections matched; no Timeout or
+worker failure occurred. These failures happened before token-partition and
+healthy-followup assertions, so that failed run exercised only three damaged
+parses; it did not validate the intended six-worker complete flow or later
+workspace targets. Owner and both initial reviews missed the builder distinction.
+The first expected tuples incorrectly assumed all
+same-offset errors deduplicate and placed two zero-width errors after trivia.
+This failure is retained; no unchanged rerun or local runtime was attempted.
+
+Source correction: `abstract_kotlin_parsing.rs::error_with_recovery` calls either
+`error` (an error item) or `error_and_advance` (a completed ERROR_ELEMENT marker).
+`builder/tree.rs::duplicate_error_items` filters only error items; completed error
+markers are not deduplicated by that path. EOF name/RPAR recovery sets without
+EOL_OR_SEMICOLON take the latter path even when advancing at EOF consumes nothing.
+Thus C14 retains two errors at37 and C16 three at32. `balance_white_spaces` gives
+error items DefaultRight binding, placing C15's empty Type/arrow errors at17 and21
+before trivia; consuming error-marker ranges18..21/29..30 stay unchanged.
+Both independent reviewers rechecked and approved the corrected exact tuples;
+the architect approved this correction plan and evidence limits. Only exact
+diagnostic tuples and this explanation were corrected. No grammar,
+budget, error union, assertion strength or fixture input changed. Independent
+source rechecks and a new exact-head controlled Linux run are required.

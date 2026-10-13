@@ -112,7 +112,10 @@ fn missing_default_consumes_later_function_as_parameter_expression() {
                 vec![("healthy", 24, 31)],
             ),
         ],
-        &[(37, 37, "Expecting comma or ')'")],
+        &[
+            (37, 37, "Expecting comma or ')'"),
+            (37, 37, "Expecting ')'"),
+        ],
     );
 }
 
@@ -124,11 +127,11 @@ fn malformed_parenthesized_type_consumes_later_function_header() {
         source,
         vec![("FUN", 0, 30, "KT_FILE", None, vec![("broken", 4, 10)])],
         &[
-            (18, 18, "Type expected"),
+            (17, 17, "Type expected"),
             (18, 21, "Expecting ')'"),
             (
-                22,
-                22,
+                21,
+                21,
                 "Expecting '->' to specify return type of a function type",
             ),
             (29, 29, "Expecting comma or ')'"),
@@ -157,6 +160,10 @@ fn malformed_parameter_annotation_consumes_later_function_as_argument() {
                 vec![("healthy", 19, 26)],
             ),
         ],
-        &[(32, 32, "Expecting ')'")],
+        &[
+            (32, 32, "Expecting ')'"),
+            (32, 32, "Parameter name expected"),
+            (32, 32, "Expecting ')'"),
+        ],
     );
 }

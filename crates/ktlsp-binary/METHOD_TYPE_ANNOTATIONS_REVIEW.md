@@ -1,4 +1,49 @@
-# #142 method type annotations: source stage
+# Method type annotation source review
+
+## Held formal-parameter source delta (2026-10-13)
+
+Root admitted finite target0x16 source and the explicit public API break on frozen
+fe97781cfde7c9e230470463e3e1212925f0c1b8/tree13672a92666a6744718d6b95908ba7890179f393/
+soleparentac93bb5f777ca1cc6e6eeb3bc3e8467b199d56b1. Owned source branch starts
+there,excluding auxiliary prep commits. Preparation v1/v2 commits/bundles remain
+preserved separately. Existing method-return evidence below remains historical.
+
+Small product delta:add formal_parameter_index:Option<u8>;0x14=>None,
+0x16=>work1 BEFORE reading u1 thenSome(encodedordinal). Other legal targets01/12/
+15/17 retain immediate UnsupportedTag. Existing path/annotation/shared helper/
+error/capacity call order unchanged. External literals/exhaustive patterns break;
+Debug/platform size/layout can change. No descriptor/source-slot/nullability or
+metadata semantics. Size-based equations use UPDATED MethodTypeAnnotation;
+node/work charges and capacity overshoot qualifications remain intact.
+
+Focused source assertions preserve all existing0x14 behaviors (withNone),reclassify
+immutable historical16/mixed payload errors as Truncated,and add22frozen payloads,
+index0/255,mixed/repeated roots,both visibilities,CP/path/unsupported precedence,
+every-prefix/duplicate/ordinal/forged refs,shared values/depth/mutations,node/byte/
+work boundaries and private work-before-index/missing-path precedence.
+New unmodified484B Guava ValueParser fixture genuine16/index2 was root-adopted
+before code;exact full bytes/CP/payload/archive/manifest/license/notice provenance
+retained under formal_parameter/. No annotation stripping or compiler execution.
+
+Local checks:initial cargo fmt --all failed extra test assertion closing')';owner
+incorrectly proceeded fmtcheck and compile-only Clippy,which repeated the same
+parser error. Architect reviewed repeated error and check sequencing;one-character
+fix preserved assertion. Corrected fmt succeeded,then fmtcheck succeeded,then
+locked workspace/all-target compile-only Clippy passed2.95s without warnings.
+No test/native/parser/worker/server/bench/JVM/compiler/Gradle/Maven/oracle execution.
+Clippy compiles tests but is NOT runtime evidence. Initial failures retained in
+external source preparation evidence;bounds/assertions not relaxed.
+
+Same reserved correctness/adversarial reviewers and architect must finish held
+source review and any fix rechecks;exact source head/tree/manifests/actual final
+readbacks belong in external owner report. Root will assign ONE later integration
+base;push/PR/hosted CI/merge are NOT admitted now. No moving-main chase or duplicate
+intermediate CI. Only method source/test/spec/review,fixture README and new focused
+fixture files changed;old fixture/helper/module/export/Cargo/lock/workflow/rootdocs/
+status bytes unchanged. #71/#17OPEN;T008/T008aHOLD;B3/B4GAP;B11UNVERIFIED;
+#7/#83/#96OPEN/UNKNOWN. No native success/parity/performance claim.
+
+## Historical #142 method-return source stage
 
 Child of #71/#17: https://github.com/anilbeesetti/ktlsp/issues/142.
 Initial implementation base8548ead597146a4ca52d3a4a2ec6ffd724fac7a3,

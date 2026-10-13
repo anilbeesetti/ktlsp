@@ -9,7 +9,13 @@ fn annotation_probes_remain_bounded_through_production_snapshot_worker() {
     let parser = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
     for depth in [8, 12, 14, 16, 20, 30] {
         let mut parameter = "x: Int".to_string();
+        let mut anonymous_ranges = Vec::new();
         for _ in 0..depth {
+            for (start, end) in &mut anonymous_ranges {
+                *start += 7;
+                *end += 7;
+            }
+            anonymous_ranges.insert(0, (3, 3 + 8 + parameter.len()));
             parameter = format!("@A(fun({parameter}) {{}}) x: Int");
         }
         let source = format!("fun f({parameter}) {{}}");
@@ -28,6 +34,73 @@ fn annotation_probes_remain_bounded_through_production_snapshot_worker() {
             let parsed = accepted.tree_for(&snapshot).unwrap();
             assert_eq!(parsed.source(), source);
             assert!(parsed.diagnostics().is_empty());
+            let elements = parsed.elements();
+            let declarations: Vec<_> = elements
+                .iter()
+                .enumerate()
+                .filter(|(_, e)| {
+                    !e.token
+                        && matches!(
+                            e.kind.as_str(),
+                            "PACKAGE_DIRECTIVE"
+                                | "CLASS"
+                                | "OBJECT_DECLARATION"
+                                | "FUN"
+                                | "PROPERTY"
+                                | "TYPEALIAS"
+                                | "IMPORT_DIRECTIVE"
+                                | "IMPORT_ALIAS"
+                        )
+                        && !(e.kind == "PACKAGE_DIRECTIVE" && e.start == e.end)
+                })
+                .collect();
+            assert_eq!(declarations.len(), depth as usize + 1);
+            for (index, &(id, function)) in declarations.iter().enumerate() {
+                let (start, end, parent_kind) = if index == 0 {
+                    (0, source.len(), "KT_FILE")
+                } else {
+                    let (start, end) = anonymous_ranges[index - 1];
+                    (6 + start, 6 + end, "VALUE_ARGUMENT")
+                };
+                assert_eq!(
+                    (function.kind.as_str(), function.start, function.end),
+                    ("FUN", start, end)
+                );
+                assert_eq!(elements[function.parent.unwrap()].kind, parent_kind);
+                let mut parent = function.parent;
+                let owner = loop {
+                    match parent {
+                        Some(p) if declarations.iter().any(|&(id, _)| id == p) => break Some(p),
+                        Some(p) => parent = elements[p].parent,
+                        None => break None,
+                    }
+                };
+                assert_eq!(owner, index.checked_sub(1).map(|i| declarations[i].0));
+                let names: Vec<_> = elements
+                    .iter()
+                    .filter(|e| e.token && e.kind == "IDENTIFIER" && e.parent == Some(id))
+                    .collect();
+                if index == 0 {
+                    assert_eq!(names.len(), 1);
+                    assert_eq!(
+                        (
+                            names[0].start,
+                            names[0].end,
+                            &source[names[0].start..names[0].end]
+                        ),
+                        (4, 5, "f")
+                    );
+                } else {
+                    assert!(names.is_empty());
+                }
+            }
+            let mut cursor = 0;
+            for token in elements.iter().filter(|e| e.token) {
+                assert_eq!(token.start, cursor);
+                assert!(source.is_char_boundary(token.start) && source.is_char_boundary(token.end));
+                cursor = token.end;
+            }
+            assert_eq!(cursor, source.len());
         } else {
             assert_eq!(result.unwrap_err(), ParserError::NestingLimit);
         }
@@ -96,10 +169,24 @@ fn repeated_recovery_keeps_every_original_declaration_until_diagnostic_gate() {
                 && e.kind == "IDENTIFIER"
                 && (e.start, e.end) == (*start + 4, *start + 4 + name.len())));
         }
-        let healthy = functions.last().unwrap().1;
+        let &(healthy_id, healthy) = functions.last().unwrap();
         assert_eq!(
             (healthy.start, healthy.end, healthy.parent),
             (healthy_start, source.len(), Some(0))
+        );
+        let names: Vec<_> = parsed
+            .elements()
+            .iter()
+            .filter(|e| e.token && e.kind == "IDENTIFIER" && e.parent == Some(healthy_id))
+            .collect();
+        assert_eq!(names.len(), 1);
+        assert_eq!(
+            (
+                names[0].start,
+                names[0].end,
+                &source[names[0].start..names[0].end]
+            ),
+            (healthy_start + 4, healthy_start + 11, "healthy")
         );
         for (diagnostic, (_, end, _)) in parsed.diagnostics().iter().zip(ranges.iter()) {
             assert_eq!(

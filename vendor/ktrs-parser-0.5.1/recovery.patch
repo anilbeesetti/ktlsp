@@ -126,7 +126,15 @@
          }
 --- a/src/parsing/declarations/parameters.rs
 +++ b/src/parsing/declarations/parameters.rs
-@@ -67,13 +67,14 @@
+@@ -4,6 +4,7 @@
+ use ktrs_syntax::SyntaxKind::{self, *};
+ 
+ use super::{DECLARATION_FIRST, LAMBDA_VALUE_PARAMETER_FIRST, PARAMETER_NAME_RECOVERY_SET, VALUE_PARAMETER_FIRST};
++use crate::builder::{PsiBuilder, SemanticWhitespaceAwarePsiBuilder};
+ use crate::parsing::{Consumer, Parser};
+ use crate::token_set::TokenSet;
+ 
+@@ -67,13 +68,14 @@
          is_function_type_contents: bool,
          type_required: bool,
          recovery_set: TokenSet,
@@ -142,7 +150,16 @@
              if is_function_type_contents {
                  if !p.try_parse_value_parameter(type_required) {
                      let value_parameter = p.mark();
-@@ -97,6 +98,7 @@
+@@ -82,7 +84,7 @@
+                     p.close_declaration_with_comment_binders(value_parameter, VALUE_PARAMETER, false);
+                 }
+             } else {
+-                p.parse_value_parameter(type_required);
++                p.parse_value_parameter_2(false, type_required, recover_declarations);
+             }
+             true
+         });
+@@ -97,6 +99,7 @@
      pub(super) fn value_parameter_loop(
          &mut self,
          in_function_type_context: bool,
@@ -150,7 +167,7 @@
          recovery_set: TokenSet,
          parse_parameter: &mut dyn FnMut(&mut Parser) -> bool,
      ) -> bool {
-@@ -107,12 +109,20 @@
+@@ -107,12 +110,20 @@
          if !self.at(RPAR) && !self.at_set(recovery_set) {
              loop {
                  let offset_before = self.my_builder.get_current_offset();
@@ -172,7 +189,7 @@
                  if self.at(COMMA) {
                      self.advance(); // COMMA
                  } else if self.at(COLON) {
-@@ -137,6 +147,23 @@
+@@ -137,20 +148,42 @@
          self.expect_3(RPAR, "Expecting ')'", Some(recovery_set)) && no_error
      }
  
@@ -196,6 +213,132 @@
      /*
       * functionParameter
       *   : modifiers ("val" | "var")? parameter ("=" element)?
+      *   ;
+      */
+     pub(super) fn try_parse_value_parameter(&mut self, type_required: bool) -> bool {
+-        self.parse_value_parameter_2(true, type_required)
++        self.parse_value_parameter_2(true, type_required, false)
+     }
+ 
+     pub(crate) fn parse_value_parameter(&mut self, type_required: bool) {
+-        self.parse_value_parameter_2(false, type_required);
+-    }
+-
+-    fn parse_value_parameter_2(&mut self, rollback_on_failure: bool, type_required: bool) -> bool {
++        self.parse_value_parameter_2(false, type_required, false);
++    }
++
++    fn parse_value_parameter_2(
++        &mut self,
++        rollback_on_failure: bool,
++        type_required: bool,
++        recover_declarations: bool,
++    ) -> bool {
+         let parameter = self.mark();
+ 
+         self.parse_modifier_list(NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER);
+@@ -159,13 +192,55 @@
+             self.advance(); // VAR_KEYWORD | VAL_KEYWORD
+         }
+ 
+-        if !self.parse_function_parameter_rest(type_required) && rollback_on_failure {
++        if !self.parse_function_parameter_rest(type_required, recover_declarations) && rollback_on_failure {
+             parameter.rollback_to(self);
+             return false;
+         }
+ 
+         self.close_declaration_with_comment_binders(parameter, VALUE_PARAMETER, false);
+         true
++    }
++
++    pub(super) fn at_simple_function_header(&self) -> bool {
++        if self.in_parameter_recovery_probe {
++            return false;
++        }
++        let psi = &self.my_builder.psi;
++        let start = psi.shift_over_whitespace_forward(psi.current_lexeme);
++        if psi.lex_types.get(start) != Some(&FUN_KEYWORD) {
++            return false;
++        }
++        // shortcut: only complete simple zero-parameter headers recover; widen with a bounded corpus.
++        let limit = (start + 256).min(psi.lex_types.len());
++        let eof = self.my_builder.effective_truncated_eof_position();
++        let mut end = start;
++        let mut terminals = 0;
++        while end < limit
++            && psi.lex_starts[end + 1] - psi.lex_starts[start] <= 4096
++            && eof.is_none_or(|eof| psi.lex_starts[end + 1] <= eof as u32)
++        {
++            terminals += usize::from(!psi.lex_types[end].is_trivia());
++            end += 1;
++            if terminals == 4 {
++                break;
++            }
++        }
++        if start == end {
++            return false;
++        }
++        let builder = PsiBuilder::from_lexemes(
++            &psi.text[psi.lex_starts[start] as usize..psi.lex_starts[end] as usize],
++            &psi.lex_starts[start..=end],
++            &psi.lex_types[start..end],
++        );
++        let mut probe =
++            Parser::create_for_top_level_non_lazy(SemanticWhitespaceAwarePsiBuilder::new(builder));
++        probe.in_parameter_recovery_probe = true;
++        // Four grammar terminals, no nested parsing; all remaps and cursor changes stay in scratch.
++        probe.expect(FUN_KEYWORD)
++            && probe.expect(IDENTIFIER)
++            && probe.expect(LPAR)
++            && probe.expect(RPAR)
+     }
+ 
+     /*
+@@ -173,7 +248,7 @@
+      *   : parameter ("=" element)?
+      *   ;
+      */
+-    fn parse_function_parameter_rest(&mut self, type_required: bool) -> bool {
++    fn parse_function_parameter_rest(&mut self, type_required: bool, recover_declarations: bool) -> bool {
+         let mut no_errors = true;
+ 
+         if self.at(COMMA) || self.at(RPAR) {
+@@ -183,13 +258,13 @@
+             // Recovery for the case 'fun foo(Array<String>) {}'
+             self.error("Parameter name expected");
+             no_errors = false;
+-            self.parse_type_ref();
++            self.parse_parameter_type_ref(recover_declarations);
+         } else if self.at(COLON) {
+             // Recovery for the case 'fun foo(: Int) {}'
+             self.error("Parameter name expected");
+             // We keep noErrors == true so that unnamed parameters starting with ":" are not rolled back during parsing of functional types
+             self.advance(); // COLON
+-            self.parse_type_ref();
++            self.parse_parameter_type_ref(recover_declarations);
+         } else {
+             self.expect_3(IDENTIFIER, "Parameter name expected", Some(PARAMETER_NAME_RECOVERY_SET));
+ 
+@@ -203,7 +278,7 @@
+                     return false;
+                 }
+ 
+-                self.parse_type_ref();
++                self.parse_parameter_type_ref(recover_declarations);
+             } else if type_required {
+                 self.error_with_recovery("Parameters must have type annotation", Some(PARAMETER_NAME_RECOVERY_SET));
+                 no_errors = false;
+@@ -212,6 +287,10 @@
+ 
+         if self.at(EQ) {
+             self.advance(); // EQ
++            if recover_declarations && self.at_simple_function_header() {
++                self.error("Expecting an expression");
++                return false;
++            }
+             self.parse_expression();
+         }
+ 
 --- a/src/parsing/declarations/type_parameters.rs
 +++ b/src/parsing/declarations/type_parameters.rs
 @@ -7,8 +7,28 @@
@@ -433,6 +576,65 @@
 +        complete
      }
  }
+--- a/src/parsing/declarations/types.rs
++++ b/src/parsing/declarations/types.rs
+@@ -29,21 +29,25 @@
+     }
+ 
+     pub(crate) fn parse_type_ref_without_intersections(&mut self) {
+-        self.parse_type_ref_2(TokenSet::EMPTY, /* allowSimpleIntersectionTypes */ false);
++        self.parse_type_ref_2(TokenSet::EMPTY, /* allowSimpleIntersectionTypes */ false, false);
+     }
+ 
+     pub(crate) fn parse_type_ref_1(&mut self, extra_recovery_set: TokenSet) {
+-        self.parse_type_ref_2(extra_recovery_set, /* allowSimpleIntersectionTypes */ true);
++        self.parse_type_ref_2(extra_recovery_set, /* allowSimpleIntersectionTypes */ true, false);
+     }
+ 
+-    fn parse_type_ref_2(&mut self, extra_recovery_set: TokenSet, allow_simple_intersection_types: bool) {
+-        let type_ref_marker = self.parse_type_ref_contents(extra_recovery_set, allow_simple_intersection_types);
++    pub(super) fn parse_parameter_type_ref(&mut self, recover_declarations: bool) {
++        self.parse_type_ref_2(TokenSet::EMPTY, true, recover_declarations);
++    }
++
++    fn parse_type_ref_2(&mut self, extra_recovery_set: TokenSet, allow_simple_intersection_types: bool, recover_parenthesized: bool) {
++        let type_ref_marker = self.parse_type_ref_contents(extra_recovery_set, allow_simple_intersection_types, recover_parenthesized);
+         type_ref_marker.done(self, TYPE_REFERENCE);
+     }
+ 
+     // The extraRecoverySet is needed for the foo(bar<x, 1, y>(z)) case, to tell whether we should stop
+     // on expression-indicating symbols or not
+-    fn parse_type_ref_contents(&mut self, extra_recovery_set: TokenSet, allow_simple_intersection_types: bool) -> Marker {
++    fn parse_type_ref_contents(&mut self, extra_recovery_set: TokenSet, allow_simple_intersection_types: bool, recover_parenthesized: bool) -> Marker {
+         let type_ref_marker = self.mark();
+ 
+         self.parse_type_modifier_list();
+@@ -78,10 +82,14 @@
+             // This may be a function parameter list or just a parenthesized type
+             self.advance(); // LPAR
+             // parenthesized types, no reference element around it is needed
+-            let contents = self.parse_type_ref_contents(TokenSet::EMPTY, /* allowSimpleIntersectionTypes */ true);
++            let contents = self.parse_type_ref_contents(TokenSet::EMPTY, /* allowSimpleIntersectionTypes */ true, recover_parenthesized);
+             contents.drop(self);
+ 
+-            if self.at(RPAR) && self.lookahead(1) != Some(ARROW) {
++            if recover_parenthesized && self.at_simple_function_header() {
++                // Keep the damaged ordinary type before function-type speculation can consume its sibling.
++                self.error("Expecting ')'");
++                function_or_parenthesized_type.drop(self);
++            } else if self.at(RPAR) && self.lookahead(1) != Some(ARROW) {
+                 // It's a parenthesized type
+                 //    (A)
+                 self.advance();
+@@ -124,7 +132,7 @@
+             left_type_ref.done(self, TYPE_REFERENCE);
+ 
+             self.advance(); // &
+-            self.parse_type_ref_2(extra_recovery_set, /* allowSimpleIntersectionTypes */ true);
++            self.parse_type_ref_2(extra_recovery_set, /* allowSimpleIntersectionTypes */ true, recover_parenthesized);
+ 
+             intersection_type.done(self, INTERSECTION_TYPE);
+             was_intersection = true;
 --- a/src/parsing/declarations/user_types.rs
 +++ b/src/parsing/declarations/user_types.rs
 @@ -176,7 +176,7 @@

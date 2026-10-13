@@ -110,3 +110,28 @@ test --locked --workspace on the final reviewed combined head and exact merged
 main. Same two final reviewers and architect must read actual checkout/parent/tree
 and completed logs/counts. Passing delivery, expected-SHA merge grant and explicit
 vendor/provenance ownership release are still pending.
+
+## Assigned final integration
+
+The coordinator assigned exactly PR113 squash
+6b76477f532f8140a51af1f4492bf46d39864301, tree
+920b14ab5bec750f21e1c17994541ac39fe883a3, sole parent
+2fa7417473e1ea0b4baa58087348662e1f09d990. It was fetched/integrated once
+into corrected held d5b04502e08dcddbb4eef3998c858a12a3607fd4 without conflicts.
+Frozen C15 source/tests/provenance and existing C14/C12/C16 contracts did not
+change. The nine child-owned paths are the complete diff against the assigned base.
+
+Inherited metadata-wire changes are an independent Rust data-only binary module;
+Cargo/lock/parser worker/API/workflow are unchanged. Inherited resource_boundaries.rs
+and RESOURCE_EVIDENCE.md remain read-only and included in final workspace CI.
+Their whitespace/property/Unicode/diagnostic/revision inputs do not enter the
+ordinary parenthesized-type branch. The new attempted missing-parenthesis error
+uses the fixed ASCII literal "Expecting ')'"; it preserves the inherited diagnostic
+message-length/serialization bound without extending the frozen resource claim.
+B3/B4 gaps and B11 unverified active grammar-layer EOF remain as inherited.
+
+Same two combined-source/full-graph/effects reviews and finished architect review
+must approve the final candidate before publication. Completed Linux all3 evidence
+must establish the actual generated checkout parents/tree matches that candidate;
+same reviewers and architect must recheck actual results. Predecessor exact-main
+success and root's exact expected-head merge grant remain separate gates.

@@ -52,8 +52,9 @@ recursive replay when annotation arguments contain anonymous functions. Remainin
 work is superlinear in nesting; existing production resource gates remain required.
 
 Known bounded repair limits: missing defaults outside C14's complete simple zero-parameter header,
-deeply malformed parenthesized types (`x: (@A`), malformed annotation arguments,
-and unclosed class generic lists outside the bounded #100 simple-function-header
+malformed parenthesized types outside C15's finite ordinary-parameter/simple-zero-parameter-header
+contract, malformed annotation arguments, and unclosed class generic lists
+outside the bounded #100 simple-function-header
 contract can still consume later declarations. These are
 upstream grammar/recovery gaps, not accepted recovery or full grammar parity.
 Missing simple types and open generic argument types improve recovery but retain

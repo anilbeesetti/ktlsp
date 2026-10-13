@@ -53,3 +53,14 @@ wireff31d666c143dbc9a5b0282ad933e8776ce2991d68451e73cf962392bf20043b.
 Local format and full-workspace compile-only Clippy passed after final test additions.
 No local native tests/runtime ran. Publication/CI/integration remain HELD for root's
 one stable integration turn; no runtime/CI/merge/delivery approval is implied.
+
+Assigned final integration (root): merged ONLY f07217061228a347e0cca1dc7601cada3776e37a
+into held ebc4b301e58e9ce33961fa60f3cd211dee9da3ae, without conflicts, producing
+33e92865a0058918d3171aa6f03750149b7127d5/tree7effddcc39a40033c9af07d9d8f0943a9636d0fd.
+Both parents verified locally; incoming graph/effects and C16 worker controls require
+same-two/architect exact combined-candidate review. Source/helper/spec/expectation
+and notices are unchanged. Metadata remains standalone, without parser/server
+consumer. Cargo/lock/workflows retain assigned-base bytes. No local runtime ran.
+Existing Linux all-three checks, completed rawlog/checkouts/behavior readbacks,
+predecessor exact-main success and root expected-SHA grant remain required before
+merge. Exact head/tree and final CI evidence belong in the PR/coordinator report.

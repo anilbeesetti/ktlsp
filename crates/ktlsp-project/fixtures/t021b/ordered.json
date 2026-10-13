@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "modules": [{
+    "id": "app",
+    "sourceRoots": [{"path": "src/./main", "kind": "production"}],
+    "dependencies": [
+      {"type": "library", "library": "core", "scope": "compile", "exported": false},
+      {"type": "module", "module": "core", "scope": "compile", "exported": false},
+      {"type": "library", "library": "core", "scope": "compile", "exported": true},
+      {"type": "library", "library": "core", "scope": "test", "exported": false},
+      {"type": "library", "library": "core", "scope": "test", "exported": true},
+      {"type": "module", "module": "core", "scope": "provided", "exported": true},
+      {"type": "library", "library": "core", "scope": "runtime", "exported": false},
+      {"type": "library", "library": "core", "scope": "runtime", "exported": true},
+      {"type": "library", "library": "core", "scope": "provided", "exported": false},
+      {"type": "library", "library": "core", "scope": "provided", "exported": true}
+    ],
+    "languageSettings": {"languageVersion": "2.3", "apiVersion": "2.2", "jvmTarget": "21"}
+  }, {"id": "core", "sourceRoots": [{"path": "../core/src", "kind": "test", "generated": true}]}],
+  "libraries": [{"id": "core", "binaries": ["lib/stdlib.jar"], "sources": ["sources/stdlib.zip"]}],
+  "sdkArchives": ["sdk/api.zip"]
+}

@@ -4,6 +4,8 @@ Standalone measurement tooling for product checkpoint `0d54973ce66f5936282936026
 
 Source-only branch preparation integrates frozen main `143c0be503cb71b2f5cd8fb4fe7d7272d4328995`; it does not retarget this benchmark. Recorded results still describe product `0d54973ce66f59362829360261fde6e46b4fc420` with harness source `0b43c7f15db440437e6f1cd08d8affa79d701358`, not the later lexer/server/parser or current main. This preparation is source-reviewed/runtime-unvalidated; historical test and CI results do not validate the prepared integration. Final stable integration, runtime checks and merge admission remain required. #96 stays open/unknown.
 
+The final integration turn adds only approved main `e2c643d60803f6580cc42a92c722ea337ce1b31a` to that prepared branch. Historical measurements and their target remain unchanged. Final validation uses the existing Linux native workspace workflow; it does not execute this standalone harness or validate Darwin RSS behavior. Local runtime checks and new measurements are outside this integration turn; merge admission remains a separate coordinator gate.
+
 ## Reproduce
 
 Use Rust 1.99.0, the platform linker and a fresh **owned** directory. Never point at another chat's binary or reuse its target directory. From the repository checkout containing this harness (record its `git rev-parse HEAD`, and any uncommitted diff):

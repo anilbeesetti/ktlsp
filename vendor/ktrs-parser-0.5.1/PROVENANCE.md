@@ -1,4 +1,4 @@
-# T007b2 source-local parser repair
+# T007b2/T007b3 source-local parser repairs
 
 Child #87 of #83/#7; production development follows merged #86 and explicit coordinator handoff.
 
@@ -27,11 +27,11 @@ is never modified by this repair. Full Kotlin grammar and semantic parity remain
 
 Source changes are recorded in two ordered phases:
 
-1. `recovery.patch` changes seven files from the pristine archive: parsing/mod.rs
-   and declarations/{classes,functions,members,modifiers,parameters,user_types}.rs.
-2. `formatting.patch` changes 49 files from the recovery phase at commit cc4920d,
-   using pinned Rust 1.99.0 rustfmt with edition 2024. All seven behavioral files
-   are among those 49; the other 42 have formatting changes only. Five source
+1. `recovery.patch` changes nine files from the pristine archive: parsing/mod.rs,
+   builder/layers.rs and declarations/{classes,functions,members,modifiers,parameters,type_parameters,user_types}.rs.
+2. `formatting.patch` changes 49 files from the current recovery phase (extending historical cc4920d),
+   using pinned Rust 1.99.0 rustfmt with edition 2024. All nine behavioral files
+   are among those 49; the other 40 have formatting changes only. Five source
    files retain pristine bytes. Exact paths are the patch headers; the final
    54-file byte inventory is `formatted-sha256.json`. No formatting opt-out or
    changed root formatting command is used.
@@ -52,7 +52,8 @@ work is superlinear in nesting; existing production resource gates remain requir
 
 Known bounded repair limits: a missing default (`x: Int =` followed by named fun),
 deeply malformed parenthesized types (`x: (@A`), malformed annotation arguments,
-and unclosed class generic lists can still consume later declarations. These are
+and unclosed class generic lists outside the bounded #100 simple-function-header
+contract can still consume later declarations. These are
 upstream grammar/recovery gaps, not accepted recovery or full grammar parity.
 Missing simple types and open generic argument types improve recovery but retain
 upstream diagnostic deduplication (e.g. only `Type expected` at one offset).
@@ -67,3 +68,49 @@ patches ktrs-parser only in its standalone graph. Run:
 Neither standalone workspace is run by root workspace tests. Equivalent production
 regressions now live in the parser crate and must pass integrated review/checks/CI
 before #87 can close.
+
+## #100 bounded classifier-generic recovery candidate
+
+The additional behavior is confined to class/interface type-parameter boundaries;
+objects and other generic callers retain ordinary parsing. Completed bounds require
+specific surviving completed TYPE_REFERENCE/concrete-type production events and
+closed type/value lists, not a void-helper return or merely no new diagnostic.
+An isolated scratch parser reuses existing annotation/modifier grammar and current
+committed token kinds, then requires FUN/name/LPAR. No live cursor, token remap,
+production, diagnostic, newline/join or layer state is changed by a probe.
+
+The scratch slice stops at the minimum nonnegative active truncation endpoint,
+256 copied complete raw tokens including internal/trailing trivia, or 4096 source
+bytes. Every eligible scratch window, including failed grammar, is charged before
+parsing against 4096 copied raw tokens per classifier list; zero-copy eligible
+rejection debits one and exhaustion declines recovery. Cheap kind/modifier/EOF
+prefilter misses remain uncharged under the coordinator-amended contract.
+Leading trivia inspection is bounded separately by input size and the advancing
+live cursor; nested scratch probes return before scanning it.
+These are recovery-coverage bounds, not new worker failures or larger global limits.
+The existing recursion-suppression flag disables nested parameter/generic probes.
+Scratch byte limits do not bound RSS: the existing builder pool can reuse larger
+buffers. Original archive checksum, upstream inventory and notices are unchanged.
+
+The layer minimum uses compile-time assertions for absent, negative, nested,
+reordered and zero boundaries. Production tests exercise exact declaration and
+name ranges/parents, damaged class/list extents, same-offset diagnostic dedup,
+original newline mapping, valid controls, incomplete bounds/excluded headers,
+per-probe thresholds, aggregate decline and repeated recovery. Runtime evidence
+must come from the authorized exact-head Linux CI; no new Darwin runtime test is
+used for this ticket. Standalone vendor tests are not part of root CI.
+
+A focused post-candidate audit identified that the original all-trivia/all-failure
+reading was broader than the implemented copied-window counter. The coordinator
+explicitly amended the private contract to the accounting above after independent
+architect review; documentation alone did not resolve that original mismatch.
+The actual loop now uses a private const byte/EOF predicate with unconditional
+assertions for endpoints before/at/inside a token, absent EOF and independent
+4096/4097-byte boundaries. This extraction preserves the original subtraction,
+inclusive endpoint comparison and absent-EOF behavior. The minimum active EOF
+feeds that predicate; an empty window returns false before constructing scratch,
+and incomplete prefixes cannot satisfy FUN/name/LPAR. These are window-predicate
+checks, not annotation parsing, active-layer integration or end-to-end truncated
+recovery evidence; that remaining gap belongs to #83's acceptance audit.
+Large-leading-trivia runtime evidence and renewed resource reviews remain pending.
+No full-parser complexity or RSS bound is asserted.

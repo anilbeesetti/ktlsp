@@ -1,0 +1,32 @@
+name: Optional synthetic oracle tools
+on:
+  pull_request:
+    paths:
+      - 'tools/oracle/**'
+      - 'crates/ktlsp-protocol/**'
+      - '.github/workflows/oracle-tools.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/oracle/**'
+      - 'crates/ktlsp-protocol/**'
+      - '.github/workflows/oracle-tools.yml'
+permissions:
+  contents: read
+jobs:
+  synthetic-tools:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.99.0 --profile minimal --component rustfmt --component clippy
+      - name: Format optional workspace
+        run: cargo fmt --manifest-path tools/oracle/Cargo.toml -- --check
+      - name: Clippy optional workspace
+        run: cargo clippy --locked --manifest-path tools/oracle/Cargo.toml --all-targets -- -D warnings
+      - name: Synthetic Rust peer tests only
+        run: cargo test --locked --manifest-path tools/oracle/Cargo.toml

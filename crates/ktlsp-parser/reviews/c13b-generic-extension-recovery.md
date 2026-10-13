@@ -84,3 +84,45 @@ No local retries-to-green, relaxed bounds or branch-protection bypass.
 #83/#7 OPEN; C13 aggregate GAP except finite delivered subclauses; T008/T008a HOLD;
 B3/B4 GAP; B11 UNVERIFIED; #96 OPEN/UNKNOWN. Historical45/32/10/3 tally is unchanged.
 No HIR/semantic/provider/full official parity or Darwin-reliability claim.
+
+## One assigned final integration / branch publication stage
+
+Root assigned stable base8548ead597146a4ca52d3a4a2ec6ffd724fac7a3, tree
+3f98c1ec916437445fb6e499a85caa04c5959e63, sole parent
+64234587e333ebcd32d96600a7a193b06b0ac9df. It was fetched by exact SHA into the
+owned independent Git directory and integrated ONCE into held source
+293157402dbf1640cb27ae04901943ade03b31f2. Conflict-free merge
+8bcc917588c6640a39b30abf14157bd61aa19b50 has tree
+070e07b9a83fe57e3a94f2f9548937d592abc900 and ordered parents held2931574 then
+assigned8548ead. No main chase or other-owner checkout mutation occurred.
+
+All held parser/test/frozen fixture/ordered-patch/hash bytes were preserved.
+Incoming39 paths are delivered field type annotations, metadata name resolver and
+V2 path-prefix budget handling plus their data/spec/tests. C16 and metadata string
+table125/PR128 are inherited unchanged. The only further owned edits are this
+integration ledger and the corresponding owned review/integration note. These
+notes do not change source, fixtures or expectations. No Cargo/lock/workflow/worker/
+API/limit/server/root-doc edit is made; Native Rust workflow blob remains
+fc6202e6d32a00d430f4d4e12b502b6ca538edab. Platform-gated V2 Windows/Cygwin bodies
+are not executed by local Darwin compilation or future Linux CI.
+
+SAME correctness/functionality, adversarial and own architect must approve the
+actual final combined head/tree/parents/assigned-base diff, full inherited graph,
+resource and execution effects before branch-only push, one attached PR and the
+existing unchanged Linux Native Rust ORIGINAL-attempt all-three run. Local checks
+remain formatting and compile-only locked workspace/all-target Clippy; no local
+native/parser/test/worker/server/bench/JVM/oracle/Gradle/Maven runtime is admitted.
+Exact held/final owned-note diffs, source hashes and combined compile receipts are
+recorded externally in the coordinator package to avoid self-referential commit
+hashes. No previous source approval is treated as combined-head or CI approval.
+
+Completed original-attempt CI must expose actual generated checkout/tree, workflow/
+executor, unchanged fmt/clippy/full-workspace commands, counts and all failures.
+SAME2 plus own architect perform actual completed-CI readbacks and changed-behavior
+rechecks. Merge remains HELD for root's expected-head grant and predecessor137
+exact-main all-three success independently verified by root and its owner.
+Following a future identical-tree merge, owner/root actual exact squash/tree/sole
+assigned-base/workflow/executor and exact-main all-three verification follow the
+admitted policy; changed identity/tree/workflow/failure/new finding renews affected
+reviews. #83/#7 OPEN, C13 aggregate GAP, T008/T008a HOLD, B3/B4 GAP, B11 UNVERIFIED,
+#96 OPEN/UNKNOWN and historical audit totals remain unchanged.

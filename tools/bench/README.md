@@ -2,9 +2,11 @@
 
 Standalone measurement tooling for product checkpoint `0d54973ce66f59362829360261fde6e46b4fc420`. Parent #44 stays open: parser/semantic indexing, incremental queries, cancellation, workspace scale, retained-memory budgets and performance gates require later work. No official JVM comparison or faster-than-official claim. This workspace is outside the default native build/test graph and adds no third-party packages beyond those already locked in the product.
 
-Source-only branch preparation integrates frozen main `143c0be503cb71b2f5cd8fb4fe7d7272d4328995`; it does not retarget this benchmark. Recorded results still describe product `0d54973ce66f59362829360261fde6e46b4fc420` with harness source `0b43c7f15db440437e6f1cd08d8affa79d701358`, not the later lexer/server/parser or current main. This preparation is source-reviewed/runtime-unvalidated; historical test and CI results do not validate the prepared integration. Final stable integration, runtime checks and merge admission remain required. #96 stays open/unknown.
+Source-only branch preparation integrates frozen main `143c0be503cb71b2f5cd8fb4fe7d7272d4328995`; it does not retarget this benchmark. Recorded results still describe product `0d54973ce66f59362829360261fde6e46b4fc420` with measured harness executable inputs at `0b43c7f15db440437e6f1cd08d8affa79d701358` ([archive provenance erratum, 2026-10-13](PROVENANCE-ERRATUM.md)), not the later lexer/server/parser or current main. This preparation is source-reviewed/runtime-unvalidated; historical test and CI results do not validate the prepared integration. Final stable integration, runtime checks and merge admission remain required. #96 stays open/unknown.
 
 The final integration turn adds only approved main `e2c643d60803f6580cc42a92c722ea337ce1b31a` to that prepared branch. Historical measurements and their target remain unchanged. Final validation uses the existing Linux native workspace workflow; it does not execute this standalone harness or validate Darwin RSS behavior. Local runtime checks and new measurements are outside this integration turn; merge admission remains a separate coordinator gate.
+
+The historical measurement archive contains three older ancillary files and lacks its intended review note; see the [dated correction](PROVENANCE-ERRATUM.md) before attributing whole-workspace source or standalone test results.
 
 ## Reproduce
 

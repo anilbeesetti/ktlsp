@@ -1,0 +1,93 @@
+{
+  "stage": "Admitted source preparation only; no runtime/PR/CI admission",
+  "base": "fe97781cfde7c9e230470463e3e1212925f0c1b8",
+  "v1_commit": "a86fc1034e377fbefa6303300b6f92f4fc20f6c2",
+  "artifact": "com.google.guava:guava:33.4.8-android",
+  "origin": "https://repo.maven.apache.org/maven2/com/google/guava/guava/33.4.8-android/guava-33.4.8-android.jar",
+  "archive_sha256": "a1f8a4bafe5a77232d333356843e194599b30837574a7f4be1063daaaaab102c",
+  "archive_size": 2936569,
+  "member": "com/google/common/cache/CacheBuilderSpec$ValueParser.class",
+  "member_local_header_offset": 215864,
+  "member_method": 8,
+  "compressed_size": 290,
+  "member_crc32": 1028747153,
+  "class_file": "fixture.class.bin",
+  "class_size": 484,
+  "class_sha256": "b1c68ef6b47734f71f06b9697de2f039aed76e212e0e7e82777d0421a6b0868f",
+  "selected_by": "minimum (decoded full class byte size, member name, archive SHA256) over both complete scans",
+  "genuine_parameter_data": [
+    {
+      "index": 0,
+      "flags": 1025,
+      "name": {
+        "index": 5,
+        "text": "parse",
+        "tag_offset": 90,
+        "bytes_offset": 93,
+        "raw_hex": "7061727365"
+      },
+      "descriptor": {
+        "index": 6,
+        "text": "(Lcom/google/common/cache/CacheBuilderSpec;Ljava/lang/String;Ljava/lang/String;)V",
+        "tag_offset": 98,
+        "bytes_offset": 101,
+        "raw_hex": "284c636f6d2f676f6f676c652f636f6d6d6f6e2f63616368652f43616368654275696c646572537065633b4c6a6176612f6c616e672f537472696e673b4c6a6176612f6c616e672f537472696e673b2956"
+      },
+      "attribute": {
+        "index": 11,
+        "text": "RuntimeVisibleTypeAnnotations",
+        "tag_offset": 222,
+        "bytes_offset": 225,
+        "raw_hex": "52756e74696d6556697369626c6554797065416e6e6f746174696f6e73"
+      },
+      "header_offset": 443,
+      "payload_offset": 449,
+      "payload_hex": "0001160200000c0000",
+      "roots": [
+        {
+          "offset": 451,
+          "target_type": 22,
+          "target_info_offset": 452,
+          "target_info": [
+            2
+          ],
+          "path": [],
+          "descriptor_index_offset": 454,
+          "descriptor_cp": {
+            "index": 12,
+            "text": "Lorg/jspecify/annotations/Nullable;",
+            "tag_offset": 254,
+            "bytes_offset": 257,
+            "raw_hex": "4c6f72672f6a737065636966792f616e6e6f746174696f6e732f4e756c6c61626c653b"
+          },
+          "pairs": 0,
+          "end_offset": 458
+        }
+      ]
+    }
+  ],
+  "raw_attribute_sha256": "4cf99542cc4fdd60c8e111f53826582bedf601d741b103323f97961360e057ea",
+  "manifest_sha256": "96bf5ca30e73f08607b1e2066883d5903c8c2986f1dca99c1d947623cf51ad16",
+  "license": "Apache-2.0",
+  "license_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+  "license_scope": "generic Guava v33.4.8 upstream LICENSE, exact primary-pinned existing fixture copy; archive Bundle-License applies to this Guava package",
+  "license_existing_origin": "crates/ktlsp-binary/tests/fixtures/method_type_annotations/provenance.json",
+  "license_upstream": "https://raw.githubusercontent.com/google/guava/v33.4.8/LICENSE",
+  "archive_notice_member": null,
+  "archive_license_member": null,
+  "notice": "NOTICE.txt is new factual fixture attribution, not an upstream source-header reproduction",
+  "selected_source_header": "not available/inspected under this boundary; AbstractIterator/Suppliers headers not reused",
+  "compiler": "unknown; manifest Build-Jdk-Spec11 is distribution metadata only",
+  "authentication": "existing primary HTTPS byte equality pin, not signature/trust-chain authentication",
+  "product_runtime": false,
+  "new_network_download": false,
+  "member_data_offset": 215952,
+  "member_local_header_hex": "504b0304140008080800000041000000000000000000000000003a000000",
+  "member_flags": 2056,
+  "member_name_bytes": 58,
+  "member_extra_bytes": 0,
+  "data_descriptor_offset": 216242,
+  "data_descriptor_hex": "504b0708916f513d22010000e4010000",
+  "local_sizes": "zero local CRC/sizes with data-descriptor flag; complete CRC/sizes in signed data descriptor and central directory",
+  "contract_core_sha256": "eccf2f0e100cdc092c14bcaae09dd5f86eba75daee53ac4b8f95667ba82b974c"
+}

@@ -15,3 +15,9 @@ authored-bytes contains21 independently authored frozen payloads from the contra
 stage, unchanged before native execution. Exact expected outputs/errors, API,
 precedence and budgets are in ../../../METHOD_TYPE_ANNOTATIONS_SPEC.md. No compiler,
 JVM, Gradle, Maven or native ktlsp parser generated the fixture or expectations.
+
+formal_parameter/ adds the root-adopted unchanged484B Guava ValueParser fixture
+with genuine target0x16,index2,plus22new independently frozen authored payloads.
+Its README/provenance/license/factualnotice preserve exact bytes and limitations.
+Historical unsupported16/mixed raw files above remain immutable; their current
+expected errors are Truncated after0x16 source admission, not UnsupportedTag16.

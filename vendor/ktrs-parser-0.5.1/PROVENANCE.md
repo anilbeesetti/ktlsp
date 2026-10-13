@@ -243,10 +243,17 @@ own independent pristine replay; neither party may borrow the other's receipt.
 
 Pinned formatting and compile-only offline locked workspace all-target Clippy
 passed. No parser/native runtime ran locally. Actual held-source SAME2+architect
-reviews/rechecks and future root-assigned integration/unchanged original LinuxCI/
-guarded merge/main-verification gates remain pending. Automatic approval review
-rejected finite issue publication; no issue was created. Push/PR/CI/integration/
-merge remain HOLD. Exact frozen fixture/ordered-patch hashes and limits are in
+approved7f51b2442bfca714a7aa0369f9ac9a8e64905aa3 without findings; both independent
+pristine replays verify54 files/zero offsets/fuzz/counts14/50/4. Initial issue
+publication was rejected twice. After fresh direct human approval, the SAME
+connector published [issue148](https://github.com/anilbeesetti/ktlsp/issues/148)
+with unchanged body SHA256
+`9eb9210e96a434544ef2082f763375a1f187cdb8e617df30483b468947300d74`; a separate
+repoID1415474657 fetch verifies OPEN/exact body. Old rejections/history remain.
+Only four owned Markdown publication notes change in this successor; SAME3 docs
+rechecks are required. Future root-assigned integration/original LinuxCI/guarded
+merge/main-verification gates remain pending. Push/PR/CI/integration/merge stay
+HOLD. Exact frozen fixture/ordered-patch hashes and limits are in
 ../../crates/ktlsp-parser/reviews/c13-qualified-extension-recovery.md.
 #83/#7 OPEN; C13 GAP; T008/T008a HOLD; B3/B4 GAP; B11 UNVERIFIED;96 UNKNOWN;
 historical45/32/10/3 unchanged. No semantic/server/RSS/official-performance claim.

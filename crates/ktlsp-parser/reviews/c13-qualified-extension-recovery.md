@@ -3,9 +3,14 @@
 Parent #83/#7; finite successor to delivered C13b/#136 (PR140). Root admitted
 source preparation and one finite issue publication after actual frozen contract
 correctness, adversarial and architect approvals. Push, PR, CI, final integration
-and merge remain HOLD. Automatic approval review rejected issue creation because
-trusted publication authorization was not established for this C13 payload; no
-issue was created. The status-corrected draft remains auxiliary local data.
+and merge remain HOLD. Initial automatic approval review rejected publication
+twice; both rejections and the exact draft remain preserved. Fresh direct human
+approval then authorized C13 and future private ktlsp tickets/PRs. The SAME GitHub
+connector published [issue148](https://github.com/anilbeesetti/ktlsp/issues/148)
+with the unchanged reviewed body SHA256
+`9eb9210e96a434544ef2082f763375a1f187cdb8e617df30483b468947300d74`.
+A separate fetch by verified private repoID1415474657 confirms OPEN and exact body
+equality. Publication does not admit runtime, push/PR, CI, integration or merge.
 
 ## Frozen contract and source
 
@@ -111,8 +116,14 @@ parser/all workspace targets including the new test. Local offline mode does not
 alter future unchanged CI commands. No parser/native test/worker/server/bench/JVM/
 oracle/Gradle/Maven runtime ran locally. Compile success is not behavior evidence.
 
-SAME correctness/adversarial/own architect actual held-source reviews and rechecks
-remain required. Future one assigned stable integration/combined-source reviews,
+SAME correctness/adversarial/own architect approved actual held source
+`7f51b2442bfca714a7aa0369f9ac9a8e64905aa3`, tree
+`e7bfc88cf73819a6c560d07b455c3151bdaa23c1`, without findings; exact source/compile
+and separate owner/adversarial pristine replay receipts remain preserved. This
+publication-status successor changes only four owned Markdown notes; source,
+fixtures, ordered artifacts and compile inputs retain the reviewed bytes. SAME3
+affected docs-only rechecks are required for this successor. Future one assigned
+stable integration/combined-source reviews,
 branch push/attached PR/original existing Linux Native Rust all-three/SAME completed-
 CI readbacks/root expected-head grant/owner+root independent actual squash/tree/
 sole-parent/workflow/executor/exact-main-all-three gates remain pending. No local

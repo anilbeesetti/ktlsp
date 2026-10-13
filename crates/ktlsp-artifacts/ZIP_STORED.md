@@ -55,7 +55,10 @@ Admitted ownership: NEW artifacts `src/zip_stored.rs`,
 `tests/zip_stored.rs`, `tests/fixtures/zip_stored/*`, `ZIP_STORED.md`,
 `ZIP_STORED_REVIEW.md`; narrowly modify existing `src/zip_index.rs` for the four
 private fields/module re-export/layout assertion/manual Index Debug and `src/lib.rs` for one
-re-export. Existing index tests are unchanged except any explicitly needed
+re-export. Root separately admitted ONLY two stale scope paragraphs in existing
+`ZIP_INDEX.md`, corrected in documentation successor717eee without source/fixture
+changes. No other existing documentation ownership was extended.
+Existing index tests are unchanged except any explicitly needed
 compile-fail example maintenance; retain directory-only accepted invalid-local
 fixtures. No root/status docs, binary/parser/vendor, integrity/lookup code,
 Cargo/lock/workflow files owned. Any additional shared/API/helper/Cargo/lock/workflow/consumer changes require

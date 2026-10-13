@@ -83,3 +83,27 @@ SAME two reviewers also read back the final evidence ledger and unchanged source
 hashes. All approvals cover source-ready local HOLD only; no runtime/publication/
 integration/CI/merge approval is inferred. Nine new integration-test functions were
 compiled, not run. Root retains the one stable final integration/expected-head gate.
+
+Root assigned ONE final integration base57411e8605495aec376edb76843fd282f6933b9c,
+tree981064f40d655a43029a405e81c217559b92d236, after predecessor exact-main success
+and ownership release. Fetched that exact SHA once and merged without conflicts
+into held8377a485, producing merge5c879163be5ee506f584e394757e4a48ff489ff0,
+tree39820c7ccb981d9337cee0290069d1005207dd8a, parents8377a485 then57411e86.
+Incoming paths are only coordinated documentation and V2 prejoin-budget fix/tests;
+all incoming nonowned bytes and held resolver/test/frozen-fixture/notices/export
+bytes were preserved. This ledger is the sole additional owned integration edit.
+
+Same two reviewers and own architect must renew actual final combined-head source,
+entire inherited/default/excluded graph, resource and execution-effect readbacks.
+That includes inherited C16 and metadata125 and incoming V2 prefix handling with
+its explicitly uncompiled platform bodies. No local runtime or new combined-head
+compile result is claimed. Standalone resolver still has no server/type/declaration
+consumer; UnsupportedUtf8 and separate decode/resolve budgets/noRSS remain limits.
+
+Root now admits branch-only push/PR/unchanged Linux CI AFTER those source approvals.
+Required premerge gate is SAME2 plus architect actual completed PR-CI readback and
+root expected-SHA merge grant. Postmerge owner AND root independently verify exact
+squash tree/soleparent/workflow/executor and completed exact-main all3. No extra
+unchanged-tree reviewer turns are implied; changed identity/tree/workflow, main
+failure or new finding blocks successors and renews affected reviews. No local
+native/test/parser/worker/JVM/oracle/Gradle/Maven or main chasing is admitted.

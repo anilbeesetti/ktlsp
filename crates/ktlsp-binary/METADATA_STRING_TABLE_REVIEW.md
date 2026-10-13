@@ -19,3 +19,9 @@ Preimplementation freeze recheck: same correctness and adversarial reviewers
 approved all revised contract/byte expectations with no findings. Own architect
 confirmed plan comments addressed. Root implementation/helper/export admission
 remains required. No source or runtime validation is represented as complete.
+
+Root PhaseA conditional admission clarification before implementation: requested
+retained capacity increments are not allocator churn/RSS or temporary old/new
+buffer accounting. Cursor boundaries derive only from validated payloads; helpers
+are called before EOF, and helper errors immediately propagate without resetting
+consumed budgets. Same-two plus architect recheck of this wording pending.

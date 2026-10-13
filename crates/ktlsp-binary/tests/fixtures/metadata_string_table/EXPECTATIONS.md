@@ -66,3 +66,9 @@ always pay wire+dispatch work, including when they change no effective value.
 Capacity arithmetic uses logical requests from length0 and each positive power-of-two
 length, independent of allocator-exposed capacity; exact B is portable under this
 policy. All expectations precede implementation/runtime.
+
+Root admission clarification before implementation: B charges requested capacity
+INCREMENTS, bounding requested RETAINED capacity only; not cumulative allocation
+churn or temporary old/new buffers/allocator surplus/rounding/actual RSS. Exact B
+remains unchanged. Helpers are called only before validated section EOF and errors
+propagate immediately, with consumed budget retained even if cursor unchanged.

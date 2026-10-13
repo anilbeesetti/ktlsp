@@ -69,6 +69,9 @@ Hard ceilings: bytes16Mi, records65,535, nodes65,535, depth2, work64Mi,
 owned_bytes16Mi. Fixed schema depth table1/Record2; no recursive descent.
 One wire::Budget covers ALL root fields, nested Record fields and packed values.
 No per-record resets. One schema budget covers ALL nodes/output capacity.
+Nested/packed cursors come only from already validated wire payload boundaries.
+Call helpers only before their section EOF (clean EOF is free), and propagate
+helper errors immediately; budget remains consumed even if caller cursor is unchanged.
 
 Initial byte check at offset0, then root depth1, node, node-work1. Each complete
 field uses unchanged wire record1+work1 then byte-read charges (including opaque
@@ -79,7 +82,9 @@ read bytes again, then interpretation-work1. Unpacked repeated ints also pay
 interpretation-work1 at tag start. Singular assignment/unknown retention is covered
 by dispatch-work1. Duplicate/unknown processing always pays these charges.
 
-Output budget covers cumulative REQUESTED backing-capacity bytes of all vectors:
+Output budget charges cumulative requested capacity INCREMENTS of all vectors,
+bounding requested RETAINED backing capacity, not cumulative allocation/reallocation
+churn:
 Record slots, unknown Field slots, int32 slots. Raw strings/messages are borrowed.
 Logical capacity grows deterministically from initialized length: at length0 request
 capacity1; at each positive power-of-two length request twice that length. Charge
@@ -87,8 +92,8 @@ the logical additional slots*sizeof(T) against owned_bytes, then that byte count
 against work, then try_reserve_exact(additional relative to current length); report
 Limit("allocation") if allocator rejects. Charge the logical reservation even when
 allocator surplus makes the reserve call a no-op; never depend on Vec::capacity().
-No declared-length allocation or reserve from untrusted range/index/length. Between logical growth points, appends incur no capacity charge; budget never refunded/reset. Allocator bookkeeping,
-rounding and stack structs are not RSS accounting. Nodes bound root/Record structs;
+No declared-length allocation or reserve from untrusted range/index/length. Between logical growth points, appends incur no capacity charge; budget never refunded/reset. Temporary old/new reallocation buffers, allocator bookkeeping/rounding/surplus
+and stack structs are excluded; this is not actual RSS accounting. Nodes bound root/Record structs;
 byte/record/work/output bounds also bound unknown handling and temporary storage.
 
 Wire errors retain #108 offsets/precedence. Schema limit labels nodes/depth/owned_bytes

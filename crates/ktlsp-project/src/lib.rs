@@ -13,6 +13,8 @@ use std::fs::File;
 use std::io::{self, Read};
 use std::path::{Component, Path, PathBuf};
 
+pub mod v2;
+
 pub const MAX_MANIFEST_BYTES: usize = 2 * 1024 * 1024;
 pub const MAX_MODULES: usize = 4_096;
 pub const MAX_LIBRARIES: usize = 8_192;

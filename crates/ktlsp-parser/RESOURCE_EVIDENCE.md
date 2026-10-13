@@ -184,7 +184,17 @@ or external/native-forbidden dependency beyond the existing public parser calls.
 
 ## B3/B4 limits and recorded evidence
 
-The unchanged supervisor starts its500ms wall-clock deadline before spawn and
+Normal post-spawn completion now checks cleanup on the same owned child before
+implicit scoped I/O joins. Confirmed successful waiting preserves the original
+result; wait failure returns ambiguous `Io`, overriding and losing the original
+public error. Best-effort Drop remains armed when cleanup is unconfirmed and on
+unwind; abort can skip it. After successful spawn, a normal Tree or non-`Io` result
+requires successful `try_wait(Some)` or `wait` on that child. Pre-spawn errors are
+excluded. This finite behavior and the focused real-worker healthy snapshot test
+await runtime verification; they add no raw wait receipt or B3/B4 attribution.
+Blocking waits/joins have no hard bound and no descendant cleanup is promised.
+
+The supervisor retains its500ms wall-clock deadline before spawn and
 polls every2ms, checking cancellation/deadline before output and exit status.
 Timeout can reflect startup, I/O, parsing, serialization or scheduling. Once child
 exit is observed, polling ends before writer/reader joins and possible

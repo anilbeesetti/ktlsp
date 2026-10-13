@@ -1,4 +1,4 @@
-# C16: ordinary parameter annotation argument recovery
+# C16 / #126: ordinary parameter annotation argument recovery
 
 Frozen delivered base `aa9e6587bb28c368e2e770fc8fb297c59f83854b`, tree
 `67f6ad4bed3048e7a86b9207784334e24c8ed6db`, sole parent
@@ -114,6 +114,37 @@ Both approve the local source/fixture/provenance package; architect review appro
 commit-and-hold with runtime, integration and publication gates still pending.
 
 GitHub issue publication was rejected twice by automatic approval review. The
-second objection requires direct authorization in this child chat; external issue,
-push/PR/CI publication remains blocked. Local source preparation does not satisfy
-that gate. No passing merge or ownership release is claimed by this note.
+coordinator later received direct human authorization and published
+[#126](https://github.com/anilbeesetti/ktlsp/issues/126) through an ordinary
+approval-reviewed request. Prior denials and the unchanged prepared body remain
+preserved as evidence. No duplicate issue or alternate publication route was used.
+No passing merge or ownership release is claimed by this note.
+
+## Assigned final integration
+
+The coordinator assigned exactly PR118 squash
+`b910df05ba8942350700e2985d497511459952b7`, tree
+`1671c20e869ec19e9247a642e43a81def1f86fd8`, sole parent
+`e47bc20e79300d92b6a4dcfe42c36a8d04fbd9c4`. It was fetched and merged once
+into held C16 `0dda03b12732f901af28f7654540e7785c025e35` without conflicts.
+Merge `afa5595dd9804bb34f9be15afb9f955f786a12c3` has exactly those two parents
+and tree `3420be2a7155ae8e96216d708161f3e69b81d744`. Frozen C16 source,
+fixtures and mechanical provenance artifacts did not change during integration.
+The complete diff against the assigned base remains the thirteen child-owned paths.
+
+Inherited changes are independent Rust data-only ZIP indexing, project-path
+budget validation and classfile annotation extensions. Full combined graph review
+also covers metadata wire handling, existing SHA-2 std/force-soft selection,
+shared annotation budgets and excluded standalone tools. They add no C16 parser
+caller, server provider or Java/C/C++ semantic dependency. Cargo/lock, native
+workflow, parser worker/API and inherited resource fixtures remain unchanged by
+C16. Its additional diagnostics use existing bounded ASCII literals; the
+inherited reconstructed-serialization bound and resource limitations retain their
+finite meaning without a new whole-parser/time/RSS claim.
+
+The same correctness/adversarial reviewers and architect must review actual
+combined graph/effects and inherited resource controls before push/PR/CI.
+Authoritative Linux all3 must then establish the actual generated checkout's
+parents/tree and completed test results, followed by the same three evidence
+readbacks. Expected-head merge authorization and exact-main checks remain separate
+delivery gates. No local native/runtime tests execute during this integration.

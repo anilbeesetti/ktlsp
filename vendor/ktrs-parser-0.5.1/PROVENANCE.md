@@ -184,6 +184,7 @@ in ../../crates/ktlsp-parser/tests/recovery_annotation_arguments.rs and
 C14/C15/classifier/incomplete-bound/resource assertions remain read-only.
 Local preparation is not runtime delivery: same-reviewer source/provenance checks,
 coordinator-assigned Linux all3 and exact-main validation remain required.
-External publication is blocked pending direct child-chat authorization after
-automatic approval rejection. #83/#7 remain open, T008/T008a held, #96 unresolved;
+Initial local preparation retained an automatic-approval publication hold; the
+coordinator later published child #126 after direct human authorization. Integrated
+Linux validation remains pending. #83/#7 remain open, T008/T008a held, #96 unresolved;
 no full parser or semantic parity is claimed.

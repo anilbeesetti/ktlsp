@@ -118,7 +118,31 @@ fn compatibility(tree: &Parsed, case: &Value) {
             .find(|e| !e.token && e.kind == "CLASS")
             .unwrap()
     };
-    if id.starts_with("decline-header-") {
+    if id == "decline-header-8" {
+        // This recorded exclusion is superseded by the finite qualified-receiver contract.
+        assert_eq!(
+            projection(tree),
+            json!([
+                ["CLASS", 0, 11, "KT_FILE", null],
+                ["TYPE_PARAMETER_LIST", 9, 11, "CLASS", [0, 11]],
+                ["TYPE_PARAMETER", 10, 11, "TYPE_PARAMETER_LIST", [0, 11]],
+                ["FUN", 12, 40, "KT_FILE", null],
+                ["TYPE_REFERENCE", 16, 26, "FUN", [12, 40]],
+                ["USER_TYPE", 16, 26, "TYPE_REFERENCE", [12, 40]],
+                ["USER_TYPE", 16, 19, "USER_TYPE", [12, 40]],
+                ["REFERENCE_EXPRESSION", 16, 19, "USER_TYPE", [12, 40]],
+                ["REFERENCE_EXPRESSION", 20, 26, "USER_TYPE", [12, 40]],
+                ["VALUE_PARAMETER_LIST", 34, 36, "FUN", [12, 40]]
+            ]),
+            "{id}"
+        );
+        assert_eq!(
+            names(tree),
+            json!([[0, 6, 9, "Box"], [12, 27, 34, "healthy"]]),
+            "{id}"
+        );
+        assert_eq!(diagnostics(tree), json!([[11, 11, "Missing '>'"]]), "{id}");
+    } else if id.starts_with("decline-header-") {
         assert_eq!(class().start, 0, "{id}");
         assert!(class().end > 11, "{id}");
         assert!(!tree.diagnostics().is_empty(), "{id}");

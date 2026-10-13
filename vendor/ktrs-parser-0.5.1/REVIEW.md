@@ -169,3 +169,37 @@ No local runtime test occurred. Source approval is preparation only; future
 coordinator integration, exact Linux all-three/completed CI review, guarded merge
 and owner/root main verification remain required. No current delivery/parity or
 Darwin96 correction is asserted; #83/#7 stay open and T008/T008a remain held.
+
+## C13 qualified receiver — held source preparation after C13b
+
+Root admitted one additional DOT/name in the private generic sibling scratch
+predicate on frozen882028224a252d728dd479f2403fd2f2d97f3f67. Only
+declarations/type_parameters.rs changes final vendor Rust bytes. Existing caller,
+complete-bound, scratch isolation, minimum active-EOF and all resource/debit gates
+remain. The recorded pkg.String seed supersedes only C13b decline-header-8's
+blanket class.end>11 assertion; historical70/38/779 data remains unchanged. New
+source-authored test data has59 sources,24 selected projections,35 compatibility
+cases and397 UTF-16 expectations. No broader receiver/full-C13/parity claim.
+
+Owner data-only pristine archive→recovery.patch→formatting.patch replay verifies
+all54 final source files, zero offsets/fuzz. Re-derived counts remain14 behavior/
+50 formatting/four pristine survivors. Upstream archive/inventory/minimal crate/
+manifests/locks/notices remain unchanged. Adversarial reviewer must perform its
+own independent pristine replay; neither party may borrow the other's receipt.
+
+Pinned formatting and compile-only offline locked workspace all-target Clippy
+passed. No parser/native runtime ran locally. Actual held-source SAME2+architect
+approved7f51b2442bfca714a7aa0369f9ac9a8e64905aa3 without findings; both independent
+pristine replays verify54 files/zero offsets/fuzz/counts14/50/4. Initial issue
+publication was rejected twice. After fresh direct human approval, the SAME
+connector published [issue148](https://github.com/anilbeesetti/ktlsp/issues/148)
+with unchanged body SHA256
+`9eb9210e96a434544ef2082f763375a1f187cdb8e617df30483b468947300d74`; a separate
+repoID1415474657 fetch verifies OPEN/exact body. Old rejections/history remain.
+Only four owned Markdown publication notes change in this successor; SAME3 docs
+rechecks are required. Future root-assigned integration/original LinuxCI/guarded
+merge/main-verification gates remain pending. Push/PR/CI/integration/merge stay
+HOLD. Exact frozen fixture/ordered-patch hashes and limits are in
+../../crates/ktlsp-parser/reviews/c13-qualified-extension-recovery.md.
+#83/#7 OPEN; C13 GAP; T008/T008a HOLD; B3/B4 GAP; B11 UNVERIFIED;96 UNKNOWN;
+historical45/32/10/3 unchanged. No semantic/server/RSS/official-performance claim.

@@ -104,8 +104,15 @@ Delivered PR102/#100 adds bounded classifier-generic sibling recovery. C17/#104
 records three complete known-defect inputs/outcomes for missing defaults, malformed
 parenthesized types and annotation arguments in `tests/recovery_residuals.rs`.
 See CORPUS.md for the finite ledger and reuse of existing excluded headers/bounds.
-Passing a defect assertion is not required recovery. C12 accepted-assertion delivery
-is not confirmed here; resource controls remain resource-only. The final refreshed
+Passing a defect assertion is not required recovery. C12/#103 is delivered in
+[PR106](https://github.com/anilbeesetti/ktlsp/pull/106), merge
+`0a1a863744a2bc520dac46792a5ce1eebe5b70dc`: exact accepted-control declarations/names/
+parents/ranges/diagnostics, original snapshot property and member recovery, nested
+anonymous annotation ownership and repeated-recovery healthy name.
+[Exact merged-main Linux CI](https://github.com/anilbeesetti/ktlsp/actions/runs/38332673276/job/115085727770)
+passed all three pinned commands (226 active tests, two exercised helpers and
+19 separate protocol fault cases). Generic threshold/leading-trivia/aggregate/
+scratch controls remain resource-only. C12 adds assertions, not grammar repairs. The final refreshed
 [#83 audit](https://github.com/anilbeesetti/ktlsp/issues/83#issuecomment-6130232640)
 keeps #83/#7 open and T008/T008a blocked on remaining recovery/assertion/resource gaps.
 
@@ -143,7 +150,10 @@ approvals and the coordinator's guarded merge grant. CORPUS.md retains identitie
 and evidence limits. This supersedes stale candidate/pending delivery prose in the
 historical review/provenance files; it does not reinterpret those old runs.
 C17 starts from main `4d27673f703fd3c7b0ee57fc7a3cf35c6c21f05f`, compatible with the
-frozen parser source above; no parser source/API/worker/dependency changes are made.
+frozen parser source above. Its one final integration base is
+`0a1a863744a2bc520dac46792a5ce1eebe5b70dc`; inherited C12 tests and all main product,
+dependency, workflow and optional-tool files are preserved. C17 itself changes no
+parser source/API/worker/dependency files.
 Issue #96 remains OPEN/UNKNOWN; Linux passes do not establish Darwin correction.
 
 The coordinator explicitly amended the accounting contract after a focused audit:

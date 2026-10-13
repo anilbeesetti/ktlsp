@@ -11,7 +11,9 @@ Delivered recovery is recorded in PR90/#87 and PR102/#100. The final refreshed
 [#83 audit](https://github.com/anilbeesetti/ktlsp/issues/83#issuecomment-6130232640)
 freezes parser source `ab00d55557cfea9bcee87aa41fe2922f82770027`. C17/#104 starts
 from actual main `4d27673f703fd3c7b0ee57fc7a3cf35c6c21f05f`; only delivered metadata
-changed between those checkpoints. Parser/vendor/API/worker/Cargo/lock are unchanged.
+changed between those checkpoints. The C17 delta changes no parser/vendor/API/worker/Cargo/lock files. Its one final
+integration base is `0a1a863744a2bc520dac46792a5ce1eebe5b70dc` (delivered PR106/C12);
+all inherited source, existing tests, dependencies and tools are preserved.
 The audit classification SHA256 is
 `b54043bde87143ce0310e18cb2a67bc5f46fcd7b285966e3a3f8076d9267fb1c`.
 
@@ -29,14 +31,21 @@ The audit classification SHA256 is
 | repeated_parameter_recovery_retains_annotation_prefix_and_eof | two broken lists preserve annotated next declaration and later typealias; exact EOF diagnostics |
 | valid_parameter_contexts_preserve_default_declarations | nested anonymous function/object declarations retain local parents/ranges; multiline/default/lambda/call/generic/annotation/receiver/constructor/function-type controls |
 | malformed_member_parameters_preserve_initializers_and_constructors | initializer/secondary constructor retain original spans and class ownership; local property belongs to initializer |
-| recovery_limits integration tests (resource-only) | bounded nested annotation probing, strict postparse NestingLimit, repeated recovery through 100 points, balanced raw-delimiter diagnostic overflow, healthy followups; these controls are not promoted to complete declaration acceptance |
+| recovery_limits integration tests | nested annotation controls now pin all anonymous FUN identities/ranges/owners and absent direct names; repeated recovery pins the healthy direct name; strict NestingLimit/diagnostic-overflow and healthy followups remain; generic threshold/leading-trivia/aggregate/scratch controls remain resource-only |
+| valid_classifier_generics_and_nonclass_callers_are_preserved | exact class/named function/property/typealias projections for all nine existing valid controls, including constructor function-type bound and receiver generics |
 | snapshots_reject_changed_revision_document_kind_and_reused_identity | exact immutable input/result association, stale revisions/documents/kinds/same-revision changed text, cancellation and retained original |
 
-C12 remains a separate accepted-assertion task, with delivery unconfirmed here.
-The audit identifies missing full projections in valid parameter/classifier controls,
-member initializer/constructor recovery and the original snapshot property. The
-resource-only controls above need not gain declaration projections unless promoted.
-This table inventories fixture intent; it does not declare C12 complete.
+C12/#103 was delivered in [PR106](https://github.com/anilbeesetti/ktlsp/pull/106),
+merge `0a1a863744a2bc520dac46792a5ce1eebe5b70dc`. It adds exact projections to the
+six parameter/default and nine classifier/nonclass valid controls, original
+snapshot property and member recovery, plus anonymous annotation ownership and
+the repeated-recovery healthy name. Existing fixture literals/invocations remain
+unchanged. [Exact merged-main Linux CI](https://github.com/anilbeesetti/ktlsp/actions/runs/38332673276/job/115085727770)
+passed all three pinned commands: 226 active tests, two exercised ignored helpers
+and 19 separately counted protocol faults. Generic threshold/leading-trivia/
+aggregate/scratch controls remain resource-only; C12 adds assertions, not recovery
+or B3–B5 resource evidence. The frozen audit above describes the earlier source
+checkpoint; this paragraph records only the subsequently delivered C12 delta.
 
 Nodes use upstream kinds without inventing an interface kind. An omitted package
 is an empty PACKAGE_DIRECTIVE, excluded from the named-declaration projection;
@@ -106,8 +115,8 @@ exclusions, not demonstrated grammar failures. Existing
 property and typealias generic lists and a class constructor with a function-type
 bound. `generic_recovery_uses_header_grammar_without_newline_dependency` covers
 classifier entry/header spellings. Neither supplies an object fixture; object
-behavior is unverified here. Missing accepted projections belong to C12. No new
-caller matrix is inferred. Missing simple types/open generic arguments retain the existing upstream
+behavior is unverified here. C12 supplies exact selected declarations for these
+existing accepted controls. No new caller matrix is inferred. Missing simple types/open generic arguments retain the existing upstream
 same-position diagnostic deduplication behavior; they are not new C17 cases.
 
 Smallest next repairs: first C14 at parameter-default expression entry while
@@ -116,7 +125,8 @@ recovery with annotated-type controls; then C16 at annotation value-argument par
 with legitimate nested-function controls. Each needs its own accepted child and
 exclusive parser/vendor/provenance ownership transfer after this fixture lane.
 Generic/extension sibling improvements are separate finite contracts if admitted.
-No C14–C16 repair or C12 delivery is claimed here.
+No C14–C16 repair is claimed here; the distinct C12 assertion delivery is recorded
+above without changing the residual classifications.
 
 #83/#7 remain open and T008a remains blocked on the remaining parent acceptance
 and individually named recovery/resource gaps.

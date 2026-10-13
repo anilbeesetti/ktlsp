@@ -1,5 +1,11 @@
-//! Bounded, read-only exact Maven-layout lookup. See the crate README for the
-//! trusted-filesystem boundary and unsupported integrity/archive verification.
+//! Bounded exact Maven-layout lookup and caller-provided SHA-256 verification.
+//! See the crate README for the filesystem and integrity trust boundaries.
+
+mod integrity;
+pub use integrity::{ExpectedDigestOrigin, IntegrityError, VerifiedArtifact, verify_sha256};
+
+mod zip_index;
+pub use zip_index::{ZipDirectoryEntry, ZipDirectoryIndex, ZipIndexError, index_zip_directory};
 
 use std::collections::HashSet;
 use std::fs::{self, File, Metadata};

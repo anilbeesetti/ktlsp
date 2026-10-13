@@ -156,7 +156,30 @@ fn compatibility(tree: &Parsed, case: &Value) {
                 .unwrap();
             assert_eq!(class.start, 0, "{id}");
             assert!(class.end > 11, "{id}");
-            assert!(!top_level_candidate(source.find("fun").unwrap()), "{id}");
+            if id == "broken-modifier-annotation" {
+                // Token-wise recovery consumes @ before the later FUN is parsed normally.
+                assert_eq!(class.end, 13, "{id}");
+                assert!(top_level_candidate(16), "{id}");
+                let at = elements
+                    .iter()
+                    .find(|e| e.token && e.kind == "AT" && (e.start, e.end) == (12, 13))
+                    .unwrap();
+                let mut owner = at.parent.unwrap();
+                while !declaration(&elements[owner].kind) {
+                    owner = elements[owner].parent.unwrap();
+                }
+                assert_eq!(
+                    (
+                        elements[owner].kind.as_str(),
+                        elements[owner].start,
+                        elements[owner].end
+                    ),
+                    ("CLASS", 0, 13),
+                    "{id}"
+                );
+            } else {
+                assert!(!top_level_candidate(source.find("fun").unwrap()), "{id}");
+            }
         }
         "aggregate-reset" => {
             assert!(!tree.diagnostics().is_empty(), "{id}");

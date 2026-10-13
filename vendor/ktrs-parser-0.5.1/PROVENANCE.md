@@ -363,3 +363,32 @@ immediately afterward, then again through healthy revision2. Initial findings an
 architect's tentative concern/incorrect withdrawal/correction remain in external
 receipts; corrected-head actual SAME2+architect rechecks and original CI remain
 required. No local native/parser/worker/test runtime executed.
+
+### Original PR162 failure and narrow harness correction
+
+Original run38417127591/job115364425245 attempt1 on reviewed3b7e9cf/tree87e8a95
+passed fmt/Clippy and failed the focused test at broken-modifier-annotation's added
+no-top-level-FUN assertion. Raw log SHA256
+`f161a37a5b8556aa8f030fae241d15f00c8385a763e13feef7bcb39af218c3f4`,
+56840 bytes/721 lines, independently matches root. The frozen control requires
+class.end>11/nonempty diagnostics, explicitly no whole declined-CST expectation.
+Its failure does not establish a new parser defect. SAME2+architect independently
+trace scratch annotation rejection with live state untouched; missingGT consumes
+AT[12,13), CLASS ends13, top-level recovery consumes A/(, then normal live grammar
+parses FUN[16,46) under KT_FILE. This is token-wise recovery, not annotation
+recovery promoting a function. Immutable contract prose saying broken annotation
+stays owned is narrowly superseded by this adjacent explicit source-stage erratum:
+the consumed AT remains CLASS-owned; the later named function can be top-level.
+Incomplete-bound annotation-owned and anonymous/lazy controls are distinct and
+retain their stronger ownership assertions.
+
+Only stable ID broken-modifier-annotation receives this source-derived correction:
+retain class/diagnostic/token/snapshot checks, assert AT[12,13) nearest CLASS[0,13)
+and normal KT_FILE FUN[16,46); every other no-promotion assertion stays intact.
+All116 literal fields and70/59/85 historical payloads, grammar, patch stack and
+budgets remain unchanged. Initial failure/reviews are preserved; no unchanged retry
+or local runtime runs. The failed test did not reach its nine later controls and
+two NestingLimit fixtures, so those outcomes remain unverified at this checkpoint.
+Root suspended merge and released fe97781 integration reservation to independent
+work; next stable base requires root assignment, integrated-delta reviews and
+actual combined-tree original Linux CI before a renewed merge lease.

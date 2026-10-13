@@ -1,0 +1,43 @@
+{
+  "operation": "data-only constant-pool transcription, no product/runtime/JVM/compiler",
+  "artifact": "/private/tmp/ktlsp-function-header-01a134e9/crates/ktlsp-binary/fixtures/t017c2/Unit.class",
+  "artifact_bytes": 781,
+  "artifact_sha256": "896588212a98f36148f2fbe1ea2878d6ba23c6376c6346c765cec5ac0c5716ce",
+  "d1_constant_pool_index": 31,
+  "d1_mutf8_classfile_span": [
+    290,
+    352
+  ],
+  "d1_encoding": "leading NUL then low8 of remaining units",
+  "decoded_d1_bytes": 52,
+  "decoded_d1_sha256": "0dd8125dda5c19a494276ec7c191472160a0190af9eb8faf9fc03266fa06f583",
+  "decoded_d1_hex": "12 0a 02 10 02 0a 02 10 00 0a 02 08 02 0a 02 10 0e 0a 00 08 c6 02 18 00 32 02 30 01 42 07 08 42 a2 06 02 08 02 4a 0a 10 03 1a 02 30 04 48 96 80 04 a8 06 05",
+  "class_payload_d1_span": [
+    19,
+    52
+  ],
+  "function_field_d1_span": [
+    37,
+    49
+  ],
+  "function_body_d1_span": [
+    39,
+    49
+  ],
+  "function_body_class_span": [
+    20,
+    30
+  ],
+  "function_body_hex": "10 03 1a 02 30 04 48 96 80 04",
+  "function_body_sha256": "c40ba211d99c8575494344d811f0af5168a99adeaac7f864c146d2c211ff9f99",
+  "expected": {
+    "name": 3,
+    "flags": 65558,
+    "old_flags": null,
+    "bytes": 10,
+    "records": 3,
+    "work": 16
+  },
+  "name_resolution": "existing independently transcribed header d2[3] is toString; resolver is separate operation",
+  "compiler_provenance": "unverified; artifact Implementation-Version identifies distribution only"
+}

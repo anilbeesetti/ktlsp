@@ -3,6 +3,7 @@
 
 pub mod class_header;
 mod encoding;
+pub mod function_header;
 mod header;
 pub mod name_resolver;
 pub mod payload;

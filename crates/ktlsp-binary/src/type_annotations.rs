@@ -40,9 +40,15 @@ pub struct FieldTypeAnnotations<'a> {
 /// logical-node bounds. Neither allocator overhead nor RSS is bounded here.
 /// Existing public declaration/extension decoders retain their own behavior.
 pub fn decode<'a>(class: &'a ClassFile<'_>) -> Result<FieldTypeAnnotations<'a>> {
-    let mut budget = Budget::default();
-    let extensions = annotation_extensions::decode_with_budget(class, &mut budget)?;
-    let fields = decode_fields(class, &mut budget)?;
+    decode_with_budget(class, &mut Budget::default())
+}
+
+pub(crate) fn decode_with_budget<'a>(
+    class: &'a ClassFile<'_>,
+    budget: &mut Budget,
+) -> Result<FieldTypeAnnotations<'a>> {
+    let extensions = annotation_extensions::decode_with_budget(class, budget)?;
+    let fields = decode_fields(class, budget)?;
     Ok(FieldTypeAnnotations { extensions, fields })
 }
 
@@ -120,7 +126,7 @@ fn decode_fields<'a>(
     Ok(fields)
 }
 
-fn vector<T>(count: usize, budget: &mut Budget) -> Result<Vec<T>> {
+pub(crate) fn vector<T>(count: usize, budget: &mut Budget) -> Result<Vec<T>> {
     budget.nodes(count)?;
     let mut out = Vec::new();
     if count != 0 {

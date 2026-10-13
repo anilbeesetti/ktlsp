@@ -261,69 +261,93 @@ fn supervise(
         .spawn()
         .map_err(|_| ParserError::Io)?;
     thread::scope(|scope| {
-        let mut guard = ChildGuard(child);
-        let mut stdin = guard.0.stdin.take().ok_or(ParserError::Io)?;
-        let stdout = guard.0.stdout.take().ok_or(ParserError::Io)?;
-        let input = normalized;
-        let writer = thread::Builder::new()
-            .spawn_scoped(scope, move || stdin.write_all(input.as_bytes()))
-            .map_err(|_| ParserError::Io)?;
-        let (sender, receiver) = mpsc::sync_channel(1);
-        let reader = thread::Builder::new()
-            .spawn_scoped(scope, move || {
-                let mut bytes = Vec::new();
-                let result = stdout
-                    .take(MAX_OUTPUT_BYTES as u64 + 1)
-                    .read_to_end(&mut bytes)
-                    .map_err(|_| ParserError::Io)
-                    .and({
-                        if bytes.len() > MAX_OUTPUT_BYTES {
-                            Err(ParserError::OutputLimit)
-                        } else {
-                            Ok(bytes)
-                        }
-                    });
-                let _ = sender.send(result);
-            })
-            .map_err(|_| ParserError::Io)?;
-        let mut output = None;
-        let status = loop {
-            if cancelled.load(Ordering::Relaxed) {
-                return Err(ParserError::Cancelled);
-            }
-            if Instant::now() >= deadline {
-                return Err(ParserError::Timeout);
-            }
-            if output.is_none() {
-                match receiver.try_recv() {
-                    Ok(result) => output = Some(result?),
-                    Err(mpsc::TryRecvError::Empty) => {}
-                    Err(mpsc::TryRecvError::Disconnected) => return Err(ParserError::Io),
-                }
-            }
-            if let Some(status) = guard.0.try_wait().map_err(|_| ParserError::Io)? {
-                break status;
-            }
-            thread::sleep(Duration::from_millis(2));
+        let mut guard = ChildGuard {
+            child,
+            reaped: false,
         };
-        if !status.success() {
-            return Err(ParserError::WorkerFailed);
-        }
-        writer
-            .join()
-            .map_err(|_| ParserError::Io)?
-            .map_err(|_| ParserError::Io)?;
-        reader.join().map_err(|_| ParserError::Io)?;
-        output
-            .map(Ok)
-            .unwrap_or_else(|| receiver.recv().map_err(|_| ParserError::Io)?)
+        let result = (|| {
+            let mut stdin = guard.child.stdin.take().ok_or(ParserError::Io)?;
+            let stdout = guard.child.stdout.take().ok_or(ParserError::Io)?;
+            let input = normalized;
+            let writer = thread::Builder::new()
+                .spawn_scoped(scope, move || stdin.write_all(input.as_bytes()))
+                .map_err(|_| ParserError::Io)?;
+            let (sender, receiver) = mpsc::sync_channel(1);
+            let reader = thread::Builder::new()
+                .spawn_scoped(scope, move || {
+                    let mut bytes = Vec::new();
+                    let result = stdout
+                        .take(MAX_OUTPUT_BYTES as u64 + 1)
+                        .read_to_end(&mut bytes)
+                        .map_err(|_| ParserError::Io)
+                        .and({
+                            if bytes.len() > MAX_OUTPUT_BYTES {
+                                Err(ParserError::OutputLimit)
+                            } else {
+                                Ok(bytes)
+                            }
+                        });
+                    let _ = sender.send(result);
+                })
+                .map_err(|_| ParserError::Io)?;
+            let mut output = None;
+            let status = loop {
+                if cancelled.load(Ordering::Relaxed) {
+                    return Err(ParserError::Cancelled);
+                }
+                if Instant::now() >= deadline {
+                    return Err(ParserError::Timeout);
+                }
+                if output.is_none() {
+                    match receiver.try_recv() {
+                        Ok(result) => output = Some(result?),
+                        Err(mpsc::TryRecvError::Empty) => {}
+                        Err(mpsc::TryRecvError::Disconnected) => return Err(ParserError::Io),
+                    }
+                }
+                if let Some(status) = guard.child.try_wait().map_err(|_| ParserError::Io)? {
+                    guard.reaped = true;
+                    break status;
+                }
+                thread::sleep(Duration::from_millis(2));
+            };
+            if !status.success() {
+                return Err(ParserError::WorkerFailed);
+            }
+            writer
+                .join()
+                .map_err(|_| ParserError::Io)?
+                .map_err(|_| ParserError::Io)?;
+            reader.join().map_err(|_| ParserError::Io)?;
+            output
+                .map(Ok)
+                .unwrap_or_else(|| receiver.recv().map_err(|_| ParserError::Io)?)
+        })();
+        // Check cleanup before the scope joins potentially blocked I/O threads.
+        guard.finish()?;
+        result
     })
 }
-struct ChildGuard(Child);
+struct ChildGuard {
+    child: Child,
+    reaped: bool,
+}
+impl ChildGuard {
+    fn finish(&mut self) -> Result<(), ParserError> {
+        if !self.reaped {
+            let _ = self.child.kill();
+            self.child.wait().map_err(|_| ParserError::Io)?;
+            self.reaped = true;
+        }
+        Ok(())
+    }
+}
 impl Drop for ChildGuard {
     fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
+        if !self.reaped {
+            let _ = self.child.kill();
+            let _ = self.child.wait();
+        }
     }
 }
 

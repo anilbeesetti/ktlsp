@@ -208,7 +208,7 @@ impl Parser {
         &mut self,
         rollback_on_failure: bool,
         type_required: bool,
-        recover_default: bool,
+        recover_declarations: bool,
     ) -> bool {
         let parameter = self.mark();
 
@@ -218,7 +218,7 @@ impl Parser {
             self.advance(); // VAR_KEYWORD | VAL_KEYWORD
         }
 
-        if !self.parse_function_parameter_rest(type_required, recover_default)
+        if !self.parse_function_parameter_rest(type_required, recover_declarations)
             && rollback_on_failure
         {
             parameter.rollback_to(self);
@@ -229,7 +229,7 @@ impl Parser {
         true
     }
 
-    fn at_missing_default_sibling(&self) -> bool {
+    pub(super) fn at_simple_function_header(&self) -> bool {
         if self.in_parameter_recovery_probe {
             return false;
         }
@@ -279,7 +279,7 @@ impl Parser {
     fn parse_function_parameter_rest(
         &mut self,
         type_required: bool,
-        recover_default: bool,
+        recover_declarations: bool,
     ) -> bool {
         let mut no_errors = true;
 
@@ -290,13 +290,13 @@ impl Parser {
             // Recovery for the case 'fun foo(Array<String>) {}'
             self.error("Parameter name expected");
             no_errors = false;
-            self.parse_type_ref();
+            self.parse_parameter_type_ref(recover_declarations);
         } else if self.at(COLON) {
             // Recovery for the case 'fun foo(: Int) {}'
             self.error("Parameter name expected");
             // We keep noErrors == true so that unnamed parameters starting with ":" are not rolled back during parsing of functional types
             self.advance(); // COLON
-            self.parse_type_ref();
+            self.parse_parameter_type_ref(recover_declarations);
         } else {
             self.expect_3(
                 IDENTIFIER,
@@ -314,7 +314,7 @@ impl Parser {
                     return false;
                 }
 
-                self.parse_type_ref();
+                self.parse_parameter_type_ref(recover_declarations);
             } else if type_required {
                 self.error_with_recovery(
                     "Parameters must have type annotation",
@@ -326,7 +326,7 @@ impl Parser {
 
         if self.at(EQ) {
             self.advance(); // EQ
-            if recover_default && self.at_missing_default_sibling() {
+            if recover_declarations && self.at_simple_function_header() {
                 self.error("Expecting an expression");
                 return false;
             }

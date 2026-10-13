@@ -32,6 +32,7 @@ impl Parser {
         self.parse_type_ref_2(
             TokenSet::EMPTY,
             /* allowSimpleIntersectionTypes */ false,
+            false,
         );
     }
 
@@ -39,16 +40,25 @@ impl Parser {
         self.parse_type_ref_2(
             extra_recovery_set,
             /* allowSimpleIntersectionTypes */ true,
+            false,
         );
+    }
+
+    pub(super) fn parse_parameter_type_ref(&mut self, recover_declarations: bool) {
+        self.parse_type_ref_2(TokenSet::EMPTY, true, recover_declarations);
     }
 
     fn parse_type_ref_2(
         &mut self,
         extra_recovery_set: TokenSet,
         allow_simple_intersection_types: bool,
+        recover_parenthesized: bool,
     ) {
-        let type_ref_marker =
-            self.parse_type_ref_contents(extra_recovery_set, allow_simple_intersection_types);
+        let type_ref_marker = self.parse_type_ref_contents(
+            extra_recovery_set,
+            allow_simple_intersection_types,
+            recover_parenthesized,
+        );
         type_ref_marker.done(self, TYPE_REFERENCE);
     }
 
@@ -58,6 +68,7 @@ impl Parser {
         &mut self,
         extra_recovery_set: TokenSet,
         allow_simple_intersection_types: bool,
+        recover_parenthesized: bool,
     ) -> Marker {
         let type_ref_marker = self.mark();
 
@@ -99,10 +110,15 @@ impl Parser {
             let contents = self.parse_type_ref_contents(
                 TokenSet::EMPTY,
                 /* allowSimpleIntersectionTypes */ true,
+                recover_parenthesized,
             );
             contents.drop(self);
 
-            if self.at(RPAR) && self.lookahead(1) != Some(ARROW) {
+            if recover_parenthesized && self.at_simple_function_header() {
+                // Keep the damaged ordinary type before function-type speculation can consume its sibling.
+                self.error("Expecting ')'");
+                function_or_parenthesized_type.drop(self);
+            } else if self.at(RPAR) && self.lookahead(1) != Some(ARROW) {
                 // It's a parenthesized type
                 //    (A)
                 self.advance();
@@ -150,6 +166,7 @@ impl Parser {
             self.parse_type_ref_2(
                 extra_recovery_set,
                 /* allowSimpleIntersectionTypes */ true,
+                recover_parenthesized,
             );
 
             intersection_type.done(self, INTERSECTION_TYPE);

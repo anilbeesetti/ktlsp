@@ -75,7 +75,7 @@ pub struct Sections<'a> {
     pub payload: Section<'a>,
 }
 
-struct Budget {
+pub(super) struct Budget {
     records: usize,
     work: usize,
 }
@@ -87,22 +87,29 @@ fn charge(left: &mut usize, n: usize, offset: usize, label: &'static str) -> Res
     Ok(())
 }
 impl Budget {
-    fn record(&mut self, offset: usize) -> Result<(), Error> {
+    pub(super) fn new(records: usize, work: usize) -> Self {
+        Self {
+            records: records.min(MAX_RECORDS),
+            work: work.min(MAX_VALIDATION_UNITS),
+        }
+    }
+
+    pub(super) fn record(&mut self, offset: usize) -> Result<(), Error> {
         charge(&mut self.records, 1, offset, "records")?;
         self.work(1, offset)
     }
-    fn work(&mut self, n: usize, offset: usize) -> Result<(), Error> {
+    pub(super) fn work(&mut self, n: usize, offset: usize) -> Result<(), Error> {
         charge(&mut self.work, n, offset, "work")
     }
 }
 
-struct Reader<'a> {
+struct Reader<'a, 'b> {
     bytes: &'a [u8],
     pos: usize,
     end: usize,
-    budget: Budget,
+    budget: &'b mut Budget,
 }
-impl<'a> Reader<'a> {
+impl<'a> Reader<'a, '_> {
     fn error(&self, kind: ErrorKind, offset: usize) -> Error {
         Error { offset, kind }
     }
@@ -146,35 +153,38 @@ impl<'a> Reader<'a> {
         }
         Ok(n as usize)
     }
+    fn field(&mut self) -> Result<Field<'a>, Error> {
+        let field_start = self.pos;
+        self.budget.record(field_start)?;
+        let tag = self.varint()? as u32;
+        let number = tag >> 3;
+        if number == 0 {
+            return Err(self.error(ErrorKind::InvalidFieldNumber, field_start));
+        }
+        let value = match tag & 7 {
+            0 => Value::Varint(self.varint()?),
+            1 => Value::Fixed64(u64::from_le_bytes(self.take(8)?.try_into().unwrap())),
+            2 => {
+                let n = self.length()?;
+                Value::Bytes(self.take(n)?)
+            }
+            3 | 4 => return Err(self.error(ErrorKind::UnsupportedGroup, field_start)),
+            5 => Value::Fixed32(u32::from_le_bytes(self.take(4)?.try_into().unwrap())),
+            _ => return Err(self.error(ErrorKind::InvalidWireType, field_start)),
+        };
+        Ok(Field {
+            number,
+            span: field_start..self.pos,
+            raw: &self.bytes[field_start..self.pos],
+            value,
+        })
+    }
     fn section(&mut self, end: usize) -> Result<Section<'a>, Error> {
         let start = self.pos;
         self.end = end;
         let mut fields = Vec::new();
         while self.pos < end {
-            let field_start = self.pos;
-            self.budget.record(field_start)?;
-            let tag = self.varint()? as u32;
-            let number = tag >> 3;
-            if number == 0 {
-                return Err(self.error(ErrorKind::InvalidFieldNumber, field_start));
-            }
-            let value = match tag & 7 {
-                0 => Value::Varint(self.varint()?),
-                1 => Value::Fixed64(u64::from_le_bytes(self.take(8)?.try_into().unwrap())),
-                2 => {
-                    let n = self.length()?;
-                    Value::Bytes(self.take(n)?)
-                }
-                3 | 4 => return Err(self.error(ErrorKind::UnsupportedGroup, field_start)),
-                5 => Value::Fixed32(u32::from_le_bytes(self.take(4)?.try_into().unwrap())),
-                _ => return Err(self.error(ErrorKind::InvalidWireType, field_start)),
-            };
-            fields.push(Field {
-                number,
-                span: field_start..self.pos,
-                raw: &self.bytes[field_start..self.pos],
-                value,
-            });
+            fields.push(self.field()?);
         }
         Ok(Section {
             span: start..end,
@@ -182,6 +192,51 @@ impl<'a> Reader<'a> {
             fields,
         })
     }
+}
+
+// Schema callers share one budget while revisiting bounded nested/packed spans.
+fn cursor<'a, 'b>(
+    bytes: &'a [u8],
+    pos: usize,
+    end: usize,
+    budget: &'b mut Budget,
+) -> Result<Reader<'a, 'b>, Error> {
+    if pos > end || end > bytes.len() {
+        return Err(Error {
+            offset: bytes.len(),
+            kind: ErrorKind::Truncated,
+        });
+    }
+    Ok(Reader {
+        bytes,
+        pos,
+        end,
+        budget,
+    })
+}
+
+pub(super) fn field<'a>(
+    bytes: &'a [u8],
+    pos: &mut usize,
+    end: usize,
+    budget: &mut Budget,
+) -> Result<Field<'a>, Error> {
+    let mut reader = cursor(bytes, *pos, end, budget)?;
+    let out = reader.field()?;
+    *pos = reader.pos;
+    Ok(out)
+}
+
+pub(super) fn varint(
+    bytes: &[u8],
+    pos: &mut usize,
+    end: usize,
+    budget: &mut Budget,
+) -> Result<u64, Error> {
+    let mut reader = cursor(bytes, *pos, end, budget)?;
+    let out = reader.varint()?;
+    *pos = reader.pos;
+    Ok(out)
 }
 
 /// Read a delimited string-table section and the remaining class/package section.
@@ -197,14 +252,12 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<Sections<'_>, Error> {
             kind: ErrorKind::Limit("bytes"),
         });
     }
+    let mut budget = Budget::new(limits.records, limits.work);
     let mut reader = Reader {
         bytes,
         pos: 0,
         end: bytes.len(),
-        budget: Budget {
-            records: limits.records.min(MAX_RECORDS),
-            work: limits.work.min(MAX_VALIDATION_UNITS),
-        },
+        budget: &mut budget,
     };
     reader.budget.record(0)?;
     let length = reader.length()?;

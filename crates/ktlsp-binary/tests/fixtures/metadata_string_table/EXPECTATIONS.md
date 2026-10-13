@@ -72,3 +72,11 @@ INCREMENTS, bounding requested RETAINED capacity only; not cumulative allocation
 churn or temporary old/new buffers/allocator surplus/rounding/actual RSS. Exact B
 remains unchanged. Helpers are called only before validated section EOF and errors
 propagate immediately, with consumed budget retained even if cursor unchanged.
+
+Independent reviewer additions before first runtime: packed
+`2a0cffffffff0f80808080108000` => local_name[-1,0,0];
+`2a0affffffffffffffffff01` => local_name[-1] (ten-byte negative).
+`0a03220180` with work16 => Limit(work) offset5; with work17 => Truncated5.
+Work derivation corrected before runtime: root wire is6 (record1+input5), total
+rootnode1+rootwire6+dispatch1+nestednode1+nestedwire4+dispatch1+packedrecord1+
+read1+failedread1=17. No allocations precede that failure.

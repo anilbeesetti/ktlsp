@@ -111,3 +111,31 @@ expectations and review/controlled-validation gates. Exact reviewed combined-hea
 and merged-main Linux all-three evidence must be retained in the PR/receipt before
 completed delivery. No local native/parser/performance/JVM run is authorized;
 #96 remains unresolved, #83/#7 remain open and full semantic parity is unfinished.
+
+## C13b / #136 finite extension sibling source stage
+
+Initial source is frozen37bfe388211fe7596986e51a222af4c89a44c3c8, tree
+8ba503ba15c5379d2a9c14d1ec7b97abaa8ded36, in a separate owned checkout/branch.
+Root admitted only finite source and issue publication after SAME correctness,
+adversarial and architect contract reviews; [issue136](https://github.com/anilbeesetti/ktlsp/issues/136)
+preserves the exact historical staged body and linked admission update. No main
+chase or integration has occurred. Product changes are the private optional-DOT
+predicate, one obsolete String-extension negative member, the new focused test
+and owned ordered artifacts/review note. No dependency/graph/worker/API/limit change.
+
+Final contract JSON supplies all 70 exact sources and 38 full selected projections;
+the new test copies selected fields literally, avoiding the obsolete intermediate
+auxiliary generator. Data-only comparison verifies sources, projections, names,
+diagnostics, positions and supplementary fields before any runtime. Source-only
+compatibility assertions do not become complete declined-tree equality or B11
+active-layer end-to-end evidence. Ordered archive -> behavior -> formatting replay
+reproduces all54 final hashes with14 behavior/50 formatting/four pristine survivors.
+
+Local validation is restricted to pinned formatting and compile-only locked
+workspace all-target Clippy. No local native/parser/test/worker/server/bench/JVM/
+oracle/Gradle/Maven execution is admitted. Actual implementation behavior requires
+a future coordinator-assigned final integration and unchanged Linux Native Rust
+all-three exact checkout/tree evidence, SAME2/architect completed-source and PR-CI
+reviews, guarded expected-SHA merge and owner/root exact-main verification.
+There is no push/PR/CI/integration/merge admission in this source stage. #96 remains
+OPEN/UNKNOWN; no Linux-proves-Darwin or full syntax/semantic/parity claim follows.

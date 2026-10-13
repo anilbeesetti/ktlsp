@@ -456,6 +456,12 @@ fn snapshots_reject_changed_revision_document_kind_and_reused_identity() {
         .parse_snapshot(&original, &AtomicBool::new(false))
         .unwrap();
     assert_eq!(accepted.snapshot(), &original);
+    check_tree(
+        accepted.tree_for(&original).unwrap(),
+        original.source(),
+        &[("PROPERTY", "val x=1", "KT_FILE", None, Some(("x", 4)))],
+        &[],
+    );
     assert_eq!(
         accepted.tree_for(&original.clone()).unwrap().source(),
         original.source()
@@ -688,35 +694,64 @@ fn valid_parameter_contexts_preserve_default_declarations() {
         ],
         &[],
     );
-    for source in [
-        "fun <T> T.ext(\n @A x: List<Map<String, T>>,\n crossinline action: (T) -> Unit = { value -> val local = value; action(local) },\n y: Int = nested(call(1, 2), 3)\n): T = this",
-        "fun f(x: Boolean = 1 < 2, y: Int = if (x) nested(1) else nested(2)) {}",
-        "class C(val first: Int, var second: String) { constructor(x: Int): this(x, \"\") }",
-        "fun f(x: (@A Int, String) -> Unit) {}",
-        "fun f(\nvararg x: String,\n@A y: Int = run { fun local() { }; local() },\n) {}",
-        "fun f(init: Int, constructor: String, public: Int, context: Int) {}",
+    for (source, name, offset, nested) in [
+        (
+            "fun <T> T.ext(\n @A x: List<Map<String, T>>,\n crossinline action: (T) -> Unit = { value -> val local = value; action(local) },\n y: Int = nested(call(1, 2), 3)\n): T = this",
+            "ext",
+            10,
+            &[(
+                "PROPERTY",
+                "val local = value",
+                "BLOCK",
+                Some(0),
+                Some(("local", 4)),
+            )][..],
+        ),
+        (
+            "fun f(x: Boolean = 1 < 2, y: Int = if (x) nested(1) else nested(2)) {}",
+            "f",
+            4,
+            &[][..],
+        ),
+        (
+            "class C(val first: Int, var second: String) { constructor(x: Int): this(x, \"\") }",
+            "C",
+            6,
+            &[][..],
+        ),
+        ("fun f(x: (@A Int, String) -> Unit) {}", "f", 4, &[][..]),
+        (
+            "fun f(\nvararg x: String,\n@A y: Int = run { fun local() { }; local() },\n) {}",
+            "f",
+            4,
+            &[(
+                "FUN",
+                "fun local() { }",
+                "BLOCK",
+                Some(0),
+                Some(("local", 4)),
+            )][..],
+        ),
+        (
+            "fun f(init: Int, constructor: String, public: Int, context: Int) {}",
+            "f",
+            4,
+            &[][..],
+        ),
     ] {
         let snapshot =
             SourceSnapshot::new("valid-parameter-context", 2, FileKind::Source, source).unwrap();
         let result = parser()
             .parse_snapshot(&snapshot, &AtomicBool::new(false))
             .unwrap();
-        let parsed = result.tree_for(&snapshot).unwrap();
-        assert_eq!(parsed.source(), source);
-        assert!(
-            parsed.diagnostics().is_empty(),
-            "{source:?}: {:?}",
-            parsed.diagnostics()
-        );
-        assert_eq!(
-            parsed
-                .elements()
-                .iter()
-                .filter(|e| e.token)
-                .map(|e| &source[e.start..e.end])
-                .collect::<String>(),
-            source
-        );
+        let kind = if source.starts_with("class") {
+            "CLASS"
+        } else {
+            "FUN"
+        };
+        let mut expected = vec![(kind, source, "KT_FILE", None, Some((name, offset)))];
+        expected.extend_from_slice(nested);
+        check_tree(result.tree_for(&snapshot).unwrap(), source, &expected, &[]);
     }
 }
 
@@ -729,6 +764,35 @@ fn malformed_member_parameters_preserve_initializers_and_constructors() {
         .parse_snapshot(&snapshot, &AtomicBool::new(false))
         .unwrap();
     let parsed = result.tree_for(&snapshot).unwrap();
+    check_tree(
+        parsed,
+        source,
+        &[
+            ("CLASS", source, "KT_FILE", None, Some(("C", 6))),
+            (
+                "FUN",
+                "fun broken(",
+                "CLASS_BODY",
+                Some(0),
+                Some(("broken", 4)),
+            ),
+            (
+                "PROPERTY",
+                "val local = 1",
+                "BLOCK",
+                Some(0),
+                Some(("local", 4)),
+            ),
+            (
+                "FUN",
+                "fun healthy() = 2",
+                "CLASS_BODY",
+                Some(0),
+                Some(("healthy", 4)),
+            ),
+        ],
+        &[(21, 21, "Expecting ')'")],
+    );
     let elements = parsed.elements();
     for (kind, text) in [
         ("FUN", "fun broken("),
@@ -871,33 +935,104 @@ fn generic_recovery_uses_header_grammar_without_newline_dependency() {
 
 #[test]
 fn valid_classifier_generics_and_nonclass_callers_are_preserved() {
-    for source in [
-        "class Box<\n @A out T : Map<String, List<Int>>,\n get : Comparable<get>,\n> where T : Any\nfun healthy() = 2",
-        "class Box<T : (Int) -> String> @A constructor(val value: T) { fun healthy() = 2 }",
-        "class Box<@A(\"fun healthy(\") T>\nfun healthy() = 2",
-        "class Box<T : @A(1 < 2) List<Int>?>\nfun healthy() = 2",
-        "class Box<T : (@A Int)?>\nfun healthy() = 2",
-        "fun <T : Map<String, List<Int>>> healthy() = 2",
-        "fun <T> T.healthy() = this",
-        "val <T> T.healthy: T get() = this",
-        "typealias Box<T> = List<T>",
+    for (source, kind, name, offset, class_extent, parent, owner) in [
+        (
+            "class Box<\n @A out T : Map<String, List<Int>>,\n get : Comparable<get>,\n> where T : Any\nfun healthy() = 2",
+            "FUN",
+            "healthy",
+            4,
+            Some(
+                "class Box<\n @A out T : Map<String, List<Int>>,\n get : Comparable<get>,\n> where T : Any",
+            ),
+            "KT_FILE",
+            None,
+        ),
+        (
+            "class Box<T : (Int) -> String> @A constructor(val value: T) { fun healthy() = 2 }",
+            "FUN",
+            "healthy",
+            4,
+            Some(
+                "class Box<T : (Int) -> String> @A constructor(val value: T) { fun healthy() = 2 }",
+            ),
+            "CLASS_BODY",
+            Some(0),
+        ),
+        (
+            "class Box<@A(\"fun healthy(\") T>\nfun healthy() = 2",
+            "FUN",
+            "healthy",
+            4,
+            Some("class Box<@A(\"fun healthy(\") T>"),
+            "KT_FILE",
+            None,
+        ),
+        (
+            "class Box<T : @A(1 < 2) List<Int>?>\nfun healthy() = 2",
+            "FUN",
+            "healthy",
+            4,
+            Some("class Box<T : @A(1 < 2) List<Int>?>"),
+            "KT_FILE",
+            None,
+        ),
+        (
+            "class Box<T : (@A Int)?>\nfun healthy() = 2",
+            "FUN",
+            "healthy",
+            4,
+            Some("class Box<T : (@A Int)?>"),
+            "KT_FILE",
+            None,
+        ),
+        (
+            "fun <T : Map<String, List<Int>>> healthy() = 2",
+            "FUN",
+            "healthy",
+            33,
+            None,
+            "KT_FILE",
+            None,
+        ),
+        (
+            "fun <T> T.healthy() = this",
+            "FUN",
+            "healthy",
+            10,
+            None,
+            "KT_FILE",
+            None,
+        ),
+        (
+            "val <T> T.healthy: T get() = this",
+            "PROPERTY",
+            "healthy",
+            10,
+            None,
+            "KT_FILE",
+            None,
+        ),
+        (
+            "typealias Box<T> = List<T>",
+            "TYPEALIAS",
+            "Box",
+            10,
+            None,
+            "KT_FILE",
+            None,
+        ),
     ] {
-        let parsed = parse(source);
-        assert!(
-            parsed.diagnostics().is_empty(),
-            "{source:?}: {:?}",
-            parsed.diagnostics()
-        );
-        assert_eq!(parsed.source(), source);
-        assert_eq!(
-            parsed
-                .elements()
-                .iter()
-                .filter(|e| e.token)
-                .map(|e| &source[e.start..e.end])
-                .collect::<String>(),
+        let mut expected = Vec::new();
+        if let Some(class) = class_extent {
+            expected.push(("CLASS", class, "KT_FILE", None, Some(("Box", 6))));
+        }
+        let extent = if class_extent.is_some() {
+            "fun healthy() = 2"
+        } else {
             source
-        );
+        };
+        expected.push((kind, extent, parent, owner, Some((name, offset))));
+        check(source, &expected, &[]);
     }
 }
 

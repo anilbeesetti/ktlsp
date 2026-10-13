@@ -241,11 +241,13 @@ fn validate_path_budget(manifest: &Manifest, base: &Path) -> Result<(), Error> {
     let mut expanded = 0usize;
     for path in paths {
         let bytes = path.as_os_str().as_encoded_bytes().len();
-        expanded = expanded.saturating_add(if path.is_absolute() {
-            bytes
-        } else {
-            base_bytes.saturating_add(1).saturating_add(bytes)
-        });
+        expanded = expanded.saturating_add(
+            if path.is_absolute() && !super::retains_base_prefix(base, path) {
+                bytes
+            } else {
+                base_bytes.saturating_add(1).saturating_add(bytes)
+            },
+        );
         if expanded > MAX_EXPANDED_PATH_BYTES {
             return Err(Error::ExpandedPathBudgetExceeded {
                 limit: MAX_EXPANDED_PATH_BYTES,

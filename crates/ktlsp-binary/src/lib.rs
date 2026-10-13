@@ -4,6 +4,7 @@ pub mod annotation_extensions;
 pub mod annotations;
 pub mod metadata;
 pub mod nesting;
+pub mod type_annotations;
 
 use std::fmt;
 

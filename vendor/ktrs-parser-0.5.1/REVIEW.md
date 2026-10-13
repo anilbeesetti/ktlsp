@@ -139,3 +139,33 @@ passed again. The authoritative combined-head Linux workflow, new leading-trivia
 runtime outcome and renewed separate reviews/finished architect remain pending.
 Root expected-head merge authorization and exact merged-main checks are still
 required. No local runtime or JVM/oracle ran; #7/#83/#96 remain open.
+
+## C13b / #136 finite source preparation (not delivered behavior)
+
+The source-authored contract was approved by the SAME correctness/functionality
+and adversarial reviewers and owner architect at frozen37bfe388/tree8ba503ba.
+Root then admitted finite source and exact issue publication only. The private
+optional-DOT expression preserves old no-dot short circuit, existing caller gates,
+completed-bound check, copied-window accounting and scratch suppression/state
+isolation. The broader recovery exclusions remain. The single String-extension
+negative member is deliberately superseded by exact positive assertions.
+
+The new focused test includes a literal selected-field copy of the reviewed final
+70-seed/38-projection contract rather than recalculating expectations from parser
+output or reusing the obsolete intermediate generator. Complete selected sequences
+include expression-body this references, exact declaration names/nearest owners,
+receiver/list/parameter hierarchy and ordered diagnostics. Compatibility-only cases
+remain explicitly limited. A corrected source trace proves that single-token
+suspend reaches USER_TYPE because DOT-truncated lookahead prevents modifier
+consumption; no missing-type or semantic validity inference remains.
+
+Owner data-only replay passed from the original checksummed archive through the
+ordered recovery/formatting patches to all54 final source hashes. Counts are14
+behavior/50 formatting/four pristine survivors; only type_parameters.rs final Rust
+bytes differ from the source base. Details, exact fixture/artifact hashes and
+compile-only/source-review receipts are in
+../../crates/ktlsp-parser/reviews/c13b-generic-extension-recovery.md.
+No local runtime test occurred. Source approval is preparation only; future
+coordinator integration, exact Linux all-three/completed CI review, guarded merge
+and owner/root main verification remain required. No current delivery/parity or
+Darwin96 correction is asserted; #83/#7 stay open and T008/T008a remain held.

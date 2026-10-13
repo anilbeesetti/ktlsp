@@ -545,7 +545,7 @@
  
                  if !self.at(COMMA) {
                      break;
-@@ -39,13 +82,111 @@
+@@ -39,13 +82,112 @@
                  }
              }
  
@@ -607,6 +607,7 @@
 +        let found = !probe.my_builder.psi.has_errors_after(marker)
 +            && probe.expect(FUN_KEYWORD)
 +            && probe.expect(IDENTIFIER)
++            && (!probe.consume_if(DOT) || probe.expect(IDENTIFIER))
 +            && probe.at(LPAR);
 +        marker.drop(&mut probe);
 +        found
@@ -659,7 +660,7 @@
      }
  
      /*
-@@ -132,23 +273,43 @@
+@@ -132,23 +274,43 @@
       *   : modifiers SimpleName (":" userType)?
       *   ;
       */

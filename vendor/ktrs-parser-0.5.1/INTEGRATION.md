@@ -152,7 +152,7 @@ owned independent Git directory and integrated ONCE into held source
 assigned8548ead. No main chase or other-owner checkout mutation occurred.
 
 All held parser/test/frozen fixture/ordered-patch/hash bytes were preserved.
-Incoming39 paths are delivered field type annotations, metadata name resolver and
+Incoming39 paths comprise merged field type annotations, metadata name resolver and
 V2 path-prefix budget handling plus their data/spec/tests. C16 and metadata string
 table125/PR128 are inherited unchanged. The only further owned edits are this
 integration ledger and the corresponding owned review/integration note. These

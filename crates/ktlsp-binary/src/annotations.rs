@@ -66,7 +66,7 @@ pub enum Value<'a> {
 type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Default)]
-struct Budget {
+pub(crate) struct Budget {
     bytes: usize,
     nodes: usize,
     work: usize,
@@ -79,13 +79,13 @@ fn charge(used: &mut usize, n: usize, max: usize, label: &'static str) -> Result
     Ok(())
 }
 impl Budget {
-    fn nodes(&mut self, n: usize) -> Result<()> {
+    pub(crate) fn nodes(&mut self, n: usize) -> Result<()> {
         charge(&mut self.nodes, n, MAX_RECORDS, "annotation nodes")
     }
-    fn work(&mut self, n: usize) -> Result<()> {
+    pub(crate) fn work(&mut self, n: usize) -> Result<()> {
         charge(&mut self.work, n, MAX_VALIDATION_UNITS, "annotation work")
     }
-    fn text<'a>(&mut self, cp: &'a [Constant], index: u16) -> Result<&'a [u16]> {
+    pub(crate) fn text<'a>(&mut self, cp: &'a [Constant], index: u16) -> Result<&'a [u16]> {
         self.work(1)?;
         if index == 0 {
             return Err(Error::Malformed("annotation constant index"));
@@ -105,6 +105,13 @@ impl Budget {
 /// containers and version; unrelated CP entries/class structure are not verified.
 /// Supported versions match `parse_class` (through 67.0); annotations need 49.0.
 pub fn decode<'a>(class: &'a ClassFile<'_>) -> Result<DeclarationAnnotations<'a>> {
+    decode_with_budget(class, &mut Budget::default())
+}
+
+pub(crate) fn decode_with_budget<'a>(
+    class: &'a ClassFile<'_>,
+    budget: &mut Budget,
+) -> Result<DeclarationAnnotations<'a>> {
     if !(class.major == 45 && class.minor <= 3
         || (46..=67).contains(&class.major) && class.minor == 0)
     {
@@ -116,17 +123,16 @@ pub fn decode<'a>(class: &'a ClassFile<'_>) -> Result<DeclarationAnnotations<'a>
     if class.constants.is_empty() || class.constants.len() > MAX_RECORDS {
         return Err(Error::Malformed("annotation constant pool size"));
     }
-    let mut budget = Budget::default();
     budget.nodes(class.fields.len())?;
     budget.nodes(class.methods.len())?;
-    let class_annotations = attributes(class, &class.attributes, &mut budget)?;
+    let class_annotations = attributes(class, &class.attributes, budget)?;
     let mut fields = Vec::new();
     let mut methods = Vec::new();
     for member in &class.fields {
-        fields.push(attributes(class, &member.attributes, &mut budget)?);
+        fields.push(attributes(class, &member.attributes, budget)?);
     }
     for member in &class.methods {
-        methods.push(attributes(class, &member.attributes, &mut budget)?);
+        methods.push(attributes(class, &member.attributes, budget)?);
     }
     Ok(DeclarationAnnotations {
         class: class_annotations,
@@ -206,7 +212,7 @@ fn element_name(s: &[u16]) -> Result<()> {
     }
     Ok(())
 }
-fn annotation<'a>(
+pub(crate) fn annotation<'a>(
     r: &mut crate::Reader<'_>,
     cp: &'a [Constant],
     budget: &mut Budget,
@@ -237,7 +243,7 @@ fn annotation<'a>(
         elements,
     })
 }
-fn value<'a>(
+pub(crate) fn value<'a>(
     r: &mut crate::Reader<'_>,
     cp: &'a [Constant],
     budget: &mut Budget,

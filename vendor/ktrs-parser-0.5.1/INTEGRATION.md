@@ -111,3 +111,73 @@ expectations and review/controlled-validation gates. Exact reviewed combined-hea
 and merged-main Linux all-three evidence must be retained in the PR/receipt before
 completed delivery. No local native/parser/performance/JVM run is authorized;
 #96 remains unresolved, #83/#7 remain open and full semantic parity is unfinished.
+
+## C13b / #136 finite extension sibling source stage
+
+Initial source is frozen37bfe388211fe7596986e51a222af4c89a44c3c8, tree
+8ba503ba15c5379d2a9c14d1ec7b97abaa8ded36, in a separate owned checkout/branch.
+Root admitted only finite source and issue publication after SAME correctness,
+adversarial and architect contract reviews; [issue136](https://github.com/anilbeesetti/ktlsp/issues/136)
+preserves the exact historical staged body and linked admission update. No main
+chase or integration has occurred. Product changes are the private optional-DOT
+predicate, one obsolete String-extension negative member, the new focused test
+and owned ordered artifacts/review note. No dependency/graph/worker/API/limit change.
+
+Final contract JSON supplies all 70 exact sources and 38 full selected projections;
+the new test copies selected fields literally, avoiding the obsolete intermediate
+auxiliary generator. Data-only comparison verifies sources, projections, names,
+diagnostics, positions and supplementary fields before any runtime. Source-only
+compatibility assertions do not become complete declined-tree equality or B11
+active-layer end-to-end evidence. Ordered archive -> behavior -> formatting replay
+reproduces all54 final hashes with14 behavior/50 formatting/four pristine survivors.
+
+Local validation is restricted to pinned formatting and compile-only locked
+workspace all-target Clippy. No local native/parser/test/worker/server/bench/JVM/
+oracle/Gradle/Maven execution is admitted. Actual implementation behavior requires
+a future coordinator-assigned final integration and unchanged Linux Native Rust
+all-three exact checkout/tree evidence, SAME2/architect completed-source and PR-CI
+reviews, guarded expected-SHA merge and owner/root exact-main verification.
+There is no push/PR/CI/integration/merge admission in this source stage. #96 remains
+OPEN/UNKNOWN; no Linux-proves-Darwin or full syntax/semantic/parity claim follows.
+
+## One assigned final integration / branch publication stage
+
+Root assigned stable base8548ead597146a4ca52d3a4a2ec6ffd724fac7a3, tree
+3f98c1ec916437445fb6e499a85caa04c5959e63, sole parent
+64234587e333ebcd32d96600a7a193b06b0ac9df. It was fetched by exact SHA into the
+owned independent Git directory and integrated ONCE into held source
+293157402dbf1640cb27ae04901943ade03b31f2. Conflict-free merge
+8bcc917588c6640a39b30abf14157bd61aa19b50 has tree
+070e07b9a83fe57e3a94f2f9548937d592abc900 and ordered parents held2931574 then
+assigned8548ead. No main chase or other-owner checkout mutation occurred.
+
+All held parser/test/frozen fixture/ordered-patch/hash bytes were preserved.
+Incoming39 paths comprise merged field type annotations, metadata name resolver and
+V2 path-prefix budget handling plus their data/spec/tests. C16 and metadata string
+table125/PR128 are inherited unchanged. The only further owned edits are this
+integration ledger and the corresponding owned review/integration note. These
+notes do not change source, fixtures or expectations. No Cargo/lock/workflow/worker/
+API/limit/server/root-doc edit is made; Native Rust workflow blob remains
+fc6202e6d32a00d430f4d4e12b502b6ca538edab. Platform-gated V2 Windows/Cygwin bodies
+are not executed by local Darwin compilation or future Linux CI.
+
+SAME correctness/functionality, adversarial and own architect must approve the
+actual final combined head/tree/parents/assigned-base diff, full inherited graph,
+resource and execution effects before branch-only push, one attached PR and the
+existing unchanged Linux Native Rust ORIGINAL-attempt all-three run. Local checks
+remain formatting and compile-only locked workspace/all-target Clippy; no local
+native/parser/test/worker/server/bench/JVM/oracle/Gradle/Maven runtime is admitted.
+Exact held/final owned-note diffs, source hashes and combined compile receipts are
+recorded externally in the coordinator package to avoid self-referential commit
+hashes. No previous source approval is treated as combined-head or CI approval.
+
+Completed original-attempt CI must expose actual generated checkout/tree, workflow/
+executor, unchanged fmt/clippy/full-workspace commands, counts and all failures.
+SAME2 plus own architect perform actual completed-CI readbacks and changed-behavior
+rechecks. Merge remains HELD for root's expected-head grant and predecessor137
+exact-main all-three success independently verified by root and its owner.
+Following a future identical-tree merge, owner/root actual exact squash/tree/sole
+assigned-base/workflow/executor and exact-main all-three verification follow the
+admitted policy; changed identity/tree/workflow/failure/new finding renews affected
+reviews. #83/#7 OPEN, C13 aggregate GAP, T008/T008a HOLD, B3/B4 GAP, B11 UNVERIFIED,
+#96 OPEN/UNKNOWN and historical audit totals remain unchanged.

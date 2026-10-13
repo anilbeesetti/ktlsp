@@ -4,6 +4,7 @@
 mod encoding;
 mod header;
 pub mod name_resolver;
+pub mod payload;
 pub mod string_table;
 pub mod wire;
 

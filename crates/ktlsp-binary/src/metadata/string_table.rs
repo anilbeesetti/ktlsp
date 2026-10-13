@@ -66,13 +66,22 @@ fn limit(label: &'static str, offset: usize) -> Error {
         kind: ErrorKind::Limit(label),
     }
 }
-struct Budget {
-    wire: wire::Budget,
+pub(super) struct Budget {
+    pub(super) wire: wire::Budget,
     nodes: usize,
     depth: usize,
     owned: usize,
 }
 impl Budget {
+    pub(super) fn new(limits: Limits) -> Self {
+        Self {
+            wire: wire::Budget::new(limits.records, limits.work),
+            nodes: limits.nodes.min(MAX_RECORDS),
+            depth: limits.depth.min(2),
+            owned: limits.owned_bytes.min(MAX_BYTES),
+        }
+    }
+
     fn node(&mut self, depth: usize, offset: usize) -> Result<(), Error> {
         if depth > self.depth {
             return Err(limit("depth", offset));
@@ -187,12 +196,13 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<StringTableTypes<'_>, Erro
     if bytes.len() > limits.bytes.min(MAX_BYTES) {
         return Err(limit("bytes", 0));
     }
-    let mut budget = Budget {
-        wire: wire::Budget::new(limits.records, limits.work),
-        nodes: limits.nodes.min(MAX_RECORDS),
-        depth: limits.depth.min(2),
-        owned: limits.owned_bytes.min(MAX_BYTES),
-    };
+    decode_with_budget(bytes, &mut Budget::new(limits))
+}
+
+pub(super) fn decode_with_budget<'a>(
+    bytes: &'a [u8],
+    budget: &mut Budget,
+) -> Result<StringTableTypes<'a>, Error> {
     budget.node(1, 0)?;
     let mut out = StringTableTypes {
         raw: bytes,
@@ -208,7 +218,7 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<StringTableTypes<'_>, Erro
         match (field.number, field.value) {
             (1, Value::Bytes(raw)) => {
                 let span = field.span.end - raw.len()..field.span.end;
-                let value = record(bytes, span.clone(), &mut budget)?;
+                let value = record(bytes, span.clone(), budget)?;
                 budget.push(&mut out.records, value, span.start)?;
             }
             (5, Value::Varint(_) | Value::Bytes(_)) => {

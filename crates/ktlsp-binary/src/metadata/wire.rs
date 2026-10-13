@@ -239,6 +239,30 @@ pub(super) fn varint(
     Ok(out)
 }
 
+pub(super) struct Envelope {
+    pub(super) prefix_span: Range<usize>,
+    pub(super) string_table_span: Range<usize>,
+    pub(super) payload_span: Range<usize>,
+}
+
+pub(super) fn envelope(bytes: &[u8], budget: &mut Budget) -> Result<Envelope, Error> {
+    let mut reader = Reader {
+        bytes,
+        pos: 0,
+        end: bytes.len(),
+        budget,
+    };
+    reader.budget.record(0)?;
+    let length = reader.length()?;
+    let prefix_span = 0..reader.pos;
+    let string_end = reader.boundary(length)?;
+    Ok(Envelope {
+        prefix_span,
+        string_table_span: reader.pos..string_end,
+        payload_span: string_end..bytes.len(),
+    })
+}
+
 /// Read a delimited string-table section and the remaining class/package section.
 /// Length-delimited fields stay opaque; unknown fields and duplicates retain order.
 /// Nonminimal varints are accepted: tags/lengths retain low32, values low64 bits.
@@ -253,18 +277,16 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<Sections<'_>, Error> {
         });
     }
     let mut budget = Budget::new(limits.records, limits.work);
+    let envelope = envelope(bytes, &mut budget)?;
     let mut reader = Reader {
         bytes,
-        pos: 0,
+        pos: envelope.string_table_span.start,
         end: bytes.len(),
         budget: &mut budget,
     };
-    reader.budget.record(0)?;
-    let length = reader.length()?;
-    let prefix_span = 0..reader.pos;
+    let prefix_span = envelope.prefix_span;
     let prefix = &bytes[prefix_span.clone()];
-    let string_end = reader.boundary(length)?;
-    let string_table = reader.section(string_end)?;
+    let string_table = reader.section(envelope.string_table_span.end)?;
     let payload = reader.section(bytes.len())?;
     Ok(Sections {
         prefix_span,

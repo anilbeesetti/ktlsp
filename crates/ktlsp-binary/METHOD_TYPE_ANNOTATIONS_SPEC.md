@@ -1,6 +1,8 @@
 # T017c3c: bounded method type annotation data
 
-CONTRACT ONLY v2, 2026-10-13. No product/source/publication/execution admission.
+Current finite source contract v3, 2026-10-13. Root admitted the target0x16
+source/API delta after v1/v2 auxiliary reviews; integration/PR/CI/merge remain held.
+Original method-return contract provenance below remains historical evidence.
 Child proposal under #71/#17; parents remain OPEN. Frozen initial source
 8548ead597146a4ca52d3a4a2ec6ffd724fac7a3, tree
 3f98c1ec916437445fb6e499a85caa04c5959e63, inspected at clean detached private
@@ -12,8 +14,9 @@ base and explicitly grant shared edits and publication; no moving-main chase.
 Same pinned JVMS Java SE23 §§4.7,4.7.16.1,4.7.20–21,4.7.20.1–2, tables4.7-A/C,
 4.7.20-A/C,4.7.20.2-A as the delivered field contract:
 https://docs.oracle.com/javase/specs/jvms/se23/html/jvms-4.html#jvms-4.7.20.
-This is a METHOD type annotation API; its initial supported encoded target is
-METHOD_RETURN0x14, whose target_info has zero bytes. It covers both
+This is a METHOD type annotation API; supported encoded targets are
+METHOD_RETURN0x14 (empty target_info) and METHOD_FORMAL_PARAMETER0x16
+(one u1 encoded formal_parameter_index). It covers both
 RuntimeVisibleTypeAnnotations and RuntimeInvisibleTypeAnnotations at method_info.
 
 Every legal method target has an explicit disposition:
@@ -24,7 +27,7 @@ Every legal method target has an explicit disposition:
 | 0x12 | method/constructor type parameter bound | Error::UnsupportedTag(0x12) |
 | 0x14 | method return/newly constructed object type | decode empty target_info, path and annotation |
 | 0x15 | method/constructor receiver | Error::UnsupportedTag(0x15) |
-| 0x16 | method/constructor formal parameter | Error::UnsupportedTag(0x16) |
+| 0x16 | method/constructor formal parameter | retain u1 encoded ordinal, decode path/annotation |
 | 0x17 | method/constructor throws type | Error::UnsupportedTag(0x17) |
 
 Every other u1 value (250 values) in a METHOD attribute yields
@@ -68,7 +71,7 @@ including NUL/surrogates are retained through annotations::annotation(...,1).
 Depth and descriptor/name/element checks remain exactly inherited.
 
 Method name/descriptor/access_flags are NOT consumed by the new method pass,
-including count0, supported0x14 and unsupported tags. A forged ClassFile may
+including count0, supported0x14/0x16 and unsupported tags. A forged ClassFile may
 therefore succeed with name0/descriptor0 or malformed/void/nonvoid descriptors;
 this is encoded data, not Java language legality. Hand-authored controls cover
 ()V,()I,()Ljava/lang/Object;, <init>()V and <clinit>()V with the SAME accepted0x14
@@ -96,8 +99,9 @@ Debug/PartialEq/Eq, with the following exact public interface:
 
 ```rust
 pub struct MethodTypeAnnotation<'a> {
-    /// Encoded target_type; successful decoding currently emits only 0x14.
+    /// Encoded target_type; successful decoding emits 0x14 or 0x16.
     pub target_type: u8,
+    pub formal_parameter_index: Option<u8>,
     pub path: Vec<type_annotations::TypePathStep>,
     pub annotation: annotations::Annotation<'a>,
 }
@@ -119,10 +123,12 @@ accepted contract. This endpoint creates one Budget, calls new crate-private
 field type_annotations::decode_with_budget(class,&mut budget), then private
 method decode_methods(class,&mut budget). fields/extensions remain wrapped once;
 out.field_types equals existing type_annotations::decode when both succeed.
-Methods aligns one-to-one with input methods. No new field in existing public
-struct; no change to existing APIs or public visibility of Budget.
+Methods aligns one-to-one with input methods. Root admits the new public
+formal_parameter_index field: source compatibility breaks for external literals
+and exhaustive patterns; derived Debug and platform layout/size can change.
+Decoded0x14 has None,0x16 has Some(encoded u1); no public Budget change.
 
-Exact root-gated shared delta:
+Original PR145 shared delta (already delivered, unchanged by this child):
 1. lib.rs additive `pub mod method_type_annotations;` only.
 2. type_annotations.rs public decode body becomes
    `decode_with_budget(class, &mut Budget::default())`.
@@ -138,7 +144,7 @@ Exact root-gated shared delta:
 No change to annotations.rs/Budget/old Vecs/annotation_extensions.rs/errors,
 metadata header/wire/payload/string/name modules, Cargo/lock/dependencies,
 parser/vendor/server/project/import/artifacts/workflow or root status docs.
-Exclusive eventual files: new module, tests/method_type_annotations.rs,
+Exclusive current files: existing method module, tests/method_type_annotations.rs,
 tests/fixtures/method_type_annotations/**, METHOD_TYPE_ANNOTATIONS_SPEC.md,
 METHOD_TYPE_ANNOTATIONS_REVIEW.md. Review package outside repository only now.
 
@@ -188,7 +194,8 @@ Precedence AFTER all field decoding succeeds:
 - Visit methods and attrs in input order; Budget::text attr.name, even ignored.
 - Recognized name: version check, duplicate visibility, u2 count, root Vec debit/
   reserve (and observed-extra debit), then per root work1 BEFORE target u1.
-- Target0x14: read path length u1, work(1+2L), path Vec debit/reserve and extra,
+- Target0x16: work1 BEFORE index u1, retain Some(index). Target0x14: None.
+  Then either supported target reads path length u1, work(1+2L), path Vec debit/reserve and extra,
   each whole kind/index pair then validate; shared annotation depth1.
 - Unsupported legal target: UnsupportedTag(tag) immediately; illegal target:
   Malformed("method type annotation target") immediately. Neither reads path.
@@ -208,7 +215,8 @@ by public endpoints after an error. No new public counter/error offsets: Error
 has no offsets. Prefix positions below are evidence-relative only.
 
 New method work = sum(1+UTF16 attr-name length) across all method attrs, plus
-one per target inspected, plus1+2L per supported path, plus shared annotation work.
+one per target inspected, plus1 for each reached0x16 index BEFORE read, plus1+2L per supported path,
+plus shared annotation work.
 Field and method names are scanned three times total each, class attrs twice;
 there is no fourth scan of either member kind or method descriptor/path pass.
 Allocator arithmetic adds no work units. Existing extension shape work unchanged.
@@ -284,24 +292,25 @@ one method name0/descriptor0/access0. Expanded controls reuse field test CP8Floa
 | ff ff | Limit("annotation nodes") before root EOF |
 | 00 00 00 | Malformed("type annotation trailing bytes") |
 | 00 01 13 | Malformed("method type annotation target") before absent path |
-| 00 01 01;00 01 12;00 01 15;00 01 16;00 01 17 | UnsupportedTag(exact tag), no target_info validation |
-| 00 02 14 00 00 03 00 00 16 | UnsupportedTag16, no partial success |
-| 00 02 16 14 00 00 03 00 00 | UnsupportedTag16 immediately |
+| 00 01 01;00 01 12;00 01 15;00 01 17 | UnsupportedTag(exact tag), no target_info validation |
+| 00 01 16 | Truncated after index work charge |
+| 00 02 14 00 00 03 00 00 16 | Truncated at missing index, no partial success |
+| 00 02 16 14 00 00 03 00 00 | index20 decoded, then Truncated at missing second target |
 
 Every strict prefix of minimal8-byte scalar13-byte/all-steps16-byte and valid
 nested/max255-path payloads is Truncated if no count/node/work limit exhausted.
 Minimal offsets:0 count,2 target,3 length,4 descriptor,6 pairs; step starts4+2*i,
 descriptor4+2L,pairs6+2L. No offsets in Error. Both visibilities same byte outcomes.
 Malformed descriptor in first supported root + later16 must descriptor-error
-first; valid first root then16 unsupported. Extra trailing byte vs missing wrapper
+first; valid first root then missing16 index is Truncated. Extra trailing byte vs missing wrapper
 nodes must trailing-error first. Same-visible duplicate at different CP index:
 valid first then empty second => duplicate; truncated first then later duplicate
-=> Truncated; unsupported first => UnsupportedTag. Distinct visibility/member
+=> Truncated; unsupported first => UnsupportedTag. Reached16 missing index is Truncated. Distinct visibility/member
 records independent. Count0 ignores trailing only if exactly2 bytes, not3.
 
 Eventual tests MUST cover:
 - Frozen exact hex outputs/errors above; all256 target values at missing suffix
-  (14 Truncated, five legal UnsupportedTag, all250 illegal Malformed), both names.
+  (14/16 Truncated, four legal UnsupportedTag, all250 illegal Malformed), both names.
 - Alignment, empty/absent/both order, duplicates by name content, repeated roots,
   raw identity; fields/extensions preserved; class/Code/Record remain opaque;
   old public field/extension endpoints keep opaque method regressions unchanged.
@@ -361,23 +370,60 @@ provenance gate before any implementation. Strings mixed target inspection is
 auxiliary corroboration only; authored mixed hex is sufficient eventual product
 fixture (no extra Strings class/license scope needed).
 
-## Stage gates and residual limits
+## Formal-parameter source delta and frozen genuine fixture
 
-Actual SAME correctness, adversarial and own architect final contract reviews
-must inspect package manifest; fix/recheck findings then report source identity,
-package SHA,actual child UUIDs/turns and clean checkout to coordinator. HOLD root
-source/publication grant. No local Cargo/fmt/compile/native/parser/worker/server/
-bench/test/JVM/oracle at stage1; #96 remains OPEN/UNKNOWN. Later optional fmt and
-compile-only Clippy only if granted; runtime exclusively existing unchanged Linux
-Native Rust fmt/clippy/fullworkspace ALL3 on one root-assigned final combined
-head/generated checkout/tree/original attempt. No workflow/executor change or
-retry-to-green/relaxed bounds. SAME2+architect source and completed-CI approvals
-before root exclusive expected-SHA reviewed-head merge. Owner+root independently
-verify merged identical tree/exactmain ALL3 under policy #134; no unnecessary
-extra postmain reviewer turns unless identity/failure/new finding changes.
+Root-admitted auxiliary v1 core ad12be7397b7d66e352d220b7c205a0d3518ddb171571c382b1a4fe082e9efbd
+and v2 core eccf2f0e100cdc092c14bcaae09dd5f86eba75daee53ac4b8f95667ba82b974c
+freeze independent raw bytes, API compatibility, budgets and genuine data before
+source. See tests/fixtures/method_type_annotations/formal_parameter/README.md
+and provenance.json. Both visibilities preserve target/index/path/annotation/input
+order; repeated same-index roots and mixed14/16 orders are accepted. Current
+root-admitted public Option<u8> is None for14 and Some(encoded ordinal) for16.
+Callers can construct inconsistent public literals; no validator is added. The
+source break for external struct literals/exhaustive patterns is intentional.
+Only the sole record constructor and focused test caller need repository updates;
+existing export/helper/Budget/Cargo/server have no changes.
 
-No PR/CI/merge now. Product checkout remains clean. Parent71/17 stay OPEN;
-full metadata/semantics/parity unfinished, T008/T008a HOLD,B3/B4 GAP,B11 UNVERIFIED,
-#96 UNKNOWN,historical#83audit45/32/10/3 unchanged,current official speed/RAM
-unverified. This API is an encoded-data slice without Class/Code/Record target
-support, bytecode validation, linkage, generics or semantic provider integration.
+Ordinal0..255 is encoded data, not a JVM slot, synthetic-parameter adjustment,
+descriptor parameter bound or Kotlin source mapping. JVMS23§4.7.20.1 explicitly
+does not require direct descriptor-position correspondence. Long/double widths
+never shift it. Method refs remain unconsumed unless earlier parameter/default
+extensions validate them. Constructor/synthetic/void/forged descriptor controls
+are encoded-only acceptance, not source/JVM legality or nullability semantics.
+
+Minimal16 payload9bytes:00 01 16 00 00 00 03 00 00. Offsets count0,target2,
+index3,pathlen4,descriptor5,pairs7; add2L to descriptor/pairs with L path steps.
+Every strict valid prefix is Truncated under nonexhausted budgets. Indexwork1
+precedes missing-index EOF; with index present but absent path length,Truncated
+precedes path work. Shared path kind/index,CP,depth/trailing/duplicate and earlier
+phase precedence stay unchanged. Other legal targets01/12/15/17 remain Unsupported.
+Existing unsupported16/mixed raw fixtures are unchanged; their expected errors
+are now Truncated. New22authored files freeze parameter outputs/errors explicitly.
+
+Logical node equations remain5+X+O and mixed25+X+O. Each reached16 root adds
+one raw byte charged once by declarations and one work unit BEFORE index read.
+Method-only minimal visible payload uses97work,6+Onodes,9rawbytes; invisible103work.
+Raw boundary ignoredclass16MiB-9 plus minimal9 is exact; ±1 remains old byte gate.
+Work fixture replacing14 with16 uses340*3*65536+3*(F+1)+104+S:
+F87345,S1/2/3 gives limit-1/exact/+1. Original14 budgets remain independently
+asserted. Depth64/65 and all annotation values/bits/UTF16/nested data share helpers.
+Selected unchanged genuine class expected9+Onodes,34rawbytes,228work; no runtime
+result claimed. All existing capacity overshoot qualifications remain.
+
+Storage equation above MUST use size_of<UPDATED MethodTypeAnnotation> with its
+Option<u8>; no fixed old record-size/ABI claim. Sum of new accounted capacities
+still obeys existing slot bound; element size can change without extra node/work
+charges. No RSS/stack/whole-operation owned-byte guarantee or native size measurement.
+
+## Held source gates and residual limits
+
+Root admitted only finite source/API ownership, local fmt and compile-only Clippy,
+and optional finite issue publication. SAME correctness/adversarial reviewers and
+architect must review the source, fixes and exact final source manifest. Then
+STOP at held head/tree/path inventory for ONE root integration base. No push/PR/
+hosted CI/merge yet; no moving-main chase. No local runtime/test/parser/worker/
+server/bench/JVM/compiler/Gradle/Maven/oracle execution; #96 OPEN/UNKNOWN.
+Eventual root-approved unchanged Linux Native Rust all3 and actual source+CI
+reviews/expected-head exclusive merge are later gates, not source preparation proof.
+Parents71/17 remain OPEN;T008/T008aHOLD;B3/B4GAP;B11UNVERIFIED;7/83/96OPEN.
+No full metadata/semantics/LSP parity or official speed/RAM claim.

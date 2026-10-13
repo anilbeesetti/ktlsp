@@ -87,6 +87,13 @@ fn root(path: &[(u8, u8)], value: Option<&[u8]>) -> Vec<u8> {
     out
 }
 
+fn parameter_root(index: u8, path: &[(u8, u8)], value: Option<&[u8]>) -> Vec<u8> {
+    let mut out = root(path, value);
+    out[0] = 0x16;
+    out.insert(1, index);
+    out
+}
+
 fn payload(roots: &[Vec<u8>]) -> Vec<u8> {
     let mut out = (roots.len() as u16).to_be_bytes().to_vec();
     for root in roots {
@@ -196,6 +203,7 @@ fn frozen_authored_byte_outcomes() {
                     if let Some(root) = a.annotations.first() {
                         assert_eq!(root.annotation.descriptor, [76, 65, 59]);
                         assert_eq!(root.target_type, 0x14);
+                        assert_eq!(root.formal_parameter_index, None);
                         let length = usize::from(bytes[3]);
                         assert_eq!(root.path.len(), length);
                         for (i, step) in root.path.iter().enumerate() {
@@ -223,45 +231,45 @@ fn frozen_authored_byte_outcomes() {
 
 #[test]
 fn frozen_unsupported_and_mixed_attributes_fail_without_partial_output() {
-    for (encoded, tag) in [
+    for (encoded, expected) in [
         (
             include_str!("fixtures/method_type_annotations/authored-bytes/unsupported_01.hex"),
-            0x01,
+            Error::UnsupportedTag(0x01),
         ),
         (
             include_str!("fixtures/method_type_annotations/authored-bytes/unsupported_12.hex"),
-            0x12,
+            Error::UnsupportedTag(0x12),
         ),
         (
             include_str!("fixtures/method_type_annotations/authored-bytes/unsupported_15.hex"),
-            0x15,
+            Error::UnsupportedTag(0x15),
         ),
         (
             include_str!("fixtures/method_type_annotations/authored-bytes/unsupported_16.hex"),
-            0x16,
+            Error::Truncated,
         ),
         (
             include_str!("fixtures/method_type_annotations/authored-bytes/unsupported_17.hex"),
-            0x17,
+            Error::UnsupportedTag(0x17),
         ),
         (
             include_str!(
                 "fixtures/method_type_annotations/authored-bytes/mixed_return_parameter.hex"
             ),
-            0x16,
+            Error::Truncated,
         ),
         (
             include_str!(
                 "fixtures/method_type_annotations/authored-bytes/mixed_parameter_return.hex"
             ),
-            0x16,
+            Error::Truncated,
         ),
     ] {
         let bytes = hex(encoded);
         for name in [1, 2] {
             let mut c = base();
             c.methods[0].attributes = vec![attr(name, &bytes)];
-            assert_eq!(decode(&c).unwrap_err(), Error::UnsupportedTag(tag));
+            assert_eq!(decode(&c).unwrap_err(), expected);
             assert_eq!(c.methods[0].attributes[0].bytes, bytes);
             assert!(type_annotations::decode(&c).is_ok());
         }
@@ -468,8 +476,8 @@ fn all_target_dispositions_path_and_version_boundaries() {
             let mut c = base();
             c.methods[0].attributes = vec![attr(name, &bytes)];
             let expected = match target {
-                0x14 => Error::Truncated,
-                0x01 | 0x12 | 0x15 | 0x16 | 0x17 => Error::UnsupportedTag(target),
+                0x14 | 0x16 => Error::Truncated,
+                0x01 | 0x12 | 0x15 | 0x17 => Error::UnsupportedTag(target),
                 _ => Error::Malformed("method type annotation target"),
             };
             assert_eq!(decode(&c).unwrap_err(), expected);
@@ -585,7 +593,7 @@ fn every_prefix_trailing_and_duplicate_content_precedence() {
             c.methods[0].attributes.swap(0, 1);
             assert_eq!(decode(&c).unwrap_err(), Error::Truncated);
             c.methods[0].attributes = vec![attr(name, &[0, 1, 0x16]), attr(duplicate, &bytes)];
-            assert_eq!(decode(&c).unwrap_err(), Error::UnsupportedTag(0x16));
+            assert_eq!(decode(&c).unwrap_err(), Error::Truncated);
         }
     }
     let mut c = base();
@@ -834,4 +842,353 @@ fn field_failure_precedes_method_outer_reservation() {
         decode(&c).unwrap_err(),
         Error::Malformed("field type annotation target")
     );
+}
+
+#[test]
+fn frozen_formal_parameter_bytes_preserve_indices_paths_and_first_errors() {
+    macro_rules! frozen {
+        ($name:literal) => {
+            include_str!(concat!(
+                "fixtures/method_type_annotations/formal_parameter/authored/",
+                $name,
+                ".hex"
+            ))
+        };
+    }
+    let cases = [
+        (frozen!("parameter0"), None),
+        (frozen!("parameter255"), None),
+        (frozen!("all_steps"), None),
+        (frozen!("int_bits"), None),
+        (frozen!("utf16"), None),
+        (frozen!("return_parameter"), None),
+        (frozen!("parameter_return"), None),
+        (frozen!("repeated_parameter"), None),
+        (frozen!("missing_index"), Some(Error::Truncated)),
+        (frozen!("missing_path_length"), Some(Error::Truncated)),
+        (frozen!("missing_path_index"), Some(Error::Truncated)),
+        (
+            frozen!("invalid_kind"),
+            Some(Error::Malformed("type annotation path")),
+        ),
+        (
+            frozen!("invalid_argument"),
+            Some(Error::Malformed("type annotation path")),
+        ),
+        (
+            frozen!("zero_descriptor"),
+            Some(Error::Malformed("annotation constant index")),
+        ),
+        (frozen!("wrong_cp"), Some(Error::Malformed("UTF8 index"))),
+        (
+            frozen!("trailing"),
+            Some(Error::Malformed("type annotation trailing bytes")),
+        ),
+        (frozen!("count_eof"), Some(Error::Limit("annotation nodes"))),
+        (
+            frozen!("illegal_field"),
+            Some(Error::Malformed("method type annotation target")),
+        ),
+        (
+            frozen!("unsupported_receiver"),
+            Some(Error::UnsupportedTag(0x15)),
+        ),
+        (
+            frozen!("malformed_before_unsupported"),
+            Some(Error::Malformed("annotation constant index")),
+        ),
+        (
+            frozen!("unsupported_before_parameter"),
+            Some(Error::UnsupportedTag(0x15)),
+        ),
+        (
+            frozen!("parameter_before_unsupported"),
+            Some(Error::UnsupportedTag(0x17)),
+        ),
+    ];
+    for (case, (encoded, expected)) in cases.into_iter().enumerate() {
+        let bytes = hex(encoded);
+        for name in [1, 2] {
+            let mut c = base();
+            c.methods[0].attributes = vec![attr(name, &bytes)];
+            assert!(type_annotations::decode(&c).is_ok());
+            match expected {
+                Some(error) => assert_eq!(decode(&c).unwrap_err(), error),
+                None => {
+                    let out = decode(&c).unwrap();
+                    let a = &out.methods[0][0];
+                    assert_eq!(
+                        a.visibility,
+                        if name == 1 {
+                            Visibility::RuntimeVisible
+                        } else {
+                            Visibility::RuntimeInvisible
+                        }
+                    );
+                    let indices: Vec<_> = a
+                        .annotations
+                        .iter()
+                        .map(|r| (r.target_type, r.formal_parameter_index))
+                        .collect();
+                    let expected = match case {
+                        0 => vec![(0x16, Some(0))],
+                        1 | 4 => vec![(0x16, Some(255))],
+                        2 => vec![(0x16, Some(1))],
+                        3 => vec![(0x16, Some(2))],
+                        5 => vec![(0x14, None), (0x16, Some(255))],
+                        6 => vec![(0x16, Some(0)), (0x14, None)],
+                        7 => vec![(0x16, Some(0)); 2],
+                        _ => unreachable!(),
+                    };
+                    assert_eq!(indices, expected);
+                    for root in &a.annotations {
+                        assert_eq!(root.annotation.descriptor, [76, 65, 59]);
+                        let path: Vec<_> = root
+                            .path
+                            .iter()
+                            .map(|s| (s.kind, s.argument_index))
+                            .collect();
+                        assert_eq!(
+                            path,
+                            if case == 2 {
+                                vec![(0, 0), (1, 0), (2, 0), (3, 255)]
+                            } else {
+                                vec![]
+                            }
+                        );
+                        match case {
+                            3 => assert_eq!(
+                                root.annotation.elements[0].value,
+                                Value::Int(0x8000_0001)
+                            ),
+                            4 => assert_eq!(
+                                root.annotation.elements[0].value,
+                                Value::String(&[0, 0xd800])
+                            ),
+                            _ => assert!(root.annotation.elements.is_empty()),
+                        }
+                    }
+                }
+            }
+            assert_eq!(c.methods[0].attributes[0].bytes, bytes);
+        }
+    }
+}
+
+#[test]
+fn formal_parameter_prefixes_ordinal_controls_and_duplicates() {
+    let nested = [vec![b'@'], annotation(Some(&array(&[scalar(b's', 7)])))].concat();
+    for bytes in [
+        payload(&[parameter_root(0, &[], None)]),
+        payload(&[parameter_root(255, &[(3, 255); 255], Some(&nested))]),
+    ] {
+        for name in [1, 2] {
+            for end in 0..bytes.len() {
+                let mut c = base();
+                c.methods[0].attributes = vec![attr(name, &bytes[..end])];
+                assert_eq!(decode(&c).unwrap_err(), Error::Truncated, "prefix{end}");
+            }
+            let mut c = base();
+            c.methods[0].attributes = vec![attr(name, &bytes), attr(name, &[])];
+            assert_eq!(
+                decode(&c).unwrap_err(),
+                Error::Malformed("duplicate type annotation attribute")
+            );
+            c.methods[0].attributes = vec![attr(name, &[]), attr(name, &bytes)];
+            assert_eq!(decode(&c).unwrap_err(), Error::Truncated);
+        }
+    }
+    for index in [0, 1, 2, 255] {
+        let bytes = payload(&[parameter_root(index, &[], None)]);
+        for (name, descriptor, flags) in [
+            ("f", "(JDLjava/lang/Object;)V", 0),
+            ("<init>", "(LOuter;J)V", 0x1000),
+            ("<clinit>", "()V", 0),
+            ("bad/name", "garbage", 0),
+        ] {
+            let mut c = base();
+            c.constants.extend([text(name), text(descriptor)]);
+            c.methods[0].name = 25;
+            c.methods[0].descriptor = 26;
+            c.methods[0].access_flags = flags;
+            c.methods[0].attributes = vec![attr(1, &bytes)];
+            assert_eq!(
+                decode(&c).unwrap().methods[0][0].annotations[0].formal_parameter_index,
+                Some(index)
+            );
+            c.methods[0].name = u16::MAX;
+            c.methods[0].descriptor = u16::MAX;
+            assert!(decode(&c).is_ok());
+            c.methods[0].attributes.push(attr(18, &[0]));
+            assert!(decode(&c).is_err());
+        }
+    }
+}
+
+#[test]
+fn formal_parameter_work_bytes_and_node_boundaries() {
+    let types = payload(&[parameter_root(
+        255,
+        &[(0, 0), (1, 0)],
+        Some(&scalar(b's', 7)),
+    )]);
+    for (length, expected) in [(1, true), (2, true), (3, false)] {
+        assert_eq!(
+            340 * 3 * 65536 + 3 * 87346 + 104 + length,
+            ktlsp_binary::MAX_VALIDATION_UNITS + length - 2
+        );
+        let mut c = base();
+        c.constants[7] = Constant::Utf8(vec![66; length]);
+        c.constants[22] = Constant::Utf8(vec![65; 65535]);
+        c.constants.push(Constant::Utf8(vec![66; 87345]));
+        c.methods[0].attributes = (0..340).map(|_| attr(22, &[])).collect();
+        c.methods[0]
+            .attributes
+            .extend([attr(25, &[]), attr(1, &types)]);
+        assert!(type_annotations::decode(&c).is_ok());
+        if expected {
+            assert!(decode(&c).is_ok());
+        } else {
+            assert_eq!(decode(&c).unwrap_err(), Error::Limit("annotation work"));
+        }
+    }
+    let types = payload(&[parameter_root(0, &[], None)]);
+    for size in [MAX_BYTES - 10, MAX_BYTES - 9, MAX_BYTES - 8] {
+        let ignored = vec![0; size];
+        let mut c = base();
+        c.attributes = vec![attr(22, &ignored)];
+        c.methods[0].attributes = vec![attr(1, &types)];
+        if size + types.len() <= MAX_BYTES {
+            assert!(decode(&c).is_ok());
+        } else {
+            assert_eq!(decode(&c).unwrap_err(), Error::Limit("annotation bytes"));
+        }
+    }
+    for count in [MAX_RECORDS - 6, MAX_RECORDS - 5, MAX_RECORDS - 4] {
+        let bytes = payload(&vec![parameter_root(255, &[], None); count]);
+        let mut c = base();
+        c.methods[0].attributes = vec![attr(1, &bytes)];
+        match decode(&c) {
+            Ok(out) => {
+                assert!(count <= MAX_RECORDS - 5);
+                assert_eq!(out.methods[0][0].annotations.len(), count);
+                assert!(
+                    2 + out.methods.capacity()
+                        + out.methods[0].capacity()
+                        + out.methods[0][0].annotations.capacity()
+                        <= MAX_RECORDS
+                );
+            }
+            Err(error) => assert_eq!(error, Error::Limit("annotation nodes")),
+        }
+    }
+}
+
+#[test]
+fn genuine_formal_parameter_fixture_matches_frozen_data() {
+    let bytes =
+        include_bytes!("fixtures/method_type_annotations/formal_parameter/fixture.class.bin");
+    assert_eq!(bytes.len(), 484);
+    let c = parse_class(bytes).unwrap();
+    let out = decode(&c).unwrap();
+    assert_eq!(c.methods.len(), 1);
+    assert_eq!(
+        c.methods[0].attributes[1].bytes,
+        hex("00 01 16 02 00 00 0c 00 00")
+    );
+    assert_eq!(out.field_types, type_annotations::decode(&c).unwrap());
+    assert!(out.field_types.fields.is_empty());
+    assert_eq!(out.methods.len(), 1);
+    assert_eq!(out.methods[0].len(), 1);
+    let a = &out.methods[0][0];
+    assert_eq!(a.visibility, Visibility::RuntimeVisible);
+    assert_eq!(a.annotations.len(), 1);
+    let root = &a.annotations[0];
+    assert_eq!(root.target_type, 0x16);
+    assert_eq!(root.formal_parameter_index, Some(2));
+    assert!(root.path.is_empty());
+    assert!(root.annotation.elements.is_empty());
+    assert_eq!(
+        root.annotation.descriptor,
+        "Lorg/jspecify/annotations/Nullable;"
+            .encode_utf16()
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn formal_parameter_shared_values_depth_and_mutations() {
+    let nested = [
+        vec![b'@'],
+        annotation(Some(&array(&[scalar(b's', 7), vec![b'[', 0, 0]]))),
+    ]
+    .concat();
+    for value in [
+        scalar(b'B', 5),
+        scalar(b'C', 5),
+        scalar(b'I', 5),
+        scalar(b'S', 5),
+        scalar(b'Z', 5),
+        scalar(b'F', 8),
+        scalar(b'J', 9),
+        scalar(b'D', 11),
+        scalar(b's', 7),
+        scalar(b'c', 15),
+        scalar(b'c', 16),
+        vec![b'e', 0, 13, 0, 14],
+        vec![b'[', 0, 0],
+        nested,
+    ] {
+        let parameter = payload(&[parameter_root(255, &[], Some(&value))]);
+        let returns = payload(&[root(&[], Some(&value))]);
+        let mut c = base();
+        c.methods[0].attributes = vec![attr(1, &parameter)];
+        let mut r = base();
+        r.methods[0].attributes = vec![attr(1, &returns)];
+        assert_eq!(
+            decode(&c).unwrap().methods[0][0].annotations[0].annotation,
+            decode(&r).unwrap().methods[0][0].annotations[0].annotation
+        );
+    }
+    for depth in [MAX_DEPTH, MAX_DEPTH + 1] {
+        for alternating in [false, true] {
+            let mut value = scalar(b's', 7);
+            let mut current = 2;
+            while current < depth {
+                if alternating && depth - current >= 2 {
+                    value = [vec![b'@'], annotation(Some(&value))].concat();
+                    current += 2;
+                } else {
+                    value = array(&[value]);
+                    current += 1;
+                }
+            }
+            let bytes = payload(&[parameter_root(0, &[], Some(&value))]);
+            let mut c = base();
+            c.methods[0].attributes = vec![attr(1, &bytes)];
+            if depth <= MAX_DEPTH {
+                assert!(decode(&c).is_ok());
+            } else {
+                assert_eq!(decode(&c).unwrap_err(), Error::Limit("annotation depth"));
+            }
+        }
+    }
+    for bytes in [
+        payload(&[parameter_root(0, &[], None)]),
+        payload(&[parameter_root(
+            255,
+            &[(3, 255)],
+            Some(&array(&[scalar(b's', 7)])),
+        )]),
+    ] {
+        for at in 0..bytes.len() {
+            for replacement in 0..=255 {
+                let mut changed = bytes.clone();
+                changed[at] = replacement;
+                let mut c = base();
+                c.methods[0].attributes = vec![attr(1, &changed)];
+                let _ = decode(&c);
+            }
+        }
+    }
 }

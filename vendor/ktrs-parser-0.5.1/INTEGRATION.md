@@ -100,7 +100,7 @@ existing resource tests remain in the unchanged C12/production suite.
 The local ordinary recovery argument is scoped by calls, independent of recursive
 probe suppression. Read-only scratch construction copies at most256 complete raw
 tokens/4096 bytes, stops after four nontrivia tokens, respects active truncated EOF,
-and performs exactly four grammar expect calls. Ordinary expression parsing runs
+and performs at most four grammar expect calls. Ordinary expression parsing runs
 when the complete simple zero-parameter named header is not recognized. No source,
 worker, API, dependency, graph, limit or diagnostic-dedup policy outside that finite
 entry is changed. Ordered replay still reproduces54 final source hashes across

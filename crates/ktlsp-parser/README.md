@@ -9,9 +9,15 @@ has no server caller and advertises no provider. It is not full grammar, recover
 HIR, formatter or official Kotlin LSP parity.
 
 Each call starts one Rust worker, concurrently transfers input and drains stdout,
-checks cancellation/deadline every 2 ms, and terminates/reaps before scoped I/O
-threads join on every exit path. Worker stderr is discarded (may contain source
-on upstream panics); no document is logged. The shipped trusted worker never
+checks cancellation/deadline every 2 ms, and checks direct-child cleanup before
+implicit scoped I/O joins on normal post-spawn completion. Successful waiting on
+the same owned child preserves the original result; unconfirmed cleanup returns
+`Io`, overriding and losing the original public error. `Io` is ambiguous and does
+not prove reaping or cleanup failure. Drop retains best-effort cleanup for
+unconfirmed state and unwinding; abort can skip it. Blocking waits and joins have
+no hard wall-time bound. This checked-completion change and its real-worker healthy
+snapshot test await runtime verification. Worker stderr is discarded (may contain
+source on upstream panics); no document is logged. The shipped trusted worker never
 spawns descendants. Callers must limit concurrent parse requests and install the matching worker.
 Editor consumers use `SourceSnapshot` and `Parser::parse_snapshot`; accepted
 `SnapshotResult::tree_for` rejects a changed document/revision/source/file kind.

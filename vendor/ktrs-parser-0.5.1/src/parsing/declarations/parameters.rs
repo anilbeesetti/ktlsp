@@ -8,7 +8,7 @@ use super::{
     VALUE_PARAMETER_FIRST,
 };
 use crate::builder::{PsiBuilder, SemanticWhitespaceAwarePsiBuilder};
-use crate::parsing::{Consumer, Parser};
+use crate::parsing::{Consumer, ParameterAnnotationContext, Parser};
 use crate::token_set::TokenSet;
 
 pub(super) const NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER: TokenSet =
@@ -208,17 +208,51 @@ impl Parser {
         &mut self,
         rollback_on_failure: bool,
         type_required: bool,
-        recover_default: bool,
+        recover_declarations: bool,
+    ) -> bool {
+        let recover_annotations = recover_declarations
+            && !self.in_parameter_recovery_probe
+            && self.parameter_annotation_context != ParameterAnnotationContext::Nested;
+        self.with_parameter_annotation_context(ParameterAnnotationContext::Nested, |p| {
+            p.parse_value_parameter_contents(
+                rollback_on_failure,
+                type_required,
+                recover_declarations,
+                recover_annotations,
+            )
+        })
+    }
+
+    fn parse_value_parameter_contents(
+        &mut self,
+        rollback_on_failure: bool,
+        type_required: bool,
+        recover_declarations: bool,
+        recover_annotations: bool,
     ) -> bool {
         let parameter = self.mark();
 
-        self.parse_modifier_list(NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER);
+        let context = if recover_annotations {
+            ParameterAnnotationContext::Modifiers
+        } else {
+            ParameterAnnotationContext::Nested
+        };
+        let recovered = self.with_parameter_annotation_context(context, |p| {
+            p.parse_modifier_list(NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER);
+            p.parameter_annotation_context == ParameterAnnotationContext::Recovered
+        });
+        if recovered {
+            let missing_name = self.mark();
+            missing_name.error(self, "Parameter name expected");
+            self.close_declaration_with_comment_binders(parameter, VALUE_PARAMETER, false);
+            return true;
+        }
 
         if self.at(VAR_KEYWORD) || self.at(VAL_KEYWORD) {
             self.advance(); // VAR_KEYWORD | VAL_KEYWORD
         }
 
-        if !self.parse_function_parameter_rest(type_required, recover_default)
+        if !self.parse_function_parameter_rest(type_required, recover_declarations)
             && rollback_on_failure
         {
             parameter.rollback_to(self);
@@ -229,7 +263,7 @@ impl Parser {
         true
     }
 
-    fn at_missing_default_sibling(&self) -> bool {
+    pub(crate) fn at_simple_function_header(&self) -> bool {
         if self.in_parameter_recovery_probe {
             return false;
         }
@@ -279,7 +313,7 @@ impl Parser {
     fn parse_function_parameter_rest(
         &mut self,
         type_required: bool,
-        recover_default: bool,
+        recover_declarations: bool,
     ) -> bool {
         let mut no_errors = true;
 
@@ -290,13 +324,13 @@ impl Parser {
             // Recovery for the case 'fun foo(Array<String>) {}'
             self.error("Parameter name expected");
             no_errors = false;
-            self.parse_type_ref();
+            self.parse_parameter_type_ref(recover_declarations);
         } else if self.at(COLON) {
             // Recovery for the case 'fun foo(: Int) {}'
             self.error("Parameter name expected");
             // We keep noErrors == true so that unnamed parameters starting with ":" are not rolled back during parsing of functional types
             self.advance(); // COLON
-            self.parse_type_ref();
+            self.parse_parameter_type_ref(recover_declarations);
         } else {
             self.expect_3(
                 IDENTIFIER,
@@ -314,7 +348,7 @@ impl Parser {
                     return false;
                 }
 
-                self.parse_type_ref();
+                self.parse_parameter_type_ref(recover_declarations);
             } else if type_required {
                 self.error_with_recovery(
                     "Parameters must have type annotation",
@@ -326,7 +360,7 @@ impl Parser {
 
         if self.at(EQ) {
             self.advance(); // EQ
-            if recover_default && self.at_missing_default_sibling() {
+            if recover_declarations && self.at_simple_function_header() {
                 self.error("Expecting an expression");
                 return false;
             }

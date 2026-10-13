@@ -1,0 +1,26 @@
+{
+  "artifact": "org.jetbrains.kotlin:kotlin-stdlib:2.3.20",
+  "origin": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.3.20/kotlin-stdlib-2.3.20.jar",
+  "jar_sha256": "0ae12504a5040ebaf37703908483420d1a5624dd1d93f357665f8c77c848a01e",
+  "implementation_version": "2.3.20-release-208",
+  "compiler_version": "Not recorded by the classfiles; Implementation-Version identifies the distribution, not verified compiler provenance.",
+  "license": "Apache-2.0",
+  "extraction": "Unmodified ZIP entry read as data; no JVM/compiler/Gradle/Maven execution.",
+  "files": {
+    "kotlin/io/ReadAfterEOFException.class": {
+      "file": "ReadAfterEOFException.class.bin",
+      "sha256": "77f69a26812780209557707c6d3858bc7edb1ecd26058a3adeab346315c57e5a",
+      "size": 766
+    }
+  },
+  "notices": {
+    "LICENSE.txt": {
+      "origin": "https://raw.githubusercontent.com/JetBrains/kotlin/v2.3.20/license/LICENSE.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "NOTICE.txt": {
+      "origin": "https://raw.githubusercontent.com/JetBrains/kotlin/v2.3.20/license/NOTICE.txt",
+      "sha256": "0b09a83d3ef7795c7dec65e815866597c066c53898f2852a76599b8f5552941a"
+    }
+  }
+}

@@ -67,6 +67,80 @@
      }
  
      pub fn eof(&mut self) -> bool {
+--- a/src/parsing/declarations/annotations.rs
++++ b/src/parsing/declarations/annotations.rs
+@@ -5,7 +5,7 @@
+ use super::parameters::AnnotationParsingMode;
+ use super::{ANNOTATION_TARGETS, IDENTIFIER_RBRACKET_LBRACKET_SET};
+ use crate::kt_tokens::{VAL_VAR, WHITE_SPACE_OR_COMMENT_BIT_SET};
+-use crate::parsing::Parser;
++use crate::parsing::{ParameterAnnotationContext, Parser};
+ 
+ impl Parser {
+     /*
+@@ -188,6 +188,19 @@
+      *   ;
+      */
+     fn parse_annotation(&mut self, mode: AnnotationParsingMode) -> bool {
++        let recover_arguments = self.parameter_annotation_context == ParameterAnnotationContext::Modifiers
++            && mode == AnnotationParsingMode::Default
++            && !self.in_parameter_recovery_probe;
++        let (parsed, recovered) = self.with_parameter_annotation_context(ParameterAnnotationContext::Nested, |p| {
++            p.parse_annotation_2(mode, recover_arguments)
++        });
++        if recovered {
++            self.parameter_annotation_context = ParameterAnnotationContext::Recovered;
++        }
++        parsed
++    }
++
++    fn parse_annotation_2(&mut self, mode: AnnotationParsingMode, recover_arguments: bool) -> (bool, bool) {
+         debug_assert!(
+             self._at(IDENTIFIER)
+                 // We have "@ann" or "@:ann" or "@ :ann", but not "@ ann"
+@@ -205,7 +218,7 @@
+ 
+         if at_at && !self.parse_annotation_target_if_needed(mode) {
+             annotation.rollback_to(self);
+-            return false;
++            return (false, false);
+         }
+ 
+         let reference = self.mark();
+@@ -216,24 +229,27 @@
+ 
+         self.parse_type_argument_list();
+ 
+-        if self.at(LPAR)
++        let recovered = if self.at(LPAR)
+             && !VAL_VAR.contains(self.lookahead(1))
+             && !(WHITE_SPACE_OR_COMMENT_BIT_SET.contains(self.my_builder.raw_lookup(-1))
+                 && mode.with_significant_whitespace_before_arguments())
+         {
+-            self.parse_value_argument_list();
++            let recovered = self.parse_value_argument_list_1(recover_arguments);
+ 
+             // Annotations on a function type may have swallowed its parentheses (`@Anno () -> Unit`)
+             // or failed on them (`@Anno (x: Any) -> Unit`): report failure so the caller reparses
+             // with significant whitespace.
+             if mode.type_context() && (self.get_last_token() != Some(RPAR) || self.at(ARROW)) {
+                 annotation.done(self, ANNOTATION_ENTRY);
+-                return false;
+-            }
+-        }
++                return (false, false);
++            }
++            recovered
++        } else {
++            false
++        };
+         annotation.done(self, ANNOTATION_ENTRY);
+ 
+-        true
++        (true, recovered)
+     }
+ 
+     fn is_next_raw_token_comment_or_whitespace(&mut self) -> bool {
 --- a/src/parsing/declarations/classes.rs
 +++ b/src/parsing/declarations/classes.rs
 @@ -70,7 +70,11 @@
@@ -113,6 +187,26 @@
          } else {
              self.error_with_recovery(
                  "Expecting '('",
+--- a/src/parsing/declarations/mod.rs
++++ b/src/parsing/declarations/mod.rs
+@@ -180,11 +180,15 @@
+     }
+ 
+     pub(crate) fn parse_lambda_expression(&mut self) {
+-        self.parse_function_literal_2(/* preferBlock = */ false, /* collapse = */ false);
++        self.with_parameter_annotation_context(super::ParameterAnnotationContext::Nested, |p| {
++            p.parse_function_literal_2(/* preferBlock = */ false, /* collapse = */ false);
++        });
+     }
+ 
+     pub(crate) fn parse_block_expression(&mut self) {
+-        self.parse_block_1(/* collapse = */ false);
++        self.with_parameter_annotation_context(super::ParameterAnnotationContext::Nested, |p| {
++            p.parse_block_1(/* collapse = */ false);
++        });
+     }
+ 
+     pub(crate) fn parse_script(&mut self) {
 --- a/src/parsing/declarations/modifiers.rs
 +++ b/src/parsing/declarations/modifiers.rs
 @@ -211,7 +211,7 @@
@@ -126,14 +220,16 @@
          }
 --- a/src/parsing/declarations/parameters.rs
 +++ b/src/parsing/declarations/parameters.rs
-@@ -4,6 +4,7 @@
+@@ -4,7 +4,8 @@
  use ktrs_syntax::SyntaxKind::{self, *};
  
  use super::{DECLARATION_FIRST, LAMBDA_VALUE_PARAMETER_FIRST, PARAMETER_NAME_RECOVERY_SET, VALUE_PARAMETER_FIRST};
+-use crate::parsing::{Consumer, Parser};
 +use crate::builder::{PsiBuilder, SemanticWhitespaceAwarePsiBuilder};
- use crate::parsing::{Consumer, Parser};
++use crate::parsing::{Consumer, ParameterAnnotationContext, Parser};
  use crate::token_set::TokenSet;
  
+ pub(super) const NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER: TokenSet = TokenSet::create(&[COMMA, COLON, EQ, RPAR]);
 @@ -67,13 +68,14 @@
          is_function_type_contents: bool,
          type_required: bool,
@@ -189,7 +285,7 @@
                  if self.at(COMMA) {
                      self.advance(); // COMMA
                  } else if self.at(COLON) {
-@@ -137,20 +148,42 @@
+@@ -137,35 +148,133 @@
          self.expect_3(RPAR, "Expecting ')'", Some(recovery_set)) && no_error
      }
  
@@ -232,17 +328,53 @@
 +        &mut self,
 +        rollback_on_failure: bool,
 +        type_required: bool,
-+        recover_default: bool,
++        recover_declarations: bool,
++    ) -> bool {
++        let recover_annotations = recover_declarations
++            && !self.in_parameter_recovery_probe
++            && self.parameter_annotation_context != ParameterAnnotationContext::Nested;
++        self.with_parameter_annotation_context(ParameterAnnotationContext::Nested, |p| {
++            p.parse_value_parameter_contents(
++                rollback_on_failure,
++                type_required,
++                recover_declarations,
++                recover_annotations,
++            )
++        })
++    }
++
++    fn parse_value_parameter_contents(
++        &mut self,
++        rollback_on_failure: bool,
++        type_required: bool,
++        recover_declarations: bool,
++        recover_annotations: bool,
 +    ) -> bool {
          let parameter = self.mark();
  
-         self.parse_modifier_list(NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER);
-@@ -159,13 +192,55 @@
+-        self.parse_modifier_list(NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER);
++        let context = if recover_annotations {
++            ParameterAnnotationContext::Modifiers
++        } else {
++            ParameterAnnotationContext::Nested
++        };
++        let recovered = self.with_parameter_annotation_context(context, |p| {
++            p.parse_modifier_list(NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER);
++            p.parameter_annotation_context == ParameterAnnotationContext::Recovered
++        });
++        if recovered {
++            let missing_name = self.mark();
++            missing_name.error(self, "Parameter name expected");
++            self.close_declaration_with_comment_binders(parameter, VALUE_PARAMETER, false);
++            return true;
++        }
+ 
+         if self.at(VAR_KEYWORD) || self.at(VAL_KEYWORD) {
              self.advance(); // VAR_KEYWORD | VAL_KEYWORD
          }
  
 -        if !self.parse_function_parameter_rest(type_required) && rollback_on_failure {
-+        if !self.parse_function_parameter_rest(type_required, recover_default) && rollback_on_failure {
++        if !self.parse_function_parameter_rest(type_required, recover_declarations) && rollback_on_failure {
              parameter.rollback_to(self);
              return false;
          }
@@ -251,7 +383,7 @@
          true
 +    }
 +
-+    fn at_missing_default_sibling(&self) -> bool {
++    pub(crate) fn at_simple_function_header(&self) -> bool {
 +        if self.in_parameter_recovery_probe {
 +            return false;
 +        }
@@ -294,20 +426,45 @@
      }
  
      /*
-@@ -173,7 +248,7 @@
+@@ -173,7 +282,7 @@
       *   : parameter ("=" element)?
       *   ;
       */
 -    fn parse_function_parameter_rest(&mut self, type_required: bool) -> bool {
-+    fn parse_function_parameter_rest(&mut self, type_required: bool, recover_default: bool) -> bool {
++    fn parse_function_parameter_rest(&mut self, type_required: bool, recover_declarations: bool) -> bool {
          let mut no_errors = true;
  
          if self.at(COMMA) || self.at(RPAR) {
-@@ -212,6 +287,10 @@
+@@ -183,13 +292,13 @@
+             // Recovery for the case 'fun foo(Array<String>) {}'
+             self.error("Parameter name expected");
+             no_errors = false;
+-            self.parse_type_ref();
++            self.parse_parameter_type_ref(recover_declarations);
+         } else if self.at(COLON) {
+             // Recovery for the case 'fun foo(: Int) {}'
+             self.error("Parameter name expected");
+             // We keep noErrors == true so that unnamed parameters starting with ":" are not rolled back during parsing of functional types
+             self.advance(); // COLON
+-            self.parse_type_ref();
++            self.parse_parameter_type_ref(recover_declarations);
+         } else {
+             self.expect_3(IDENTIFIER, "Parameter name expected", Some(PARAMETER_NAME_RECOVERY_SET));
+ 
+@@ -203,7 +312,7 @@
+                     return false;
+                 }
+ 
+-                self.parse_type_ref();
++                self.parse_parameter_type_ref(recover_declarations);
+             } else if type_required {
+                 self.error_with_recovery("Parameters must have type annotation", Some(PARAMETER_NAME_RECOVERY_SET));
+                 no_errors = false;
+@@ -212,6 +321,10 @@
  
          if self.at(EQ) {
              self.advance(); // EQ
-+            if recover_default && self.at_missing_default_sibling() {
++            if recover_declarations && self.at_simple_function_header() {
 +                self.error("Expecting an expression");
 +                return false;
 +            }
@@ -551,6 +708,65 @@
 +        complete
      }
  }
+--- a/src/parsing/declarations/types.rs
++++ b/src/parsing/declarations/types.rs
+@@ -29,21 +29,25 @@
+     }
+ 
+     pub(crate) fn parse_type_ref_without_intersections(&mut self) {
+-        self.parse_type_ref_2(TokenSet::EMPTY, /* allowSimpleIntersectionTypes */ false);
++        self.parse_type_ref_2(TokenSet::EMPTY, /* allowSimpleIntersectionTypes */ false, false);
+     }
+ 
+     pub(crate) fn parse_type_ref_1(&mut self, extra_recovery_set: TokenSet) {
+-        self.parse_type_ref_2(extra_recovery_set, /* allowSimpleIntersectionTypes */ true);
++        self.parse_type_ref_2(extra_recovery_set, /* allowSimpleIntersectionTypes */ true, false);
+     }
+ 
+-    fn parse_type_ref_2(&mut self, extra_recovery_set: TokenSet, allow_simple_intersection_types: bool) {
+-        let type_ref_marker = self.parse_type_ref_contents(extra_recovery_set, allow_simple_intersection_types);
++    pub(super) fn parse_parameter_type_ref(&mut self, recover_declarations: bool) {
++        self.parse_type_ref_2(TokenSet::EMPTY, true, recover_declarations);
++    }
++
++    fn parse_type_ref_2(&mut self, extra_recovery_set: TokenSet, allow_simple_intersection_types: bool, recover_parenthesized: bool) {
++        let type_ref_marker = self.parse_type_ref_contents(extra_recovery_set, allow_simple_intersection_types, recover_parenthesized);
+         type_ref_marker.done(self, TYPE_REFERENCE);
+     }
+ 
+     // The extraRecoverySet is needed for the foo(bar<x, 1, y>(z)) case, to tell whether we should stop
+     // on expression-indicating symbols or not
+-    fn parse_type_ref_contents(&mut self, extra_recovery_set: TokenSet, allow_simple_intersection_types: bool) -> Marker {
++    fn parse_type_ref_contents(&mut self, extra_recovery_set: TokenSet, allow_simple_intersection_types: bool, recover_parenthesized: bool) -> Marker {
+         let type_ref_marker = self.mark();
+ 
+         self.parse_type_modifier_list();
+@@ -78,10 +82,14 @@
+             // This may be a function parameter list or just a parenthesized type
+             self.advance(); // LPAR
+             // parenthesized types, no reference element around it is needed
+-            let contents = self.parse_type_ref_contents(TokenSet::EMPTY, /* allowSimpleIntersectionTypes */ true);
++            let contents = self.parse_type_ref_contents(TokenSet::EMPTY, /* allowSimpleIntersectionTypes */ true, recover_parenthesized);
+             contents.drop(self);
+ 
+-            if self.at(RPAR) && self.lookahead(1) != Some(ARROW) {
++            if recover_parenthesized && self.at_simple_function_header() {
++                // Keep the damaged ordinary type before function-type speculation can consume its sibling.
++                self.error("Expecting ')'");
++                function_or_parenthesized_type.drop(self);
++            } else if self.at(RPAR) && self.lookahead(1) != Some(ARROW) {
+                 // It's a parenthesized type
+                 //    (A)
+                 self.advance();
+@@ -124,7 +132,7 @@
+             left_type_ref.done(self, TYPE_REFERENCE);
+ 
+             self.advance(); // &
+-            self.parse_type_ref_2(extra_recovery_set, /* allowSimpleIntersectionTypes */ true);
++            self.parse_type_ref_2(extra_recovery_set, /* allowSimpleIntersectionTypes */ true, recover_parenthesized);
+ 
+             intersection_type.done(self, INTERSECTION_TYPE);
+             was_intersection = true;
 --- a/src/parsing/declarations/user_types.rs
 +++ b/src/parsing/declarations/user_types.rs
 @@ -176,7 +176,7 @@
@@ -562,29 +778,133 @@
  
          self.expect_3(ARROW, "Expecting '->' to specify return type of a function type", Some(TYPE_REF_FIRST));
          self.parse_type_ref();
+--- a/src/parsing/expressions/mod.rs
++++ b/src/parsing/expressions/mod.rs
+@@ -120,6 +120,12 @@
+     }
+ 
+     pub(crate) fn parse_expression_1(&mut self, message_if_not_expression_first: &str) {
++        self.with_parameter_annotation_context(super::ParameterAnnotationContext::Nested, |p| {
++            p.parse_expression_2(message_if_not_expression_first);
++        });
++    }
++
++    fn parse_expression_2(&mut self, message_if_not_expression_first: &str) {
+         if !self.at_set(EXPRESSION_FIRST) {
+             self.error(message_if_not_expression_first);
+             return;
+--- a/src/parsing/expressions/primary.rs
++++ b/src/parsing/expressions/primary.rs
+@@ -4,7 +4,7 @@
+ use ktrs_syntax::SyntaxKind::{self, *};
+ 
+ use super::ALLOW_NEWLINE_OPERATIONS;
+-use crate::parsing::Parser;
++use crate::parsing::{ParameterAnnotationContext, Parser};
+ use crate::parsing::declarations::{EXPRESSION_FIRST, EXPRESSION_FOLLOW, NameParsingMode};
+ 
+ impl Parser {
+@@ -152,13 +152,28 @@
+      *   ;
+      */
+     pub(crate) fn parse_value_argument_list(&mut self) {
++        self.parse_value_argument_list_1(false);
++    }
++
++    pub(crate) fn parse_value_argument_list_1(&mut self, recover_declarations: bool) -> bool {
++        self.with_parameter_annotation_context(ParameterAnnotationContext::Nested, |p| {
++            p.parse_value_argument_list_contents(recover_declarations)
++        })
++    }
++
++    fn parse_value_argument_list_contents(&mut self, recover_declarations: bool) -> bool {
+         let list = self.mark();
++        let mut recovered = false;
+ 
+         self.my_builder.disable_newlines();
+ 
+         if self.expect_3(LPAR, "Expecting an argument list", Some(EXPRESSION_FOLLOW)) {
+             if !self.at(RPAR) {
+                 loop {
++                    if recover_declarations && self.at_simple_function_header() {
++                        recovered = true;
++                        break;
++                    }
+                     self.parse_value_argument();
+                     if self.at(COLON) && self.lookahead(1) == Some(IDENTIFIER) {
+                         self.error_and_advance_2("Unexpected type specification", 2);
+@@ -178,12 +193,17 @@
+                 }
+             }
+ 
+-            self.expect_3(RPAR, "Expecting ')'", Some(EXPRESSION_FOLLOW));
++            if recovered {
++                self.error("Expecting ')'");
++            } else {
++                self.expect_3(RPAR, "Expecting ')'", Some(EXPRESSION_FOLLOW));
++            }
+         }
+ 
+         self.my_builder.restore_newlines_state();
+ 
+         list.done(self, VALUE_ARGUMENT_LIST);
++        recovered
+     }
+ 
+     /*
 --- a/src/parsing/mod.rs
 +++ b/src/parsing/mod.rs
-@@ -70,6 +70,7 @@
+@@ -64,12 +64,22 @@
+     fn consume(&mut self, item: T);
+ }
+ 
++#[derive(Clone, Copy, PartialEq, Eq)]
++enum ParameterAnnotationContext {
++    Outside,
++    Modifiers,
++    Recovered,
++    Nested,
++}
++
+ /// The state shared by one `KotlinParsing` + `KotlinExpressionParsing` pair.
+ pub struct Parser {
+     pub(crate) my_builder: SemanticWhitespaceAwarePsiBuilder,
      pub(crate) is_lazy: bool,
      /// Index of this context's `ForByClause` builder layer; `None` for top-level parsers.
      by_clause_layer: Option<usize>,
 +    in_parameter_recovery_probe: bool,
++    parameter_annotation_context: ParameterAnnotationContext,
  }
  
  impl MarkerHost for Parser {
-@@ -81,13 +82,13 @@
+@@ -79,15 +89,28 @@
+ }
+ 
  impl Parser {
++    fn with_parameter_annotation_context<R>(
++        &mut self,
++        context: ParameterAnnotationContext,
++        f: impl FnOnce(&mut Parser) -> R,
++    ) -> R {
++        let saved = std::mem::replace(&mut self.parameter_annotation_context, context);
++        let result = f(self);
++        self.parameter_annotation_context = saved;
++        result
++    }
++
      /// `KotlinParsing.createForTopLevel`.
      pub(crate) fn create_for_top_level(builder: SemanticWhitespaceAwarePsiBuilder) -> Parser {
 -        Parser { my_builder: builder, is_lazy: true, by_clause_layer: None }
-+        Parser { my_builder: builder, is_lazy: true, by_clause_layer: None, in_parameter_recovery_probe: false }
++        Parser { my_builder: builder, is_lazy: true, by_clause_layer: None, in_parameter_recovery_probe: false,
++            parameter_annotation_context: ParameterAnnotationContext::Outside, }
      }
  
      /// `KotlinParsing.createForTopLevelNonLazy`.
      #[allow(dead_code)] // TODO: only `KotlinLightParser` uses it upstream; not ported yet.
      pub(crate) fn create_for_top_level_non_lazy(builder: SemanticWhitespaceAwarePsiBuilder) -> Parser {
 -        Parser { my_builder: builder, is_lazy: false, by_clause_layer: None }
-+        Parser { my_builder: builder, is_lazy: false, by_clause_layer: None, in_parameter_recovery_probe: false }
++        Parser { my_builder: builder, is_lazy: false, by_clause_layer: None, in_parameter_recovery_probe: false,
++            parameter_annotation_context: ParameterAnnotationContext::Outside, }
      }
  
      /// `KotlinParsing.createForByClause(myBuilder, isLazy)`: runs `f` on a non-top-level parser

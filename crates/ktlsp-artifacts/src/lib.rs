@@ -4,6 +4,9 @@
 mod integrity;
 pub use integrity::{ExpectedDigestOrigin, IntegrityError, VerifiedArtifact, verify_sha256};
 
+mod zip_index;
+pub use zip_index::{ZipDirectoryEntry, ZipDirectoryIndex, ZipIndexError, index_zip_directory};
+
 use std::collections::HashSet;
 use std::fs::{self, File, Metadata};
 use std::io::{self, Read};

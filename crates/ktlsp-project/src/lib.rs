@@ -22,8 +22,11 @@ pub const MAX_LIBRARIES: usize = 8_192;
 pub const MAX_DEPENDENCIES: usize = 65_536;
 pub const MAX_SOURCE_ROOTS: usize = 16_384;
 pub const MAX_ARCHIVE_PATHS: usize = 32_768;
+pub const MAX_CALLER_PATH_BYTES: usize = 8 * 1024 * 1024;
+/// Shared conservative prejoin bound across all model path collections.
+pub const MAX_EXPANDED_PATH_BYTES: usize = 8 * 1024 * 1024;
 
-/// Counts are checked by a streaming pass before allocating the typed model.
+/// Resource limits are checked before the related allocation or path expansion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Budget {
     ManifestBytes,
@@ -32,6 +35,8 @@ pub enum Budget {
     Dependencies,
     SourceRoots,
     ArchivePaths,
+    CallerPathBytes,
+    ExpandedPathBytes,
 }
 
 #[derive(Debug)]
@@ -222,12 +227,14 @@ struct Manifest {
 
 /// Reads at most the byte budget plus one sentinel byte, even if the file grows.
 pub fn load_manifest(manifest_path: impl AsRef<Path>) -> Result<ProjectModel, ProjectError> {
-    let file = File::open(manifest_path.as_ref()).map_err(ProjectError::Io)?;
+    let path = manifest_path.as_ref();
+    caller_path_bytes(path)?;
+    let file = File::open(path).map_err(ProjectError::Io)?;
     let mut bytes = Vec::new();
     file.take((MAX_MANIFEST_BYTES + 1) as u64)
         .read_to_end(&mut bytes)
         .map_err(ProjectError::Io)?;
-    from_json(manifest_path, &bytes)
+    from_json(path, &bytes)
 }
 
 /// Parses bytes using the manifest's parent as the relative-path base.
@@ -250,15 +257,21 @@ pub fn from_json(
         ));
     }
     let path = manifest_path.as_ref();
+    let path_bytes = caller_path_bytes(path)?;
     validate_path(path)?;
     let absolute = if path.is_absolute() {
         normalize(path)
     } else {
-        normalize(
-            &std::env::current_dir()
-                .map_err(ProjectError::Io)?
-                .join(path),
-        )
+        let current_dir = std::env::current_dir().map_err(ProjectError::Io)?;
+        let cwd_bytes = caller_path_bytes(&current_dir)?;
+        check_path_bytes(
+            cwd_bytes
+                .checked_add(1)
+                .and_then(|n| n.checked_add(path_bytes)),
+            Budget::CallerPathBytes,
+            MAX_CALLER_PATH_BYTES,
+        )?;
+        normalize(&current_dir.join(path))
     };
     if !absolute.is_absolute() {
         return Err(ProjectError::InvalidPath(
@@ -268,6 +281,7 @@ pub fn from_json(
     let base = absolute
         .parent()
         .ok_or_else(|| ProjectError::InvalidPath(path.to_string_lossy().into_owned()))?;
+    validate_path_budget(&manifest, base)?;
     validate_model(&mut manifest, base)?;
     Ok(ProjectModel {
         schema_version: manifest.schema_version,
@@ -275,6 +289,54 @@ pub fn from_json(
         libraries: manifest.libraries,
         sdk_archives: manifest.sdk_archives,
     })
+}
+
+fn check_path_bytes(
+    bytes: Option<usize>,
+    budget: Budget,
+    limit: usize,
+) -> Result<usize, ProjectError> {
+    bytes
+        .filter(|&n| n <= limit)
+        .ok_or(ProjectError::BudgetExceeded { budget, limit })
+}
+
+fn caller_path_bytes(path: &Path) -> Result<usize, ProjectError> {
+    check_path_bytes(
+        Some(path.as_os_str().as_encoded_bytes().len()),
+        Budget::CallerPathBytes,
+        MAX_CALLER_PATH_BYTES,
+    )
+}
+
+fn validate_path_budget(manifest: &Manifest, base: &Path) -> Result<(), ProjectError> {
+    let base_bytes = base.as_os_str().as_encoded_bytes().len();
+    let paths = manifest
+        .modules
+        .iter()
+        .flat_map(|m| m.source_roots.iter().map(|r| &r.path))
+        .chain(
+            manifest
+                .libraries
+                .iter()
+                .flat_map(|l| l.binaries.iter().chain(&l.sources)),
+        )
+        .chain(&manifest.sdk_archives);
+    let mut total = 0usize;
+    for path in paths {
+        let bytes = path.as_os_str().as_encoded_bytes().len();
+        let expanded = if path.is_absolute() && !retains_base_prefix(base, path) {
+            Some(bytes)
+        } else {
+            base_bytes.checked_add(1).and_then(|n| n.checked_add(bytes))
+        };
+        total = check_path_bytes(
+            expanded.and_then(|n| total.checked_add(n)),
+            Budget::ExpandedPathBytes,
+            MAX_EXPANDED_PATH_BYTES,
+        )?;
+    }
+    Ok(())
 }
 
 fn validate_path(path: &Path) -> Result<(), ProjectError> {
@@ -301,9 +363,19 @@ fn normalize(path: &Path) -> PathBuf {
     result
 }
 
+fn retains_base_prefix(base: &Path, path: &Path) -> bool {
+    // Cygwin absolute root-only paths retain the base prefix when joined.
+    matches!(path.components().next(), Some(Component::RootDir))
+        && matches!(base.components().next(), Some(Component::Prefix(_)))
+}
+
 fn resolve(path: &mut PathBuf, base: &Path) -> Result<(), ProjectError> {
     validate_path(path)?;
-    let resolved = normalize(&base.join(&*path));
+    let resolved = if path.is_absolute() && !retains_base_prefix(base, path) {
+        normalize(path)
+    } else {
+        normalize(&base.join(&*path))
+    };
     if !resolved.is_absolute() {
         return Err(ProjectError::InvalidPath(
             path.to_string_lossy().into_owned(),
@@ -655,4 +727,20 @@ fn preflight(bytes: &[u8]) -> Result<(), ProjectError> {
     }
     result.map_err(ProjectError::Json)?;
     deserializer.end().map_err(ProjectError::Json)
+}
+
+#[cfg(test)]
+mod path_budget_tests {
+    use super::*;
+
+    #[test]
+    fn arithmetic_overflow_is_a_named_resource_error() {
+        for budget in [Budget::CallerPathBytes, Budget::ExpandedPathBytes] {
+            assert!(matches!(
+                check_path_bytes(usize::MAX.checked_add(1), budget, MAX_EXPANDED_PATH_BYTES),
+                Err(ProjectError::BudgetExceeded { budget: actual, limit })
+                    if actual == budget && limit == MAX_EXPANDED_PATH_BYTES
+            ));
+        }
+    }
 }

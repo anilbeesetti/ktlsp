@@ -5,7 +5,7 @@ use ktrs_syntax::SyntaxKind::{self, *};
 use super::parameters::AnnotationParsingMode;
 use super::{ANNOTATION_TARGETS, IDENTIFIER_RBRACKET_LBRACKET_SET};
 use crate::kt_tokens::{VAL_VAR, WHITE_SPACE_OR_COMMENT_BIT_SET};
-use crate::parsing::Parser;
+use crate::parsing::{ParameterAnnotationContext, Parser};
 
 impl Parser {
     /*
@@ -195,6 +195,25 @@ impl Parser {
      *   ;
      */
     fn parse_annotation(&mut self, mode: AnnotationParsingMode) -> bool {
+        let recover_arguments = self.parameter_annotation_context
+            == ParameterAnnotationContext::Modifiers
+            && mode == AnnotationParsingMode::Default
+            && !self.in_parameter_recovery_probe;
+        let (parsed, recovered) = self
+            .with_parameter_annotation_context(ParameterAnnotationContext::Nested, |p| {
+                p.parse_annotation_2(mode, recover_arguments)
+            });
+        if recovered {
+            self.parameter_annotation_context = ParameterAnnotationContext::Recovered;
+        }
+        parsed
+    }
+
+    fn parse_annotation_2(
+        &mut self,
+        mode: AnnotationParsingMode,
+        recover_arguments: bool,
+    ) -> (bool, bool) {
         debug_assert!(
             self._at(IDENTIFIER)
                 // We have "@ann" or "@:ann" or "@ :ann", but not "@ ann"
@@ -212,7 +231,7 @@ impl Parser {
 
         if at_at && !self.parse_annotation_target_if_needed(mode) {
             annotation.rollback_to(self);
-            return false;
+            return (false, false);
         }
 
         let reference = self.mark();
@@ -223,24 +242,27 @@ impl Parser {
 
         self.parse_type_argument_list();
 
-        if self.at(LPAR)
+        let recovered = if self.at(LPAR)
             && !VAL_VAR.contains(self.lookahead(1))
             && !(WHITE_SPACE_OR_COMMENT_BIT_SET.contains(self.my_builder.raw_lookup(-1))
                 && mode.with_significant_whitespace_before_arguments())
         {
-            self.parse_value_argument_list();
+            let recovered = self.parse_value_argument_list_1(recover_arguments);
 
             // Annotations on a function type may have swallowed its parentheses (`@Anno () -> Unit`)
             // or failed on them (`@Anno (x: Any) -> Unit`): report failure so the caller reparses
             // with significant whitespace.
             if mode.type_context() && (self.get_last_token() != Some(RPAR) || self.at(ARROW)) {
                 annotation.done(self, ANNOTATION_ENTRY);
-                return false;
+                return (false, false);
             }
-        }
+            recovered
+        } else {
+            false
+        };
         annotation.done(self, ANNOTATION_ENTRY);
 
-        true
+        (true, recovered)
     }
 
     fn is_next_raw_token_comment_or_whitespace(&mut self) -> bool {

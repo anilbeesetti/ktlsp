@@ -244,11 +244,15 @@ impl Parser {
     }
 
     pub(crate) fn parse_lambda_expression(&mut self) {
-        self.parse_function_literal_2(/* preferBlock = */ false, /* collapse = */ false);
+        self.with_parameter_annotation_context(super::ParameterAnnotationContext::Nested, |p| {
+            p.parse_function_literal_2(/* preferBlock = */ false, /* collapse = */ false);
+        });
     }
 
     pub(crate) fn parse_block_expression(&mut self) {
-        self.parse_block_1(/* collapse = */ false);
+        self.with_parameter_annotation_context(super::ParameterAnnotationContext::Nested, |p| {
+            p.parse_block_1(/* collapse = */ false);
+        });
     }
 
     pub(crate) fn parse_script(&mut self) {

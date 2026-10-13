@@ -7,6 +7,7 @@ use super::{
     DECLARATION_FIRST, LAMBDA_VALUE_PARAMETER_FIRST, PARAMETER_NAME_RECOVERY_SET,
     VALUE_PARAMETER_FIRST,
 };
+use crate::builder::{PsiBuilder, SemanticWhitespaceAwarePsiBuilder};
 use crate::parsing::{Consumer, Parser};
 use crate::token_set::TokenSet;
 
@@ -104,7 +105,7 @@ impl Parser {
                         );
                     }
                 } else {
-                    p.parse_value_parameter(type_required);
+                    p.parse_value_parameter_2(false, type_required, recover_declarations);
                 }
                 true
             },
@@ -196,14 +197,19 @@ impl Parser {
      *   ;
      */
     pub(super) fn try_parse_value_parameter(&mut self, type_required: bool) -> bool {
-        self.parse_value_parameter_2(true, type_required)
+        self.parse_value_parameter_2(true, type_required, false)
     }
 
     pub(crate) fn parse_value_parameter(&mut self, type_required: bool) {
-        self.parse_value_parameter_2(false, type_required);
+        self.parse_value_parameter_2(false, type_required, false);
     }
 
-    fn parse_value_parameter_2(&mut self, rollback_on_failure: bool, type_required: bool) -> bool {
+    fn parse_value_parameter_2(
+        &mut self,
+        rollback_on_failure: bool,
+        type_required: bool,
+        recover_default: bool,
+    ) -> bool {
         let parameter = self.mark();
 
         self.parse_modifier_list(NO_MODIFIER_BEFORE_FOR_VALUE_PARAMETER);
@@ -212,7 +218,9 @@ impl Parser {
             self.advance(); // VAR_KEYWORD | VAL_KEYWORD
         }
 
-        if !self.parse_function_parameter_rest(type_required) && rollback_on_failure {
+        if !self.parse_function_parameter_rest(type_required, recover_default)
+            && rollback_on_failure
+        {
             parameter.rollback_to(self);
             return false;
         }
@@ -221,12 +229,58 @@ impl Parser {
         true
     }
 
+    fn at_missing_default_sibling(&self) -> bool {
+        if self.in_parameter_recovery_probe {
+            return false;
+        }
+        let psi = &self.my_builder.psi;
+        let start = psi.shift_over_whitespace_forward(psi.current_lexeme);
+        if psi.lex_types.get(start) != Some(&FUN_KEYWORD) {
+            return false;
+        }
+        // shortcut: only complete simple zero-parameter headers recover; widen with a bounded corpus.
+        let limit = (start + 256).min(psi.lex_types.len());
+        let eof = self.my_builder.effective_truncated_eof_position();
+        let mut end = start;
+        let mut terminals = 0;
+        while end < limit
+            && psi.lex_starts[end + 1] - psi.lex_starts[start] <= 4096
+            && eof.is_none_or(|eof| psi.lex_starts[end + 1] <= eof as u32)
+        {
+            terminals += usize::from(!psi.lex_types[end].is_trivia());
+            end += 1;
+            if terminals == 4 {
+                break;
+            }
+        }
+        if start == end {
+            return false;
+        }
+        let builder = PsiBuilder::from_lexemes(
+            &psi.text[psi.lex_starts[start] as usize..psi.lex_starts[end] as usize],
+            &psi.lex_starts[start..=end],
+            &psi.lex_types[start..end],
+        );
+        let mut probe =
+            Parser::create_for_top_level_non_lazy(SemanticWhitespaceAwarePsiBuilder::new(builder));
+        probe.in_parameter_recovery_probe = true;
+        // Four grammar terminals, no nested parsing; all remaps and cursor changes stay in scratch.
+        probe.expect(FUN_KEYWORD)
+            && probe.expect(IDENTIFIER)
+            && probe.expect(LPAR)
+            && probe.expect(RPAR)
+    }
+
     /*
      * functionParameterRest
      *   : parameter ("=" element)?
      *   ;
      */
-    fn parse_function_parameter_rest(&mut self, type_required: bool) -> bool {
+    fn parse_function_parameter_rest(
+        &mut self,
+        type_required: bool,
+        recover_default: bool,
+    ) -> bool {
         let mut no_errors = true;
 
         if self.at(COMMA) || self.at(RPAR) {
@@ -272,6 +326,10 @@ impl Parser {
 
         if self.at(EQ) {
             self.advance(); // EQ
+            if recover_default && self.at_missing_default_sibling() {
+                self.error("Expecting an expression");
+                return false;
+            }
             self.parse_expression();
         }
 

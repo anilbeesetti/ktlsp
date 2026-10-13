@@ -44,13 +44,14 @@ remain unchanged.
 
 The behavioral patch checks ordinary function parameter boundaries, probes existing modifier
 and annotation grammar with rollback, and reports a missing ')' without consuming
-a following declaration. Nested type/default parsing remains with existing grammar.
+a following declaration. Nested type parsing remains with existing grammar; the finite C14 default-entry
+repair is described below.
 Constructor, function-type and context parameter loops keep their original context.
 EOF diagnostics retain upstream behavior. A scoped speculative-probe flag avoids
 recursive replay when annotation arguments contain anonymous functions. Remaining
 work is superlinear in nesting; existing production resource gates remain required.
 
-Known bounded repair limits: a missing default (`x: Int =` followed by named fun),
+Known bounded repair limits: missing defaults outside C14's complete simple zero-parameter header,
 deeply malformed parenthesized types (`x: (@A`), malformed annotation arguments,
 and unclosed class generic lists outside the bounded #100 simple-function-header
 contract can still consume later declarations. These are
@@ -114,3 +115,20 @@ checks, not annotation parsing, active-layer integration or end-to-end truncated
 recovery evidence; that remaining gap belongs to #83's acceptance audit.
 Large-leading-trivia runtime evidence and renewed resource reviews remain pending.
 No full-parser complexity or RSS bound is asserted.
+
+## C14 / #121 ordinary missing-default entry
+
+Only parameters.rs changes behavior in this child. Call-local ordinary-list
+recovery context excludes constructor/function-type/context/direct parameter
+paths without ambient Parser state. At post-EQ entry an isolated scratch builder
+uses four grammar expectations to recognize FUN/IDENTIFIER/LPAR/RPAR. The window
+ends within active truncated EOF,256 complete raw tokens including internal trivia,
+4096 bytes, or four nontrivia tokens. The recursion-suppression flag remains
+separate. There is no live speculative mutation or text-search reconstruction.
+Broader headers remain recovery gaps; leading trivia inspection is bounded by the
+input limit, outside copied-window accounting. Worker/resource/Coverage contracts
+are unchanged. The ordered phases were recomputed as9 behavior/49 formatting/54
+final source files with5 pristine survivors, not inferred from historical counts.
+Source-frozen expectations and review requirements are in
+../../crates/ktlsp-parser/reviews/c14-default-recovery.md. Controlled Linux validation
+and coordinator delivery gates remain required; no new Darwin execution is used.

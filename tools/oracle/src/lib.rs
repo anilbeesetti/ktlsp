@@ -414,3 +414,5 @@ pub fn differences(expected: Option<&Value>, actual: Option<&Value>) -> Vec<Valu
     visit(String::new(), expected, actual, &mut result);
     result
 }
+
+pub mod recorder;

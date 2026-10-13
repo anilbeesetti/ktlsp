@@ -50,8 +50,30 @@ its path later may read different data. Consumers should use returned bytes.
 
 ## Verification and remaining work
 
+### Caller-provided SHA-256 (T020b / #88)
+
+`verify_sha256(artifact, expected: [u8; 32])` consumes an existing `Artifact`.
+Before hashing it rejects actual empty bytes, actual size above 64 MiB, then an
+inconsistent `provenance.byte_length`, in that order. `IntegrityError::Mismatch`
+contains expected and actual digests. All errors consume and drop the artifact.
+
+Success returns `VerifiedArtifact` with private fields and borrowed `bytes()`,
+`provenance()`, `digest()` getters and `expected_digest_origin()` equal to
+`ExpectedDigestOrigin::CallerProvided`. Verification hashes the existing byte
+allocation without copying or accessing any path. Replacing/deleting the original
+file cannot change the retained bytes. There is no mutable getter or unchecked
+constructor. Original lookup provenance, including `checksum: Unverified`, stays
+as supplied; the wrapper records the separate digest-equality evidence.
+
+The caller is responsible for trusting the expected digest. Equality does not
+authenticate that digest or the supplied coordinate/provenance, validate ZIP/JAR
+contents, or guarantee anything about future path contents. Manually constructed
+artifacts are accepted when their actual size/recorded length/digest agree.
+No constant-time secret comparison is promised; digests here are public integrity
+values. See [dependency and vector audit](INTEGRITY.md) and retained `notices/`.
+
 Fixtures are independently authored temporary local files; default tests are
 Rust-only and execute no JVM/Gradle/Maven. No official oracle comparison is claimed.
-Parent T020 remains open. Integrity/checksum and bounded archive verification,
+Parent T020 remains open. Authenticated checksum acquisition and bounded archive verification,
 remote transport/cache mutation, lockfiles, dependency graphs, metadata-driven
 snapshot/dynamic resolution and Gradle layouts need subsequent child tickets.

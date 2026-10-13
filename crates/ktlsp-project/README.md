@@ -7,3 +7,9 @@ The schema is defined in `docs/specs/project-model.md`. Public serializable stru
 Paths are native-platform absolute paths normalized lexically. Missing binaries, sources and SDK archives remain model data. The loader does not invoke Gradle/Maven/JPS, run a compiler, download or inspect artifacts, discover source files, or resolve symlinks. Lexically disjoint roots can refer to the same directory through symlinks; a separate filesystem discovery/ownership check is required before analysis. Language/API/JVM version strings receive syntax/order validation only, not support validation.
 
 Before typed model allocation, a streaming JSON pass enforces aggregate collection budgets: 4,096 modules, 8,192 libraries, 65,536 module dependency and module library reference edges combined, 16,384 roots, and 32,768 binary/source/SDK archive paths combined. Inputs are limited to 2 MiB; file reading uses at most that size plus one sentinel byte. JSON's default nesting limit remains enabled. Graph validation is iterative; lexical root ownership uses sorting and an ancestor stack rather than comparing every pair.
+
+V1 also limits caller raw/cwd-composed encoded paths and shared conservative
+prejoin model path bytes to 8 MiB each. Oversized expansions reject even when
+normalization would shrink them. See the [v1 path budget contract](reviews/t111-v1-path-budget.md)
+for accounting, new `Budget` variants/error precedence and unchanged
+serialization/reload limits.

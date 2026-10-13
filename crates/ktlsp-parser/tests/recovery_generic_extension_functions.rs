@@ -142,6 +142,49 @@ fn compatibility(tree: &Parsed, case: &Value) {
             "{id}"
         );
         assert_eq!(diagnostics(tree), json!([[11, 11, "Missing '>'"]]), "{id}");
+    } else if id == "decline-header-10" {
+        // The finite nullable-receiver contract supersedes only this recorded exclusion.
+        assert_eq!(
+            projection(tree),
+            json!([
+                ["CLASS", 0, 11, "KT_FILE", null],
+                ["TYPE_PARAMETER_LIST", 9, 11, "CLASS", [0, 11]],
+                ["TYPE_PARAMETER", 10, 11, "TYPE_PARAMETER_LIST", [0, 11]],
+                ["FUN", 12, 37, "KT_FILE", null],
+                ["TYPE_REFERENCE", 16, 23, "FUN", [12, 37]],
+                ["USER_TYPE", 16, 22, "NULLABLE_TYPE", [12, 37]],
+                ["REFERENCE_EXPRESSION", 16, 22, "USER_TYPE", [12, 37]],
+                ["VALUE_PARAMETER_LIST", 31, 33, "FUN", [12, 37]]
+            ]),
+            "{id}"
+        );
+        assert_eq!(
+            names(tree),
+            json!([[0, 6, 9, "Box"], [12, 24, 31, "healthy"]]),
+            "{id}"
+        );
+        assert_eq!(diagnostics(tree), json!([[11, 11, "Missing '>'"]]), "{id}");
+        let nullable = elements
+            .iter()
+            .find(|e| !e.token && e.kind == "NULLABLE_TYPE" && (e.start, e.end) == (16, 23))
+            .unwrap();
+        let reference = &elements[nullable.parent.unwrap()];
+        assert_eq!(
+            (reference.kind.as_str(), reference.start, reference.end),
+            ("TYPE_REFERENCE", 16, 23)
+        );
+        let function = &elements[reference.parent.unwrap()];
+        assert_eq!(
+            (function.kind.as_str(), function.start, function.end),
+            ("FUN", 12, 37)
+        );
+        token(
+            tree,
+            &json!([16, 22, "String", "REFERENCE_EXPRESSION"]),
+            "IDENTIFIER",
+        );
+        token(tree, &json!([22, 23, "QUEST", "NULLABLE_TYPE"]), "DOT");
+        token(tree, &json!([23, 24, "DOT", "FUN"]), "DOT");
     } else if id.starts_with("decline-header-") {
         assert_eq!(class().start, 0, "{id}");
         assert!(class().end > 11, "{id}");

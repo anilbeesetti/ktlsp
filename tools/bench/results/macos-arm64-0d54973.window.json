@@ -1,0 +1,148 @@
+{
+  "elapsed_seconds": 2.392132875000243,
+  "sampling_interval_seconds": 0.25,
+  "observations": [
+    {
+      "utc": "2026-10-12T12:58:04.991662+00:00",
+      "load_average": [
+        2.021484375,
+        2.54833984375,
+        2.8994140625
+      ],
+      "names_counts": {},
+      "ambient_names_counts": {
+        "replayd": 1
+      }
+    },
+    {
+      "utc": "2026-10-12T12:58:05.269234+00:00",
+      "load_average": [
+        2.021484375,
+        2.54833984375,
+        2.8994140625
+      ],
+      "names_counts": {
+        "ktlsp-baseline": 2
+      },
+      "ambient_names_counts": {
+        "replayd": 1
+      }
+    },
+    {
+      "utc": "2026-10-12T12:58:05.543223+00:00",
+      "load_average": [
+        2.021484375,
+        2.54833984375,
+        2.8994140625
+      ],
+      "names_counts": {
+        "ktlsp-baseline": 2
+      },
+      "ambient_names_counts": {
+        "replayd": 1
+      }
+    },
+    {
+      "utc": "2026-10-12T12:58:05.822804+00:00",
+      "load_average": [
+        2.021484375,
+        2.54833984375,
+        2.8994140625
+      ],
+      "names_counts": {
+        "ktlsp-baseline": 2
+      },
+      "ambient_names_counts": {
+        "replayd": 1
+      }
+    },
+    {
+      "utc": "2026-10-12T12:58:06.094176+00:00",
+      "load_average": [
+        2.021484375,
+        2.54833984375,
+        2.8994140625
+      ],
+      "names_counts": {
+        "ktlsp-baseline": 2
+      },
+      "ambient_names_counts": {
+        "replayd": 1
+      }
+    },
+    {
+      "utc": "2026-10-12T12:58:06.373490+00:00",
+      "load_average": [
+        2.021484375,
+        2.54833984375,
+        2.8994140625
+      ],
+      "names_counts": {
+        "ktlsp-baseline": 2
+      },
+      "ambient_names_counts": {
+        "replayd": 1
+      }
+    },
+    {
+      "utc": "2026-10-12T12:58:06.642408+00:00",
+      "load_average": [
+        2.021484375,
+        2.54833984375,
+        2.8994140625
+      ],
+      "names_counts": {
+        "ktlsp-baseline": 2
+      },
+      "ambient_names_counts": {
+        "replayd": 1
+      }
+    },
+    {
+      "utc": "2026-10-12T12:58:06.912103+00:00",
+      "load_average": [
+        2.021484375,
+        2.54833984375,
+        2.8994140625
+      ],
+      "names_counts": {
+        "ktlsp-baseline": 2
+      },
+      "ambient_names_counts": {
+        "replayd": 1
+      }
+    },
+    {
+      "utc": "2026-10-12T12:58:07.184426+00:00",
+      "load_average": [
+        2.021484375,
+        2.54833984375,
+        2.8994140625
+      ],
+      "names_counts": {
+        "ktlsp-baseline": 1
+      },
+      "ambient_names_counts": {
+        "replayd": 1
+      }
+    },
+    {
+      "utc": "2026-10-12T12:58:07.386032+00:00",
+      "load_average": [
+        2.021484375,
+        2.54833984375,
+        2.8994140625
+      ],
+      "names_counts": {},
+      "ambient_names_counts": {
+        "replayd": 1
+      }
+    }
+  ],
+  "allowed_measured_names": [
+    "ktlsp-baseline",
+    "ktlsp"
+  ],
+  "monitor_overhead": "ps name-only sampling every250ms from separate Python coordination driver; included ambient interference",
+  "contaminated": false
+}

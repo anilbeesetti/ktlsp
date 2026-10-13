@@ -181,3 +181,30 @@ assigned-base/workflow/executor and exact-main all-three verification follow the
 admitted policy; changed identity/tree/workflow/failure/new finding renews affected
 reviews. #83/#7 OPEN, C13 aggregate GAP, T008/T008a HOLD, B3/B4 GAP, B11 UNVERIFIED,
 #96 OPEN/UNKNOWN and historical audit totals remain unchanged.
+
+## C13 qualified receiver — held source preparation after C13b
+
+Root admitted one additional DOT/name in the private generic sibling scratch
+predicate on frozen882028224a252d728dd479f2403fd2f2d97f3f67. Only
+declarations/type_parameters.rs changes final vendor Rust bytes. Existing caller,
+complete-bound, scratch isolation, minimum active-EOF and all resource/debit gates
+remain. The recorded pkg.String seed supersedes only C13b decline-header-8's
+blanket class.end>11 assertion; historical70/38/779 data remains unchanged. New
+source-authored test data has59 sources,24 selected projections,35 compatibility
+cases and397 UTF-16 expectations. No broader receiver/full-C13/parity claim.
+
+Owner data-only pristine archive→recovery.patch→formatting.patch replay verifies
+all54 final source files, zero offsets/fuzz. Re-derived counts remain14 behavior/
+50 formatting/four pristine survivors. Upstream archive/inventory/minimal crate/
+manifests/locks/notices remain unchanged. Adversarial reviewer must perform its
+own independent pristine replay; neither party may borrow the other's receipt.
+
+Pinned formatting and compile-only offline locked workspace all-target Clippy
+passed. No parser/native runtime ran locally. Actual held-source SAME2+architect
+reviews/rechecks and future root-assigned integration/unchanged original LinuxCI/
+guarded merge/main-verification gates remain pending. Automatic approval review
+rejected finite issue publication; no issue was created. Push/PR/CI/integration/
+merge remain HOLD. Exact frozen fixture/ordered-patch hashes and limits are in
+../../crates/ktlsp-parser/reviews/c13-qualified-extension-recovery.md.
+#83/#7 OPEN; C13 GAP; T008/T008a HOLD; B3/B4 GAP; B11 UNVERIFIED;96 UNKNOWN;
+historical45/32/10/3 unchanged. No semantic/server/RSS/official-performance claim.

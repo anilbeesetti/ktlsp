@@ -143,9 +143,14 @@ impl Parser {
             } else if probe.consume_if(QUEST) {
                 probe.expect(DOT) && probe.expect(IDENTIFIER)
             } else {
-                !probe.consume_if(DOT)
-                    || (probe.expect(IDENTIFIER)
-                        && (!probe.consume_if(DOT) || probe.expect(IDENTIFIER)))
+                let mut plain = true;
+                while probe.consume_if(DOT) {
+                    if !probe.expect(IDENTIFIER) {
+                        plain = false;
+                        break;
+                    }
+                }
+                plain
             })
             && probe.at(LPAR);
         marker.drop(&mut probe);

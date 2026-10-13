@@ -1,0 +1,12 @@
+Unmodified precompiled fixture from com.google.guava:guava:33.4.8-android
+Member: com/google/common/cache/CacheBuilderSpec$ValueParser.class
+Upstream project: https://github.com/google/guava/
+License: Apache License, Version 2.0; exact generic upstream LICENSE accompanies.
+
+This is authored fixture attribution, not an upstream NOTICE or source header.
+The pinned distribution has no LICENSE or NOTICE member. Its manifest declares
+the Apache-2.0 Bundle-License for Guava. LICENSE.txt is the byte-identical generic
+Guava v33.4.8 license retained by the existing primary-pinned Guava fixtures.
+No selected-source copyright year/header was available within the admitted data
+boundary; no unrelated AbstractIterator.java or Suppliers.java header is reused.
+Full class bytes and original archive manifest are preserved unchanged.

@@ -195,6 +195,12 @@ impl Parser {
     }
 
     pub(crate) fn parse_expression_1(&mut self, message_if_not_expression_first: &str) {
+        self.with_parameter_annotation_context(super::ParameterAnnotationContext::Nested, |p| {
+            p.parse_expression_2(message_if_not_expression_first);
+        });
+    }
+
+    fn parse_expression_2(&mut self, message_if_not_expression_first: &str) {
         if !self.at_set(EXPRESSION_FIRST) {
             self.error(message_if_not_expression_first);
             return;

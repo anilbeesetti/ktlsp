@@ -27,11 +27,12 @@ is never modified by this repair. Full Kotlin grammar and semantic parity remain
 
 Source changes are recorded in two ordered phases:
 
-1. `recovery.patch` changes ten files from the pristine archive: parsing/mod.rs,
-   builder/layers.rs and declarations/{classes,functions,members,modifiers,parameters,type_parameters,types,user_types}.rs.
-2. `formatting.patch` changes 49 files from the current recovery phase (extending historical cc4920d),
-   using pinned Rust 1.99.0 rustfmt with edition 2024. All ten behavioral files
-   are among those 49; the other 39 have formatting changes only. Five source
+1. `recovery.patch` changes fourteen files from the pristine archive: parsing/mod.rs,
+   builder/layers.rs, declarations/{annotations,classes,functions,members,mod,modifiers,parameters,type_parameters,types,user_types}.rs
+   and expressions/{mod,primary}.rs.
+2. `formatting.patch` changes 50 files from the current recovery phase (extending historical cc4920d),
+   using pinned Rust 1.99.0 rustfmt with edition 2024. All fourteen behavioral files
+   are among those 50; the other 36 have formatting changes only. Four source
    files retain pristine bytes. Exact paths are the patch headers; the final
    54-file byte inventory is `formatted-sha256.json`. No formatting opt-out or
    changed root formatting command is used.
@@ -44,7 +45,7 @@ remain unchanged.
 
 The behavioral patch checks ordinary function parameter boundaries, probes existing modifier
 and annotation grammar with rollback, and reports a missing ')' without consuming
-a following declaration. The finite C14 default-entry and C15 parenthesized-type
+a following declaration. The finite C14 default-entry, C15 parenthesized-type and C16 annotation-argument
 repairs are described below.
 Constructor, function-type and context parameter loops keep their original context.
 EOF diagnostics retain upstream behavior. A scoped speculative-probe flag avoids
@@ -53,7 +54,8 @@ work is superlinear in nesting; existing production resource gates remain requir
 
 Known bounded repair limits: missing defaults outside C14's complete simple zero-parameter header,
 malformed parenthesized types outside C15's finite ordinary-parameter/simple-zero-parameter-header
-contract, malformed annotation arguments, and unclosed class generic lists
+contract, malformed annotation arguments outside C16's direct ordinary-parameter/simple-zero-parameter-header
+contract, and unclosed class generic lists
 outside the bounded #100 simple-function-header
 contract can still consume later declarations. These are
 upstream grammar/recovery gaps, not accepted recovery or full grammar parity.
@@ -156,3 +158,32 @@ pending controlled Linux validation are recorded in
 ../../crates/ktlsp-parser/reviews/c15-parenthesized-type-recovery.md. C14 controls,
 C16 residuals and existing incomplete-bound assertions remain unchanged. This
 finite syntax repair leaves #83/#7 open and T008 held; #96 remains OPEN/UNKNOWN.
+
+## C16 ordinary parameter annotation arguments
+
+Only declarations/{annotations,parameters,mod}.rs, expressions/{primary,mod}.rs
+and parsing/mod.rs change in this child. Separate scoped parsing context permits
+bounded sibling recovery only in a direct annotation argument list in eligible
+ordinary parameter modifiers. All ineligible modifiers, annotation callees/type
+arguments, nested expressions, ordinary calls and block/lambda reparses are scoped
+Nested; the latter conservatively excludes local functions in reparsed bodies.
+An actual direct-list stop is consumed by its own parameter before context
+restoration. Scoped callbacks restore normal early returns and speculative
+rollback; no panic-safe guarantee is asserted. Scratch suppression remains
+separate, and the C14 four-terminal probe body and its per-call limits are unchanged
+(internal visibility only widens). Additional individually bounded invocations
+do not establish whole-parser linearity. Existing item-versus-marker diagnostics
+remain distinct; no builder policy or global equal-offset deduplication changes.
+
+Ordered pristine-archive replay recomputed14 behavior/50 formatting/54 final
+source files with4 pristine survivors. Original archive/upstream hashes and
+notices are unchanged. Complete pre-runtime source-derived expectations for
+LF/CRLF/CR, three exact valid LF controls and one lazy-body exclusion are recorded
+in ../../crates/ktlsp-parser/tests/recovery_annotation_arguments.rs and
+../../crates/ktlsp-parser/reviews/c16-annotation-argument-recovery.md. Existing
+C14/C15/classifier/incomplete-bound/resource assertions remain read-only.
+Local preparation is not runtime delivery: same-reviewer source/provenance checks,
+coordinator-assigned Linux all3 and exact-main validation remain required.
+External publication is blocked pending direct child-chat authorization after
+automatic approval rejection. #83/#7 remain open, T008/T008a held, #96 unresolved;
+no full parser or semantic parity is claimed.

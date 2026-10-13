@@ -27,11 +27,11 @@ is never modified by this repair. Full Kotlin grammar and semantic parity remain
 
 Source changes are recorded in two ordered phases:
 
-1. `recovery.patch` changes nine files from the pristine archive: parsing/mod.rs,
-   builder/layers.rs and declarations/{classes,functions,members,modifiers,parameters,type_parameters,user_types}.rs.
+1. `recovery.patch` changes ten files from the pristine archive: parsing/mod.rs,
+   builder/layers.rs and declarations/{classes,functions,members,modifiers,parameters,type_parameters,types,user_types}.rs.
 2. `formatting.patch` changes 49 files from the current recovery phase (extending historical cc4920d),
-   using pinned Rust 1.99.0 rustfmt with edition 2024. All nine behavioral files
-   are among those 49; the other 40 have formatting changes only. Five source
+   using pinned Rust 1.99.0 rustfmt with edition 2024. All ten behavioral files
+   are among those 49; the other 39 have formatting changes only. Five source
    files retain pristine bytes. Exact paths are the patch headers; the final
    54-file byte inventory is `formatted-sha256.json`. No formatting opt-out or
    changed root formatting command is used.
@@ -44,16 +44,17 @@ remain unchanged.
 
 The behavioral patch checks ordinary function parameter boundaries, probes existing modifier
 and annotation grammar with rollback, and reports a missing ')' without consuming
-a following declaration. Nested type parsing remains with existing grammar; the finite C14 default-entry
-repair is described below.
+a following declaration. The finite C14 default-entry and C15 parenthesized-type
+repairs are described below.
 Constructor, function-type and context parameter loops keep their original context.
 EOF diagnostics retain upstream behavior. A scoped speculative-probe flag avoids
 recursive replay when annotation arguments contain anonymous functions. Remaining
 work is superlinear in nesting; existing production resource gates remain required.
 
 Known bounded repair limits: missing defaults outside C14's complete simple zero-parameter header,
-deeply malformed parenthesized types (`x: (@A`), malformed annotation arguments,
-and unclosed class generic lists outside the bounded #100 simple-function-header
+malformed parenthesized types outside C15's finite ordinary-parameter/simple-zero-parameter-header
+contract, malformed annotation arguments, and unclosed class generic lists
+outside the bounded #100 simple-function-header
 contract can still consume later declarations. These are
 upstream grammar/recovery gaps, not accepted recovery or full grammar parity.
 Missing simple types and open generic argument types improve recovery but retain
@@ -132,3 +133,26 @@ final source files with5 pristine survivors, not inferred from historical counts
 Source-frozen expectations and review requirements are in
 ../../crates/ktlsp-parser/reviews/c14-default-recovery.md. Controlled Linux validation
 and coordinator delivery gates remain required; no new Darwin execution is used.
+
+## C15 / #123 ordinary malformed parenthesized type
+
+Only parameters.rs and types.rs change behavior in this child. The ordinary-list
+call-local context also reaches parameter type contents, recursively through
+parentheses and intersections. General, constructor, function-type, annotation,
+type-argument and classifier entries retain their existing context. Before
+parenthesized-type rollback into function-type parsing, the unchanged C14 bounded
+scratch grammar header check can retain the damaged type and annotation, leaving
+the complete simple named function for the outer declaration loop. No parser
+state field, new probe implementation, dependency, builder policy or resource change is
+introduced. Existing same-lexeme error-item behavior preserves the deepest
+Type expected diagnostic, without blanket equal-offset error-marker suppression.
+
+Ordered replay from the original checksummed archive recomputed10 behavior/49
+formatting/54 final source files with5 pristine survivors. Archive/upstream hashes
+and notices are unchanged. Complete source-derived expectations for three original
+newline spellings and four valid LF controls are frozen in
+../../crates/ktlsp-parser/tests/recovery_parenthesized_types.rs; source review and
+pending controlled Linux validation are recorded in
+../../crates/ktlsp-parser/reviews/c15-parenthesized-type-recovery.md. C14 controls,
+C16 residuals and existing incomplete-bound assertions remain unchanged. This
+finite syntax repair leaves #83/#7 open and T008 held; #96 remains OPEN/UNKNOWN.

@@ -2113,8 +2113,8 @@
              self.advance(); // VAR_KEYWORD | VAL_KEYWORD
          }
  
--        if !self.parse_function_parameter_rest(type_required, recover_default) && rollback_on_failure {
-+        if !self.parse_function_parameter_rest(type_required, recover_default)
+-        if !self.parse_function_parameter_rest(type_required, recover_declarations) && rollback_on_failure {
++        if !self.parse_function_parameter_rest(type_required, recover_declarations)
 +            && rollback_on_failure
 +        {
              parameter.rollback_to(self);
@@ -2124,18 +2124,18 @@
       *   : parameter ("=" element)?
       *   ;
       */
--    fn parse_function_parameter_rest(&mut self, type_required: bool, recover_default: bool) -> bool {
+-    fn parse_function_parameter_rest(&mut self, type_required: bool, recover_declarations: bool) -> bool {
 +    fn parse_function_parameter_rest(
 +        &mut self,
 +        type_required: bool,
-+        recover_default: bool,
++        recover_declarations: bool,
 +    ) -> bool {
          let mut no_errors = true;
  
          if self.at(COMMA) || self.at(RPAR) {
 @@ -266,7 +298,11 @@
              self.advance(); // COLON
-             self.parse_type_ref();
+             self.parse_parameter_type_ref(recover_declarations);
          } else {
 -            self.expect_3(IDENTIFIER, "Parameter name expected", Some(PARAMETER_NAME_RECOVERY_SET));
 +            self.expect_3(
@@ -2148,7 +2148,7 @@
                  self.advance(); // COLON
 @@ -280,7 +316,10 @@
  
-                 self.parse_type_ref();
+                 self.parse_parameter_type_ref(recover_declarations);
              } else if type_required {
 -                self.error_with_recovery("Parameters must have type annotation", Some(PARAMETER_NAME_RECOVERY_SET));
 +                self.error_with_recovery(
@@ -2480,51 +2480,60 @@
  
 --- a/src/parsing/declarations/types.rs
 +++ b/src/parsing/declarations/types.rs
-@@ -29,21 +29,36 @@
+@@ -29,25 +29,47 @@
      }
  
      pub(crate) fn parse_type_ref_without_intersections(&mut self) {
--        self.parse_type_ref_2(TokenSet::EMPTY, /* allowSimpleIntersectionTypes */ false);
+-        self.parse_type_ref_2(TokenSet::EMPTY, /* allowSimpleIntersectionTypes */ false, false);
 +        self.parse_type_ref_2(
 +            TokenSet::EMPTY,
 +            /* allowSimpleIntersectionTypes */ false,
++            false,
 +        );
      }
  
      pub(crate) fn parse_type_ref_1(&mut self, extra_recovery_set: TokenSet) {
--        self.parse_type_ref_2(extra_recovery_set, /* allowSimpleIntersectionTypes */ true);
--    }
--
--    fn parse_type_ref_2(&mut self, extra_recovery_set: TokenSet, allow_simple_intersection_types: bool) {
--        let type_ref_marker = self.parse_type_ref_contents(extra_recovery_set, allow_simple_intersection_types);
+-        self.parse_type_ref_2(extra_recovery_set, /* allowSimpleIntersectionTypes */ true, false);
 +        self.parse_type_ref_2(
 +            extra_recovery_set,
 +            /* allowSimpleIntersectionTypes */ true,
++            false,
 +        );
-+    }
-+
+     }
+ 
+     pub(super) fn parse_parameter_type_ref(&mut self, recover_declarations: bool) {
+         self.parse_type_ref_2(TokenSet::EMPTY, true, recover_declarations);
+     }
+ 
+-    fn parse_type_ref_2(&mut self, extra_recovery_set: TokenSet, allow_simple_intersection_types: bool, recover_parenthesized: bool) {
+-        let type_ref_marker = self.parse_type_ref_contents(extra_recovery_set, allow_simple_intersection_types, recover_parenthesized);
 +    fn parse_type_ref_2(
 +        &mut self,
 +        extra_recovery_set: TokenSet,
 +        allow_simple_intersection_types: bool,
++        recover_parenthesized: bool,
 +    ) {
-+        let type_ref_marker =
-+            self.parse_type_ref_contents(extra_recovery_set, allow_simple_intersection_types);
++        let type_ref_marker = self.parse_type_ref_contents(
++            extra_recovery_set,
++            allow_simple_intersection_types,
++            recover_parenthesized,
++        );
          type_ref_marker.done(self, TYPE_REFERENCE);
      }
  
      // The extraRecoverySet is needed for the foo(bar<x, 1, y>(z)) case, to tell whether we should stop
      // on expression-indicating symbols or not
--    fn parse_type_ref_contents(&mut self, extra_recovery_set: TokenSet, allow_simple_intersection_types: bool) -> Marker {
+-    fn parse_type_ref_contents(&mut self, extra_recovery_set: TokenSet, allow_simple_intersection_types: bool, recover_parenthesized: bool) -> Marker {
 +    fn parse_type_ref_contents(
 +        &mut self,
 +        extra_recovery_set: TokenSet,
 +        allow_simple_intersection_types: bool,
++        recover_parenthesized: bool,
 +    ) -> Marker {
          let type_ref_marker = self.mark();
  
          self.parse_type_modifier_list();
-@@ -70,7 +85,10 @@
+@@ -74,7 +96,10 @@
              let dynamic_type = self.mark();
              self.advance(); // DYNAMIC_KEYWORD
              dynamic_type.done(self, DYNAMIC_TYPE);
@@ -2536,19 +2545,20 @@
              self.parse_user_type();
          } else if self.at(LPAR) {
              let function_or_parenthesized_type = self.mark();
-@@ -78,7 +96,10 @@
+@@ -82,7 +107,11 @@
              // This may be a function parameter list or just a parenthesized type
              self.advance(); // LPAR
              // parenthesized types, no reference element around it is needed
--            let contents = self.parse_type_ref_contents(TokenSet::EMPTY, /* allowSimpleIntersectionTypes */ true);
+-            let contents = self.parse_type_ref_contents(TokenSet::EMPTY, /* allowSimpleIntersectionTypes */ true, recover_parenthesized);
 +            let contents = self.parse_type_ref_contents(
 +                TokenSet::EMPTY,
 +                /* allowSimpleIntersectionTypes */ true,
++                recover_parenthesized,
 +            );
              contents.drop(self);
  
-             if self.at(RPAR) && self.lookahead(1) != Some(ARROW) {
-@@ -101,7 +122,9 @@
+             if recover_parenthesized && self.at_simple_function_header() {
+@@ -109,7 +138,9 @@
                  "Type expected",
                  Some(TokenSet::or_set(&[
                      TOP_LEVEL_DECLARATION_FIRST,
@@ -2559,19 +2569,20 @@
                      extra_recovery_set,
                  ])),
              );
-@@ -124,7 +147,10 @@
+@@ -132,7 +163,11 @@
              left_type_ref.done(self, TYPE_REFERENCE);
  
              self.advance(); // &
--            self.parse_type_ref_2(extra_recovery_set, /* allowSimpleIntersectionTypes */ true);
+-            self.parse_type_ref_2(extra_recovery_set, /* allowSimpleIntersectionTypes */ true, recover_parenthesized);
 +            self.parse_type_ref_2(
 +                extra_recovery_set,
 +                /* allowSimpleIntersectionTypes */ true,
++                recover_parenthesized,
 +            );
  
              intersection_type.done(self, INTERSECTION_TYPE);
              was_intersection = true;
-@@ -159,7 +185,9 @@
+@@ -167,7 +202,9 @@
                  "Function type expected expected",
                  Some(TokenSet::or_set(&[
                      TOP_LEVEL_DECLARATION_FIRST,

@@ -109,26 +109,15 @@ fn missing_default_restores_later_function_as_sibling() {
 }
 
 #[test]
-fn malformed_parenthesized_type_consumes_later_function_header() {
-    // shortcut: C15 must preserve the later declaration beyond nested type parsing.
+fn malformed_parenthesized_type_restores_later_function_as_sibling() {
     let source = "fun broken(x: (@A\nfun healthy() = 2";
     check(
         source,
-        vec![("FUN", 0, 30, "KT_FILE", None, vec![("broken", 4, 10)])],
-        &[
-            (17, 17, "Type expected"),
-            (18, 21, "Expecting ')'"),
-            (
-                21,
-                21,
-                "Expecting '->' to specify return type of a function type",
-            ),
-            (29, 29, "Expecting comma or ')'"),
-            (29, 30, "Expecting ')'"),
-            (30, 31, "Expecting a top level declaration"),
-            (32, 33, "Expecting a top level declaration"),
-            (34, 35, "Expecting a top level declaration"),
+        vec![
+            ("FUN", 0, 17, "KT_FILE", None, vec![("broken", 4, 10)]),
+            ("FUN", 18, 35, "KT_FILE", None, vec![("healthy", 22, 29)]),
         ],
+        &[(17, 17, "Type expected")],
     );
 }
 

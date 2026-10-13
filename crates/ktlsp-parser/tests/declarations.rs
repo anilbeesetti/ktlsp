@@ -489,28 +489,7 @@ fn snapshots_reject_changed_revision_document_kind_and_reused_identity() {
 }
 
 #[test]
-fn unresolved_generic_recovery_gate_is_recorded() {
-    {
-        let source = "class Box<T\nfun healthy() = 2\n";
-        let parsed = parse(source);
-        assert!(!parsed.diagnostics().is_empty());
-        // This is a known defect assertion, not acceptance of ordinary recovery.
-        assert!(
-            !parsed
-                .elements()
-                .iter()
-                .any(|e| e.kind == "FUN" && source[e.start..e.end].starts_with("fun healthy"))
-        );
-        assert_eq!(
-            parsed
-                .elements()
-                .iter()
-                .filter(|e| e.token)
-                .map(|e| &source[e.start..e.end])
-                .collect::<String>(),
-            source
-        );
-    }
+fn token_loss_still_rejects_coverage_and_allows_healthy_followup() {
     assert_eq!(
         parser()
             .parse(
@@ -784,4 +763,274 @@ fn malformed_member_parameters_preserve_initializers_and_constructors() {
         (d.start, d.end, d.message.as_str()),
         (21, 21, "Expecting ')'")
     );
+}
+
+#[test]
+fn unclosed_classifier_generics_restore_named_sibling_snapshots() {
+    for newline in ["\n", "\r\n", "\r"] {
+        for (prefix, suffix, outer_kind, immediate_parent) in [
+            ("", "", None, "KT_FILE"),
+            ("class Host {\n", "}", Some("CLASS"), "CLASS_BODY"),
+            ("fun outer() {\n", "}", Some("FUN"), "BLOCK"),
+        ] {
+            for (broken, name_offset, error) in [
+                ("class Box<T", 6, "Missing '>'"),
+                ("interface Box<T", 10, "Missing '>'"),
+                ("class Box<", 6, "Type parameter declaration expected"),
+                ("class Box<T,", 6, "Type parameter declaration expected"),
+                ("class Box<T : Map<String, List<Int>>", 6, "Missing '>'"),
+                ("class Box<T : (Int) -> String", 6, "Missing '>'"),
+            ] {
+                let healthy = "@A public fun `healthy 🦀e\u{301}`() = 2";
+                let source = format!("{prefix}{broken}{newline}{healthy}{newline}{suffix}");
+                let snapshot =
+                    SourceSnapshot::new("generic-recovery", 11, FileKind::Source, source.as_str())
+                        .unwrap();
+                let result = parser()
+                    .parse_snapshot(&snapshot, &AtomicBool::new(false))
+                    .unwrap();
+                let parsed = result.tree_for(&snapshot).unwrap();
+                let owner = outer_kind.map(|_| 0);
+                let mut expected = vec![
+                    (
+                        "CLASS",
+                        broken,
+                        immediate_parent,
+                        owner,
+                        Some(("Box", name_offset)),
+                    ),
+                    (
+                        "FUN",
+                        healthy,
+                        immediate_parent,
+                        owner,
+                        Some(("`healthy 🦀e\u{301}`", 14)),
+                    ),
+                ];
+                if let Some(kind) = outer_kind {
+                    expected.insert(
+                        0,
+                        (
+                            kind,
+                            source.as_str(),
+                            "KT_FILE",
+                            None,
+                            Some(if kind == "CLASS" {
+                                ("Host", 6)
+                            } else {
+                                ("outer", 4)
+                            }),
+                        ),
+                    );
+                }
+                let boundary = prefix.len() + broken.len();
+                check_tree(parsed, &source, &expected, &[(boundary, boundary, error)]);
+                let list_start = prefix.len() + broken.find('<').unwrap();
+                let list = parsed
+                    .elements()
+                    .iter()
+                    .find(|e| !e.token && e.kind == "TYPE_PARAMETER_LIST")
+                    .unwrap();
+                assert_eq!((list.start, list.end), (list_start, boundary));
+                assert_eq!(result.snapshot(), &snapshot);
+                assert_eq!(snapshot.source(), source);
+                if newline == "\r\n" {
+                    assert!(parsed.position(boundary + 1).is_err());
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn generic_recovery_uses_header_grammar_without_newline_dependency() {
+    for (separator, healthy, name, offset) in [
+        ("\n", "fun healthy() = 2", "healthy", 4),
+        (" ", "fun healthy() = 2", "healthy", 4),
+        ("\n", "fun get() = 2", "get", 4),
+        ("\n", "@A public fun healthy() = 2", "healthy", 14),
+        ("\n", "@A(1 < 2) fun healthy() = 2", "healthy", 14),
+        (
+            "\n",
+            "@A(\n1 > 0\n) public fun healthy() = 2",
+            "healthy",
+            23,
+        ),
+    ] {
+        let source = format!("class Box<T{separator}{healthy}\n");
+        check(
+            &source,
+            &[
+                ("CLASS", "class Box<T", "KT_FILE", None, Some(("Box", 6))),
+                ("FUN", healthy, "KT_FILE", None, Some((name, offset))),
+            ],
+            &[(11, 11, "Missing '>'")],
+        );
+    }
+}
+
+#[test]
+fn valid_classifier_generics_and_nonclass_callers_are_preserved() {
+    for source in [
+        "class Box<\n @A out T : Map<String, List<Int>>,\n get : Comparable<get>,\n> where T : Any\nfun healthy() = 2",
+        "class Box<T : (Int) -> String> @A constructor(val value: T) { fun healthy() = 2 }",
+        "class Box<@A(\"fun healthy(\") T>\nfun healthy() = 2",
+        "class Box<T : @A(1 < 2) List<Int>?>\nfun healthy() = 2",
+        "class Box<T : (@A Int)?>\nfun healthy() = 2",
+        "fun <T : Map<String, List<Int>>> healthy() = 2",
+        "fun <T> T.healthy() = this",
+        "val <T> T.healthy: T get() = this",
+        "typealias Box<T> = List<T>",
+    ] {
+        let parsed = parse(source);
+        assert!(
+            parsed.diagnostics().is_empty(),
+            "{source:?}: {:?}",
+            parsed.diagnostics()
+        );
+        assert_eq!(parsed.source(), source);
+        assert_eq!(
+            parsed
+                .elements()
+                .iter()
+                .filter(|e| e.token)
+                .map(|e| &source[e.start..e.end])
+                .collect::<String>(),
+            source
+        );
+    }
+}
+
+#[test]
+fn failed_generic_probes_preserve_type_parameters_and_existing_recovery() {
+    for source in [
+        "class Box<@A(1 < 2) public : Any>\nfun healthy() = 2",
+        "class Box<public, private : Map<String, Int>>\nfun healthy() = 2",
+    ] {
+        let class = source.split('\n').next().unwrap();
+        let parsed = check(
+            source,
+            &[
+                ("CLASS", class, "KT_FILE", None, Some(("Box", 6))),
+                (
+                    "FUN",
+                    "fun healthy() = 2",
+                    "KT_FILE",
+                    None,
+                    Some(("healthy", 4)),
+                ),
+            ],
+            &[],
+        );
+        let names: Vec<_> = parsed
+            .elements()
+            .iter()
+            .filter(|e| {
+                e.token
+                    && e.kind == "IDENTIFIER"
+                    && e.parent
+                        .is_some_and(|p| parsed.elements()[p].kind == "TYPE_PARAMETER")
+            })
+            .map(|e| &source[e.start..e.end])
+            .collect();
+        assert_eq!(
+            names,
+            if source.contains("@A") {
+                vec!["public"]
+            } else {
+                vec!["public", "private"]
+            }
+        );
+    }
+    for broken in [
+        "class Box<T : List<Int",
+        "class Box<T : (Int",
+        "class Box<T : Int.",
+        "class Box<T : Int &",
+        "class Box<T : @A(1",
+    ] {
+        let source = format!("{broken}\nfun healthy() = 2");
+        let parsed = parse(&source);
+        assert!(!parsed.diagnostics().is_empty());
+        assert!(
+            !parsed.elements().iter().any(|e| !e.token
+                && e.kind == "FUN"
+                && e.parent
+                    .is_some_and(|p| parsed.elements()[p].kind == "KT_FILE")
+                && &source[e.start..e.end] == "fun healthy() = 2"),
+            "{source:?}"
+        );
+        if broken.contains("@A") {
+            let (id, function) = parsed
+                .elements()
+                .iter()
+                .enumerate()
+                .find(|(_, e)| {
+                    !e.token && e.kind == "FUN" && &source[e.start..e.end] == "fun healthy() = 2"
+                })
+                .unwrap();
+            assert_eq!(
+                (function.start, function.end),
+                (broken.len() + 1, source.len())
+            );
+            assert_eq!(
+                parsed.elements()[function.parent.unwrap()].kind,
+                "VALUE_ARGUMENT"
+            );
+            assert!(parsed.elements().iter().any(|e| e.token
+                && e.parent == Some(id)
+                && e.kind == "IDENTIFIER"
+                && (e.start, e.end) == (broken.len() + 5, broken.len() + 12)));
+            for kind in ["CLASS", "TYPE_PARAMETER_LIST"] {
+                let node = parsed
+                    .elements()
+                    .iter()
+                    .find(|e| !e.token && e.kind == kind)
+                    .unwrap();
+                assert_eq!(
+                    (node.start, node.end),
+                    (if kind == "CLASS" { 0 } else { 9 }, source.len())
+                );
+            }
+        }
+        assert_eq!(
+            parsed
+                .elements()
+                .iter()
+                .filter(|e| e.token)
+                .map(|e| &source[e.start..e.end])
+                .collect::<String>(),
+            source
+        );
+    }
+    for header in [
+        "fun",
+        "fun () = 2",
+        "fun <U> healthy() = 2",
+        "fun String.healthy() = 2",
+        "val later = 1",
+        "@A(\nfun healthy() = 2",
+    ] {
+        let source = format!("class Box<T\n{header}");
+        let parsed = parse(&source);
+        assert!(!parsed.diagnostics().is_empty());
+        let class = parsed
+            .elements()
+            .iter()
+            .find(|e| !e.token && e.kind == "CLASS")
+            .unwrap();
+        assert!(
+            class.end > "class Box<T".len(),
+            "excluded header unexpectedly triggered recovery: {source:?}"
+        );
+        assert_eq!(
+            parsed
+                .elements()
+                .iter()
+                .filter(|e| e.token)
+                .map(|e| &source[e.start..e.end])
+                .collect::<String>(),
+            source
+        );
+    }
 }

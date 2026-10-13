@@ -19,6 +19,55 @@ fn is_offset_beyond_eof(eof_position: i32, offset_from_current: i32) -> bool {
     eof_position >= 0 && offset_from_current >= eof_position
 }
 
+const fn effective_truncation(layers: &[Layer]) -> Option<i32> {
+    let mut minimum = None;
+    let mut index = 0;
+    while index < layers.len() {
+        if let Layer::Truncated { eof_position } = layers[index] {
+            if eof_position >= 0 {
+                minimum = Some(match minimum {
+                    Some(previous) if previous < eof_position => previous,
+                    _ => eof_position,
+                });
+            }
+        }
+        index += 1;
+    }
+    minimum
+}
+
+const _: () = {
+    use Layer::{ForByClause, Truncated};
+    assert!(matches!(effective_truncation(&[]), None));
+    assert!(matches!(
+        effective_truncation(&[Truncated { eof_position: -1 }]),
+        None
+    ));
+    assert!(matches!(
+        effective_truncation(&[
+            Truncated { eof_position: 12 },
+            ForByClause { stack_size: 1 },
+            Truncated { eof_position: 4 }
+        ]),
+        Some(4)
+    ));
+    assert!(matches!(
+        effective_truncation(&[
+            Truncated { eof_position: 4 },
+            Truncated { eof_position: -1 },
+            Truncated { eof_position: 12 }
+        ]),
+        Some(4)
+    ));
+    assert!(matches!(
+        effective_truncation(&[
+            Truncated { eof_position: 0 },
+            Truncated { eof_position: 12 }
+        ]),
+        Some(0)
+    ));
+};
+
 impl SemanticWhitespaceAwarePsiBuilder {
     pub fn push_layer(&mut self, layer: Layer) -> usize {
         self.layers.push(layer);
@@ -51,6 +100,10 @@ impl SemanticWhitespaceAwarePsiBuilder {
             Layer::Truncated { eof_position } => Some(eof_position),
             Layer::ForByClause { .. } => None,
         })
+    }
+
+    pub(crate) fn effective_truncated_eof_position(&self) -> Option<i32> {
+        effective_truncation(&self.layers)
     }
 
     pub fn eof(&mut self) -> bool {

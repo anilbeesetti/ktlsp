@@ -73,8 +73,11 @@ impl Parser {
             }
         }
 
-        let type_parameters_declared =
-            self.parse_type_parameter_list(TYPE_PARAMETER_GT_RECOVERY_SET);
+        let (type_parameters_declared, recovered_function) =
+            self.parse_classifier_type_parameters(TYPE_PARAMETER_GT_RECOVERY_SET, !object);
+        if recovered_function {
+            return CLASS;
+        }
 
         let before_constructor_modifiers = self.mark();
         let primary_constructor_marker = self.mark();

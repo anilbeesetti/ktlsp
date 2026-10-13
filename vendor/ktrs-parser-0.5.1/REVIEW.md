@@ -289,3 +289,23 @@ admitted source and issue publication; push/PR require held-source clearance and
 merge requires the root expected-head grant. #7/#83/#96 OPEN/Darwin UNKNOWN;
 broaderC13/B3/B4 GAP,B11 UNVERIFIED,T008/T008a HOLD. No semantic/full-parity,
 whole-parser complexity,RSS,official-performance or Darwin-fix claim.
+
+### Held-source review correction before native execution
+
+Initial held head e65344987bc2d2886ee73fefedcca847405b9ad9 is retained.
+SAME independent source reviews found that raw-chain127's frozen downstream-guard
+control cannot require an accepted CST: after scratch decline, MissingGT consumes
+FUN, leaving259 simple top-level error tokens plus that one diagnostic. The worker
+checks diagnostic count260>256 before tree-depth serialization and returns exact
+OutputLimit. Its unchanged literal control now asserts ParserError::OutputLimit,
+prior-snapshot immutability and healthy followup. The two frozen NestingLimit cases
+remain exact. No fixture, product limit or predicate change was made.
+
+Object no-recovery now additionally requires object.end>12 and no direct KT_FILE
+FUN at13. parse_object discards its inner SyntaxKind, so merely requiring root
+OBJECT_DECLARATION would miss forbidden early recovery. Resource prior snapshot,
+source,elements and diagnostics are captured BEFORE the failing request and checked
+immediately afterward, then again through healthy revision2. Initial findings and
+architect's tentative concern/incorrect withdrawal/correction remain in external
+receipts; corrected-head actual SAME2+architect rechecks and original CI remain
+required. No local native/parser/worker/test runtime executed.

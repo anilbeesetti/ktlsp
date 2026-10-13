@@ -1,15 +1,23 @@
-# Kotlin 2.3 declaration baseline v1 — #86/#87/#100, partial #83
+# Kotlin 2.3 declaration baseline v1 — #86/#87/#100/#104, partial #83
 
 This independently authored native corpus pins the source-local ktrs-parser 0.5.1 fork and registry syntax 0.5.1, not
 compiler or official LSP parity. Source literals and exact expected extents,
 declaration-relative name offsets, immediate CST parents, nearest declaration
-parents, and diagnostic spans/messages live in `tests/declarations.rs`. Expectations
+parents, and diagnostic spans/messages live in `tests/declarations.rs` and
+`tests/recovery_residuals.rs`. Expectations
 are hand-authored, not captured worker snapshots. Every parse uses the real
 supervised Rust worker. The parser crate has no provider/HIR/server caller.
-The #87 delivery gate requires exact-head production execution and behavioral
-review; current evidence is recorded in REVIEW.md and PR90.
+Delivered recovery is recorded in PR90/#87 and PR102/#100. The final refreshed
+[#83 audit](https://github.com/anilbeesetti/ktlsp/issues/83#issuecomment-6130232640)
+freezes parser source `ab00d55557cfea9bcee87aa41fe2922f82770027`. C17/#104 starts
+from actual main `4d27673f703fd3c7b0ee57fc7a3cf35c6c21f05f`; only delivered metadata
+changed between those checkpoints. The C17 delta changes no parser/vendor/API/worker/Cargo/lock files. Its one final
+integration base is `0a1a863744a2bc520dac46792a5ce1eebe5b70dc` (delivered PR106/C12);
+all inherited source, existing tests, dependencies and tools are preserved.
+The audit classification SHA256 is
+`b54043bde87143ce0310e18cb2a67bc5f46fcd7b285966e3a3f8076d9267fb1c`.
 
-## Accepted fixtures
+## Declaration fixtures and assertion limits
 
 | Named test | Contract |
 | --- | --- |
@@ -23,8 +31,21 @@ review; current evidence is recorded in REVIEW.md and PR90.
 | repeated_parameter_recovery_retains_annotation_prefix_and_eof | two broken lists preserve annotated next declaration and later typealias; exact EOF diagnostics |
 | valid_parameter_contexts_preserve_default_declarations | nested anonymous function/object declarations retain local parents/ranges; multiline/default/lambda/call/generic/annotation/receiver/constructor/function-type controls |
 | malformed_member_parameters_preserve_initializers_and_constructors | initializer/secondary constructor retain original spans and class ownership; local property belongs to initializer |
-| recovery_limits integration tests | bounded nested annotation probing, strict postparse NestingLimit, repeated recovery through 100 points, balanced raw-delimiter diagnostic overflow, healthy followups |
+| recovery_limits integration tests | nested annotation controls now pin all anonymous FUN identities/ranges/owners and absent direct names; repeated recovery pins the healthy direct name; strict NestingLimit/diagnostic-overflow and healthy followups remain; generic threshold/leading-trivia/aggregate/scratch controls remain resource-only |
+| valid_classifier_generics_and_nonclass_callers_are_preserved | exact class/named function/property/typealias projections for all nine existing valid controls, including constructor function-type bound and receiver generics |
 | snapshots_reject_changed_revision_document_kind_and_reused_identity | exact immutable input/result association, stale revisions/documents/kinds/same-revision changed text, cancellation and retained original |
+
+C12/#103 was delivered in [PR106](https://github.com/anilbeesetti/ktlsp/pull/106),
+merge `0a1a863744a2bc520dac46792a5ce1eebe5b70dc`. It adds exact projections to the
+six parameter/default and nine classifier/nonclass valid controls, original
+snapshot property and member recovery, plus anonymous annotation ownership and
+the repeated-recovery healthy name. Existing fixture literals/invocations remain
+unchanged. [Exact merged-main Linux CI](https://github.com/anilbeesetti/ktlsp/actions/runs/38332673276/job/115085727770)
+passed all three pinned commands: 226 active tests, two exercised ignored helpers
+and 19 separately counted protocol faults. Generic threshold/leading-trivia/
+aggregate/scratch controls remain resource-only; C12 adds assertions, not recovery
+or B3–B5 resource evidence. The frozen audit above describes the earlier source
+checkpoint; this paragraph records only the subsequently delivered C12 delta.
 
 Nodes use upstream kinds without inventing an interface kind. An omitted package
 is an empty PACKAGE_DIRECTIVE, excluded from the named-declaration projection;
@@ -48,16 +69,64 @@ This does not accept all malformed syntax or complete #83/#7 recovery.
 `unclosed_classifier_generics_restore_named_sibling_snapshots` replaces the recorded
 class-generic defect with exact class/list, sibling kind/name/range/parent
 and diagnostic expectations. Entry-boundary errors retain same-offset deduplication.
-Candidate Linux execution and both reviews passed; stable integration remains required.
+PR102/#100 delivered the bounded repair; exact final evidence appears below.
 `token_loss_still_rejects_coverage_and_allows_healthy_followup` separately preserves
 Coverage rejection for `{fun<)]<T:@( {})` and its healthy followup.
 
-Other individually named upstream limits remain: a missing default (`x: Int =`
-followed by named `fun`), deeply malformed parenthesized type (`x: (@A`) and
-malformed annotation arguments can still consume later declarations. Recovery
-inside those nested grammar productions is outside the parameter-boundary repair.
-Missing simple types/open generic argument types may recover with upstream
-same-position diagnostic deduplication (e.g. only `Type expected`).
+## C17 finite residual ledger — #104
+
+`tests/recovery_residuals.rs` supplies the three previously missing complete inputs.
+Each literal ends at `2` with **no terminal newline**; all use Source mode through
+production `parse_snapshot`/`tree_for`, document `c17`, revision 17. Assertions pin
+all CLASS/OBJECT_DECLARATION/FUN/PROPERTY/TYPEALIAS nodes, exact direct identifiers,
+original spans, immediate CST parents and nearest declaration spans, the complete
+diagnostic sequence, immutable snapshot association and contiguous original token
+partition. Revision 18 parses `fun healthy() = 2` with exact FUN/name/parent/range
+and no diagnostics, then rechecks the original result. No tree is reconstructed.
+These known-defect assertions are **required recovery GAPs**, not accepted recovery.
+The exact diagnostic tuples are independently authored in the test, not whole-tree
+snapshots. Exact-head execution/review/delivery status is recorded in
+[PR109](https://github.com/anilbeesetti/ktlsp/pull/109); this source-authored contract
+does not substitute for that controlled Linux evidence.
+
+| Audit family / exact source literal | Named assertion / expected current defect |
+| --- | --- |
+| C14 `fun broken(x: Int =\nfun healthy() = 2` | `missing_default_consumes_later_function_as_parameter_expression`: broken FUN consumes the file; healthy FUN belongs to VALUE_PARAMETER inside broken instead of KT_FILE |
+| C15 `fun broken(x: (@A\nfun healthy() = 2` | `malformed_parenthesized_type_consumes_later_function_header`: broken FUN consumes the later header; healthy has no declaration node; exact diagnostic spans distinguish the nested type failure and remaining top-level tokens |
+| C16 `fun broken(@A(\nfun healthy() = 2` | `malformed_parameter_annotation_consumes_later_function_as_argument`: healthy FUN belongs to VALUE_ARGUMENT inside broken's unclosed parameter annotation; this is the smallest named representative of the audit's fragment-only annotation family |
+
+The following existing inputs/assertions in declarations.rs
+`failed_generic_probes_preserve_type_parameters_and_existing_recovery` are reused,
+not duplicated. Their current expectations are narrower negative evidence, not full
+exact declaration/diagnostic projections. All append the stated header after one LF.
+
+| Existing complete input construction | Existing asserted outcome and limit |
+| --- | --- |
+| `class Box<T : List<Int\nfun healthy() = 2` | diagnostics nonempty; healthy is not an exact KT_FILE FUN; original token spelling retained |
+| `class Box<T : (Int\nfun healthy() = 2` | same bounded negative assertions |
+| `class Box<T : Int.\nfun healthy() = 2` | same bounded negative assertions |
+| `class Box<T : Int &\nfun healthy() = 2` | same bounded negative assertions |
+| `class Box<T : @A(1\nfun healthy() = 2` | same assertions plus exact nested healthy FUN/name span under VALUE_ARGUMENT and class/type-list extents through EOF |
+| `class Box<T\n` + `fun`, `fun () = 2`, `fun <U> healthy() = 2`, `fun String.healthy() = 2`, `val later = 1`, or `@A(\nfun healthy() = 2` | six excluded header inputs: diagnostics nonempty, class extends past `class Box<T`, original token spelling retained; no exact complete projection claimed |
+
+Other callers outside #100's classifier-owned type-parameter repair are contract
+exclusions, not demonstrated grammar failures. Existing
+`valid_classifier_generics_and_nonclass_callers_are_preserved` covers valid function,
+property and typealias generic lists and a class constructor with a function-type
+bound. `generic_recovery_uses_header_grammar_without_newline_dependency` covers
+classifier entry/header spellings. Neither supplies an object fixture; object
+behavior is unverified here. C12 supplies exact selected declarations for these
+existing accepted controls. No new caller matrix is inferred. Missing simple types/open generic arguments retain the existing upstream
+same-position diagnostic deduplication behavior; they are not new C17 cases.
+
+Smallest next repairs: first C14 at parameter-default expression entry while
+preserving valid nested default declarations; then C15 at parenthesized/function-type
+recovery with annotated-type controls; then C16 at annotation value-argument parsing
+with legitimate nested-function controls. Each needs its own accepted child and
+exclusive parser/vendor/provenance ownership transfer after this fixture lane.
+Generic/extension sibling improvements are separate finite contracts if admitted.
+No C14–C16 repair is claimed here; the distinct C12 assertion delivery is recorded
+above without changing the residual classifications.
 
 #83/#7 remain open and T008a remains blocked on the remaining parent acceptance
 and individually named recovery/resource gaps.
@@ -112,9 +181,9 @@ Abort fixtures allow WorkerFailed or Timeout: the supervisor checks the deadline
 before observing exit status, and abort completion can cross it. Normal nonzero
 exit, hang/no-read, output, and healthy-followup assertions remain strict.
 
-## #100 classifier-generic recovery candidate
+## Delivered #100 classifier-generic recovery
 
-The candidate recovers simple named sibling function headers after incomplete
+PR102 recovers simple named sibling function headers after incomplete
 class/interface type-parameter lists at parameter entries or after completed
 parameters/bounds. Optional complete annotations/modifiers stay with the function.
 Newlines and keywords alone do not establish a recovery boundary. Generic and
@@ -129,12 +198,17 @@ charge and remains bounded by the input limit and advancing parser cursor.
 Exceeding the scratch limits declines recovery without changing global budgets,
 Coverage rejection, snapshot identity, strict result validation or the 500 ms
 worker deadline. No server provider or semantic API changes. Exact independent
-regressions are in declarations.rs/recovery_limits.rs. Authorized Linux CI and
-both independent behavioral reviews passed for candidate054e352 on the actual
-synthetic merge86bbd04: 169 active tests, zero failures, two exercised helper
-fixtures and 19 worker fault cases. Exact checkout/tree evidence is in REVIEW.md.
-Local format/Clippy and ordered patch/hash replay also passed. Authorized main ef120be was integrated once; final combined-head CI/reviews and
-coordinator merge grant remain required. This is not a completed-delivery claim. Issue #96 remains unresolved.
+regressions are in declarations.rs/recovery_limits.rs. Final reviewed head `d7da79ddeea95901327d774382a37740445a0ef7`, CI checkout
+`78c55c4bfb5629704bfdb11203f869af2e24781c` and merge
+`ab00d55557cfea9bcee87aa41fe2922f82770027` share tree
+`2d46fd856392f961af4c727b9f6ff7f3a561ae09`. Renewed independent correctness,
+adversarial and architect reviews approved; the coordinator granted the guarded merge.
+[Final merged-main Linux CI](https://github.com/anilbeesetti/ktlsp/actions/runs/38289885940/job/114947148613)
+passed all three pinned commands: 192 active tests, two exercised helper fixtures,
+19 separately counted protocol faults. #100 is closed; #83/#7 remain open and T008a
+blocked. Historical candidate prose in REVIEW/vendor evidence is superseded for
+**delivery status** by final PR102/audit evidence; no earlier runs are relabeled.
+Issue #96 remains OPEN/UNKNOWN; Linux passes do not establish Darwin reliability.
 
 The coordinator explicitly amended the accounting contract after a focused audit:
 leading trivia and cheap kind/modifier/EOF prefilter misses may remain outside
@@ -142,8 +216,9 @@ the copied-token allowance. Every eligible scratch window is charged before
 grammar evaluation, including failure; a zero-copy eligible rejection debits one.
 The separate allocation-free leading scan is bounded by the 64 KiB input and
 local comma-consuming loop progress. This is not a bound on every examination,
-whole-parser complexity, RSS or total work. New leading-trivia regression evidence
-is prepared but not executed. Unconditional window-predicate checks compile
+whole-parser complexity, RSS or total work. The production leading-trivia regression
+`large_leading_generic_trivia_keeps_copied_prefix_accounting` passed final Linux CI. Unconditional window-predicate checks compile
 against the actual byte/EOF guard. These do not establish an end-to-end active-EOF
-recovery case; that gap remains for #83. Final Linux execution and renewed resource
-review remain required before final integration approval.
+recovery case; that gap remains for #83. The final #83 audit still classifies attributable production deadline/allocation/
+serialization boundary evidence B3–B5 as GAP. C17 changes none of those limits or
+claims and supplies no new resource-boundary execution.

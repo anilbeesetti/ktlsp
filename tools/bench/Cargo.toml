@@ -1,0 +1,13 @@
+[workspace]
+
+[package]
+name = "ktlsp-baseline"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+
+[dependencies]
+ktlsp-text = { path = "../../crates/ktlsp-text" }
+ktlsp-syntax = { path = "../../crates/ktlsp-syntax" }
+ktlsp-protocol = { path = "../../crates/ktlsp-protocol" }
+serde_json = "1.0"

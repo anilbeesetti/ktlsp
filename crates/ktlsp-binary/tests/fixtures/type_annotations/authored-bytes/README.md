@@ -1,0 +1,1 @@
+Independently hand-authored JVMS23 payload hex, before product runtime. Exact forged CP and expected outcomes are in TYPE_ANNOTATIONS_SPEC.md table; use either visible/invisible attribute name. No compiler, JVM, native product parser or decoder produced these bytes. Product tests remain unexecuted.

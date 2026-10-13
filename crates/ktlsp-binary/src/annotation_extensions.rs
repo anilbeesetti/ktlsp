@@ -31,20 +31,21 @@ pub struct AnnotationExtensions<'a> {
 /// Only consumed references/local default shapes are validated, not JVM semantics.
 /// The additional scan can exhaust work on inputs accepted by declaration-only decode.
 pub fn decode<'a>(class: &'a ClassFile<'_>) -> Result<AnnotationExtensions<'a>> {
-    let mut budget = Budget::default();
-    let declarations = annotations::decode_with_budget(class, &mut budget)?;
-    attributes(class, &class.attributes, None, &mut budget)?;
+    decode_with_budget(class, &mut Budget::default())
+}
+
+pub(crate) fn decode_with_budget<'a>(
+    class: &'a ClassFile<'_>,
+    budget: &mut Budget,
+) -> Result<AnnotationExtensions<'a>> {
+    let declarations = annotations::decode_with_budget(class, budget)?;
+    attributes(class, &class.attributes, None, budget)?;
     for field in &class.fields {
-        attributes(class, &field.attributes, None, &mut budget)?;
+        attributes(class, &field.attributes, None, budget)?;
     }
     let mut methods = Vec::new();
     for method in &class.methods {
-        methods.push(attributes(
-            class,
-            &method.attributes,
-            Some(method),
-            &mut budget,
-        )?);
+        methods.push(attributes(class, &method.attributes, Some(method), budget)?);
     }
     Ok(AnnotationExtensions {
         declarations,

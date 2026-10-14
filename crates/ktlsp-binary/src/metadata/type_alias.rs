@@ -1,7 +1,9 @@
 //! Selected TypeAlias data; inline Type occurrences remain opaque and unmerged.
-use super::wire::{self, Value};
+use super::{
+    string_table,
+    wire::{self, Value},
+};
 use crate::{MAX_BYTES, MAX_RECORDS, MAX_VALIDATION_UNITS};
-use std::mem::size_of;
 
 /// Callers can tighten, but cannot raise, the hard defaults.
 #[derive(Clone, Copy, Debug)]
@@ -75,39 +77,6 @@ fn limit(label: &'static str, offset: usize) -> Error {
     .into()
 }
 
-struct Budget {
-    wire: wire::Budget,
-    owned: usize,
-}
-impl Budget {
-    fn push<'a>(
-        &mut self,
-        values: &mut Vec<&'a [u8]>,
-        value: &'a [u8],
-        offset: usize,
-    ) -> Result<(), Error> {
-        let len = values.len();
-        // Logical reservations stay deterministic even if the allocator grants surplus.
-        if len == 0 || len.is_power_of_two() {
-            let slots = len.max(1);
-            len.checked_add(slots).ok_or(limit("owned_bytes", offset))?;
-            let bytes = slots
-                .checked_mul(size_of::<&[u8]>())
-                .ok_or(limit("owned_bytes", offset))?;
-            self.owned = self
-                .owned
-                .checked_sub(bytes)
-                .ok_or(limit("owned_bytes", offset))?;
-            self.wire.work(bytes, offset)?;
-            values
-                .try_reserve_exact(slots)
-                .map_err(|_| limit("allocation", offset))?;
-        }
-        values.push(value);
-        Ok(())
-    }
-}
-
 /// Scan ONE unframed TypeAlias body under one aggregate budget.
 /// Caller independently selects supported mv=[2,3,0] Class/Package TypeAlias data;
 /// this bytes-only API cannot enforce kind/version or full message initialization.
@@ -118,10 +87,21 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<TypeAlias<'_>, Error> {
     if bytes.len() > limits.bytes.min(MAX_BYTES) {
         return Err(limit("bytes", 0));
     }
-    let mut budget = Budget {
-        wire: wire::Budget::new(limits.records, limits.work),
-        owned: limits.owned_bytes.min(MAX_BYTES),
-    };
+    decode_with_budget(
+        bytes,
+        &mut string_table::Budget::new(string_table::Limits {
+            records: limits.records,
+            work: limits.work,
+            owned_bytes: limits.owned_bytes,
+            ..string_table::Limits::default()
+        }),
+    )
+}
+
+pub(super) fn decode_with_budget<'a>(
+    bytes: &'a [u8],
+    budget: &mut string_table::Budget,
+) -> Result<TypeAlias<'a>, Error> {
     let mut pos = 0;
     let mut flags = None;
     let mut name = None;

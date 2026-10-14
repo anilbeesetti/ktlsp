@@ -47,3 +47,38 @@ Allocation failure mapping static review only. No merge until exclusive root
 expected-head/base lease; preserve first failures, no unchanged rerun to green.
 #18/#68 OPEN; T008/T008a HOLD; broaderC13/B3/B4 GAP; B11 UNVERIFIED;
 #7/#83/#96 OPEN/Darwin UNKNOWN. Data-only reader is not semantic/full LSP parity.
+
+## Final assigned stable integration cut
+
+Initial798-based final head2fe5106abda7a743c8f7e6ea8be28410a9fb8312 received
+actual SAME3 final source plus completed original Linux CI approvals, no findings.
+Original attempt1 run38526015898/job115726417863 passed all3 unchanged pinned
+commands:523passed=510ordinary+13compilefail,0failed,2ignored helpers exercised
+by active parents,22separate worker fault cases. All11 Type.Argument tests,
+61cuts/genuine Pair composition/hostile corpus passed. This first proof remains
+distinct from later integration and establishes no current-main proof.
+
+Root explicitly granted ONE final source integration cut at Constructor206
+squash0a0af012d7a5a258357b5a53407a31b2359bc09f,
+tree20cb2cf3f9f1a5daace6c082dc050278dcd3a15f,
+sole parenta13ab6ba4100f7c26377a47ab5af0858b6491a48.
+One ordinary local merge producedc79bd37f245f01e0e522f1e362e6ae9154506467,
+tree11dcdf44bf8e22b4221c0ede85aebb34397592be, without conflicts. Metadata
+exports merged additively; Constructor/TypeHeader/class-member helpers and all
+incoming C13/B3 code preserved. Diff from assigned cut is still fifteen owned
+new paths plus sole pub mod type_argument addition. Source/tests/all frozen
+fixtures remain byte-identical to initial2fe5106, including the licensed Pair.
+Only this accurate review receipt changes; no incoming helper/dependency/Cargo/
+workflow/root-document or provider-status edit. No unpublished dependency.
+
+Final-cut pinned cargo fmt --all -- --check and compile-only locked workspace
+Clippy passed on their first invocation after integration, no warnings.
+Retained SAME3 combined source/consumer compatibility reviews, new original
+unchanged Linux CI and SAME3 completed
+raw/config/checkout/count reviews remain pending at this historical receipt.
+No local native runtime or merge lease is inferred from the source-cut grant.
+Any future merge requires a fresh separate READONLY guard call with exit0 and
+all exact lease/main/head/base/status/check/scope/config checks parsed valid,
+followed only then by a SEPARATE ordinary expected-head merge call. Any guard
+timeout/nonzero/malformed/mismatch stops and suspends the lease. No admin/bypass/
+force/settings or guard-plus-mutation command is permitted.

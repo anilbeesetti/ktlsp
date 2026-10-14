@@ -1,5 +1,5 @@
 //! JVMS 23 §§4.7.20–21 method type annotations, retained as encoded data.
-//! Method return/formal parameter targets are decoded; other legal targets error.
+//! All six method targets are decoded without semantic index validation.
 
 use crate::annotations::{self, Annotation, Budget, Visibility};
 use crate::type_annotations::{self, FieldTypeAnnotations, TypePathStep, vector};
@@ -7,12 +7,24 @@ use crate::{ClassFile, Error};
 
 type Result<T> = std::result::Result<T, Error>;
 
+/// Encoded target_info, without descriptor, Signature or Exceptions validation.
+#[derive(Debug, PartialEq, Eq)]
+pub enum MethodTargetInfo {
+    Empty,
+    TypeParameter(u8),
+    TypeParameterBound {
+        type_parameter_index: u8,
+        bound_index: u8,
+    },
+    FormalParameter(u8),
+    Throws(u16),
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct MethodTypeAnnotation<'a> {
-    /// Encoded target_type; successful decoding emits 0x14 or 0x16.
+    /// Encoded target_type: 0x01, 0x12, 0x14, 0x15, 0x16 or 0x17.
     pub target_type: u8,
-    /// None for 0x14; Some(encoded ordinal) for 0x16. Not a JVM slot or source map.
-    pub formal_parameter_index: Option<u8>,
+    pub target_info: MethodTargetInfo,
     pub path: Vec<TypePathStep>,
     pub annotation: Annotation<'a>,
 }
@@ -31,8 +43,8 @@ pub struct MethodTypeAnnotations<'a> {
 }
 
 /// Decode declarations, extensions, field types, then method types with one budget.
-/// Recognized method type attributes require 52.0–67.0. Legal unimplemented method
-/// targets return UnsupportedTag immediately; their remaining bytes are unvalidated.
+/// Recognized method type attributes require 52.0–67.0. Other target tags are
+/// malformed in method context; indices and type-path applicability are unvalidated.
 /// Any failure returns no partial output and leaves raw ClassFile bytes available.
 /// Method names/descriptors are unconsumed here; earlier parameter/default extensions
 /// can consume them. Void/constructor annotations and paths are encoded data only.
@@ -82,14 +94,28 @@ fn decode_methods<'a>(
             for _ in 0..count {
                 budget.work(1)?;
                 let target_type = reader.u8()?;
-                let formal_parameter_index = match target_type {
-                    0x14 => None,
+                let target_info = match target_type {
+                    0x01 => {
+                        budget.work(1)?;
+                        MethodTargetInfo::TypeParameter(reader.u8()?)
+                    }
+                    0x12 => {
+                        budget.work(1)?;
+                        let type_parameter_index = reader.u8()?;
+                        budget.work(1)?;
+                        MethodTargetInfo::TypeParameterBound {
+                            type_parameter_index,
+                            bound_index: reader.u8()?,
+                        }
+                    }
+                    0x14 | 0x15 => MethodTargetInfo::Empty,
                     0x16 => {
                         budget.work(1)?;
-                        Some(reader.u8()?)
+                        MethodTargetInfo::FormalParameter(reader.u8()?)
                     }
-                    0x01 | 0x12 | 0x15 | 0x17 => {
-                        return Err(Error::UnsupportedTag(target_type));
+                    0x17 => {
+                        budget.work(2)?;
+                        MethodTargetInfo::Throws(reader.u16()?)
                     }
                     _ => return Err(Error::Malformed("method type annotation target")),
                 };
@@ -110,7 +136,7 @@ fn decode_methods<'a>(
                 let annotation = annotations::annotation(&mut reader, &class.constants, budget, 1)?;
                 annotations.push(MethodTypeAnnotation {
                     target_type,
-                    formal_parameter_index,
+                    target_info,
                     path,
                     annotation,
                 });
@@ -203,7 +229,7 @@ mod tests {
     }
 
     #[test]
-    fn parameter_index_work_precedes_missing_byte_but_not_missing_path_length() {
+    fn fixed_target_info_work_precedes_reads_but_not_missing_path_length() {
         let mut class = ClassFile {
             major: 52,
             minor: 0,
@@ -246,5 +272,38 @@ mod tests {
             decode_methods(&class, &mut budget),
             Err(Error::Limit("annotation work"))
         );
+        for (bytes, remaining, expected) in [
+            (&[0, 1, 0x01][..], 31, Error::Limit("annotation work")),
+            (&[0, 1, 0x01], 32, Error::Truncated),
+            (&[0, 1, 0x01, 255], 32, Error::Truncated),
+            (&[0, 1, 0x01, 255, 0], 32, Error::Limit("annotation work")),
+            (&[0, 1, 0x12], 31, Error::Limit("annotation work")),
+            (&[0, 1, 0x12], 32, Error::Truncated),
+            (&[0, 1, 0x12, 255], 32, Error::Limit("annotation work")),
+            (&[0, 1, 0x12, 255], 33, Error::Truncated),
+            (&[0, 1, 0x12, 255, 255], 33, Error::Truncated),
+            (
+                &[0, 1, 0x12, 255, 255, 0],
+                33,
+                Error::Limit("annotation work"),
+            ),
+            (&[0, 1, 0x15], 31, Error::Truncated),
+            (&[0, 1, 0x15, 0], 31, Error::Limit("annotation work")),
+            (&[0, 1, 0x17], 32, Error::Limit("annotation work")),
+            (&[0, 1, 0x17], 33, Error::Truncated),
+            (&[0, 1, 0x17, 255], 32, Error::Limit("annotation work")),
+            (&[0, 1, 0x17, 255], 33, Error::Truncated),
+            (&[0, 1, 0x17, 255, 255], 33, Error::Truncated),
+            (
+                &[0, 1, 0x17, 255, 255, 0],
+                33,
+                Error::Limit("annotation work"),
+            ),
+        ] {
+            class.methods[0].attributes[0].bytes = bytes;
+            let mut budget = Budget::default();
+            budget.work(MAX_VALIDATION_UNITS - remaining).unwrap();
+            assert_eq!(decode_methods(&class, &mut budget), Err(expected));
+        }
     }
 }

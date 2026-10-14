@@ -1,0 +1,69 @@
+{
+  "artifact": "org.jetbrains.kotlin:kotlin-stdlib:2.3.20",
+  "origin": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.3.20/kotlin-stdlib-2.3.20.jar",
+  "local_source": "/Users/anil/.gradle/wrapper/dists/gradle-9.5.0-bin/bvnork1r7n8i6kp5cnkibsc9q/gradle-9.5.0/lib/kotlin-stdlib-2.3.20.jar",
+  "archive_bytes": 1804720,
+  "archive_sha256": "0ae12504a5040ebaf37703908483420d1a5624dd1d93f357665f8c77c848a01e",
+  "member": "kotlin/jvm/internal/KTypeParameterBaseKt.class",
+  "member_bytes": 368,
+  "member_sha256": "ddbf21c6cea2ad2f18d809e57a8b5b1e59a42d55a3f622b6e4b1295684d692af",
+  "d1_encoding": "Leading NUL removed; every remaining UTF16 unit in this fixture <=255, copied exactly as byte (mode0)",
+  "decoded_d1_bytes": 26,
+  "decoded_d1_sha256": "9ff8bb7084c7999234ee5745121782679818c75e165e0669f0e4c50fe9c3d15f",
+  "license": "Apache-2.0",
+  "compiler": "Not independently verified; distribution Implementation-Version only",
+  "method": "Python standard-library ZIP + CP/annotation byte inspection; no product/native/JVM/compiler/oracle execution",
+  "source_pin": "d57eb4a26ed01ab03cf195da686c8047032ff16f",
+  "files": {
+    "KTypeParameterBaseKt.class.bin": {
+      "bytes": 368,
+      "sha256": "ddbf21c6cea2ad2f18d809e57a8b5b1e59a42d55a3f622b6e4b1295684d692af"
+    },
+    "LICENSE.txt": {
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "NOTICE.txt": {
+      "bytes": 482,
+      "sha256": "0b09a83d3ef7795c7dec65e815866597c066c53898f2852a76599b8f5552941a"
+    },
+    "PROTOBUF_LICENSE.txt": {
+      "bytes": 1659,
+      "sha256": "2f706d67271d8db967046638e30f7887a5ba6e49593e6395e8145a7c9feab96a"
+    },
+    "README.md": {
+      "bytes": 2081,
+      "sha256": "65ad44ef6a7c9012801f6c3fe71c915c8e19adf53fb63f303bb0a72b0298307b"
+    },
+    "archive-MANIFEST.MF": {
+      "bytes": 214,
+      "sha256": "9fac3616aff09c92ef707e134a15fc77aab036b8e0aa5c3e131c82df48ac2711"
+    },
+    "genuine-annotation.json": {
+      "bytes": 765,
+      "sha256": "5bd43aea7544f1629b90871a4d91c425d413be5fed40c6bc01f5a767c4b397b8"
+    },
+    "genuine-d1.hex": {
+      "bytes": 78,
+      "sha256": "8bbb4508dd31b753210ac67d5ed445359853657db99a786c068858b6352d5ef3"
+    },
+    "minimal.hex": {
+      "bytes": 3,
+      "sha256": "d9b2aefb1febe2dd6e403f634e18917a8c0dd1a440c976e9fe126b465ae9fc8d"
+    },
+    "mixed.hex": {
+      "bytes": 165,
+      "sha256": "4dba1af3f106e86a0d07f1dc3710dcabbac15f911db71030e379d7fcef0f6e5b"
+    }
+  },
+  "source_files": {
+    "ProtoBuf.java": {
+      "bytes": 1241495,
+      "sha256": "da7fa6f03c1afa3499086cb5a1f92471e3f327c8f43298ea8d9548b7e4753716"
+    },
+    "metadata.proto": {
+      "bytes": 19546,
+      "sha256": "a08e508cc7d98cc225e8b0df7290724b545a0250f7d9c91460cfc1244a3c08e2"
+    }
+  }
+}

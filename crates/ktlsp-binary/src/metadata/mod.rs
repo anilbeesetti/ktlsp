@@ -8,6 +8,7 @@ mod encoding;
 pub mod function_header;
 mod header;
 pub mod name_resolver;
+pub mod package_member_names;
 pub mod payload;
 pub mod property_header;
 pub mod string_table;

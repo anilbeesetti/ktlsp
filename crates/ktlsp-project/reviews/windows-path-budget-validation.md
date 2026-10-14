@@ -193,3 +193,73 @@ Compile-only static Windows test names (no execution claim):
 - `lib`: `path_budget_tests::arithmetic_overflow_is_a_named_resource_error`.
 - `model`: `fixture_retains_semantics_and_missing_artifacts`, `defaults_and_empty_project`, `malformed_schema_unknown_fields_and_required_fields`, `versions_are_syntactic_numeric_and_api_is_ordered_numerically`, `ids_namespaces_and_references`, `graph_rejects_self_duplicates_and_cycles_including_disconnected_cycles`, `max_length_chain_is_iterative_and_accepts_all_scopes`, `lexical_paths_are_absolute_missing_parent_relative_and_root_bounded`, `ownership_handles_component_boundaries_normalization_and_nested_ancestors`, `bounded_manifest_read_and_io_errors`, `collection_budgets_run_before_typed_allocation_and_are_aggregate`, `arbitrary_truncations_bytes_and_deep_json_return_without_panicking`, `duplicate_library_edges_and_all_boundary_counts`, `load_manifest_reads_fixture_from_its_own_parent`.
 - `v2_library_edges`: `ordered_fixture_roundtrips_all_scopes_exports_and_namespaces`, `v1_stays_strict_and_v2_does_not_accept_v1_fields_or_version`, `strict_json_and_tagged_variants_reject_malformed_unknown_and_duplicate_keys`, `ids_references_and_tuple_duplicates_are_validated_in_separate_namespaces`, `whole_graph_handles_parallel_edges_self_and_disconnected_cycles_iteratively`, `paths_ownership_and_settings_keep_shared_semantics`, `exact_collection_preflight_boundaries_precede_typed_schema_allocation`, `valid_large_libraries_roots_and_mixed_edges_remain_bounded`, `caller_base_amplification_is_bounded_before_any_model_path_expansion`, `short_input_with_oversized_normalized_output_rejects_during_load`, `exact_compact_output_boundary_counts_unicode_escaping_and_preserves_roundtrip`, `exact_byte_limit_bounded_file_reads_and_io_errors`, `malformed_truncations_arbitrary_bytes_and_deep_json_do_not_panic`.
+
+
+## First corrected W2 attempt: frozen-source guard failure
+
+This section supersedes earlier no-job/no-artifact and pending-status wording
+for the subsequent W2 attempt. The earlier rejected W1/H1 POST and all three
+separate failed push startup records remain permanently retained first outcomes;
+none becomes a passing run retroactively.
+
+After owner/root source delivery clear, one separately admitted POST for W2
+`9d30fc2d22cc8003f3aca575ad8664114b393487`, tree
+`08d7f8a97f5e3ff411d5fb692020ccb21931d60e`, and H2
+`e38302eccecba61c46299ac43360378a79bd76e3274416fbae32cbf79eeff9be`
+(14,289 bytes) returned HTTP 204. Original
+[run 38575294702 / job 115890672910](https://github.com/anilbeesetti/ktlsp/actions/runs/38575294702/job/115890672910),
+attempt 1, event `workflow_dispatch`, ref `main`, completed FAILURE.
+Metadata and the uploaded identity/workflow bytes confirmed immutable W2/H2
+binding; the first identity and workflow-byte checks succeeded. The source
+checkout logged exact frozen HEAD `2d561ab30812dcdabc56260a8b510979e1e70a61`
+and used depth 2. Git was `2.55.0.windows.5`, PowerShell `7.6.6`, runner image
+`win25-vs2026` version `20260925.250.1`.
+
+The first failure was `Frozen source identity or cleanliness mismatch` at the
+source-guard script's line 8, exit 1. Runtime source tree, parent, status and
+individual native exit values were not emitted; the failing OR predicate remains
+UNRESOLVED. The artifact's declared source tree is not runtime verification.
+Source-pin verification was not reached. Rust installation, compilation,
+inventory listing and all test bodies were skipped. No v1/v2 runtime outcome
+exists; all 17 selected Windows tests remain UNVERIFIED.
+
+The original raw log is 57,198 bytes, SHA-256
+`a0a7079bc89b74c785250d025e74c4483b21b5c7f8ed34b65d3c4ca4c403333a`.
+Artifact `11899427448`, `t021-windows-38575294702-attempt-1`, is 5,175 bytes,
+SHA-256 `b5f8ecb7d0711c5f3d7230365f1c35991693ed603211d7c3e48438b6804aa7a0`;
+it contains only `identity.json` and `workflow.yml`. Original bytes and the
+consumed reservation are preserved. Retained first-outcome reviews:
+`/root/architect:T021-W2-first-outcome-r1`,
+`T021-WIN-W2-FIRST-OUTCOME-CORRECTNESS-15-20261014`, `/root/adversarial`.
+Root independently confirmed the failure and released the short identity freeze.
+No unchanged retry, rerun, source tuning or local runtime followed that admission.
+
+## Diagnostic source correction: no demonstrated cause-specific fix
+
+Canonical Git-object data agrees with the frozen HEAD/tree/sole-parent
+expectations. No tracked attributes or screened Windows path collisions were
+found; six text blobs contain CRLF. Actual runner Git configuration and status
+were not recorded, so neither checkout depth nor line-ending behavior identifies
+the original failing predicate. That cause remains UNRESOLVED.
+
+The diagnostic correction retains exact HEAD/tree/sole-parent and cleanliness
+requirements. It records native outputs and immediate exit codes, the shallow
+flag and seven relevant Git configuration keys with origins before checking
+conditions. Evidence is emitted to raw logs and `source-before-lf.json`.
+Unexpected native errors or output shapes fail closed; config query exit 1 is
+accepted only with empty output. A dirty initial source stops before the existing
+LF materialization can overwrite unexplained changes. That unchanged command's
+result/exit and subsequent ordinary-config status are recorded in
+`source-after-lf.json`, then checked for errors and cleanliness.
+
+The new pre-materialization check may stop earlier; its outcome cannot identify
+W2's original failing predicate. Step-local native error preference permits exit
+capture followed by explicit failure checks; PowerShell cmdlet errors still stop.
+There is no configuration write, cause-specific normalization fix, reset,
+expected-value relaxation, helper framework or change to the frozen product,
+23 pins, depth 2, 14+3 selected tests, compile-only targets, compiler commands,
+runner, timeout or artifact limits. This supplies diagnostics and native exit
+handling, not Windows test correctness. A future runtime attempt requires new
+reviewed immutable workflow bytes and separate root admission; neither W1/H1 nor
+W2/H2 may be retried. Mutable runner, uncapped raw logs, finite artifact retention
+and all previously recorded platform/resource/semantic limits remain unchanged.

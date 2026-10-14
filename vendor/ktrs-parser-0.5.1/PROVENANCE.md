@@ -431,3 +431,188 @@ and exact v3 contract identity are in
 ran; original unchanged Linux CI remains required. No positive witness or B3
 promotion is claimed in this source-stage note; B4 remains GAP, B11 UNVERIFIED,
 T008/T008a HOLD and #7/#83/#96 OPEN, Darwin UNKNOWN.
+
+## C13 two-component nullable recovery — combined source candidate
+
+Root released exact fe4f4a73f0bf9190f7668bf74a9b963f70114449,
+tree01e0300947dc10cb4f737fded962987d556358fa, soleparent
+cb0c8c7dd064a5a3f2d1c82097a2cfd0547e496a after PR202 owner/root clear.
+That delivered source was integrated once into reviewed private C13 source
+e7cb4d28529a41e0bf12c4d6d90372daaa257e6b without conflicts; all six C13 blobs
+and all incoming B3/parser/binary bytes were preserved before provenance updates.
+The former five-file publication HOLD is released for this sole owner; earlier
+private-stage mismatch notes are historical, not the current artifact state.
+
+Only declarations/type_parameters.rs adds C13 grammar behavior: after exactly two
+successfully consumed identifiers, accept one SAFE_ACCESS or QUEST+DOT separator,
+a direct function identifier and complete LPAR. Existing single-nullable/plain
+qualified/property branches, caller/bound/recursion/EOF/window/debit guards remain.
+Long nullable chains and generic/annotated/parenthesized receivers remain gaps.
+Only nullable-decline-qualified and qualified-decline-nullable dispatch change;
+all70/59/116/85 historical payloads/supplements and other live overrides remain.
+The focused literal packet retains49 positives/61 controls/42 cuts/1416 UTF16
+positions. Forty EOF arithmetic rows do not establish active-layer integration.
+
+Inherited B3 observer state is thread-local, not Parser-instance-local. Thus
+Parser::eof in same-thread scratch probes also dispatches the callback before
+the unchanged builder EOF predicate and contributes to sampled cadence. A receipt
+cannot identify live versus scratch/lazy work. C13's syntax-state isolation does
+not promise unchanged observation counts. Ordinary parse_snapshot installs no
+observer socket/callback, but each EOF still checks TLS; default/observing overhead
+and timing/allocation perturbation are unmeasured. Callback dispatch does not
+change EOF truth, recovery budgets or add waits/retries. No B3 source/fixture/
+protocol/allocator/limit is changed by this child. All three delivered PR202
+observations had MissingACK; B3 remains GAP.
+
+Inherited allocation/refusal/status86 and supervisor precedence remain: main-loop
+cancellation, original deadline, output error, then child status; allocation
+refusal priority at ordinary worker exit; finish_io keeps the original deadline;
+guard.finish()? retains ambiguous Io override before scoped joins. Cleanup waits/
+joins remain unbounded. No identical timing/containment result is promised by
+TLS overhead; ordinary syntax/result compatibility requires actual original CI.
+
+Fresh generation from the verified registry archive, delivered behavioral phase
+plus only reviewed C13 delta, then pinned1.99.0/edition2024 scratch formatting
+rederived16 behavior files,50 formatting files,54 final hashes/four pristine
+survivors. A second fresh owner extraction replayed recovery then formatting with
+zero offsets/fuzz and matched all54 current combined Rust files. Independent
+adversarial extraction/replay is separately required; no old replay receipt or
+counts were reused. Original upstream inventory, archive, notices and manifests/
+locks remain unchanged.
+
+Combined phase SHA256:
+- recovery.patch 74922955e653db43633e3e49848060f9d667e699ddae370d69d886f632b7ed87
+- formatting.patch c5f1625125e46e35ff79ff1094698eb33995464d6b863e184ba7d2e65b1637aa
+- formatted-sha256.json 7666e63232ddc2aac66a77311c213417e6c700a8839d3c95bffe00d2160c5773
+
+SAME3 actual combined source/provenance reviews, owned-file formatting and
+compile-only locked workspace Clippy precede issue/push/open+attach PR and original
+unchanged Linux all3. No local native/parser/worker/tests/server/bench runtime.
+Merge remains HOLD for root's exclusive expected-head/base lease and completed
+source/CI reviews. See ../../crates/ktlsp-parser/reviews/c13-two-component-nullable-recovery.md.
+Aggregate C13/B3/B4 GAP, B11 UNVERIFIED, T008/T008a HOLD, #7/#83/#96 OPEN;
+Darwin UNKNOWN. No semantic/provider/full-parity/performance promotion.
+
+## B11 finite actual-copy observation — source candidate
+
+Source base a13ab6ba4100f7c26377a47ab5af0858b6491a48, tree
+1fa56ee9bc6c4c6a2e07441aa47fd95e257a99e0, sole parent
+2d561ab30812dcdabc56260a8b510979e1e70a61; integrated once, clean, before
+implementation. SAME architect/correctness/adversarial reviewers confirmed the
+incoming C13 two-component nullable header additions do not change the frozen
+bare healthy( path or copy/layer/worker seams. C13 grammar additions are retained.
+Root explicitly approved only a finite actual-copy production integration
+interpretation and the exact twelve-file additive observation scope. Stronger
+clipped-header negative remains unrealized; its prior feasibility HOLD is valid.
+
+Only vendor lib.rs, builder/layers.rs and declarations/type_parameters.rs change.
+A separately scoped callback reports the constructed scratch builder's last
+copied token endpoint, not a bound-clamped prediction. Independent live-layer
+count/minimum do not use the production minimum helper; the production bound is
+reported separately. The default path adds an inert callback-slot check at copied
+windows and skips the independent walk. Existing copy predicate/loop/debit,
+recursion suppression, scratch grammar, C13 branches and B3 EOF bridge remain.
+Nested callback installation is declined with observation disabled for that scope;
+RAII restores previous callback state on normal return and unwind.
+
+Exclusive Unix facade/worker observation uses a fresh same-child/request datagram
+pair, one64-byte aggregate and one nonblocking send attempt; parent makes at most
+two65-byte nonblocking reads after existing cleanup/scoped joins. Worker source
+clone is bounded by64KiB; fixed state holds first record and event count saturated
+at2. Full builder source equality and independently positive layer count qualify
+events; no desired offset/bound/endpoint filter or synthetic layer is installed.
+Duplicate, failed installation, reentry or malformed records cannot become valid
+zero-event controls. Socket address checks precede shared-OFD nonblocking changes;
+trusted parent pair construction establishes socket type, not fd conversion.
+Source text does not enter the observation wire.
+
+Default Reply schema, allocator/latch/status86, B3 argument/cadence, source/window/
+allocation/output limits, cancellation/deadline/error priority and checked cleanup
+remain. Observation work can change actual timing/allocation outcomes: overhead
+and outcome equivalence are UNMEASURED. No direct observation-error remapping,
+wait/retry/grace/relative-deadline/config/dependency/framework is added. Existing
+cleanup waits/joins have no hard bound. No observer runs in allocator callbacks.
+
+Fresh verified archive -> delivered a13 behavioral phase plus these three
+additions -> pinned1.99.0 edition2024 scratch formatting produced actual counts:
+16 behavioral files, 50 formatting files,
+54 final Rust hashes, 4 pristine survivors.
+A separate fresh owner extraction replayed both ordered patches with zero fuzz/
+offsets and matched every current source hash. Notices/licenses, original archive,
+upstream inventory, manifests and locks remain byte-identical. Independent
+adversarial replay is separately required; no previous delivery replay is credited.
+
+- recovery.patch SHA256 6a9876d6b4ae1fb4fcab6528ac50c88c32a9c8f8db474cb35a9d33078c9fb9cf
+- formatting.patch SHA256 310e0541870c7d4e1ab5c6ded355195a081587bf3178090c592cbd5d00fd9338
+- formatted-sha256.json SHA256 eddd511b00401c38ba9c62463eaef2456d269167c96e81f9d06dbba4f996de66
+
+The frozen production test requires strict recovery/identity/original range/parent/
+diagnostic/UTF16/partition checks, an actual source-matching active event with
+count1/min57/start28/end57/next57..58 eligible under other caps, and ordinary strict
+healthy followup. Expected values were frozen before runtime; no first-output
+retargeting or rerun-to-green. Machinery/unit controls are distinct from that
+production evidence. Format and compile-only locked all-target Clippy are local;
+no local parser/worker/tests/server/bench/JVM/oracle execution. Original unchanged
+Linux all-three CI and SAME3 raw/config/checkout reviews remain required.
+
+B11 UNVERIFIED; B3/B4/broader C13 GAP; T008/T008a HOLD; #7/#83/#96 OPEN;
+Darwin UNKNOWN. Even a later passing finite observation does not prove header-cut
+rejection, multiple active layers, annotation semantics, full B11/#83/T008, grammar,
+semantics or performance. Merge remains held for root's explicit expected-head/base
+lease and a successful read-only fail-closed guard in a separate tool call before
+any ordinary expected-head merge. See the focused source review at
+../../crates/ktlsp-parser/reviews/generic-copy-observation.md.
+
+## C13 finite one-argument generic receiver — source candidate
+
+Integrated exact delivered B11 base f6e2c6b3a8e43a4a76ba27a01205f4e44b7e8e04,
+tree a920a637bf947ae8fd6d386d32b27044ddb6fbcd, sole parent cca3a618, ONCE before
+editing. SAME correctness/adversarial/architect reviewed incoming B11 source and
+confirmed frozen V3 compatibility before implementation. B11 observer, library,
+layers, worker and five tests remain unchanged from this base.
+
+Only type_parameters.rs changes source behavior: existing scratch prefix/FUN then
+one unqualified receiver/one unqualified argument/direct name with complete LPAR.
+The literal generic branch requires IDENTIFIER LT IDENTIFIER GT DOT IDENTIFIER;
+bare suspend receiver/argument are excluded because live type grammar treats them
+as modifiers. Escaped names retain grammar; bare dynamic argument is DYNAMIC_TYPE.
+Failure in this branch cannot fall through to qualified/nullable recognition.
+No new builder/API/helper/callback/dependency/ambient state/budget is introduced.
+Existing complete-bound gate, recursion suppression, scratch/live isolation,
+256complete-token/4096byte/minimum active EOF window and4096copied-window debit
+including failed windows remain. Incoming observer logic is byte-preserved.
+
+V3 contract manifest85cdaa57e1cc16dfca40479e7b54de9aed2223dd3097a0a8087bfdb6d1997f90
+was frozen and actually SAME3 approved before source. New production-worker test
+retains all84sources/26projections/58controls/19200positions, exact diagnostics/
+parents/tokens/identity/followup. Only historical decline-header-9 dispatch is
+superseded; its42byte/no-final-LF fixture and all other historical bytes/assertions
+stay intact. The separately named43byte/final-LF case stays distinct. All36related
+inventory occurrences are preserved. Earlier V1 EOF expectation and V2 inventory
+regex preparation errors were preserved and corrected BEFORE any runtime.
+
+Fresh owner authoritative crates.io archive checksum
+ec8d43d9549490689477385c7678bbd22ecbc445973ab364e8ecb69dd4882bcc -> delivered
+behavioral phase plus only this private-predicate delta -> pinned1.99.0/edition2024
+scratch formatting rederived16behavior/50formatting files,54final hashes and4
+pristine survivors. A second fresh owner extraction replayed both new patches
+with zero fuzz/offsets and all54hashes matching. Independent ADV must fetch/extract
+and replay separately; old receipts/owner extraction cannot substitute. Original
+archive/upstream inventory/notices/minimal manifests/locks stay unchanged.
+
+Combined ordered phase SHA256:
+- recovery.patch 3027d625f09b57d132fc8379471dc1824d9710c9f156d9a6ff343fa2db06a2a8
+- formatting.patch 7aafd8939e3dfbb695871b3869dd4eb70a92772ccc79cf2057b3ef72d8b35069
+- formatted-sha256.json c313db83e58e2dc7abac7c5d59d08b613ba4e16e1bef55ca4bf91f242d51fc4c
+
+Local pinned format/compile-only locked Clippy and SAME3 final source/provenance
+reviews precede admitted publication and ORIGINAL unchanged Linux Native Rust
+all-three CI. No local native runtime is authorized. Merge still requires the
+root exclusive expected-head/base lease, a separate read-only fresh guard with
+all matching facts and exit0, then a separate ordinary expected-head merge.
+Actual squash tree/sole parent and OWNER+ROOT original exact-main proof follow.
+See ../../crates/ktlsp-parser/reviews/c13-generic-receiver-recovery.md.
+
+Broader C13/B3/B4 GAP, full B11 UNVERIFIED, T008/T008a HOLD; #7/#83/#96 OPEN;
+Darwin UNKNOWN; observer overhead UNMEASURED. No grammar/semantic/parity/performance
+promotion follows from this finite source candidate.

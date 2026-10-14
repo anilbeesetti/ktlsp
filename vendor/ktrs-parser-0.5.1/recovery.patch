@@ -56,7 +56,7 @@
  
  impl SemanticWhitespaceAwarePsiBuilder {
      pub fn push_layer(&mut self, layer: Layer) -> usize {
-@@ -51,6 +100,10 @@
+@@ -51,6 +100,24 @@
              Layer::Truncated { eof_position } => Some(eof_position),
              Layer::ForByClause { .. } => None,
          })
@@ -64,12 +64,26 @@
 +
 +    pub(crate) fn effective_truncated_eof_position(&self) -> Option<i32> {
 +        effective_truncation(&self.layers)
++    }
++
++    pub(crate) fn generic_copy_active_layers(&self) -> (usize, Option<i32>) {
++        let mut count = 0;
++        let mut minimum: Option<i32> = None;
++        for layer in &self.layers {
++            if let Layer::Truncated { eof_position } = *layer {
++                if eof_position >= 0 {
++                    count += 1;
++                    minimum = Some(minimum.map_or(eof_position, |value| value.min(eof_position)));
++                }
++            }
++        }
++        (count, minimum)
      }
  
      pub fn eof(&mut self) -> bool {
 --- a/src/lib.rs
 +++ b/src/lib.rs
-@@ -40,6 +40,32 @@
+@@ -40,6 +40,88 @@
      parsing::kotlin_parser::parse(text, kind)
  }
  
@@ -97,6 +111,62 @@
 +    if let Ok(Some(observer)) = EOF_OBSERVER.try_with(std::cell::Cell::get) {
 +        observer();
 +    }
++}
++
++/// Actual constructed generic-recovery scratch boundary; offsets are in the original builder.
++#[doc(hidden)]
++#[derive(Debug, Clone, Copy)]
++pub struct GenericCopyBoundary {
++    pub active_layers: usize,
++    pub independent_min: Option<i32>,
++    pub production_bound: Option<i32>,
++    pub window_start: u32,
++    pub actual_copy_end: Option<u32>,
++    pub next_token: Option<(u32, u32)>,
++    pub next_fits_other_caps: bool,
++}
++
++type GenericCopyCallback = fn(&str, GenericCopyBoundary);
++std::thread_local! {
++    static GENERIC_COPY_OBSERVER: std::cell::Cell<Option<GenericCopyCallback>> =
++        const { std::cell::Cell::new(None) };
++}
++
++/// Finite copy observation; false means no new callback scope was installed.
++#[doc(hidden)]
++pub fn parse_file_observing_generic_copy(
++    text: &str,
++    kind: FileKind,
++    observer: GenericCopyCallback,
++) -> (Parse, bool) {
++    struct Restore(Option<GenericCopyCallback>);
++    impl Drop for Restore {
++        fn drop(&mut self) {
++            let _ = GENERIC_COPY_OBSERVER.try_with(|slot| slot.set(self.0));
++        }
++    }
++    let Ok(previous) = GENERIC_COPY_OBSERVER.try_with(|slot| {
++        let previous = slot.replace(Some(observer));
++        if previous.is_some() {
++            slot.set(None);
++        }
++        previous
++    }) else {
++        return (parse_file(text, kind), false);
++    };
++    let installed = previous.is_none();
++    let parse = {
++        let _restore = Restore(previous);
++        parse_file(text, kind)
++    };
++    (parse, installed)
++}
++
++pub(crate) fn generic_copy_observer() -> Option<GenericCopyCallback> {
++    GENERIC_COPY_OBSERVER
++        .try_with(std::cell::Cell::get)
++        .ok()
++        .flatten()
 +}
 +
  /// [`parse_file`] for callers re-parsing similar text: the result is identical, but lazy blocks,
@@ -590,7 +660,7 @@
  
                  if !self.at(COMMA) {
                      break;
-@@ -39,13 +82,129 @@
+@@ -39,13 +82,173 @@
                  }
              }
  
@@ -644,6 +714,30 @@
 +            &psi.lex_starts[start..=end],
 +            &psi.lex_types[start..end],
 +        );
++        if let Some(observer) = crate::generic_copy_observer() {
++            let (active_layers, independent_min) = self.my_builder.generic_copy_active_layers();
++            let next_token = psi
++                .lex_starts
++                .get(end + 1)
++                .map(|&next_end| (psi.lex_starts[end], next_end));
++            observer(
++                &psi.text,
++                crate::GenericCopyBoundary {
++                    active_layers,
++                    independent_min,
++                    production_bound: eof,
++                    window_start: psi.lex_starts[start],
++                    actual_copy_end: builder
++                        .lex_starts
++                        .last()
++                        .and_then(|&last| psi.lex_starts[start].checked_add(last)),
++                    next_token,
++                    next_fits_other_caps: end < limit
++                        && next_token
++                            .is_some_and(|(_, next_end)| next_end - psi.lex_starts[start] <= 4096),
++                },
++            );
++        }
 +        let mut probe =
 +            Parser::create_for_top_level_non_lazy(SemanticWhitespaceAwarePsiBuilder::new(builder));
 +        probe.in_parameter_recovery_probe = true;
@@ -654,21 +748,41 @@
 +            probe.parse_modifier_list(GT_COMMA_COLON_SET);
 +            !probe.my_builder.psi.has_errors_after(marker)
 +                && probe.expect(FUN_KEYWORD)
-+                && probe.expect(IDENTIFIER)
-+                && (if probe.consume_if(SAFE_ACCESS) {
++                && {
++                    let generic_receiver_name =
++                        probe.my_builder.get_token_text() != Some("suspend");
++                    probe.expect(IDENTIFIER)
++                        && (if probe.consume_if(LT) {
++                            generic_receiver_name
++                                && probe.my_builder.get_token_text() != Some("suspend")
++                                && probe.expect(IDENTIFIER)
++                                && probe.expect(GT)
++                                && probe.expect(DOT)
++                                && probe.expect(IDENTIFIER)
++                        } else if probe.consume_if(SAFE_ACCESS) {
 +                    probe.expect(IDENTIFIER)
 +                } else if probe.consume_if(QUEST) {
 +                    probe.expect(DOT) && probe.expect(IDENTIFIER)
 +                } else {
 +                    let mut plain = true;
++                    let mut identifiers = 1;
 +                    while probe.consume_if(DOT) {
 +                        if !probe.expect(IDENTIFIER) {
 +                            plain = false;
 +                            break;
 +                        }
++                        identifiers += 1;
 +                    }
 +                    plain
++                        && (if identifiers == 2 && probe.consume_if(SAFE_ACCESS) {
++                            probe.expect(IDENTIFIER)
++                        } else if identifiers == 2 && probe.consume_if(QUEST) {
++                            probe.expect(DOT) && probe.expect(IDENTIFIER)
++                        } else {
++                            true
++                        })
 +                })
++                }
 +                && probe.at(LPAR)
 +        };
 +        marker.drop(&mut probe);
@@ -722,7 +836,7 @@
      }
  
      /*
-@@ -132,23 +291,43 @@
+@@ -132,23 +335,43 @@
       *   : modifiers SimpleName (":" userType)?
       *   ;
       */

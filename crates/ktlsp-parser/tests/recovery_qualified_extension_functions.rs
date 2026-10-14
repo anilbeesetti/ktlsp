@@ -156,6 +156,38 @@ fn compatibility(tree: &Parsed, case: &Value) {
     let id = case["id"].as_str().unwrap();
     let elements = tree.elements();
     let source = tree.source();
+    if id == "qualified-decline-nullable" {
+        // Only this frozen exclusion is superseded by the exact two-component nullable seed.
+        let expected: Value = serde_json::from_str(r####"{"id":"two-nullable-class-lf-top","source":"class Box<T\nfun pkg.String?.healthy() = 2","projection":[["CLASS",0,11,"KT_FILE",null],["TYPE_PARAMETER_LIST",9,11,"CLASS",[0,11]],["TYPE_PARAMETER",10,11,"TYPE_PARAMETER_LIST",[0,11]],["FUN",12,41,"KT_FILE",null],["TYPE_REFERENCE",16,27,"FUN",[12,41]],["USER_TYPE",16,26,"NULLABLE_TYPE",[12,41]],["USER_TYPE",16,19,"USER_TYPE",[12,41]],["REFERENCE_EXPRESSION",16,19,"USER_TYPE",[12,41]],["REFERENCE_EXPRESSION",20,26,"USER_TYPE",[12,41]],["VALUE_PARAMETER_LIST",35,37,"FUN",[12,41]]],"declaration_names":[[0,6,9,"Box"],[12,28,35,"healthy"]],"diagnostics":[[11,11,"Missing '>'"]],"type_parameter_name":[10,11],"receiver_tokens":[[16,19,"pkg","REFERENCE_EXPRESSION"],[20,26,"String","REFERENCE_EXPRESSION"]],"raw_header_tokens":[[12,15,"FUN_KEYWORD","fun",1],[15,16,"WHITE_SPACE"," ",2],[16,19,"IDENTIFIER","pkg",3],[19,20,"DOT",".",4],[20,26,"IDENTIFIER","String",5],[26,27,"QUEST","?",6],[27,28,"DOT",".",7],[28,35,"IDENTIFIER","healthy",8],[35,36,"LPAR","(",9],[36,37,"RPAR",")",10]],"scratch_receiver_tokens":["IDENTIFIER","DOT","IDENTIFIER","SAFE_ACCESS","IDENTIFIER","LPAR"],"positions":{"0":[0,0],"6":[0,6],"9":[0,9],"10":[0,10],"11":[0,11],"12":[1,0],"15":[1,3],"16":[1,4],"19":[1,7],"20":[1,8],"26":[1,14],"27":[1,15],"28":[1,16],"35":[1,23],"36":[1,24],"37":[1,25],"41":[1,29]},"invalid_utf8_offsets":[],"probe_accounting":{"lpar_raw_ordinal":9,"lpar_end_from_probe_start":24},"body_owner":null,"bytes":41,"source_sha256":"3f15755be73b9e8c660004bc877ccf0c0140be22e5e96cb99d5838b00c4d8bcf","expectation_basis":"Source/marker derivation only; no Kotlin lexer/parser/compiler/runtime output","receiver_dots":[[19,20,"USER_TYPE"],[27,28,"FUN"]]}"####).unwrap();
+        assert_eq!(source, expected["source"].as_str().unwrap(), "{id}");
+        positive(tree, &expected);
+        let nullable = elements
+            .iter()
+            .find(|e| !e.token && e.kind == "NULLABLE_TYPE" && (e.start, e.end) == (16, 27))
+            .unwrap();
+        let reference = &elements[nullable.parent.unwrap()];
+        assert_eq!(
+            (reference.kind.as_str(), reference.start, reference.end),
+            ("TYPE_REFERENCE", 16, 27),
+            "{id}"
+        );
+        let function = &elements[reference.parent.unwrap()];
+        assert_eq!(
+            (function.kind.as_str(), function.start, function.end),
+            ("FUN", 12, 41),
+            "{id}"
+        );
+        assert!(
+            elements.iter().any(|e| e.token
+                && e.kind == "QUEST"
+                && (e.start, e.end) == (26, 27)
+                && e.parent.is_some_and(|p| elements[p].kind == "NULLABLE_TYPE"
+                    && (elements[p].start, elements[p].end) == (16, 27))),
+            "{id}"
+        );
+        return;
+    }
+
     if id == "qualified-decline-third-component" {
         // Only this recorded exclusion is superseded by the frozen longer-qualified seed.
         let expected: Value = serde_json::from_str(r####"{"id":"chain3-class-lf-top","source":"class Box<T\nfun a.pkg.String.healthy() = 2","receiver_components":3,"function_name":"healthy","projection":[["CLASS",0,11,"KT_FILE",null],["TYPE_PARAMETER_LIST",9,11,"CLASS",[0,11]],["TYPE_PARAMETER",10,11,"TYPE_PARAMETER_LIST",[0,11]],["FUN",12,42,"KT_FILE",null],["TYPE_REFERENCE",16,28,"FUN",[12,42]],["USER_TYPE",16,28,"TYPE_REFERENCE",[12,42]],["USER_TYPE",16,21,"USER_TYPE",[12,42]],["USER_TYPE",16,17,"USER_TYPE",[12,42]],["REFERENCE_EXPRESSION",16,17,"USER_TYPE",[12,42]],["REFERENCE_EXPRESSION",18,21,"USER_TYPE",[12,42]],["REFERENCE_EXPRESSION",22,28,"USER_TYPE",[12,42]],["VALUE_PARAMETER_LIST",36,38,"FUN",[12,42]]],"declaration_names":[[0,6,9,"Box"],[12,29,36,"healthy"]],"diagnostics":[[11,11,"Missing '>'"]],"expectation_basis":"independent marker/source derivation; no parser/lexer runtime output","bytes":42,"source_sha256":"eff7fc5146528cbe973b16f2bb9696eb0a0e0e62d827a395937bbadf0da7250e","positions":{"0":[0,0],"6":[0,6],"9":[0,9],"10":[0,10],"11":[0,11],"12":[1,0],"16":[1,4],"17":[1,5],"18":[1,6],"21":[1,9],"22":[1,10],"28":[1,16],"29":[1,17],"36":[1,24],"38":[1,26],"42":[1,30]},"invalid_utf8_offsets":[],"receiver_tokens":[[16,17,"a","REFERENCE_EXPRESSION"],[18,21,"pkg","REFERENCE_EXPRESSION"],[22,28,"String","REFERENCE_EXPRESSION"]],"receiver_dots":[[17,18,"USER_TYPE"],[21,22,"USER_TYPE"],[28,29,"FUN"]]}"####).unwrap();

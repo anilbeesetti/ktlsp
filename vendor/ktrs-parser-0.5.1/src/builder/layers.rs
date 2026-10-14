@@ -106,6 +106,20 @@ impl SemanticWhitespaceAwarePsiBuilder {
         effective_truncation(&self.layers)
     }
 
+    pub(crate) fn generic_copy_active_layers(&self) -> (usize, Option<i32>) {
+        let mut count = 0;
+        let mut minimum: Option<i32> = None;
+        for layer in &self.layers {
+            if let Layer::Truncated { eof_position } = *layer {
+                if eof_position >= 0 {
+                    count += 1;
+                    minimum = Some(minimum.map_or(eof_position, |value| value.min(eof_position)));
+                }
+            }
+        }
+        (count, minimum)
+    }
+
     pub fn eof(&mut self) -> bool {
         let base = self.psi.eof();
         if base || self.layers.is_empty() {

@@ -1,0 +1,442 @@
+{
+  "provenance": "Independently authored bytes from JVMS framing; not compiled, genuine, JVM/oracle observed or implementation output.",
+  "context": {
+    "version": [
+      52,
+      0
+    ],
+    "method_name_index": 8,
+    "method_name_utf16": [
+      109
+    ],
+    "method_flags": 0,
+    "outer_attribute_name": 1,
+    "cp": [
+      {
+        "kind": "Unusable"
+      },
+      {
+        "kind": "Utf8",
+        "utf16": [
+          67,
+          111,
+          100,
+          101
+        ]
+      },
+      {
+        "kind": "Utf8",
+        "utf16": [
+          88
+        ]
+      },
+      {
+        "kind": "Class",
+        "name": 0
+      },
+      {
+        "kind": "Integer",
+        "bits": 0
+      },
+      {
+        "kind": "Unusable"
+      },
+      {
+        "kind": "Utf8",
+        "utf16": [
+          67,
+          111,
+          100,
+          101
+        ]
+      },
+      {
+        "kind": "Utf8",
+        "utf16": [
+          0,
+          55296
+        ]
+      },
+      {
+        "kind": "Utf8",
+        "utf16": [
+          109
+        ]
+      }
+    ]
+  },
+  "storage_symbols": {
+    "S": "size_of::<Option<CodeBody>>() on target",
+    "H": "size_of::<ExceptionHandler>() on target",
+    "A": "size_of::<Attribute>() on target"
+  },
+  "valid": [
+    {
+      "id": "V01",
+      "hex": "00 01 00 01 00 00 00 01 b1 00 00 00 00",
+      "length": 13,
+      "max_stack": 1,
+      "max_locals": 1,
+      "bytecode_hex": "b1",
+      "bytecode_span": [
+        8,
+        9
+      ],
+      "exceptions": [],
+      "nested": [],
+      "budget": {
+        "bytes": 13,
+        "records": 2,
+        "work": 22,
+        "owned_bytes": "S"
+      }
+    },
+    {
+      "id": "V02",
+      "hex": "00 02 00 03 00 00 00 04 00 00 00 b1 00 02 00 00 00 04 00 03 00 00 00 01 00 03 00 02 00 03 00 02 00 02 00 00 00 02 aa bb 00 02 00 00 00 00",
+      "length": 46,
+      "max_stack": 2,
+      "max_locals": 3,
+      "bytecode_hex": "00 00 00 b1",
+      "bytecode_span": [
+        8,
+        12
+      ],
+      "exceptions": [
+        [
+          0,
+          4,
+          3,
+          0
+        ],
+        [
+          1,
+          3,
+          2,
+          3
+        ]
+      ],
+      "nested": [
+        {
+          "name": 2,
+          "header_span": [
+            32,
+            38
+          ],
+          "payload_span": [
+            38,
+            40
+          ],
+          "hex": "aa bb"
+        },
+        {
+          "name": 2,
+          "header_span": [
+            40,
+            46
+          ],
+          "payload_span": [
+            46,
+            46
+          ],
+          "hex": ""
+        }
+      ],
+      "budget": {
+        "bytes": 46,
+        "records": 6,
+        "work": 64,
+        "owned_bytes": "S + 2*H + 2*A"
+      }
+    },
+    {
+      "id": "V03",
+      "hex": "ff ff 00 00 00 00 00 01 ff 00 00 00 02 00 07 00 00 00 02 de ad 00 07 00 00 00 00",
+      "length": 27,
+      "max_stack": 65535,
+      "max_locals": 0,
+      "bytecode_hex": "ff",
+      "bytecode_span": [
+        8,
+        9
+      ],
+      "exceptions": [],
+      "nested": [
+        {
+          "name": 7,
+          "header_span": [
+            13,
+            19
+          ],
+          "payload_span": [
+            19,
+            21
+          ],
+          "hex": "de ad"
+        },
+        {
+          "name": 7,
+          "header_span": [
+            21,
+            27
+          ],
+          "payload_span": [
+            27,
+            27
+          ],
+          "hex": ""
+        }
+      ],
+      "budget": {
+        "bytes": 27,
+        "records": 4,
+        "work": 44,
+        "owned_bytes": "S + 2*A"
+      }
+    },
+    {
+      "id": "V04",
+      "hex": "00 00 00 00 00 00 00 01 00 00 00 00 01 00 01 00 00 00 01 00",
+      "length": 20,
+      "max_stack": 0,
+      "max_locals": 0,
+      "bytecode_hex": "00",
+      "bytecode_span": [
+        8,
+        9
+      ],
+      "exceptions": [],
+      "nested": [
+        {
+          "name": 1,
+          "header_span": [
+            13,
+            19
+          ],
+          "payload_span": [
+            19,
+            20
+          ],
+          "hex": "00"
+        }
+      ],
+      "budget": {
+        "bytes": 20,
+        "records": 3,
+        "work": 35,
+        "owned_bytes": "S + A"
+      }
+    }
+  ],
+  "malformed": [
+    {
+      "id": "M01",
+      "base": "V01",
+      "overwrite": [
+        {
+          "offset": 4,
+          "hex": "00 00 00 00"
+        }
+      ],
+      "expected": "Malformed(\"code length\")"
+    },
+    {
+      "id": "M02",
+      "base": "V01",
+      "overwrite": [
+        {
+          "offset": 4,
+          "hex": "00 01 00 00"
+        }
+      ],
+      "expected": "Malformed(\"code length\")"
+    },
+    {
+      "id": "M03",
+      "base": "V01",
+      "overwrite": [
+        {
+          "offset": 4,
+          "hex": "ff ff ff ff"
+        }
+      ],
+      "expected": "Malformed(\"code length\")"
+    },
+    {
+      "id": "M04",
+      "base": "V01",
+      "overwrite": [
+        {
+          "offset": 4,
+          "hex": "00 00 00 02"
+        }
+      ],
+      "expected": "Truncated"
+    },
+    {
+      "id": "M05",
+      "base": "V02",
+      "overwrite": [
+        {
+          "offset": 14,
+          "hex": "00 04"
+        }
+      ],
+      "expected": "Malformed(\"code exception range\")"
+    },
+    {
+      "id": "M06",
+      "base": "V02",
+      "overwrite": [
+        {
+          "offset": 16,
+          "hex": "00 00"
+        }
+      ],
+      "expected": "Malformed(\"code exception range\")"
+    },
+    {
+      "id": "M07",
+      "base": "V02",
+      "overwrite": [
+        {
+          "offset": 16,
+          "hex": "00 05"
+        }
+      ],
+      "expected": "Malformed(\"code exception range\")"
+    },
+    {
+      "id": "M08",
+      "base": "V02",
+      "overwrite": [
+        {
+          "offset": 18,
+          "hex": "00 04"
+        }
+      ],
+      "expected": "Malformed(\"code exception range\")"
+    },
+    {
+      "id": "M09",
+      "base": "V02",
+      "overwrite": [
+        {
+          "offset": 20,
+          "hex": "00 04"
+        }
+      ],
+      "expected": "Malformed(\"class index\")"
+    },
+    {
+      "id": "M10",
+      "base": "V02",
+      "overwrite": [
+        {
+          "offset": 20,
+          "hex": "00 05"
+        }
+      ],
+      "expected": "Malformed(\"constant index\")"
+    },
+    {
+      "id": "M11",
+      "base": "V02",
+      "overwrite": [
+        {
+          "offset": 20,
+          "hex": "ff ff"
+        }
+      ],
+      "expected": "Malformed(\"constant index\")"
+    },
+    {
+      "id": "M12",
+      "base": "V02",
+      "overwrite": [
+        {
+          "offset": 32,
+          "hex": "00 00"
+        }
+      ],
+      "expected": "Malformed(\"constant index\")"
+    },
+    {
+      "id": "M13",
+      "base": "V02",
+      "overwrite": [
+        {
+          "offset": 32,
+          "hex": "00 03"
+        }
+      ],
+      "expected": "Malformed(\"UTF8 index\")"
+    },
+    {
+      "id": "M14",
+      "base": "V02",
+      "overwrite": [
+        {
+          "offset": 32,
+          "hex": "00 05"
+        }
+      ],
+      "expected": "Malformed(\"constant index\")"
+    },
+    {
+      "id": "M15",
+      "base": "V02",
+      "overwrite": [
+        {
+          "offset": 32,
+          "hex": "ff ff"
+        }
+      ],
+      "expected": "Malformed(\"constant index\")"
+    },
+    {
+      "id": "M16",
+      "base": "V02",
+      "overwrite": [
+        {
+          "offset": 34,
+          "hex": "ff ff ff ff"
+        }
+      ],
+      "expected": "Truncated"
+    },
+    {
+      "id": "M17",
+      "base": "V02",
+      "overwrite": [
+        {
+          "offset": 30,
+          "hex": "00 03"
+        }
+      ],
+      "expected": "Truncated"
+    },
+    {
+      "id": "M18",
+      "base": "V02",
+      "overwrite": [
+        {
+          "offset": 12,
+          "hex": "00 03"
+        }
+      ],
+      "expected": "Malformed(\"code exception range\")"
+    },
+    {
+      "id": "M19",
+      "base": "V01",
+      "overwrite": [
+        {
+          "offset": 9,
+          "hex": "ff ff"
+        }
+      ],
+      "expected": "Limit(\"code records\")"
+    }
+  ]
+}

@@ -156,6 +156,54 @@ fn compatibility(tree: &Parsed, case: &Value) {
     let elements = tree.elements();
     let source = tree.source();
     assert!(!tree.diagnostics().is_empty(), "{id}");
+    if matches!(
+        id,
+        "nullable-decline-safe-call-expression" | "nullable-decline-safe-call-elvis-expression"
+    ) {
+        // Ordinary-property recovery preserves the original expression lookalike ownership guard.
+        let supplement: Value = serde_json::from_str(PROPERTY_OWNERSHIP).unwrap();
+        let expected = supplement["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["id"].as_str() == Some(id))
+            .unwrap();
+        assert_eq!(source, expected["source"].as_str().unwrap(), "{id}");
+        assert_eq!(projection(tree), expected["projection"], "{id}");
+        assert_eq!(names(tree), expected["declaration_names"], "{id}");
+        assert_eq!(diagnostics(tree), expected["diagnostics"], "{id}");
+        assert!(
+            !elements.iter().any(|e| !e.token && e.kind == "FUN"),
+            "{id}"
+        );
+        for node in expected["expression_nodes"].as_array().unwrap() {
+            let matches: Vec<_> = elements
+                .iter()
+                .filter(|e| {
+                    !e.token
+                        && e.kind == node[0].as_str().unwrap()
+                        && e.start == node[1].as_u64().unwrap() as usize
+                        && e.end == node[2].as_u64().unwrap() as usize
+                })
+                .collect();
+            assert_eq!(matches.len(), 1, "{id}: {node}");
+            let parent = &elements[matches[0].parent.unwrap()];
+            assert_eq!(
+                json!([parent.kind, parent.start, parent.end]),
+                json!([node[3], node[4][0], node[4][1]]),
+                "{id}: {node}"
+            );
+        }
+        for (offset, position) in expected["positions"].as_object().unwrap() {
+            let actual = tree.position(offset.parse::<usize>().unwrap()).unwrap();
+            assert_eq!(
+                json!([actual.line, actual.character]),
+                *position,
+                "{id}: {offset}"
+            );
+        }
+        return;
+    }
     match case["invariant"].as_str().unwrap() {
         "no-complete-top-level-fun" => {
             let start = case["candidate_start"].as_u64().unwrap() as usize;
@@ -413,3 +461,403 @@ const FIXTURES: &str = r####"[
 {"id":"nullable-aggregate-debit-resets-next-list","source":"class Box<@A T0,\n@A T1,\n@A T2,\n@A T3,\n@A T4,\n@A T5,\n@A T6,\n@A T7,\n@A T8,\n@A T9,\n@A T10,\n@A T11,\n@A T12,\n@A T13,\n@A T14,\n@A T15,\n@A T16,\n@A T17,\n@A T18,\n@A T19,\n@A T20,\n@A T21,\n@A T22,\n@A T23,\n@A T24,\n@A T25,\n@A T26,\n@A T27,\n@A T28,\n@A T29,\n@A T30,\n@A T31,\n@A T32,\n@A T33,\n@A T34,\n@A T35,\n@A T36,\n@A T37,\n@A T38,\n@A T39,\n@A T40,\n@A T41,\n@A T42,\n@A T43,\n@A T44,\n@A T45,\n@A T46,\n@A T47,\n@A T48,\n@A T49,\n@A T50,\n@A T51,\n@A T52,\n@A T53,\n@A T54,\n@A T55,\n@A T56,\n@A T57,\n@A T58,\n@A T59,\n@A T60,\n@A T61,\n@A T62,\n@A T63,\nfun String?.declined() = 1\nclass Fresh<T\nfun String?.healthy() = 2","reason":"first16 eligible windows debit16x256=4096; later classifier resets4096","invariant":"aggregate-reset","diagnostics":"nonempty","full_projection":"not specified; finite compatibility invariant only","declined_start":512,"healthy_start":553,"bytes":578,"source_sha256":"2c5567d5e80332d9b3697c7d78fbb16b95f562a90fecb26cf87b2bf330f03d06"},
 {"id":"nullable-nonclass-object","source":"object Box<T\nfun String?.healthy() = 2","reason":"!object callsite remains unchanged","invariant":"object-no-classifier-recovery","diagnostics":"nonempty","full_projection":"not specified; finite compatibility invariant only","bytes":38,"source_sha256":"d63302e8fd64d15c756cf98d58c0643b9e590d89ffd69fd69790b504380d5fec"}
 ]"####;
+
+// Source-derived supplemental ownership contract SHA256: bf8a8e17aee78e01cc429385e6cf421c77ca4fef6000992d48b196a1df548bc0
+const PROPERTY_OWNERSHIP: &str = r####"{
+  "status": "SUPPLEMENTAL CONTRACT ONLY; SOURCE HOLD pending root scope admission",
+  "current_head": "851901e5d219d14a3f0d2a2b90d7c1f01ce5484c",
+  "frozen_property_contract_sha256": "2305fb9abb52d67356ad67527f3c3d5c622725a1d07753bf099c82fc0004bc8f",
+  "expectation_basis": "independent source grammar in calls.rs/operations.rs/properties.rs and original ASCII byte/UTF16 arithmetic; failure log exposes boundary assertion only; no parser/native output used",
+  "cases": [
+    {
+      "id": "nullable-decline-safe-call-expression",
+      "source": "class Box<T\nval value = receiver?.healthy()",
+      "bytes": 43,
+      "source_sha256": "fd47508713e386d56160b7ce9499adca91c65c11f9d1004b22f180cd90087501",
+      "projection": [
+        [
+          "CLASS",
+          0,
+          11,
+          "KT_FILE",
+          null
+        ],
+        [
+          "TYPE_PARAMETER_LIST",
+          9,
+          11,
+          "CLASS",
+          [
+            0,
+            11
+          ]
+        ],
+        [
+          "TYPE_PARAMETER",
+          10,
+          11,
+          "TYPE_PARAMETER_LIST",
+          [
+            0,
+            11
+          ]
+        ],
+        [
+          "PROPERTY",
+          12,
+          43,
+          "KT_FILE",
+          null
+        ],
+        [
+          "REFERENCE_EXPRESSION",
+          24,
+          32,
+          "SAFE_ACCESS_EXPRESSION",
+          [
+            12,
+            43
+          ]
+        ],
+        [
+          "REFERENCE_EXPRESSION",
+          34,
+          41,
+          "CALL_EXPRESSION",
+          [
+            12,
+            43
+          ]
+        ]
+      ],
+      "declaration_names": [
+        [
+          0,
+          6,
+          9,
+          "Box"
+        ],
+        [
+          12,
+          16,
+          21,
+          "value"
+        ]
+      ],
+      "diagnostics": [
+        [
+          11,
+          11,
+          "Missing '>'"
+        ]
+      ],
+      "expression_nodes": [
+        [
+          "SAFE_ACCESS_EXPRESSION",
+          24,
+          43,
+          "PROPERTY",
+          [
+            12,
+            43
+          ]
+        ],
+        [
+          "CALL_EXPRESSION",
+          34,
+          43,
+          "SAFE_ACCESS_EXPRESSION",
+          [
+            24,
+            43
+          ]
+        ],
+        [
+          "VALUE_ARGUMENT_LIST",
+          41,
+          43,
+          "CALL_EXPRESSION",
+          [
+            34,
+            43
+          ]
+        ]
+      ],
+      "positions": {
+        "0": [
+          0,
+          0
+        ],
+        "6": [
+          0,
+          6
+        ],
+        "9": [
+          0,
+          9
+        ],
+        "10": [
+          0,
+          10
+        ],
+        "11": [
+          0,
+          11
+        ],
+        "12": [
+          1,
+          0
+        ],
+        "16": [
+          1,
+          4
+        ],
+        "21": [
+          1,
+          9
+        ],
+        "24": [
+          1,
+          12
+        ],
+        "32": [
+          1,
+          20
+        ],
+        "34": [
+          1,
+          22
+        ],
+        "41": [
+          1,
+          29
+        ],
+        "43": [
+          1,
+          31
+        ]
+      },
+      "no_fun_nodes": true
+    },
+    {
+      "id": "nullable-decline-safe-call-elvis-expression",
+      "source": "class Box<T\nval value = receiver?.healthy() ?: 2",
+      "bytes": 48,
+      "source_sha256": "85d38c287a821ecb2736533b01ad27c7f0685204b0383d242f3bb2edb71dcdda",
+      "projection": [
+        [
+          "CLASS",
+          0,
+          11,
+          "KT_FILE",
+          null
+        ],
+        [
+          "TYPE_PARAMETER_LIST",
+          9,
+          11,
+          "CLASS",
+          [
+            0,
+            11
+          ]
+        ],
+        [
+          "TYPE_PARAMETER",
+          10,
+          11,
+          "TYPE_PARAMETER_LIST",
+          [
+            0,
+            11
+          ]
+        ],
+        [
+          "PROPERTY",
+          12,
+          48,
+          "KT_FILE",
+          null
+        ],
+        [
+          "REFERENCE_EXPRESSION",
+          24,
+          32,
+          "SAFE_ACCESS_EXPRESSION",
+          [
+            12,
+            48
+          ]
+        ],
+        [
+          "REFERENCE_EXPRESSION",
+          34,
+          41,
+          "CALL_EXPRESSION",
+          [
+            12,
+            48
+          ]
+        ]
+      ],
+      "declaration_names": [
+        [
+          0,
+          6,
+          9,
+          "Box"
+        ],
+        [
+          12,
+          16,
+          21,
+          "value"
+        ]
+      ],
+      "diagnostics": [
+        [
+          11,
+          11,
+          "Missing '>'"
+        ]
+      ],
+      "expression_nodes": [
+        [
+          "BINARY_EXPRESSION",
+          24,
+          48,
+          "PROPERTY",
+          [
+            12,
+            48
+          ]
+        ],
+        [
+          "SAFE_ACCESS_EXPRESSION",
+          24,
+          43,
+          "BINARY_EXPRESSION",
+          [
+            24,
+            48
+          ]
+        ],
+        [
+          "CALL_EXPRESSION",
+          34,
+          43,
+          "SAFE_ACCESS_EXPRESSION",
+          [
+            24,
+            43
+          ]
+        ],
+        [
+          "VALUE_ARGUMENT_LIST",
+          41,
+          43,
+          "CALL_EXPRESSION",
+          [
+            34,
+            43
+          ]
+        ],
+        [
+          "OPERATION_REFERENCE",
+          44,
+          46,
+          "BINARY_EXPRESSION",
+          [
+            24,
+            48
+          ]
+        ],
+        [
+          "INTEGER_CONSTANT",
+          47,
+          48,
+          "BINARY_EXPRESSION",
+          [
+            24,
+            48
+          ]
+        ]
+      ],
+      "positions": {
+        "0": [
+          0,
+          0
+        ],
+        "6": [
+          0,
+          6
+        ],
+        "9": [
+          0,
+          9
+        ],
+        "10": [
+          0,
+          10
+        ],
+        "11": [
+          0,
+          11
+        ],
+        "12": [
+          1,
+          0
+        ],
+        "16": [
+          1,
+          4
+        ],
+        "21": [
+          1,
+          9
+        ],
+        "24": [
+          1,
+          12
+        ],
+        "32": [
+          1,
+          20
+        ],
+        "34": [
+          1,
+          22
+        ],
+        "41": [
+          1,
+          29
+        ],
+        "43": [
+          1,
+          31
+        ],
+        "44": [
+          1,
+          32
+        ],
+        "46": [
+          1,
+          34
+        ],
+        "47": [
+          1,
+          35
+        ],
+        "48": [
+          1,
+          36
+        ]
+      },
+      "no_fun_nodes": true
+    }
+  ],
+  "preserve": "all85 historical nullable JSON bytes and all other assertions/dispatch; no product/vendor/budget/fixture changes",
+  "original_intent": "initializer safe-call/Elvis expression remains PROPERTY-owned, never promoted into FUN or sibling selector declaration",
+  "scope_request": "only crates/ktlsp-parser/tests/recovery_nullable_extension_functions.rs two named stable IDs + adjacent failure/scope erratum in already-owned local/vendor review notes; root admission required"
+}
+"####;

@@ -1,0 +1,35 @@
+{
+  "modules": [
+    {
+      "name": "app😀",
+      "dependencies": [
+        {"type":"library","name":"shared","scope":"compile"},
+        {"type":"moduleSource"},
+        {"type":"module","name":"shared","scope":"provided","isExported":true},
+        {"type":"library","name":"shared","scope":"compile","isExported":true},
+        {"type":"library","name":"shared","scope":"test"},
+        {"type":"library","name":"shared","scope":"test","isExported":true},
+        {"type":"moduleSource"},
+        {"type":"library","name":"shared","scope":"runtime"},
+        {"type":"library","name":"shared","scope":"runtime","isExported":true},
+        {"type":"module","name":"shared","scope":"provided"},
+        {"type":"library","name":"shared","scope":"provided"},
+        {"type":"library","name":"shared","scope":"provided","isExported":true}
+      ],
+      "contentRoots": [
+        {"path":"<WORKSPACE>/app","sourceRoots":[
+          {"path":"<WORKSPACE>/app/src/../src/kotlin","type":"kotlin-source"},
+          {"path":"<WORKSPACE>/app/test","type":"java-test"}
+        ]},
+        {"path":"<WORKSPACE>/extra","sourceRoots":[
+          {"path":"<WORKSPACE>/extra/src","type":"java-source"}
+        ]}
+      ]
+    },
+    {"name":"shared"}
+  ],
+  "libraries":[{"name":"shared","type":null,"roots":[
+    {"path":"<WORKSPACE>/lib/sources.zip","type":"SOURCES"},
+    {"path":"<WORKSPACE>/lib/classes.jar"}
+  ]}]
+}

@@ -65,3 +65,28 @@ exclusive expected-head/base merge lease and exact-main owner/root verification
 remain required. Issue169 is OPEN; branchpublication/PR/CI admitted,merge HOLD.
 BroaderC13/B3/B4 GAP,B11 UNVERIFIED,T008/T008a HOLD,#7/#83/#96 OPEN/Darwin UNKNOWN.
 No full-parser,semantic,full-parity,RSS,official-performance or Darwin-fix claim.
+
+### Original PR170 failure and one historical dispatch reconciliation
+
+Original run38497231040/job115635663818 attempt1 on reviewed78b6c18/tree
+c2556e29014085749715d32028ef58b981d5281b passed formatting/Clippy and failed
+Tests at recovery_generic_extension_functions.rs:190, decline-header-3's
+class.end>11 assertion. Raw log SHA256
+a81796c31887a2e8b630d8c513ce6a72802b85b0f42d6ebda03a4eb7861ecd77
+(56377 bytes/715 lines) is retained independently by owner and root. The focused
+property suite was not reached; the failure establishes no complete recovered CST.
+
+The historical 25-byte source is identical to the preimplementation seed-lf
+positive. Owner and all three reviewers missed this duplicate negative. After
+actual SAME2+architect failure/proposal reviews, root admitted only stable-ID
+decline-header-3's dispatch using the unchanged frozen four-row CLASS/list/T/
+PROPERTY projection, direct names and sole Missing '>' diagnostic. All 70 historical
+JSON fixtures remain byte-identical, as do every other dispatch/assertion and all
+other function/nullable/qualified tests. Frozen property JSON is unchanged.
+This adjacent exception supersedes only the earlier blanket dispatch-preservation
+claim; it adds no product grammar, patch, resource or expectation changes.
+
+The corrected head requires actual SAME source rechecks and new original unchanged
+Linux Native Rust all3. No unchanged retry or local native execution is used. Merge
+remains HOLD for root's expected-head/base lease, completed CI approvals and
+owner/root exact-main verification; broader parity and Darwin gates stay unchanged.

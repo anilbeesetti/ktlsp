@@ -67,6 +67,51 @@
      }
  
      pub fn eof(&mut self) -> bool {
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -40,6 +40,32 @@
+     parsing::kotlin_parser::parse(text, kind)
+ }
+ 
++std::thread_local! {
++    static EOF_OBSERVER: std::cell::Cell<Option<fn()>> = const { std::cell::Cell::new(None) };
++}
++
++/// Dedicated grammar-checkpoint observation; does not establish EOF or CPU consumption.
++#[doc(hidden)]
++pub fn parse_file_observing_eof(text: &str, kind: FileKind, observer: fn()) -> Parse {
++    struct Restore(Option<fn()>);
++    impl Drop for Restore {
++        fn drop(&mut self) {
++            let _ = EOF_OBSERVER.try_with(|slot| slot.set(self.0));
++        }
++    }
++    let Ok(previous) = EOF_OBSERVER.try_with(|slot| slot.replace(Some(observer))) else {
++        return parse_file(text, kind);
++    };
++    let _restore = Restore(previous);
++    parse_file(text, kind)
++}
++
++pub(crate) fn observe_eof() {
++    if let Ok(Some(observer)) = EOF_OBSERVER.try_with(std::cell::Cell::get) {
++        observer();
++    }
++}
++
+ /// [`parse_file`] for callers re-parsing similar text: the result is identical, but lazy blocks,
+ /// lambdas and KDoc whose text was already seen with `cache` are reused instead of re-parsed.
+ pub fn parse_file_cached(text: &str, kind: FileKind, cache: &mut ChameleonCache) -> Parse {
+--- a/src/parsing/abstract_kotlin_parsing.rs
++++ b/src/parsing/abstract_kotlin_parsing.rs
+@@ -91,6 +91,7 @@
+     }
+ 
+     pub(crate) fn eof(&mut self) -> bool {
++        crate::observe_eof();
+         self.my_builder.eof()
+     }
+ 
 --- a/src/parsing/declarations/annotations.rs
 +++ b/src/parsing/declarations/annotations.rs
 @@ -5,7 +5,7 @@
@@ -545,7 +590,7 @@
  
                  if !self.at(COMMA) {
                      break;
-@@ -39,13 +82,129 @@
+@@ -39,13 +82,138 @@
                  }
              }
  
@@ -616,13 +661,22 @@
 +                    probe.expect(DOT) && probe.expect(IDENTIFIER)
 +                } else {
 +                    let mut plain = true;
++                    let mut identifiers = 1;
 +                    while probe.consume_if(DOT) {
 +                        if !probe.expect(IDENTIFIER) {
 +                            plain = false;
 +                            break;
 +                        }
++                        identifiers += 1;
 +                    }
 +                    plain
++                        && (if identifiers == 2 && probe.consume_if(SAFE_ACCESS) {
++                            probe.expect(IDENTIFIER)
++                        } else if identifiers == 2 && probe.consume_if(QUEST) {
++                            probe.expect(DOT) && probe.expect(IDENTIFIER)
++                        } else {
++                            true
++                        })
 +                })
 +                && probe.at(LPAR)
 +        };
@@ -677,7 +731,7 @@
      }
  
      /*
-@@ -132,23 +291,43 @@
+@@ -132,23 +300,43 @@
       *   : modifiers SimpleName (":" userType)?
       *   ;
       */

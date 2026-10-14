@@ -365,3 +365,83 @@ contract and validation gates are in
 ../../crates/ktlsp-parser/reviews/c13-property-recovery.md. Publication/PR/original
 Linux CI are admitted; merge remains HOLD for root's expected-head/base lease and
 passing actual source/CI reviews, followed by owner/root exact-main verification.
+
+## #83 B3 finite causal observation
+
+An additive doc-hidden vendor wrapper installs a scoped thread-local observer;
+actual Parser::eof dispatches it before its ordinary builder predicate. Restoration
+on normal/nested/unwind paths and thread isolation are checked in the production
+workspace's deadline_observation test, since this vendor workspace is excluded
+from unchanged root CI. Parent/worker witness transport is a request-local Unix
+datagram pair, never parser stdout or a new relative deadline. Immediate cleanup
+is unchanged; no acknowledgement grace, retry or polling wait is introduced.
+
+See ../../crates/ktlsp-parser/reviews/deadline-observation.md for literal request,
+causal acceptance, fallback FILE/PIPE flag checks, fixed wire/count/cadence and
+unmeasured default/observing overhead. The ordered patch replay now covers16
+behavior/50 formatting files and all54 final source hashes with four pristine
+survivors. Original notices/archive/manifests/locks stay unchanged. Source-stage
+fmt and compile-only Clippy do not prove a runtime witness; reviewed original
+Linux CI is still required. B3/B4 GAP, B11 UNVERIFIED, T008 HOLD; no semantic or
+performance/full-parity claim.
+
+## C13 two-component nullable recovery — combined source candidate
+
+Root released exact fe4f4a73f0bf9190f7668bf74a9b963f70114449,
+tree01e0300947dc10cb4f737fded962987d556358fa, soleparent
+cb0c8c7dd064a5a3f2d1c82097a2cfd0547e496a after PR202 owner/root clear.
+That delivered source was integrated once into reviewed private C13 source
+e7cb4d28529a41e0bf12c4d6d90372daaa257e6b without conflicts; all six C13 blobs
+and all incoming B3/parser/binary bytes were preserved before provenance updates.
+The former five-file publication HOLD is released for this sole owner; earlier
+private-stage mismatch notes are historical, not the current artifact state.
+
+Only declarations/type_parameters.rs adds C13 grammar behavior: after exactly two
+successfully consumed identifiers, accept one SAFE_ACCESS or QUEST+DOT separator,
+a direct function identifier and complete LPAR. Existing single-nullable/plain
+qualified/property branches, caller/bound/recursion/EOF/window/debit guards remain.
+Long nullable chains and generic/annotated/parenthesized receivers remain gaps.
+Only nullable-decline-qualified and qualified-decline-nullable dispatch change;
+all70/59/116/85 historical payloads/supplements and other live overrides remain.
+The focused literal packet retains49 positives/61 controls/42 cuts/1416 UTF16
+positions. Forty EOF arithmetic rows do not establish active-layer integration.
+
+Inherited B3 observer state is thread-local, not Parser-instance-local. Thus
+Parser::eof in same-thread scratch probes also dispatches the callback before
+the unchanged builder EOF predicate and contributes to sampled cadence. A receipt
+cannot identify live versus scratch/lazy work. C13's syntax-state isolation does
+not promise unchanged observation counts. Ordinary parse_snapshot installs no
+observer socket/callback, but each EOF still checks TLS; default/observing overhead
+and timing/allocation perturbation are unmeasured. Callback dispatch does not
+change EOF truth, recovery budgets or add waits/retries. No B3 source/fixture/
+protocol/allocator/limit is changed by this child. All three delivered PR202
+observations had MissingACK; B3 remains GAP.
+
+Inherited allocation/refusal/status86 and supervisor precedence remain: main-loop
+cancellation, original deadline, output error, then child status; allocation
+refusal priority at ordinary worker exit; finish_io keeps the original deadline;
+guard.finish()? retains ambiguous Io override before scoped joins. Cleanup waits/
+joins remain unbounded. No identical timing/containment result is promised by
+TLS overhead; ordinary syntax/result compatibility requires actual original CI.
+
+Fresh generation from the verified registry archive, delivered behavioral phase
+plus only reviewed C13 delta, then pinned1.99.0/edition2024 scratch formatting
+rederived16 behavior files,50 formatting files,54 final hashes/four pristine
+survivors. A second fresh owner extraction replayed recovery then formatting with
+zero offsets/fuzz and matched all54 current combined Rust files. Independent
+adversarial extraction/replay is separately required; no old replay receipt or
+counts were reused. Original upstream inventory, archive, notices and manifests/
+locks remain unchanged.
+
+Combined phase SHA256:
+- recovery.patch 74922955e653db43633e3e49848060f9d667e699ddae370d69d886f632b7ed87
+- formatting.patch c5f1625125e46e35ff79ff1094698eb33995464d6b863e184ba7d2e65b1637aa
+- formatted-sha256.json 7666e63232ddc2aac66a77311c213417e6c700a8839d3c95bffe00d2160c5773
+
+SAME3 actual combined source/provenance reviews, owned-file formatting and
+compile-only locked workspace Clippy precede issue/push/open+attach PR and original
+unchanged Linux all3. No local native/parser/worker/tests/server/bench runtime.
+Merge remains HOLD for root's exclusive expected-head/base lease and completed
+source/CI reviews. See ../../crates/ktlsp-parser/reviews/c13-two-component-nullable-recovery.md.
+Aggregate C13/B3/B4 GAP, B11 UNVERIFIED, T008/T008a HOLD, #7/#83/#96 OPEN;
+Darwin UNKNOWN. No semantic/provider/full-parity/performance promotion.

@@ -60,7 +60,13 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<PropertyHeader<'_>, Error>
         }
         .into());
     }
-    let mut budget = wire::Budget::new(limits.records, limits.work);
+    decode_with_budget(bytes, &mut wire::Budget::new(limits.records, limits.work))
+}
+
+pub(super) fn decode_with_budget<'a>(
+    bytes: &'a [u8],
+    budget: &mut wire::Budget,
+) -> Result<PropertyHeader<'a>, Error> {
     let mut pos = 0;
     let mut flags = None;
     let mut old_flags = None;
@@ -68,7 +74,7 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<PropertyHeader<'_>, Error>
     let mut setter_flags = None;
     let mut name = None;
     while pos < bytes.len() {
-        let field = wire::field(bytes, &mut pos, bytes.len(), &mut budget)?;
+        let field = wire::field(bytes, &mut pos, bytes.len(), budget)?;
         budget.work(1, field.span.start)?;
         match (field.number, field.value) {
             (1, Value::Varint(value)) => old_flags = Some(value as u32 as i32),

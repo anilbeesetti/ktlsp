@@ -40,6 +40,32 @@ pub fn parse_file(text: &str, kind: FileKind) -> Parse {
     parsing::kotlin_parser::parse(text, kind)
 }
 
+std::thread_local! {
+    static EOF_OBSERVER: std::cell::Cell<Option<fn()>> = const { std::cell::Cell::new(None) };
+}
+
+/// Dedicated grammar-checkpoint observation; does not establish EOF or CPU consumption.
+#[doc(hidden)]
+pub fn parse_file_observing_eof(text: &str, kind: FileKind, observer: fn()) -> Parse {
+    struct Restore(Option<fn()>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            let _ = EOF_OBSERVER.try_with(|slot| slot.set(self.0));
+        }
+    }
+    let Ok(previous) = EOF_OBSERVER.try_with(|slot| slot.replace(Some(observer))) else {
+        return parse_file(text, kind);
+    };
+    let _restore = Restore(previous);
+    parse_file(text, kind)
+}
+
+pub(crate) fn observe_eof() {
+    if let Ok(Some(observer)) = EOF_OBSERVER.try_with(std::cell::Cell::get) {
+        observer();
+    }
+}
+
 /// [`parse_file`] for callers re-parsing similar text: the result is identical, but lazy blocks,
 /// lambdas and KDoc whose text was already seen with `cache` are reused instead of re-parsed.
 pub fn parse_file_cached(text: &str, kind: FileKind, cache: &mut ChameleonCache) -> Parse {

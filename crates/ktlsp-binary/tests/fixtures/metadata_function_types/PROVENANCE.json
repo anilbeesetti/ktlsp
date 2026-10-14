@@ -1,0 +1,117 @@
+{
+  "status": "actual held bytes read; no download/JVM/compiler/oracle/product execution",
+  "base": "9b4cf49e817d0bb30cbd2f09b674f91afb1aa5fd",
+  "tree": "f85d7afb021618081aeee27e7b9dd6190bbc0fcf",
+  "sole_parent": "e84f13f10babcdcc431dd6f5e3e59843e0201eaa",
+  "branch": "codex/t018-function-inline-types",
+  "artifact": "org.jetbrains.kotlin:kotlin-stdlib:2.3.20",
+  "jar_sha256_inherited_not_rehashed": "0ae12504a5040ebaf37703908483420d1a5624dd1d93f357665f8c77c848a01e",
+  "compiler_provenance": "UNVERIFIED; Implementation-Version identifies distribution only",
+  "genuine_receiver": "ABSENT in finite held Unit witness; receiver fixtures synthetic",
+  "source_pin_inherited": "Kotlin v2.3.20 d57eb4a26ed01ab03cf195da686c8047032ff16f; no source reacquired",
+  "schema_sha256_inherited": "a08e508cc7d98cc225e8b0df7290724b545a0250f7d9c91460cfc1244a3c08e2",
+  "generated_java_sha256_inherited": "da7fa6f03c1afa3499086cb5a1f92471e3f327c8f43298ea8d9548b7e4753716",
+  "schema_fields": "Function inline return_type3/receiver_type5 from assigned root contract; Type class_name6; pinned scalar/wire rules from held committed specs",
+  "actual_witness": {
+    "cp31_mutf8_span": [
+      290,
+      352
+    ],
+    "cp31_hex": "c0 80 12 0a 02 10 02 0a 02 10 c0 80 0a 02 08 02 0a 02 10 0e 0a c0 80 08 c3 86 02 18 c0 80 32 02 30 01 42 07 08 42 c2 a2 06 02 08 02 4a 0a 10 03 1a 02 30 04 48 c2 96 c2 80 04 c2 a8 06 05",
+    "d1_bytes": 52,
+    "d1_sha256": "0dd8125dda5c19a494276ec7c191472160a0190af9eb8faf9fc03266fa06f583",
+    "d1_hex": "12 0a 02 10 02 0a 02 10 00 0a 02 08 02 0a 02 10 0e 0a 00 08 c6 02 18 00 32 02 30 01 42 07 08 42 a2 06 02 08 02 4a 0a 10 03 1a 02 30 04 48 96 80 04 a8 06 05",
+    "function_body_d1_span": [
+      39,
+      49
+    ],
+    "function_sha256": "c40ba211d99c8575494344d811f0af5168a99adeaac7f864c146d2c211ff9f99",
+    "type_body_function_span": [
+      4,
+      6
+    ],
+    "type_body_d1_span": [
+      43,
+      45
+    ],
+    "type_hex": "30 04",
+    "expected_type_class_name": 4
+  },
+  "held_files": [
+    {
+      "path": "crates/ktlsp-binary/fixtures/t017c2/Unit.class",
+      "bytes": 781,
+      "sha256": "896588212a98f36148f2fbe1ea2878d6ba23c6376c6346c765cec5ac0c5716ce"
+    },
+    {
+      "path": "crates/ktlsp-binary/fixtures/t017c2/provenance.json",
+      "bytes": 1524,
+      "sha256": "f14bace82b33337dbde20ecff6900c95036d5084e8b2bf9fb9be61c7b749914f"
+    },
+    {
+      "path": "crates/ktlsp-binary/tests/fixtures/metadata_function_header/UNIT_EXTRACTION.json",
+      "bytes": 1452,
+      "sha256": "3a1da1537abbf80b80ea407c528e91c6a95055a1ee00861fa8fd11394779efa0"
+    },
+    {
+      "path": "crates/ktlsp-binary/METADATA_FUNCTION_HEADER_SPEC.md",
+      "bytes": 10651,
+      "sha256": "e224c8ccb4d4f069342a9cc2dd5dd93eb2b1cc1a8ec4dadccd8639db8813098c"
+    },
+    {
+      "path": "crates/ktlsp-binary/METADATA_TYPE_HEADER_SPEC.md",
+      "bytes": 10623,
+      "sha256": "37499ec4b01c99c18cbcd89f37bdf9f0327da7d295c8a3ceae180392d5739933"
+    },
+    {
+      "path": "crates/ktlsp-binary/tests/fixtures/metadata_wire/README.md",
+      "bytes": 2889,
+      "sha256": "cc0820729d0bded8f440586f4de27566ebd3e8145da688948e2d320b4ffda8e9"
+    },
+    {
+      "path": "crates/ktlsp-binary/src/metadata/function_header.rs",
+      "bytes": 3014,
+      "sha256": "2161c099d529af3379a5f8eb8ce06b10e682ea41a2ea58a8f200b8642520ce32"
+    },
+    {
+      "path": "crates/ktlsp-binary/src/metadata/type_header.rs",
+      "bytes": 3521,
+      "sha256": "0ce3555bf60382a597f3dae6d7222144b6d6a4c6c0c2ae4a6340f181641af422"
+    },
+    {
+      "path": "crates/ktlsp-binary/src/metadata/wire.rs",
+      "bytes": 8734,
+      "sha256": "ae3427b243faa459c03d2c14d3640c50410838b3e7ff8b7e48b0904c3832860f"
+    },
+    {
+      "path": "crates/ktlsp-binary/src/metadata/string_table.rs",
+      "bytes": 8117,
+      "sha256": "ef6be0e45bc5e05b82400023e40ade98cd3a21ac3be331f03d9344fbc910afcf"
+    },
+    {
+      "path": "crates/ktlsp-binary/src/metadata/type_arguments.rs",
+      "bytes": 2594,
+      "sha256": "6f054a1196795db5bf2781d4ee0b661317066ccde846f0fe37c37b7ff19b6328"
+    },
+    {
+      "path": "crates/ktlsp-binary/src/metadata/mod.rs",
+      "bytes": 723,
+      "sha256": "566137a94df6aa5e1657c347eab92f1a60c8c3f3e124cd619bb4734ea63ff345"
+    },
+    {
+      "path": "crates/ktlsp-binary/tests/fixtures/metadata_function_header/LICENSE.txt",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "crates/ktlsp-binary/tests/fixtures/metadata_function_header/NOTICE.txt",
+      "bytes": 482,
+      "sha256": "0b09a83d3ef7795c7dec65e815866597c066c53898f2852a76599b8f5552941a"
+    },
+    {
+      "path": "crates/ktlsp-binary/tests/fixtures/metadata_function_header/PROTOBUF_LICENSE.txt",
+      "bytes": 1659,
+      "sha256": "2f706d67271d8db967046638e30f7887a5ba6e49593e6395e8145a7c9feab96a"
+    }
+  ]
+}

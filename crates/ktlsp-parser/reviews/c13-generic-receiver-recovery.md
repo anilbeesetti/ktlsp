@@ -71,3 +71,45 @@ retains first case outcomes even when Rust's ordinary test capture would hide
 successful output; this changes no frozen expectation or parser behavior. Final
 format/compile checks and SAME3 actual final source rechecks include that delta.
 Original Linux CI remains required and has not yet run at this source stage.
+
+
+## First original CI failure and one-case source-derived authoring erratum
+
+Original attempt1 pull_request run38545225414/job115789502686 at reviewed head
+bb90242f146c4cfd9e4b1cab87052b02a4299145 failed without a rerun. Format/Clippy
+passed; tests stopped after391Rust passes/1failure/2ignored (partial workspace,
+no doctests/protocol completion claim). The new test logged53case completions,
+then malformed-annotation-prefix failed;30later cases were UNREACHED. Original
+rawAPI log80238bytes SHA256
+61b194757b9b827af6a481875409a596608bfbd0d0b92a0c39f4fe54a1f40a57 is retained.
+Checkout329850effc69a3e0763743fab07923d9b8600349 has reviewed tree8602256b and
+ordered parents f6e2c6b3 then bb90242f; workflow blobfc6202e6 is unchanged.
+
+Owner and actual independent retained SAME3 source-only reviews found a contract
+authoring defect, not an implementation correction: scratch annotation failure
+short-circuits before the new generic branch. Existing live GT recovery consumes
+only AT12..13, closing CLASS/list13. Top-level recovery rejects A13..14 and
+LPAR14..15, then normal grammar parses FUN16..46/directhealthy33..40. The prior
+ownership assertion wrongly equated scratch rejection with classifier ownership
+through the later function. This documented historical distinction was missed
+in preparation and prior approvals; those approvals do not cover this correction.
+
+The reviewed erratum preserves the entire immutable V3 payload and all84literal
+sources/83other expectations/historical assertions. Only stable id
+malformed-annotation-prefix selects separate exact source-derived expectations:
+13selected rows, two names, three ordered diagnostic messages/spans,11selected
+tokens/parents, three ERROR_ELEMENT immediate parents/nearest owners, full original
+partition and47UTF16coordinates. AT remains CLASS-owned, A/( remain root errors,
+and the ordinary FUN is KT_FILE-owned. No live ANNOTATION_ENTRY is invented.
+Every snapshot/stale/token-partition/healthy-followup/old-tree assertion remains.
+No blanket weakening, skip, or class.end>11-only shortcut is used.
+
+All30unreached cases require separate static LIVE-path review before a correction
+head: incomplete bounds, nonclass owners, anonymous/argument ownership, exact
+raw/byte copy refusals, overlong tokens, aggregate exhaustion and leading trivia.
+Scratch refusal alone is not evidence of final class/list ownership. Production
+predicate and all vendor/provenance bytes remain unchanged; no replay is needed
+for an unchanged vendor stack. V3/failed head/raw first outcome remain preserved.
+Only explicit root-approved two-file correction and SAME3 actual changed-source
+review admit a new changed head's ORIGINAL unchanged CI; never rerun failedhead.
+No local native/runtime/compiler execution occurred during diagnosis/proposal.

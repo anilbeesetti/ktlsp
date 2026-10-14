@@ -1,5 +1,46 @@
 # B11 finite actual production scratch-copy observation
 
+## Final integration cut and historical evidence
+
+Root assigned one final cut: `cca3a61842f5d90d2315250cc8f75e131fda8a98`,
+tree `0685e2732af0b90283a47da2f9d9136de5f9c5fd`, sole parent
+`fa26a992a54f5a7c81dc34fe1fc51ba3253e8e54`. Integration commit
+`4246b41a3f52f92098a90ec6377b3bd64f61394a` has ordered parents
+`c0bb0edada7d759842e76572ecc180cb54d66f59` and that exact assigned cut.
+No conflict occurred. Incoming docs/AGENTS durable merge guards and binary
+TypeArgument/Constructor additions/exports are retained. Parser/vendor/build
+configuration did not change in the incoming delta. All B11 product/test/frozen
+assertion and vendor/provenance bytes remain identical to the initial reviewed
+head; only this owned review receipt gains historical-stage classification.
+
+The initial source-stage receipt below, and the source-candidate sections of
+vendor INTEGRATION.md/PROVENANCE.md, are retained historical records. Their
+future/unobserved wording describes preparation before the first execution,
+not the subsequent original Linux result. Initial attempt1 PR CI
+[run38534197245/job115753001629](https://github.com/anilbeesetti/ktlsp/actions/runs/38534197245/job/115753001629)
+at head `c0bb0edada7d759842e76572ecc180cb54d66f59` passed unchanged pinned
+format/Clippy/workspace tests: 540 passes (527 ordinary +13 compile-fail),
+zero failures, two exercised ignored helpers and22 separate protocol cases.
+SAME3 reviewed actual source/raw/config/checkout. The strict production assertion
+established the finite count1/min57/bound57/start28/copied-end57/eligible next57..58
+plus frozen recovery/identity/healthy conjunction. Numeric successful stderr was
+harness-captured; raw numeric payload capture and mutation execution are not claimed.
+This initial result is not final-cut or exact-main validation.
+
+All54 vendor hashes, both patch hashes and notices are reverified unchanged.
+The first fresh owner and independent adversarial pristine ordered zero-fuzz/
+offset replay receipts remain valid; identical vendor bytes are not regenerated,
+repacked or replayed. New combined-source SAME3 review, pinned formatting,
+compile-only locked all-target Clippy and a new original unchanged Linux CI with
+SAME3 actual completed evidence review apply to the final integrated head.
+No local native/parser/worker/server/test/bench/oracle execution or frozen-input
+retuning. Full B11 remains UNVERIFIED, stronger clipped-header negative HOLD,
+B3/B4/broader C13 GAP, T008/T008a HOLD and #96/Darwin UNKNOWN. Merge still needs
+root's later exclusive expected-head/base lease and separate successful read-only
+guard, then separate ordinary expected-head merge and OWNER+ROOT exact-main proof.
+
+## Historical initial source-stage receipt
+
 Root approved the finite canonical interpretation from contract SHA256
 `d11baac33d4c09c0abf12bf7b20a2bcfe53c7d1d45ca73f32d47df16bd2574ad`,
 scope `ef59751a952569dc06cdac9494f56deefc050b6b375a6791e1d10a7c42b8085f`,

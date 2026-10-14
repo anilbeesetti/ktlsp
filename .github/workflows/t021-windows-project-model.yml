@@ -21,8 +21,6 @@ jobs:
       run:
         shell: pwsh
     env:
-      CARGO_HOME: ${{ runner.temp }}/t021-cargo
-      CARGO_TARGET_DIR: ${{ runner.temp }}/t021-target
       CARGO_TERM_COLOR: never
       RUSTFLAGS: ''
       CARGO_ENCODED_RUSTFLAGS: ''
@@ -66,6 +64,8 @@ jobs:
               $env:ACTUAL_WORKFLOW_SHA -cne $env:EXPECTED_WORKFLOW_SHA) {
             throw 'Workflow identity/attempt mismatch; no source validation admitted'
           }
+          "CARGO_HOME=$env:RUNNER_TEMP/t021-cargo" >> $env:GITHUB_ENV
+          "CARGO_TARGET_DIR=$env:RUNNER_TEMP/t021-target" >> $env:GITHUB_ENV
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.workflow_sha }}

@@ -3,9 +3,12 @@
 
 pub mod class_header;
 pub mod class_member_names;
+pub mod class_supertypes;
 pub mod constructor;
+pub mod constructor_parameters;
 mod encoding;
 pub mod function_header;
+pub mod function_types;
 mod header;
 pub mod jvm_method_signature;
 pub mod jvm_property_signature;

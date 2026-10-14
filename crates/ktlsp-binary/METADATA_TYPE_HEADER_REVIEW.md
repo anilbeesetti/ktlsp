@@ -3,7 +3,15 @@
 Root admitted frozen contract a90880e51fedead92eba370cebf9b83a30e49c06314dc8a0fc51ec9b3b5b5157
 and literal expectations b74771ca41036bdc0e5d1a96409e173b459a46f513d7255d0846a4d647a47dd4.
 Contract reviewers /root/correctness, /root/adversarial and /root/architect all
-approved with no findings. SAME3 source/finished-original-CI reviews remain pending.
+approved with no findings. SAME3 source reviews APPROVED at b25e778ed1e8140a80ecd3d5fa9563ea5e82cfdb,
+no actionable findings. Correctness and adversarial reviewers independently
+checked schema/wire/budget/error behavior, frozen matrices/cuts/limits, exact
+notice/expectation identities and actual Unit consumer path; architect approved
+minimal scope/API and resource boundaries. Final exact-head/completed-original-CI
+reviews remain pending. Source SHA256
+58a12f02a650d710b3f6e7ac268dbc09e295325180d11c312ce0002d7b1ad82e;
+test SHA256 0e0748d105aef9b8ce4fc3cf1ac1f97246ccf92304aac534e28b9b077c1a1a4f.
+Child #197 is published under #68/#18; stable-base integration/merge remain held.
 
 Scope: one allocation-free unframed Type scalar scan, complete borrowed raw,
 optional presence, low32 signed integers/full64 Boolean, wrong-wire/duplicate

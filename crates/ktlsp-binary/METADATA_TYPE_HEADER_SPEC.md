@@ -1,4 +1,4 @@
-# Selected Type header — source admitted, runtime validation pending
+# Selected Type header — #197 source reviewed, runtime validation pending
 
 Root admitted the exact frozen contract a90880e51fedead92eba370cebf9b83a30e49c06314dc8a0fc51ec9b3b5b5157
 and expectations b74771ca41036bdc0e5d1a96409e173b459a46f513d7255d0846a4d647a47dd4,

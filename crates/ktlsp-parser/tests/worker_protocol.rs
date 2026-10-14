@@ -1,12 +1,18 @@
 //! Rust-only fault executable and assert-based public-boundary suite.
 use ktlsp_parser::{
-    Diagnostic, Element, FileKind, MAX_OUTPUT_BYTES, Parser, ParserError, Reply, SourceSnapshot,
+    Diagnostic, Element, FileKind, MAX_ALLOCATION_BYTES, MAX_OUTPUT_BYTES, Parser, ParserError,
+    Reply, SnapshotResult, SourceSnapshot,
 };
 use std::{
+    alloc::{GlobalAlloc, Layout},
     io::{Read, Write},
+    process::{Command, Stdio},
     sync::atomic::{AtomicBool, Ordering},
-    time::Duration,
+    time::{Duration, Instant},
 };
+
+#[path = "../src/worker_allocator.rs"]
+mod worker_allocator;
 
 fn main() {
     if std::env::args().any(|arg| arg == "--source") {
@@ -32,10 +38,17 @@ fn main() {
         ("oversize", ParserError::OutputLimit),
         ("crash", ParserError::WorkerFailed),
         ("exit-failure", ParserError::WorkerFailed),
+        ("allocation_alloc", ParserError::AllocationLimit),
+        ("allocation_zeroed", ParserError::AllocationLimit),
+        ("allocation_realloc", ParserError::AllocationLimit),
         ("hang", ParserError::Timeout),
         ("depth129-token", ParserError::NestingLimit),
         ("depth129-empty", ParserError::NestingLimit),
     ] {
+        let allocation = source.starts_with("allocation_");
+        if allocation {
+            check_allocation_exit(source);
+        }
         let snapshot = SourceSnapshot::new("fault-test", 1, FileKind::Source, source).unwrap();
         let error = faulty
             .parse_snapshot(&snapshot, &AtomicBool::new(false))
@@ -50,12 +63,24 @@ fn main() {
             assert_eq!(error, expected, "{source}");
         }
         assert_eq!(snapshot.source(), source);
-        let next =
-            SourceSnapshot::new("healthy", 2, FileKind::Source, "val healthy = 1\r\n").unwrap();
+        let next = SourceSnapshot::new(
+            "healthy",
+            2,
+            FileKind::Source,
+            if allocation {
+                "val healthy=1\n"
+            } else {
+                "val healthy = 1\r\n"
+            },
+        )
+        .unwrap();
         let result = healthy
             .parse_snapshot(&next, &AtomicBool::new(false))
             .unwrap_or_else(|error| panic!("healthy worker after {source}: {error:?}"));
         assert_eq!(result.tree_for(&next).unwrap().source(), next.source());
+        if allocation {
+            check_healthy_snapshot(&result, &next);
+        }
     }
     let snapshot = SourceSnapshot::new("cancel", 1, FileKind::Source, "hang").unwrap();
     let cancelled = AtomicBool::new(false);
@@ -93,13 +118,16 @@ fn main() {
         );
     }
     println!(
-        "worker_protocol: 19 fault cases, exact depth boundaries, midflight cancellation, and healthy followups passed"
+        "worker_protocol: 22 fault cases, exact depth boundaries, midflight cancellation, and healthy followups passed"
     );
 }
 
 fn fault_worker() {
     let mut source = String::new();
     std::io::stdin().read_to_string(&mut source).unwrap();
+    if source.starts_with("allocation_") {
+        allocation_fault(&source);
+    }
     match source.as_str() {
         "hang" => loop {
             std::thread::sleep(Duration::from_secs(1));
@@ -242,4 +270,132 @@ fn fault_worker() {
         value["Tree"]["untrusted"] = true.into();
     }
     serde_json::to_writer(std::io::stdout(), &value).unwrap();
+}
+
+fn allocation_fault(source: &str) -> ! {
+    use worker_allocator::{LimitedAllocator, worker_exit_code};
+    assert_eq!(worker_exit_code(true), 0);
+    assert_eq!(worker_exit_code(false), 1);
+    let small = Layout::from_size_align(1, 1).unwrap();
+    let refused = Layout::from_size_align(MAX_ALLOCATION_BYTES + 1, 1).unwrap();
+    // Direct trait calls exercise each callback without optimizable vec-only evidence.
+    unsafe {
+        match source {
+            "allocation_alloc" => assert!(LimitedAllocator.alloc(refused).is_null()),
+            "allocation_zeroed" => assert!(LimitedAllocator.alloc_zeroed(refused).is_null()),
+            "allocation_realloc" => {
+                let original = LimitedAllocator.alloc(small);
+                assert!(!original.is_null());
+                original.write(0xA5);
+                assert!(
+                    LimitedAllocator
+                        .realloc(original, small, refused.size())
+                        .is_null()
+                );
+                assert_eq!(original.read(), 0xA5);
+                LimitedAllocator.dealloc(original, small);
+            }
+            _ => panic!("unknown allocation fault"),
+        }
+        assert_eq!(worker_exit_code(true), 86);
+        assert_eq!(worker_exit_code(false), 86);
+        if source == "allocation_alloc" {
+            let later = LimitedAllocator.alloc(small);
+            assert!(!later.is_null());
+            LimitedAllocator.dealloc(later, small);
+            assert_eq!(worker_exit_code(true), 86);
+        }
+    }
+    if source == "allocation_alloc" {
+        std::io::stdout().write_all(br#"{"Tree":{"elements":[{"kind":"KT_FILE","start":0,"end":16,"parent":null,"subtree_end":3,"token":false},{"kind":"REFERENCE_EXPRESSION","start":0,"end":16,"parent":0,"subtree_end":3,"token":false},{"kind":"IDENTIFIER","start":0,"end":16,"parent":1,"subtree_end":3,"token":true}],"diagnostics":[]}}"#).unwrap();
+        std::io::stdout().flush().unwrap();
+    }
+    std::process::exit(worker_exit_code(source != "allocation_zeroed"));
+}
+
+fn check_allocation_exit(source: &str) {
+    let mut child = Command::new(std::env::current_exe().unwrap())
+        .arg("--source")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .env_clear()
+        .spawn()
+        .unwrap();
+    let input = child.stdin.take().unwrap().write_all(source.as_bytes());
+    if let Err(error) = input {
+        let _ = child.kill();
+        let cleanup = child.wait();
+        panic!("{source}: input error {error}; same-child cleanup {cleanup:?}");
+    }
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            outcome => {
+                let _ = child.kill();
+                let cleanup = child.wait();
+                panic!(
+                    "{source}: first status outcome {outcome:?}; same-child cleanup {cleanup:?}"
+                );
+            }
+        }
+    };
+    if status.code() != Some(86) {
+        let _ = child.kill();
+        let cleanup = child.wait();
+        panic!("{source}: first status {status:?}; same-child cleanup {cleanup:?}");
+    }
+    assert!(!status.success());
+    assert_eq!(child.wait().unwrap(), status);
+    assert_eq!(child.try_wait().unwrap(), Some(status));
+    println!("{source}: raw code86 and same-owned-Child wait/try_wait confirmed");
+}
+
+fn check_healthy_snapshot(result: &SnapshotResult, snapshot: &SourceSnapshot) {
+    assert_eq!(result.snapshot(), snapshot);
+    let tree = result.tree_for(snapshot).unwrap();
+    assert_eq!(tree.source(), "val healthy=1\n");
+    assert!(tree.diagnostics().is_empty());
+    let actual: Vec<_> = tree
+        .elements()
+        .iter()
+        .map(|e| {
+            (
+                e.kind.as_str(),
+                e.start,
+                e.end,
+                e.parent,
+                e.subtree_end,
+                e.token,
+            )
+        })
+        .collect();
+    assert_eq!(
+        actual,
+        [
+            ("KT_FILE", 0, 14, None, 11, false),
+            ("PACKAGE_DIRECTIVE", 0, 0, Some(0), 2, false),
+            ("IMPORT_LIST", 0, 0, Some(0), 3, false),
+            ("PROPERTY", 0, 13, Some(0), 10, false),
+            ("VAL_KEYWORD", 0, 3, Some(3), 5, true),
+            ("WHITE_SPACE", 3, 4, Some(3), 6, true),
+            ("IDENTIFIER", 4, 11, Some(3), 7, true),
+            ("EQ", 11, 12, Some(3), 8, true),
+            ("INTEGER_CONSTANT", 12, 13, Some(3), 10, false),
+            ("INTEGER_LITERAL", 12, 13, Some(8), 10, true),
+            ("WHITE_SPACE", 13, 14, Some(0), 11, true),
+        ]
+    );
+    let tokens: String = tree
+        .elements()
+        .iter()
+        .filter(|e| e.token)
+        .map(|e| &tree.source()[e.start..e.end])
+        .collect();
+    assert_eq!(tokens, snapshot.source());
+    assert_eq!(&tree.source()[4..11], "healthy");
 }

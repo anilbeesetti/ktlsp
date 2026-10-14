@@ -1,11 +1,12 @@
 # Optional Windows project path-budget validation (#21 child)
 
-Status: the first optional dispatch was rejected before a run was created.
+Status: the first optional dispatch POST was rejected without creating a
+`workflow_dispatch` run or job.
 Windows/Cygwin runtime correctness remains UNVERIFIED; no Windows install,
 compile, inventory listing, test, job or artifact exists. Parent #21 and
 packaging T046 remain open.
 
-## First optional dispatch: rejected before run creation
+## First optional dispatch: rejected without a dispatch run or job
 
 On 2026-10-14, the first dispatch of workflow `384102190`, ref `main`, with
 `expected_workflow_sha=015057d40ea8739502e179b246b9385be016b5b2` and
@@ -13,10 +14,25 @@ On 2026-10-14, the first dispatch of workflow `384102190`, ref `main`, with
 was rejected with HTTP 422. GitHub identified `runner.temp` in job-level env
 at lines 24 and 25 as an unavailable named context. The initial response is
 396 bytes, SHA-256 `f3894680583f17bea21ff9142e1ef7001f15536d5219286a2e2874c2e6f6232b`.
-Read-only resolution confirmed zero workflow runs; there is no run, attempt,
-job, compiler/test output or artifact. This is dispatch validation failure,
+Read-only resolution confirmed that the rejected POST created no
+`workflow_dispatch` run or job, compiler/test output or artifact. There is no
+run attempt for that POST. This is dispatch validation failure,
 not a Windows compiler/test outcome. The first failure is retained permanently;
 no retry, resend, rerun or source correction was performed under that admission.
+
+Separate original GitHub startup records are retained: main
+`015057d40ea8739502e179b246b9385be016b5b2`, run `38562813506`; main
+`e3a79570895d8cd0af4681424eebca819e725361`, run `38567332094`; and constructor
+`60af5d3c5f0f55613be080ca222807ed2fbbf222`, run `38569059184`. Each is attempt 1,
+event `push`, completed FAILURE with zero jobs. Constructor check suite
+`104509956493` has zero check runs, so named native SUCCESS alone misses that
+failure. Exact startup validator diagnostics are absent; attributing these
+failures to the same unavailable job-env `runner.temp` context is an inference
+from their identical original workflow hash and the explicit earlier HTTP 422.
+Earlier native 587-pass proofs remain valid for native CI only; they do not
+establish that all workflows passed. These startup failures provide no Windows
+runtime or compiler/test outcome and do not alter the rejected POST's zero
+`workflow_dispatch` runs or consumed admission.
 
 [GitHub's context-availability table](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability)
 excludes `runner` at job env. The correction removes only those two

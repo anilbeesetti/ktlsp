@@ -1,0 +1,234 @@
+# Optional execution requires a separately recorded root admission.
+name: Optional T021 Windows project path validation
+on:
+  workflow_dispatch:
+    inputs:
+      expected_workflow_sha:
+        description: Reviewed workflow commit on main (40 lowercase hex)
+        required: true
+        type: string
+      expected_workflow_sha256:
+        description: Reviewed workflow file SHA-256 (64 lowercase hex)
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  windows-project:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      CARGO_TERM_COLOR: never
+      RUSTFLAGS: ''
+      CARGO_ENCODED_RUSTFLAGS: ''
+      RUSTC_WRAPPER: ''
+      RUSTC_WORKSPACE_WRAPPER: ''
+      RUSTC_BOOTSTRAP: ''
+    steps:
+      - name: Admit exact workflow identity before source or compiler work
+        env:
+          EXPECTED_WORKFLOW_SHA: ${{ inputs.expected_workflow_sha }}
+          EXPECTED_WORKFLOW_HASH: ${{ inputs.expected_workflow_sha256 }}
+          ACTUAL_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          ACTUAL_WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP 't021-evidence'
+          New-Item -ItemType Directory -Path $evidence | Out-Null
+          @{
+            repository = '${{ github.repository }}'
+            ref = '${{ github.ref }}'
+            workflow_ref = $env:ACTUAL_WORKFLOW_REF
+            workflow_sha = $env:ACTUAL_WORKFLOW_SHA
+            expected_workflow_sha = $env:EXPECTED_WORKFLOW_SHA
+            expected_workflow_sha256 = $env:EXPECTED_WORKFLOW_HASH
+            source_sha = '2d561ab30812dcdabc56260a8b510979e1e70a61'
+            source_tree = 'be29ab7d30d31f6b071b57e4d48320521e190919'
+            run_id = '${{ github.run_id }}'
+            run_attempt = '${{ github.run_attempt }}'
+            runner_os = '${{ runner.os }}'
+            runner_arch = '${{ runner.arch }}'
+            image_os = $env:ImageOS
+            image_version = $env:ImageVersion
+            powershell = $PSVersionTable.PSVersion.ToString()
+          } | ConvertTo-Json | Set-Content "$evidence/identity.json"
+          if ('${{ github.repository }}' -cne 'anilbeesetti/ktlsp' -or
+              '${{ github.ref }}' -cne 'refs/heads/main' -or
+              $env:ACTUAL_WORKFLOW_REF -cne 'anilbeesetti/ktlsp/.github/workflows/t021-windows-project-model.yml@refs/heads/main' -or
+              '${{ github.run_attempt }}' -cne '1' -or
+              '${{ runner.os }}' -cne 'Windows' -or '${{ runner.arch }}' -cne 'X64' -or
+              $env:EXPECTED_WORKFLOW_SHA -cnotmatch '^[0-9a-f]{40}$' -or
+              $env:EXPECTED_WORKFLOW_HASH -cnotmatch '^[0-9a-f]{64}$' -or
+              $env:ACTUAL_WORKFLOW_SHA -cne $env:EXPECTED_WORKFLOW_SHA) {
+            throw 'Workflow identity/attempt mismatch; no source validation admitted'
+          }
+          "CARGO_HOME=$env:RUNNER_TEMP/t021-cargo" >> $env:GITHUB_ENV
+          "CARGO_TARGET_DIR=$env:RUNNER_TEMP/t021-target" >> $env:GITHUB_ENV
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: control
+          persist-credentials: false
+      - name: Verify reviewed workflow bytes
+        env:
+          EXPECTED_WORKFLOW_HASH: ${{ inputs.expected_workflow_sha256 }}
+        working-directory: control
+        run: |
+          git -c core.autocrlf=false -c core.eol=lf checkout-index --all --force
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $file = '.github/workflows/t021-windows-project-model.yml'
+          $actual = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -cne $env:EXPECTED_WORKFLOW_HASH) { throw 'Workflow byte mismatch' }
+          Copy-Item $file "$env:RUNNER_TEMP/t021-evidence/workflow.yml"
+      - uses: actions/checkout@v4
+        with:
+          ref: 2d561ab30812dcdabc56260a8b510979e1e70a61
+          fetch-depth: 2
+          path: source
+          persist-credentials: false
+      - name: Verify frozen clean source and exact input hashes
+        working-directory: source
+        run: |
+          git -c core.autocrlf=false -c core.eol=lf checkout-index --all --force
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((git rev-parse HEAD) -cne '2d561ab30812dcdabc56260a8b510979e1e70a61' -or
+              (git rev-parse 'HEAD^{tree}') -cne 'be29ab7d30d31f6b071b57e4d48320521e190919' -or
+              (git show -s --format=%P HEAD) -cne '7980480e015150b75b982001c871ad1a5b54f35a' -or
+              @(git status --porcelain=v1 --untracked-files=all).Count -ne 0) {
+            throw 'Frozen source identity or cleanliness mismatch'
+          }
+          if ((Test-Path .cargo) -or (Test-Path crates/ktlsp-project/build.rs) -or
+              (Test-Path $env:CARGO_HOME) -or (Test-Path $env:CARGO_TARGET_DIR)) {
+            throw 'Unexpected Cargo configuration, build script or reused build inputs'
+          }
+          $pins = @'
+          {
+            ".github/workflows/native.yml": "87c83b01c28c217c385fac416a8d60f7b7f7dbf8ec037d20040fbd4ea44686fe",
+            "Cargo.lock": "8e34c8c44333b5dc1b469dd8c199199c6a9e864ab2976f398f35999d0c4f9c91",
+            "Cargo.toml": "b6c8a2f95f1ba437c665f50bf34a423ddacf88d8099880ce636ae773b3e769d7",
+            "crates/ktlsp-artifacts/Cargo.toml": "6986c43ca73ecb1b4421dd95cf05151b9000970a8a25d786c4f389f71f79e791",
+            "crates/ktlsp-binary/Cargo.toml": "76e788c0eeba910ad6b43b3676274da6dcf51c2fc7af7ed0fdb7dcf5a6553c7e",
+            "crates/ktlsp-import/Cargo.toml": "64655b866ddf78ebccf59879dc3a11641b5707e32d0a4cf58f6b10b2f35a6050",
+            "crates/ktlsp-parser/Cargo.toml": "6a748901adda60de75f62458689d6523d386e77ad14a99799516c1b93361b961",
+            "crates/ktlsp-project/Cargo.toml": "73208bae8fff1cbbe1c2f1133e87f7dc02e2af9c9c546fc691f921419bb5e5b8",
+            "crates/ktlsp-project/fixtures/t021b/contract-example.json": "7a35d881c2f2b17a3c2d3f2639d3d40ada817f7846396782abbcab42783a70a6",
+            "crates/ktlsp-project/fixtures/t021b/ordered.json": "dae4071c328f8c57feaef33734c3b0c7ef48a72ec0217a7886265180857e4ba7",
+            "crates/ktlsp-project/src/lib.rs": "024f9825cf06fdef6db2aa1510b1e35f3233e4729847ac1b4533010fc2479704",
+            "crates/ktlsp-project/src/v2.rs": "c87b891a91c7809e20fcd255c2876b3b4c1c98c0535b280e35bc511ac5c770d5",
+            "crates/ktlsp-project/tests/fixtures/multimodule.json": "cc69f9f38c64e2d831b0654ff35d353f92658742e7d60c2f320566c5dc0adb31",
+            "crates/ktlsp-project/tests/model.rs": "66eeae9849ecd527f98d101c82ed830170bf624e4dccd8fe7c51c87f968240a7",
+            "crates/ktlsp-project/tests/v1_path_budget.rs": "65e92d9d8e36d6bb9128c2ccb0f9f4b1b8bcf431fb2bfcc55a47cdaa14ffded5",
+            "crates/ktlsp-project/tests/v2_library_edges.rs": "2c983d058d89d6abaa23bbcf9496403e42e92b457250b23fa338ba2a557645de",
+            "crates/ktlsp-project/tests/v2_prejoin_budget.rs": "641905a02a11f89b0b40f6c4411e4359027f1e4f33a8bb4fb0c23bf180eecad3",
+            "crates/ktlsp-protocol/Cargo.toml": "a9ca342c3c32519a4eff1fbcff71de018aa55a8083ab9d30b63db64a77bbe79d",
+            "crates/ktlsp-server/Cargo.toml": "f785e9d1bfdb32acec82f50af7a70420b98b8d61979a8aff5c9f4166e510982a",
+            "crates/ktlsp-syntax/Cargo.toml": "08c6bebf8f2b3604fed6899f0ca62e58197a2daf134068cd0544a14112ebfde1",
+            "crates/ktlsp-syntax/evidence/85/probe/Cargo.toml": "74a740477f48fb0abe1207c2c7e9ef0a2c6b9bd12de4a97e97bc5a8b6eab9d9e",
+            "crates/ktlsp-text/Cargo.toml": "9d58a03a86abf7984d79b5fc9b71058028685526ec82c40b0e88298b6e10b19d",
+            "rust-toolchain.toml": "2ad6f15416572b4836585087f1d4abc53b8fa2dbd616f8dacfaa587ed6714228"
+          }
+          '@ | ConvertFrom-Json -AsHashtable
+          foreach ($path in $pins.Keys) {
+            $actual = (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -cne $pins[$path]) { throw "Frozen input mismatch: $path" }
+          }
+          $pins | ConvertTo-Json | Set-Content "$env:RUNNER_TEMP/t021-evidence/source-pins.json"
+      - name: Install and record pinned Rust and MSVC target
+        run: |
+          rustup toolchain install 1.99.0-x86_64-pc-windows-msvc --profile minimal --target x86_64-pc-windows-msvc 2>&1 | Tee-Object "$env:RUNNER_TEMP/t021-evidence/toolchain-install.txt"
+          $code = $LASTEXITCODE
+          if ($code -ne 0) { exit $code }
+          rustc +1.99.0-x86_64-pc-windows-msvc -vV 2>&1 | Tee-Object "$env:RUNNER_TEMP/t021-evidence/rustc.txt"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo +1.99.0-x86_64-pc-windows-msvc -Vv 2>&1 | Tee-Object "$env:RUNNER_TEMP/t021-evidence/cargo.txt"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustc +1.99.0-x86_64-pc-windows-msvc --print cfg --target x86_64-pc-windows-msvc 2>&1 | Tee-Object "$env:RUNNER_TEMP/t021-evidence/target-cfg.txt"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: First compile of existing project test targets (no execution)
+        working-directory: source
+        run: |
+          cargo +1.99.0-x86_64-pc-windows-msvc test --locked -p ktlsp-project --target x86_64-pc-windows-msvc --tests --no-run -vv 2>&1 | Tee-Object "$env:RUNNER_TEMP/t021-evidence/compile.txt"
+          $code = $LASTEXITCODE
+          "exit_code=$code" | Set-Content "$env:RUNNER_TEMP/t021-evidence/compile-exit.txt"
+          exit $code
+      - name: Freeze exact compiled Windows inventories before execution
+        id: inventory
+        working-directory: source
+        run: |
+          $expected = @'
+          {
+            "v1_path_budget": [
+              "absolute_paths_exclude_long_base_and_preserve_v1_v2_results_and_errors",
+              "all_four_collections_share_admission_before_any_model_validation",
+              "caller_conversion_is_single_for_guard_open_and_base_resolution",
+              "caller_exact_and_above_limit_precede_io_and_nul_diagnostic_copies",
+              "decoded_unicode_and_escaped_keys_paths_use_bytes_not_wire_spelling",
+              "each_collection_accepts_exact_expansion_and_rejects_one_more_byte",
+              "json_version_and_input_errors_keep_precedence_over_caller_budget",
+              "mixed_absolute_relative_paths_charge_only_relative_base",
+              "model_normalization_shrink_does_not_bypass_conservative_admission",
+              "native_caller_root_trailing_separator_and_unicode_spellings_are_preserved",
+              "normalized_serialization_retains_existing_reload_limit_and_small_roundtrip",
+              "relative_caller_composition_is_checked_before_shrinking_normalization",
+              "retained_prefix_paths_share_exact_prejoin_budget_and_preserve_resolution",
+              "windows_absolute_rooted_and_prefixed_paths_preserve_both_model_versions"
+            ],
+            "v2_prejoin_budget": [
+              "each_collection_cygwin_regression_windows_preservation",
+              "mixed_precedence_cygwin_regression_windows_preservation",
+              "small_resolution_cygwin_regression_windows_preservation"
+            ]
+          }
+          '@ | ConvertFrom-Json -AsHashtable
+          $expected | ConvertTo-Json | Set-Content "$env:RUNNER_TEMP/t021-evidence/expected-tests.json"
+          foreach ($target in @('v1_path_budget', 'v2_prejoin_budget')) {
+            cargo +1.99.0-x86_64-pc-windows-msvc test --locked -p ktlsp-project --target x86_64-pc-windows-msvc --test $target -- --list --format terse 2>&1 | Tee-Object "$env:RUNNER_TEMP/t021-evidence/$target-list.txt"
+            $code = $LASTEXITCODE
+            "exit_code=$code" | Set-Content "$env:RUNNER_TEMP/t021-evidence/$target-list-exit.txt"
+            if ($code -ne 0) { exit $code }
+            $listed = @(Get-Content "$env:RUNNER_TEMP/t021-evidence/$target-list.txt" | ForEach-Object {
+              if ($_ -cmatch '^([a-z0-9_]+): test$') { $Matches[1] }
+            })
+            if ($listed.Count -ne $expected[$target].Count -or $listed.Count -eq 0 -or
+                @(Compare-Object ($listed | Sort-Object) ($expected[$target] | Sort-Object)).Count -ne 0) {
+              throw "Exact Windows test inventory mismatch: $target"
+            }
+          }
+      - name: First execution of existing v1 and v2 targets
+        if: ${{ success() }}
+        working-directory: source
+        run: |
+          $expected = Get-Content "$env:RUNNER_TEMP/t021-evidence/expected-tests.json" -Raw | ConvertFrom-Json -AsHashtable
+          $failed = $false
+          foreach ($target in @('v1_path_budget', 'v2_prejoin_budget')) {
+            cargo +1.99.0-x86_64-pc-windows-msvc test --locked -p ktlsp-project --target x86_64-pc-windows-msvc --test $target -- --format pretty --test-threads=1 2>&1 | Tee-Object "$env:RUNNER_TEMP/t021-evidence/$target-run.txt"
+            $code = $LASTEXITCODE
+            "exit_code=$code" | Set-Content "$env:RUNNER_TEMP/t021-evidence/$target-run-exit.txt"
+            if ($code -ne 0) { $failed = $true; continue }
+            $log = Get-Content "$env:RUNNER_TEMP/t021-evidence/$target-run.txt"
+            $passed = @($log | ForEach-Object {
+              if ($_ -cmatch '^test ([a-z0-9_]+) \.\.\. ok$') { $Matches[1] }
+            })
+            $count = $expected[$target].Count
+            $summary = "^test result: ok\. $count passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;"
+            if ($passed.Count -ne $count -or
+                @(Compare-Object ($passed | Sort-Object) ($expected[$target] | Sort-Object)).Count -ne 0 -or
+                @($log | Where-Object { $_ -cmatch $summary }).Count -ne 1) {
+              "Executed Windows test inventory mismatch: $target" | Write-Output
+              $failed = $true
+            }
+          }
+          if (@(git status --porcelain=v1 --untracked-files=all).Count -ne 0) {
+            throw 'Source changed during validation'
+          }
+          if ($failed) { exit 1 }
+      - name: Preserve original attempt evidence on success or failure
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: t021-windows-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/t021-evidence/
+          if-no-files-found: error
+          retention-days: 14

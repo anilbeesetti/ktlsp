@@ -255,10 +255,49 @@ pub fn from_json(
     project_directory: impl AsRef<Path>,
     bytes: &[u8],
 ) -> Result<ImportedWorkspace, ImportError> {
+    let base = project_directory.as_ref();
+    let parsed = parse_workspace(base, bytes, false)?;
+    let bytes = serde_json::to_vec(&parsed.manifest).map_err(ImportError::Json)?;
+    let project = ktlsp_project::from_json(base.join("workspace.json"), &bytes)
+        .map_err(ImportError::Project)?;
+    let modules = parsed
+        .modules
+        .into_iter()
+        .map(|module| ImportedModule {
+            name: module.name,
+            content_roots: module.content_roots,
+            dependencies: module
+                .dependencies
+                .into_iter()
+                .map(|edge| match edge {
+                    v2::Dependency::Module(edge) => Dependency::Module(edge),
+                    v2::Dependency::Library { library, .. } => Dependency::Library(library),
+                    v2::Dependency::ModuleSource => Dependency::ModuleSource,
+                })
+                .collect(),
+        })
+        .collect();
+    Ok(ImportedWorkspace {
+        project,
+        modules,
+        libraries: parsed.libraries,
+    })
+}
+
+struct ParsedWorkspace {
+    manifest: Value,
+    modules: Vec<v2::ImportedModule>,
+    libraries: Vec<ImportedLibrary>,
+}
+
+fn parse_workspace(
+    base: &Path,
+    bytes: &[u8],
+    use_v2: bool,
+) -> Result<ParsedWorkspace, ImportError> {
     if bytes.len() > MAX_BYTES {
         return Err(ImportError::BudgetExceeded("bytes"));
     }
-    let base = project_directory.as_ref();
     if base.as_os_str().as_encoded_bytes().len() > MAX_EXPANDED_PATH_BYTES {
         return Err(ImportError::BudgetExceeded("project directory bytes"));
     }
@@ -347,26 +386,38 @@ pub fn from_json(
                             scope,
                             exported,
                         };
-                        native_edges.push(edge.clone());
-                        dependencies.push(Dependency::Module(edge));
+                        native_edges.push(if use_v2 {
+                            json!({"type": "module", "module": edge.module, "scope": edge.scope, "exported": edge.exported})
+                        } else {
+                            json!(edge)
+                        });
+                        dependencies.push(v2::Dependency::Module(edge));
                     } else {
-                        if scope != DependencyScope::Compile {
+                        if !use_v2 && scope != DependencyScope::Compile {
                             reports.add(
                                 field_path(&p, "scope"),
                                 "v1 cannot represent scoped library edges",
                             );
                         }
-                        if exported {
+                        if !use_v2 && exported {
                             reports.add(
                                 field_path(&p, "isExported"),
                                 "v1 cannot represent exported library edges",
                             );
                         }
-                        native_libraries.push(name.clone());
-                        dependencies.push(Dependency::Library(name));
+                        if use_v2 {
+                            native_edges.push(json!({"type": "library", "library": name, "scope": scope, "exported": exported}));
+                        } else {
+                            native_libraries.push(name.clone());
+                        }
+                        dependencies.push(v2::Dependency::Library {
+                            library: name,
+                            scope,
+                            exported,
+                        });
                     }
                 }
-                "moduleSource" => dependencies.push(Dependency::ModuleSource),
+                "moduleSource" => dependencies.push(v2::Dependency::ModuleSource),
                 _ => reports.add(
                     field_path(&p, "type"),
                     "unsupported dependency variant (including SDK bindings)",
@@ -431,8 +482,12 @@ pub fn from_json(
             });
             reports.unknown(c, &p);
         }
-        native_modules.push(json!({"id": name, "sourceRoots": native_roots, "dependencies": native_edges, "libraries": native_libraries}));
-        modules.push(ImportedModule {
+        native_modules.push(if use_v2 {
+            json!({"id": name, "sourceRoots": native_roots, "dependencies": native_edges})
+        } else {
+            json!({"id": name, "sourceRoots": native_roots, "dependencies": native_edges, "libraries": native_libraries})
+        });
+        modules.push(v2::ImportedModule {
             name,
             dependencies,
             content_roots,
@@ -517,14 +572,135 @@ pub fn from_json(
             truncated: reports.truncated,
         });
     }
-    let manifest =
-        json!({"schemaVersion": 1, "modules": native_modules, "libraries": native_libraries});
-    let bytes = serde_json::to_vec(&manifest).map_err(ImportError::Json)?;
-    let project = ktlsp_project::from_json(base.join("workspace.json"), &bytes)
-        .map_err(ImportError::Project)?;
-    Ok(ImportedWorkspace {
-        project,
+    let manifest = json!({"schemaVersion": if use_v2 { 2 } else { 1 }, "modules": native_modules, "libraries": native_libraries});
+    Ok(ParsedWorkspace {
+        manifest,
         modules,
         libraries,
     })
+}
+
+/// Additive ordered scoped/exported import API; the original v1 API stays strict.
+pub mod v2 {
+    use super::{
+        ContentRoot, DependencyScope, ImportError, ImportedLibrary, MAX_BYTES, ModuleDependency,
+    };
+    use std::{fmt, io, path::Path};
+
+    #[derive(Debug)]
+    pub struct ImportedWorkspace {
+        project: ktlsp_project::v2::ProjectModel,
+        pub modules: Vec<ImportedModule>,
+        pub libraries: Vec<ImportedLibrary>,
+    }
+    impl ImportedWorkspace {
+        /// Validated v2 projection; moduleSource placement remains in the sidecar.
+        pub fn project_projection(&self) -> &ktlsp_project::v2::ProjectModel {
+            &self.project
+        }
+    }
+    #[derive(Debug, PartialEq, Eq)]
+    pub struct ImportedModule {
+        pub name: String,
+        pub content_roots: Vec<ContentRoot>,
+        pub dependencies: Vec<Dependency>,
+    }
+    #[derive(Debug, PartialEq, Eq)]
+    pub enum Dependency {
+        Module(ModuleDependency),
+        Library {
+            library: String,
+            scope: DependencyScope,
+            exported: bool,
+        },
+        ModuleSource,
+    }
+    #[derive(Debug)]
+    pub enum Error {
+        Import(ImportError),
+        Project(ktlsp_project::v2::Error),
+    }
+    impl fmt::Display for Error {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                Self::Import(error) => error.fmt(f),
+                Self::Project(error) => write!(f, "incompatible workspace project: {error}"),
+            }
+        }
+    }
+    impl std::error::Error for Error {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match self {
+                Self::Import(error) => Some(error),
+                Self::Project(error) => Some(error),
+            }
+        }
+    }
+
+    /// Data-only, unversioned official input; no implicit fallback to the v1 API.
+    pub fn from_json(
+        project_directory: impl AsRef<Path>,
+        bytes: &[u8],
+    ) -> Result<ImportedWorkspace, Error> {
+        let base = project_directory.as_ref();
+        let parsed = super::parse_workspace(base, bytes, true).map_err(Error::Import)?;
+        let mut output = Projection {
+            bytes: Vec::new(),
+            exceeded: false,
+        };
+        if let Err(error) = serde_json::to_writer(&mut output, &parsed.manifest) {
+            return Err(Error::Import(if output.exceeded {
+                ImportError::BudgetExceeded("projection bytes")
+            } else {
+                ImportError::Json(error)
+            }));
+        }
+        let project = ktlsp_project::v2::from_json(base.join("workspace.json"), &output.bytes)
+            .map_err(Error::Project)?;
+        Ok(ImportedWorkspace {
+            project,
+            modules: parsed.modules,
+            libraries: parsed.libraries,
+        })
+    }
+
+    struct Projection {
+        bytes: Vec<u8>,
+        exceeded: bool,
+    }
+    impl io::Write for Projection {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if self.bytes.len().saturating_add(bytes.len()) > MAX_BYTES {
+                self.exceeded = true;
+                return Err(io::Error::other(
+                    "workspace projection byte budget exceeded",
+                ));
+            }
+            self.bytes.extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn v2_intermediate_manifest_matches_frozen_literal() {
+        let parsed = parse_workspace(
+            Path::new("/ktlsp/t021"),
+            include_bytes!("../tests/fixtures/scoped-exported.json"),
+            true,
+        )
+        .unwrap();
+        let expected: Value = serde_json::from_slice(include_bytes!(
+            "../tests/fixtures/scoped-exported-projection.json"
+        ))
+        .unwrap();
+        assert_eq!(parsed.manifest, expected);
+    }
 }

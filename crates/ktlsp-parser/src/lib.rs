@@ -19,6 +19,8 @@ pub const MAX_ELEMENTS: usize = 16_384;
 pub const MAX_DIAGNOSTICS: usize = 256;
 pub const MAX_NESTING: usize = 128;
 pub const MAX_ALLOCATION_BYTES: usize = 64 * 1024 * 1024;
+#[doc(hidden)]
+pub const WORKER_ALLOCATION_LIMIT_EXIT_CODE: i32 = 86;
 pub const TIMEOUT: Duration = Duration::from_millis(500);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,6 +34,8 @@ pub enum ParserError {
     InputLimit,
     NestingLimit,
     OutputLimit,
+    /// The worker observed a cumulative-cap refusal before its outer exit boundary.
+    AllocationLimit,
     Coverage,
     InvalidTree,
     Cancelled,
@@ -193,6 +197,75 @@ impl Parsed {
     }
 }
 
+#[cfg(unix)]
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum DeadlineReceipt {
+    #[default]
+    Missing,
+    Invalid,
+    CheckpointAfterDecision,
+}
+
+#[cfg(unix)]
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct DeadlineEvidence {
+    pub deadline_selected: bool,
+    pub decision_send: Option<Result<usize, std::io::ErrorKind>>,
+    pub receipt: DeadlineReceipt,
+}
+
+#[cfg(unix)]
+struct DeadlineObserver {
+    socket: std::os::unix::net::UnixDatagram,
+    evidence: DeadlineEvidence,
+}
+#[cfg(unix)]
+impl DeadlineObserver {
+    fn new(command: &mut Command) -> std::io::Result<Self> {
+        use std::os::{fd::OwnedFd, unix::net::UnixDatagram};
+        let (socket, worker) = UnixDatagram::pair()?;
+        socket.set_nonblocking(true)?;
+        worker.set_nonblocking(true)?;
+        command
+            .arg("--observe-deadline-eof-v1")
+            .stderr(Stdio::from(OwnedFd::from(worker)));
+        Ok(Self {
+            socket,
+            evidence: DeadlineEvidence::default(),
+        })
+    }
+    fn select_deadline(&mut self) {
+        self.evidence.deadline_selected = true;
+        self.evidence.decision_send =
+            Some(self.socket.send(b"KTLSP-DUE-v1!!!!").map_err(|e| e.kind()));
+    }
+    fn finish(mut self) -> DeadlineEvidence {
+        let mut bytes = [0; 17];
+        self.evidence.receipt = match self.socket.recv(&mut bytes) {
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => DeadlineReceipt::Missing,
+            Ok(16)
+                if bytes[..16] == *b"KTLSP-EOF-v1!!!!"
+                    && self.evidence.deadline_selected
+                    && self.evidence.decision_send == Some(Ok(16)) =>
+            {
+                match self.socket.recv(&mut bytes) {
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        DeadlineReceipt::CheckpointAfterDecision
+                    }
+                    _ => DeadlineReceipt::Invalid,
+                }
+            }
+            _ => DeadlineReceipt::Invalid,
+        };
+        if self.evidence.deadline_selected && self.evidence.decision_send != Some(Ok(16)) {
+            self.evidence.receipt = DeadlineReceipt::Invalid;
+        }
+        self.evidence
+    }
+}
+
 /// Caller supplies the trusted installed Rust worker's absolute path.
 /// Each call owns exactly one child; concurrent calls need caller-side admission.
 pub struct Parser {
@@ -219,12 +292,52 @@ impl Parser {
             parsed,
         })
     }
+    /// Finite Unix observation; overhead is unmeasured and missing receipts are inconclusive.
+    #[cfg(unix)]
+    #[doc(hidden)]
+    pub fn parse_snapshot_observing_deadline(
+        &self,
+        snapshot: &SourceSnapshot,
+        cancelled: &AtomicBool,
+    ) -> (Result<SnapshotResult, ParserError>, DeadlineEvidence) {
+        let mut evidence = DeadlineEvidence::default();
+        let result = self
+            .parse_inner(
+                snapshot.source(),
+                snapshot.kind,
+                cancelled,
+                Some(&mut evidence),
+            )
+            .map(|mut parsed| {
+                parsed.source = Arc::clone(&snapshot.source);
+                SnapshotResult {
+                    snapshot: snapshot.clone(),
+                    parsed,
+                }
+            });
+        (result, evidence)
+    }
     /// Unversioned parser gate for standalone callers; editor consumers use parse_snapshot.
     pub fn parse(
         &self,
         source: &str,
         kind: FileKind,
         cancelled: &AtomicBool,
+    ) -> Result<Parsed, ParserError> {
+        self.parse_inner(
+            source,
+            kind,
+            cancelled,
+            #[cfg(unix)]
+            None,
+        )
+    }
+    fn parse_inner(
+        &self,
+        source: &str,
+        kind: FileKind,
+        cancelled: &AtomicBool,
+        #[cfg(unix)] evidence: Option<&mut DeadlineEvidence>,
     ) -> Result<Parsed, ParserError> {
         if source.len() > MAX_SOURCE_BYTES {
             return Err(ParserError::InputLimit);
@@ -239,7 +352,25 @@ impl Parser {
             FileKind::Source => "--source",
             FileKind::Script => "--script",
         });
-        let bytes = supervise(command, &normalized, cancelled)?;
+        command.stderr(Stdio::null());
+        #[cfg(unix)]
+        let mut observer = if evidence.is_some() {
+            Some(DeadlineObserver::new(&mut command).map_err(|_| ParserError::Io)?)
+        } else {
+            None
+        };
+        let bytes = supervise(
+            command,
+            &normalized,
+            cancelled,
+            #[cfg(unix)]
+            observer.as_mut(),
+        );
+        #[cfg(unix)]
+        if let (Some(observer), Some(evidence)) = (observer, evidence) {
+            *evidence = observer.finish();
+        }
+        let bytes = bytes?;
         if cancelled.load(Ordering::Relaxed) {
             return Err(ParserError::Cancelled);
         }
@@ -251,15 +382,22 @@ fn supervise(
     mut command: Command,
     normalized: &str,
     cancelled: &AtomicBool,
+    #[cfg(unix)] mut observer: Option<&mut DeadlineObserver>,
 ) -> Result<Vec<u8>, ParserError> {
+    #[cfg(unix)]
+    if observer.is_none() {
+        command.stderr(Stdio::null());
+    }
+    #[cfg(not(unix))]
+    command.stderr(Stdio::null());
     let deadline = Instant::now() + TIMEOUT;
     let child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
         .env_clear()
         .spawn()
         .map_err(|_| ParserError::Io)?;
+    drop(command);
     thread::scope(|scope| {
         let mut guard = ChildGuard {
             child,
@@ -296,6 +434,11 @@ fn supervise(
                     return Err(ParserError::Cancelled);
                 }
                 if Instant::now() >= deadline {
+                    #[cfg(unix)]
+                    if let Some(observer) = observer.as_deref_mut() {
+                        observer.select_deadline();
+                    }
+                    // Never wait for an observation before the existing cleanup.
                     return Err(ParserError::Timeout);
                 }
                 if output.is_none() {
@@ -311,6 +454,9 @@ fn supervise(
                 }
                 thread::sleep(Duration::from_millis(2));
             };
+            if status.code() == Some(WORKER_ALLOCATION_LIMIT_EXIT_CODE) {
+                return Err(ParserError::AllocationLimit);
+            }
             if !status.success() {
                 return Err(ParserError::WorkerFailed);
             }
@@ -834,6 +980,8 @@ mod tests {
             ("oversize", ParserError::OutputLimit),
             ("crash", ParserError::WorkerFailed),
             ("exit-failure", ParserError::WorkerFailed),
+            ("exit-allocation", ParserError::AllocationLimit),
+            ("exit-neighbor", ParserError::WorkerFailed),
         ] {
             let mut command = Command::new(std::env::current_exe().unwrap());
             command.args(["--exact", "tests::fault_worker", "--ignored", "--nocapture"]);
@@ -843,7 +991,13 @@ mod tests {
                 mode.into()
             };
             let start = Instant::now();
-            let result = supervise(command, &source, &AtomicBool::new(false));
+            let result = supervise(
+                command,
+                &source,
+                &AtomicBool::new(false),
+                #[cfg(unix)]
+                None,
+            );
             if mode == "crash" {
                 // Abort completion can cross the deadline checked before exit status.
                 assert!(matches!(
@@ -864,13 +1018,28 @@ mod tests {
             let mut command = Command::new(std::env::current_exe().unwrap());
             command.args(["--exact", "tests::fault_worker", "--ignored", "--nocapture"]);
             assert_eq!(
-                supervise(command, "hang", &cancel),
+                supervise(
+                    command,
+                    "hang",
+                    &cancel,
+                    #[cfg(unix)]
+                    None
+                ),
                 Err(ParserError::Cancelled)
             );
         });
         let mut command = Command::new(std::env::current_exe().unwrap());
         command.args(["--exact", "tests::fault_worker", "--ignored", "--nocapture"]);
-        assert!(supervise(command, "healthy", &AtomicBool::new(false)).is_ok());
+        assert!(
+            supervise(
+                command,
+                "healthy",
+                &AtomicBool::new(false),
+                #[cfg(unix)]
+                None
+            )
+            .is_ok()
+        );
     }
     #[test]
     #[ignore = "subprocess fault fixture"]
@@ -897,7 +1066,103 @@ mod tests {
             }
             "crash" => std::process::abort(),
             "exit-failure" => std::process::exit(1),
+            "exit-allocation" => std::process::exit(86),
+            "exit-neighbor" => std::process::exit(87),
             _ => {}
         }
+    }
+}
+
+#[cfg(all(test, unix))]
+mod deadline_tests {
+    use super::*;
+    use std::os::unix::net::UnixDatagram;
+
+    #[test]
+    fn deadline_receipts_require_exact_challenge_ack_and_empty_sentinel() {
+        for (packets, selected, sent, expected) in [
+            (vec![], true, Some(Ok(16)), DeadlineReceipt::Missing),
+            (
+                vec![b"KTLSP-EOF-v1!!!!".to_vec()],
+                true,
+                Some(Ok(16)),
+                DeadlineReceipt::CheckpointAfterDecision,
+            ),
+            (
+                vec![b"KTLSP-EOF-v1!!!!".to_vec()],
+                false,
+                None,
+                DeadlineReceipt::Invalid,
+            ),
+            (
+                vec![],
+                true,
+                Some(Err(std::io::ErrorKind::WouldBlock)),
+                DeadlineReceipt::Invalid,
+            ),
+            (vec![], true, Some(Ok(15)), DeadlineReceipt::Invalid),
+            (vec![vec![]], true, Some(Ok(16)), DeadlineReceipt::Invalid),
+            (
+                vec![b"KTLSP-EOF-v1!!!".to_vec()],
+                true,
+                Some(Ok(16)),
+                DeadlineReceipt::Invalid,
+            ),
+            (
+                vec![b"KTLSP-EOF-v1!!!!!".to_vec()],
+                true,
+                Some(Ok(16)),
+                DeadlineReceipt::Invalid,
+            ),
+            (
+                vec![vec![b'X'; 4096]],
+                true,
+                Some(Ok(16)),
+                DeadlineReceipt::Invalid,
+            ),
+            (
+                vec![b"KTLSP-EOF-v1!!!!".to_vec(), vec![]],
+                true,
+                Some(Ok(16)),
+                DeadlineReceipt::Invalid,
+            ),
+            (
+                vec![b"KTLSP-EOF-v1!!!!".to_vec(), b"noise".to_vec()],
+                true,
+                Some(Ok(16)),
+                DeadlineReceipt::Invalid,
+            ),
+        ] {
+            let (socket, worker) = UnixDatagram::pair().unwrap();
+            socket.set_nonblocking(true).unwrap();
+            worker.set_nonblocking(true).unwrap();
+            for packet in packets {
+                worker.send(&packet).unwrap();
+            }
+            let observer = DeadlineObserver {
+                socket,
+                evidence: DeadlineEvidence {
+                    deadline_selected: selected,
+                    decision_send: sent,
+                    receipt: DeadlineReceipt::Missing,
+                },
+            };
+            assert_eq!(observer.finish().receipt, expected);
+        }
+    }
+
+    #[test]
+    fn failed_decision_send_is_not_a_witness() {
+        let (socket, worker) = UnixDatagram::pair().unwrap();
+        socket.set_nonblocking(true).unwrap();
+        drop(worker);
+        let mut observer = DeadlineObserver {
+            socket,
+            evidence: DeadlineEvidence::default(),
+        };
+        observer.select_deadline();
+        assert!(observer.evidence.deadline_selected);
+        assert!(matches!(observer.evidence.decision_send, Some(Err(_))));
+        assert_eq!(observer.finish().receipt, DeadlineReceipt::Invalid);
     }
 }

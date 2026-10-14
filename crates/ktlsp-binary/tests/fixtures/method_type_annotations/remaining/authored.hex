@@ -1,0 +1,18 @@
+type_parameter0|00 01 01 00 00 00 03 00 00
+type_parameter255|00 01 01 ff 00 00 03 00 00
+bound0|00 01 12 00 00 00 00 03 00 00
+bound255|00 01 12 ff ff 00 00 03 00 00
+receiver|00 01 15 00 00 03 00 00
+throws0|00 01 17 00 00 00 00 03 00 00
+throws65535|00 01 17 ff ff 00 00 03 00 00
+throws258|00 01 17 01 02 00 00 03 00 00
+all_steps|00 01 12 fe fd 04 00 00 01 00 02 00 03 ff 00 03 00 00
+invalid_kind_missing_index|00 01 01 ff 01 04
+invalid_kind|00 01 01 ff 01 04 00
+invalid_argument|00 01 17 ff ff 01 00 01
+zero_descriptor|00 01 15 00 00 00 00 00
+wrong_cp|00 01 12 00 01 00 00 05 00 00
+trailing|00 01 15 00 00 03 00 00 00
+illegal_field|00 01 13
+unknown|00 01 ff
+count_eof|ff ff

@@ -13,3 +13,9 @@ Budgets are checked before reading/adding records: 16 MiB input; 65,535 aggregat
 Success is **not JVM verification**. Attribute interiors (Code, BootstrapMethods, Signature, annotations, nesting, etc.) and their internal CP/bootstrap indices are unchecked. Access-flag combinations, duplicate declarations, module structural constraints, linkage and bytecode validity are deferred. Generic signatures, annotation/nesting interpretation and Kotlin metadata need separate children; parent #17 remains open. No Java semantic or Kotlin LSP parity is claimed.
 
 Format contract: [JVMS Java SE 23 chapter 4](https://docs.oracle.com/javase/specs/jvms/se23/html/jvms-4.html). This reader implements only the subset above.
+
+## Encoded method type annotations
+
+`method_type_annotations::decode` composes declaration/extension/field data with all six legal method targets (0x01, 0x12, 0x14, 0x15, 0x16, 0x17), sharing one annotation budget. `target_type` retains the raw tag and `target_info: MethodTargetInfo` retains fixed-width indices. **Breaking API change:** `formal_parameter_index` was removed; formal-parameter data is now `MethodTargetInfo::FormalParameter(index)`. External field reads/literals/patterns and derived Debug/layout/size can change.
+
+Indices and paths are encoded data, without descriptor, Signature, bound, receiver or Exceptions validation. Class/Code/Record contexts remain outside this method decoder; no semantic server feature or full annotation-context parity follows. See [the finite contract](METHOD_TYPE_ANNOTATIONS_SPEC.md).

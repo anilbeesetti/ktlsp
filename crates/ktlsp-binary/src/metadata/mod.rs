@@ -7,6 +7,8 @@ pub mod constructor;
 mod encoding;
 pub mod function_header;
 mod header;
+pub mod jvm_method_signature;
+pub mod jvm_property_signature;
 pub mod name_resolver;
 pub mod package_member_names;
 pub mod payload;

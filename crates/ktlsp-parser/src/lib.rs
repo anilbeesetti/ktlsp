@@ -314,19 +314,44 @@ fn supervise(
             if !status.success() {
                 return Err(ParserError::WorkerFailed);
             }
-            writer
-                .join()
-                .map_err(|_| ParserError::Io)?
-                .map_err(|_| ParserError::Io)?;
-            reader.join().map_err(|_| ParserError::Io)?;
-            output
-                .map(Ok)
-                .unwrap_or_else(|| receiver.recv().map_err(|_| ParserError::Io)?)
+            finish_io(writer, reader, receiver, output, deadline, cancelled)
         })();
         // Check cleanup before the scope joins potentially blocked I/O threads.
         guard.finish()?;
         result
     })
+}
+fn join_io<T>(
+    handle: thread::ScopedJoinHandle<'_, T>,
+    deadline: Instant,
+    cancelled: &AtomicBool,
+) -> Result<T, ParserError> {
+    loop {
+        if cancelled.load(Ordering::Relaxed) {
+            return Err(ParserError::Cancelled);
+        }
+        if Instant::now() >= deadline {
+            return Err(ParserError::Timeout);
+        }
+        if handle.is_finished() {
+            return handle.join().map_err(|_| ParserError::Io);
+        }
+        thread::sleep(Duration::from_millis(2));
+    }
+}
+fn finish_io(
+    writer: thread::ScopedJoinHandle<'_, std::io::Result<()>>,
+    reader: thread::ScopedJoinHandle<'_, ()>,
+    receiver: mpsc::Receiver<Result<Vec<u8>, ParserError>>,
+    output: Option<Vec<u8>>,
+    deadline: Instant,
+    cancelled: &AtomicBool,
+) -> Result<Vec<u8>, ParserError> {
+    join_io(writer, deadline, cancelled)?.map_err(|_| ParserError::Io)?;
+    join_io(reader, deadline, cancelled)?;
+    output
+        .map(Ok)
+        .unwrap_or_else(|| receiver.try_recv().map_err(|_| ParserError::Io)?)
 }
 struct ChildGuard {
     child: Child,
@@ -513,6 +538,129 @@ fn validate(
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn pending_io<T: Send>(
+        work: impl FnOnce() -> T + Send,
+        deadline_after: Duration,
+        cancel: bool,
+    ) -> Result<(), ParserError> {
+        let (release, gate) = mpsc::channel();
+        let (started, ready) = mpsc::channel();
+        let (selected, result) = mpsc::channel();
+        let cancelled = AtomicBool::new(false);
+        thread::scope(|controller| {
+            let task = controller.spawn(move || {
+                thread::scope(|scope| {
+                    let handle = scope.spawn(move || {
+                        let value = work();
+                        started.send(()).unwrap();
+                        gate.recv().unwrap();
+                        value
+                    });
+                    ready.recv().unwrap();
+                    cancelled.store(cancel, Ordering::Relaxed);
+                    let outcome = join_io(handle, Instant::now() + deadline_after, &cancelled);
+                    let _ = selected.send(outcome.map(|_| ()));
+                });
+            });
+            let outcome = result.recv_timeout(Duration::from_secs(3));
+            // Release even when a broken join blocks result selection.
+            let _ = release.send(());
+            task.join().unwrap();
+            outcome.expect("I/O result must be selected before releasing the pending thread")
+        })
+    }
+    #[test]
+    fn pending_io_checks_cancellation_and_deadline_before_join() {
+        for (deadline, cancel, expected) in [
+            (Duration::ZERO, false, ParserError::Timeout),
+            (TIMEOUT, true, ParserError::Cancelled),
+            (TIMEOUT, false, ParserError::Timeout),
+        ] {
+            assert_eq!(
+                pending_io(|| Ok::<(), std::io::Error>(()), deadline, cancel),
+                Err(expected)
+            );
+            assert_eq!(pending_io(|| (), deadline, cancel), Err(expected));
+        }
+    }
+    #[test]
+    fn output_receipt_does_not_mean_reader_thread_finished() {
+        for (cancel, expected) in [
+            (false, ParserError::Timeout),
+            (true, ParserError::Cancelled),
+        ] {
+            let (sender, receiver) = mpsc::sync_channel(1);
+            assert_eq!(
+                pending_io(
+                    move || sender.send(Ok::<_, ParserError>(b"ok".to_vec())).unwrap(),
+                    if cancel { TIMEOUT } else { Duration::ZERO },
+                    cancel,
+                ),
+                Err(expected)
+            );
+            assert_eq!(receiver.try_recv().unwrap(), Ok(b"ok".to_vec()));
+        }
+    }
+    #[test]
+    fn completed_io_preserves_error_order_and_output() {
+        for (case, expected) in [
+            ("writer-error", Err(ParserError::Io)),
+            ("writer-panic", Err(ParserError::Io)),
+            ("reader-panic", Err(ParserError::Io)),
+            ("reader-error-panic", Err(ParserError::Io)),
+            ("reader-error", Err(ParserError::OutputLimit)),
+            ("missing-result", Err(ParserError::Io)),
+            ("success", Ok(b"ok".to_vec())),
+            ("buffered-success", Ok(b"ok".to_vec())),
+            ("cancel-ready", Err(ParserError::Cancelled)),
+            ("timeout-ready", Err(ParserError::Timeout)),
+        ] {
+            let actual = thread::scope(|scope| {
+                let writer = scope.spawn(move || match case {
+                    "writer-error" => Err(std::io::Error::other("test writer failure")),
+                    "writer-panic" => panic!("test writer panic"),
+                    _ => Ok(()),
+                });
+                let (sender, receiver) = mpsc::sync_channel(1);
+                let reader = scope.spawn(move || {
+                    if case == "reader-panic" {
+                        panic!("test reader panic");
+                    }
+                    if case != "missing-result" && case != "buffered-success" {
+                        let output = if matches!(
+                            case,
+                            "writer-error" | "reader-error" | "reader-error-panic"
+                        ) {
+                            Err(ParserError::OutputLimit)
+                        } else {
+                            Ok(b"ok".to_vec())
+                        };
+                        sender.send(output).unwrap();
+                    }
+                    if case == "reader-error-panic" {
+                        panic!("test reader panic after output error");
+                    }
+                });
+                while !writer.is_finished() || !reader.is_finished() {
+                    thread::yield_now();
+                }
+                finish_io(
+                    writer,
+                    reader,
+                    receiver,
+                    (case == "buffered-success").then(|| b"ok".to_vec()),
+                    Instant::now()
+                        + if matches!(case, "cancel-ready" | "timeout-ready") {
+                            Duration::ZERO
+                        } else {
+                            TIMEOUT
+                        },
+                    &AtomicBool::new(case == "cancel-ready"),
+                )
+            });
+            assert_eq!(actual, expected, "{case}");
+        }
+    }
     #[test]
     fn normalization_preserves_original_boundaries() {
         let source = "😀\r\n\r\nx\ry\n";

@@ -172,10 +172,17 @@ impl Parser {
                             generic_receiver_name
                                 && probe.my_builder.get_token_text() != Some("suspend")
                                 && probe.expect(IDENTIFIER)
-                                && probe.expect(GT)
-                                && (probe.consume_if(DOT)
-                                    || probe.consume_if(SAFE_ACCESS)
-                                    || (probe.consume_if(QUEST) && probe.expect(DOT)))
+                                && (if probe.consume_if(COMMA) {
+                                    probe.my_builder.get_token_text() != Some("suspend")
+                                        && probe.expect(IDENTIFIER)
+                                        && probe.expect(GT)
+                                        && probe.expect(DOT)
+                                } else {
+                                    probe.expect(GT)
+                                        && (probe.consume_if(DOT)
+                                            || probe.consume_if(SAFE_ACCESS)
+                                            || (probe.consume_if(QUEST) && probe.expect(DOT)))
+                                })
                                 && probe.expect(IDENTIFIER)
                         } else if probe.consume_if(SAFE_ACCESS) {
                             probe.expect(IDENTIFIER)

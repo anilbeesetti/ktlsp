@@ -643,3 +643,65 @@ first outcomes must be reviewed by retained SAME3. First contradiction preserves
 and STOPS, without output-derived tuning or unchanged retry. No merge lease or
 final integration cut has been assigned; no main chasing or native local runtime.
 BroaderC13/B3/B4GAP/fullB11UNVERIFIED/T008/T008aHOLD/#7/#83/#96OPEN/DarwinUNKNOWN.
+
+
+## C13 finite two-argument nonnullable receiver — source candidate
+
+Exact root-admitted base28ff42d743b6290b9a1e587e36eced80cebd6438,
+treef989c624b58fead0144ebe197967e6ff2291444d,
+soleparent9b4cf49e817d0bb30cbd2f09b674f91afb1aa5fd. PR231 OWNER+ROOT delivery
+released vendor ownership before this child. All ten delivered PR231 paths match
+reviewed provisional4c1bad2 by byte/hash and Git mode/type/blob. No other incoming
+delta is authored here. Frozen V2 contract manifest
+d8ebae1ed7c3bffcf8819bcee6ba179a4ac3e5a0ebf7e596b31d771915e908c3;
+actual preparation SAME3 approved corrected V2, preserving V1 findings.
+
+Only type_parameters.rs adds a COMMA arm requiring second non-bare-suspend
+IDENTIFIER, GT, DOT, direct name and complete LPAR. The one-argument nullable
+suffix remains unchanged. Nullable TWO arguments, trailing commas, extra/missing
+arguments, nullable/nested/qualified/annotated/variance/star/function/intersection
+arguments and hard in remain declined. Soft out and escaped names stay supported.
+No live grammar/helper/export/resource/worker/server/dependency change occurs.
+
+Focused131case/42exact/142131original position objects match frozen V2 exactly.
+Complete ordered error ownership retains duplicate zero-width EOF entries;
+nonempty filtering is used only for source partitions. Four stale identities
+include same-length2→3 for the65536-byte case, with separate65537InputLimit;
+strict healthy followups preserve old snapshot/tree/source. Only historical
+generic-receiver multiple-arguments gains one explicit dispatch. Its original
+46-byte input, all84embedded inputs/83other records/prior nullable overlays and
+malformed-prefix erratum remain exact, as does the full111nullable231 test.
+The canonical historical overlay adds only its necessary original_partitions
+schema for the unchanged adapter; frozen131 objects stay untouched.
+
+Owner and independent ADV each completed ONE fresh-authoritative ordered final
+archive→recovery.patch→formatting.patch replay, zero offsets/fuzz. Counts remain
+16behavior/50formatting/54final/4pristine, with53unchanged Rust files and only
+type_parameters.rs changed. All67other trackedvendor paths/notices/manifests/
+locks retain exact bytes. ADV receipt SHA256
+56c70f5f39eb1d0d5042bfe0e5929355b31674f83a9d1102545701a075c0ea74;
+its initial restricted DNS fetch failure is preserved before the authorized
+fresh fetch and replay. No redundant replay follows docs/harness-only changes.
+Final phase SHA256:
+- recovery.patch 1db8080819e4b5357e6bed3d75156b53050f3ee88d3f5fdf10aac75257b761c5
+- formatting.patch 3d010eb42f3c1006e2e2ab05b36899345da7ca071df6f38ec6c438da9a8276f3
+- formatted-sha256.json 085ecbe6f94b02dba681bca32fed7ef8aa13abce3977906aa186b36f9a14196b
+
+First pinned local format check and lockedworkspacealltargetsClippy passed;
+Clippy is COMPILEONLY. No local native/parser/worker/test/server/bench/JVM/oracle
+runtime is executed. Actual final-source and first ORIGINAL unchanged Linux
+Native Rust CI reviews by retained SAME3 are separate gates. Required hosted
+commands remain cargo fmt --all -- --check; cargo clippy --locked --workspace
+--all-targets -- -D warnings; cargo test --locked --workspace. Preserve first
+failure and STOP for independent source diagnosis/root correction grant; no
+output-derived expectation tuning or unchanged retry to green.
+
+Only nine granted source paths are owned. Initial publication needs passing
+source review; merge needs a later root stable integration cut/exclusive exact
+head-base lease, separate strict read-only EXIT0 valid guard and separate ordinary
+expected-head merge, then OWNER+ROOT original exact-main delivery proof. No main
+chasing, protection bypass/settings changes or force-main. See
+../../crates/ktlsp-parser/reviews/c13-two-argument-generic-receiver-recovery.md.
+BroaderC13/B3/B4 GAP, fullB11 UNVERIFIED, T008/T008a HOLD, #7/#83 OPEN and
+#96/Darwin UNKNOWN remain. No semantic/provider/full-parity/performance claim;
+native product/build/core/default tests stay Rust-only at the existing boundary.

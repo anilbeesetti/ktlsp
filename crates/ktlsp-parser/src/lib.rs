@@ -19,6 +19,8 @@ pub const MAX_ELEMENTS: usize = 16_384;
 pub const MAX_DIAGNOSTICS: usize = 256;
 pub const MAX_NESTING: usize = 128;
 pub const MAX_ALLOCATION_BYTES: usize = 64 * 1024 * 1024;
+#[doc(hidden)]
+pub const WORKER_ALLOCATION_LIMIT_EXIT_CODE: i32 = 86;
 pub const TIMEOUT: Duration = Duration::from_millis(500);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,6 +34,8 @@ pub enum ParserError {
     InputLimit,
     NestingLimit,
     OutputLimit,
+    /// The worker observed a cumulative-cap refusal before its outer exit boundary.
+    AllocationLimit,
     Coverage,
     InvalidTree,
     Cancelled,
@@ -311,6 +315,9 @@ fn supervise(
                 }
                 thread::sleep(Duration::from_millis(2));
             };
+            if status.code() == Some(WORKER_ALLOCATION_LIMIT_EXIT_CODE) {
+                return Err(ParserError::AllocationLimit);
+            }
             if !status.success() {
                 return Err(ParserError::WorkerFailed);
             }
@@ -834,6 +841,8 @@ mod tests {
             ("oversize", ParserError::OutputLimit),
             ("crash", ParserError::WorkerFailed),
             ("exit-failure", ParserError::WorkerFailed),
+            ("exit-allocation", ParserError::AllocationLimit),
+            ("exit-neighbor", ParserError::WorkerFailed),
         ] {
             let mut command = Command::new(std::env::current_exe().unwrap());
             command.args(["--exact", "tests::fault_worker", "--ignored", "--nocapture"]);
@@ -897,6 +906,8 @@ mod tests {
             }
             "crash" => std::process::abort(),
             "exit-failure" => std::process::exit(1),
+            "exit-allocation" => std::process::exit(86),
+            "exit-neighbor" => std::process::exit(87),
             _ => {}
         }
     }

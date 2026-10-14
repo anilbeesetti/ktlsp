@@ -91,13 +91,53 @@ jobs:
       - name: Verify frozen clean source and exact input hashes
         working-directory: source
         run: |
-          git -c core.autocrlf=false -c core.eol=lf checkout-index --all --force
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if ((git rev-parse HEAD) -cne '2d561ab30812dcdabc56260a8b510979e1e70a61' -or
-              (git rev-parse 'HEAD^{tree}') -cne 'be29ab7d30d31f6b071b57e4d48320521e190919' -or
-              (git show -s --format=%P HEAD) -cne '7980480e015150b75b982001c871ad1a5b54f35a' -or
-              @(git status --porcelain=v1 --untracked-files=all).Count -ne 0) {
-            throw 'Frozen source identity or cleanliness mismatch'
+          $nativeErrorPreference = $PSNativeCommandUseErrorActionPreference
+          # Record native exits before failing; PowerShell cmdlet errors still stop.
+          $PSNativeCommandUseErrorActionPreference = $false
+          $gitConfig = @(git config --show-origin --get-regexp '^core\.(autocrlf|eol|safecrlf|attributesfile|filemode|ignorecase|symlinks)$' 2>&1 | ForEach-Object { $_.ToString() })
+          $gitConfigExit = $LASTEXITCODE
+          $sourceShallow = @(git rev-parse --is-shallow-repository 2>&1 | ForEach-Object { $_.ToString() })
+          $sourceShallowExit = $LASTEXITCODE
+          $sourceHead = @(git rev-parse HEAD 2>&1 | ForEach-Object { $_.ToString() })
+          $sourceHeadExit = $LASTEXITCODE
+          $sourceTree = @(git rev-parse 'HEAD^{tree}' 2>&1 | ForEach-Object { $_.ToString() })
+          $sourceTreeExit = $LASTEXITCODE
+          $sourceParents = @(git show -s --format=%P HEAD 2>&1 | ForEach-Object { $_.ToString() })
+          $sourceParentsExit = $LASTEXITCODE
+          $sourceStatusBefore = @(git status --porcelain=v1 --untracked-files=all 2>&1 | ForEach-Object { $_.ToString() })
+          $sourceStatusBeforeExit = $LASTEXITCODE
+          @{
+            native_error_preference_before = $nativeErrorPreference
+            native_argument_passing = "$PSNativeCommandArgumentPassing"
+            git_config = @{ output = $gitConfig; exit_code = $gitConfigExit }
+            shallow = @{ output = $sourceShallow; exit_code = $sourceShallowExit }
+            head = @{ output = $sourceHead; exit_code = $sourceHeadExit }
+            tree = @{ output = $sourceTree; exit_code = $sourceTreeExit }
+            parents = @{ output = $sourceParents; exit_code = $sourceParentsExit }
+            status = @{ output = $sourceStatusBefore; exit_code = $sourceStatusBeforeExit }
+          } | ConvertTo-Json -Depth 4 | Tee-Object "$env:RUNNER_TEMP/t021-evidence/source-before-lf.json"
+          if (($gitConfigExit -ne 0 -and ($gitConfigExit -ne 1 -or $gitConfig.Count -ne 0)) -or
+              $sourceShallowExit -ne 0 -or $sourceShallow.Count -ne 1 -or
+              $sourceShallow[0] -cnotin @('true', 'false') -or
+              $sourceHeadExit -ne 0 -or $sourceTreeExit -ne 0 -or
+              $sourceParentsExit -ne 0 -or $sourceStatusBeforeExit -ne 0 -or
+              $sourceHead.Count -ne 1 -or $sourceHead[0] -cne '2d561ab30812dcdabc56260a8b510979e1e70a61' -or
+              $sourceTree.Count -ne 1 -or $sourceTree[0] -cne 'be29ab7d30d31f6b071b57e4d48320521e190919' -or
+              $sourceParents.Count -ne 1 -or $sourceParents[0] -cne '7980480e015150b75b982001c871ad1a5b54f35a' -or
+              $sourceStatusBefore.Count -ne 0) {
+            throw 'Frozen source identity, command or cleanliness mismatch before LF materialization'
+          }
+          $sourceCheckout = @(git -c core.autocrlf=false -c core.eol=lf checkout-index --all --force 2>&1 | ForEach-Object { $_.ToString() })
+          $sourceCheckoutExit = $LASTEXITCODE
+          $sourceStatusAfter = @(git status --porcelain=v1 --untracked-files=all 2>&1 | ForEach-Object { $_.ToString() })
+          $sourceStatusAfterExit = $LASTEXITCODE
+          @{
+            checkout = @{ output = $sourceCheckout; exit_code = $sourceCheckoutExit }
+            status = @{ output = $sourceStatusAfter; exit_code = $sourceStatusAfterExit }
+          } | ConvertTo-Json -Depth 4 | Tee-Object "$env:RUNNER_TEMP/t021-evidence/source-after-lf.json"
+          if ($sourceCheckoutExit -ne 0 -or $sourceStatusAfterExit -ne 0 -or
+              $sourceStatusAfter.Count -ne 0) {
+            throw 'Frozen source command or cleanliness mismatch after LF materialization'
           }
           if ((Test-Path .cargo) -or (Test-Path crates/ktlsp-project/build.rs) -or
               (Test-Path $env:CARGO_HOME) -or (Test-Path $env:CARGO_TARGET_DIR)) {

@@ -660,7 +660,7 @@
  
                  if !self.at(COMMA) {
                      break;
-@@ -39,13 +82,162 @@
+@@ -39,13 +82,173 @@
                  }
              }
  
@@ -748,8 +748,18 @@
 +            probe.parse_modifier_list(GT_COMMA_COLON_SET);
 +            !probe.my_builder.psi.has_errors_after(marker)
 +                && probe.expect(FUN_KEYWORD)
-+                && probe.expect(IDENTIFIER)
-+                && (if probe.consume_if(SAFE_ACCESS) {
++                && {
++                    let generic_receiver_name =
++                        probe.my_builder.get_token_text() != Some("suspend");
++                    probe.expect(IDENTIFIER)
++                        && (if probe.consume_if(LT) {
++                            generic_receiver_name
++                                && probe.my_builder.get_token_text() != Some("suspend")
++                                && probe.expect(IDENTIFIER)
++                                && probe.expect(GT)
++                                && probe.expect(DOT)
++                                && probe.expect(IDENTIFIER)
++                        } else if probe.consume_if(SAFE_ACCESS) {
 +                    probe.expect(IDENTIFIER)
 +                } else if probe.consume_if(QUEST) {
 +                    probe.expect(DOT) && probe.expect(IDENTIFIER)
@@ -772,6 +782,7 @@
 +                            true
 +                        })
 +                })
++                }
 +                && probe.at(LPAR)
 +        };
 +        marker.drop(&mut probe);
@@ -825,7 +836,7 @@
      }
  
      /*
-@@ -132,23 +324,43 @@
+@@ -132,23 +335,43 @@
       *   : modifiers SimpleName (":" userType)?
       *   ;
       */

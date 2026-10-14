@@ -365,3 +365,22 @@ contract and validation gates are in
 ../../crates/ktlsp-parser/reviews/c13-property-recovery.md. Publication/PR/original
 Linux CI are admitted; merge remains HOLD for root's expected-head/base lease and
 passing actual source/CI reviews, followed by owner/root exact-main verification.
+
+## #83 B3 finite causal observation
+
+An additive doc-hidden vendor wrapper installs a scoped thread-local observer;
+actual Parser::eof dispatches it before its ordinary builder predicate. Restoration
+on normal/nested/unwind paths and thread isolation are checked in the production
+workspace's deadline_observation test, since this vendor workspace is excluded
+from unchanged root CI. Parent/worker witness transport is a request-local Unix
+datagram pair, never parser stdout or a new relative deadline. Immediate cleanup
+is unchanged; no acknowledgement grace, retry or polling wait is introduced.
+
+See ../../crates/ktlsp-parser/reviews/deadline-observation.md for literal request,
+causal acceptance, fallback FILE/PIPE flag checks, fixed wire/count/cadence and
+unmeasured default/observing overhead. The ordered patch replay now covers16
+behavior/50 formatting files and all54 final source hashes with four pristine
+survivors. Original notices/archive/manifests/locks stay unchanged. Source-stage
+fmt and compile-only Clippy do not prove a runtime witness; reviewed original
+Linux CI is still required. B3/B4 GAP, B11 UNVERIFIED, T008 HOLD; no semantic or
+performance/full-parity claim.

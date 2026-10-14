@@ -1214,7 +1214,7 @@
              }
          };
          if recover {
-@@ -152,7 +161,10 @@
+@@ -153,7 +162,10 @@
              return true;
          }
          // Inlined so a constant `expectation` folds this away; the rest can only match in these cases.
@@ -1226,7 +1226,7 @@
              return false;
          }
          self.at_rest(token, expectation)
-@@ -210,7 +222,10 @@
+@@ -211,7 +223,10 @@
              return true;
          }
          // As in `at`: folds away for a constant `set`.
@@ -1238,7 +1238,7 @@
              return false;
          }
          self.at_set_rest(token, set)
-@@ -268,8 +283,14 @@
+@@ -269,8 +284,14 @@
      }
  
      pub(crate) fn error_until(&mut self, message: &str, token_set: TokenSet) {
@@ -1255,7 +1255,7 @@
          let error = self.mark();
          self.skip_until(token_set);
          error.error(self, message);
-@@ -296,16 +317,28 @@
+@@ -297,16 +318,28 @@
          preceding_non_doc_comments: bool,
      ) {
          marker.done(self, element_type);
@@ -1289,7 +1289,7 @@
          self.with_context(true, None, f)
      }
  
-@@ -325,4 +358,3 @@
+@@ -326,4 +359,3 @@
      }
      index
  }

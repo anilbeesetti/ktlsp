@@ -226,15 +226,17 @@ fn compatibility(tree: &Parsed, case: &Value) {
                 top_level_function(tree, case["candidate_start"].as_u64().unwrap() as usize),
                 "{id}"
             );
-            assert!(
+            assert_eq!(
                 tree.diagnostics()
-                    .iter()
-                    .any(|d| (d.start, d.end, d.message.as_str()) == (11, 11, "Missing '>'")),
+                    .first()
+                    .map(|d| (d.start, d.end, d.message.as_str())),
+                Some((11, 11, "Missing '>'")),
                 "{id}"
             );
             assert!(
                 tree.diagnostics()
                     .iter()
+                    .skip(1)
                     .any(|d| d.message != "Missing '>'"),
                 "{id}"
             );
@@ -298,7 +300,14 @@ fn compatibility(tree: &Parsed, case: &Value) {
                 })
                 .unwrap();
             assert!(object.end > 12, "{id}");
-            assert!(!top_level_function(tree, 13), "{id}");
+            assert!(
+                !tree.elements().iter().any(|e| !e.token
+                    && e.kind == "FUN"
+                    && e.start == 13
+                    && e.parent
+                        .is_some_and(|p| tree.elements()[p].kind == "KT_FILE")),
+                "{id}"
+            );
             assert!(!tree.diagnostics().is_empty(), "{id}");
         }
         "first CLASS extends beyond declined_start; fresh CLASS recovers complete KT_FILE healthy FUN at healthy_start; diagnostics nonempty" =>
@@ -395,6 +404,7 @@ fn frozen_two_component_nullable_receiver_contract_through_production_snapshot_w
             SourceSnapshot::new(format!("{id}-other"), 1, FileKind::Source, source).unwrap(),
             SourceSnapshot::new(id, 1, FileKind::Source, format!("{source} ")).unwrap(),
             SourceSnapshot::new(id, 1, FileKind::Script, source).unwrap(),
+            SourceSnapshot::new(id, 2, FileKind::Source, source).unwrap(),
         ] {
             assert_eq!(
                 accepted.tree_for(&mismatch).unwrap_err(),

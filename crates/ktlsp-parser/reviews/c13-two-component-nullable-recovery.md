@@ -74,3 +74,18 @@ recursion suppression and64KiB/500ms/64MiB requested allocation/4MiB reply/
 remain scheduling-dependent and activeEOF integration is not proved here.
 T008/T008a HOLD; aggregateC13/B3/B4 GAP;B11 UNVERIFIED;#7/#83/#96 OPEN;
 Darwin UNKNOWN. No semantic/provider/full official parity or performance claim.
+
+## Source-stage assertion corrections
+
+Initial private sourcec3a4b05faf3c6d7e2ac1adea29d8aac28d50a74b is retained.
+SAME reviews found three harness gaps: revision mismatch also changed source;
+header-only diagnostics checked membership without frozen order; and object
+no-promotion checked only a complete rather than any direct FUN starting13.
+The focused test now isolates revision2 with identical id/kind/source, requires
+first[11,11)Missing'> followed by a later parameter error, and rejects every
+direct KT_FILE FUN starting13 for the object control. No-complete controls retain
+their complete-range helper. Frozen expectation bytes, production grammar and all
+historical fixture/assertion bytes are unchanged by these fixes. Initial pinned
+owned fmt and compile-only locked workspace Clippy passed before corrections;
+actual SAME3 corrected-source rechecks and compile-only verification remain
+separate. No native execution occurred and all publication/provenance gates remain.

@@ -27,12 +27,13 @@ is never modified by this repair. Full Kotlin grammar and semantic parity remain
 
 Source changes are recorded in two ordered phases:
 
-1. `recovery.patch` changes fourteen files from the pristine archive: parsing/mod.rs,
+1. `recovery.patch` changes sixteen files from the pristine archive: lib.rs,
+   parsing/abstract_kotlin_parsing.rs, parsing/mod.rs,
    builder/layers.rs, declarations/{annotations,classes,functions,members,mod,modifiers,parameters,type_parameters,types,user_types}.rs
    and expressions/{mod,primary}.rs.
 2. `formatting.patch` changes 50 files from the current recovery phase (extending historical cc4920d),
-   using pinned Rust 1.99.0 rustfmt with edition 2024. All fourteen behavioral files
-   are among those 50; the other 36 have formatting changes only. Four source
+   using pinned Rust 1.99.0 rustfmt with edition 2024. All sixteen behavioral files
+   are among those 50; the other 34 have formatting changes only. Four source
    files retain pristine bytes. Exact paths are the patch headers; the final
    54-file byte inventory is `formatted-sha256.json`. No formatting opt-out or
    changed root formatting command is used.
@@ -407,3 +408,26 @@ files, four pristine survivors. Archive/upstream hashes, manifests, locks and
 notices are unchanged. Independent adversarial fresh replay is separately required.
 The frozen contract, phase hashes and review/validation gates are recorded in
 ../../crates/ktlsp-parser/reviews/c13-property-recovery.md.
+
+## #83 B3 original-deadline grammar observation — source stage
+
+On assigned PR195 main3baf05494c142416c8cd4641707e1c7dbed0a539, only final
+vendor lib.rs and parsing/abstract_kotlin_parsing.rs gain behavior: a scoped
+thread-local fn() observer wrapper and dispatch at actual Parser::eof, immediately
+before its unchanged builder predicate. Default calls now check TLS too; overhead
+and timing/allocation perturbation remain unmeasured. No grammar/recovery/token/
+builder/layout/EOF-truth change is claimed. The observer includes nested/lazy
+grammar contexts and does not establish B11 active-EOF acceptance.
+
+Fresh owner pristine archive -> recovery.patch -> formatting.patch replay verifies
+all54 final Rust files with zero fuzz/offsets:16 behavior files,50 formatting files,
+four pristine survivors. The original archive/upstream inventory/notices and both
+manifests/locks are unchanged. The independent adversarial reviewer must perform
+a fresh separate replay before source approval. No source origin is reassigned.
+
+The production witness, strict healthy controls, socket/error/perturbation limits
+and exact v3 contract identity are in
+../../crates/ktlsp-parser/reviews/deadline-observation.md. No local native runtime
+ran; original unchanged Linux CI remains required. No positive witness or B3
+promotion is claimed in this source-stage note; B4 remains GAP, B11 UNVERIFIED,
+T008/T008a HOLD and #7/#83/#96 OPEN, Darwin UNKNOWN.

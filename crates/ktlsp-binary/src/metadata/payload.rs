@@ -28,19 +28,25 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<Payload<'_>, wire::Error> 
             kind: wire::ErrorKind::Limit("bytes"),
         });
     }
-    let mut budget = string_table::Budget::new(limits);
+    decode_with_budget(bytes, &mut string_table::Budget::new(limits))
+}
+
+pub(super) fn decode_with_budget<'a>(
+    bytes: &'a [u8],
+    budget: &mut string_table::Budget,
+) -> Result<Payload<'a>, wire::Error> {
     let envelope = wire::envelope(bytes, &mut budget.wire)?;
     let string_table =
-        string_table::decode_with_budget(&bytes[envelope.string_table_span.clone()], &mut budget)
+        string_table::decode_with_budget(&bytes[envelope.string_table_span.clone()], budget)
             .map_err(
-            |error| match envelope.string_table_span.start.checked_add(error.offset) {
-                Some(offset) => wire::Error { offset, ..error },
-                None => wire::Error {
-                    offset: bytes.len(),
-                    kind: wire::ErrorKind::Limit("bytes"),
+                |error| match envelope.string_table_span.start.checked_add(error.offset) {
+                    Some(offset) => wire::Error { offset, ..error },
+                    None => wire::Error {
+                        offset: bytes.len(),
+                        kind: wire::ErrorKind::Limit("bytes"),
+                    },
                 },
-            },
-        )?;
+            )?;
     Ok(Payload {
         prefix: &bytes[envelope.prefix_span.clone()],
         prefix_span: envelope.prefix_span,

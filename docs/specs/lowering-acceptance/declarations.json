@@ -1,0 +1,24 @@
+{
+  "purpose": "prospective lowering acceptance; no parser or lowering execution",
+  "source": {
+    "file": "declarations.kt",
+    "sha256": "fa935b144a49838fd9e603bfc95462bcf3701eeb19877501d451ca069ce9e233",
+    "bytes": 146,
+    "encoding": "UTF-8",
+    "newline": "LF",
+    "final_newline": true,
+    "document": "lowering-acceptance/declarations",
+    "revision": 1,
+    "file_kind": "Source"
+  },
+  "declarations": [
+    {"label":"host", "kind":"CLASS", "range":[0,129], "raw_name":"Host", "name_range":[6,10], "cst_parent_kind":"KT_FILE", "owner":null, "incomplete":false},
+    {"label":"member-property", "kind":"PROPERTY", "range":[17,29], "raw_name":"same", "name_range":[21,25], "cst_parent_kind":"CLASS_BODY", "owner":"host", "incomplete":false},
+    {"label":"member-function", "kind":"FUN", "range":[34,127], "raw_name":"same", "name_range":[38,42], "cst_parent_kind":"CLASS_BODY", "owner":"host", "incomplete":false},
+    {"label":"local-class", "kind":"CLASS", "range":[55,66], "raw_name":"Local", "name_range":[61,66], "cst_parent_kind":"BLOCK", "owner":"member-function", "incomplete":false},
+    {"label":"local-function", "kind":"FUN", "range":[75,89], "raw_name":"inner", "name_range":[79,84], "cst_parent_kind":"BLOCK", "owner":"member-function", "incomplete":false},
+    {"label":"local-property", "kind":"PROPERTY", "range":[98,121], "raw_name":"`local 🦀é`", "name_range":[102,117], "cst_parent_kind":"BLOCK", "owner":"member-function", "incomplete":false},
+    {"label":"top-function", "kind":"FUN", "range":[131,145], "raw_name":"same", "name_range":[135,139], "cst_parent_kind":"KT_FILE", "owner":null, "incomplete":false}
+  ],
+  "errors": []
+}

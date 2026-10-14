@@ -5,7 +5,9 @@ and expectations b74771ca41036bdc0e5d1a96409e173b459a46f513d7255d0846a4d647a47dd
 twelve exclusive new paths and additive metadata/mod.rs export. Local formatting
 and compile-only Clippy are admitted; no local native runtime/tests. Publication
 and original unchanged Linux Native CI are admitted after SAME3 source review.
-Stable-base integration and exclusive expected-head merge lease remain held.
+Root admitted the exact final integration cut at fe4f4a73f0bf9190f7668bf74a9b963f70114449;
+new original CI and SAME3 combined-source/completed-CI reviews are required.
+Exclusive expected-head/base merge lease remains held.
 The preimplementation acceptance contract below is preserved unchanged.
 
 # T018 selected Kotlin Type header — preparation only, v1

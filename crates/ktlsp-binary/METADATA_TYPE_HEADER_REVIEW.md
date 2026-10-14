@@ -1,3 +1,28 @@
+# Exact final source integration — new original CI pending
+
+Root admitted one final integration cut at fe4f4a73f0bf9190f7668bf74a9b963f70114449,
+tree01e0300947dc10cb4f737fded962987d556358fa, soleparentcb0c8c7dd064a5a3f2d1c82097a2cfd0547e496a.
+Only merge conflict was the permitted adjacent additive module exports; retained
+ALL incoming modules and added type_header. Reviewed TypeHeader source/tests,
+literal fixtures and behavior are unchanged. Earlier c0e44e99 PR-CI is historical;
+SAME3 actual combined-source and new original-CI reviews are required. Merge held.
+
+Compatibility readback: delivered #193 private decode_with_budget extraction
+preserves public Class/Function/Property/payload APIs used by this child's genuine
+consumer. Existing public calls create their own budget and delegate to the same
+loops. Resolver's existing public standalone path retains separate budgets;
+new private shared composition paths are not invoked by TypeHeader. wire::Budget
+work visibility changed only, its field/charge behavior is unchanged. TypeHeader
+still uses new+field+dispatch directly, zero allocation/recursion and N+2F.
+ValueParameter retains nested Type occurrences solely in raw; TypeTable exposes
+borrowed opaque bodies; TypeAlias preserves every inline occurrence in ordered
+borrowed lists. None calls or changes TypeHeader, merging, table lookup or
+semantic nullability. No helper, Cargo/lock/workflow/parser/vendor changes relative
+to the exact incoming base. B3 remains GAP: first and final observed Timeout /
+sendOk16 / MissingACK are not promoted by green CI. #96/Darwin remain unknown.
+
+The prior source-review receipt below is historical, preserved for provenance.
+
 # Selected Type header review
 
 Root admitted frozen contract a90880e51fedead92eba370cebf9b83a30e49c06314dc8a0fc51ec9b3b5b5157

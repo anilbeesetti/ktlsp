@@ -1,62 +1,20 @@
 //! Private one-request worker. Never run ktrs inside the server process.
 use ktlsp_parser::{
-    Diagnostic, Element, MAX_ALLOCATION_BYTES, MAX_DIAGNOSTICS, MAX_ELEMENTS, MAX_NESTING,
-    MAX_OUTPUT_BYTES, MAX_SOURCE_BYTES, Reply,
+    Diagnostic, Element, MAX_DIAGNOSTICS, MAX_ELEMENTS, MAX_NESTING, MAX_OUTPUT_BYTES,
+    MAX_SOURCE_BYTES, Reply,
 };
-use std::{
-    alloc::{GlobalAlloc, Layout, System},
-    io::{Read, Write},
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::io::{Read, Write};
 
-struct LimitedAllocator;
-static ALLOCATED: AtomicUsize = AtomicUsize::new(0);
-fn charge(counter: &AtomicUsize, bytes: usize) -> bool {
-    let mut used = counter.load(Ordering::Relaxed);
-    loop {
-        let Some(total) = used
-            .checked_add(bytes)
-            .filter(|&total| total <= MAX_ALLOCATION_BYTES)
-        else {
-            return false;
-        };
-        match counter.compare_exchange_weak(used, total, Ordering::Relaxed, Ordering::Relaxed) {
-            Ok(_) => return true,
-            Err(actual) => used = actual,
-        }
-    }
-}
-// Cumulative charging also bounds allocation churn during exponential backtracking.
-// Safety: every successful allocation/deallocation is forwarded unchanged to System.
-unsafe impl GlobalAlloc for LimitedAllocator {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        if !charge(&ALLOCATED, layout.size()) {
-            return std::ptr::null_mut();
-        }
-        unsafe { System.alloc(layout) }
-    }
-    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
-        if !charge(&ALLOCATED, layout.size()) {
-            return std::ptr::null_mut();
-        }
-        unsafe { System.alloc_zeroed(layout) }
-    }
-    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, size: usize) -> *mut u8 {
-        if !charge(&ALLOCATED, size) {
-            return std::ptr::null_mut();
-        }
-        unsafe { System.realloc(ptr, layout, size) }
-    }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        unsafe { System.dealloc(ptr, layout) }
-    }
-}
+#[path = "../worker_allocator.rs"]
+mod worker_allocator;
+use worker_allocator::LimitedAllocator;
+
 #[global_allocator]
 static ALLOCATOR: LimitedAllocator = LimitedAllocator;
 
 fn main() {
     let result = run();
-    std::process::exit(if result.is_ok() { 0 } else { 1 });
+    std::process::exit(worker_allocator::worker_exit_code(result.is_ok()));
 }
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
@@ -64,6 +22,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         Some("--source") => ktrs_parser::FileKind::Source,
         Some("--script") => ktrs_parser::FileKind::Script,
         _ => return Err("invalid worker mode".into()),
+    };
+    let observing = match args.next().as_deref() {
+        None => false,
+        #[cfg(unix)]
+        Some("--observe-deadline-eof-v1") => true,
+        _ => return Err("unexpected argument".into()),
     };
     if args.next().is_some() {
         return Err("unexpected argument".into());
@@ -76,7 +40,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Err("invalid worker input".into());
     }
     ktlsp_parser::preflight(&source)?;
-    let parse = ktrs_parser::parse_file(&source, kind);
+    #[cfg(unix)]
+    let parse = if observing {
+        parse_observing_deadline(&source, kind)
+    } else {
+        ktrs_parser::parse_file(&source, kind)
+    };
+    #[cfg(not(unix))]
+    let parse = {
+        let _ = observing;
+        ktrs_parser::parse_file(&source, kind)
+    };
     let tree = &parse.tree;
     let reply = if !parse.missed_tokens.is_empty() || tree.text() != source {
         Reply::Coverage
@@ -128,6 +102,90 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     };
     write_reply(&reply)
 }
+#[cfg(unix)]
+std::thread_local! {
+    static DEADLINE_OBSERVER: (std::cell::Cell<bool>, std::cell::RefCell<Option<(std::os::unix::net::UnixDatagram, u16)>>) =
+        const { (std::cell::Cell::new(false), std::cell::RefCell::new(None)) };
+}
+
+#[cfg(unix)]
+fn deadline_socket() -> std::io::Result<std::os::unix::net::UnixDatagram> {
+    use std::os::{fd::AsFd, unix::net::UnixDatagram};
+    let socket = UnixDatagram::from(std::io::stderr().as_fd().try_clone_to_owned()?);
+    // Address checks precede shared-OFD mutation; the trusted parent establishes SO_TYPE.
+    if !socket.local_addr()?.is_unnamed() || !socket.peer_addr()?.is_unnamed() {
+        return Err(std::io::ErrorKind::InvalidInput.into());
+    }
+    socket.set_nonblocking(true)?;
+    Ok(socket)
+}
+
+#[cfg(unix)]
+fn parse_observing_deadline(source: &str, kind: ktrs_parser::FileKind) -> ktrs_syntax::Parse {
+    struct Clear;
+    impl Drop for Clear {
+        fn drop(&mut self) {
+            let _ = DEADLINE_OBSERVER.try_with(|(disabled, state)| {
+                disabled.set(true);
+                if let Ok(mut state) = state.try_borrow_mut() {
+                    state.take();
+                }
+            });
+        }
+    }
+    let installed = deadline_socket().ok().is_some_and(|socket| {
+        DEADLINE_OBSERVER
+            .try_with(|(disabled, state)| {
+                let Ok(mut state) = state.try_borrow_mut() else {
+                    return false;
+                };
+                *state = Some((socket, 0));
+                disabled.set(false);
+                true
+            })
+            .unwrap_or(false)
+    });
+    let _clear = Clear;
+    if installed {
+        ktrs_parser::parse_file_observing_eof(source, kind, deadline_checkpoint)
+    } else {
+        ktrs_parser::parse_file(source, kind)
+    }
+}
+
+#[cfg(unix)]
+fn deadline_checkpoint() {
+    let _ = DEADLINE_OBSERVER.try_with(|(disabled, state)| {
+        if disabled.get() {
+            return;
+        }
+        let Ok(mut state) = state.try_borrow_mut() else {
+            disabled.set(true);
+            return;
+        };
+        let Some((socket, count)) = state.as_mut() else {
+            return;
+        };
+        *count = count.wrapping_add(1);
+        if *count & 1023 != 0 {
+            return;
+        }
+        let mut bytes = [0; 17];
+        match socket.recv(&mut bytes) {
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+            outcome => {
+                disabled.set(true);
+                let Some((socket, _)) = state.take() else {
+                    return;
+                };
+                if matches!(outcome, Ok(16)) && bytes[..16] == *b"KTLSP-DUE-v1!!!!" {
+                    let _ = socket.send(b"KTLSP-EOF-v1!!!!");
+                }
+            }
+        }
+    });
+}
+
 fn write_reply(reply: &Reply) -> Result<(), Box<dyn std::error::Error>> {
     let bytes = serde_json::to_vec(reply)?;
     if bytes.len() > MAX_OUTPUT_BYTES {
@@ -141,6 +199,114 @@ fn write_reply(reply: &Reply) -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ktlsp_parser::MAX_ALLOCATION_BYTES;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use worker_allocator::charge;
+    #[cfg(unix)]
+    #[test]
+    fn checkpoint_is_sampled_and_disarms_before_one_ack_attempt() {
+        use std::os::unix::net::UnixDatagram;
+        for packet in [
+            b"KTLSP-DUE-v1!!!!".as_slice(),
+            b"KTLSP-DUE-v1!!!!!".as_slice(),
+            b"bad".as_slice(),
+            b"".as_slice(),
+        ] {
+            let (parent, socket) = UnixDatagram::pair().unwrap();
+            parent.set_nonblocking(true).unwrap();
+            socket.set_nonblocking(true).unwrap();
+            DEADLINE_OBSERVER.with(|(disabled, state)| {
+                disabled.set(false);
+                *state.borrow_mut() = Some((socket, 0));
+            });
+            // A pre-decision sampled WouldBlock must keep the hook armed.
+            for _ in 0..1024 {
+                deadline_checkpoint();
+            }
+            DEADLINE_OBSERVER.with(|(disabled, state)| {
+                assert!(!disabled.get());
+                assert!(state.borrow().is_some());
+            });
+            parent.send(packet).unwrap();
+            for _ in 0..1023 {
+                deadline_checkpoint();
+            }
+            let mut bytes = [0; 17];
+            assert_eq!(
+                parent.recv(&mut bytes).unwrap_err().kind(),
+                std::io::ErrorKind::WouldBlock
+            );
+            deadline_checkpoint();
+            DEADLINE_OBSERVER.with(|(disabled, state)| {
+                assert!(disabled.get());
+                assert!(state.borrow().is_none());
+            });
+            if packet == b"KTLSP-DUE-v1!!!!" {
+                assert_eq!(parent.recv(&mut bytes).unwrap(), 16);
+                assert_eq!(&bytes[..16], b"KTLSP-EOF-v1!!!!");
+            }
+            for _ in 0..2048 {
+                deadline_checkpoint();
+            }
+            assert_eq!(
+                parent.recv(&mut bytes).unwrap_err().kind(),
+                std::io::ErrorKind::WouldBlock
+            );
+        }
+    }
+    #[cfg(unix)]
+    #[test]
+    fn reentrant_checkpoint_disables_without_panicking() {
+        use std::os::unix::net::UnixDatagram;
+        let (_parent, socket) = UnixDatagram::pair().unwrap();
+        DEADLINE_OBSERVER.with(|(disabled, state)| {
+            disabled.set(false);
+            *state.borrow_mut() = Some((socket, 0));
+            let mut borrowed = state.borrow_mut();
+            deadline_checkpoint();
+            assert!(disabled.get());
+            borrowed.take();
+        });
+    }
+    #[cfg(unix)]
+    #[test]
+    fn acknowledgement_backpressure_and_peer_loss_do_not_retry() {
+        use std::os::unix::net::UnixDatagram;
+        for peer_lost in [false, true] {
+            let (parent, socket) = UnixDatagram::pair().unwrap();
+            parent.set_nonblocking(true).unwrap();
+            socket.set_nonblocking(true).unwrap();
+            if !peer_lost {
+                let mut full = false;
+                for _ in 0..4096 {
+                    match socket.send(b"synthetic-noise") {
+                        Ok(_) => {}
+                        Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                            full = true;
+                            break;
+                        }
+                        Err(e) => panic!("unexpected queue error: {e}"),
+                    }
+                }
+                assert!(full, "finite synthetic queue did not backpressure");
+            }
+            parent.send(b"KTLSP-DUE-v1!!!!").unwrap();
+            if peer_lost {
+                drop(parent);
+            }
+            DEADLINE_OBSERVER.with(|(disabled, state)| {
+                disabled.set(false);
+                *state.borrow_mut() = Some((socket, 0));
+            });
+            for _ in 0..2048 {
+                deadline_checkpoint();
+            }
+            DEADLINE_OBSERVER.with(|(disabled, state)| {
+                assert!(disabled.get());
+                assert!(state.borrow().is_none());
+            });
+        }
+    }
     #[test]
     fn allocation_accounting_is_checked_and_cumulative() {
         let counter = AtomicUsize::new(0);

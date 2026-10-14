@@ -77,7 +77,7 @@ pub struct Sections<'a> {
 
 pub(super) struct Budget {
     records: usize,
-    work: usize,
+    pub(super) work: usize,
 }
 fn charge(left: &mut usize, n: usize, offset: usize, label: &'static str) -> Result<(), Error> {
     *left = left.checked_sub(n).ok_or(Error {

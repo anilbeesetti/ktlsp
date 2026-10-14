@@ -85,6 +85,7 @@ pub struct Resolver<'t, 'a> {
     work: usize,
     queries: usize,
     output_units: usize,
+    owned: Option<usize>,
 }
 impl<'t, 'a> Resolver<'t, 'a> {
     pub fn new(
@@ -157,7 +158,40 @@ impl<'t, 'a> Resolver<'t, 'a> {
             work,
             queries: limits.queries.min(hard.queries),
             output_units: limits.output_units.min(hard.output_units),
+            owned: None,
         })
+    }
+
+    pub(super) fn new_with_budget(
+        table: &'t StringTableTypes<'a>,
+        d2: &'t [&'a [u16]],
+        limits: Limits,
+        budget: &mut super::string_table::Budget,
+    ) -> Result<Self, Error> {
+        let out = Self::new(
+            table,
+            d2,
+            Limits {
+                work: budget.wire.work,
+                ..limits
+            },
+        )?;
+        budget.wire.work = out.work;
+        Ok(out)
+    }
+
+    pub(super) fn get_string_with_budget(
+        &mut self,
+        index: i32,
+        budget: &mut super::string_table::Budget,
+    ) -> Result<Vec<u16>, Error> {
+        // Transfer the remaining allowances; queries/output units stay lifetime-wide.
+        self.work = budget.wire.work;
+        self.owned = Some(budget.owned);
+        let out = self.get_string(index);
+        budget.wire.work = self.work;
+        budget.owned = self.owned.take().unwrap();
+        out
     }
 
     fn query(&mut self, error: Error) -> Result<(), Error> {
@@ -240,6 +274,9 @@ impl<'t, 'a> Resolver<'t, 'a> {
         debit(&mut self.output_units, length, error.limit("output_units"))?;
         let bytes = length.checked_mul(2).ok_or(error.limit("work"))?;
         debit(&mut self.work, bytes, error.limit("work"))?;
+        if let Some(owned) = &mut self.owned {
+            debit(owned, bytes, error.limit("owned_bytes"))?;
+        }
         let mut out = Vec::new();
         out.try_reserve_exact(length)
             .map_err(|_| error.limit("allocation"))?;

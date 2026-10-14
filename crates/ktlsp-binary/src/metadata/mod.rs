@@ -3,6 +3,7 @@
 
 pub mod class_header;
 pub mod class_member_names;
+pub mod constructor;
 mod encoding;
 pub mod function_header;
 mod header;
@@ -11,6 +12,7 @@ pub mod payload;
 pub mod property_header;
 pub mod string_table;
 pub mod type_alias;
+pub mod type_argument;
 pub mod type_header;
 pub mod type_parameter;
 pub mod type_table;

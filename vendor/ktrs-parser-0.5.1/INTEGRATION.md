@@ -350,3 +350,18 @@ two NestingLimit fixtures, so those outcomes remain unverified at this checkpoin
 Root suspended merge and released fe97781 integration reservation to independent
 work; next stable base requires root assignment, integrated-delta reviews and
 actual combined-tree original Linux CI before a renewed merge lease.
+
+## C13 / #169 ordinary property sibling headers — source preparation
+
+Root assigned exact 941c72efd9896b0847ab342ec0dd22c10a000f3b as source and initial
+integration base. Its six docs-only changes preserve all 17 frozen contract inputs
+from 50bef1c6d907c673839dd06666023314cad5c1fa, verified before source edits.
+
+Only the classifier scratch predicate gains first-token val/IDENTIFIER/EQ recovery.
+No shared API, worker, server, dependency, Cargo, workflow or resource limit changes.
+The focused test replaces only the contradictory val exclusion; all historical
+function/nullable/qualified families remain unchanged. Exact source/patch hashes,
+contract and validation gates are in
+../../crates/ktlsp-parser/reviews/c13-property-recovery.md. Publication/PR/original
+Linux CI are admitted; merge remains HOLD for root's expected-head/base lease and
+passing actual source/CI reviews, followed by owner/root exact-main verification.

@@ -60,13 +60,20 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<ValueParameter<'_>, Error>
         .into());
     }
     let mut budget = wire::Budget::new(limits.records, limits.work);
+    decode_with_budget(bytes, &mut budget)
+}
+
+pub(super) fn decode_with_budget<'a>(
+    bytes: &'a [u8],
+    budget: &mut wire::Budget,
+) -> Result<ValueParameter<'a>, Error> {
     let mut pos = 0;
     let mut flags = None;
     let mut type_id = None;
     let mut vararg_element_type_id = None;
     let mut name = None;
     while pos < bytes.len() {
-        let field = wire::field(bytes, &mut pos, bytes.len(), &mut budget)?;
+        let field = wire::field(bytes, &mut pos, bytes.len(), budget)?;
         budget.work(1, field.span.start)?;
         match (field.number, field.value) {
             (1, Value::Varint(value)) => flags = Some(value as u32 as i32),

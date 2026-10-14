@@ -1,0 +1,1568 @@
+{
+  "status": "frozen pre-source; UNEXECUTED",
+  "symbol": "S=size_of::<function_types::SelectedType>() on actual target",
+  "successes": [
+    {
+      "name": "minimal",
+      "origin": "synthetic authored",
+      "hex": "10 00",
+      "raw_sha256": "707bf0b938f307b5c222e670598b865d5e1f8a8003df82c7abbf7c9f8fa4d720",
+      "N": 2,
+      "F": 1,
+      "K": 0,
+      "M": [],
+      "G": [],
+      "parent_header": {
+        "name": 0
+      },
+      "types": [],
+      "minimum": {
+        "bytes": 2,
+        "records": 2,
+        "nodes": 1,
+        "depth": 1,
+        "owned_S": 0,
+        "work_constant": 9,
+        "work_S": 0
+      },
+      "one_less_offsets": {
+        "records": 0,
+        "nodes": 0,
+        "depth": 0,
+        "work": 0,
+        "owned_bytes": null
+      },
+      "successful_prefixes": [
+        2
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "unit_function",
+      "origin": "genuine held Unit.class",
+      "hex": "10 03 1a 02 30 04 48 96 80 04",
+      "raw_sha256": "c40ba211d99c8575494344d811f0af5168a99adeaac7f864c146d2c211ff9f99",
+      "N": 10,
+      "F": 3,
+      "K": 1,
+      "M": [
+        2
+      ],
+      "G": [
+        1
+      ],
+      "parent_header": {
+        "name": 3,
+        "flags": 65558
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            4,
+            6
+          ],
+          "raw_hex": "30 04",
+          "header": {
+            "class_name": 4
+          }
+        }
+      ],
+      "minimum": {
+        "bytes": 10,
+        "records": 7,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 38,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "records": 6,
+        "nodes": 4,
+        "depth": 4,
+        "work": 6,
+        "owned_bytes": 2
+      },
+      "successful_prefixes": [
+        2,
+        6,
+        10
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "Wire(Truncated)",
+          "offset": 4
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "Wire(Truncated)",
+          "offset": 8
+        },
+        {
+          "length": 9,
+          "result": "Wire(Truncated)",
+          "offset": 9
+        },
+        {
+          "length": 10,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "receiver",
+      "origin": "synthetic authored",
+      "hex": "10 00 2a 04 18 01 30 02",
+      "raw_sha256": "fabe9d63cc80c355956c8e20f991fc2957f28612f907e2da8676ae852eb1b261",
+      "N": 8,
+      "F": 2,
+      "K": 1,
+      "M": [
+        4
+      ],
+      "G": [
+        2
+      ],
+      "parent_header": {
+        "name": 0
+      },
+      "types": [
+        {
+          "field_number": 5,
+          "span": [
+            4,
+            8
+          ],
+          "raw_hex": "18 01 30 02",
+          "header": {
+            "nullable": true,
+            "class_name": 2
+          }
+        }
+      ],
+      "minimum": {
+        "bytes": 8,
+        "records": 6,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 34,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "records": 6,
+        "nodes": 4,
+        "depth": 4,
+        "work": 2,
+        "owned_bytes": 2
+      },
+      "successful_prefixes": [
+        2,
+        8
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "Wire(Truncated)",
+          "offset": 4
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "Wire(Truncated)",
+          "offset": 6
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "duplicates",
+      "origin": "synthetic authored",
+      "hex": "10 00 1a 02 30 01 2a 00 1a 02 18 01 2a 02 30 02",
+      "raw_sha256": "5c3a5c12a6f0e48c41fd32bea7081c8cf736f6af2129654bdd798922a3c553e9",
+      "N": 16,
+      "F": 5,
+      "K": 4,
+      "M": [
+        2,
+        0,
+        2,
+        2
+      ],
+      "G": [
+        1,
+        0,
+        1,
+        1
+      ],
+      "parent_header": {
+        "name": 0
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            4,
+            6
+          ],
+          "raw_hex": "30 01",
+          "header": {
+            "class_name": 1
+          }
+        },
+        {
+          "field_number": 5,
+          "span": [
+            8,
+            8
+          ],
+          "raw_hex": "",
+          "header": {}
+        },
+        {
+          "field_number": 3,
+          "span": [
+            10,
+            12
+          ],
+          "raw_hex": "18 01",
+          "header": {
+            "nullable": true
+          }
+        },
+        {
+          "field_number": 5,
+          "span": [
+            14,
+            16
+          ],
+          "raw_hex": "30 02",
+          "header": {
+            "class_name": 2
+          }
+        }
+      ],
+      "minimum": {
+        "bytes": 16,
+        "records": 13,
+        "nodes": 5,
+        "depth": 2,
+        "owned_S": 4,
+        "work_constant": 69,
+        "work_S": 4
+      },
+      "one_less_offsets": {
+        "records": 14,
+        "nodes": 14,
+        "depth": 4,
+        "work": 14,
+        "owned_bytes": 8
+      },
+      "successful_prefixes": [
+        2,
+        6,
+        8,
+        12,
+        16
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "Wire(Truncated)",
+          "offset": 4
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 9,
+          "result": "Wire(Truncated)",
+          "offset": 9
+        },
+        {
+          "length": 10,
+          "result": "Wire(Truncated)",
+          "offset": 10
+        },
+        {
+          "length": 11,
+          "result": "Wire(Truncated)",
+          "offset": 11
+        },
+        {
+          "length": 12,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 13,
+          "result": "Wire(Truncated)",
+          "offset": 13
+        },
+        {
+          "length": 14,
+          "result": "Wire(Truncated)",
+          "offset": 14
+        },
+        {
+          "length": 15,
+          "result": "Wire(Truncated)",
+          "offset": 15
+        },
+        {
+          "length": 16,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "scalars",
+      "origin": "synthetic authored",
+      "hex": "08 01 10 01 48 02 1a 00 08 06 10 ff ff ff ff 0f 48 00 2a 00",
+      "raw_sha256": "c23d5c32877fe7d79efddc5b1fe1430ed27d6913e364bff28a759eb1f9ccb84f",
+      "N": 20,
+      "F": 8,
+      "K": 2,
+      "M": [
+        0,
+        0
+      ],
+      "G": [
+        0,
+        0
+      ],
+      "parent_header": {
+        "name": -1,
+        "flags": 0,
+        "old_flags": 6
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            8,
+            8
+          ],
+          "raw_hex": "",
+          "header": {}
+        },
+        {
+          "field_number": 5,
+          "span": [
+            20,
+            20
+          ],
+          "raw_hex": "",
+          "header": {}
+        }
+      ],
+      "minimum": {
+        "bytes": 20,
+        "records": 16,
+        "nodes": 3,
+        "depth": 2,
+        "owned_S": 2,
+        "work_constant": 75,
+        "work_S": 2
+      },
+      "one_less_offsets": {
+        "records": 18,
+        "nodes": 20,
+        "depth": 8,
+        "work": 18,
+        "owned_bytes": 18
+      },
+      "successful_prefixes": [
+        4,
+        6,
+        8,
+        10,
+        16,
+        18,
+        20
+      ],
+      "missing_prefixes": [
+        0,
+        2
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "MissingName",
+          "offset": 2
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 9,
+          "result": "Wire(Truncated)",
+          "offset": 9
+        },
+        {
+          "length": 10,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 11,
+          "result": "Wire(Truncated)",
+          "offset": 11
+        },
+        {
+          "length": 12,
+          "result": "Wire(Truncated)",
+          "offset": 12
+        },
+        {
+          "length": 13,
+          "result": "Wire(Truncated)",
+          "offset": 13
+        },
+        {
+          "length": 14,
+          "result": "Wire(Truncated)",
+          "offset": 14
+        },
+        {
+          "length": 15,
+          "result": "Wire(Truncated)",
+          "offset": 15
+        },
+        {
+          "length": 16,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 17,
+          "result": "Wire(Truncated)",
+          "offset": 17
+        },
+        {
+          "length": 18,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 19,
+          "result": "Wire(Truncated)",
+          "offset": 19
+        },
+        {
+          "length": 20,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "wrong_wire",
+      "origin": "synthetic authored",
+      "hex": "10 00 18 01 19 01 02 03 04 05 06 07 08 1d 01 02 03 04 28 01 29 01 02 03 04 05 06 07 08 2d 01 02 03 04 1a 00 2a 00",
+      "raw_sha256": "281768cab5711cf876900daf653be656b1856f25d17a5d8a12e6e27a9002cbf5",
+      "N": 38,
+      "F": 9,
+      "K": 2,
+      "M": [
+        0,
+        0
+      ],
+      "G": [
+        0,
+        0
+      ],
+      "parent_header": {
+        "name": 0
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            36,
+            36
+          ],
+          "raw_hex": "",
+          "header": {}
+        },
+        {
+          "field_number": 5,
+          "span": [
+            38,
+            38
+          ],
+          "raw_hex": "",
+          "header": {}
+        }
+      ],
+      "minimum": {
+        "bytes": 38,
+        "records": 18,
+        "nodes": 3,
+        "depth": 2,
+        "owned_S": 2,
+        "work_constant": 115,
+        "work_S": 2
+      },
+      "one_less_offsets": {
+        "records": 36,
+        "nodes": 38,
+        "depth": 36,
+        "work": 36,
+        "owned_bytes": 36
+      },
+      "successful_prefixes": [
+        2,
+        4,
+        13,
+        18,
+        20,
+        29,
+        34,
+        36,
+        38
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "Wire(Truncated)",
+          "offset": 6
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "Wire(Truncated)",
+          "offset": 8
+        },
+        {
+          "length": 9,
+          "result": "Wire(Truncated)",
+          "offset": 9
+        },
+        {
+          "length": 10,
+          "result": "Wire(Truncated)",
+          "offset": 10
+        },
+        {
+          "length": 11,
+          "result": "Wire(Truncated)",
+          "offset": 11
+        },
+        {
+          "length": 12,
+          "result": "Wire(Truncated)",
+          "offset": 12
+        },
+        {
+          "length": 13,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 14,
+          "result": "Wire(Truncated)",
+          "offset": 14
+        },
+        {
+          "length": 15,
+          "result": "Wire(Truncated)",
+          "offset": 15
+        },
+        {
+          "length": 16,
+          "result": "Wire(Truncated)",
+          "offset": 16
+        },
+        {
+          "length": 17,
+          "result": "Wire(Truncated)",
+          "offset": 17
+        },
+        {
+          "length": 18,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 19,
+          "result": "Wire(Truncated)",
+          "offset": 19
+        },
+        {
+          "length": 20,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 21,
+          "result": "Wire(Truncated)",
+          "offset": 21
+        },
+        {
+          "length": 22,
+          "result": "Wire(Truncated)",
+          "offset": 22
+        },
+        {
+          "length": 23,
+          "result": "Wire(Truncated)",
+          "offset": 23
+        },
+        {
+          "length": 24,
+          "result": "Wire(Truncated)",
+          "offset": 24
+        },
+        {
+          "length": 25,
+          "result": "Wire(Truncated)",
+          "offset": 25
+        },
+        {
+          "length": 26,
+          "result": "Wire(Truncated)",
+          "offset": 26
+        },
+        {
+          "length": 27,
+          "result": "Wire(Truncated)",
+          "offset": 27
+        },
+        {
+          "length": 28,
+          "result": "Wire(Truncated)",
+          "offset": 28
+        },
+        {
+          "length": 29,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 30,
+          "result": "Wire(Truncated)",
+          "offset": 30
+        },
+        {
+          "length": 31,
+          "result": "Wire(Truncated)",
+          "offset": 31
+        },
+        {
+          "length": 32,
+          "result": "Wire(Truncated)",
+          "offset": 32
+        },
+        {
+          "length": 33,
+          "result": "Wire(Truncated)",
+          "offset": 33
+        },
+        {
+          "length": 34,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 35,
+          "result": "Wire(Truncated)",
+          "offset": 35
+        },
+        {
+          "length": 36,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 37,
+          "result": "Wire(Truncated)",
+          "offset": 37
+        },
+        {
+          "length": 38,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "opaque",
+      "origin": "synthetic authored",
+      "hex": "10 00 1a 0c 12 01 00 2a 01 80 52 01 0b 6a 01 ff 22 01 00 32 01 80 5a 01 ff",
+      "raw_sha256": "f5d8f16ba776f8ab4f27c3d326dc2e311ac2a506c9c8164a563815bdee0c4924",
+      "N": 25,
+      "F": 5,
+      "K": 1,
+      "M": [
+        12
+      ],
+      "G": [
+        4
+      ],
+      "parent_header": {
+        "name": 0
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            4,
+            16
+          ],
+          "raw_hex": "12 01 00 2a 01 80 52 01 0b 6a 01 ff",
+          "header": {}
+        }
+      ],
+      "minimum": {
+        "bytes": 25,
+        "records": 14,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 92,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "records": 22,
+        "nodes": 4,
+        "depth": 4,
+        "work": 22,
+        "owned_bytes": 2
+      },
+      "successful_prefixes": [
+        2,
+        16,
+        19,
+        22,
+        25
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "Wire(Truncated)",
+          "offset": 4
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "Wire(Truncated)",
+          "offset": 6
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "Wire(Truncated)",
+          "offset": 8
+        },
+        {
+          "length": 9,
+          "result": "Wire(Truncated)",
+          "offset": 9
+        },
+        {
+          "length": 10,
+          "result": "Wire(Truncated)",
+          "offset": 10
+        },
+        {
+          "length": 11,
+          "result": "Wire(Truncated)",
+          "offset": 11
+        },
+        {
+          "length": 12,
+          "result": "Wire(Truncated)",
+          "offset": 12
+        },
+        {
+          "length": 13,
+          "result": "Wire(Truncated)",
+          "offset": 13
+        },
+        {
+          "length": 14,
+          "result": "Wire(Truncated)",
+          "offset": 14
+        },
+        {
+          "length": 15,
+          "result": "Wire(Truncated)",
+          "offset": 15
+        },
+        {
+          "length": 16,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 17,
+          "result": "Wire(Truncated)",
+          "offset": 17
+        },
+        {
+          "length": 18,
+          "result": "Wire(Truncated)",
+          "offset": 18
+        },
+        {
+          "length": 19,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 20,
+          "result": "Wire(Truncated)",
+          "offset": 20
+        },
+        {
+          "length": 21,
+          "result": "Wire(Truncated)",
+          "offset": 21
+        },
+        {
+          "length": 22,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 23,
+          "result": "Wire(Truncated)",
+          "offset": 23
+        },
+        {
+          "length": 24,
+          "result": "Wire(Truncated)",
+          "offset": 24
+        },
+        {
+          "length": 25,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "nonminimal",
+      "origin": "synthetic authored",
+      "hex": "90 00 80 00 9a 00 84 00 b0 00 84 00",
+      "raw_sha256": "51b62a094b29e415aafafe63cd8dbd49bf00dd38ad2442651c4db9114432dcc0",
+      "N": 12,
+      "F": 2,
+      "K": 1,
+      "M": [
+        4
+      ],
+      "G": [
+        1
+      ],
+      "parent_header": {
+        "name": 0
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            8,
+            12
+          ],
+          "raw_hex": "b0 00 84 00",
+          "header": {
+            "class_name": 4
+          }
+        }
+      ],
+      "minimum": {
+        "bytes": 12,
+        "records": 5,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 40,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "records": 8,
+        "nodes": 8,
+        "depth": 8,
+        "work": 4,
+        "owned_bytes": 4
+      },
+      "successful_prefixes": [
+        4,
+        12
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "Wire(Truncated)",
+          "offset": 2
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "Wire(Truncated)",
+          "offset": 6
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "Wire(Truncated)",
+          "offset": 8
+        },
+        {
+          "length": 9,
+          "result": "Wire(Truncated)",
+          "offset": 9
+        },
+        {
+          "length": 10,
+          "result": "Wire(Truncated)",
+          "offset": 10
+        },
+        {
+          "length": 11,
+          "result": "Wire(Truncated)",
+          "offset": 11
+        },
+        {
+          "length": 12,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "ids",
+      "origin": "synthetic authored",
+      "hex": "10 00 38 07 40 08 1a 00",
+      "raw_sha256": "ba01324a1eaac62d1b9345cd317c3dd068342b029eca6ed9e428f547e618412d",
+      "N": 8,
+      "F": 4,
+      "K": 1,
+      "M": [
+        0
+      ],
+      "G": [
+        0
+      ],
+      "parent_header": {
+        "name": 0
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            8,
+            8
+          ],
+          "raw_hex": "",
+          "header": {}
+        }
+      ],
+      "minimum": {
+        "bytes": 8,
+        "records": 8,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 34,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "records": 6,
+        "nodes": 8,
+        "depth": 8,
+        "work": 6,
+        "owned_bytes": 6
+      },
+      "successful_prefixes": [
+        2,
+        4,
+        6,
+        8
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "conflicts",
+      "origin": "synthetic authored",
+      "hex": "10 00 1a 08 30 01 38 02 48 03 60 04",
+      "raw_sha256": "d25a15971d773faf450747fb0479014ccf723ff1f58b0b4a45fa2d46bb355e85",
+      "N": 12,
+      "F": 2,
+      "K": 1,
+      "M": [
+        8
+      ],
+      "G": [
+        4
+      ],
+      "parent_header": {
+        "name": 0
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            4,
+            12
+          ],
+          "raw_hex": "30 01 38 02 48 03 60 04",
+          "header": {
+            "class_name": 1,
+            "type_parameter": 2,
+            "type_parameter_name": 3,
+            "type_alias_name": 4
+          }
+        }
+      ],
+      "minimum": {
+        "bytes": 12,
+        "records": 8,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 50,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "records": 10,
+        "nodes": 4,
+        "depth": 4,
+        "work": 2,
+        "owned_bytes": 2
+      },
+      "successful_prefixes": [
+        2,
+        12
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "Wire(Truncated)",
+          "offset": 4
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "Wire(Truncated)",
+          "offset": 6
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "Wire(Truncated)",
+          "offset": 8
+        },
+        {
+          "length": 9,
+          "result": "Wire(Truncated)",
+          "offset": 9
+        },
+        {
+          "length": 10,
+          "result": "Wire(Truncated)",
+          "offset": 10
+        },
+        {
+          "length": 11,
+          "result": "Wire(Truncated)",
+          "offset": 11
+        },
+        {
+          "length": 12,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    }
+  ],
+  "malformed": [
+    {
+      "name": "empty",
+      "hex": "",
+      "error": "MissingName",
+      "offset": 0
+    },
+    {
+      "name": "name_wrong_wire",
+      "hex": "12 00",
+      "error": "MissingName",
+      "offset": 2
+    },
+    {
+      "name": "missing_before_child",
+      "hex": "1a 01 00",
+      "error": "MissingName",
+      "offset": 3
+    },
+    {
+      "name": "wrong_name_before_child",
+      "hex": "12 00 1a 01 00",
+      "error": "MissingName",
+      "offset": 5
+    },
+    {
+      "name": "parent_zero",
+      "hex": "10 00 00",
+      "error": "Wire(InvalidFieldNumber)",
+      "offset": 2
+    },
+    {
+      "name": "parent_group",
+      "hex": "10 00 1b",
+      "error": "Wire(UnsupportedGroup)",
+      "offset": 2
+    },
+    {
+      "name": "parent_wire",
+      "hex": "10 00 1e",
+      "error": "Wire(InvalidWireType)",
+      "offset": 2
+    },
+    {
+      "name": "parent_short",
+      "hex": "10 00 1a 02 30",
+      "error": "Wire(Truncated)",
+      "offset": 5
+    },
+    {
+      "name": "parent_negative",
+      "hex": "10 00 1a ff ff ff ff 0f",
+      "error": "Wire(NegativeLength)",
+      "offset": 3
+    },
+    {
+      "name": "child_zero",
+      "hex": "10 00 1a 01 00",
+      "error": "Wire(InvalidFieldNumber)",
+      "offset": 4
+    },
+    {
+      "name": "child_receiver_group",
+      "hex": "10 00 2a 01 0b",
+      "error": "Wire(UnsupportedGroup)",
+      "offset": 4
+    },
+    {
+      "name": "child_receiver_wire",
+      "hex": "10 00 2a 01 0e",
+      "error": "Wire(InvalidWireType)",
+      "offset": 4
+    },
+    {
+      "name": "child_short",
+      "hex": "10 00 1a 01 30",
+      "error": "Wire(Truncated)",
+      "offset": 5
+    },
+    {
+      "name": "child_bulk_short",
+      "hex": "10 00 1a 03 12 02 ff",
+      "error": "Wire(Truncated)",
+      "offset": 7
+    },
+    {
+      "name": "child_negative",
+      "hex": "10 00 1a 06 12 ff ff ff ff 0f",
+      "error": "Wire(NegativeLength)",
+      "offset": 5
+    },
+    {
+      "name": "child_malformed",
+      "hex": "10 00 1a 0a 80 80 80 80 80 80 80 80 80 80",
+      "error": "Wire(MalformedVarint)",
+      "offset": 13
+    },
+    {
+      "name": "parent_malformed",
+      "hex": "10 00 80 80 80 80 80 80 80 80 80 80",
+      "error": "Wire(MalformedVarint)",
+      "offset": 11
+    },
+    {
+      "name": "later_parent_wins",
+      "hex": "10 00 1a 01 00 00",
+      "error": "Wire(InvalidFieldNumber)",
+      "offset": 5
+    },
+    {
+      "name": "missing_and_parent_wins",
+      "hex": "1a 01 00 00",
+      "error": "Wire(InvalidFieldNumber)",
+      "offset": 3
+    },
+    {
+      "name": "after_empty_sibling",
+      "hex": "10 00 1a 00 2a 01 30",
+      "error": "Wire(Truncated)",
+      "offset": 7
+    },
+    {
+      "name": "nonminimal_child_start",
+      "hex": "10 00 aa 00 81 00 30",
+      "error": "Wire(Truncated)",
+      "offset": 7
+    },
+    {
+      "name": "name_after_malformed_child",
+      "hex": "1a 01 00 10 00",
+      "error": "Wire(InvalidFieldNumber)",
+      "offset": 2
+    }
+  ]
+}

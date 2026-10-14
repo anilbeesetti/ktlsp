@@ -1602,10 +1602,8 @@ fn genuine_bound_and_formal_parameter_fixture_matches_frozen_bytes() {
     );
     assert_eq!(c.methods[0].access_flags, 8);
     assert!(
-        c.methods[0]
-            .attributes
-            .iter()
-            .any(|a| a.name == 23 && a.bytes == hex("0002120000000018000016000000180000"))
+        c.methods[0].attributes.iter().any(|a| a.name == 23
+            && a.bytes == hex("00 02 12 00 00 00 00 18 00 00 16 00 00 00 18 00 00"))
     );
     assert_eq!(out.field_types, type_annotations::decode(&c).unwrap());
     assert_eq!(out.methods.len(), 2);

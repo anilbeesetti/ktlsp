@@ -14,7 +14,7 @@ Its one visible type attribute header443,payload449..458:
 00 01 16 02 00 00 0c 00 00. Target at451,index2 at452,pathlen0 at453,
 descriptorCP12 reference454..456,pairs0 at456..458. CP12descriptor UTF8tag254,
 bytes257..292 is Lorg/jspecify/annotations/Nullable;. Expected target16,
-formal_parameter_indexSome2,empty path/elements; no other method type target.
+target_infoMethodTargetInfo::FormalParameter(2),empty path/elements; no other method type target.
 Encoded data only: no nullability/source-slot/linkage interpretation. Whole-class
 native success remains unverified until admitted hosted CI, despite exact data.
 

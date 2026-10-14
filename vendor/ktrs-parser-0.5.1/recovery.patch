@@ -545,7 +545,7 @@
  
                  if !self.at(COMMA) {
                      break;
-@@ -39,13 +82,125 @@
+@@ -39,13 +82,129 @@
                  }
              }
  
@@ -574,7 +574,7 @@
 +            return false;
 +        };
 +        let word = &psi.text[psi.lex_starts[start] as usize..psi.lex_starts[start + 1] as usize];
-+        if !matches!(kind, AT | FUN_KEYWORD)
++        if !matches!(kind, AT | FUN_KEYWORD | VAL_KEYWORD)
 +            && !crate::kt_tokens::MODIFIER_KEYWORDS.contains(kind)
 +            && !crate::kt_tokens::MODIFIER_KEYWORDS
 +                .contains(crate::kt_tokens::soft_keyword_by_text(Some(word)))
@@ -603,25 +603,29 @@
 +            Parser::create_for_top_level_non_lazy(SemanticWhitespaceAwarePsiBuilder::new(builder));
 +        probe.in_parameter_recovery_probe = true;
 +        let marker = probe.mark();
-+        probe.parse_modifier_list(GT_COMMA_COLON_SET);
-+        let found = !probe.my_builder.psi.has_errors_after(marker)
-+            && probe.expect(FUN_KEYWORD)
-+            && probe.expect(IDENTIFIER)
-+            && (if probe.consume_if(SAFE_ACCESS) {
-+                probe.expect(IDENTIFIER)
-+            } else if probe.consume_if(QUEST) {
-+                probe.expect(DOT) && probe.expect(IDENTIFIER)
-+            } else {
-+                let mut plain = true;
-+                while probe.consume_if(DOT) {
-+                    if !probe.expect(IDENTIFIER) {
-+                        plain = false;
-+                        break;
++        let found = if kind == VAL_KEYWORD {
++            probe.expect(VAL_KEYWORD) && probe.expect(IDENTIFIER) && probe.at(EQ)
++        } else {
++            probe.parse_modifier_list(GT_COMMA_COLON_SET);
++            !probe.my_builder.psi.has_errors_after(marker)
++                && probe.expect(FUN_KEYWORD)
++                && probe.expect(IDENTIFIER)
++                && (if probe.consume_if(SAFE_ACCESS) {
++                    probe.expect(IDENTIFIER)
++                } else if probe.consume_if(QUEST) {
++                    probe.expect(DOT) && probe.expect(IDENTIFIER)
++                } else {
++                    let mut plain = true;
++                    while probe.consume_if(DOT) {
++                        if !probe.expect(IDENTIFIER) {
++                            plain = false;
++                            break;
++                        }
 +                    }
-+                }
-+                plain
-+            })
-+            && probe.at(LPAR);
++                    plain
++                })
++                && probe.at(LPAR)
++        };
 +        marker.drop(&mut probe);
 +        found
 +    }
@@ -673,7 +677,7 @@
      }
  
      /*
-@@ -132,23 +287,43 @@
+@@ -132,23 +291,43 @@
       *   : modifiers SimpleName (":" userType)?
       *   ;
       */

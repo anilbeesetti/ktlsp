@@ -1,62 +1,20 @@
 //! Private one-request worker. Never run ktrs inside the server process.
 use ktlsp_parser::{
-    Diagnostic, Element, MAX_ALLOCATION_BYTES, MAX_DIAGNOSTICS, MAX_ELEMENTS, MAX_NESTING,
-    MAX_OUTPUT_BYTES, MAX_SOURCE_BYTES, Reply,
+    Diagnostic, Element, MAX_DIAGNOSTICS, MAX_ELEMENTS, MAX_NESTING, MAX_OUTPUT_BYTES,
+    MAX_SOURCE_BYTES, Reply,
 };
-use std::{
-    alloc::{GlobalAlloc, Layout, System},
-    io::{Read, Write},
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::io::{Read, Write};
 
-struct LimitedAllocator;
-static ALLOCATED: AtomicUsize = AtomicUsize::new(0);
-fn charge(counter: &AtomicUsize, bytes: usize) -> bool {
-    let mut used = counter.load(Ordering::Relaxed);
-    loop {
-        let Some(total) = used
-            .checked_add(bytes)
-            .filter(|&total| total <= MAX_ALLOCATION_BYTES)
-        else {
-            return false;
-        };
-        match counter.compare_exchange_weak(used, total, Ordering::Relaxed, Ordering::Relaxed) {
-            Ok(_) => return true,
-            Err(actual) => used = actual,
-        }
-    }
-}
-// Cumulative charging also bounds allocation churn during exponential backtracking.
-// Safety: every successful allocation/deallocation is forwarded unchanged to System.
-unsafe impl GlobalAlloc for LimitedAllocator {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        if !charge(&ALLOCATED, layout.size()) {
-            return std::ptr::null_mut();
-        }
-        unsafe { System.alloc(layout) }
-    }
-    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
-        if !charge(&ALLOCATED, layout.size()) {
-            return std::ptr::null_mut();
-        }
-        unsafe { System.alloc_zeroed(layout) }
-    }
-    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, size: usize) -> *mut u8 {
-        if !charge(&ALLOCATED, size) {
-            return std::ptr::null_mut();
-        }
-        unsafe { System.realloc(ptr, layout, size) }
-    }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        unsafe { System.dealloc(ptr, layout) }
-    }
-}
+#[path = "../worker_allocator.rs"]
+mod worker_allocator;
+use worker_allocator::LimitedAllocator;
+
 #[global_allocator]
 static ALLOCATOR: LimitedAllocator = LimitedAllocator;
 
 fn main() {
     let result = run();
-    std::process::exit(if result.is_ok() { 0 } else { 1 });
+    std::process::exit(worker_allocator::worker_exit_code(result.is_ok()));
 }
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
@@ -141,6 +99,9 @@ fn write_reply(reply: &Reply) -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ktlsp_parser::MAX_ALLOCATION_BYTES;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use worker_allocator::charge;
     #[test]
     fn allocation_accounting_is_checked_and_cumulative() {
         let counter = AtomicUsize::new(0);

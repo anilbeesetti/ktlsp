@@ -1,5 +1,6 @@
 use ktlsp_parser::{FileKind, MAX_NESTING, MAX_SOURCE_BYTES, Parser, ParserError};
 use std::{
+    io::Write,
     sync::atomic::AtomicBool,
     time::{Duration, Instant},
 };
@@ -57,7 +58,10 @@ fn malformed_eof_and_generated_unicode_are_lossless_or_explicitly_rejected() {
             }
             Err(error) => assert!(matches!(
                 error,
-                ParserError::Coverage | ParserError::WorkerFailed | ParserError::Timeout
+                ParserError::Coverage
+                    | ParserError::WorkerFailed
+                    | ParserError::Timeout
+                    | ParserError::AllocationLimit
             )),
         }
     }
@@ -97,11 +101,17 @@ fn backtracking_regressions_are_bounded() {
         let start = Instant::now();
         let result = parser().parse(&source, FileKind::Source, &AtomicBool::new(false));
         assert!(start.elapsed() < Duration::from_secs(3));
+        writeln!(
+            std::io::stderr(),
+            "allocation-observation: depth={depth} outcome={:?}",
+            result.as_ref().map(|_| ())
+        )
+        .unwrap();
         match result {
             Ok(parsed) => assert_eq!(parsed.source(), source),
             Err(error) => assert!(matches!(
                 error,
-                ParserError::WorkerFailed | ParserError::Timeout
+                ParserError::WorkerFailed | ParserError::Timeout | ParserError::AllocationLimit
             )),
         }
         check("val healthy = 1", FileKind::Source);

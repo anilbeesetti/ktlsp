@@ -1,0 +1,22 @@
+{
+  "purpose": "prospective lowering acceptance; no parser or lowering execution",
+  "source": {
+    "file": "error-node.kt",
+    "sha256": "c052b78e7603a88f3531f5b06f3a533f8df5394ce8ce9eeab3eb2b3ce3f4bd2c",
+    "bytes": 44,
+    "encoding": "UTF-8",
+    "newline": "LF",
+    "final_newline": true,
+    "document": "lowering-acceptance/error-node",
+    "revision": 1,
+    "file_kind": "Source"
+  },
+  "declarations": [
+    {"label":"broken", "kind":"FUN", "range":[0,11], "raw_name":"broken", "name_range":[4,10], "cst_parent_kind":"KT_FILE", "owner":null, "incomplete":true},
+    {"label":"later", "kind":"PROPERTY", "range":[12,25], "raw_name":"later", "name_range":[16,21], "cst_parent_kind":"KT_FILE", "owner":null, "incomplete":false},
+    {"label":"healthy", "kind":"FUN", "range":[26,43], "raw_name":"healthy", "name_range":[30,37], "cst_parent_kind":"KT_FILE", "owner":null, "incomplete":false}
+  ],
+  "errors": [
+    {"kind":"ERROR_ELEMENT", "range":[11,11], "message":"Expecting ')'", "owner":"broken"}
+  ]
+}

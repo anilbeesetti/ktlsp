@@ -392,3 +392,18 @@ two NestingLimit fixtures, so those outcomes remain unverified at this checkpoin
 Root suspended merge and released fe97781 integration reservation to independent
 work; next stable base requires root assignment, integrated-delta reviews and
 actual combined-tree original Linux CI before a renewed merge lease.
+
+## C13 / #169 ordinary property sibling headers — source preparation
+
+[Issue169](https://github.com/anilbeesetti/ktlsp/issues/169) adds only a first-token
+VAL_KEYWORD scratch branch in declarations/type_parameters.rs, requiring the
+existing IDENTIFIER expectation then EQ. Modifier/annotation prefixes retain the
+unchanged function predicate; typed/destructured/var/receiver/generic/delegate
+properties remain excluded. Caller/completion/EOF/scratch/debit guards are unchanged.
+
+Fresh owner pristine archive -> recovery.patch -> formatting.patch replay matches
+all 54 final source hashes, zero offsets/fuzz: 14 behavior files, 50 formatting
+files, four pristine survivors. Archive/upstream hashes, manifests, locks and
+notices are unchanged. Independent adversarial fresh replay is separately required.
+The frozen contract, phase hashes and review/validation gates are recorded in
+../../crates/ktlsp-parser/reviews/c13-property-recovery.md.

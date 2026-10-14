@@ -6,6 +6,7 @@ pub mod class_member_names;
 pub mod constructor;
 mod encoding;
 pub mod function_header;
+pub mod function_types;
 mod header;
 pub mod jvm_method_signature;
 pub mod jvm_property_signature;

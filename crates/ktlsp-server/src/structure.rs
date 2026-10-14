@@ -126,20 +126,48 @@ pub fn analyze(text: &str, fold_limit: usize) -> Result<Analysis, &'static str> 
     // Tracking line numbers here prevents single-line pairs consuming the fold budget.
     let mut line = 0;
     let mut byte = 0;
+    let mut indentation_only = true;
+    let mut comments: Option<(usize, usize, usize, usize)> = None;
     for token in lexed.tokens {
         let start_line = line;
+        let whole_line_comment = token.kind == TokenKind::LineComment && indentation_only;
         while byte < token.end {
             match text.as_bytes()[byte] {
                 b'\r' => {
                     line += 1;
+                    indentation_only = true;
                     if text.as_bytes().get(byte + 1) == Some(&b'\n') {
                         byte += 1;
                     }
                 }
-                b'\n' => line += 1,
-                _ => {}
+                b'\n' => {
+                    line += 1;
+                    indentation_only = true;
+                }
+                b' ' | b'\t' | b'\x0c' => {}
+                _ => indentation_only = false,
             }
             byte += 1;
+        }
+        if token.kind != TokenKind::Whitespace {
+            // Complete a separated group before this token can complete another fold.
+            match comments.take() {
+                Some((start, _, first_line, last_line))
+                    if whole_line_comment && start_line == last_line + 1 =>
+                {
+                    comments = Some((start, token.end, first_line, start_line));
+                }
+                previous => {
+                    if let Some((start, end, first_line, last_line)) = previous
+                        && first_line < last_line
+                    {
+                        analysis.fold(start, end, "comment", fold_limit);
+                    }
+                    if whole_line_comment {
+                        comments = Some((token.start, token.end, start_line, start_line));
+                    }
+                }
+            }
         }
         match token.kind {
             TokenKind::LeftBrace | TokenKind::LeftParen | TokenKind::LeftBracket => {
@@ -188,6 +216,11 @@ pub fn analyze(text: &str, fold_limit: usize) -> Result<Analysis, &'static str> 
             }
             _ => {}
         }
+    }
+    if let Some((start, end, first_line, last_line)) = comments
+        && first_line < last_line
+    {
+        analysis.fold(start, end, "comment", fold_limit);
     }
     for (_, start, end, _) in stack {
         analysis.diagnostic(start, end, "structural", "unclosed delimiter");

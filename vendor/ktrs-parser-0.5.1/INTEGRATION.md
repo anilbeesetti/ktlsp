@@ -569,3 +569,77 @@ See ../../crates/ktlsp-parser/reviews/c13-generic-receiver-recovery.md.
 Broader C13/B3/B4 GAP, full B11 UNVERIFIED, T008/T008a HOLD; #7/#83/#96 OPEN;
 Darwin UNKNOWN; observer overhead UNMEASURED. No grammar/semantic/parity/performance
 promotion follows from this finite source candidate.
+
+
+## C13 finite nullable generic receiver — initial source candidate
+
+Assigned initial base1c41e58daf531d96144686638a84bcac157ea0e3/tree9a1465b4bb0efcb43d8d7c70979f02d134727c39,
+soleparent626d374ee64a8abc3b50cf7ad050a7e72209e10e, integrated ONCE before edits.
+Retained SAME3 incoming reconciliation confirms83binary-property paths disjoint
+from unchanged parser/config/vendor pins and frozenV4contract manifest170cfc334b3a961029c021e69cf85ca2ea923361a4ef488edb453783f6c0b570.
+Only private type_parameters.rs post-GT header recognition adds one nullable
+suffix SAFE_ACCESS or QUEST DOT before directname/completeLPAR. One unqualified
+nonnullable argument, bare suspend gates, generic-arm nofallthrough, trivia,
+256whole raw tokens/4096normalizedbytes/minactiveEOF/4096copied-token aggregate
+and global limits remain. B11 observer/lib/layers/worker and all other production
+Rust source remain unchanged. No helper/API/dependency/server capability change.
+
+Focused111case/38exact/113881originalUTF16 expectations remain literal-frozen.
+Only three historical dispatch amendments: generic-suite safe-nullable-receiver
+and spaced-nullable-receiver, nullable-suite nullable-decline-generic. Original
+84/85payloads,82/84otherexpectations,ID13erratum/helpers/priorliveoverlays stay.
+Source-derived rootpartition schema supplement on only the two generic records
+keeps their unchanged adapter and all frozen fields. Ordered duplicate EOF error
+ownership is checked explicitly in the new test. PreparationV1 third-assertion
+finding and V2 scope-wording correction remain preserved; root granted tenthfile.
+
+Fresh authoritative archive -> delivered behavioral patch plus only this suffix
+delta -> pinned1.99.0 edition2024 formatting -> ONE separate fresh owner ordered
+replay with zero fuzz/offsets matches all54finalRust source hashes.73trackedvendor
+paths are distinct from54source hashes; all67other vendor paths/notices/licenses/
+upstream inventory/manifests/locks retain original bytes. Independent ADV freshly
+fetches/extracts/replays separately once; no inherited replay receipt is credited.
+Actual phase counts: 16 behavior / 50 formatting /54final / 4 pristine.
+New phase SHA256:
+- recovery.patch 669994202dc68fee8172e86997922f0ccc96c682577f2e32a8da70622c97f44a
+- formatting.patch e9ce26188d086e67207eec9f5bc3f84661f0c2bb61fa2a670b33109c06d50535
+- formatted-sha256.json 3dc64e81b48bad57933b0915e3920fa746ebe4c61020e3c1405a0400994627cc
+
+Local fmt and lockedworkspacealltargetsClippy are COMPILEONLY; no local native/
+parser/worker/server/tests/bench/JVM/oracle/upstream runtime. Actual SAME3 source
+and completed ORIGINAL unchanged Linux all3/raw/config/checkout/count reviews
+remain required. First CI contradiction preserve+STOP; no output-derived fixture
+tuning or unchanged-head rerun. Merge remains HELD for root futurestablecut/sole
+expectedhead-baselease and separate EXIT0valid fresh read-only guard before any
+ordinary expectedhead merge. See ../../crates/ktlsp-parser/reviews/c13-nullable-generic-receiver-recovery.md.
+BroaderC13/B3/B4GAP/fullB11UNVERIFIED/T008/T008aHOLD/#7/#83/#96OPEN/DarwinUNKNOWN;
+observeroverheadUNMEASURED; no semantics/fullparity/performance claim.
+
+
+## Initial publication preparation — #230
+
+Child issue https://github.com/anilbeesetti/ktlsp/issues/230 records this finite
+nullable generic receiver subset. Retained SAME correctness/functionality,
+adversarial and architect actually reviewed the source and rechecked the
+aggregate TYPE_PARAMETER_LIST ownership/range assertion; all approved with no
+remaining findings. Frozen111case payload and all historical inputs/other
+expectations remain exact. Source-stage format and compile-only locked Clippy
+first attempts and changed-test rechecks passed exit0; no local native runtime.
+
+Owner and independent ADV each performed one successful fresh-authoritative
+ordered final patch replay, zero offsets/fuzz,16behavior/50formatting/54final/
+4pristine. Independent receipt SHA256
+bc00c65fb98366f86a59e85e2b3dd3ec29510b69769c4e1e7b77e474071ae5fe.
+ADV first sandbox DNS exit6 was preserved before zero extraction/replay phases;
+subsequent authorized exact-fetch network escalation succeeded, with no reuse of
+owner archive/extraction. All73trackedvendor/54source inventory distinctions,
+67other vendor paths/notices/manifests/locks and intentional patch whitespace
+remain verified. No redundant replay is required for this documentation update.
+
+Original unchanged hosted Linux Native Rust CI is still PENDING: exact commands
+cargo fmt --all -- --check; cargo clippy --locked --workspace --all-targets -- -D warnings;
+cargo test --locked --workspace. Actual raw/config/checkout/counts and111ordered
+first outcomes must be reviewed by retained SAME3. First contradiction preserves
+and STOPS, without output-derived tuning or unchanged retry. No merge lease or
+final integration cut has been assigned; no main chasing or native local runtime.
+BroaderC13/B3/B4GAP/fullB11UNVERIFIED/T008/T008aHOLD/#7/#83/#96OPEN/DarwinUNKNOWN.

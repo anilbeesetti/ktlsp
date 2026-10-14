@@ -100,6 +100,7 @@ impl Parser {
     }
 
     pub(crate) fn eof(&mut self) -> bool {
+        crate::observe_eof();
         self.my_builder.eof()
     }
 

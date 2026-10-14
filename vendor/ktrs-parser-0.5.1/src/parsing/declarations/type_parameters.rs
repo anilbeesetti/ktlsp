@@ -164,30 +164,41 @@ impl Parser {
             probe.parse_modifier_list(GT_COMMA_COLON_SET);
             !probe.my_builder.psi.has_errors_after(marker)
                 && probe.expect(FUN_KEYWORD)
-                && probe.expect(IDENTIFIER)
-                && (if probe.consume_if(SAFE_ACCESS) {
+                && {
+                    let generic_receiver_name =
+                        probe.my_builder.get_token_text() != Some("suspend");
                     probe.expect(IDENTIFIER)
-                } else if probe.consume_if(QUEST) {
-                    probe.expect(DOT) && probe.expect(IDENTIFIER)
-                } else {
-                    let mut plain = true;
-                    let mut identifiers = 1;
-                    while probe.consume_if(DOT) {
-                        if !probe.expect(IDENTIFIER) {
-                            plain = false;
-                            break;
-                        }
-                        identifiers += 1;
-                    }
-                    plain
-                        && (if identifiers == 2 && probe.consume_if(SAFE_ACCESS) {
+                        && (if probe.consume_if(LT) {
+                            generic_receiver_name
+                                && probe.my_builder.get_token_text() != Some("suspend")
+                                && probe.expect(IDENTIFIER)
+                                && probe.expect(GT)
+                                && probe.expect(DOT)
+                                && probe.expect(IDENTIFIER)
+                        } else if probe.consume_if(SAFE_ACCESS) {
                             probe.expect(IDENTIFIER)
-                        } else if identifiers == 2 && probe.consume_if(QUEST) {
+                        } else if probe.consume_if(QUEST) {
                             probe.expect(DOT) && probe.expect(IDENTIFIER)
                         } else {
-                            true
+                            let mut plain = true;
+                            let mut identifiers = 1;
+                            while probe.consume_if(DOT) {
+                                if !probe.expect(IDENTIFIER) {
+                                    plain = false;
+                                    break;
+                                }
+                                identifiers += 1;
+                            }
+                            plain
+                                && (if identifiers == 2 && probe.consume_if(SAFE_ACCESS) {
+                                    probe.expect(IDENTIFIER)
+                                } else if identifiers == 2 && probe.consume_if(QUEST) {
+                                    probe.expect(DOT) && probe.expect(IDENTIFIER)
+                                } else {
+                                    true
+                                })
                         })
-                })
+                }
                 && probe.at(LPAR)
         };
         marker.drop(&mut probe);

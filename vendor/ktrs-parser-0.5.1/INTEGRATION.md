@@ -515,3 +515,57 @@ semantics or performance. Merge remains held for root's explicit expected-head/b
 lease and a successful read-only fail-closed guard in a separate tool call before
 any ordinary expected-head merge. See the focused source review at
 ../../crates/ktlsp-parser/reviews/generic-copy-observation.md.
+
+## C13 finite one-argument generic receiver — source candidate
+
+Integrated exact delivered B11 base f6e2c6b3a8e43a4a76ba27a01205f4e44b7e8e04,
+tree a920a637bf947ae8fd6d386d32b27044ddb6fbcd, sole parent cca3a618, ONCE before
+editing. SAME correctness/adversarial/architect reviewed incoming B11 source and
+confirmed frozen V3 compatibility before implementation. B11 observer, library,
+layers, worker and five tests remain unchanged from this base.
+
+Only type_parameters.rs changes source behavior: existing scratch prefix/FUN then
+one unqualified receiver/one unqualified argument/direct name with complete LPAR.
+The literal generic branch requires IDENTIFIER LT IDENTIFIER GT DOT IDENTIFIER;
+bare suspend receiver/argument are excluded because live type grammar treats them
+as modifiers. Escaped names retain grammar; bare dynamic argument is DYNAMIC_TYPE.
+Failure in this branch cannot fall through to qualified/nullable recognition.
+No new builder/API/helper/callback/dependency/ambient state/budget is introduced.
+Existing complete-bound gate, recursion suppression, scratch/live isolation,
+256complete-token/4096byte/minimum active EOF window and4096copied-window debit
+including failed windows remain. Incoming observer logic is byte-preserved.
+
+V3 contract manifest85cdaa57e1cc16dfca40479e7b54de9aed2223dd3097a0a8087bfdb6d1997f90
+was frozen and actually SAME3 approved before source. New production-worker test
+retains all84sources/26projections/58controls/19200positions, exact diagnostics/
+parents/tokens/identity/followup. Only historical decline-header-9 dispatch is
+superseded; its42byte/no-final-LF fixture and all other historical bytes/assertions
+stay intact. The separately named43byte/final-LF case stays distinct. All36related
+inventory occurrences are preserved. Earlier V1 EOF expectation and V2 inventory
+regex preparation errors were preserved and corrected BEFORE any runtime.
+
+Fresh owner authoritative crates.io archive checksum
+ec8d43d9549490689477385c7678bbd22ecbc445973ab364e8ecb69dd4882bcc -> delivered
+behavioral phase plus only this private-predicate delta -> pinned1.99.0/edition2024
+scratch formatting rederived16behavior/50formatting files,54final hashes and4
+pristine survivors. A second fresh owner extraction replayed both new patches
+with zero fuzz/offsets and all54hashes matching. Independent ADV must fetch/extract
+and replay separately; old receipts/owner extraction cannot substitute. Original
+archive/upstream inventory/notices/minimal manifests/locks stay unchanged.
+
+Combined ordered phase SHA256:
+- recovery.patch 3027d625f09b57d132fc8379471dc1824d9710c9f156d9a6ff343fa2db06a2a8
+- formatting.patch 7aafd8939e3dfbb695871b3869dd4eb70a92772ccc79cf2057b3ef72d8b35069
+- formatted-sha256.json c313db83e58e2dc7abac7c5d59d08b613ba4e16e1bef55ca4bf91f242d51fc4c
+
+Local pinned format/compile-only locked Clippy and SAME3 final source/provenance
+reviews precede admitted publication and ORIGINAL unchanged Linux Native Rust
+all-three CI. No local native runtime is authorized. Merge still requires the
+root exclusive expected-head/base lease, a separate read-only fresh guard with
+all matching facts and exit0, then a separate ordinary expected-head merge.
+Actual squash tree/sole parent and OWNER+ROOT original exact-main proof follow.
+See ../../crates/ktlsp-parser/reviews/c13-generic-receiver-recovery.md.
+
+Broader C13/B3/B4 GAP, full B11 UNVERIFIED, T008/T008a HOLD; #7/#83/#96 OPEN;
+Darwin UNKNOWN; observer overhead UNMEASURED. No grammar/semantic/parity/performance
+promotion follows from this finite source candidate.

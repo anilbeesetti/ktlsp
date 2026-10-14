@@ -223,9 +223,9 @@ recovery case; that gap remains for #83. The final #83 audit still classifies at
 serialization boundary evidence B3–B5 as GAP. C17 changes none of those limits or
 claims and supplies no new resource-boundary execution.
 
-## Private C13 two-component nullable recovery preparation
+## Finite C13 two-component nullable recovery candidate
 
-The finite header `fun pkg.String?.healthy(` is privately prepared after unfinished
+The finite header `fun pkg.String?.healthy(` is prepared after unfinished
 class/interface generics, requiring exactly two receiver components, one nullable
 marker and a complete opening-parenthesis token. The focused test freezes49
 selected positive projections,61 finite controls,42 raw-token/byte cuts and1416
@@ -234,7 +234,10 @@ Only nullable-decline-qualified and qualified-decline-nullable are superseded by
 exact seed assertions; all historical fixture bytes/other live assertions, longer
 nullable declines and resource limits remain. This is syntax-only preparation.
 
-Source/provenance currently differ under the explicit six-path private handoff;
-the five shared vendor publication artifacts remain B3-owned/HOLD. No publication,
-CI, runtime/activeEOF evidence, semantic/provider or parity promotion follows.
-See [the held-source review](reviews/c13-two-component-nullable-recovery.md).
+Exact delivered fe4f4a73 was integrated once with all incoming B3/binary work
+preserved; combined provenance was rebuilt from the verified original archive.
+Inherited observer callbacks include same-thread scratch EOF calls; ordinary EOF
+TLS overhead remains unmeasured. PR202's three MissingACK observations leave B3
+GAP. Combined SAME3 review and original Linux CI remain required. No activeEOF,
+semantic/provider/full-parity/performance or aggregate gate promotion follows.
+See [the source review](reviews/c13-two-component-nullable-recovery.md).

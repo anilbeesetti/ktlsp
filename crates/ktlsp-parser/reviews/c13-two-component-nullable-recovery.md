@@ -89,3 +89,52 @@ historical fixture/assertion bytes are unchanged by these fixes. Initial pinned
 owned fmt and compile-only locked workspace Clippy passed before corrections;
 actual SAME3 corrected-source rechecks and compile-only verification remain
 separate. No native execution occurred and all publication/provenance gates remain.
+
+## Combined source and provenance publication admission
+
+This section supersedes the historical private-source/provenance HOLD above.
+Root released the exact11-path allowlist after PR202 owner/root clear, assigned
+fe4f4a73f0bf9190f7668bf74a9b963f70114449/tree
+01e0300947dc10cb4f737fded962987d556358fa/soleparent
+cb0c8c7dd064a5a3f2d1c82097a2cfd0547e496a. It was integrated ONCE by merge
+6aca512b6b08163b5c8ec67eed3210e823854dbd, parents e7cb4d2 and fe4f4a73.
+No conflict or source redesign occurred. All six reviewed C13 blobs were exact at
+merge; all incoming binary/B3/parser changes are retained. Only truthful review/
+corpus records and the five released provenance artifacts are updated afterward.
+
+The inherited EOF observer is thread-local, so same-thread scratch Parser::eof
+calls contribute to callback cadence. Its callback precedes the unchanged builder
+predicate; it does not distinguish live/scratch/lazy contexts or prove EOF truth.
+Syntax-state isolation remains; unchanged observation counts are not claimed.
+Ordinary parse_snapshot has no socket/callback installed, but all EOF checks have
+TLS lookup overhead. Timing/allocation effects are UNMEASURED and500ms outcomes
+can vary. The observer adds no waits/retries, changes no effective EOF/budget and
+does not directly map callback failures into grammar diagnostics. PR202's three
+observations were all MissingACK; no positive B3 witness or promotion follows.
+
+Incoming allocation latch/status86, cumulative charging and no-refund/realloc
+rules remain exact. Main-loop cancellation -> deadline -> output -> status
+precedence, original finish_io deadline and ambiguous guard.finish()? Io override
+before scoped joins remain. Old cleanup waits/joins are unbounded. No B3 observer/
+protocol/fixture/allocator or lib/bin/worker file is edited by this child.
+
+Owner extracted the checksummed pristine registry archive, verified all54 original
+hashes, rebuilt delivered recovery plus only the C13 arm and generated both phases
+against current combined Rust sources. Pinned1.99.0 edition2024 formatting ran only
+on scratch phase files. A separate second pristine extraction replayed both phases
+with zero fuzz/offsets and all54 final hashes equal current combined source.
+Actual counts are16 behavior/50 formatting/four pristine survivors; manifests,
+locks, upstream inventory and notices remain byte-identical. Phase hashes:
+
+- recovery74922955e653db43633e3e49848060f9d667e699ddae370d69d886f632b7ed87
+- formattingc5f1625125e46e35ff79ff1094698eb33995464d6b863e184ba7d2e65b1637aa
+- finalinventory7666e63232ddc2aac66a77311c213417e6c700a8839d3c95bffe00d2160c5773
+
+SAME adversarial reviewer must independently extract/replay both phases, while
+SAME3 review actual combined source/inherited effects/provenance and fixes. Owned-
+source formatting and compile-only locked workspace Clippy remain admitted; local
+parser/worker/tests/server/bench execution is forbidden under96. After combined
+approval, concrete issue/push/open+attach PR and original unchanged Linux all3 are
+admitted. SAME3 completed original CI/readback remains required; merge awaits a
+later root exclusive expected-head/base lease. No main chasing, runtime-derived
+expectation tuning, unchanged retry-to-green, bypass or broader gate promotion.

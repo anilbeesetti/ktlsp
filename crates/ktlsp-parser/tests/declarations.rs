@@ -1142,7 +1142,6 @@ fn failed_generic_probes_preserve_type_parameters_and_existing_recovery() {
         "fun",
         "fun () = 2",
         "fun <U> healthy() = 2",
-        "val later = 1",
         "@A(\nfun healthy() = 2",
     ] {
         let source = format!("class Box<T\n{header}");

@@ -660,7 +660,7 @@
  
                  if !self.at(COMMA) {
                      break;
-@@ -39,13 +82,182 @@
+@@ -39,13 +82,184 @@
                  }
              }
  
@@ -760,7 +760,9 @@
 +                                    probe.my_builder.get_token_text() != Some("suspend")
 +                                        && probe.expect(IDENTIFIER)
 +                                        && probe.expect(GT)
-+                                        && probe.expect(DOT)
++                                        && (probe.consume_if(DOT)
++                                            || probe.consume_if(SAFE_ACCESS)
++                                            || (probe.consume_if(QUEST) && probe.expect(DOT)))
 +                                } else {
 +                                    probe.expect(GT)
 +                                        && (probe.consume_if(DOT)
@@ -845,7 +847,7 @@
      }
  
      /*
-@@ -132,23 +344,43 @@
+@@ -132,23 +346,43 @@
       *   : modifiers SimpleName (":" userType)?
       *   ;
       */

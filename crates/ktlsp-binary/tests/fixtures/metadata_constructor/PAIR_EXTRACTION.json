@@ -1,0 +1,91 @@
+{
+  "stage": "CONTRACT ONLY; intended future composition, unexecuted",
+  "extraction": "Existing unchanged Pair data copy; CP89 MUTF8 span decoded as data, literal Constructor slices asserted; no product/native/compiler/JVM/oracle",
+  "artifact": "org.jetbrains.kotlin:kotlin-stdlib:2.3.20",
+  "origin": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.3.20/kotlin-stdlib-2.3.20.jar",
+  "local_source": "/Users/anil/.gradle/wrapper/dists/gradle-9.5.0-bin/bvnork1r7n8i6kp5cnkibsc9q/gradle-9.5.0/lib/kotlin-stdlib-2.3.20.jar",
+  "jar_sha256": "0ae12504a5040ebaf37703908483420d1a5624dd1d93f357665f8c77c848a01e",
+  "entry": "kotlin/Pair.class",
+  "class_size": 2983,
+  "class_sha256": "8fed0fa88eb2df5723812a95330dee6bc91fd66b13906acb7906f9a813da9736",
+  "distribution": "2.3.20-release-208",
+  "compiler_provenance": "UNVERIFIED; distribution version is not compiler proof",
+  "d1_cp_index": 89,
+  "d1_mutf8_classfile_span": [
+    1276,
+    1599
+  ],
+  "d1_encoding": "leading NUL marker then direct low8 units",
+  "decoded_d1_length": 285,
+  "class_d1_span": [
+    47,
+    285
+  ],
+  "license": "Apache-2.0",
+  "license_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+  "notice_sha256": "0b09a83d3ef7795c7dec65e815866597c066c53898f2852a76599b8f5552941a",
+  "decoded_d1_sha256": "a4c2bf2d0bcd52aac574d156b413e3926cec249c5c2a23259d126c68872afa8e",
+  "decoded_d1_hex": "2e 0a 02 18 02 0a 02 08 02 0a 02 18 02 0a 02 18 02 0a 02 08 09 0a 02 10 0e 0a 02 08 05 0a 02 10 0b 0a 00 0a 02 10 00 0a 00 0a 02 10 08 0a 00 08 87 08 18 00 2a 06 08 00 10 01 20 01 2a 06 08 01 10 02 20 01 32 06 30 03 6a 02 60 04 42 19 08 46 12 06 10 05 1a 02 38 00 12 06 10 06 1a 02 38 01 a2 06 04 08 07 10 08 4a 0a 10 0d 1a 02 30 0e 48 96 80 04 4a 0f 10 0f 1a 02 38 00 48 c6 83 04 a2 06 02 10 0a 4a 0f 10 10 1a 02 38 01 48 c6 83 04 a2 06 02 10 0a 4a 2f 10 11 1a 0e 12 04 12 02 38 00 12 04 12 02 38 01 30 00 32 08 08 02 10 05 1a 02 38 00 32 08 08 02 10 06 1a 02 38 01 48 c6 81 04 a2 06 02 10 12 4a 14 10 13 1a 02 30 14 32 08 10 15 1a 04 18 01 30 16 48 d6 83 04 4a 0a 10 17 1a 02 30 18 48 d6 81 04 52 17 10 05 1a 02 38 00 58 86 84 08 a2 06 0a 0a 02 10 0b 1a 04 08 09 10 0a 52 17 10 06 1a 02 38 01 58 86 84 08 a2 06 0a 0a 02 10 0b 1a 04 08 0c 10 0a a8 06 19",
+  "constructor_field_d1_span": [
+    76,
+    103
+  ],
+  "constructor_body_d1_span": [
+    78,
+    103
+  ],
+  "constructor_body_class_span": [
+    31,
+    56
+  ],
+  "constructor_body_hex": "08 46 12 06 10 05 1a 02 38 00 12 06 10 06 1a 02 38 01 a2 06 04 08 07 10 08",
+  "constructor_body_sha256": "b10772c4ed0df9d57ce93391dcd7ba4b0940417c20c36a5916e99a150d63f4b6",
+  "parameter_body_constructor_spans": [
+    [
+      4,
+      10
+    ],
+    [
+      12,
+      18
+    ]
+  ],
+  "parameter_body_d1_spans": [
+    [
+      82,
+      88
+    ],
+    [
+      90,
+      96
+    ]
+  ],
+  "parameter_body_hex": [
+    "10 05 1a 02 38 00",
+    "10 06 1a 02 38 01"
+  ],
+  "expected": {
+    "flags": 70,
+    "version_requirements": [],
+    "parameters": [
+      {
+        "flags": null,
+        "name": 5,
+        "type_id": null,
+        "vararg_element_type_id": null
+      },
+      {
+        "flags": null,
+        "name": 6,
+        "type_id": null,
+        "vararg_element_type_id": null
+      }
+    ]
+  },
+  "independent_existing_archive_verification": {
+    "jar_sha256_matches": true,
+    "class_entry_byte_identical": true,
+    "license_notice_origin": "Existing t017c2 provenance pins Kotlin v2.3.20 license/LICENSE.txt and license/NOTICE.txt; byte-identical copied notices. JAR has no license/notice entries.",
+    "first_data_check": "An attempted META-INF/LICENSE.txt lookup raised KeyError; no product execution or content change. Actual ZIP inventory then confirmed no notice entries; authoritative existing external-source notice provenance retained."
+  }
+}

@@ -2485,7 +2485,7 @@
  };
  use crate::builder::{PsiBuilder, SemanticWhitespaceAwarePsiBuilder};
  use crate::parsing::Parser;
-@@ -265,13 +265,21 @@
+@@ -274,13 +274,21 @@
          self.parse_annotations(AnnotationParsingMode::Default);
  
          let reference = self.mark();

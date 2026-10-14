@@ -147,13 +147,22 @@ impl Parser {
                     probe.expect(DOT) && probe.expect(IDENTIFIER)
                 } else {
                     let mut plain = true;
+                    let mut identifiers = 1;
                     while probe.consume_if(DOT) {
                         if !probe.expect(IDENTIFIER) {
                             plain = false;
                             break;
                         }
+                        identifiers += 1;
                     }
                     plain
+                        && (if identifiers == 2 && probe.consume_if(SAFE_ACCESS) {
+                            probe.expect(IDENTIFIER)
+                        } else if identifiers == 2 && probe.consume_if(QUEST) {
+                            probe.expect(DOT) && probe.expect(IDENTIFIER)
+                        } else {
+                            true
+                        })
                 })
                 && probe.at(LPAR)
         };

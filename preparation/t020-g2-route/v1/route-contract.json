@@ -1,0 +1,102 @@
+{
+  "accepted_lock_sha256": "6dcd19bc5b0242b01bf4764e7f92dd2ac3eb86b5c1c8fe2423da1d028b0a259f",
+  "actions": {
+    "checkout": "11d5960a326750d5838078e36cf38b85af677262",
+    "upload_artifact": "ea165f8d65b6e75b540449e92b4886f43607fa02"
+  },
+  "archive_bytes": 3083327,
+  "archive_sha256": "62d3f4845d801dcc4fa6883547c209404a7345fca6aae5fb73d9a718d9fcadfa",
+  "automatic_calibration": false,
+  "automatic_candidate_execution": false,
+  "automatic_tests": false,
+  "auxiliary_branch": "codex/t020-g2-compile-only-route",
+  "base": "941c72efd9896b0847ab342ec0dd22c10a000f3b",
+  "build_only": {
+    "codegen_units": 1,
+    "debug": 2,
+    "incremental": false,
+    "lto": false,
+    "panic": "unwind",
+    "profile_D": {
+      "debug_assertions": true,
+      "opt_level": 0,
+      "overflow_checks": true
+    },
+    "profile_R": {
+      "debug_assertions": false,
+      "opt_level": 3,
+      "overflow_checks": false
+    },
+    "target_cpu": "x86-64"
+  },
+  "diagnostic_lock_sha256": "d871d1ff80a03de1e1df3027e46858eb936fa2940665f6fc73d5e9455caa02a5",
+  "eligibility_policy": "EXACT_STABLE_CPU_KERNEL_AND_IMAGE_TOOL_LIBRARY_TUPLES; NO_CONTRACT_AMENDMENT",
+  "limits": {
+    "candidate_deadline_seconds": 10,
+    "compiled_stack_bytes": 262144,
+    "compressed_bytes": 8388608,
+    "declared_output_bytes": 8388608,
+    "decoder_heap_allocations": 0,
+    "guarded_thread_bytes": 1048576,
+    "minimum_lower_guard_bytes": 4096,
+    "output_usable_overhead_bytes": 8192,
+    "rss_delta_bytes": 33554432,
+    "rss_hwm_bytes": 134217728,
+    "unexpected_panics_crashes_missing_receipts": 0,
+    "work_swu": 16777216,
+    "wrapper_reallocations": 0
+  },
+  "modes": [
+    "preflight",
+    "compile"
+  ],
+  "output_capacity_rule": "O=0: zero wrapper allocations; O>0: one fallible request capacity O, usable O..O+8192",
+  "payload_path": "preparation/t020-g2-route/v1",
+  "provisioning": {
+    "components": [
+      "rustfmt",
+      "clippy"
+    ],
+    "default_toolchain_change": false,
+    "distribution_server": "https://static.rust-lang.org",
+    "entry": "internal provision; not a workflow input",
+    "fallback": false,
+    "install_attempts": 1,
+    "install_timeout_seconds": 900,
+    "permission": "separate future root preflight grant covers provisioning plus metadata only; no Cargo/buildscripts/tests/calibration/candidate/runtime",
+    "profile": "minimal",
+    "receipt_output_bytes_per_stream": 4096,
+    "route": "existing native.yml rustup toolchain install; explicit GNU triple and --no-self-update",
+    "self_update": false,
+    "toolchain": "1.99.0-x86_64-unknown-linux-gnu",
+    "toolchain_inventory_max_expanded_bytes": 8589934592,
+    "toolchain_inventory_max_files": 100000,
+    "toolchain_inventory_max_json_bytes": 33554432,
+    "update_root": "https://static.rust-lang.org/rustup"
+  },
+  "publication_allowlist": [
+    "preparation/t020-g2-route/v1/stage.tar.gz",
+    "preparation/t020-g2-route/v1/stage-members.json",
+    "preparation/t020-g2-route/v1/vendor-members.json",
+    "preparation/t020-g2-route/v1/route-contract.json",
+    "preparation/t020-g2-route/v1/route.py",
+    "preparation/t020-g2-route/v1/compile-admission.json"
+  ],
+  "registry_archives": 11,
+  "repository": "anilbeesetti/ktlsp",
+  "runner_selector": "ubuntu-24.04",
+  "runtime_admission": false,
+  "rust_toolchain": "1.99.0-x86_64-unknown-linux-gnu",
+  "schema": 1,
+  "source_files": 607,
+  "source_manifest_sha256": "59c355692dda28e57986ddc9d8f88b9e56666cf98fe30d60919e4fe2fb4d898b",
+  "stage_expanded_bytes": 55703140,
+  "stage_members": 621,
+  "stage_members_sha256": "275a591fea8547f942aff38d8ccd81f05dbe7aa3a570b0f54dd09f04694afb63",
+  "status": "PROPOSAL_ONLY_NO_GRANT",
+  "target": "x86_64-unknown-linux-gnu",
+  "vendor_expanded_bytes": 6327564,
+  "vendor_files": 620,
+  "vendor_members_sha256": "fab2f9d58a7be79c211a3b4a00f1131e65075be58d93f84aa9a12ef93a6d8163",
+  "workflow_path": ".github/workflows/t020-g2-compile-only.yml"
+}

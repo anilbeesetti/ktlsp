@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "status": "HOLD",
+  "mode": "compile_only",
+  "expected_eligibility": null,
+  "preflight_provenance": null,
+  "stage_sha256": "62d3f4845d801dcc4fa6883547c209404a7345fca6aae5fb73d9a718d9fcadfa"
+}

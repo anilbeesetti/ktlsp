@@ -1,0 +1,301 @@
+{
+  "base": "bb64eb5b5200ef801ffb224336bf2eb997b68054",
+  "tree": "0ebc83052425eefe3747d3f99a3e02e5c6a2190a",
+  "sole_parent": "048c344c5a75f7cf16cadc627c7ff765c025c7f7",
+  "worktree": "/Users/anil/.codex/worktrees/t018-type-argument-contract/ktlsp",
+  "branch": "codex/t018-type-argument-contract",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "bytes": 2480,
+      "sha256": "ac71e66ed095c4259c0ad744332b621d36cfbea80c1ddca3b10000f121f5583c"
+    },
+    {
+      "path": "README.md",
+      "bytes": 11562,
+      "sha256": "14b619556c2d4988b1a011ca0f0c77c73c0a72efe7895c8d927b9901faa3efd1"
+    },
+    {
+      "path": "docs/HANDOFF.md",
+      "bytes": 30307,
+      "sha256": "c2702e1e9f91b94ebda1ab106a205e30dfdc4a4b7dc725697e98c63933b76d67"
+    },
+    {
+      "path": "docs/PLAN.md",
+      "bytes": 19365,
+      "sha256": "74bdd68c8c1d50d2bf579cea500c07c1257db486a330b75ecf6617ff91bcbaae"
+    },
+    {
+      "path": "docs/TICKETS.md",
+      "bytes": 21622,
+      "sha256": "5b28010fac38e6fe679fb4e5039fdee387095bd76c3450af36a9d4d4be7f3723"
+    },
+    {
+      "path": "crates/ktlsp-binary/src/lib.rs",
+      "bytes": 18132,
+      "sha256": "9c461e26219b0c7cc01ea6b85301e87b378574376d8908bba6a5cea98495f6d1"
+    },
+    {
+      "path": "crates/ktlsp-binary/src/metadata/mod.rs",
+      "bytes": 667,
+      "sha256": "663ee925b993ef7f68e9f9d9d4e6e83b6f3e0d88de17b41cdf410d255efed2bd"
+    },
+    {
+      "path": "crates/ktlsp-binary/src/metadata/type_header.rs",
+      "bytes": 3353,
+      "sha256": "58a12f02a650d710b3f6e7ac268dbc09e295325180d11c312ce0002d7b1ad82e"
+    },
+    {
+      "path": "crates/ktlsp-binary/src/metadata/type_argument.rs",
+      "bytes": 3810,
+      "sha256": "e109a1f22159ba31079e4e0006ed03c7007e0d8a4e1bd59112a3610b95010ea2"
+    },
+    {
+      "path": "crates/ktlsp-binary/src/metadata/type_table.rs",
+      "bytes": 3364,
+      "sha256": "bc392a96b3e08e8f100fc2daa12ec447915e15f54b03491746ed8f677409b733"
+    },
+    {
+      "path": "crates/ktlsp-binary/src/metadata/wire.rs",
+      "bytes": 8734,
+      "sha256": "ae3427b243faa459c03d2c14d3640c50410838b3e7ff8b7e48b0904c3832860f"
+    },
+    {
+      "path": "crates/ktlsp-binary/src/metadata/string_table.rs",
+      "bytes": 8117,
+      "sha256": "ef6be0e45bc5e05b82400023e40ade98cd3a21ac3be331f03d9344fbc910afcf"
+    },
+    {
+      "path": "crates/ktlsp-binary/src/metadata/jvm_method_signature.rs",
+      "bytes": 3816,
+      "sha256": "2f9725a6b7a3cc32e532aa5e2bd45822d2808933b4b1ca13696d79ef1b70feea"
+    },
+    {
+      "path": "crates/ktlsp-binary/tests/metadata_type_argument.rs",
+      "bytes": 25626,
+      "sha256": "fb737789da2fe3ab3a7eeea63ee10c3e68fb34e7b2abd366bfe91e5a71478588"
+    },
+    {
+      "path": "crates/ktlsp-binary/tests/metadata_type_header.rs",
+      "bytes": 16117,
+      "sha256": "0e0748d105aef9b8ce4fc3cf1ac1f97246ccf92304aac534e28b9b077c1a1a4f"
+    },
+    {
+      "path": "crates/ktlsp-binary/METADATA_TYPE_HEADER_SPEC.md",
+      "bytes": 10623,
+      "sha256": "37499ec4b01c99c18cbcd89f37bdf9f0327da7d295c8a3ceae180392d5739933"
+    },
+    {
+      "path": "crates/ktlsp-binary/METADATA_TYPE_ARGUMENT_SPEC.md",
+      "bytes": 9816,
+      "sha256": "ee91cc9919d1227082573c2c3155f89cd051369d9f80e60a4c464899a5a10beb"
+    },
+    {
+      "path": "crates/ktlsp-binary/METADATA_WIRE_SPEC.md",
+      "bytes": 4370,
+      "sha256": "d1da685d8df07e26cb3b7f8c1da3af33c0b983e0553b50419947fec053d6b4c7"
+    },
+    {
+      "path": "crates/ktlsp-binary/METADATA_STRING_TABLE_SPEC.md",
+      "bytes": 7749,
+      "sha256": "7f8c8a3f86446fa2edba4b343b0a59dcb75031556cfcdc52a2822b081a426cdf"
+    },
+    {
+      "path": "docs/specs/architecture.md",
+      "bytes": 8551,
+      "sha256": "010982703918b87be347aeca1df35f5a7e8edea34f0b441a70a1d4c34ff9eee1"
+    },
+    {
+      "path": "docs/specs/lowering-acceptance/README.md",
+      "bytes": 5543,
+      "sha256": "6041415f40cf8be9dfb8c928db75cb46dc77841a71f00211dcb7764edb322151"
+    },
+    {
+      "path": "docs/specs/lowering-acceptance/REVIEW.md",
+      "bytes": 2197,
+      "sha256": "91a6d7554e722ecfbb6db0811fa3a5d78f7ee80074d991251bc1cfa821005844"
+    },
+    {
+      "path": "docs/specs/lowering-acceptance/declarations.json",
+      "bytes": 1677,
+      "sha256": "72fbd738468ded64546441c6c080d50fd1b39525715393ebb57ef7e824e12f0f"
+    },
+    {
+      "path": "docs/specs/lowering-acceptance/declarations.kt",
+      "bytes": 146,
+      "sha256": "fa935b144a49838fd9e603bfc95462bcf3701eeb19877501d451ca069ce9e233"
+    },
+    {
+      "path": "docs/specs/lowering-acceptance/error-node.json",
+      "bytes": 1018,
+      "sha256": "c6a8f6b182eb362ea7333064def659efe4784d402621868e8e0254cc38208b19"
+    },
+    {
+      "path": "docs/specs/lowering-acceptance/error-node.kt",
+      "bytes": 44,
+      "sha256": "c052b78e7603a88f3531f5b06f3a533f8df5394ce8ce9eeab3eb2b3ce3f4bd2c"
+    },
+    {
+      "path": "docs/specs/parity.md",
+      "bytes": 6416,
+      "sha256": "b9bc276a46a6d9d6d89dd3d64c663420342875b3054107d7018fa1b1cb639e70"
+    },
+    {
+      "path": "docs/specs/project-model.md",
+      "bytes": 3316,
+      "sha256": "a525ca98a0d30e8fff7dfdba23dba9ad7bb9d317c806c35de47310f2b1a69563"
+    },
+    {
+      "path": "docs/specs/runtime-boundary.md",
+      "bytes": 1776,
+      "sha256": "706e2edfee0937aee922406ea03d4d08e54708852ea403eeefcf96d2888bf2b3"
+    },
+    {
+      "path": "docs/specs/server-foundation.md",
+      "bytes": 5027,
+      "sha256": "53be4f1e46866484ca1fd57ce8f9911be19bf13de18f92c3cf31228254b2833c"
+    },
+    {
+      "path": "docs/specs/verification.md",
+      "bytes": 6034,
+      "sha256": "966d3dd894eb7ac59f00a51f78be473657703bb1e47abadfdd378a0ccc331567"
+    },
+    {
+      "path": "docs/research/community.md",
+      "bytes": 15893,
+      "sha256": "976400b44d9146e18609fe9d75cabcb1874a40e0d23bb1bdcc8f2d081af5a02f"
+    },
+    {
+      "path": "docs/research/official.md",
+      "bytes": 25258,
+      "sha256": "58967d5f3c107a9a19fcf807bcf183b9f0b0466be2c6f359371c206c4d584853"
+    },
+    {
+      "path": "docs/research/oracle/README.md",
+      "bytes": 2619,
+      "sha256": "cee1ffaf99b1bdeea574d84547f036b0b43823e1553c538787e467f43f83437d"
+    },
+    {
+      "path": "docs/research/oracle/comparisons/README.md",
+      "bytes": 2769,
+      "sha256": "a48fb0d18550211f50ec05c08bd85319bfd6c9f42ba783776a880544a991e3f1"
+    },
+    {
+      "path": "docs/research/oracle/comparisons/lifecycle-folding-native-baseline.json",
+      "bytes": 20607,
+      "sha256": "9e1617c2ea4999d9c78aafed5bf33d5ccb4bb16e49434d6f4a353ace27ce31a8"
+    },
+    {
+      "path": "docs/research/oracle/initialize-result.json",
+      "bytes": 4260,
+      "sha256": "7aedfec3a808d763e391ac122333f5a1e153e915d611d5b3fb3e1a1567ce9f7f"
+    },
+    {
+      "path": "docs/research/oracle/lifecycle-folding/Main.kt",
+      "bytes": 36,
+      "sha256": "f1a8b52ae5177312536d5f54c662faf932b06b3708825a3098faeaa49e26a974"
+    },
+    {
+      "path": "docs/research/oracle/lifecycle-folding/metadata.json",
+      "bytes": 578,
+      "sha256": "f2147c77bef1106a6306f5d871bfaf741cc0a3b51c462485c56a261c8aedb8f9"
+    },
+    {
+      "path": "docs/research/oracle/lifecycle-folding/transcript.json",
+      "bytes": 10442,
+      "sha256": "53a4b7eff2abf1ca9741e0d3538590f3a0244e83873366b98a9b8aada9cc07a7"
+    },
+    {
+      "path": "docs/research/oracle/standalone-declarations/Main.kt",
+      "bytes": 74,
+      "sha256": "53948678f50da649de7ec7ae5585a287015637c22855e80ba9662cbd6928a4c0"
+    },
+    {
+      "path": "docs/research/oracle/standalone-declarations/metadata.json",
+      "bytes": 578,
+      "sha256": "f2147c77bef1106a6306f5d871bfaf741cc0a3b51c462485c56a261c8aedb8f9"
+    },
+    {
+      "path": "docs/research/oracle/standalone-declarations/transcript.json",
+      "bytes": 14345,
+      "sha256": "7807eaf346dad9983122d06caa19ba79ea0330ab02831299e3b5a75f69801816"
+    },
+    {
+      "path": "docs/research/review.md",
+      "bytes": 810,
+      "sha256": "b09c0acc8fb9f495e97b05fa5e0f1a6dc52d05ee18f3cacd9bc759682fb97769"
+    },
+    {
+      "path": "docs/status/development.md",
+      "bytes": 114906,
+      "sha256": "9c6f21b45d8964f4dd547f8d4329f1f9745fb79bf2493e6bab0960b67f046b8b"
+    },
+    {
+      "path": "docs/status/parity.md",
+      "bytes": 40425,
+      "sha256": "4ff96a2979c117c5ca7157afd41919b9721d7cd033a2bd18ddaf02a75e2cdaed"
+    },
+    {
+      "path": "crates/ktlsp-binary/tests/fixtures/metadata_type_argument/EXPECTATIONS.md",
+      "bytes": 10787,
+      "sha256": "31eb979ef3a1a129f2ff815e80739d3d81645399107b718fee38fd033dcaf6ba"
+    },
+    {
+      "path": "crates/ktlsp-binary/tests/fixtures/metadata_type_argument/LICENSE.txt",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "crates/ktlsp-binary/tests/fixtures/metadata_type_argument/NOTICE.txt",
+      "bytes": 482,
+      "sha256": "0b09a83d3ef7795c7dec65e815866597c066c53898f2852a76599b8f5552941a"
+    },
+    {
+      "path": "crates/ktlsp-binary/tests/fixtures/metadata_type_argument/PAIR_EXTRACTION.json",
+      "bytes": 1688,
+      "sha256": "3408eaa6c1bbf2a1d7b643853b753fb86c6c3c54ad973296b5d3b6241f13638e"
+    },
+    {
+      "path": "crates/ktlsp-binary/tests/fixtures/metadata_type_argument/PROTOBUF_LICENSE.txt",
+      "bytes": 1659,
+      "sha256": "2f706d67271d8db967046638e30f7887a5ba6e49593e6395e8145a7c9feab96a"
+    },
+    {
+      "path": "crates/ktlsp-binary/tests/fixtures/metadata_type_argument/Pair.class.bin",
+      "bytes": 2983,
+      "sha256": "8fed0fa88eb2df5723812a95330dee6bc91fd66b13906acb7906f9a813da9736"
+    },
+    {
+      "path": "crates/ktlsp-binary/tests/fixtures/metadata_type_argument/README.md",
+      "bytes": 1295,
+      "sha256": "9acdad5f19e33be60bb829729afce6920aee66f0fa271b968ddea0d8d22295e0"
+    },
+    {
+      "path": "crates/ktlsp-binary/tests/fixtures/metadata_type_argument/duplicates.hex",
+      "bytes": 90,
+      "sha256": "1378a4c69bea4c6b51f0e490ef5f934866876068ff2591833c2b46fc2d025e53"
+    },
+    {
+      "path": "crates/ktlsp-binary/tests/fixtures/metadata_type_argument/opaque.hex",
+      "bytes": 45,
+      "sha256": "f5cef54e96fc57635115b01c6bb7fae6fafa8a5ef1355a0a76ba470c38a31243"
+    },
+    {
+      "path": "crates/ktlsp-binary/tests/fixtures/metadata_type_argument/pair_argument.hex",
+      "bytes": 12,
+      "sha256": "51066b794050f96c323cad8d36ebfb6c28f51ea047dcb4447425e04930b0c0a9"
+    },
+    {
+      "path": "crates/ktlsp-binary/tests/fixtures/metadata_type_argument/selected.hex",
+      "bytes": 24,
+      "sha256": "1321a5e1a82561127ca8661a0c0da54b18186874f07aff83e650d0a356e8d6d7"
+    }
+  ],
+  "root_delivery_proof": {
+    "path": "/private/tmp/ktlsp-root-219-owner-delivery-clear.json",
+    "sha256": "5fe54538e53b56309ef2740ed3db56ce92ec5336429b61191367976f3e664814"
+  },
+  "new_fixture_origin": "hand-authored data except Pair Type literal already present in licensed extraction; no new artifact acquisition",
+  "license": "existing Pair Apache-2.0 license/NOTICE and protobuf notice remain unchanged and are pinned above",
+  "runtime": "NONE; Python literal/hash/slice only"
+}

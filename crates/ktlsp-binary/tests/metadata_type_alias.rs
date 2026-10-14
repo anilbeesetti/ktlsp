@@ -1,3 +1,8 @@
+#![expect(
+    clippy::single_range_in_vec_init,
+    reason = "Fixture lists contain byte spans, not collected indexes."
+)]
+
 use ktlsp_binary::metadata::type_alias::{Error, ErrorKind, Limits, TypeAlias, decode};
 use ktlsp_binary::metadata::wire::ErrorKind as WireKind;
 use std::{mem::size_of, ops::Range};

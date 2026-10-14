@@ -18,7 +18,12 @@ bench runtime is authorized under unresolved #96. Linux Native Rust CI runs all
 three unchanged pinned commands. Same functionality/adversarial/architect reviewers
 must inspect source/fixes and completed original CI before merge admission.
 
-Validation/CI/final source review are pending at this source-writing checkpoint.
+All three reviewers approved initial source 79aa1cc. Local format passed; first
+compile-only Clippy found 13 single_range_in_vec_init diagnostics for intentional
+one-element byte-span fixture lists. A test-file expect documents that intent; no
+assertion/product/workflow was weakened. Changed-source format and compile-only
+locked workspace Clippy passed. Original Linux CI/final reviews remain pending;
+the first failure receipt and subsequent compile-only log are preserved externally.
 No changed deadline/assertion/workflow/dependency or fresh JVM/oracle execution.
 No merged/delivered claim, whole-pipeline memory/latency claim, semantic/full metadata
 parity claim or Darwin reliability correction. Parents #68/#18 and #96 stay open.

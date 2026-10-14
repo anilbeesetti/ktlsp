@@ -7,7 +7,9 @@ pub mod function_header;
 mod header;
 pub mod name_resolver;
 pub mod payload;
+pub mod property_header;
 pub mod string_table;
+pub mod type_parameter;
 pub mod type_table;
 pub mod wire;
 

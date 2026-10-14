@@ -3,7 +3,7 @@ use ktlsp_binary::metadata::{
     name_resolver::Resolver,
     payload,
     type_argument::{Error, ErrorKind, InlineType, Limits, Projection, TypeArgument, decode},
-    type_header,
+    type_arguments, type_header,
     wire::{self, Value},
 };
 use std::{mem::size_of, ops::Range};
@@ -698,7 +698,7 @@ fn caller_limits_cannot_raise_hard_bounds() {
 }
 
 #[test]
-fn genuine_pair_generic_return_composes_with_type_headers_and_separate_budgets() {
+fn genuine_pair_generic_return_composes_arguments_under_one_budget() {
     let class = ktlsp_binary::parse_class(include_bytes!(
         "fixtures/metadata_type_argument/Pair.class.bin"
     ))
@@ -753,10 +753,23 @@ fn genuine_pair_generic_return_composes_with_type_headers_and_separate_budgets()
     let inline = &selected_function.raw[4..18];
     assert_eq!(inline, hex("12 04 12 02 38 00 12 04 12 02 38 01 30 00"));
     assert_eq!(inline.as_ptr(), bytes[155..169].as_ptr());
-    let selected_type = type_header::decode(inline, Default::default()).unwrap();
+    let a = size_of::<type_arguments::SelectedArgument<'_>>();
+    let composed = type_arguments::decode(
+        inline,
+        type_arguments::Limits {
+            bytes: 14,
+            records: 8,
+            nodes: 3,
+            depth: 2,
+            work: 55 + 2 * a + 2 * S,
+            owned_bytes: 2 * a + 2 * S,
+        },
+    )
+    .unwrap();
+    let selected_type = &composed.header;
     assert_eq!(
         selected_type,
-        type_header::TypeHeader {
+        &type_header::TypeHeader {
             raw: inline,
             class_name: Some(0),
             flags: None,
@@ -771,25 +784,21 @@ fn genuine_pair_generic_return_composes_with_type_headers_and_separate_budgets()
         }
     );
     assert_eq!(selected_type.raw.as_ptr(), inline.as_ptr());
-    for (span, d1_span, id) in [(2..6, 157..161, 0), (8..12, 163..167, 1)] {
-        assert_eq!(&selected_type.raw[span.start - 2..span.start], &[18, 4]);
-        let argument = &selected_type.raw[span];
+    assert_eq!(composed.arguments.len(), 2);
+    for (selected, (span, d1_span, id)) in composed
+        .arguments
+        .iter()
+        .zip([(2..6, 157..161, 0), (8..12, 163..167, 1)])
+    {
+        assert_eq!(selected.span, span);
+        let decoded = &selected.argument;
+        let argument = decoded.raw;
         assert_eq!(argument, [18, 2, 56, id]);
         if id == 0 {
             assert_eq!(argument, hex(PAIR));
         }
         assert_eq!(argument.as_ptr(), bytes[d1_span].as_ptr());
-        let decoded = decode(
-            argument,
-            Limits {
-                bytes: 4,
-                records: 1,
-                work: 6 + S,
-                owned_bytes: S,
-            },
-        )
-        .unwrap();
-        retained(&decoded, argument);
+        retained(decoded, &selected_type.raw[selected.span.clone()]);
         assert_eq!((decoded.projection, decoded.type_id), (None, None));
         assert_eq!(decoded.inline_types.len(), 1);
         let nested = &decoded.inline_types[0];

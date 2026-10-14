@@ -110,3 +110,43 @@ first outcomes must be reviewed by retained SAME3. First contradiction preserves
 and STOPS, without output-derived tuning or unchanged retry. No merge lease or
 final integration cut has been assigned; no main chasing or native local runtime.
 BroaderC13/B3/B4GAP/fullB11UNVERIFIED/T008/T008aHOLD/#7/#83/#96OPEN/DarwinUNKNOWN.
+
+
+## First original PR231 CI failure and source-only harness diagnosis
+
+Original attempt1/pull_request run38563606466/job115850603591 on reviewed
+0e756ed0ac2feccf26d55add83baf17af3534e49 passed Format/Clippy and failed Tests101.
+Raw94574bytes SHA256d0a7cd218b9372a648d5dc4871d7fe58af3a56cff5c62ec415eaf2b1b9c339a6
+and failedhead remain preserved; no unchanged rerun. Actual synthetic checkout
+fba654562a6349ccc9e5b299c6423bf3c6cbdba8/treea2adb96bf132816456196cee8035700ad70d978a
+has orderedparents015057d40ea8739502e179b246b9385be016b5b2 then reviewedhead.
+All10owned and162reviewedparser/dependency/config mode/type/blob pins match the
+reviewedhead; incomingbase adds only separate Windows workflow/project review
+note. Partial435ordinaryRustpasses/1failure/2ignored belong to this combined
+checkout, not a completed workspace/doctest/protocol claim. All84historicalgeneric
+case completions passed. New32cases completed; malformed-annotation-prefix-nullable
+failed the rootpartitions selector;78latercases remain UNREACHED at this outcome.
+
+Actual retained SAME3 independently traced parse_file->parse_preamble: omitted
+package creates PACKAGE_DIRECTIVE0..0 and absentimports creates IMPORT_LIST0..0
+without advancing. Both root CST nodes cover no source bytes; binding/export
+retains them. The frozen original_partitions arrays encode contiguous nonempty
+source spans. This describes their values and purpose; NONEMPTY was not verbatim
+wording in the original contract. The new harness incorrectly collected ALL root children;
+this selector defect was missed by owner and initialreviews. No finite receiver
+predicate or frozen expected field is contradicted by this diagnosis.
+
+The exact proposed correction filters immediate root children by start<end before
+unchanged exact partition-array equality. Complete token partition, allselected
+nodes/names/tokens/diagnostics and COMPLETE ordered error_ownership remain intact,
+including same-range zero-width EOF errors. All111case objects/expectedfields,
+threehistoricalamendments, vendor bytes/patches/hashmanifest/limits stay unchanged.
+No kind-specific/output-derived fixture tuning or general test weakening.
+
+Static independent audit of the78unreached cases (66declined/2nonclassifier/4nested/
+5exactboundary-leading/1aggregate) found no other consumer of original_partitions
+or source-derived contradiction; this is not runtime evidence. No vendor delta
+or redundant pristine replay is justified. Root exact two-file correction grant,
+actual SAME3 changedsource rechecks, pinnedfmt/COMPILEONLYClippy before changed-head publication. Then only the new changed head's ORIGINAL
+unchanged Linux CI is required before completion or merge readiness. No local
+native runtime; no unchanged-head retry; merge stillHELD.

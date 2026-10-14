@@ -320,7 +320,7 @@ fn frozen_nullable_generic_receiver_contract_through_production_snapshot_worker(
                 let elements = tree.elements();
                 let root_parts: Value = elements
                     .iter()
-                    .filter(|e| e.parent == Some(0))
+                    .filter(|e| e.parent == Some(0) && e.start < e.end)
                     .map(|e| json!([e.kind, e.start, e.end]))
                     .collect();
                 assert_eq!(root_parts, json!(partitions), "{id}");

@@ -89,7 +89,12 @@ impl Budget {
         self.nodes = self.nodes.checked_sub(1).ok_or(limit("nodes", offset))?;
         self.wire.work(1, offset)
     }
-    fn push<T>(&mut self, values: &mut Vec<T>, value: T, offset: usize) -> Result<(), Error> {
+    pub(super) fn push<T>(
+        &mut self,
+        values: &mut Vec<T>,
+        value: T,
+        offset: usize,
+    ) -> Result<(), Error> {
         let len = values.len();
         // Logical reservations stay deterministic even if the allocator grants surplus.
         if len == 0 || len.is_power_of_two() {
@@ -114,7 +119,7 @@ impl Budget {
         self.wire.work(1, offset)?;
         self.push(values, value as u32 as i32, offset)
     }
-    fn integers(
+    pub(super) fn integers(
         &mut self,
         bytes: &[u8],
         field: &Field<'_>,

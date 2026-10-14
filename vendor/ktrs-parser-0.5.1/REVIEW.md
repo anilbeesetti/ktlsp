@@ -377,3 +377,35 @@ The corrected head requires actual SAME source rechecks and new original unchang
 Linux Native Rust all3. No unchanged retry or local native execution is used. Merge
 remains HOLD for root's expected-head/base lease, completed CI approvals and
 owner/root exact-main verification; broader parity and Darwin gates stay unchanged.
+
+### Corrected PR170 original failure and nullable initializer ownership
+
+Corrected original run38498826024/job115640658803 attempt1 on reviewed851901e/tree
+15d24b7d1521ac708a660c65c8e5ebfcc971ad28 passed formatting/Clippy, C13b70 and
+long-qualified116 tests, then failed nullable-decline-safe-call-expression's
+class.end>11 assertion. Raw log SHA256
+82ac183ac404a8f3bbdfe0618959b8a441a41af13740d1a3b6e5bcfc1c74a8b4
+(58486 bytes/741 lines) is retained independently by owner and root. The focused
+property suite was not reached. Neither this failure nor the first establishes
+a complete recovered property result. Both original failures remain preserved.
+
+Three static audits covered all 330 historical embedded cases and nonembedded/
+generated parser inputs. Only the corrected C13b seed and these two nullable
+initializer controls cross an unfinished classifier with an ordinary val header.
+Owner and reviewers missed val value while first searching for val later. Root
+admitted only nullable-decline-safe-call-expression and
+nullable-decline-safe-call-elvis-expression dispatches after actual SAME2+architect
+source-derived supplemental-contract review. Supplemental JSON SHA256
+bf8a8e17aee78e01cc429385e6cf421c77ca4fef6000992d48b196a1df548bc0
+is embedded unchanged: six-row projections, exact safe-call/Elvis expression-parent
+chains, names, sole Missing '>' diagnostic, 30 original UTF16 positions and no FUN
+nodes preserve the original function-lookalike ownership intent. Expectations
+come from grammar and source arithmetic, never native output.
+
+All 85 historical nullable fixture bytes and every other dispatch/assertion remain
+unchanged, as do 70/59/116 payloads and all 36 new property fixtures. Only these two
+old class-boundary invariants are superseded. Grammar, vendor source/patch hashes,
+limits, APIs and workflows remain identical to851901e. Common diagnostic/token/
+snapshot/healthy-followup checks still execute. Changed-source SAME reviews and
+new original unchanged Linux Native Rust all3 remain required; no local native or
+unchanged retry is used. Merge remains HOLD for root's lease and exact-main checks.

@@ -55,8 +55,8 @@ jobs:
             powershell = $PSVersionTable.PSVersion.ToString()
           } | ConvertTo-Json | Set-Content "$evidence/identity.json"
           if ('${{ github.repository }}' -cne 'anilbeesetti/ktlsp' -or
-              '${{ github.ref }}' -cne 'refs/heads/codex/t021-windows-source-diagnostics-w3' -or
-              $env:ACTUAL_WORKFLOW_REF -cne 'anilbeesetti/ktlsp/.github/workflows/t021-windows-project-model.yml@refs/heads/codex/t021-windows-source-diagnostics-w3' -or
+              '${{ github.ref }}' -cne 'refs/heads/codex/t021-windows-first-pin-observability' -or
+              $env:ACTUAL_WORKFLOW_REF -cne 'anilbeesetti/ktlsp/.github/workflows/t021-windows-project-model.yml@refs/heads/codex/t021-windows-first-pin-observability' -or
               '${{ github.run_attempt }}' -cne '1' -or
               '${{ runner.os }}' -cne 'Windows' -or '${{ runner.arch }}' -cne 'X64' -or
               $env:EXPECTED_WORKFLOW_SHA -cnotmatch '^[0-9a-f]{40}$' -or
@@ -172,7 +172,204 @@ jobs:
           '@ | ConvertFrom-Json -AsHashtable
           foreach ($path in $pins.Keys) {
             $actual = (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
-            if ($actual -cne $pins[$path]) { throw "Frozen input mismatch: $path" }
+            if ($actual -cne $pins[$path]) {
+              try {
+                # The original comparison and this later capture are separate reads.
+                $pinCap = 65536
+                $stderrCap = 4096
+                $jsonCap = 32768
+                $gitDeadlineMs = 10000
+                $pinEvidence = Join-Path $env:RUNNER_TEMP 't021-evidence'
+                $sourceDirectory = (Get-Location).ProviderPath
+                function Limit-PinError($message) {
+                  $text = [string]$message
+                  if ($text.Length -gt 256) { $text = $text.Substring(0, 256) }
+                  return $text
+                }
+                function New-PinCapture($artifact) {
+                  return [ordered]@{
+                    artifact = $artifact; observed_bytes = 0; captured_bytes = 0
+                    byte_length = $null; byte_length_after = $null; eof = $false; capture_complete = $false; truncated = $false
+                    full_sha256 = $null; prefix_sha256 = $null; capture_error = $null
+                    hash_error = $null; retained = $false; write_error = $null
+                  }
+                }
+                function Finish-PinCapture($capture, [byte[]]$buffer, [int]$count, [int]$cap) {
+                  $capture.observed_bytes = $count
+                  $capture.captured_bytes = [Math]::Min($count, $cap)
+                  $capture.truncated = $count -gt $cap
+                  if ($capture.truncated) { $capture.capture_complete = $false }
+                  if ($capture.captured_bytes -eq 0 -and -not $capture.capture_complete) { return }
+                  $hasher = [System.Security.Cryptography.SHA256]::Create()
+                  try {
+                    $digest = [BitConverter]::ToString($hasher.ComputeHash($buffer, 0, $capture.captured_bytes)).Replace('-', '').ToLowerInvariant()
+                    if ($capture.capture_complete) { $capture.full_sha256 = $digest } else { $capture.prefix_sha256 = $digest }
+                  } catch { $capture.hash_error = Limit-PinError $_.Exception.Message; $capture.capture_complete = $false }
+                  finally { $hasher.Dispose() }
+                  $writer = $null
+                  $writeOK = $false
+                  try {
+                    $writer = [IO.File]::Open((Join-Path $pinEvidence $capture.artifact), [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+                    $writer.Write($buffer, 0, $capture.captured_bytes)
+                    $writer.Flush($true)
+                    $writeOK = $true
+                  } catch { $capture.write_error = Limit-PinError $_.Exception.Message }
+                  finally {
+                    if ($null -ne $writer) {
+                      try { $writer.Dispose() } catch { $capture.write_error = Limit-PinError $_.Exception.Message; $writeOK = $false }
+                    }
+                  }
+                  $capture.retained = $writeOK
+                }
+                function Write-PinMetadata($value) {
+                  $value.metadata.phase = 'before_metadata_write'
+                  $value.metadata.retained = $null
+                  $json = $value | ConvertTo-Json -Depth 6 -Compress
+                  $jsonBytes = [Text.UTF8Encoding]::new($false).GetBytes($json)
+                  if ($jsonBytes.Length -gt $jsonCap) { throw 'first_pin_metadata_cap' }
+                  $writer = $null
+                  $writeOK = $false
+                  try {
+                    $writer = [IO.File]::Open((Join-Path $pinEvidence 'first-pin.json'), [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+                    $writer.Write($jsonBytes, 0, $jsonBytes.Length)
+                    $writer.Flush($true)
+                    $writeOK = $true
+                  } catch { $value.metadata.write_error = Limit-PinError $_.Exception.Message }
+                  finally {
+                    if ($null -ne $writer) {
+                      try { $writer.Dispose() } catch { $value.metadata.write_error = Limit-PinError $_.Exception.Message; $writeOK = $false }
+                    }
+                  }
+                  $value.metadata.phase = 'after_metadata_write'
+                  $value.metadata.retained = $writeOK
+                  Write-Output ('FIRST_PIN_EVIDENCE_JSON: ' + ($value | ConvertTo-Json -Depth 6 -Compress))
+                }
+                $record = [ordered]@{
+                  schema = 1; path = $path; expected_sha256 = $pins[$path]; compared_actual_sha256 = $actual
+                  read_relationship = 'separate_reads_no_atomic_snapshot_claim'
+                  caps = @{ binary = $pinCap; stderr = $stderrCap; metadata = $jsonCap; git_deadline_ms = $gitDeadlineMs }
+                  working_tree = (New-PinCapture 'first-pin-working-tree.bin')
+                  source_blob = (New-PinCapture 'first-pin-source-blob.bin')
+                  git_stderr = (New-PinCapture 'first-pin-git-stderr.bin')
+                  source_commit = '2d561ab30812dcdabc56260a8b510979e1e70a61'
+                  source_expression = "2d561ab30812dcdabc56260a8b510979e1e70a61:$path"
+                  computed_git_blob_oid = $null
+                  process = @{ started = $false; exit_code = $null; timed_out = $false; termination_requested = $false; termination_error = $null; capture_error = $null; elapsed_ms = 0 }
+                  metadata = @{ phase = 'before_metadata_write'; retained = $null; write_error = $null; truncated = $false }
+                }
+                $workBuffer = [byte[]]::new($pinCap + 1)
+                $workCount = 0
+                $reader = $null
+                try {
+                  $reader = [IO.File]::Open((Join-Path $sourceDirectory $path), [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+                  $record.working_tree.byte_length = $reader.Length
+                  while ($workCount -lt $workBuffer.Length) {
+                    $read = $reader.Read($workBuffer, $workCount, $workBuffer.Length - $workCount)
+                    if ($read -eq 0) { $record.working_tree.eof = $true; break }
+                    $workCount += $read
+                  }
+                  $record.working_tree.byte_length_after = $reader.Length
+                  if ($record.working_tree.byte_length_after -ne $record.working_tree.byte_length) { $record.working_tree.capture_error = 'working_tree_length_changed' }
+                  if ($record.working_tree.eof -and $workCount -ne $record.working_tree.byte_length -and $null -eq $record.working_tree.capture_error) { $record.working_tree.capture_error = 'working_tree_short_read' }
+                  $record.working_tree.capture_complete = $record.working_tree.eof -and $workCount -eq $record.working_tree.byte_length -and $null -eq $record.working_tree.capture_error
+                } catch { $record.working_tree.capture_error = Limit-PinError $_.Exception.Message }
+                finally { if ($null -ne $reader) { $reader.Dispose() } }
+                Finish-PinCapture $record.working_tree $workBuffer $workCount $pinCap
+                $blobBuffer = [byte[]]::new($pinCap + 1)
+                $errorBuffer = [byte[]]::new($stderrCap + 1)
+                $blobCount = 0
+                $errorCount = 0
+                $clock = [Diagnostics.Stopwatch]::StartNew()
+                $process = [Diagnostics.Process]::new()
+                try {
+                  $process.StartInfo.FileName = 'git'
+                  $process.StartInfo.WorkingDirectory = $sourceDirectory
+                  $process.StartInfo.UseShellExecute = $false
+                  $process.StartInfo.RedirectStandardOutput = $true
+                  $process.StartInfo.RedirectStandardError = $true
+                  $process.StartInfo.CreateNoWindow = $true
+                  $process.StartInfo.ArgumentList.Add('cat-file')
+                  $process.StartInfo.ArgumentList.Add('blob')
+                  $process.StartInfo.ArgumentList.Add($record.source_expression)
+                  $record.process.started = $process.Start()
+                  if (-not $record.process.started) { throw 'git_start_returned_false' }
+                  $stdoutRead = $process.StandardOutput.BaseStream.ReadAsync($blobBuffer, 0, $blobBuffer.Length)
+                  $stderrRead = $process.StandardError.BaseStream.ReadAsync($errorBuffer, 0, $errorBuffer.Length)
+                  while ($true) {
+                    if ($clock.ElapsedMilliseconds -ge $gitDeadlineMs) { $record.process.timed_out = $true; $record.process.capture_error = 'git_deadline'; break }
+                    if (-not $record.source_blob.eof -and $stdoutRead.IsCompleted) {
+                      $read = $stdoutRead.GetAwaiter().GetResult()
+                      $blobCount += $read
+                      if ($read -eq 0) { $record.source_blob.eof = $true }
+                      elseif ($blobCount -gt $pinCap) { $record.process.capture_error = 'git_stdout_cap'; break }
+                      else { $stdoutRead = $process.StandardOutput.BaseStream.ReadAsync($blobBuffer, $blobCount, $blobBuffer.Length - $blobCount) }
+                    }
+                    if (-not $record.git_stderr.eof -and $stderrRead.IsCompleted) {
+                      $read = $stderrRead.GetAwaiter().GetResult()
+                      $errorCount += $read
+                      if ($read -eq 0) { $record.git_stderr.eof = $true }
+                      elseif ($errorCount -gt $stderrCap) { $record.process.capture_error = 'git_stderr_cap'; break }
+                      else { $stderrRead = $process.StandardError.BaseStream.ReadAsync($errorBuffer, $errorCount, $errorBuffer.Length - $errorCount) }
+                    }
+                    if ($record.source_blob.eof -and $record.git_stderr.eof -and $process.HasExited) { break }
+                    [Threading.Thread]::Sleep([int][Math]::Min(5, [Math]::Max(0, $gitDeadlineMs - $clock.ElapsedMilliseconds)))
+                  }
+                } catch { $record.process.capture_error = Limit-PinError $_.Exception.Message }
+                finally {
+                  if ($record.process.started) {
+                    try {
+                      if (-not $process.HasExited) {
+                        $record.process.termination_requested = $true
+                        $process.Kill()
+                        if (-not $process.WaitForExit([int][Math]::Max(0, $gitDeadlineMs - $clock.ElapsedMilliseconds))) { $record.process.termination_error = 'git_exit_not_observed_before_deadline' }
+                      }
+                      if ($process.HasExited) { $record.process.exit_code = $process.ExitCode }
+                    } catch { $record.process.termination_error = Limit-PinError $_.Exception.Message }
+                  }
+                  $record.process.elapsed_ms = $clock.ElapsedMilliseconds
+                  $process.Dispose()
+                  $clock.Stop()
+                }
+                $record.source_blob.capture_error = $record.process.capture_error
+                $record.source_blob.capture_complete = $record.source_blob.eof -and $record.git_stderr.eof -and $blobCount -le $pinCap -and $errorCount -le $stderrCap -and $record.process.exit_code -eq 0 -and $null -eq $record.process.capture_error -and $null -eq $record.process.termination_error
+                if ($record.process.exit_code -ne 0 -and $null -eq $record.source_blob.capture_error) { $record.source_blob.capture_error = 'git_exit_nonzero_or_unavailable' }
+                if ($record.source_blob.capture_complete) { $record.source_blob.byte_length = $blobCount }
+                if (-not $record.git_stderr.eof) { $record.git_stderr.capture_error = $record.process.capture_error }
+                $record.git_stderr.capture_complete = $record.git_stderr.eof -and $errorCount -le $stderrCap
+                if ($record.git_stderr.capture_complete) { $record.git_stderr.byte_length = $errorCount }
+                Finish-PinCapture $record.source_blob $blobBuffer $blobCount $pinCap
+                Finish-PinCapture $record.git_stderr $errorBuffer $errorCount $stderrCap
+                if ($record.source_blob.capture_complete) {
+                  $object = [IO.MemoryStream]::new()
+                  $oidHasher = [System.Security.Cryptography.SHA1]::Create()
+                  try {
+                    $header = [Text.Encoding]::ASCII.GetBytes("blob $blobCount`0")
+                    $object.Write($header, 0, $header.Length)
+                    $object.Write($blobBuffer, 0, $blobCount)
+                    $object.Position = 0
+                    $record.computed_git_blob_oid = [BitConverter]::ToString($oidHasher.ComputeHash($object)).Replace('-', '').ToLowerInvariant()
+                  } catch { $record.source_blob.hash_error = Limit-PinError $_.Exception.Message; $record.source_blob.capture_complete = $false; $record.source_blob.prefix_sha256 = $record.source_blob.full_sha256; $record.source_blob.full_sha256 = $null }
+                  finally { $oidHasher.Dispose(); $object.Dispose() }
+                }
+                Write-PinMetadata $record
+              } catch {
+                $message = [string]$_.Exception.Message
+                if ($message.Length -gt 256) { $message = $message.Substring(0, 256) }
+                $fallback = [ordered]@{
+                  schema = 1; path = $path; expected_sha256 = $pins[$path]; compared_actual_sha256 = $actual
+                  read_relationship = 'separate_reads_no_atomic_snapshot_claim'
+                  source_commit = '2d561ab30812dcdabc56260a8b510979e1e70a61'
+                  source_expression = "2d561ab30812dcdabc56260a8b510979e1e70a61:$path"
+                  caps = @{ binary = 65536; stderr = 4096; metadata = 32768; git_deadline_ms = 10000 }
+                  captures_omitted = $true; collection_error = $message
+                  metadata = @{ phase = 'before_metadata_write'; retained = $null; write_error = $null; truncated = ($message -eq 'first_pin_metadata_cap') }
+                }
+                try { Write-PinMetadata $fallback }
+                catch { Write-Output ('FIRST_PIN_EVIDENCE_COLLECTION_ERROR: ' + $message) }
+              } finally {
+                throw "Frozen input mismatch: $path"
+              }
+            }
           }
           $pins | ConvertTo-Json | Set-Content "$env:RUNNER_TEMP/t021-evidence/source-pins.json"
       - name: Install and record pinned Rust and MSVC target

@@ -2485,8 +2485,8 @@
  };
  use crate::builder::{PsiBuilder, SemanticWhitespaceAwarePsiBuilder};
  use crate::parsing::Parser;
-@@ -176,28 +176,28 @@
-                                 && probe.expect(DOT)
+@@ -178,28 +178,28 @@
+                                     || (probe.consume_if(QUEST) && probe.expect(DOT)))
                                  && probe.expect(IDENTIFIER)
                          } else if probe.consume_if(SAFE_ACCESS) {
 -                    probe.expect(IDENTIFIER)
@@ -2532,7 +2532,7 @@
                  }
                  && probe.at(LPAR)
          };
-@@ -309,13 +309,21 @@
+@@ -311,13 +311,21 @@
          self.parse_annotations(AnnotationParsingMode::Default);
  
          let reference = self.mark();

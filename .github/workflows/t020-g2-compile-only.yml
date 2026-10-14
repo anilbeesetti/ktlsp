@@ -1,0 +1,142 @@
+# PROPOSAL DATA; future default-branch anchor requires its own publication grant.
+name: Optional T020 G2 preflight and compile only
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Separately root-admitted phase
+        type: choice
+        options: [preflight, compile]
+        required: true
+      payload_commit:
+        description: Reviewed immutable auxiliary commit (40 lowercase hex)
+        type: string
+        required: true
+      admission_sha256:
+        description: Root-reviewed compile-admission SHA256; empty for preflight
+        type: string
+        required: false
+        default: ''
+permissions:
+  contents: read
+jobs:
+  route:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout reviewed default-branch anchor
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Checkout immutable auxiliary payload
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.payload_commit }}
+          path: payload
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify frozen route and perform admitted phase
+        id: route
+        shell: bash --noprofile --norc -euo pipefail {0}
+        env:
+          G2_MODE: ${{ inputs.mode }}
+          G2_PAYLOAD_COMMIT: ${{ inputs.payload_commit }}
+          G2_ADMISSION_SHA256: ${{ inputs.admission_sha256 }}
+          G2_WORKSPACE: ${{ github.workspace }}
+          G2_WORK: ${{ runner.temp }}/t020-g2-work-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          [[ "$G2_PAYLOAD_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$G2_MODE" = preflight || "$G2_MODE" = compile ]]
+          if [[ "$G2_MODE" = compile ]]; then [[ "$G2_ADMISSION_SHA256" =~ ^[0-9a-f]{64}$ ]]; fi
+          G2_RESULTS="$(/usr/bin/mktemp -d "$RUNNER_TEMP/t020-g2-results-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-XXXXXX")"
+          printf 'results_path=%s\n' "$G2_RESULTS" >> "$GITHUB_OUTPUT"
+          cd "$G2_WORKSPACE/payload/preparation/t020-g2-route/v1"
+          /usr/bin/sha256sum --check --strict <<'G2_PINS'
+          d7308885c1124d449f8e483125d505ef2cb8be22789d16e7b4bbeb32ec8f7ae3  route.py
+          26982e82f6f758f21a532f20ab0f4b0efaddf135fcd4a2e242ff3137b2ec2505  route-contract.json
+          275a591fea8547f942aff38d8ccd81f05dbe7aa3a570b0f54dd09f04694afb63  stage-members.json
+          fab2f9d58a7be79c211a3b4a00f1131e65075be58d93f84aa9a12ef93a6d8163  vendor-members.json
+          62d3f4845d801dcc4fa6883547c209404a7345fca6aae5fb73d9a718d9fcadfa  stage.tar.gz
+          G2_PINS
+          /usr/bin/python3 -I ./route.py provision "$G2_RESULTS"
+          /usr/bin/env -i HOME="$HOME" PATH=/usr/bin:/bin LANG=C LC_ALL=C \
+            ImageOS="${ImageOS-}" ImageVersion="${ImageVersion-}" \
+            GITHUB_REPOSITORY="$GITHUB_REPOSITORY" GITHUB_SHA="$GITHUB_SHA" \
+            GITHUB_REF="$GITHUB_REF" GITHUB_WORKFLOW_REF="$GITHUB_WORKFLOW_REF" \
+            GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" \
+            G2_PAYLOAD_COMMIT="$G2_PAYLOAD_COMMIT" G2_ADMISSION_SHA256="$G2_ADMISSION_SHA256" \
+            /usr/bin/python3 ./route.py "$G2_MODE" "$PWD" "$G2_WORKSPACE/control" "$G2_WORK" "$G2_RESULTS"
+      - name: Preserve allowlisted receipts and partial compile artifacts
+        if: ${{ always() && steps.route.outputs.results_path != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: t020-g2-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.mode }}
+          path: |
+            ${{ steps.route.outputs.results_path }}/provenance.json
+            ${{ steps.route.outputs.results_path }}/eligibility.json
+            ${{ steps.route.outputs.results_path }}/status.json
+            ${{ steps.route.outputs.results_path }}/postcompile-facts.json
+            ${{ steps.route.outputs.results_path }}/vendor-overlays.json
+            ${{ steps.route.outputs.results_path }}/output-files.json
+            ${{ steps.route.outputs.results_path }}/metadata-failure.json
+            ${{ steps.route.outputs.results_path }}/provisioning.json
+            ${{ steps.route.outputs.results_path }}/toolchain-files.json
+            ${{ steps.route.outputs.results_path }}/accepted-D-build.txt
+            ${{ steps.route.outputs.results_path }}/accepted-D-build.status.json
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/D/capture.json
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/D/g2-child
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/D/g2-child.readelf.txt
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/D/g2-child.readelf.status.json
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/D/g2-child.objdump.txt
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/D/g2-child.objdump.status.json
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/D/g2-supervise
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/D/g2-supervise.readelf.txt
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/D/g2-supervise.readelf.status.json
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/D/g2-supervise.objdump.txt
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/D/g2-supervise.objdump.status.json
+            ${{ steps.route.outputs.results_path }}/accepted-R-build.txt
+            ${{ steps.route.outputs.results_path }}/accepted-R-build.status.json
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/R/capture.json
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/R/g2-child
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/R/g2-child.readelf.txt
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/R/g2-child.readelf.status.json
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/R/g2-child.objdump.txt
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/R/g2-child.objdump.status.json
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/R/g2-supervise
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/R/g2-supervise.readelf.txt
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/R/g2-supervise.readelf.status.json
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/R/g2-supervise.objdump.txt
+            ${{ steps.route.outputs.results_path }}/artifacts/accepted/R/g2-supervise.objdump.status.json
+            ${{ steps.route.outputs.results_path }}/diagnostic-D-build.txt
+            ${{ steps.route.outputs.results_path }}/diagnostic-D-build.status.json
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/D/capture.json
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/D/g2-child
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/D/g2-child.readelf.txt
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/D/g2-child.readelf.status.json
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/D/g2-child.objdump.txt
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/D/g2-child.objdump.status.json
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/D/g2-supervise
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/D/g2-supervise.readelf.txt
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/D/g2-supervise.readelf.status.json
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/D/g2-supervise.objdump.txt
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/D/g2-supervise.objdump.status.json
+            ${{ steps.route.outputs.results_path }}/diagnostic-R-build.txt
+            ${{ steps.route.outputs.results_path }}/diagnostic-R-build.status.json
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/R/capture.json
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/R/g2-child
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/R/g2-child.readelf.txt
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/R/g2-child.readelf.status.json
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/R/g2-child.objdump.txt
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/R/g2-child.objdump.status.json
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/R/g2-supervise
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/R/g2-supervise.readelf.txt
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/R/g2-supervise.readelf.status.json
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/R/g2-supervise.objdump.txt
+            ${{ steps.route.outputs.results_path }}/artifacts/diagnostic/R/g2-supervise.objdump.status.json
+          if-no-files-found: warn
+          include-hidden-files: false
+          retention-days: 14

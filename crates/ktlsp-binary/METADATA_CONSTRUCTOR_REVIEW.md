@@ -42,3 +42,36 @@ Constructor blobs except this accurate review receipt. No helper edits; incoming
 PR193 extraction owns helper changes. Budget new/push/integers semantics unchanged.
 SAME3 actual combined-source compatibility and first original Linux CI reviews
 pending. No main chasing/local native execution. Merge remains HOLD.
+
+
+## Final stable source integration cut
+
+Initial combined head8f55abf/treebfebd8e received actual SAME3 compatibility PASS
+and first original unchanged Linux CI38521108139/job115710758907 attempt1,
+pull_request, on synthetic66fa621f/treebfebd8e. All three pinned commands passed:
+501=488ordinary+13compilefail,0failed,2knownignored plus22protocolcases. All9
+Constructor tests and8class-member tests passed. SAME3 independently reviewed
+completed raw log/metadata/tree and passed. Raw96165B SHA256
+086473fa56f4f172e22ad20bb0565dde10162d7b5b18752f54b016046d87df9f.
+No earlier b15 run existed; first no-escape log collection refused output, corrected
+download flag only, no CI rerun. This remains historical initial-cut evidence.
+
+Root assigned ONE final source cut a13ab6ba4100f7c26377a47ab5af0858b6491a48,
+tree1fa56ee9bc6c4c6a2e07441aa47fd95e257a99e0,sole2d561ab30812dcdabc56260a8b510979e1e70a61.
+The exact commit was initially absent locally; fetched only that SHA, then merged
+once. Automatic export merge preserved constructor and every incoming export.
+All15 Constructor blobs matched initial8f55 before this receipt update; all
+incoming blobs matched assigneda13 except additive mod.rs. No helper/parser/
+vendor/Cargo/workflow/root-doc edit; incoming B3/C13/193 changes stay unchanged.
+
+PR208 procedural incident retained: its fresh guard timed out but a fail-open
+newline sequence continued the merge. Root independently proved the actual
+expected artifact/tree/base and original exact-main526/0+22; artifact delivery
+was accepted after proof, not as an excuse for the incident. All main merge grants
+are suspended pending process correction. This stage admits only source/push/CI.
+Future merge guard must be a SEPARATE read-only call with no mutation; inspect
+exit_code0 and parsed expected main/head/base, OPEN+CLEAN+MERGEABLE, original
+checks/scope/config. ANY timeout/nonzero/malformed/mismatch stops and suspends the
+lease; only then may a separate ordinary expected-head merge call run. No lease
+or merge permission exists now. Final SAME3 compatibility/new original CI reviews
+pending; no local runtime or main chasing.

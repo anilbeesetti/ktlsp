@@ -1,0 +1,1033 @@
+{
+  "stage": "frozen independent expectations; Rust/runtime UNEXECUTED",
+  "symbolic_size": "S=size_of::<property_types::SelectedType>() on actual target",
+  "cases": [
+    {
+      "id": "minimal",
+      "origin": "authored",
+      "raw_hex": "10 00",
+      "sha256": "707bf0b938f307b5c222e670598b865d5e1f8a8003df82c7abbf7c9f8fa4d720",
+      "parent": {
+        "name": 0,
+        "flags": null,
+        "old_flags": null,
+        "getter_flags": null,
+        "setter_flags": null
+      },
+      "types": [],
+      "parent_field_boundaries": [
+        2
+      ],
+      "parent_fields": 1,
+      "child_lengths": [],
+      "child_fields": [],
+      "exact": {
+        "bytes": 2,
+        "records": 2,
+        "nodes": 1,
+        "depth": 1,
+        "owned_S": 0,
+        "work_constant": 9,
+        "work_S": 0
+      },
+      "one_less_offsets": {
+        "bytes": 0,
+        "records": 0,
+        "nodes": 0,
+        "depth": 0,
+        "owned_bytes": null,
+        "work": 0
+      }
+    },
+    {
+      "id": "empty",
+      "origin": "authored",
+      "raw_hex": "10 00 1a 00",
+      "sha256": "c1d52d61382c6d6f449b40d05e2e4049f88125af053de3e22ffacf83cc62fb79",
+      "parent": {
+        "name": 0,
+        "flags": null,
+        "old_flags": null,
+        "getter_flags": null,
+        "setter_flags": null
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            4,
+            4
+          ],
+          "header": {
+            "flags": null,
+            "nullable": null,
+            "flexible_type_capabilities_id": null,
+            "class_name": null,
+            "type_parameter": null,
+            "flexible_upper_bound_id": null,
+            "type_parameter_name": null,
+            "outer_type_id": null,
+            "type_alias_name": null,
+            "abbreviated_type_id": null
+          },
+          "raw_hex": ""
+        }
+      ],
+      "parent_field_boundaries": [
+        2,
+        4
+      ],
+      "parent_fields": 2,
+      "child_lengths": [
+        0
+      ],
+      "child_fields": [
+        0
+      ],
+      "exact": {
+        "bytes": 4,
+        "records": 4,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 18,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "bytes": 0,
+        "records": 2,
+        "nodes": 4,
+        "depth": 4,
+        "owned_bytes": 2,
+        "work": 2
+      }
+    },
+    {
+      "id": "receiver",
+      "origin": "authored",
+      "raw_hex": "10 00 2a 02 30 00",
+      "sha256": "d6b7a5258f6d109a2dc1ae675b52c77eddae59895560056840d365b13e36bc67",
+      "parent": {
+        "name": 0,
+        "flags": null,
+        "old_flags": null,
+        "getter_flags": null,
+        "setter_flags": null
+      },
+      "types": [
+        {
+          "field_number": 5,
+          "span": [
+            4,
+            6
+          ],
+          "header": {
+            "flags": null,
+            "nullable": null,
+            "flexible_type_capabilities_id": null,
+            "class_name": 0,
+            "type_parameter": null,
+            "flexible_upper_bound_id": null,
+            "type_parameter_name": null,
+            "outer_type_id": null,
+            "type_alias_name": null,
+            "abbreviated_type_id": null
+          },
+          "raw_hex": "30 00"
+        }
+      ],
+      "parent_field_boundaries": [
+        2,
+        6
+      ],
+      "parent_fields": 2,
+      "child_lengths": [
+        2
+      ],
+      "child_fields": [
+        1
+      ],
+      "exact": {
+        "bytes": 6,
+        "records": 5,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 26,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "bytes": 0,
+        "records": 4,
+        "nodes": 4,
+        "depth": 4,
+        "owned_bytes": 2,
+        "work": 2
+      }
+    },
+    {
+      "id": "interleaved",
+      "origin": "authored",
+      "raw_hex": "10 00 1a 02 30 01 2a 00 1a 02 18 01 2a 02 38 02",
+      "sha256": "94291ddc5b33910314e966a992079080dadaf6337064161fa676978a6db4501e",
+      "parent": {
+        "name": 0,
+        "flags": null,
+        "old_flags": null,
+        "getter_flags": null,
+        "setter_flags": null
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            4,
+            6
+          ],
+          "header": {
+            "flags": null,
+            "nullable": null,
+            "flexible_type_capabilities_id": null,
+            "class_name": 1,
+            "type_parameter": null,
+            "flexible_upper_bound_id": null,
+            "type_parameter_name": null,
+            "outer_type_id": null,
+            "type_alias_name": null,
+            "abbreviated_type_id": null
+          },
+          "raw_hex": "30 01"
+        },
+        {
+          "field_number": 5,
+          "span": [
+            8,
+            8
+          ],
+          "header": {
+            "flags": null,
+            "nullable": null,
+            "flexible_type_capabilities_id": null,
+            "class_name": null,
+            "type_parameter": null,
+            "flexible_upper_bound_id": null,
+            "type_parameter_name": null,
+            "outer_type_id": null,
+            "type_alias_name": null,
+            "abbreviated_type_id": null
+          },
+          "raw_hex": ""
+        },
+        {
+          "field_number": 3,
+          "span": [
+            10,
+            12
+          ],
+          "header": {
+            "flags": null,
+            "nullable": true,
+            "flexible_type_capabilities_id": null,
+            "class_name": null,
+            "type_parameter": null,
+            "flexible_upper_bound_id": null,
+            "type_parameter_name": null,
+            "outer_type_id": null,
+            "type_alias_name": null,
+            "abbreviated_type_id": null
+          },
+          "raw_hex": "18 01"
+        },
+        {
+          "field_number": 5,
+          "span": [
+            14,
+            16
+          ],
+          "header": {
+            "flags": null,
+            "nullable": null,
+            "flexible_type_capabilities_id": null,
+            "class_name": null,
+            "type_parameter": 2,
+            "flexible_upper_bound_id": null,
+            "type_parameter_name": null,
+            "outer_type_id": null,
+            "type_alias_name": null,
+            "abbreviated_type_id": null
+          },
+          "raw_hex": "38 02"
+        }
+      ],
+      "parent_field_boundaries": [
+        2,
+        6,
+        8,
+        12,
+        16
+      ],
+      "parent_fields": 5,
+      "child_lengths": [
+        2,
+        0,
+        2,
+        2
+      ],
+      "child_fields": [
+        1,
+        0,
+        1,
+        1
+      ],
+      "exact": {
+        "bytes": 16,
+        "records": 13,
+        "nodes": 5,
+        "depth": 2,
+        "owned_S": 4,
+        "work_constant": 69,
+        "work_S": 4
+      },
+      "one_less_offsets": {
+        "bytes": 0,
+        "records": 14,
+        "nodes": 14,
+        "depth": 4,
+        "owned_bytes": 8,
+        "work": 14
+      }
+    },
+    {
+      "id": "duplicates",
+      "origin": "authored",
+      "raw_hex": "10 00 1a 02 30 01 1a 02 30 02",
+      "sha256": "f8c273a9f36ff628078e55f3f32e21299b46094ba237953a95f31ca0479c2234",
+      "parent": {
+        "name": 0,
+        "flags": null,
+        "old_flags": null,
+        "getter_flags": null,
+        "setter_flags": null
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            4,
+            6
+          ],
+          "header": {
+            "flags": null,
+            "nullable": null,
+            "flexible_type_capabilities_id": null,
+            "class_name": 1,
+            "type_parameter": null,
+            "flexible_upper_bound_id": null,
+            "type_parameter_name": null,
+            "outer_type_id": null,
+            "type_alias_name": null,
+            "abbreviated_type_id": null
+          },
+          "raw_hex": "30 01"
+        },
+        {
+          "field_number": 3,
+          "span": [
+            8,
+            10
+          ],
+          "header": {
+            "flags": null,
+            "nullable": null,
+            "flexible_type_capabilities_id": null,
+            "class_name": 2,
+            "type_parameter": null,
+            "flexible_upper_bound_id": null,
+            "type_parameter_name": null,
+            "outer_type_id": null,
+            "type_alias_name": null,
+            "abbreviated_type_id": null
+          },
+          "raw_hex": "30 02"
+        }
+      ],
+      "parent_field_boundaries": [
+        2,
+        6,
+        10
+      ],
+      "parent_fields": 3,
+      "child_lengths": [
+        2,
+        2
+      ],
+      "child_fields": [
+        1,
+        1
+      ],
+      "exact": {
+        "bytes": 10,
+        "records": 8,
+        "nodes": 3,
+        "depth": 2,
+        "owned_S": 2,
+        "work_constant": 43,
+        "work_S": 2
+      },
+      "one_less_offsets": {
+        "bytes": 0,
+        "records": 8,
+        "nodes": 8,
+        "depth": 4,
+        "owned_bytes": 6,
+        "work": 6
+      }
+    },
+    {
+      "id": "scalars",
+      "origin": "authored",
+      "raw_hex": "08 00 10 00 38 00 40 00 58 00 08 01 10 02 38 04 40 05 58 03 1a 14 08 01 18 02 20 03 30 04 38 05 40 06 48 07 58 08 60 09 70 0a",
+      "sha256": "6fdda3de6051c91f77319ffe16aefb96e57e4e9220ff3e5885fa13a5d3c2df3f",
+      "parent": {
+        "name": 2,
+        "flags": 3,
+        "old_flags": 1,
+        "getter_flags": 4,
+        "setter_flags": 5
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            22,
+            42
+          ],
+          "header": {
+            "flags": 1,
+            "nullable": true,
+            "flexible_type_capabilities_id": 3,
+            "class_name": 4,
+            "type_parameter": 5,
+            "flexible_upper_bound_id": 6,
+            "type_parameter_name": 7,
+            "outer_type_id": 8,
+            "type_alias_name": 9,
+            "abbreviated_type_id": 10
+          },
+          "raw_hex": "08 01 18 02 20 03 30 04 38 05 40 06 48 07 58 08 60 09 70 0a"
+        }
+      ],
+      "parent_field_boundaries": [
+        2,
+        4,
+        6,
+        8,
+        10,
+        12,
+        14,
+        16,
+        18,
+        20,
+        42
+      ],
+      "parent_fields": 11,
+      "child_lengths": [
+        20
+      ],
+      "child_fields": [
+        10
+      ],
+      "exact": {
+        "bytes": 42,
+        "records": 32,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 170,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "bytes": 0,
+        "records": 40,
+        "nodes": 22,
+        "depth": 22,
+        "owned_bytes": 20,
+        "work": 20
+      }
+    },
+    {
+      "id": "wrong_wire",
+      "origin": "authored",
+      "raw_hex": "10 00 18 01 28 00 1a 00 2d 00 00 00 00 29 00 00 00 00 00 00 00 00 1d 00 00 00 00 19 00 00 00 00 00 00 00 00",
+      "sha256": "214e0c6da3ade98d5996304eff5c41fa146e8042c64be1582940a0850e30eaa2",
+      "parent": {
+        "name": 0,
+        "flags": null,
+        "old_flags": null,
+        "getter_flags": null,
+        "setter_flags": null
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            8,
+            8
+          ],
+          "header": {
+            "flags": null,
+            "nullable": null,
+            "flexible_type_capabilities_id": null,
+            "class_name": null,
+            "type_parameter": null,
+            "flexible_upper_bound_id": null,
+            "type_parameter_name": null,
+            "outer_type_id": null,
+            "type_alias_name": null,
+            "abbreviated_type_id": null
+          },
+          "raw_hex": ""
+        }
+      ],
+      "parent_field_boundaries": [
+        2,
+        4,
+        6,
+        8,
+        13,
+        22,
+        27,
+        36
+      ],
+      "parent_fields": 8,
+      "child_lengths": [
+        0
+      ],
+      "child_fields": [
+        0
+      ],
+      "exact": {
+        "bytes": 36,
+        "records": 16,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 106,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "bytes": 0,
+        "records": 27,
+        "nodes": 8,
+        "depth": 8,
+        "owned_bytes": 6,
+        "work": 27
+      }
+    },
+    {
+      "id": "opaque",
+      "origin": "authored",
+      "raw_hex": "10 00 1a 0c 12 01 00 2a 01 80 52 01 00 6a 01 0b 32 01 00",
+      "sha256": "13126b519aae0328f0ec381547e9519d2ac8e9acd8c1fa87af1ad7fe61d147f2",
+      "parent": {
+        "name": 0,
+        "flags": null,
+        "old_flags": null,
+        "getter_flags": null,
+        "setter_flags": null
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            4,
+            16
+          ],
+          "header": {
+            "flags": null,
+            "nullable": null,
+            "flexible_type_capabilities_id": null,
+            "class_name": null,
+            "type_parameter": null,
+            "flexible_upper_bound_id": null,
+            "type_parameter_name": null,
+            "outer_type_id": null,
+            "type_alias_name": null,
+            "abbreviated_type_id": null
+          },
+          "raw_hex": "12 01 00 2a 01 80 52 01 00 6a 01 0b"
+        }
+      ],
+      "parent_field_boundaries": [
+        2,
+        16,
+        19
+      ],
+      "parent_fields": 3,
+      "child_lengths": [
+        12
+      ],
+      "child_fields": [
+        4
+      ],
+      "exact": {
+        "bytes": 19,
+        "records": 10,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 72,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "bytes": 0,
+        "records": 16,
+        "nodes": 4,
+        "depth": 4,
+        "owned_bytes": 2,
+        "work": 16
+      }
+    },
+    {
+      "id": "ids",
+      "origin": "authored",
+      "raw_hex": "10 00 48 00 50 01 1a 02 30 00 2a 02 38 01",
+      "sha256": "593b3a8ea0f2c434ca72801b0d775a50d29c28f1e4f32aee610da0665c9c1159",
+      "parent": {
+        "name": 0,
+        "flags": null,
+        "old_flags": null,
+        "getter_flags": null,
+        "setter_flags": null
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            8,
+            10
+          ],
+          "header": {
+            "flags": null,
+            "nullable": null,
+            "flexible_type_capabilities_id": null,
+            "class_name": 0,
+            "type_parameter": null,
+            "flexible_upper_bound_id": null,
+            "type_parameter_name": null,
+            "outer_type_id": null,
+            "type_alias_name": null,
+            "abbreviated_type_id": null
+          },
+          "raw_hex": "30 00"
+        },
+        {
+          "field_number": 5,
+          "span": [
+            12,
+            14
+          ],
+          "header": {
+            "flags": null,
+            "nullable": null,
+            "flexible_type_capabilities_id": null,
+            "class_name": null,
+            "type_parameter": 1,
+            "flexible_upper_bound_id": null,
+            "type_parameter_name": null,
+            "outer_type_id": null,
+            "type_alias_name": null,
+            "abbreviated_type_id": null
+          },
+          "raw_hex": "38 01"
+        }
+      ],
+      "parent_field_boundaries": [
+        2,
+        4,
+        6,
+        10,
+        14
+      ],
+      "parent_fields": 5,
+      "child_lengths": [
+        2,
+        2
+      ],
+      "child_fields": [
+        1,
+        1
+      ],
+      "exact": {
+        "bytes": 14,
+        "records": 12,
+        "nodes": 3,
+        "depth": 2,
+        "owned_S": 2,
+        "work_constant": 59,
+        "work_S": 2
+      },
+      "one_less_offsets": {
+        "bytes": 0,
+        "records": 12,
+        "nodes": 12,
+        "depth": 8,
+        "owned_bytes": 10,
+        "work": 10
+      }
+    },
+    {
+      "id": "nonminimal",
+      "origin": "authored",
+      "raw_hex": "10 00 9a 80 80 80 10 80 80 80 80 10",
+      "sha256": "695197455a4e2ddb99287290fb3ba332acb6b2584548731ae2ad063b773ba725",
+      "parent": {
+        "name": 0,
+        "flags": null,
+        "old_flags": null,
+        "getter_flags": null,
+        "setter_flags": null
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            12,
+            12
+          ],
+          "header": {
+            "flags": null,
+            "nullable": null,
+            "flexible_type_capabilities_id": null,
+            "class_name": null,
+            "type_parameter": null,
+            "flexible_upper_bound_id": null,
+            "type_parameter_name": null,
+            "outer_type_id": null,
+            "type_alias_name": null,
+            "abbreviated_type_id": null
+          },
+          "raw_hex": ""
+        }
+      ],
+      "parent_field_boundaries": [
+        2,
+        12
+      ],
+      "parent_fields": 2,
+      "child_lengths": [
+        0
+      ],
+      "child_fields": [
+        0
+      ],
+      "exact": {
+        "bytes": 12,
+        "records": 4,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 34,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "bytes": 0,
+        "records": 2,
+        "nodes": 12,
+        "depth": 12,
+        "owned_bytes": 2,
+        "work": 2
+      }
+    },
+    {
+      "id": "raw64_signed",
+      "origin": "authored",
+      "raw_hex": "10 00 1a 13 08 ff ff ff ff 0f 18 80 80 80 80 10 30 01 30 02 32 01 00",
+      "sha256": "d6ac09cd7ceef6a237a3ca715a8797ab0e00f0a66f0d237d7ee2a01acd18b888",
+      "parent": {
+        "name": 0,
+        "flags": null,
+        "old_flags": null,
+        "getter_flags": null,
+        "setter_flags": null
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            4,
+            23
+          ],
+          "header": {
+            "flags": -1,
+            "nullable": true,
+            "flexible_type_capabilities_id": null,
+            "class_name": 2,
+            "type_parameter": null,
+            "flexible_upper_bound_id": null,
+            "type_parameter_name": null,
+            "outer_type_id": null,
+            "type_alias_name": null,
+            "abbreviated_type_id": null
+          },
+          "raw_hex": "08 ff ff ff ff 0f 18 80 80 80 80 10 30 01 30 02 32 01 00"
+        }
+      ],
+      "parent_field_boundaries": [
+        2,
+        23
+      ],
+      "parent_fields": 2,
+      "child_lengths": [
+        19
+      ],
+      "child_fields": [
+        5
+      ],
+      "exact": {
+        "bytes": 23,
+        "records": 9,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 85,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "bytes": 0,
+        "records": 20,
+        "nodes": 4,
+        "depth": 4,
+        "owned_bytes": 2,
+        "work": 2
+      }
+    },
+    {
+      "id": "pair_first",
+      "origin": "genuine-held-Pair",
+      "raw_hex": "10 05 1a 02 38 00 58 86 84 08 a2 06 0a 0a 02 10 0b 1a 04 08 09 10 0a",
+      "sha256": "d203f54609553942586a0f89eb6d21722c467429dd427089d95b9b566efb0ae8",
+      "parent": {
+        "name": 5,
+        "flags": 131590,
+        "old_flags": null,
+        "getter_flags": null,
+        "setter_flags": null
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            4,
+            6
+          ],
+          "header": {
+            "flags": null,
+            "nullable": null,
+            "flexible_type_capabilities_id": null,
+            "class_name": null,
+            "type_parameter": 0,
+            "flexible_upper_bound_id": null,
+            "type_parameter_name": null,
+            "outer_type_id": null,
+            "type_alias_name": null,
+            "abbreviated_type_id": null
+          },
+          "raw_hex": "38 00"
+        }
+      ],
+      "parent_field_boundaries": [
+        2,
+        6,
+        10,
+        23
+      ],
+      "parent_fields": 4,
+      "child_lengths": [
+        2
+      ],
+      "child_fields": [
+        1
+      ],
+      "exact": {
+        "bytes": 23,
+        "records": 9,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 68,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "bytes": 0,
+        "records": 10,
+        "nodes": 4,
+        "depth": 4,
+        "owned_bytes": 2,
+        "work": 10
+      }
+    },
+    {
+      "id": "pair_second",
+      "origin": "genuine-held-Pair",
+      "raw_hex": "10 06 1a 02 38 01 58 86 84 08 a2 06 0a 0a 02 10 0b 1a 04 08 0c 10 0a",
+      "sha256": "9bb6592c7a52970bc3810221e15f8d9d8d305479678db6032c9ed56dfe0faa6a",
+      "parent": {
+        "name": 6,
+        "flags": 131590,
+        "old_flags": null,
+        "getter_flags": null,
+        "setter_flags": null
+      },
+      "types": [
+        {
+          "field_number": 3,
+          "span": [
+            4,
+            6
+          ],
+          "header": {
+            "flags": null,
+            "nullable": null,
+            "flexible_type_capabilities_id": null,
+            "class_name": null,
+            "type_parameter": 1,
+            "flexible_upper_bound_id": null,
+            "type_parameter_name": null,
+            "outer_type_id": null,
+            "type_alias_name": null,
+            "abbreviated_type_id": null
+          },
+          "raw_hex": "38 01"
+        }
+      ],
+      "parent_field_boundaries": [
+        2,
+        6,
+        10,
+        23
+      ],
+      "parent_fields": 4,
+      "child_lengths": [
+        2
+      ],
+      "child_fields": [
+        1
+      ],
+      "exact": {
+        "bytes": 23,
+        "records": 9,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 68,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "bytes": 0,
+        "records": 10,
+        "nodes": 4,
+        "depth": 4,
+        "owned_bytes": 2,
+        "work": 10
+      }
+    }
+  ],
+  "malformed": [
+    {
+      "raw_hex": "",
+      "error": "MissingName",
+      "offset": 0
+    },
+    {
+      "raw_hex": "1a 00",
+      "error": "MissingName",
+      "offset": 2
+    },
+    {
+      "raw_hex": "1a 01 00",
+      "error": "MissingName",
+      "offset": 3
+    },
+    {
+      "raw_hex": "12 00 1a 01 00",
+      "error": "MissingName",
+      "offset": 5
+    },
+    {
+      "raw_hex": "10 00 1a 01 00",
+      "error": "Wire(InvalidFieldNumber)",
+      "offset": 4
+    },
+    {
+      "raw_hex": "10 00 2a 01 00",
+      "error": "Wire(InvalidFieldNumber)",
+      "offset": 4
+    },
+    {
+      "raw_hex": "10 00 1a 01 80",
+      "error": "Wire(Truncated)",
+      "offset": 5
+    },
+    {
+      "raw_hex": "10 00 2a 01 30",
+      "error": "Wire(Truncated)",
+      "offset": 5
+    },
+    {
+      "raw_hex": "10 00 1a 01 0b",
+      "error": "Wire(UnsupportedGroup)",
+      "offset": 4
+    },
+    {
+      "raw_hex": "10 00 2a 01 0e",
+      "error": "Wire(InvalidWireType)",
+      "offset": 4
+    },
+    {
+      "raw_hex": "10 00 1a 01 00 00",
+      "error": "Wire(InvalidFieldNumber)",
+      "offset": 5
+    },
+    {
+      "raw_hex": "1a 01 00 00",
+      "error": "Wire(InvalidFieldNumber)",
+      "offset": 3
+    },
+    {
+      "raw_hex": "10 00 1a 02 00",
+      "error": "Wire(Truncated)",
+      "offset": 5
+    },
+    {
+      "raw_hex": "10 00 1a 00 2a 01 00",
+      "error": "Wire(InvalidFieldNumber)",
+      "offset": 6
+    },
+    {
+      "raw_hex": "10 00 1a 06 32 ff ff ff ff 0f",
+      "error": "Wire(NegativeLength)",
+      "offset": 5
+    },
+    {
+      "raw_hex": "10 00 1a 0a 80 80 80 80 80 80 80 80 80 80",
+      "error": "Wire(MalformedVarint)",
+      "offset": 13
+    },
+    {
+      "raw_hex": "10 00 00",
+      "error": "Wire(InvalidFieldNumber)",
+      "offset": 2
+    },
+    {
+      "raw_hex": "10 00 0b",
+      "error": "Wire(UnsupportedGroup)",
+      "offset": 2
+    },
+    {
+      "raw_hex": "10 00 0e",
+      "error": "Wire(InvalidWireType)",
+      "offset": 2
+    }
+  ]
+}

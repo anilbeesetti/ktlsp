@@ -2485,7 +2485,54 @@
  };
  use crate::builder::{PsiBuilder, SemanticWhitespaceAwarePsiBuilder};
  use crate::parsing::Parser;
-@@ -298,13 +298,21 @@
+@@ -176,28 +176,28 @@
+                                 && probe.expect(DOT)
+                                 && probe.expect(IDENTIFIER)
+                         } else if probe.consume_if(SAFE_ACCESS) {
+-                    probe.expect(IDENTIFIER)
+-                } else if probe.consume_if(QUEST) {
+-                    probe.expect(DOT) && probe.expect(IDENTIFIER)
+-                } else {
+-                    let mut plain = true;
+-                    let mut identifiers = 1;
+-                    while probe.consume_if(DOT) {
+-                        if !probe.expect(IDENTIFIER) {
+-                            plain = false;
+-                            break;
+-                        }
+-                        identifiers += 1;
+-                    }
+-                    plain
+-                        && (if identifiers == 2 && probe.consume_if(SAFE_ACCESS) {
+                             probe.expect(IDENTIFIER)
+-                        } else if identifiers == 2 && probe.consume_if(QUEST) {
++                        } else if probe.consume_if(QUEST) {
+                             probe.expect(DOT) && probe.expect(IDENTIFIER)
+                         } else {
+-                            true
++                            let mut plain = true;
++                            let mut identifiers = 1;
++                            while probe.consume_if(DOT) {
++                                if !probe.expect(IDENTIFIER) {
++                                    plain = false;
++                                    break;
++                                }
++                                identifiers += 1;
++                            }
++                            plain
++                                && (if identifiers == 2 && probe.consume_if(SAFE_ACCESS) {
++                                    probe.expect(IDENTIFIER)
++                                } else if identifiers == 2 && probe.consume_if(QUEST) {
++                                    probe.expect(DOT) && probe.expect(IDENTIFIER)
++                                } else {
++                                    true
++                                })
+                         })
+-                })
+                 }
+                 && probe.at(LPAR)
+         };
+@@ -309,13 +309,21 @@
          self.parse_annotations(AnnotationParsingMode::Default);
  
          let reference = self.mark();

@@ -204,6 +204,50 @@ fn compatibility(tree: &Parsed, case: &Value) {
             "{id}"
         );
         assert_eq!(diagnostics(tree), json!([[11, 11, "Missing '>'"]]), "{id}");
+    } else if id == "decline-header-9" {
+        // The finite generic-receiver contract supersedes only this recorded exclusion.
+        assert_eq!(
+            source, "class Box<T\nfun List<String>.healthy() = 2",
+            "{id}"
+        );
+        assert_eq!(
+            projection(tree),
+            json!([
+                ["CLASS", 0, 11, "KT_FILE", null],
+                ["TYPE_PARAMETER_LIST", 9, 11, "CLASS", [0, 11]],
+                ["TYPE_PARAMETER", 10, 11, "TYPE_PARAMETER_LIST", [0, 11]],
+                ["FUN", 12, 42, "KT_FILE", null],
+                ["TYPE_REFERENCE", 16, 28, "FUN", [12, 42]],
+                ["USER_TYPE", 16, 28, "TYPE_REFERENCE", [12, 42]],
+                ["REFERENCE_EXPRESSION", 16, 20, "USER_TYPE", [12, 42]],
+                ["TYPE_ARGUMENT_LIST", 20, 28, "USER_TYPE", [12, 42]],
+                ["TYPE_PROJECTION", 21, 27, "TYPE_ARGUMENT_LIST", [12, 42]],
+                ["TYPE_REFERENCE", 21, 27, "TYPE_PROJECTION", [12, 42]],
+                ["USER_TYPE", 21, 27, "TYPE_REFERENCE", [12, 42]],
+                ["REFERENCE_EXPRESSION", 21, 27, "USER_TYPE", [12, 42]],
+                ["VALUE_PARAMETER_LIST", 36, 38, "FUN", [12, 42]]
+            ]),
+            "{id}"
+        );
+        assert_eq!(
+            names(tree),
+            json!([[0, 6, 9, "Box"], [12, 29, 36, "healthy"]]),
+            "{id}"
+        );
+        assert_eq!(diagnostics(tree), json!([[11, 11, "Missing '>'"]]), "{id}");
+        token(
+            tree,
+            &json!([16, 20, "List", "REFERENCE_EXPRESSION"]),
+            "IDENTIFIER",
+        );
+        token(
+            tree,
+            &json!([21, 27, "String", "REFERENCE_EXPRESSION"]),
+            "IDENTIFIER",
+        );
+        token(tree, &json!([20, 21, "<", "TYPE_ARGUMENT_LIST"]), "LT");
+        token(tree, &json!([27, 28, ">", "TYPE_ARGUMENT_LIST"]), "GT");
+        token(tree, &json!([28, 29, "DOT", "FUN"]), "DOT");
     } else if id.starts_with("decline-header-") {
         assert_eq!(class().start, 0, "{id}");
         assert!(class().end > 11, "{id}");

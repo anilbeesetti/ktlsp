@@ -780,3 +780,90 @@ T008/T008a HOLD, broaderC13/B3/B4 GAP, fullB11 UNVERIFIED, #7/#83 OPEN,
 performance claim. Native product/build/core/default tests remain Rust-only;
 no bundled JVM/JDK/compiler/JNI/C/C++ analyzer/tree-sitter C. Existing optional
 external build tools and isolated oracle stay at their separate boundary, unused here.
+
+
+## C13 three-or-more simple generic receiver — source-only candidate
+
+Assigned delivered base `66d2a99c752f901dbe7a46a7fc5254cdd8a90484`, tree
+`c3e117c44097f533ef4a5440411be1e5b25a27a4`, sole parent
+`9bf15b653219f105b99a239121098cef2fd932df`. The explicit nine-path source grant
+has SHA256 `5ce8d8b6df203d600fe9894e02843a1585126b4f8824c84c1cf702aa8b3e48da`.
+Before edits, all1002 incoming mode/type/blob/SHA identities were verified against
+assigned66d2, and all1002 disk hashes matched that assigned base after one exact
+fast-forward. Separately, actual253 ten-path inputs and all141 relevant parser/
+text/vendor/Cargo/toolchain/workflow inputs matched accepted provisional68a. Frozen preparation remains a distinct fe280/provisional
+cut: CONTRACT_READY SHA256
+`6904e1e788d1b5535d2206431b84824fef786ce1dcb2709864002b720ff16299`, reviewed
+candidate `f7eee3691a9ce3a1b440fd6a784c7fc264b6512e635e4bd3d2c8405c0a05ba24`.
+
+Only the existing private `at_generic_sibling_function` comma arm changes
+production behavior. After the second identifier, each further successful
+iteration consumes COMMA and a non-bare-suspend IDENTIFIER. Failure exits and
+refuses; a boolean marks third-or-later arguments, requiring GT and plain DOT
+for that family. Existing one-/two-argument DOT/SAFE_ACCESS/(QUEST DOT) behavior
+and direct name plus observable LPAR remain. No new production helper/module/API,
+live type grammar, caller, worker, semantic provider or capability changes.
+Nullable N>=3 suffixes and nullable/nested/qualified/annotated/variance/star/
+function/intersection/empty/trailing/missing arguments remain excluded. Bare
+suspend receiver/every argument and hard in stay declined; escaped names, soft
+out, dynamic and trivia keep their existing syntax rules.
+
+The new focused test embeds all165 frozen objects/48 full token-inclusive CST
+expectations/231567 original-byte UTF16 entries unchanged as JSON values and
+source bytes. Exact parents/subtrees/token partitions/names/diagnostics/ordered
+ERROR_ELEMENT ownership preserve duplicate zero-width EOF markers. Strict live
+refusal never substitutes Coverage/resource/timeout/cancellation for success.
+All positions/four independent stale identities/SAME Parser healthy followup/
+unchanged old trees are asserted. LF/CRLF/loneCR, source65536/65537 admission,
+raw/byte cuts, whole-token straddles, source-dependent largest lists, leading4401
+trivia and actual aggregate4082/4083/4084 prior-copy carriers remain frozen.
+
+Exactly one historical expectation gets additive ID plus exact-source selection:
+nonnullable twoarg131 case44 `extra-third-argument`, literal
+`class Box<T\nfun Triple<String,Int,Any>.healthy() = 2`. All original raw131
+objects and existing nullable-two eight-ID overlay bytes stay unchanged;
+nullable-two case51 and all malformed comma controls remain declined.
+Other historical tests/dispatch helpers/source literals remain untouched.
+
+The existing cloned window FIRST bounds repetition to256 raw tokens/4096
+normalized bytes/effective EOF; every successful iteration advances. Whole copied
+windows debit the shared4096 classifier allowance before grammar, including
+failed windows and trailing/internal trivia. All source64KiB/worker500ms/64MiB
+requested allocation/cancellation/snapshot/other limits remain unchanged.
+Static arithmetic and compile success do not establish hard total work, RSS,
+stack, cleanup bounds, crash safety or full active-layer B11.
+
+Owner verified accepted prior behavioral phase bytes against exact delivered
+recovery/formatting patches without rerunning an old replay, applied only the
+new contiguous comma arm, then generated current patches. One fresh authoritative
+original archive download, checksum
+`ec8d43d9549490689477385c7678bbd22ecbc445973ab364e8ecb69dd4882bcc`, and one
+fresh extraction replayed current recovery then formatting with zero fuzz/offsets.
+All54 final hashes matched; counts16behavior/50formatting/4pristine. Only
+`src/parsing/declarations/type_parameters.rs` changes among54 Rust files;
+67 tracked vendor paths remain equal in total:53 unchanged Rust source files
+and14 other paths, including notices/manifests/locks.
+Current phase hashes:
+- recovery.patch SHA256 `2436b50d6a879b1a80466f05af68e296143f1e13986621724cbb46d8969f9090`
+- formatting.patch SHA256 `50ebde4b22a76fc40cee49b795cf89981883c862577d6eee0f309c4d71a0dabc`
+- formatted-sha256.json SHA256 `54594b95342ee33292f0ea8f0cb78dab47dfebb8163e76120dee98e582e7ba2b`
+
+First pinned local `cargo +1.99.0 fmt --all -- --check` and compile-only
+`cargo +1.99.0 clippy --locked --workspace --all-targets -- -D warnings` passed.
+Clippy used an isolated temporary target directory and executed no test bodies.
+No local parser/tokenizer/worker/server/tests/bench/JVM/oracle runtime ran under
+#96. Independent adversarial pristine replay and retained SAME3 actual final
+source reviews are separate required receipts, not established by this note.
+No hosted CI, commit, push, issue or PR occurred in this source stage.
+
+SOURCE_READY requires coordinator acceptance before publication or hosted checks.
+Later original pinned hosted format/locked Clippy/full-workspace tests, reviewed
+head, exact base lease, fresh standalone read-only guard EXIT0/full PASS then
+separate ordinary expected-head merge and OWNER+ROOT exact-main delivery proof
+remain gated. No speculative main chase, bypass/admin/settings/force-main.
+
+C13/B3/B4 GAP, fullB11 UNVERIFIED, T008/T008a HOLD, #7/#83 OPEN and #96 Darwin
+UNKNOWN remain. No semantics/server providers/performance/full parity promotion.
+Native product/core/build/default tests remain Rust-only, with no bundled JVM/
+JDK/compiler/JNI/C/C++ analyzer/tree-sitter C. Optional existing external tools
+and isolated official oracle remain at their separate boundary, unused here.

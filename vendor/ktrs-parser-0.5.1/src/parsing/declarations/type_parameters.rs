@@ -175,10 +175,31 @@ impl Parser {
                                 && (if probe.consume_if(COMMA) {
                                     probe.my_builder.get_token_text() != Some("suspend")
                                         && probe.expect(IDENTIFIER)
-                                        && probe.expect(GT)
-                                        && (probe.consume_if(DOT)
-                                            || probe.consume_if(SAFE_ACCESS)
-                                            || (probe.consume_if(QUEST) && probe.expect(DOT)))
+                                        && {
+                                            let mut complete = true;
+                                            let mut longer = false;
+                                            // The finite scratch window bounds each advancing comma/identifier pair.
+                                            while probe.consume_if(COMMA) {
+                                                longer = true;
+                                                if probe.my_builder.get_token_text()
+                                                    == Some("suspend")
+                                                    || !probe.expect(IDENTIFIER)
+                                                {
+                                                    complete = false;
+                                                    break;
+                                                }
+                                            }
+                                            complete
+                                                && probe.expect(GT)
+                                                && (if longer {
+                                                    probe.consume_if(DOT)
+                                                } else {
+                                                    probe.consume_if(DOT)
+                                                        || probe.consume_if(SAFE_ACCESS)
+                                                        || (probe.consume_if(QUEST)
+                                                            && probe.expect(DOT))
+                                                })
+                                        }
                                 } else {
                                     probe.expect(GT)
                                         && (probe.consume_if(DOT)

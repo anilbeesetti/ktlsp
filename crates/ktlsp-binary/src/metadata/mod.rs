@@ -3,6 +3,7 @@
 
 pub mod class_header;
 pub mod class_member_names;
+pub mod class_supertypes;
 pub mod constructor;
 mod encoding;
 pub mod function_header;

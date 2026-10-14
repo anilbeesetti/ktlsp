@@ -1,0 +1,2679 @@
+{
+  "status": "preimplementation literal freeze; no runtime",
+  "budget_units": "B=sizeof219::SignatureBody,M=sizeofMemberSignatureBody; work=constant+B_capacity*B+M_capacity*M; owned=B_capacity*B+M_capacity*M",
+  "signature_notation": "null absent extension;{} present extension all slots absent; absent slot keysNone; pair[name,desc], null absent scalar",
+  "valid": [
+    {
+      "id": "V00",
+      "hex": "",
+      "bytes": 0,
+      "signature": null,
+      "outer_body_spans": [],
+      "members": [],
+      "records": 0,
+      "work_constant": 0,
+      "B_capacity": 0,
+      "M_capacity": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outer_field_spans": []
+    },
+    {
+      "id": "V01",
+      "hex": "a2 06 00",
+      "bytes": 3,
+      "signature": {},
+      "outer_body_spans": [
+        [
+          3,
+          3
+        ]
+      ],
+      "members": [],
+      "records": 1,
+      "work_constant": 5,
+      "B_capacity": 1,
+      "M_capacity": 0,
+      "raw_sha256": "aed4684df4e056e96885f127d50b4fbc9ccdb2b3fc3f5f1d31651779e9ed4c84",
+      "outer_field_spans": [
+        [
+          0,
+          3
+        ]
+      ]
+    },
+    {
+      "id": "V02",
+      "hex": "a2 06 02 0a 00",
+      "bytes": 5,
+      "signature": {
+        "field": [
+          null,
+          null
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          5
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Field",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            5
+          ],
+          "body_span": [
+            5,
+            5
+          ]
+        }
+      ],
+      "records": 2,
+      "work_constant": 11,
+      "B_capacity": 1,
+      "M_capacity": 1,
+      "raw_sha256": "6de77d7020c6ea1879f28b7d9e064c724b6595d30e77d083ea16e587d7702dc0",
+      "outer_field_spans": [
+        [
+          0,
+          5
+        ]
+      ]
+    },
+    {
+      "id": "V03",
+      "hex": "a2 06 1e 0a 04 08 01 10 02 12 04 08 03 10 04 1a 04 08 05 10 06 22 04 08 07 10 08 2a 04 08 09 10 0a",
+      "bytes": 33,
+      "signature": {
+        "field": [
+          1,
+          2
+        ],
+        "synthetic_method": [
+          3,
+          4
+        ],
+        "getter": [
+          5,
+          6
+        ],
+        "setter": [
+          7,
+          8
+        ],
+        "delegate_method": [
+          9,
+          10
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          33
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Field",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            9
+          ],
+          "body_span": [
+            5,
+            9
+          ]
+        },
+        {
+          "kind": "SyntheticMethod",
+          "outer_ordinal": 0,
+          "field_span": [
+            9,
+            15
+          ],
+          "body_span": [
+            11,
+            15
+          ]
+        },
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            15,
+            21
+          ],
+          "body_span": [
+            17,
+            21
+          ]
+        },
+        {
+          "kind": "Setter",
+          "outer_ordinal": 0,
+          "field_span": [
+            21,
+            27
+          ],
+          "body_span": [
+            23,
+            27
+          ]
+        },
+        {
+          "kind": "DelegateMethod",
+          "outer_ordinal": 0,
+          "field_span": [
+            27,
+            33
+          ],
+          "body_span": [
+            29,
+            33
+          ]
+        }
+      ],
+      "records": 16,
+      "work_constant": 115,
+      "B_capacity": 1,
+      "M_capacity": 8,
+      "raw_sha256": "bb1b3d1f48c64dad028ac744ce443ce3a971bb445698d7b420557a25876ffde9",
+      "outer_field_spans": [
+        [
+          0,
+          33
+        ]
+      ]
+    },
+    {
+      "id": "V04",
+      "hex": "a2 06 08 1a 02 08 07 1a 02 10 08",
+      "bytes": 11,
+      "signature": {
+        "getter": [
+          7,
+          8
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          11
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            7
+          ],
+          "body_span": [
+            5,
+            7
+          ]
+        },
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            7,
+            11
+          ],
+          "body_span": [
+            9,
+            11
+          ]
+        }
+      ],
+      "records": 5,
+      "work_constant": 33,
+      "B_capacity": 1,
+      "M_capacity": 2,
+      "raw_sha256": "303f10275338bebceb63a6a838349169cabecac344f5f9236d05920656bf0829",
+      "outer_field_spans": [
+        [
+          0,
+          11
+        ]
+      ]
+    },
+    {
+      "id": "V05",
+      "hex": "a2 06 04 1a 02 08 07 a2 06 04 1a 02 10 08 a2 06 02 1a 00 a2 06 00",
+      "bytes": 22,
+      "signature": {
+        "getter": [
+          7,
+          8
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          7
+        ],
+        [
+          10,
+          14
+        ],
+        [
+          17,
+          19
+        ],
+        [
+          22,
+          22
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            7
+          ],
+          "body_span": [
+            5,
+            7
+          ]
+        },
+        {
+          "kind": "Getter",
+          "outer_ordinal": 1,
+          "field_span": [
+            10,
+            14
+          ],
+          "body_span": [
+            12,
+            14
+          ]
+        },
+        {
+          "kind": "Getter",
+          "outer_ordinal": 2,
+          "field_span": [
+            17,
+            19
+          ],
+          "body_span": [
+            19,
+            19
+          ]
+        }
+      ],
+      "records": 9,
+      "work_constant": 54,
+      "B_capacity": 4,
+      "M_capacity": 4,
+      "raw_sha256": "9531daac5d288e4712805344ed95ee883d3fcf06069fb452f06bbf90e66d0116",
+      "outer_field_spans": [
+        [
+          0,
+          7
+        ],
+        [
+          7,
+          14
+        ],
+        [
+          14,
+          19
+        ],
+        [
+          19,
+          22
+        ]
+      ]
+    },
+    {
+      "id": "V06",
+      "hex": "a2 06 08 0a 02 08 01 0a 02 10 02",
+      "bytes": 11,
+      "signature": {
+        "field": [
+          1,
+          2
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          11
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Field",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            7
+          ],
+          "body_span": [
+            5,
+            7
+          ]
+        },
+        {
+          "kind": "Field",
+          "outer_ordinal": 0,
+          "field_span": [
+            7,
+            11
+          ],
+          "body_span": [
+            9,
+            11
+          ]
+        }
+      ],
+      "records": 5,
+      "work_constant": 33,
+      "B_capacity": 1,
+      "M_capacity": 2,
+      "raw_sha256": "0dba8e7b5f014038477a17cfdb4a8ab10df30618dbfb65cbdea498133002fd7c",
+      "outer_field_spans": [
+        [
+          0,
+          11
+        ]
+      ]
+    },
+    {
+      "id": "V07",
+      "hex": "a2 06 08 0a 06 08 01 08 02 10 03",
+      "bytes": 11,
+      "signature": {
+        "field": [
+          2,
+          3
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          11
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Field",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            11
+          ],
+          "body_span": [
+            5,
+            11
+          ]
+        }
+      ],
+      "records": 5,
+      "work_constant": 35,
+      "B_capacity": 1,
+      "M_capacity": 1,
+      "raw_sha256": "540d26956228fe82b4fb762b426de023acbbc67dce6f23e40c6b18e7ab11c69e",
+      "outer_field_spans": [
+        [
+          0,
+          11
+        ]
+      ]
+    },
+    {
+      "id": "V08",
+      "hex": "a2 06 08 1a 06 08 ff ff ff ff 0f",
+      "bytes": 11,
+      "signature": {
+        "getter": [
+          -1,
+          null
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          11
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            11
+          ],
+          "body_span": [
+            5,
+            11
+          ]
+        }
+      ],
+      "records": 3,
+      "work_constant": 31,
+      "B_capacity": 1,
+      "M_capacity": 1,
+      "raw_sha256": "dd089b70e4b40aa5cf56c3c42677030101251532da6ad20458df3975e6840e67",
+      "outer_field_spans": [
+        [
+          0,
+          11
+        ]
+      ]
+    },
+    {
+      "id": "V09",
+      "hex": "a2 06 08 0a 06 10 80 80 80 80 08",
+      "bytes": 11,
+      "signature": {
+        "field": [
+          null,
+          -2147483648
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          11
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Field",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            11
+          ],
+          "body_span": [
+            5,
+            11
+          ]
+        }
+      ],
+      "records": 3,
+      "work_constant": 31,
+      "B_capacity": 1,
+      "M_capacity": 1,
+      "raw_sha256": "24d04e53e23d5e10ebefb0bf2f8d0ca699a4bd08b77dea977470598bfcc7e198",
+      "outer_field_spans": [
+        [
+          0,
+          11
+        ]
+      ]
+    },
+    {
+      "id": "V10",
+      "hex": "a2 06 08 22 06 08 80 80 80 80 10",
+      "bytes": 11,
+      "signature": {
+        "setter": [
+          0,
+          null
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          11
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Setter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            11
+          ],
+          "body_span": [
+            5,
+            11
+          ]
+        }
+      ],
+      "records": 3,
+      "work_constant": 31,
+      "B_capacity": 1,
+      "M_capacity": 1,
+      "raw_sha256": "2135907ed3ef9399b95aa2862a17e17040faae1ebb3ce3b2d9a20e61ab5e1917",
+      "outer_field_spans": [
+        [
+          0,
+          11
+        ]
+      ]
+    },
+    {
+      "id": "V11",
+      "hex": "a2 06 0d 2a 0b 08 ff ff ff ff ff ff ff ff ff 01",
+      "bytes": 16,
+      "signature": {
+        "delegate_method": [
+          -1,
+          null
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          16
+        ]
+      ],
+      "members": [
+        {
+          "kind": "DelegateMethod",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            16
+          ],
+          "body_span": [
+            5,
+            16
+          ]
+        }
+      ],
+      "records": 3,
+      "work_constant": 46,
+      "B_capacity": 1,
+      "M_capacity": 1,
+      "raw_sha256": "b1abb4889e6f1a14957c3cddf13224997b186dcfc69f21a539fb8d66602956db",
+      "outer_field_spans": [
+        [
+          0,
+          16
+        ]
+      ]
+    },
+    {
+      "id": "V12",
+      "hex": "a2 86 00 85 00 1a 03 08 87 00",
+      "bytes": 10,
+      "signature": {
+        "getter": [
+          7,
+          null
+        ]
+      },
+      "outer_body_spans": [
+        [
+          5,
+          10
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            5,
+            10
+          ],
+          "body_span": [
+            7,
+            10
+          ]
+        }
+      ],
+      "records": 3,
+      "work_constant": 24,
+      "B_capacity": 1,
+      "M_capacity": 1,
+      "raw_sha256": "dab19db925c47b45cb00ecf007654d276e83acee09c1af6512ed8a0d959b065a",
+      "outer_field_spans": [
+        [
+          0,
+          10
+        ]
+      ]
+    },
+    {
+      "id": "V13",
+      "hex": "a2 06 09 9a 80 80 80 10 03 08 87 00",
+      "bytes": 12,
+      "signature": {
+        "getter": [
+          7,
+          null
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          12
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            12
+          ],
+          "body_span": [
+            9,
+            12
+          ]
+        }
+      ],
+      "records": 3,
+      "work_constant": 30,
+      "B_capacity": 1,
+      "M_capacity": 1,
+      "raw_sha256": "4104c6e8835fb54fc91903fec022cf3ed374d6d321a40845391a0d43d6b91970",
+      "outer_field_spans": [
+        [
+          0,
+          12
+        ]
+      ]
+    },
+    {
+      "id": "V14",
+      "hex": "a0 06 01",
+      "bytes": 3,
+      "signature": null,
+      "outer_body_spans": [],
+      "members": [],
+      "records": 1,
+      "work_constant": 5,
+      "B_capacity": 0,
+      "M_capacity": 0,
+      "raw_sha256": "de639dc3b932aaa4b6806ab3a208b4b49b67a403cef836fd4785e5e661ec9aac",
+      "outer_field_spans": []
+    },
+    {
+      "id": "V15",
+      "hex": "a2 06 02 08 07",
+      "bytes": 5,
+      "signature": {},
+      "outer_body_spans": [
+        [
+          3,
+          5
+        ]
+      ],
+      "members": [],
+      "records": 2,
+      "work_constant": 11,
+      "B_capacity": 1,
+      "M_capacity": 0,
+      "raw_sha256": "e8e00176f558c5a29235107e7908044c14214e861839d6e1c345e250882101a5",
+      "outer_field_spans": [
+        [
+          0,
+          5
+        ]
+      ]
+    },
+    {
+      "id": "V16",
+      "hex": "a2 06 05 1a 03 0a 01 00",
+      "bytes": 8,
+      "signature": {
+        "getter": [
+          null,
+          null
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          8
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            8
+          ],
+          "body_span": [
+            5,
+            8
+          ]
+        }
+      ],
+      "records": 3,
+      "work_constant": 22,
+      "B_capacity": 1,
+      "M_capacity": 1,
+      "raw_sha256": "db962e5209869d5b874df82c1afd27a2722c5cb36859c2c874a3a449de422474",
+      "outer_field_spans": [
+        [
+          0,
+          8
+        ]
+      ]
+    },
+    {
+      "id": "V17",
+      "hex": "a2 06 07 1a 05 0d 00 00 00 00",
+      "bytes": 10,
+      "signature": {
+        "getter": [
+          null,
+          null
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          10
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            10
+          ],
+          "body_span": [
+            5,
+            10
+          ]
+        }
+      ],
+      "records": 3,
+      "work_constant": 28,
+      "B_capacity": 1,
+      "M_capacity": 1,
+      "raw_sha256": "b873a9578e5406d4378567242e197a17b52f78888ad8b7dbf8831b953006e176",
+      "outer_field_spans": [
+        [
+          0,
+          10
+        ]
+      ]
+    },
+    {
+      "id": "V18",
+      "hex": "a2 06 08 1a 02 08 07 1a 02 0a 00",
+      "bytes": 11,
+      "signature": {
+        "getter": [
+          7,
+          null
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          11
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            7
+          ],
+          "body_span": [
+            5,
+            7
+          ]
+        },
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            7,
+            11
+          ],
+          "body_span": [
+            9,
+            11
+          ]
+        }
+      ],
+      "records": 5,
+      "work_constant": 33,
+      "B_capacity": 1,
+      "M_capacity": 2,
+      "raw_sha256": "779df30f2f73181278d48ebbd29003623338f8653d9ba1a0d767dd71433ef72e",
+      "outer_field_spans": [
+        [
+          0,
+          11
+        ]
+      ]
+    },
+    {
+      "id": "V19",
+      "hex": "a2 06 03 32 01 00",
+      "bytes": 6,
+      "signature": {},
+      "outer_body_spans": [
+        [
+          3,
+          6
+        ]
+      ],
+      "members": [],
+      "records": 2,
+      "work_constant": 13,
+      "B_capacity": 1,
+      "M_capacity": 0,
+      "raw_sha256": "12afac1808e217b9f9c219882c1c5e0ea0e82572eb94bb3e5b27be99726fd2a4",
+      "outer_field_spans": [
+        [
+          0,
+          6
+        ]
+      ]
+    },
+    {
+      "id": "V20",
+      "hex": "aa 06 01 00",
+      "bytes": 4,
+      "signature": null,
+      "outer_body_spans": [],
+      "members": [],
+      "records": 1,
+      "work_constant": 6,
+      "B_capacity": 0,
+      "M_capacity": 0,
+      "raw_sha256": "c3d853eb878adf9473ea68f218949bb06dc2820390b5910b923842cbee3a9667",
+      "outer_field_spans": []
+    },
+    {
+      "id": "V21",
+      "hex": "a2 06 04 1a 02 18 63",
+      "bytes": 7,
+      "signature": {
+        "getter": [
+          null,
+          null
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          7
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            7
+          ],
+          "body_span": [
+            5,
+            7
+          ]
+        }
+      ],
+      "records": 3,
+      "work_constant": 19,
+      "B_capacity": 1,
+      "M_capacity": 1,
+      "raw_sha256": "7296843d330774e222000e2cfa3430f5682fafa580a336c74360ac57b6ef5882",
+      "outer_field_spans": [
+        [
+          0,
+          7
+        ]
+      ]
+    },
+    {
+      "id": "V22",
+      "hex": "10 00 a2 06 00",
+      "bytes": 5,
+      "signature": {},
+      "outer_body_spans": [
+        [
+          5,
+          5
+        ]
+      ],
+      "members": [],
+      "records": 2,
+      "work_constant": 9,
+      "B_capacity": 1,
+      "M_capacity": 0,
+      "raw_sha256": "60df41ee91f7bf36879808f5d0f6754053a2b87298353bf620dd6c6b4cc81436",
+      "outer_field_spans": [
+        [
+          2,
+          5
+        ]
+      ]
+    },
+    {
+      "id": "V23",
+      "hex": "1a 01 00 a2 06 00",
+      "bytes": 6,
+      "signature": {},
+      "outer_body_spans": [
+        [
+          6,
+          6
+        ]
+      ],
+      "members": [],
+      "records": 2,
+      "work_constant": 10,
+      "B_capacity": 1,
+      "M_capacity": 0,
+      "raw_sha256": "fd11e32d91aff34c5f2d19d820eb4f7428934923285b66223f7f7a09be1efb2e",
+      "outer_field_spans": [
+        [
+          3,
+          6
+        ]
+      ]
+    },
+    {
+      "id": "V24",
+      "hex": "a2 06 04 1a 02 08 07 a0 06 01",
+      "bytes": 10,
+      "signature": {
+        "getter": [
+          7,
+          null
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          7
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            7
+          ],
+          "body_span": [
+            5,
+            7
+          ]
+        }
+      ],
+      "records": 4,
+      "work_constant": 24,
+      "B_capacity": 1,
+      "M_capacity": 1,
+      "raw_sha256": "057c1c39f50f76cf9f88b47a9ca858ba03db4d9e6d906b2448c6620f6b007dc6",
+      "outer_field_spans": [
+        [
+          0,
+          7
+        ]
+      ]
+    },
+    {
+      "id": "V25",
+      "hex": "a2 06 06 1a 04 08 00 10 00",
+      "bytes": 9,
+      "signature": {
+        "getter": [
+          0,
+          0
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          9
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            9
+          ],
+          "body_span": [
+            5,
+            9
+          ]
+        }
+      ],
+      "records": 4,
+      "work_constant": 27,
+      "B_capacity": 1,
+      "M_capacity": 1,
+      "raw_sha256": "6e450b71d68bf52c096ee82dc2a0c91cbaae22b1864c3ddd94ae56f44b915d1e",
+      "outer_field_spans": [
+        [
+          0,
+          9
+        ]
+      ]
+    },
+    {
+      "id": "V26",
+      "hex": "a2 06 0a 0a 00 12 00 1a 00 22 00 2a 00",
+      "bytes": 13,
+      "signature": {
+        "field": [
+          null,
+          null
+        ],
+        "synthetic_method": [
+          null,
+          null
+        ],
+        "getter": [
+          null,
+          null
+        ],
+        "setter": [
+          null,
+          null
+        ],
+        "delegate_method": [
+          null,
+          null
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          13
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Field",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            5
+          ],
+          "body_span": [
+            5,
+            5
+          ]
+        },
+        {
+          "kind": "SyntheticMethod",
+          "outer_ordinal": 0,
+          "field_span": [
+            5,
+            7
+          ],
+          "body_span": [
+            7,
+            7
+          ]
+        },
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            7,
+            9
+          ],
+          "body_span": [
+            9,
+            9
+          ]
+        },
+        {
+          "kind": "Setter",
+          "outer_ordinal": 0,
+          "field_span": [
+            9,
+            11
+          ],
+          "body_span": [
+            11,
+            11
+          ]
+        },
+        {
+          "kind": "DelegateMethod",
+          "outer_ordinal": 0,
+          "field_span": [
+            11,
+            13
+          ],
+          "body_span": [
+            13,
+            13
+          ]
+        }
+      ],
+      "records": 6,
+      "work_constant": 35,
+      "B_capacity": 1,
+      "M_capacity": 8,
+      "raw_sha256": "b827172adfb387e54f98e7b02b63bde7c37243053b492a8c671c0d433ea95408",
+      "outer_field_spans": [
+        [
+          0,
+          13
+        ]
+      ]
+    },
+    {
+      "id": "V27",
+      "hex": "a2 06 00 a2 06 00 a2 06 00",
+      "bytes": 9,
+      "signature": {},
+      "outer_body_spans": [
+        [
+          3,
+          3
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          9,
+          9
+        ]
+      ],
+      "members": [],
+      "records": 3,
+      "work_constant": 15,
+      "B_capacity": 4,
+      "M_capacity": 0,
+      "raw_sha256": "7db34f4008ae760fa396ea17a6a71a46200d741b8b0b85abd8099d6e4cc3212f",
+      "outer_field_spans": [
+        [
+          0,
+          3
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          6,
+          9
+        ]
+      ]
+    },
+    {
+      "id": "V28",
+      "hex": "a2 06 02 1a 00 a2 06 00 a2 06 02 0a 00",
+      "bytes": 13,
+      "signature": {
+        "getter": [
+          null,
+          null
+        ],
+        "field": [
+          null,
+          null
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          5
+        ],
+        [
+          8,
+          8
+        ],
+        [
+          11,
+          13
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            5
+          ],
+          "body_span": [
+            5,
+            5
+          ]
+        },
+        {
+          "kind": "Field",
+          "outer_ordinal": 2,
+          "field_span": [
+            11,
+            13
+          ],
+          "body_span": [
+            13,
+            13
+          ]
+        }
+      ],
+      "records": 5,
+      "work_constant": 27,
+      "B_capacity": 4,
+      "M_capacity": 2,
+      "raw_sha256": "10b83f8fe903c628eddf99db38c0eb7e04e7cfec81a312fdfdabc5e906f460c3",
+      "outer_field_spans": [
+        [
+          0,
+          5
+        ],
+        [
+          5,
+          8
+        ],
+        [
+          8,
+          13
+        ]
+      ]
+    },
+    {
+      "id": "V29",
+      "hex": "a2 06 84 80 80 80 10 1a 02 08 07",
+      "bytes": 11,
+      "signature": {
+        "getter": [
+          7,
+          null
+        ]
+      },
+      "outer_body_spans": [
+        [
+          7,
+          11
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            7,
+            11
+          ],
+          "body_span": [
+            9,
+            11
+          ]
+        }
+      ],
+      "records": 3,
+      "work_constant": 23,
+      "B_capacity": 1,
+      "M_capacity": 1,
+      "raw_sha256": "27a9fb8447bc4e3fc200c86e3b791da2a46cd7ee5ffe6fd571f7077b1a19d546",
+      "outer_field_spans": [
+        [
+          0,
+          11
+        ]
+      ]
+    },
+    {
+      "id": "V30",
+      "hex": "a2 86 80 80 10 04 1a 02 08 07",
+      "bytes": 10,
+      "signature": {
+        "getter": [
+          7,
+          null
+        ]
+      },
+      "outer_body_spans": [
+        [
+          6,
+          10
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            6,
+            10
+          ],
+          "body_span": [
+            8,
+            10
+          ]
+        }
+      ],
+      "records": 3,
+      "work_constant": 22,
+      "B_capacity": 1,
+      "M_capacity": 1,
+      "raw_sha256": "e2fa6b831ac52db96f4f1074994ff818dcb1349f857e6d432dbc216b9da8d8b6",
+      "outer_field_spans": [
+        [
+          0,
+          10
+        ]
+      ]
+    },
+    {
+      "id": "V31",
+      "hex": "a2 06 04 1a 02 08 07 a2 06 02 18 01",
+      "bytes": 12,
+      "signature": {
+        "getter": [
+          7,
+          null
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          7
+        ],
+        [
+          10,
+          12
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            7
+          ],
+          "body_span": [
+            5,
+            7
+          ]
+        }
+      ],
+      "records": 5,
+      "work_constant": 30,
+      "B_capacity": 2,
+      "M_capacity": 1,
+      "raw_sha256": "c8de553831cd90d617a1c934e55fe15116db57c19f612264ca9b752b55c65c74",
+      "outer_field_spans": [
+        [
+          0,
+          7
+        ],
+        [
+          7,
+          12
+        ]
+      ]
+    },
+    {
+      "id": "V32",
+      "hex": "a2 06 0a 1a 04 08 07 10 08 1a 02 12 00",
+      "bytes": 13,
+      "signature": {
+        "getter": [
+          7,
+          8
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          13
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            9
+          ],
+          "body_span": [
+            5,
+            9
+          ]
+        },
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            9,
+            13
+          ],
+          "body_span": [
+            11,
+            13
+          ]
+        }
+      ],
+      "records": 6,
+      "work_constant": 41,
+      "B_capacity": 1,
+      "M_capacity": 2,
+      "raw_sha256": "9ddc4bd75cbcd72762afe27fc70849ff6229b9da0142f5842dc0f3b1ff961cdf",
+      "outer_field_spans": [
+        [
+          0,
+          13
+        ]
+      ]
+    },
+    {
+      "id": "V33",
+      "hex": "a2 06 14 0a 02 08 01 12 02 08 03 1a 02 08 05 22 02 08 07 2a 02 08 09 a2 06 14 0a 02 10 02 12 02 10 04 1a 02 10 06 22 02 10 08 2a 02 10 0a",
+      "bytes": 46,
+      "signature": {
+        "field": [
+          1,
+          2
+        ],
+        "synthetic_method": [
+          3,
+          4
+        ],
+        "getter": [
+          5,
+          6
+        ],
+        "setter": [
+          7,
+          8
+        ],
+        "delegate_method": [
+          9,
+          10
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          23
+        ],
+        [
+          26,
+          46
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Field",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            7
+          ],
+          "body_span": [
+            5,
+            7
+          ]
+        },
+        {
+          "kind": "SyntheticMethod",
+          "outer_ordinal": 0,
+          "field_span": [
+            7,
+            11
+          ],
+          "body_span": [
+            9,
+            11
+          ]
+        },
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            11,
+            15
+          ],
+          "body_span": [
+            13,
+            15
+          ]
+        },
+        {
+          "kind": "Setter",
+          "outer_ordinal": 0,
+          "field_span": [
+            15,
+            19
+          ],
+          "body_span": [
+            17,
+            19
+          ]
+        },
+        {
+          "kind": "DelegateMethod",
+          "outer_ordinal": 0,
+          "field_span": [
+            19,
+            23
+          ],
+          "body_span": [
+            21,
+            23
+          ]
+        },
+        {
+          "kind": "Field",
+          "outer_ordinal": 1,
+          "field_span": [
+            26,
+            30
+          ],
+          "body_span": [
+            28,
+            30
+          ]
+        },
+        {
+          "kind": "SyntheticMethod",
+          "outer_ordinal": 1,
+          "field_span": [
+            30,
+            34
+          ],
+          "body_span": [
+            32,
+            34
+          ]
+        },
+        {
+          "kind": "Getter",
+          "outer_ordinal": 1,
+          "field_span": [
+            34,
+            38
+          ],
+          "body_span": [
+            36,
+            38
+          ]
+        },
+        {
+          "kind": "Setter",
+          "outer_ordinal": 1,
+          "field_span": [
+            38,
+            42
+          ],
+          "body_span": [
+            40,
+            42
+          ]
+        },
+        {
+          "kind": "DelegateMethod",
+          "outer_ordinal": 1,
+          "field_span": [
+            42,
+            46
+          ],
+          "body_span": [
+            44,
+            46
+          ]
+        }
+      ],
+      "records": 22,
+      "work_constant": 150,
+      "B_capacity": 2,
+      "M_capacity": 16,
+      "raw_sha256": "201cd6f946a57d6564359915a0f1293abfbad535ed184718505c8f56df776406",
+      "outer_field_spans": [
+        [
+          0,
+          23
+        ],
+        [
+          23,
+          46
+        ]
+      ]
+    },
+    {
+      "id": "V34",
+      "hex": "a2 06 06 1a 04 08 07 10 08 a2 06 04 1a 02 08 09 a2 06 04 1a 02 10 0a",
+      "bytes": 23,
+      "signature": {
+        "getter": [
+          9,
+          10
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          9
+        ],
+        [
+          12,
+          16
+        ],
+        [
+          19,
+          23
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            9
+          ],
+          "body_span": [
+            5,
+            9
+          ]
+        },
+        {
+          "kind": "Getter",
+          "outer_ordinal": 1,
+          "field_span": [
+            12,
+            16
+          ],
+          "body_span": [
+            14,
+            16
+          ]
+        },
+        {
+          "kind": "Getter",
+          "outer_ordinal": 2,
+          "field_span": [
+            19,
+            23
+          ],
+          "body_span": [
+            21,
+            23
+          ]
+        }
+      ],
+      "records": 10,
+      "work_constant": 65,
+      "B_capacity": 4,
+      "M_capacity": 4,
+      "raw_sha256": "319b1808d30c317c383066b05dbfaaf1bd59d5a6ef10fad6ad835e928db99c4d",
+      "outer_field_spans": [
+        [
+          0,
+          9
+        ],
+        [
+          9,
+          16
+        ],
+        [
+          16,
+          23
+        ]
+      ]
+    },
+    {
+      "id": "C_field",
+      "hex": "a2 06 04 0a 02 08 07 a2 06 04 0a 02 10 08 a2 06 02 0a 00",
+      "bytes": 19,
+      "signature": {
+        "field": [
+          7,
+          8
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          7
+        ],
+        [
+          10,
+          14
+        ],
+        [
+          17,
+          19
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Field",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            7
+          ],
+          "body_span": [
+            5,
+            7
+          ]
+        },
+        {
+          "kind": "Field",
+          "outer_ordinal": 1,
+          "field_span": [
+            10,
+            14
+          ],
+          "body_span": [
+            12,
+            14
+          ]
+        },
+        {
+          "kind": "Field",
+          "outer_ordinal": 2,
+          "field_span": [
+            17,
+            19
+          ],
+          "body_span": [
+            19,
+            19
+          ]
+        }
+      ],
+      "records": 8,
+      "work_constant": 49,
+      "B_capacity": 4,
+      "M_capacity": 4,
+      "raw_sha256": "eed6195a271b5f0d85066efd390776d9a26f7c6374e53f6ea35eb8101fb96f07",
+      "outer_field_spans": [
+        [
+          0,
+          7
+        ],
+        [
+          7,
+          14
+        ],
+        [
+          14,
+          19
+        ]
+      ]
+    },
+    {
+      "id": "D_field",
+      "hex": "a2 06 0a 0a 06 08 01 08 02 10 03 0a 00",
+      "bytes": 13,
+      "signature": {
+        "field": [
+          2,
+          3
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          13
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Field",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            11
+          ],
+          "body_span": [
+            5,
+            11
+          ]
+        },
+        {
+          "kind": "Field",
+          "outer_ordinal": 0,
+          "field_span": [
+            11,
+            13
+          ],
+          "body_span": [
+            13,
+            13
+          ]
+        }
+      ],
+      "records": 6,
+      "work_constant": 41,
+      "B_capacity": 1,
+      "M_capacity": 2,
+      "raw_sha256": "7e15c1bdbf4801a0f1d7f7561a588621042069aaf285c494a4fa561ff0e99eb2",
+      "outer_field_spans": [
+        [
+          0,
+          13
+        ]
+      ]
+    },
+    {
+      "id": "C_synthetic",
+      "hex": "a2 06 04 12 02 08 07 a2 06 04 12 02 10 08 a2 06 02 12 00",
+      "bytes": 19,
+      "signature": {
+        "synthetic_method": [
+          7,
+          8
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          7
+        ],
+        [
+          10,
+          14
+        ],
+        [
+          17,
+          19
+        ]
+      ],
+      "members": [
+        {
+          "kind": "SyntheticMethod",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            7
+          ],
+          "body_span": [
+            5,
+            7
+          ]
+        },
+        {
+          "kind": "SyntheticMethod",
+          "outer_ordinal": 1,
+          "field_span": [
+            10,
+            14
+          ],
+          "body_span": [
+            12,
+            14
+          ]
+        },
+        {
+          "kind": "SyntheticMethod",
+          "outer_ordinal": 2,
+          "field_span": [
+            17,
+            19
+          ],
+          "body_span": [
+            19,
+            19
+          ]
+        }
+      ],
+      "records": 8,
+      "work_constant": 49,
+      "B_capacity": 4,
+      "M_capacity": 4,
+      "raw_sha256": "1797d63a04f220ad6921bf81f11725c813aa227e960e7bbcd51c6811ab056796",
+      "outer_field_spans": [
+        [
+          0,
+          7
+        ],
+        [
+          7,
+          14
+        ],
+        [
+          14,
+          19
+        ]
+      ]
+    },
+    {
+      "id": "D_synthetic",
+      "hex": "a2 06 0a 12 06 08 01 08 02 10 03 12 00",
+      "bytes": 13,
+      "signature": {
+        "synthetic_method": [
+          2,
+          3
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          13
+        ]
+      ],
+      "members": [
+        {
+          "kind": "SyntheticMethod",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            11
+          ],
+          "body_span": [
+            5,
+            11
+          ]
+        },
+        {
+          "kind": "SyntheticMethod",
+          "outer_ordinal": 0,
+          "field_span": [
+            11,
+            13
+          ],
+          "body_span": [
+            13,
+            13
+          ]
+        }
+      ],
+      "records": 6,
+      "work_constant": 41,
+      "B_capacity": 1,
+      "M_capacity": 2,
+      "raw_sha256": "b1b4d039fd7418c5a3ea71688b3610fe7471e022c438138ab9d659d383947f9b",
+      "outer_field_spans": [
+        [
+          0,
+          13
+        ]
+      ]
+    },
+    {
+      "id": "C_getter",
+      "hex": "a2 06 04 1a 02 08 07 a2 06 04 1a 02 10 08 a2 06 02 1a 00",
+      "bytes": 19,
+      "signature": {
+        "getter": [
+          7,
+          8
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          7
+        ],
+        [
+          10,
+          14
+        ],
+        [
+          17,
+          19
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            7
+          ],
+          "body_span": [
+            5,
+            7
+          ]
+        },
+        {
+          "kind": "Getter",
+          "outer_ordinal": 1,
+          "field_span": [
+            10,
+            14
+          ],
+          "body_span": [
+            12,
+            14
+          ]
+        },
+        {
+          "kind": "Getter",
+          "outer_ordinal": 2,
+          "field_span": [
+            17,
+            19
+          ],
+          "body_span": [
+            19,
+            19
+          ]
+        }
+      ],
+      "records": 8,
+      "work_constant": 49,
+      "B_capacity": 4,
+      "M_capacity": 4,
+      "raw_sha256": "341dd920910bef2556f3d9ef5bc3d8ff79152538ebbef7c59c7138b3474246f9",
+      "outer_field_spans": [
+        [
+          0,
+          7
+        ],
+        [
+          7,
+          14
+        ],
+        [
+          14,
+          19
+        ]
+      ]
+    },
+    {
+      "id": "D_getter",
+      "hex": "a2 06 0a 1a 06 08 01 08 02 10 03 1a 00",
+      "bytes": 13,
+      "signature": {
+        "getter": [
+          2,
+          3
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          13
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            11
+          ],
+          "body_span": [
+            5,
+            11
+          ]
+        },
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            11,
+            13
+          ],
+          "body_span": [
+            13,
+            13
+          ]
+        }
+      ],
+      "records": 6,
+      "work_constant": 41,
+      "B_capacity": 1,
+      "M_capacity": 2,
+      "raw_sha256": "e1ce848e2bd2f5acd91e7d7745b7eeac302c25ef4b672355e48a1eca1e5d7416",
+      "outer_field_spans": [
+        [
+          0,
+          13
+        ]
+      ]
+    },
+    {
+      "id": "C_setter",
+      "hex": "a2 06 04 22 02 08 07 a2 06 04 22 02 10 08 a2 06 02 22 00",
+      "bytes": 19,
+      "signature": {
+        "setter": [
+          7,
+          8
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          7
+        ],
+        [
+          10,
+          14
+        ],
+        [
+          17,
+          19
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Setter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            7
+          ],
+          "body_span": [
+            5,
+            7
+          ]
+        },
+        {
+          "kind": "Setter",
+          "outer_ordinal": 1,
+          "field_span": [
+            10,
+            14
+          ],
+          "body_span": [
+            12,
+            14
+          ]
+        },
+        {
+          "kind": "Setter",
+          "outer_ordinal": 2,
+          "field_span": [
+            17,
+            19
+          ],
+          "body_span": [
+            19,
+            19
+          ]
+        }
+      ],
+      "records": 8,
+      "work_constant": 49,
+      "B_capacity": 4,
+      "M_capacity": 4,
+      "raw_sha256": "74e8fc84a279a78bfcac516e5c95f3daa461b9688dcb4022c48817f41cc27c77",
+      "outer_field_spans": [
+        [
+          0,
+          7
+        ],
+        [
+          7,
+          14
+        ],
+        [
+          14,
+          19
+        ]
+      ]
+    },
+    {
+      "id": "D_setter",
+      "hex": "a2 06 0a 22 06 08 01 08 02 10 03 22 00",
+      "bytes": 13,
+      "signature": {
+        "setter": [
+          2,
+          3
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          13
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Setter",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            11
+          ],
+          "body_span": [
+            5,
+            11
+          ]
+        },
+        {
+          "kind": "Setter",
+          "outer_ordinal": 0,
+          "field_span": [
+            11,
+            13
+          ],
+          "body_span": [
+            13,
+            13
+          ]
+        }
+      ],
+      "records": 6,
+      "work_constant": 41,
+      "B_capacity": 1,
+      "M_capacity": 2,
+      "raw_sha256": "76b501b8d6f0bb5d7f67d58f77d2db1d385d597be8e994e7996c63c6e2d69e47",
+      "outer_field_spans": [
+        [
+          0,
+          13
+        ]
+      ]
+    },
+    {
+      "id": "C_delegate",
+      "hex": "a2 06 04 2a 02 08 07 a2 06 04 2a 02 10 08 a2 06 02 2a 00",
+      "bytes": 19,
+      "signature": {
+        "delegate_method": [
+          7,
+          8
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          7
+        ],
+        [
+          10,
+          14
+        ],
+        [
+          17,
+          19
+        ]
+      ],
+      "members": [
+        {
+          "kind": "DelegateMethod",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            7
+          ],
+          "body_span": [
+            5,
+            7
+          ]
+        },
+        {
+          "kind": "DelegateMethod",
+          "outer_ordinal": 1,
+          "field_span": [
+            10,
+            14
+          ],
+          "body_span": [
+            12,
+            14
+          ]
+        },
+        {
+          "kind": "DelegateMethod",
+          "outer_ordinal": 2,
+          "field_span": [
+            17,
+            19
+          ],
+          "body_span": [
+            19,
+            19
+          ]
+        }
+      ],
+      "records": 8,
+      "work_constant": 49,
+      "B_capacity": 4,
+      "M_capacity": 4,
+      "raw_sha256": "99fc8dc5367ba46f37326b6213d030e9d9a745807ee573db81a94f99a76a4343",
+      "outer_field_spans": [
+        [
+          0,
+          7
+        ],
+        [
+          7,
+          14
+        ],
+        [
+          14,
+          19
+        ]
+      ]
+    },
+    {
+      "id": "D_delegate",
+      "hex": "a2 06 0a 2a 06 08 01 08 02 10 03 2a 00",
+      "bytes": 13,
+      "signature": {
+        "delegate_method": [
+          2,
+          3
+        ]
+      },
+      "outer_body_spans": [
+        [
+          3,
+          13
+        ]
+      ],
+      "members": [
+        {
+          "kind": "DelegateMethod",
+          "outer_ordinal": 0,
+          "field_span": [
+            3,
+            11
+          ],
+          "body_span": [
+            5,
+            11
+          ]
+        },
+        {
+          "kind": "DelegateMethod",
+          "outer_ordinal": 0,
+          "field_span": [
+            11,
+            13
+          ],
+          "body_span": [
+            13,
+            13
+          ]
+        }
+      ],
+      "records": 6,
+      "work_constant": 41,
+      "B_capacity": 1,
+      "M_capacity": 2,
+      "raw_sha256": "50a2cbf01d26ddad11b01a0143292785130ae5ae410f297281d7e948f67a3dfb",
+      "outer_field_spans": [
+        [
+          0,
+          13
+        ]
+      ]
+    },
+    {
+      "id": "P_first",
+      "hex": "10 05 1a 02 38 00 58 86 84 08 a2 06 0a 0a 02 10 0b 1a 04 08 09 10 0a",
+      "bytes": 23,
+      "signature": {
+        "field": [
+          null,
+          11
+        ],
+        "getter": [
+          9,
+          10
+        ]
+      },
+      "outer_body_spans": [
+        [
+          13,
+          23
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Field",
+          "outer_ordinal": 0,
+          "field_span": [
+            13,
+            17
+          ],
+          "body_span": [
+            15,
+            17
+          ]
+        },
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            17,
+            23
+          ],
+          "body_span": [
+            19,
+            23
+          ]
+        }
+      ],
+      "records": 9,
+      "work_constant": 57,
+      "B_capacity": 1,
+      "M_capacity": 2,
+      "raw_sha256": "d203f54609553942586a0f89eb6d21722c467429dd427089d95b9b566efb0ae8",
+      "outer_field_spans": [
+        [
+          10,
+          23
+        ]
+      ]
+    },
+    {
+      "id": "P_second",
+      "hex": "10 06 1a 02 38 01 58 86 84 08 a2 06 0a 0a 02 10 0b 1a 04 08 0c 10 0a",
+      "bytes": 23,
+      "signature": {
+        "field": [
+          null,
+          11
+        ],
+        "getter": [
+          12,
+          10
+        ]
+      },
+      "outer_body_spans": [
+        [
+          13,
+          23
+        ]
+      ],
+      "members": [
+        {
+          "kind": "Field",
+          "outer_ordinal": 0,
+          "field_span": [
+            13,
+            17
+          ],
+          "body_span": [
+            15,
+            17
+          ]
+        },
+        {
+          "kind": "Getter",
+          "outer_ordinal": 0,
+          "field_span": [
+            17,
+            23
+          ],
+          "body_span": [
+            19,
+            23
+          ]
+        }
+      ],
+      "records": 9,
+      "work_constant": 57,
+      "B_capacity": 1,
+      "M_capacity": 2,
+      "raw_sha256": "9bb6592c7a52970bc3810221e15f8d9d8d305479678db6032c9ed56dfe0faa6a",
+      "outer_field_spans": [
+        [
+          10,
+          23
+        ]
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "id": "M01",
+      "hex": "00",
+      "kind": "InvalidFieldNumber",
+      "offset": 0
+    },
+    {
+      "id": "M02",
+      "hex": "0e",
+      "kind": "InvalidWireType",
+      "offset": 0
+    },
+    {
+      "id": "M03",
+      "hex": "0b",
+      "kind": "UnsupportedGroup",
+      "offset": 0
+    },
+    {
+      "id": "M04",
+      "hex": "a2 06 01 00",
+      "kind": "InvalidFieldNumber",
+      "offset": 3
+    },
+    {
+      "id": "M05",
+      "hex": "a2 06 01 1a",
+      "kind": "Truncated",
+      "offset": 4
+    },
+    {
+      "id": "M06",
+      "hex": "a2 06 02 1a 80",
+      "kind": "Truncated",
+      "offset": 5
+    },
+    {
+      "id": "M07",
+      "hex": "a2 06 03 1a 01 00",
+      "kind": "InvalidFieldNumber",
+      "offset": 5
+    },
+    {
+      "id": "M08",
+      "hex": "a2 06 03 1a 01 08",
+      "kind": "Truncated",
+      "offset": 6
+    },
+    {
+      "id": "M09",
+      "hex": "a2 06 04 1a 02 08 80",
+      "kind": "Truncated",
+      "offset": 7
+    },
+    {
+      "id": "M10",
+      "hex": "a2 06 03 1a 01 0e",
+      "kind": "InvalidWireType",
+      "offset": 5
+    },
+    {
+      "id": "M11",
+      "hex": "a2 06 03 1a 01 0b",
+      "kind": "UnsupportedGroup",
+      "offset": 5
+    },
+    {
+      "id": "M12",
+      "hex": "a2 06 03 1a 03 08 10 00",
+      "kind": "Truncated",
+      "offset": 6
+    },
+    {
+      "id": "M13",
+      "hex": "a2 06 04 1a 02 0a 02 10 00",
+      "kind": "Truncated",
+      "offset": 7
+    },
+    {
+      "id": "M14",
+      "hex": "a2 06 00 00",
+      "kind": "InvalidFieldNumber",
+      "offset": 3
+    },
+    {
+      "id": "M15",
+      "hex": "a2 06 02 1a 00 a2 06 03 1a 01 08",
+      "kind": "Truncated",
+      "offset": 11
+    },
+    {
+      "id": "M16",
+      "hex": "a2 06 ff ff ff ff 0f",
+      "kind": "NegativeLength",
+      "offset": 2
+    },
+    {
+      "id": "M17",
+      "hex": "a2 06 06 1a ff ff ff ff 0f",
+      "kind": "NegativeLength",
+      "offset": 4
+    },
+    {
+      "id": "M18",
+      "hex": "a2 06 08 1a 06 0a ff ff ff ff 0f",
+      "kind": "NegativeLength",
+      "offset": 6
+    },
+    {
+      "id": "M19",
+      "hex": "a2 06 0d 1a 0b 08 80 80 80 80 80 80 80 80 80 80",
+      "kind": "MalformedVarint",
+      "offset": 15
+    },
+    {
+      "id": "M20",
+      "hex": "a2 06 0a 80 80 80 80 80 80 80 80 80 80",
+      "kind": "MalformedVarint",
+      "offset": 12
+    },
+    {
+      "id": "M21",
+      "hex": "a2 06 04 1a 02 08 07 a2 06 01 1a",
+      "kind": "Truncated",
+      "offset": 11
+    },
+    {
+      "id": "M22",
+      "hex": "a2 06 03 1a 01 0c",
+      "kind": "UnsupportedGroup",
+      "offset": 5
+    },
+    {
+      "id": "M23",
+      "hex": "a2 06 03 1a 01 0f",
+      "kind": "InvalidWireType",
+      "offset": 5
+    },
+    {
+      "id": "M24",
+      "hex": "a2 06 02 1a 00 08",
+      "kind": "Truncated",
+      "offset": 6
+    }
+  ]
+}

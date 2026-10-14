@@ -1,0 +1,1972 @@
+{
+  "status": "frozen pre-source; every product assertion UNEXECUTED",
+  "symbol": "S=size_of::<class_supertypes::SelectedSupertype>() on actual target",
+  "successes": [
+    {
+      "name": "minimal",
+      "origin": "synthetic authored",
+      "hex": "18 00",
+      "raw_sha256": "78a23af8da46b1b37e8767921a2d3f528fdc8eca37cea8aea775fd2b283d3776",
+      "L": 2,
+      "F": 1,
+      "K": 0,
+      "M": [],
+      "G": [],
+      "parent_header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "supertypes": [],
+      "minimum": {
+        "bytes": 2,
+        "records": 2,
+        "nodes": 1,
+        "depth": 1,
+        "owned_S": 0,
+        "work_constant": 9,
+        "work_S": 0
+      },
+      "one_less_offsets": {
+        "records": 0,
+        "nodes": 0,
+        "depth": 0,
+        "work": 0,
+        "owned_bytes": null
+      },
+      "successful_prefixes": [
+        2
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingFqName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "empty",
+      "origin": "synthetic authored",
+      "hex": "18 00 32 00",
+      "raw_sha256": "f2911b5c01e5ffa19856f5f110351762e939897ce2caafd083e0593f515fea51",
+      "L": 4,
+      "F": 2,
+      "K": 1,
+      "M": [
+        0
+      ],
+      "G": [
+        0
+      ],
+      "parent_header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "supertypes": [
+        {
+          "span": [
+            4,
+            4
+          ],
+          "raw_hex": "",
+          "header": {}
+        }
+      ],
+      "minimum": {
+        "bytes": 4,
+        "records": 4,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 18,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "records": 2,
+        "nodes": 4,
+        "depth": 4,
+        "work": 2,
+        "owned_bytes": 2
+      },
+      "successful_prefixes": [
+        2,
+        4
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingFqName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "unit_class",
+      "origin": "held genuine licensed Class slice",
+      "hex": "08 c6 02 18 00 32 02 30 01 42 07 08 42 a2 06 02 08 02 4a 0a 10 03 1a 02 30 04 48 96 80 04 a8 06 05",
+      "raw_sha256": "a2347e06c72121e1b208adf03357b53155e929f0ab4c3ac93a413897ec28c1b5",
+      "L": 33,
+      "F": 6,
+      "K": 1,
+      "M": [
+        2
+      ],
+      "G": [
+        1
+      ],
+      "parent_header": {
+        "flags": 326,
+        "fq_name": 0
+      },
+      "supertypes": [
+        {
+          "span": [
+            7,
+            9
+          ],
+          "raw_hex": "30 01",
+          "header": {
+            "class_name": 1
+          }
+        }
+      ],
+      "minimum": {
+        "bytes": 33,
+        "records": 13,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 96,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "records": 30,
+        "nodes": 7,
+        "depth": 7,
+        "work": 30,
+        "owned_bytes": 5
+      },
+      "successful_prefixes": [
+        5,
+        9,
+        18,
+        30,
+        33
+      ],
+      "missing_prefixes": [
+        0,
+        3
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingFqName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "Wire(Truncated)",
+          "offset": 2
+        },
+        {
+          "length": 3,
+          "result": "MissingFqName",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "Wire(Truncated)",
+          "offset": 4
+        },
+        {
+          "length": 5,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 6,
+          "result": "Wire(Truncated)",
+          "offset": 6
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "Wire(Truncated)",
+          "offset": 8
+        },
+        {
+          "length": 9,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 10,
+          "result": "Wire(Truncated)",
+          "offset": 10
+        },
+        {
+          "length": 11,
+          "result": "Wire(Truncated)",
+          "offset": 11
+        },
+        {
+          "length": 12,
+          "result": "Wire(Truncated)",
+          "offset": 12
+        },
+        {
+          "length": 13,
+          "result": "Wire(Truncated)",
+          "offset": 13
+        },
+        {
+          "length": 14,
+          "result": "Wire(Truncated)",
+          "offset": 14
+        },
+        {
+          "length": 15,
+          "result": "Wire(Truncated)",
+          "offset": 15
+        },
+        {
+          "length": 16,
+          "result": "Wire(Truncated)",
+          "offset": 16
+        },
+        {
+          "length": 17,
+          "result": "Wire(Truncated)",
+          "offset": 17
+        },
+        {
+          "length": 18,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 19,
+          "result": "Wire(Truncated)",
+          "offset": 19
+        },
+        {
+          "length": 20,
+          "result": "Wire(Truncated)",
+          "offset": 20
+        },
+        {
+          "length": 21,
+          "result": "Wire(Truncated)",
+          "offset": 21
+        },
+        {
+          "length": 22,
+          "result": "Wire(Truncated)",
+          "offset": 22
+        },
+        {
+          "length": 23,
+          "result": "Wire(Truncated)",
+          "offset": 23
+        },
+        {
+          "length": 24,
+          "result": "Wire(Truncated)",
+          "offset": 24
+        },
+        {
+          "length": 25,
+          "result": "Wire(Truncated)",
+          "offset": 25
+        },
+        {
+          "length": 26,
+          "result": "Wire(Truncated)",
+          "offset": 26
+        },
+        {
+          "length": 27,
+          "result": "Wire(Truncated)",
+          "offset": 27
+        },
+        {
+          "length": 28,
+          "result": "Wire(Truncated)",
+          "offset": 28
+        },
+        {
+          "length": 29,
+          "result": "Wire(Truncated)",
+          "offset": 29
+        },
+        {
+          "length": 30,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 31,
+          "result": "Wire(Truncated)",
+          "offset": 31
+        },
+        {
+          "length": 32,
+          "result": "Wire(Truncated)",
+          "offset": 32
+        },
+        {
+          "length": 33,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "duplicates",
+      "origin": "synthetic authored",
+      "hex": "18 00 32 02 30 01 32 00 32 04 30 02 30 03 08 07 18 02",
+      "raw_sha256": "3896a08fa8b239f5c735df64e213f7a499ca4f5fa7b4dc2607c5d6bd5ecc5e92",
+      "L": 18,
+      "F": 6,
+      "K": 3,
+      "M": [
+        2,
+        0,
+        4
+      ],
+      "G": [
+        1,
+        0,
+        2
+      ],
+      "parent_header": {
+        "flags": 7,
+        "fq_name": 2
+      },
+      "supertypes": [
+        {
+          "span": [
+            4,
+            6
+          ],
+          "raw_hex": "30 01",
+          "header": {
+            "class_name": 1
+          }
+        },
+        {
+          "span": [
+            8,
+            8
+          ],
+          "raw_hex": "",
+          "header": {}
+        },
+        {
+          "span": [
+            10,
+            14
+          ],
+          "raw_hex": "30 02 30 03",
+          "header": {
+            "class_name": 3
+          }
+        }
+      ],
+      "minimum": {
+        "bytes": 18,
+        "records": 15,
+        "nodes": 4,
+        "depth": 2,
+        "owned_S": 4,
+        "work_constant": 76,
+        "work_S": 4
+      },
+      "one_less_offsets": {
+        "records": 16,
+        "nodes": 10,
+        "depth": 4,
+        "work": 16,
+        "owned_bytes": 8
+      },
+      "successful_prefixes": [
+        2,
+        6,
+        8,
+        14,
+        16,
+        18
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingFqName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "Wire(Truncated)",
+          "offset": 4
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 9,
+          "result": "Wire(Truncated)",
+          "offset": 9
+        },
+        {
+          "length": 10,
+          "result": "Wire(Truncated)",
+          "offset": 10
+        },
+        {
+          "length": 11,
+          "result": "Wire(Truncated)",
+          "offset": 11
+        },
+        {
+          "length": 12,
+          "result": "Wire(Truncated)",
+          "offset": 12
+        },
+        {
+          "length": 13,
+          "result": "Wire(Truncated)",
+          "offset": 13
+        },
+        {
+          "length": 14,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 15,
+          "result": "Wire(Truncated)",
+          "offset": 15
+        },
+        {
+          "length": 16,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 17,
+          "result": "Wire(Truncated)",
+          "offset": 17
+        },
+        {
+          "length": 18,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "scalars",
+      "origin": "synthetic authored",
+      "hex": "18 00 32 14 08 00 18 00 20 01 30 04 38 02 40 03 48 05 58 06 60 07 70 08",
+      "raw_sha256": "95be119aa29b6336e975b16f462c5fa353cf5c7469ea2311f3d17cb80f120852",
+      "L": 24,
+      "F": 2,
+      "K": 1,
+      "M": [
+        20
+      ],
+      "G": [
+        10
+      ],
+      "parent_header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "supertypes": [
+        {
+          "span": [
+            4,
+            24
+          ],
+          "raw_hex": "08 00 18 00 20 01 30 04 38 02 40 03 48 05 58 06 60 07 70 08",
+          "header": {
+            "flags": 0,
+            "nullable": false,
+            "flexible_type_capabilities_id": 1,
+            "class_name": 4,
+            "type_parameter": 2,
+            "flexible_upper_bound_id": 3,
+            "type_parameter_name": 5,
+            "outer_type_id": 6,
+            "type_alias_name": 7,
+            "abbreviated_type_id": 8
+          }
+        }
+      ],
+      "minimum": {
+        "bytes": 24,
+        "records": 14,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 98,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "records": 22,
+        "nodes": 4,
+        "depth": 4,
+        "work": 2,
+        "owned_bytes": 2
+      },
+      "successful_prefixes": [
+        2,
+        24
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingFqName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "Wire(Truncated)",
+          "offset": 4
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "Wire(Truncated)",
+          "offset": 6
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "Wire(Truncated)",
+          "offset": 8
+        },
+        {
+          "length": 9,
+          "result": "Wire(Truncated)",
+          "offset": 9
+        },
+        {
+          "length": 10,
+          "result": "Wire(Truncated)",
+          "offset": 10
+        },
+        {
+          "length": 11,
+          "result": "Wire(Truncated)",
+          "offset": 11
+        },
+        {
+          "length": 12,
+          "result": "Wire(Truncated)",
+          "offset": 12
+        },
+        {
+          "length": 13,
+          "result": "Wire(Truncated)",
+          "offset": 13
+        },
+        {
+          "length": 14,
+          "result": "Wire(Truncated)",
+          "offset": 14
+        },
+        {
+          "length": 15,
+          "result": "Wire(Truncated)",
+          "offset": 15
+        },
+        {
+          "length": 16,
+          "result": "Wire(Truncated)",
+          "offset": 16
+        },
+        {
+          "length": 17,
+          "result": "Wire(Truncated)",
+          "offset": 17
+        },
+        {
+          "length": 18,
+          "result": "Wire(Truncated)",
+          "offset": 18
+        },
+        {
+          "length": 19,
+          "result": "Wire(Truncated)",
+          "offset": 19
+        },
+        {
+          "length": 20,
+          "result": "Wire(Truncated)",
+          "offset": 20
+        },
+        {
+          "length": 21,
+          "result": "Wire(Truncated)",
+          "offset": 21
+        },
+        {
+          "length": 22,
+          "result": "Wire(Truncated)",
+          "offset": 22
+        },
+        {
+          "length": 23,
+          "result": "Wire(Truncated)",
+          "offset": 23
+        },
+        {
+          "length": 24,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "type_duplicates",
+      "origin": "synthetic authored",
+      "hex": "18 00 32 0b 30 01 30 02 18 01 18 00 32 01 80",
+      "raw_sha256": "13c19f80da9b3a2a4d95838a7ee60d9924fc702a83c438465234cafc0127f44b",
+      "L": 15,
+      "F": 2,
+      "K": 1,
+      "M": [
+        11
+      ],
+      "G": [
+        5
+      ],
+      "parent_header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "supertypes": [
+        {
+          "span": [
+            4,
+            15
+          ],
+          "raw_hex": "30 01 30 02 18 01 18 00 32 01 80",
+          "header": {
+            "class_name": 2,
+            "nullable": false
+          }
+        }
+      ],
+      "minimum": {
+        "bytes": 15,
+        "records": 9,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 61,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "records": 12,
+        "nodes": 4,
+        "depth": 4,
+        "work": 2,
+        "owned_bytes": 2
+      },
+      "successful_prefixes": [
+        2,
+        15
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingFqName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "Wire(Truncated)",
+          "offset": 4
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "Wire(Truncated)",
+          "offset": 6
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "Wire(Truncated)",
+          "offset": 8
+        },
+        {
+          "length": 9,
+          "result": "Wire(Truncated)",
+          "offset": 9
+        },
+        {
+          "length": 10,
+          "result": "Wire(Truncated)",
+          "offset": 10
+        },
+        {
+          "length": 11,
+          "result": "Wire(Truncated)",
+          "offset": 11
+        },
+        {
+          "length": 12,
+          "result": "Wire(Truncated)",
+          "offset": 12
+        },
+        {
+          "length": 13,
+          "result": "Wire(Truncated)",
+          "offset": 13
+        },
+        {
+          "length": 14,
+          "result": "Wire(Truncated)",
+          "offset": 14
+        },
+        {
+          "length": 15,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "wrong_wire",
+      "origin": "synthetic authored",
+      "hex": "18 00 30 01 31 01 02 03 04 05 06 07 08 35 01 02 03 04 32 00 32 02 30 01 30 00",
+      "raw_sha256": "e7542d186372836c55228717d9238c009ef774042772d85894d98085097245ca",
+      "L": 26,
+      "F": 7,
+      "K": 2,
+      "M": [
+        0,
+        2
+      ],
+      "G": [
+        0,
+        1
+      ],
+      "parent_header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "supertypes": [
+        {
+          "span": [
+            20,
+            20
+          ],
+          "raw_hex": "",
+          "header": {}
+        },
+        {
+          "span": [
+            22,
+            24
+          ],
+          "raw_hex": "30 01",
+          "header": {
+            "class_name": 1
+          }
+        }
+      ],
+      "minimum": {
+        "bytes": 26,
+        "records": 15,
+        "nodes": 3,
+        "depth": 2,
+        "owned_S": 2,
+        "work_constant": 87,
+        "work_S": 2
+      },
+      "one_less_offsets": {
+        "records": 24,
+        "nodes": 22,
+        "depth": 20,
+        "work": 24,
+        "owned_bytes": 20
+      },
+      "successful_prefixes": [
+        2,
+        4,
+        13,
+        18,
+        20,
+        24,
+        26
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingFqName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "Wire(Truncated)",
+          "offset": 6
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "Wire(Truncated)",
+          "offset": 8
+        },
+        {
+          "length": 9,
+          "result": "Wire(Truncated)",
+          "offset": 9
+        },
+        {
+          "length": 10,
+          "result": "Wire(Truncated)",
+          "offset": 10
+        },
+        {
+          "length": 11,
+          "result": "Wire(Truncated)",
+          "offset": 11
+        },
+        {
+          "length": 12,
+          "result": "Wire(Truncated)",
+          "offset": 12
+        },
+        {
+          "length": 13,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 14,
+          "result": "Wire(Truncated)",
+          "offset": 14
+        },
+        {
+          "length": 15,
+          "result": "Wire(Truncated)",
+          "offset": 15
+        },
+        {
+          "length": 16,
+          "result": "Wire(Truncated)",
+          "offset": 16
+        },
+        {
+          "length": 17,
+          "result": "Wire(Truncated)",
+          "offset": 17
+        },
+        {
+          "length": 18,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 19,
+          "result": "Wire(Truncated)",
+          "offset": 19
+        },
+        {
+          "length": 20,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 21,
+          "result": "Wire(Truncated)",
+          "offset": 21
+        },
+        {
+          "length": 22,
+          "result": "Wire(Truncated)",
+          "offset": 22
+        },
+        {
+          "length": 23,
+          "result": "Wire(Truncated)",
+          "offset": 23
+        },
+        {
+          "length": 24,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 25,
+          "result": "Wire(Truncated)",
+          "offset": 25
+        },
+        {
+          "length": 26,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "ids",
+      "origin": "synthetic authored",
+      "hex": "18 00 10 07 12 03 ff 00 80 32 00",
+      "raw_sha256": "877f1453707ca5aae2345472bb5191051380a0246fb4af314a420491abce6baa",
+      "L": 11,
+      "F": 4,
+      "K": 1,
+      "M": [
+        0
+      ],
+      "G": [
+        0
+      ],
+      "parent_header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "supertypes": [
+        {
+          "span": [
+            11,
+            11
+          ],
+          "raw_hex": "",
+          "header": {}
+        }
+      ],
+      "minimum": {
+        "bytes": 11,
+        "records": 8,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 40,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "records": 9,
+        "nodes": 11,
+        "depth": 11,
+        "work": 9,
+        "owned_bytes": 9
+      },
+      "successful_prefixes": [
+        2,
+        4,
+        9,
+        11
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingFqName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "Wire(Truncated)",
+          "offset": 6
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "Wire(Truncated)",
+          "offset": 8
+        },
+        {
+          "length": 9,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 10,
+          "result": "Wire(Truncated)",
+          "offset": 10
+        },
+        {
+          "length": 11,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "opaque",
+      "origin": "synthetic authored",
+      "hex": "18 00 32 0c 12 01 00 2a 01 80 52 01 0b 6a 01 ff 2a 01 00 42 01 80 4a 01 ff",
+      "raw_sha256": "4a6a0048442dd2f743a18945b173992536f8997636e55586191db02c06008cb9",
+      "L": 25,
+      "F": 5,
+      "K": 1,
+      "M": [
+        12
+      ],
+      "G": [
+        4
+      ],
+      "parent_header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "supertypes": [
+        {
+          "span": [
+            4,
+            16
+          ],
+          "raw_hex": "12 01 00 2a 01 80 52 01 0b 6a 01 ff",
+          "header": {}
+        }
+      ],
+      "minimum": {
+        "bytes": 25,
+        "records": 14,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 92,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "records": 22,
+        "nodes": 4,
+        "depth": 4,
+        "work": 22,
+        "owned_bytes": 2
+      },
+      "successful_prefixes": [
+        2,
+        16,
+        19,
+        22,
+        25
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingFqName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "Wire(Truncated)",
+          "offset": 4
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "Wire(Truncated)",
+          "offset": 6
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "Wire(Truncated)",
+          "offset": 8
+        },
+        {
+          "length": 9,
+          "result": "Wire(Truncated)",
+          "offset": 9
+        },
+        {
+          "length": 10,
+          "result": "Wire(Truncated)",
+          "offset": 10
+        },
+        {
+          "length": 11,
+          "result": "Wire(Truncated)",
+          "offset": 11
+        },
+        {
+          "length": 12,
+          "result": "Wire(Truncated)",
+          "offset": 12
+        },
+        {
+          "length": 13,
+          "result": "Wire(Truncated)",
+          "offset": 13
+        },
+        {
+          "length": 14,
+          "result": "Wire(Truncated)",
+          "offset": 14
+        },
+        {
+          "length": 15,
+          "result": "Wire(Truncated)",
+          "offset": 15
+        },
+        {
+          "length": 16,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 17,
+          "result": "Wire(Truncated)",
+          "offset": 17
+        },
+        {
+          "length": 18,
+          "result": "Wire(Truncated)",
+          "offset": 18
+        },
+        {
+          "length": 19,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 20,
+          "result": "Wire(Truncated)",
+          "offset": 20
+        },
+        {
+          "length": 21,
+          "result": "Wire(Truncated)",
+          "offset": 21
+        },
+        {
+          "length": 22,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 23,
+          "result": "Wire(Truncated)",
+          "offset": 23
+        },
+        {
+          "length": 24,
+          "result": "Wire(Truncated)",
+          "offset": 24
+        },
+        {
+          "length": 25,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "nonminimal",
+      "origin": "synthetic authored",
+      "hex": "98 00 80 00 b2 00 84 00 b0 00 81 00",
+      "raw_sha256": "4cdb41fdbfc407f3fa29a52ea78bd1e5b971d6386984259ff5b161789005b468",
+      "L": 12,
+      "F": 2,
+      "K": 1,
+      "M": [
+        4
+      ],
+      "G": [
+        1
+      ],
+      "parent_header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "supertypes": [
+        {
+          "span": [
+            8,
+            12
+          ],
+          "raw_hex": "b0 00 81 00",
+          "header": {
+            "class_name": 1
+          }
+        }
+      ],
+      "minimum": {
+        "bytes": 12,
+        "records": 5,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 40,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "records": 8,
+        "nodes": 8,
+        "depth": 8,
+        "work": 4,
+        "owned_bytes": 4
+      },
+      "successful_prefixes": [
+        4,
+        12
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingFqName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "Wire(Truncated)",
+          "offset": 2
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "Wire(Truncated)",
+          "offset": 6
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "Wire(Truncated)",
+          "offset": 8
+        },
+        {
+          "length": 9,
+          "result": "Wire(Truncated)",
+          "offset": 9
+        },
+        {
+          "length": 10,
+          "result": "Wire(Truncated)",
+          "offset": 10
+        },
+        {
+          "length": 11,
+          "result": "Wire(Truncated)",
+          "offset": 11
+        },
+        {
+          "length": 12,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "low32_alias",
+      "origin": "synthetic authored",
+      "hex": "18 00 b2 80 80 80 10 80 80 80 80 10",
+      "raw_sha256": "3bcec67cbdd7189b300f3e2dc4e4c384cf200359b152058d3bd12c5e15f2b132",
+      "L": 12,
+      "F": 2,
+      "K": 1,
+      "M": [
+        0
+      ],
+      "G": [
+        0
+      ],
+      "parent_header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "supertypes": [
+        {
+          "span": [
+            12,
+            12
+          ],
+          "raw_hex": "",
+          "header": {}
+        }
+      ],
+      "minimum": {
+        "bytes": 12,
+        "records": 4,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 34,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "records": 2,
+        "nodes": 12,
+        "depth": 12,
+        "work": 2,
+        "owned_bytes": 2
+      },
+      "successful_prefixes": [
+        2,
+        12
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingFqName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "Wire(Truncated)",
+          "offset": 4
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "Wire(Truncated)",
+          "offset": 6
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "Wire(Truncated)",
+          "offset": 8
+        },
+        {
+          "length": 9,
+          "result": "Wire(Truncated)",
+          "offset": 9
+        },
+        {
+          "length": 10,
+          "result": "Wire(Truncated)",
+          "offset": 10
+        },
+        {
+          "length": 11,
+          "result": "Wire(Truncated)",
+          "offset": 11
+        },
+        {
+          "length": 12,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "late_fq",
+      "origin": "synthetic authored",
+      "hex": "32 02 30 01 18 00",
+      "raw_sha256": "9d0305355a02355a0fe6f2f7441486c2762fc26e80c16aecbfbdcdafc697af0a",
+      "L": 6,
+      "F": 2,
+      "K": 1,
+      "M": [
+        2
+      ],
+      "G": [
+        1
+      ],
+      "parent_header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "supertypes": [
+        {
+          "span": [
+            2,
+            4
+          ],
+          "raw_hex": "30 01",
+          "header": {
+            "class_name": 1
+          }
+        }
+      ],
+      "minimum": {
+        "bytes": 6,
+        "records": 5,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 26,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "records": 4,
+        "nodes": 2,
+        "depth": 2,
+        "work": 4,
+        "owned_bytes": 0
+      },
+      "successful_prefixes": [
+        6
+      ],
+      "missing_prefixes": [
+        0,
+        4
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingFqName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "Wire(Truncated)",
+          "offset": 2
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "MissingFqName",
+          "offset": 4
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    },
+    {
+      "name": "conflicts",
+      "origin": "synthetic authored",
+      "hex": "18 00 32 08 30 01 38 02 48 03 60 04",
+      "raw_sha256": "8f2de151a443b3f452e4b6d2fa4a11aa3ed5934ea87ff51c06a8b152f5db708f",
+      "L": 12,
+      "F": 2,
+      "K": 1,
+      "M": [
+        8
+      ],
+      "G": [
+        4
+      ],
+      "parent_header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "supertypes": [
+        {
+          "span": [
+            4,
+            12
+          ],
+          "raw_hex": "30 01 38 02 48 03 60 04",
+          "header": {
+            "class_name": 1,
+            "type_parameter": 2,
+            "type_parameter_name": 3,
+            "type_alias_name": 4
+          }
+        }
+      ],
+      "minimum": {
+        "bytes": 12,
+        "records": 8,
+        "nodes": 2,
+        "depth": 2,
+        "owned_S": 1,
+        "work_constant": 50,
+        "work_S": 1
+      },
+      "one_less_offsets": {
+        "records": 10,
+        "nodes": 4,
+        "depth": 4,
+        "work": 2,
+        "owned_bytes": 2
+      },
+      "successful_prefixes": [
+        2,
+        12
+      ],
+      "missing_prefixes": [
+        0
+      ],
+      "prefix_outcomes": [
+        {
+          "length": 0,
+          "result": "MissingFqName",
+          "offset": 0
+        },
+        {
+          "length": 1,
+          "result": "Wire(Truncated)",
+          "offset": 1
+        },
+        {
+          "length": 2,
+          "result": "success",
+          "offset": null
+        },
+        {
+          "length": 3,
+          "result": "Wire(Truncated)",
+          "offset": 3
+        },
+        {
+          "length": 4,
+          "result": "Wire(Truncated)",
+          "offset": 4
+        },
+        {
+          "length": 5,
+          "result": "Wire(Truncated)",
+          "offset": 5
+        },
+        {
+          "length": 6,
+          "result": "Wire(Truncated)",
+          "offset": 6
+        },
+        {
+          "length": 7,
+          "result": "Wire(Truncated)",
+          "offset": 7
+        },
+        {
+          "length": 8,
+          "result": "Wire(Truncated)",
+          "offset": 8
+        },
+        {
+          "length": 9,
+          "result": "Wire(Truncated)",
+          "offset": 9
+        },
+        {
+          "length": 10,
+          "result": "Wire(Truncated)",
+          "offset": 10
+        },
+        {
+          "length": 11,
+          "result": "Wire(Truncated)",
+          "offset": 11
+        },
+        {
+          "length": 12,
+          "result": "success",
+          "offset": null
+        }
+      ]
+    }
+  ],
+  "malformed": [
+    {
+      "name": "empty",
+      "hex": "",
+      "error": "MissingFqName",
+      "offset": 0
+    },
+    {
+      "name": "wrong_fq",
+      "hex": "1a 00",
+      "error": "MissingFqName",
+      "offset": 2
+    },
+    {
+      "name": "missing_before_child",
+      "hex": "32 01 00",
+      "error": "MissingFqName",
+      "offset": 3
+    },
+    {
+      "name": "wrong_fq_before_child",
+      "hex": "1a 00 32 01 00",
+      "error": "MissingFqName",
+      "offset": 5
+    },
+    {
+      "name": "parent_zero",
+      "hex": "18 00 00",
+      "error": "Wire(InvalidFieldNumber)",
+      "offset": 2
+    },
+    {
+      "name": "parent_group",
+      "hex": "18 00 33",
+      "error": "Wire(UnsupportedGroup)",
+      "offset": 2
+    },
+    {
+      "name": "parent_badwire",
+      "hex": "18 00 36",
+      "error": "Wire(InvalidWireType)",
+      "offset": 2
+    },
+    {
+      "name": "parent_short",
+      "hex": "18 00 32 02 30",
+      "error": "Wire(Truncated)",
+      "offset": 5
+    },
+    {
+      "name": "parent_negative",
+      "hex": "18 00 32 ff ff ff ff 0f",
+      "error": "Wire(NegativeLength)",
+      "offset": 3
+    },
+    {
+      "name": "child_zero",
+      "hex": "18 00 32 01 00",
+      "error": "Wire(InvalidFieldNumber)",
+      "offset": 4
+    },
+    {
+      "name": "child_group",
+      "hex": "18 00 32 01 0b",
+      "error": "Wire(UnsupportedGroup)",
+      "offset": 4
+    },
+    {
+      "name": "child_wire",
+      "hex": "18 00 32 01 0e",
+      "error": "Wire(InvalidWireType)",
+      "offset": 4
+    },
+    {
+      "name": "child_short",
+      "hex": "18 00 32 01 30",
+      "error": "Wire(Truncated)",
+      "offset": 5
+    },
+    {
+      "name": "child_bulk_short",
+      "hex": "18 00 32 03 12 02 ff",
+      "error": "Wire(Truncated)",
+      "offset": 7
+    },
+    {
+      "name": "child_negative",
+      "hex": "18 00 32 06 12 ff ff ff ff 0f",
+      "error": "Wire(NegativeLength)",
+      "offset": 5
+    },
+    {
+      "name": "child_malformed",
+      "hex": "18 00 32 0a 80 80 80 80 80 80 80 80 80 80",
+      "error": "Wire(MalformedVarint)",
+      "offset": 13
+    },
+    {
+      "name": "parent_malformed",
+      "hex": "18 00 80 80 80 80 80 80 80 80 80 80",
+      "error": "Wire(MalformedVarint)",
+      "offset": 11
+    },
+    {
+      "name": "later_parent_wins",
+      "hex": "18 00 32 01 00 00",
+      "error": "Wire(InvalidFieldNumber)",
+      "offset": 5
+    },
+    {
+      "name": "missing_and_parent_wins",
+      "hex": "32 01 00 00",
+      "error": "Wire(InvalidFieldNumber)",
+      "offset": 3
+    },
+    {
+      "name": "after_empty_sibling",
+      "hex": "18 00 32 00 32 01 30",
+      "error": "Wire(Truncated)",
+      "offset": 7
+    },
+    {
+      "name": "nonminimal_child_start",
+      "hex": "18 00 b2 00 81 00 30",
+      "error": "Wire(Truncated)",
+      "offset": 7
+    },
+    {
+      "name": "fq_after_badchild",
+      "hex": "32 01 00 18 00",
+      "error": "Wire(InvalidFieldNumber)",
+      "offset": 2
+    }
+  ]
+}

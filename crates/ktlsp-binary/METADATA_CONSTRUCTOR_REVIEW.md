@@ -30,3 +30,15 @@ First Clippy log SHA256ab4f06cfb4d5efee219c7854bdb96b9dd31ab78b317d6a8390e52b977
 No local native tests/runtime. Original completed Linux CI review and incoming
 Class-member193 helper compatibility remain pending; no runtime/CI pass claim.
 Merge HOLD for exclusive root expected-head/base lease. Parent gaps unchanged.
+
+
+## Initial integration cut
+
+Root admitted exactcb0c8c7dd064a5a3f2d1c82097a2cfd0547e496a after PR206
+headb15d945 had no original CI run because its module-export conflict made the
+PR dirty. Integrated only that exact cut; sole conflict was additive mod.rs.
+Preserved constructor/class_member_names and all incoming exports, all15 exclusive
+Constructor blobs except this accurate review receipt. No helper edits; incoming
+PR193 extraction owns helper changes. Budget new/push/integers semantics unchanged.
+SAME3 actual combined-source compatibility and first original Linux CI reviews
+pending. No main chasing/local native execution. Merge remains HOLD.

@@ -492,3 +492,73 @@ Merge remains HOLD for root's exclusive expected-head/base lease and completed
 source/CI reviews. See ../../crates/ktlsp-parser/reviews/c13-two-component-nullable-recovery.md.
 Aggregate C13/B3/B4 GAP, B11 UNVERIFIED, T008/T008a HOLD, #7/#83/#96 OPEN;
 Darwin UNKNOWN. No semantic/provider/full-parity/performance promotion.
+
+## B11 finite actual-copy observation — source candidate
+
+Source base a13ab6ba4100f7c26377a47ab5af0858b6491a48, tree
+1fa56ee9bc6c4c6a2e07441aa47fd95e257a99e0, sole parent
+2d561ab30812dcdabc56260a8b510979e1e70a61; integrated once, clean, before
+implementation. SAME architect/correctness/adversarial reviewers confirmed the
+incoming C13 two-component nullable header additions do not change the frozen
+bare healthy( path or copy/layer/worker seams. C13 grammar additions are retained.
+Root explicitly approved only a finite actual-copy production integration
+interpretation and the exact twelve-file additive observation scope. Stronger
+clipped-header negative remains unrealized; its prior feasibility HOLD is valid.
+
+Only vendor lib.rs, builder/layers.rs and declarations/type_parameters.rs change.
+A separately scoped callback reports the constructed scratch builder's last
+copied token endpoint, not a bound-clamped prediction. Independent live-layer
+count/minimum do not use the production minimum helper; the production bound is
+reported separately. The default path adds an inert callback-slot check at copied
+windows and skips the independent walk. Existing copy predicate/loop/debit,
+recursion suppression, scratch grammar, C13 branches and B3 EOF bridge remain.
+Nested callback installation is declined with observation disabled for that scope;
+RAII restores previous callback state on normal return and unwind.
+
+Exclusive Unix facade/worker observation uses a fresh same-child/request datagram
+pair, one64-byte aggregate and one nonblocking send attempt; parent makes at most
+two65-byte nonblocking reads after existing cleanup/scoped joins. Worker source
+clone is bounded by64KiB; fixed state holds first record and event count saturated
+at2. Full builder source equality and independently positive layer count qualify
+events; no desired offset/bound/endpoint filter or synthetic layer is installed.
+Duplicate, failed installation, reentry or malformed records cannot become valid
+zero-event controls. Socket address checks precede shared-OFD nonblocking changes;
+trusted parent pair construction establishes socket type, not fd conversion.
+Source text does not enter the observation wire.
+
+Default Reply schema, allocator/latch/status86, B3 argument/cadence, source/window/
+allocation/output limits, cancellation/deadline/error priority and checked cleanup
+remain. Observation work can change actual timing/allocation outcomes: overhead
+and outcome equivalence are UNMEASURED. No direct observation-error remapping,
+wait/retry/grace/relative-deadline/config/dependency/framework is added. Existing
+cleanup waits/joins have no hard bound. No observer runs in allocator callbacks.
+
+Fresh verified archive -> delivered a13 behavioral phase plus these three
+additions -> pinned1.99.0 edition2024 scratch formatting produced actual counts:
+16 behavioral files, 50 formatting files,
+54 final Rust hashes, 4 pristine survivors.
+A separate fresh owner extraction replayed both ordered patches with zero fuzz/
+offsets and matched every current source hash. Notices/licenses, original archive,
+upstream inventory, manifests and locks remain byte-identical. Independent
+adversarial replay is separately required; no previous delivery replay is credited.
+
+- recovery.patch SHA256 6a9876d6b4ae1fb4fcab6528ac50c88c32a9c8f8db474cb35a9d33078c9fb9cf
+- formatting.patch SHA256 310e0541870c7d4e1ab5c6ded355195a081587bf3178090c592cbd5d00fd9338
+- formatted-sha256.json SHA256 eddd511b00401c38ba9c62463eaef2456d269167c96e81f9d06dbba4f996de66
+
+The frozen production test requires strict recovery/identity/original range/parent/
+diagnostic/UTF16/partition checks, an actual source-matching active event with
+count1/min57/start28/end57/next57..58 eligible under other caps, and ordinary strict
+healthy followup. Expected values were frozen before runtime; no first-output
+retargeting or rerun-to-green. Machinery/unit controls are distinct from that
+production evidence. Format and compile-only locked all-target Clippy are local;
+no local parser/worker/tests/server/bench/JVM/oracle execution. Original unchanged
+Linux all-three CI and SAME3 raw/config/checkout reviews remain required.
+
+B11 UNVERIFIED; B3/B4/broader C13 GAP; T008/T008a HOLD; #7/#83/#96 OPEN;
+Darwin UNKNOWN. Even a later passing finite observation does not prove header-cut
+rejection, multiple active layers, annotation semantics, full B11/#83/T008, grammar,
+semantics or performance. Merge remains held for root's explicit expected-head/base
+lease and a successful read-only fail-closed guard in a separate tool call before
+any ordinary expected-head merge. See the focused source review at
+../../crates/ktlsp-parser/reviews/generic-copy-observation.md.

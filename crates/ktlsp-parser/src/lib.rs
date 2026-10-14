@@ -266,6 +266,168 @@ impl DeadlineObserver {
     }
 }
 
+#[cfg(unix)]
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GenericCopyRecord {
+    pub status: u32,
+    pub source_len: u32,
+    pub active_events: u32,
+    pub active_layers: u32,
+    pub production_bound: i32,
+    pub independent_min: i32,
+    pub window_start: u32,
+    pub actual_copy_end: u32,
+    pub next_start: u32,
+    pub next_end: u32,
+    pub next_fits_other_caps: u32,
+    pub reserved: u32,
+}
+#[cfg(unix)]
+impl Default for GenericCopyRecord {
+    fn default() -> Self {
+        Self {
+            status: 0,
+            source_len: 0,
+            active_events: 0,
+            active_layers: 0,
+            production_bound: -1,
+            independent_min: -1,
+            window_start: 0,
+            actual_copy_end: 0,
+            next_start: 0,
+            next_end: 0,
+            next_fits_other_caps: 0,
+            reserved: 0,
+        }
+    }
+}
+#[cfg(unix)]
+impl GenericCopyRecord {
+    #[doc(hidden)]
+    pub fn to_bytes(self) -> [u8; 64] {
+        let mut bytes = [0; 64];
+        bytes[..16].copy_from_slice(b"KTLSP-B11COPY-v1");
+        let words = [
+            self.status,
+            self.source_len,
+            self.active_events,
+            self.active_layers,
+            self.production_bound as u32,
+            self.independent_min as u32,
+            self.window_start,
+            self.actual_copy_end,
+            self.next_start,
+            self.next_end,
+            self.next_fits_other_caps,
+            self.reserved,
+        ];
+        for (chunk, word) in bytes[16..].as_chunks_mut::<4>().0.iter_mut().zip(words) {
+            chunk.copy_from_slice(&word.to_le_bytes());
+        }
+        bytes
+    }
+    fn from_bytes(bytes: &[u8], source: &str) -> Option<Self> {
+        if bytes.len() != 64 || bytes[..16] != *b"KTLSP-B11COPY-v1" {
+            return None;
+        }
+        let mut words = [0; 12];
+        for (word, chunk) in words.iter_mut().zip(bytes[16..].as_chunks::<4>().0) {
+            *word = u32::from_le_bytes(*chunk);
+        }
+        let record = Self {
+            status: words[0],
+            source_len: words[1],
+            active_events: words[2],
+            active_layers: words[3],
+            production_bound: words[4] as i32,
+            independent_min: words[5] as i32,
+            window_start: words[6],
+            actual_copy_end: words[7],
+            next_start: words[8],
+            next_end: words[9],
+            next_fits_other_caps: words[10],
+            reserved: words[11],
+        };
+        if source.len() > MAX_SOURCE_BYTES
+            || record.source_len as usize != source.len()
+            || record.reserved != 0
+        {
+            return None;
+        }
+        if record.status == 0 {
+            return (record
+                == Self {
+                    source_len: record.source_len,
+                    ..Self::default()
+                })
+            .then_some(record);
+        }
+        let boundary =
+            |offset: u32| offset <= record.source_len && source.is_char_boundary(offset as usize);
+        let next = (record.next_start == record.actual_copy_end
+            && record.next_start < record.next_end
+            && boundary(record.next_end))
+            || (record.next_start == 0
+                && record.next_end == 0
+                && record.next_fits_other_caps == 0
+                && record.actual_copy_end == record.source_len);
+        (record.status == 1
+            && record.active_events == 1
+            && record.active_layers > 0
+            && record.production_bound >= -1
+            && (record.production_bound == -1 || boundary(record.production_bound as u32))
+            && record.independent_min >= 0
+            && boundary(record.independent_min as u32)
+            && record.window_start < record.actual_copy_end
+            && boundary(record.window_start)
+            && boundary(record.actual_copy_end)
+            && record.next_fits_other_caps <= 1
+            && next)
+            .then_some(record)
+    }
+}
+#[cfg(unix)]
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum GenericCopyEvidence {
+    #[default]
+    Missing,
+    Invalid,
+    Complete(GenericCopyRecord),
+}
+#[cfg(unix)]
+struct GenericCopyObserver(std::os::unix::net::UnixDatagram);
+#[cfg(unix)]
+impl GenericCopyObserver {
+    fn new(command: &mut Command) -> std::io::Result<Self> {
+        use std::os::{fd::OwnedFd, unix::net::UnixDatagram};
+        let (socket, worker) = UnixDatagram::pair()?;
+        socket.set_nonblocking(true)?;
+        worker.set_nonblocking(true)?;
+        command
+            .arg("--observe-generic-copy-v1")
+            .stderr(Stdio::from(OwnedFd::from(worker)));
+        Ok(Self(socket))
+    }
+    fn finish(self, source: &str) -> GenericCopyEvidence {
+        let mut bytes = [0; 65];
+        let record = match self.0.recv(&mut bytes) {
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                return GenericCopyEvidence::Missing;
+            }
+            Ok(64) => GenericCopyRecord::from_bytes(&bytes[..64], source),
+            _ => None,
+        };
+        match (record, self.0.recv(&mut bytes)) {
+            (Some(record), Err(e)) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                GenericCopyEvidence::Complete(record)
+            }
+            _ => GenericCopyEvidence::Invalid,
+        }
+    }
+}
+
 /// Caller supplies the trusted installed Rust worker's absolute path.
 /// Each call owns exactly one child; concurrent calls need caller-side admission.
 pub struct Parser {
@@ -307,6 +469,33 @@ impl Parser {
                 snapshot.kind,
                 cancelled,
                 Some(&mut evidence),
+                None,
+            )
+            .map(|mut parsed| {
+                parsed.source = Arc::clone(&snapshot.source);
+                SnapshotResult {
+                    snapshot: snapshot.clone(),
+                    parsed,
+                }
+            });
+        (result, evidence)
+    }
+    /// Finite actual-copy observation; effects on allocation/deadline outcomes are unmeasured.
+    #[cfg(unix)]
+    #[doc(hidden)]
+    pub fn parse_snapshot_observing_generic_copy(
+        &self,
+        snapshot: &SourceSnapshot,
+        cancelled: &AtomicBool,
+    ) -> (Result<SnapshotResult, ParserError>, GenericCopyEvidence) {
+        let mut evidence = GenericCopyEvidence::Missing;
+        let result = self
+            .parse_inner(
+                snapshot.source(),
+                snapshot.kind,
+                cancelled,
+                None,
+                Some(&mut evidence),
             )
             .map(|mut parsed| {
                 parsed.source = Arc::clone(&snapshot.source);
@@ -330,6 +519,8 @@ impl Parser {
             cancelled,
             #[cfg(unix)]
             None,
+            #[cfg(unix)]
+            None,
         )
     }
     fn parse_inner(
@@ -338,6 +529,7 @@ impl Parser {
         kind: FileKind,
         cancelled: &AtomicBool,
         #[cfg(unix)] evidence: Option<&mut DeadlineEvidence>,
+        #[cfg(unix)] copy_evidence: Option<&mut GenericCopyEvidence>,
     ) -> Result<Parsed, ParserError> {
         if source.len() > MAX_SOURCE_BYTES {
             return Err(ParserError::InputLimit);
@@ -359,16 +551,28 @@ impl Parser {
         } else {
             None
         };
+        #[cfg(unix)]
+        let copy_observer = if copy_evidence.is_some() {
+            Some(GenericCopyObserver::new(&mut command).map_err(|_| ParserError::Io)?)
+        } else {
+            None
+        };
         let bytes = supervise(
             command,
             &normalized,
             cancelled,
             #[cfg(unix)]
             observer.as_mut(),
+            #[cfg(unix)]
+            copy_observer.is_some(),
         );
         #[cfg(unix)]
         if let (Some(observer), Some(evidence)) = (observer, evidence) {
             *evidence = observer.finish();
+        }
+        #[cfg(unix)]
+        if let (Some(observer), Some(evidence)) = (copy_observer, copy_evidence) {
+            *evidence = observer.finish(&normalized);
         }
         let bytes = bytes?;
         if cancelled.load(Ordering::Relaxed) {
@@ -383,9 +587,10 @@ fn supervise(
     normalized: &str,
     cancelled: &AtomicBool,
     #[cfg(unix)] mut observer: Option<&mut DeadlineObserver>,
+    #[cfg(unix)] preserve_copy_stderr: bool,
 ) -> Result<Vec<u8>, ParserError> {
     #[cfg(unix)]
-    if observer.is_none() {
+    if observer.is_none() && !preserve_copy_stderr {
         command.stderr(Stdio::null());
     }
     #[cfg(not(unix))]
@@ -715,6 +920,114 @@ mod tests {
             outcome.expect("I/O result must be selected before releasing the pending thread")
         })
     }
+    #[cfg(unix)]
+    #[test]
+    fn generic_copy_wire_is_bounded_and_rejects_invalid_or_duplicate_records() {
+        use std::os::unix::net::UnixDatagram;
+        let source = "class C<T fun f() = 1";
+        let record = GenericCopyRecord {
+            status: 1,
+            source_len: source.len() as u32,
+            active_events: 1,
+            active_layers: 1,
+            production_bound: 10,
+            independent_min: 10,
+            window_start: 10,
+            actual_copy_end: 13,
+            next_start: 13,
+            next_end: 14,
+            next_fits_other_caps: 1,
+            reserved: 0,
+        };
+        let bytes = record.to_bytes();
+        assert_eq!(GenericCopyRecord::from_bytes(&bytes, source), Some(record));
+        let zero = GenericCopyRecord {
+            source_len: source.len() as u32,
+            ..GenericCopyRecord::default()
+        };
+        assert_eq!(
+            GenericCopyRecord::from_bytes(&zero.to_bytes(), source),
+            Some(zero)
+        );
+        let missing_next = GenericCopyRecord {
+            next_start: 0,
+            next_end: 0,
+            next_fits_other_caps: 0,
+            ..record
+        };
+        assert_eq!(
+            GenericCopyRecord::from_bytes(&missing_next.to_bytes(), source),
+            None
+        );
+        // Machinery only: numeric wire validation does not prove the live bound was obeyed.
+        for (word, value) in [
+            (0, 2),
+            (0, 3),
+            (1, 0),
+            (2, 0),
+            (2, 2),
+            (3, 0),
+            (4, (-2_i32) as u32),
+            (5, u32::MAX),
+            (6, 13),
+            (7, 100),
+            (8, 12),
+            (9, 100),
+            (10, 2),
+            (11, 1),
+        ] {
+            let mut invalid = bytes;
+            invalid[16 + word * 4..20 + word * 4].copy_from_slice(&value.to_le_bytes());
+            assert_eq!(GenericCopyRecord::from_bytes(&invalid, source), None);
+        }
+        for packet in [b"".as_slice(), b"unknown", &bytes[..63], &[0; 65]] {
+            assert_eq!(GenericCopyRecord::from_bytes(packet, source), None);
+        }
+        for duplicate in [false, true] {
+            let (parent, worker) = UnixDatagram::pair().unwrap();
+            parent.set_nonblocking(true).unwrap();
+            worker.set_nonblocking(true).unwrap();
+            worker.send(&bytes).unwrap();
+            if duplicate {
+                worker.send(b"").unwrap();
+            }
+            let evidence = GenericCopyObserver(parent).finish(source);
+            assert_eq!(
+                evidence,
+                if duplicate {
+                    GenericCopyEvidence::Invalid
+                } else {
+                    GenericCopyEvidence::Complete(record)
+                }
+            );
+        }
+        let (parent, _worker) = UnixDatagram::pair().unwrap();
+        parent.set_nonblocking(true).unwrap();
+        assert_eq!(
+            GenericCopyObserver(parent).finish(source),
+            GenericCopyEvidence::Missing
+        );
+        for packet in [b"".as_slice(), &bytes[..63], &[0; 65]] {
+            let (parent, worker) = UnixDatagram::pair().unwrap();
+            parent.set_nonblocking(true).unwrap();
+            worker.send(packet).unwrap();
+            assert_eq!(
+                GenericCopyObserver(parent).finish(source),
+                GenericCopyEvidence::Invalid
+            );
+        }
+    }
+    #[cfg(unix)]
+    #[test]
+    fn generic_copy_precancellation_does_not_launch_or_emit() {
+        let parser = Parser::new("/no-such-b11-worker").unwrap();
+        let snapshot = SourceSnapshot::new("b11-cancel", 1, FileKind::Source, "fun f()=0").unwrap();
+        let (result, evidence) =
+            parser.parse_snapshot_observing_generic_copy(&snapshot, &AtomicBool::new(true));
+        assert_eq!(result.unwrap_err(), ParserError::Cancelled);
+        assert_eq!(evidence, GenericCopyEvidence::Missing);
+    }
+
     #[test]
     fn pending_io_checks_cancellation_and_deadline_before_join() {
         for (deadline, cancel, expected) in [
@@ -997,6 +1310,8 @@ mod tests {
                 &AtomicBool::new(false),
                 #[cfg(unix)]
                 None,
+                #[cfg(unix)]
+                false,
             );
             if mode == "crash" {
                 // Abort completion can cross the deadline checked before exit status.
@@ -1023,7 +1338,9 @@ mod tests {
                     "hang",
                     &cancel,
                     #[cfg(unix)]
-                    None
+                    None,
+                    #[cfg(unix)]
+                    false
                 ),
                 Err(ParserError::Cancelled)
             );
@@ -1036,7 +1353,9 @@ mod tests {
                 "healthy",
                 &AtomicBool::new(false),
                 #[cfg(unix)]
-                None
+                None,
+                #[cfg(unix)]
+                false
             )
             .is_ok()
         );

@@ -338,3 +338,17 @@ two NestingLimit fixtures, so those outcomes remain unverified at this checkpoin
 Root suspended merge and released fe97781 integration reservation to independent
 work; next stable base requires root assignment, integrated-delta reviews and
 actual combined-tree original Linux CI before a renewed merge lease.
+
+## C13 / #169 ordinary property sibling headers — source preparation
+
+The finite property branch and exact frozen production contract are described in
+../../crates/ktlsp-parser/reviews/c13-property-recovery.md. Both preliminary
+reviewers found that the initial revision-2 assertion also changed source; an added
+same-source/document/kind revision-2 mismatch isolates revision rejection. Product
+source and frozen expectations did not change in that correction.
+
+Pinned formatting and compile-only locked workspace all-target Clippy passed. No
+local native runtime ran. Actual SAME correctness/adversarial final source reviews,
+independent patch replay, architect review and completed original Linux Native Rust
+all3 remain required. Broader C13/B3/B4 GAP, B11 UNVERIFIED, T008/T008a HOLD and
+#7/#83/#96 OPEN/Darwin UNKNOWN remain unchanged; no full parity or Darwin-fix claim.

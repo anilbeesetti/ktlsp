@@ -1,4 +1,13 @@
-# Selected JVM method-signature contract review — READY
+# Current source review — PASS, original CI pending
+
+Assigned source basefa26a992a54f5a7c81dc34fe1fc51ba3253e8e54 integrated once;
+source/export committed73ecee5. Serialized module-export slot RELEASED. The
+preimplementation review section below is preserved as HISTORICAL: statements
+about no grant/no source/clean base/held publication apply to that earlier stage.
+Current source grant, compile checks, SAME3 source reviews and remaining CI gate
+are recorded in the admitted-source section at the end.
+
+# Historical selected JVM method-signature contract review — READY
 
 Stage CONTRACT/TEMPDATA only. No product/source/export/test implementation,
 compiler/native/parser/worker/server/bench/JVM/oracle, issue publication, push/PR/CI.
@@ -96,3 +105,11 @@ corrected to active204; source/blob equivalence0a0af→fa26 confirmed by root.
 Owner status send to coordinator was specifically auto-review rejected: low-risk
 status message lacked recognized trusted human authorization to message that
 thread. No retry/proxy/workaround attempted; coordinator can pull owner chat.
+
+Actual SAME3 SOURCE review: correctness PASS, adversarial PASS, architect PASS
+with no implementation/test defect. All requested current-vs-historical stage
+clarifications applied before publication and sent to SAME3 for recheck.
+ReaderSHA2562f9725a6b7a3cc32e532aa5e2bd45822d2808933b4b1ca13696d79ef1b70feea;
+testsSHA25659596e9ca130cbeb23dcd3f596a3887f4b2828d1ad8befa479d5257c4f85731f;
+frozenEXPECTATIONS49c2636e6ba4d52842e4a2af4f4322832fb4eb31d0123ea0733a3528951cfa7b.
+Original unchanged Linux CI and retained SAME3 completed-CI review still pending.

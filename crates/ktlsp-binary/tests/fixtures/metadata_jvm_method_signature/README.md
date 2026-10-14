@@ -1,4 +1,4 @@
-# Selected JVM method-signature fixture — CONTRACT/TEMPDATA
+# Selected JVM method-signature fixture — historical preimplementation freeze
 
 selected.hex(V3) and merged.hex(V4) are independently authored literals, frozen
 before any product source/runtime. pair_parent.hex is byte-identical to existing
@@ -12,7 +12,8 @@ Existing PAIR_EXTRACTION.json documents JAR/source/license/compiler limitations.
 PAIR_SIGNATURE_EXTRACTION.json records independent data-only CP/metadata/method
 transcription, explicit signature indices7/8 and encoded method CPrefs8/9.
 Future Rust composition MUST use the actual delivered resolver and classfile APIs;
-that assertion remains unexecuted at this contract stage. No omitted inference,
+the delivered test now contains that assertion; its execution awaits original
+Linux CI. This historical data freeze predates the explicit source grant. No omitted inference,
 constructor identity, source parameter mapping, linkage or semantic claim.
 
 Kotlin source pin d57eb4a26ed01ab03cf195da686c8047032ff16f; proto/generated-source

@@ -1,3 +1,15 @@
+# Remaining legal method target source stage (2026-10-14)
+
+Root admitted exact contract SHA323bc9d772a2f427fba26ab7bc99311953b34db90e2347c22c9afebc0bfe12a6 and11 paths on basecff36d17cd5cd1386059ecc91572013fdb417b48. Same architect/correctness/adversarial reviewers approved the contract after correcting selection-order wording and adding the existing formal-parameter fixture README API correction.
+
+The method pass decodes01/12/15/17 alongside14/16, preserving raw target_type and replacing formal_parameter_index with typed MethodTargetInfo. This intentionally breaks external field access/literals/patterns and changes derived Debug/layout/size. All repository consumers are updated. No semantic descriptor/Signature/bound/Exceptions validation, server consumer or capability is added. Shared Budget/Reader/vector/annotation and all historical raw fixtures remain unchanged. Fixed-width info adds no allocation; capacity equations use the updated root size, without a whole-operation owned-byte/RSS promise.
+
+The pinned835B Guava NullnessCasts fixture supplies genuine12+16; the bounded1932-class archive scan found no01/15/17, whose controls are explicitly synthetic. Archive/class/payload provenance and Apache license attribution are retained. No compiler/JVM/native decoder generated fixture expectations.
+
+Initial source formatting and format-check passed; first compile-only locked workspace/all-target Clippy passed without warnings (3.73s). No native product/test/parser/worker runtime executed. Exact command logs are retained in the owner temporary packet. SAME3 approved source ba3f3a0/tree7e75a02 before publication. Original PR189 Linux CI run38502770266/job115653316658 attempt1 passed Format/Clippy but failed Tests: the new genuine-fixture assertion passed compact hex to the existing whitespace-delimited helper, causing ParseIntError::PosOverflow. The frozen bytes and expected payload were correct; only spaces between byte pairs are added. No product logic/helper/fixture/expected outcome changes. Original failure log is preserved; no unchanged retry. SAME3 must recheck this changed source and the original completed CI before a fresh changed-head run. Source and completed original hosted CI review remain pending. Local runtime/tests/parser/worker/server/bench are prohibited under unresolved#96; only admitted format and compile-only locked workspace Clippy may run. Issue publication/push/attachedPR/original unchanged LinuxNativeRust all3 are admitted; merge remains held for a stable coordinator cut and exclusive expected-head/base lease. No full parity, semantics, Darwin reliability or comparative performance claim.
+
+---
+
 # Method type annotation source review
 
 ## Held formal-parameter source delta (2026-10-13)

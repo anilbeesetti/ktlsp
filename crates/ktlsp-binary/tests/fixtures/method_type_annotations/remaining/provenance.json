@@ -1,0 +1,63 @@
+{
+  "entry": "com/google/common/base/NullnessCasts.class",
+  "size": 835,
+  "sha256": "efdd5084585676be44665f177c6fa6bb315ff5e57417e7ccf56db7a5da5a0b8d",
+  "annotations": [
+    {
+      "method": "uncheckedCastNullableTToT",
+      "descriptor": "(Ljava/lang/Object;)Ljava/lang/Object;",
+      "attribute": {
+        "name": "RuntimeVisibleTypeAnnotations",
+        "name_cp": 23,
+        "header_offset": 729,
+        "payload_offset": 735,
+        "length": 17,
+        "payload_hex": "0002120000000018000016000000180000"
+      },
+      "roots": [
+        {
+          "offset": 2,
+          "tag": 18,
+          "target_info": "0000",
+          "path": ""
+        },
+        {
+          "offset": 10,
+          "tag": 22,
+          "target_info": "00",
+          "path": ""
+        }
+      ]
+    }
+  ],
+  "archive_sha256": "a1f8a4bafe5a77232d333356843e194599b30837574a7f4be1063daaaaab102c",
+  "archive_size": 2936569,
+  "artifact": "com.google.guava:guava:33.4.8-android",
+  "origin": "https://repo.maven.apache.org/maven2/com/google/guava/guava/33.4.8-android/guava-33.4.8-android.jar",
+  "local_header_offset": 109654,
+  "compression_method": 8,
+  "flags": 2056,
+  "compressed_size": 452,
+  "crc32": 820833898,
+  "license": "Apache-2.0",
+  "license_relative": "../LICENSE.txt",
+  "license_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+  "source_header": "Unavailable/uninspected; factual fixture attribution only",
+  "compiler": "Unknown",
+  "authentication": "Existing primary HTTPS byte equality pin; not signature authentication",
+  "new_network": false,
+  "execution": "Auxiliary Python data inspection only; no JVM/compiler/ktlsp runtime",
+  "scan": {
+    "classes": 1932,
+    "counts": {
+      "0x01": 0,
+      "0x12": 969,
+      "0x14": 1021,
+      "0x15": 0,
+      "0x16": 1479,
+      "0x17": 0
+    },
+    "selection": "minimum(class size, archive entry path) among176 candidates",
+    "other_new_forms": "Explicitly synthetic coverage only"
+  }
+}

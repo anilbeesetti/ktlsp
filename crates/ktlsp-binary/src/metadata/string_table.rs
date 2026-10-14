@@ -70,7 +70,7 @@ pub(super) struct Budget {
     pub(super) wire: wire::Budget,
     nodes: usize,
     depth: usize,
-    owned: usize,
+    pub(super) owned: usize,
 }
 impl Budget {
     pub(super) fn new(limits: Limits) -> Self {
@@ -82,7 +82,7 @@ impl Budget {
         }
     }
 
-    fn node(&mut self, depth: usize, offset: usize) -> Result<(), Error> {
+    pub(super) fn node(&mut self, depth: usize, offset: usize) -> Result<(), Error> {
         if depth > self.depth {
             return Err(limit("depth", offset));
         }

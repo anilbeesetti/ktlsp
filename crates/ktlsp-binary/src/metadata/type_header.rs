@@ -36,6 +36,14 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<TypeHeader<'_>, Error> {
             kind: ErrorKind::Limit("bytes"),
         });
     }
+    let mut budget = wire::Budget::new(limits.records, limits.work);
+    decode_with_budget(bytes, &mut budget)
+}
+
+pub(super) fn decode_with_budget<'a>(
+    bytes: &'a [u8],
+    budget: &mut wire::Budget,
+) -> Result<TypeHeader<'a>, Error> {
     let mut out = TypeHeader {
         raw: bytes,
         flags: None,
@@ -49,10 +57,9 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<TypeHeader<'_>, Error> {
         type_alias_name: None,
         abbreviated_type_id: None,
     };
-    let mut budget = wire::Budget::new(limits.records, limits.work);
     let mut pos = 0;
     while pos < bytes.len() {
-        let field = wire::field(bytes, &mut pos, bytes.len(), &mut budget)?;
+        let field = wire::field(bytes, &mut pos, bytes.len(), budget)?;
         budget.work(1, field.span.start)?;
         match (field.number, field.value) {
             (1, Value::Varint(value)) => out.flags = Some(value as u32 as i32),

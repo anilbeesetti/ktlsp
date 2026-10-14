@@ -40,7 +40,7 @@
      pub(super) fn insert(&mut self, subtree: Tree) {
 --- a/src/builder/layers.rs
 +++ b/src/builder/layers.rs
-@@ -151,7 +151,10 @@
+@@ -165,7 +165,10 @@
          }
  
          let raw_look_ahead_steps = self.raw_look_ahead(steps);
@@ -2485,7 +2485,7 @@
  };
  use crate::builder::{PsiBuilder, SemanticWhitespaceAwarePsiBuilder};
  use crate::parsing::Parser;
-@@ -274,13 +274,21 @@
+@@ -298,13 +298,21 @@
          self.parse_annotations(AnnotationParsingMode::Default);
  
          let reference = self.mark();

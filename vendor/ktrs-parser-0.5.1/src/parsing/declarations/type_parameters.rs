@@ -130,6 +130,30 @@ impl Parser {
             &psi.lex_starts[start..=end],
             &psi.lex_types[start..end],
         );
+        if let Some(observer) = crate::generic_copy_observer() {
+            let (active_layers, independent_min) = self.my_builder.generic_copy_active_layers();
+            let next_token = psi
+                .lex_starts
+                .get(end + 1)
+                .map(|&next_end| (psi.lex_starts[end], next_end));
+            observer(
+                &psi.text,
+                crate::GenericCopyBoundary {
+                    active_layers,
+                    independent_min,
+                    production_bound: eof,
+                    window_start: psi.lex_starts[start],
+                    actual_copy_end: builder
+                        .lex_starts
+                        .last()
+                        .and_then(|&last| psi.lex_starts[start].checked_add(last)),
+                    next_token,
+                    next_fits_other_caps: end < limit
+                        && next_token
+                            .is_some_and(|(_, next_end)| next_end - psi.lex_starts[start] <= 4096),
+                },
+            );
+        }
         let mut probe =
             Parser::create_for_top_level_non_lazy(SemanticWhitespaceAwarePsiBuilder::new(builder));
         probe.in_parameter_recovery_probe = true;

@@ -9,6 +9,7 @@ pub mod function_header;
 mod header;
 pub mod jvm_method_signature;
 pub mod name_resolver;
+pub mod package_member_names;
 pub mod payload;
 pub mod property_header;
 pub mod string_table;
@@ -18,6 +19,7 @@ pub mod type_header;
 pub mod type_parameter;
 pub mod type_table;
 pub mod value_parameter;
+pub mod version_requirement;
 pub mod wire;
 
 pub use header::{Error, Header, Limits, Outcome, Unsupported, decode};

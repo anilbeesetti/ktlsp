@@ -2,6 +2,7 @@
 //! No declaration/type reconstruction or Kotlin semantic analysis.
 
 pub mod class_header;
+pub mod constructor;
 mod encoding;
 pub mod function_header;
 mod header;

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       expected_workflow_sha:
-        description: Reviewed workflow commit on main (40 lowercase hex)
+        description: Reviewed auxiliary workflow commit (40 lowercase hex)
         required: true
         type: string
       expected_workflow_sha256:
@@ -55,8 +55,8 @@ jobs:
             powershell = $PSVersionTable.PSVersion.ToString()
           } | ConvertTo-Json | Set-Content "$evidence/identity.json"
           if ('${{ github.repository }}' -cne 'anilbeesetti/ktlsp' -or
-              '${{ github.ref }}' -cne 'refs/heads/main' -or
-              $env:ACTUAL_WORKFLOW_REF -cne 'anilbeesetti/ktlsp/.github/workflows/t021-windows-project-model.yml@refs/heads/main' -or
+              '${{ github.ref }}' -cne 'refs/heads/codex/t021-windows-source-diagnostics-w3' -or
+              $env:ACTUAL_WORKFLOW_REF -cne 'anilbeesetti/ktlsp/.github/workflows/t021-windows-project-model.yml@refs/heads/codex/t021-windows-source-diagnostics-w3' -or
               '${{ github.run_attempt }}' -cne '1' -or
               '${{ runner.os }}' -cne 'Windows' -or '${{ runner.arch }}' -cne 'X64' -or
               $env:EXPECTED_WORKFLOW_SHA -cnotmatch '^[0-9a-f]{40}$' -or

@@ -1,8 +1,57 @@
 # Optional Windows project path-budget validation (#21 child)
 
-Status: preparation only, Windows/Cygwin runtime correctness UNVERIFIED. No
-Windows job, product test, oracle or native command has run for this record.
-This finite validation leaves parent #21 and packaging T046 open.
+Status: the first optional dispatch POST was rejected without creating a
+`workflow_dispatch` run or job.
+Windows/Cygwin runtime correctness remains UNVERIFIED; no Windows install,
+compile, inventory listing, test, job or artifact exists. Parent #21 and
+packaging T046 remain open.
+
+## First optional dispatch: rejected without a dispatch run or job
+
+On 2026-10-14, the first dispatch of workflow `384102190`, ref `main`, with
+`expected_workflow_sha=015057d40ea8739502e179b246b9385be016b5b2` and
+`expected_workflow_sha256=dcd716340f22660fd2fa18fa9a7c0bc178107e38f3f03d7c4623302f93642036`
+was rejected with HTTP 422. GitHub identified `runner.temp` in job-level env
+at lines 24 and 25 as an unavailable named context. The initial response is
+396 bytes, SHA-256 `f3894680583f17bea21ff9142e1ef7001f15536d5219286a2e2874c2e6f6232b`.
+Read-only resolution confirmed that the rejected POST created no
+`workflow_dispatch` run or job, compiler/test output or artifact. There is no
+run attempt for that POST. This is dispatch validation failure,
+not a Windows compiler/test outcome. The first failure is retained permanently;
+no retry, resend, rerun or source correction was performed under that admission.
+
+Separate original GitHub startup records are retained: main
+`015057d40ea8739502e179b246b9385be016b5b2`, run `38562813506`; main
+`e3a79570895d8cd0af4681424eebca819e725361`, run `38567332094`; and constructor
+`60af5d3c5f0f55613be080ca222807ed2fbbf222`, run `38569059184`. Each is attempt 1,
+event `push`, completed FAILURE with zero jobs. Constructor check suite
+`104509956493` has zero check runs, so named native SUCCESS alone misses that
+failure. Exact startup validator diagnostics are absent; attributing these
+failures to the same unavailable job-env `runner.temp` context is an inference
+from their identical original workflow hash and the explicit earlier HTTP 422.
+Earlier native 587-pass proofs remain valid for native CI only; they do not
+establish that all workflows passed. These startup failures provide no Windows
+runtime or compiler/test outcome and do not alter the rejected POST's zero
+`workflow_dispatch` runs or consumed admission.
+
+[GitHub's context-availability table](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability)
+excludes `runner` at job env. The correction removes only those two
+job env fields. After the unchanged first identity guard succeeds, the existing
+`pwsh` step appends the same Cargo home/target paths derived from `RUNNER_TEMP`
+to `GITHUB_ENV`. [GitHub's environment-file documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-environment-variable)
+supports UTF-8 `pwsh` appends and makes their values available to later steps,
+not to the writing step. That step does not use either new value or create
+Cargo directories; the later freshness check remains unchanged.
+
+This source-only correction supplies no new dispatch or runtime outcome. The
+original W/H tuple is consumed. Source delivery retains separate root scope,
+reviewed source/original Linux CI and ordinary guarded merge; any future first
+dispatch needs a new immutable W2/H2 admission. Pending fields below refer to
+that future corrected workflow, never an unchanged-tuple retry.
+Frozen product source, all 23 pins, 14+3 selected tests, compile-only targets,
+assertions, commands, identity guards, timeout and resource limitations remain
+unchanged. All other expression placements received a source-only context audit;
+that audit does not claim GitHub dispatch acceptance or Windows runtime success.
 
 Frozen source `2d561ab30812dcdabc56260a8b510979e1e70a61`, tree
 `be29ab7d30d31f6b071b57e4d48320521e190919`, sole parent

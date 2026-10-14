@@ -8,6 +8,7 @@ mod header;
 pub mod name_resolver;
 pub mod payload;
 pub mod string_table;
+pub mod type_parameter;
 pub mod wire;
 
 pub use header::{Error, Header, Limits, Outcome, Unsupported, decode};

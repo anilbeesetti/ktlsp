@@ -155,6 +155,14 @@ fn compatibility(tree: &Parsed, case: &Value) {
     let id = case["id"].as_str().unwrap();
     let elements = tree.elements();
     let source = tree.source();
+    if id == "nullable-decline-qualified" {
+        // Only this frozen exclusion is superseded by the exact two-component nullable seed.
+        let expected: Value = serde_json::from_str(r####"{"id":"two-nullable-class-lf-top","source":"class Box<T\nfun pkg.String?.healthy() = 2","projection":[["CLASS",0,11,"KT_FILE",null],["TYPE_PARAMETER_LIST",9,11,"CLASS",[0,11]],["TYPE_PARAMETER",10,11,"TYPE_PARAMETER_LIST",[0,11]],["FUN",12,41,"KT_FILE",null],["TYPE_REFERENCE",16,27,"FUN",[12,41]],["NULLABLE_TYPE",16,27,"TYPE_REFERENCE",[12,41]],["USER_TYPE",16,26,"NULLABLE_TYPE",[12,41]],["USER_TYPE",16,19,"USER_TYPE",[12,41]],["REFERENCE_EXPRESSION",16,19,"USER_TYPE",[12,41]],["REFERENCE_EXPRESSION",20,26,"USER_TYPE",[12,41]],["VALUE_PARAMETER_LIST",35,37,"FUN",[12,41]]],"declaration_names":[[0,6,9,"Box"],[12,28,35,"healthy"]],"diagnostics":[[11,11,"Missing '>'"]],"type_parameter_name":[10,11],"receiver_tokens":[[16,19,"IDENTIFIER","pkg","REFERENCE_EXPRESSION"],[19,20,"DOT",".","USER_TYPE"],[20,26,"IDENTIFIER","String","REFERENCE_EXPRESSION"],[26,27,"QUEST","?","NULLABLE_TYPE"],[27,28,"DOT",".","FUN"]],"raw_header_tokens":[[12,15,"FUN_KEYWORD","fun",1],[15,16,"WHITE_SPACE"," ",2],[16,19,"IDENTIFIER","pkg",3],[19,20,"DOT",".",4],[20,26,"IDENTIFIER","String",5],[26,27,"QUEST","?",6],[27,28,"DOT",".",7],[28,35,"IDENTIFIER","healthy",8],[35,36,"LPAR","(",9],[36,37,"RPAR",")",10]],"scratch_receiver_tokens":["IDENTIFIER","DOT","IDENTIFIER","SAFE_ACCESS","IDENTIFIER","LPAR"],"positions":{"0":[0,0],"6":[0,6],"9":[0,9],"10":[0,10],"11":[0,11],"12":[1,0],"15":[1,3],"16":[1,4],"19":[1,7],"20":[1,8],"26":[1,14],"27":[1,15],"28":[1,16],"35":[1,23],"36":[1,24],"37":[1,25],"41":[1,29]},"invalid_utf8_offsets":[],"probe_accounting":{"lpar_raw_ordinal":9,"lpar_end_from_probe_start":24},"body_owner":null,"bytes":41,"source_sha256":"3f15755be73b9e8c660004bc877ccf0c0140be22e5e96cb99d5838b00c4d8bcf","expectation_basis":"Source/marker derivation only; no Kotlin lexer/parser/compiler/runtime output","raw_receiver_tokens":[[12,15,"FUN_KEYWORD","fun",1],[15,16,"WHITE_SPACE"," ",2],[16,19,"IDENTIFIER","pkg",3],[19,20,"DOT",".",4],[20,26,"IDENTIFIER","String",5],[26,27,"QUEST","?",6],[27,28,"DOT",".",7],[28,35,"IDENTIFIER","healthy",8],[35,36,"LPAR","(",9],[36,37,"RPAR",")",10]]}"####).unwrap();
+        assert_eq!(source, expected["source"].as_str().unwrap(), "{id}");
+        positive(tree, &expected);
+        return;
+    }
+
     assert!(!tree.diagnostics().is_empty(), "{id}");
     if matches!(
         id,

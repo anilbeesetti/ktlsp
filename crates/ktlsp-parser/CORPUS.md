@@ -222,3 +222,19 @@ against the actual byte/EOF guard. These do not establish an end-to-end active-E
 recovery case; that gap remains for #83. The final #83 audit still classifies attributable production deadline/allocation/
 serialization boundary evidence B3–B5 as GAP. C17 changes none of those limits or
 claims and supplies no new resource-boundary execution.
+
+## Private C13 two-component nullable recovery preparation
+
+The finite header `fun pkg.String?.healthy(` is privately prepared after unfinished
+class/interface generics, requiring exactly two receiver components, one nullable
+marker and a complete opening-parenthesis token. The focused test freezes49
+selected positive projections,61 finite controls,42 raw-token/byte cuts and1416
+UTF16 literals in original LF/CRLF/loneCR; forty EOF arithmetic rows are data-only.
+Only nullable-decline-qualified and qualified-decline-nullable are superseded by
+exact seed assertions; all historical fixture bytes/other live assertions, longer
+nullable declines and resource limits remain. This is syntax-only preparation.
+
+Source/provenance currently differ under the explicit six-path private handoff;
+the five shared vendor publication artifacts remain B3-owned/HOLD. No publication,
+CI, runtime/activeEOF evidence, semantic/provider or parity promotion follows.
+See [the held-source review](reviews/c13-two-component-nullable-recovery.md).

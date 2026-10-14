@@ -4,6 +4,7 @@
 pub mod class_header;
 pub mod class_member_names;
 pub mod constructor;
+pub mod constructor_parameters;
 mod encoding;
 pub mod function_header;
 mod header;

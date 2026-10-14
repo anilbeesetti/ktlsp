@@ -37,6 +37,62 @@ Paths support `<WORKSPACE>/` substitution and absolute host-native paths, preser
 
 Before Value construction, a custom serde visitor limits 2 MiB input bytes, 100,000 JSON values (keys are bounded by bytes), and depth 32 including root; duplicate keys are rejected at every depth. The caller project-directory length and aggregate expanded path bytes are each capped at 2 MiB; expanded lengths are charged conservatively before joining/normalizing paths. Reports stop at 128 and set `truncated` if additional fields exist; no model is returned. Conversion also applies native v1 budgets, including its 2 MiB serialized projection limit; expanding long absolute paths can hit that limit. All graph validation is iterative through ktlsp-project.
 
+## Additive v2 import (T021c / #171)
+
+`ktlsp_import::v2::from_json(absolute_project_directory, bytes)` returns a
+separate `v2::ImportedWorkspace` with an ordered sidecar and
+`project_projection() -> &ktlsp_project::v2::ProjectModel`. Existing `from_json`,
+v1 public types/errors and compile/non-exported restrictions stay unchanged.
+There is no automatic fallback, migration or v2-to-v1 conversion.
+
+Only this new API accepts all eight library scope/export tuples: lowercase
+compile/test/runtime/provided, each with absent/default-false or true
+`isExported`. Name and scope remain required. Library `isTestJar` stays unknown;
+module `isTestJar: true` remains unsupported. All other original subset rules
+above still apply, and unsupported semantics reject the whole call atomically.
+
+The separate v2 sidecar dependency enum contains `Module(ModuleDependency)`,
+`Library { library, scope, exported }` and `ModuleSource`. It preserves every
+entry, including repeated moduleSource positions. The v2 project projection
+omits only moduleSource and retains relative module/library edge order. Content
+boundaries, source membership/exact root types and interleaved library-root order
+remain in the sidecar. The projection alone is incomplete import semantics.
+
+Delivered project v2 validates tuple identity `(tag, target, scope, exported)`:
+identical tuples reject; different scopes/exports survive separately; module and
+library names occupy separate namespaces. Targets, self-edges, cycles across all
+scopes/exports, IDs and root ownership use v2 validation without coalescing or
+flattening through v1. New `v2::Error::{Import(ImportError), Project(v2::Error)}`
+wraps the respective importer or project errors and exposes their error source.
+
+The stricter importer byte/node/depth/caller/path/report limits above remain.
+V2 additionally caps its intermediate compact native manifest at 2 MiB, counting
+actual escaped JSON bytes **before extending** the serialized buffer; excess is
+`Import(BudgetExceeded("projection bytes"))`. Intermediate keys/default omissions
+are frozen in the [literal projection fixture](tests/fixtures/scoped-exported-projection.json).
+The delivered v2 loader then applies its collection, 8 MiB prejoin and separate
+2 MiB normalized-output limits. An exact intermediate limit can therefore pass
+serialization and still fail normalized output. Early Schema/path errors can
+override accumulated Unsupported reports; collected Unsupported precedes
+serialization and project validation. V1 retains its serialization/error policy.
+
+Decoded input/string bytes and JSON-node counts, aggregate expanded paths across
+all content/source/library occurrences, fixed sidecar/projection copies and the
+new serialized-length cap provide finite logical storage bounds. These are
+separate limits, not an aggregate allocator-capacity, RSS or OOM guarantee.
+Public-field mutation is outside loader-returned bounds. Valid maximum edge
+counts may be unreachable under the simultaneous byte/node limits.
+
+The independently authored [input fixture](tests/fixtures/scoped-exported.json)
+freezes 12 sidecar entries and 10 projected edges, all eight library tuples,
+same-name module/library identities, Unicode paths and ordered roots. Tests
+cover compatibility, tuple/graph/reference errors, malformed/unknown fields,
+atomic mixed blockers, truncation and byte/node/depth/path/projection boundaries.
+Verification evidence is in [the review note](reviews/t021-import-v2.md).
+No official runtime/oracle/build tool was run. SDK/resources/exclusions/facets/
+plugins/compiler/build metadata, path/symlink/platform parity, server wiring and
+semantic visibility remain pending. This finite child does not complete T021/#21.
+
 ## Next child
 
-Extend the native/import contract for module SDK identity/default inheritance, scoped/exported library edges, resource/excluded roots, facets/plugins, compiler/language/output settings, special library metadata, and build-system provenance. Then add original-schema fixtures for those translations and oracle comparisons. This subset does not implement full T021, Gradle/Maven/JPS import, dependency resolution or compiler semantics.
+Extend the native/import contract for module SDK identity/default inheritance, resource/excluded roots, facets/plugins, compiler/language/output settings, special library metadata, and build-system provenance. Then add original-schema fixtures for those translations and oracle comparisons. This subset does not implement full T021, Gradle/Maven/JPS import, dependency resolution or compiler semantics.

@@ -1,0 +1,31 @@
+{
+  "schemaVersion":2,
+  "modules":[
+    {
+      "id":"app😀",
+      "sourceRoots":[
+        {"path":"/ktlsp/t021/app/src/kotlin","kind":"production"},
+        {"path":"/ktlsp/t021/app/test","kind":"test"},
+        {"path":"/ktlsp/t021/extra/src","kind":"production"}
+      ],
+      "dependencies":[
+        {"type":"library","library":"shared","scope":"compile","exported":false},
+        {"type":"module","module":"shared","scope":"provided","exported":true},
+        {"type":"library","library":"shared","scope":"compile","exported":true},
+        {"type":"library","library":"shared","scope":"test","exported":false},
+        {"type":"library","library":"shared","scope":"test","exported":true},
+        {"type":"library","library":"shared","scope":"runtime","exported":false},
+        {"type":"library","library":"shared","scope":"runtime","exported":true},
+        {"type":"module","module":"shared","scope":"provided","exported":false},
+        {"type":"library","library":"shared","scope":"provided","exported":false},
+        {"type":"library","library":"shared","scope":"provided","exported":true}
+      ]
+    },
+    {"id":"shared","sourceRoots":[],"dependencies":[]}
+  ],
+  "libraries":[{
+    "id":"shared",
+    "binaries":["/ktlsp/t021/lib/classes.jar"],
+    "sources":["/ktlsp/t021/lib/sources.zip"]
+  }]
+}

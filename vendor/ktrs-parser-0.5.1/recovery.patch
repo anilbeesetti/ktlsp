@@ -660,7 +660,7 @@
  
                  if !self.at(COMMA) {
                      break;
-@@ -39,13 +82,175 @@
+@@ -39,13 +82,182 @@
                  }
              }
  
@@ -756,10 +756,17 @@
 +                            generic_receiver_name
 +                                && probe.my_builder.get_token_text() != Some("suspend")
 +                                && probe.expect(IDENTIFIER)
-+                                && probe.expect(GT)
-+                                && (probe.consume_if(DOT)
-+                                    || probe.consume_if(SAFE_ACCESS)
-+                                    || (probe.consume_if(QUEST) && probe.expect(DOT)))
++                                && (if probe.consume_if(COMMA) {
++                                    probe.my_builder.get_token_text() != Some("suspend")
++                                        && probe.expect(IDENTIFIER)
++                                        && probe.expect(GT)
++                                        && probe.expect(DOT)
++                                } else {
++                                    probe.expect(GT)
++                                        && (probe.consume_if(DOT)
++                                            || probe.consume_if(SAFE_ACCESS)
++                                            || (probe.consume_if(QUEST) && probe.expect(DOT)))
++                                })
 +                                && probe.expect(IDENTIFIER)
 +                        } else if probe.consume_if(SAFE_ACCESS) {
 +                    probe.expect(IDENTIFIER)
@@ -838,7 +845,7 @@
      }
  
      /*
-@@ -132,23 +337,43 @@
+@@ -132,23 +344,43 @@
       *   : modifiers SimpleName (":" userType)?
       *   ;
       */

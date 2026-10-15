@@ -1,0 +1,12 @@
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.ktlsp.fixture</groupId>
+  <artifactId>core</artifactId>
+  <version>1.0.0</version>
+  <dependencies>
+    <dependency><groupId>org.example</groupId><artifactId>api</artifactId><version>2.0</version></dependency>
+    <dependency><groupId>org.example</groupId><artifactId>tests</artifactId><version>3.0</version><scope>test</scope></dependency>
+    <dependency><groupId>org.example</groupId><artifactId>runtime</artifactId><version>4.0</version><scope>runtime</scope></dependency>
+    <dependency><groupId>org.example</groupId><artifactId>api</artifactId><version>2.0</version><scope>provided</scope><type>jar</type><optional>false</optional></dependency>
+  </dependencies>
+</project>

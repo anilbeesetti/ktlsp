@@ -55,8 +55,8 @@ jobs:
             powershell = $PSVersionTable.PSVersion.ToString()
           } | ConvertTo-Json | Set-Content "$evidence/identity.json"
           if ('${{ github.repository }}' -cne 'anilbeesetti/ktlsp' -or
-              '${{ github.ref }}' -cne 'refs/heads/codex/t021-windows-first-pin-observability' -or
-              $env:ACTUAL_WORKFLOW_REF -cne 'anilbeesetti/ktlsp/.github/workflows/t021-windows-project-model.yml@refs/heads/codex/t021-windows-first-pin-observability' -or
+              '${{ github.ref }}' -cne 'refs/heads/codex/t021-windows-control-byte-evidence' -or
+              $env:ACTUAL_WORKFLOW_REF -cne 'anilbeesetti/ktlsp/.github/workflows/t021-windows-project-model.yml@refs/heads/codex/t021-windows-control-byte-evidence' -or
               '${{ github.run_attempt }}' -cne '1' -or
               '${{ runner.os }}' -cne 'Windows' -or '${{ runner.arch }}' -cne 'X64' -or
               $env:EXPECTED_WORKFLOW_SHA -cnotmatch '^[0-9a-f]{40}$' -or
@@ -79,8 +79,306 @@ jobs:
           git -c core.autocrlf=false -c core.eol=lf checkout-index --all --force
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $file = '.github/workflows/t021-windows-project-model.yml'
-          $actual = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actual -cne $env:EXPECTED_WORKFLOW_HASH) { throw 'Workflow byte mismatch' }
+          $actual = $null
+          $controlRecord = $null
+          $controlGate = @{ metadata_retained = $false; metadata_write_attempted = $false; metadata_write_error = $null; after_bound = $false }
+          try {
+          $controlEvidence = Join-Path $env:RUNNER_TEMP 't021-evidence'
+          $controlDirectory = (Get-Location).ProviderPath
+          $controlClock = $null
+          function Limit-ControlError($message) {
+            $text = [string]$message
+            if ($text.Length -gt 256) { $text = $text.Substring(0, 256) }
+            return $text
+          }
+          function Get-ControlDigest([byte[]]$buffer, [int]$count) {
+            $hasher = [Security.Cryptography.SHA256]::Create()
+            try { return [BitConverter]::ToString($hasher.ComputeHash($buffer, 0, $count)).Replace('-', '').ToLowerInvariant() }
+            finally { $hasher.Dispose() }
+          }
+          function Write-ControlBytes($name, [byte[]]$buffer, [int]$count) {
+            $writer = $null
+            $result = @{ retained = $false; write_error = $null }
+            try {
+              $writer = [IO.File]::Open((Join-Path $controlEvidence $name), [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+              $writer.Write($buffer, 0, $count)
+              $writer.Flush($true)
+              $result.retained = $true
+            } catch { $result.write_error = Limit-ControlError $_.Exception.Message }
+            finally {
+              if ($null -ne $writer) {
+                try { $writer.Dispose() } catch { $result.retained = $false; $result.write_error = Limit-ControlError $_.Exception.Message }
+              }
+            }
+            return $result
+          }
+          function New-ControlCapture($artifact) {
+            return [ordered]@{
+              artifact = $artifact; observed_bytes = 0; captured_bytes = 0
+              initial_length = $null; final_length = $null; complete_byte_length = $null
+              eof = $false; truncated = $false; capture_complete = $false
+              full_sha256 = $null; prefix_sha256 = $null; capture_error = $null; hash_error = $null
+              retained = $false; write_error = $null
+            }
+          }
+          function Finish-ControlCapture($capture, [byte[]]$buffer, [int]$count, [int]$cap) {
+            $capture.observed_bytes = $count
+            $capture.captured_bytes = [Math]::Min($count, $cap)
+            $capture.truncated = $count -gt $cap
+            if ($capture.truncated) { $capture.capture_complete = $false }
+            if ($capture.captured_bytes -eq 0 -and -not $capture.capture_complete) { return }
+            try {
+              $digest = Get-ControlDigest $buffer $capture.captured_bytes
+              if ($capture.capture_complete) { $capture.full_sha256 = $digest; $capture.complete_byte_length = $count }
+              else { $capture.prefix_sha256 = $digest }
+            } catch { $capture.hash_error = Limit-ControlError $_.Exception.Message; $capture.capture_complete = $false }
+            $write = Write-ControlBytes $capture.artifact $buffer $capture.captured_bytes
+            $capture.retained = $write.retained
+            $capture.write_error = $write.write_error
+          }
+          function Invoke-ControlGit([string[]]$arguments, [int]$stdoutCap, [int]$stderrCap) {
+            $value = @{
+              stdout_buffer = [byte[]]::new($stdoutCap + 1); stderr_buffer = [byte[]]::new($stderrCap + 1)
+              stdout_count = 0; stderr_count = 0; stdout_eof = $false; stderr_eof = $false
+              process = @{ started = $false; exit_code = $null; timed_out = $false; termination_requested = $false; termination_error = $null; capture_error = $null; elapsed_ms = 0 }
+            }
+            if ($controlClock.ElapsedMilliseconds -ge 10000) {
+              $value.process.timed_out = $true; $value.process.capture_error = 'shared_deadline_not_started'
+              $value.process.elapsed_ms = $controlClock.ElapsedMilliseconds
+              return $value
+            }
+            $process = [Diagnostics.Process]::new()
+            try {
+              $process.StartInfo.FileName = 'git'
+              $process.StartInfo.WorkingDirectory = $controlDirectory
+              $process.StartInfo.UseShellExecute = $false
+              $process.StartInfo.RedirectStandardOutput = $true
+              $process.StartInfo.RedirectStandardError = $true
+              $process.StartInfo.CreateNoWindow = $true
+              foreach ($argument in $arguments) { $process.StartInfo.ArgumentList.Add($argument) }
+              if ($controlClock.ElapsedMilliseconds -ge 10000) { $value.process.timed_out = $true; throw 'shared_deadline_before_start' }
+              $value.process.started = $process.Start()
+              if (-not $value.process.started) { throw 'git_start_returned_false' }
+              $stdoutRead = $process.StandardOutput.BaseStream.ReadAsync($value.stdout_buffer, 0, $value.stdout_buffer.Length)
+              $stderrRead = $process.StandardError.BaseStream.ReadAsync($value.stderr_buffer, 0, $value.stderr_buffer.Length)
+              while ($true) {
+                if ($controlClock.ElapsedMilliseconds -ge 10000) { $value.process.timed_out = $true; $value.process.capture_error = 'shared_deadline'; break }
+                if (-not $value.stdout_eof -and $stdoutRead.IsCompleted) {
+                  $read = $stdoutRead.GetAwaiter().GetResult()
+                  $value.stdout_count += $read
+                  if ($read -eq 0) { $value.stdout_eof = $true }
+                  elseif ($value.stdout_count -gt $stdoutCap) { $value.process.capture_error = 'stdout_cap'; break }
+                  else { $stdoutRead = $process.StandardOutput.BaseStream.ReadAsync($value.stdout_buffer, $value.stdout_count, $value.stdout_buffer.Length - $value.stdout_count) }
+                }
+                if (-not $value.stderr_eof -and $stderrRead.IsCompleted) {
+                  $read = $stderrRead.GetAwaiter().GetResult()
+                  $value.stderr_count += $read
+                  if ($read -eq 0) { $value.stderr_eof = $true }
+                  elseif ($value.stderr_count -gt $stderrCap) { $value.process.capture_error = 'stderr_cap'; break }
+                  else { $stderrRead = $process.StandardError.BaseStream.ReadAsync($value.stderr_buffer, $value.stderr_count, $value.stderr_buffer.Length - $value.stderr_count) }
+                }
+                if ($controlClock.ElapsedMilliseconds -ge 10000) { $value.process.timed_out = $true; $value.process.capture_error = 'shared_deadline'; break }
+                if ($value.stdout_eof -and $value.stderr_eof -and $process.HasExited) { break }
+                [Threading.Thread]::Sleep([int][Math]::Min(5, [Math]::Max(0, 10000 - $controlClock.ElapsedMilliseconds)))
+              }
+            } catch { $value.process.capture_error = Limit-ControlError $_.Exception.Message }
+            finally {
+              if ($value.process.started) {
+                try {
+                  if (-not $process.HasExited) {
+                    $value.process.termination_requested = $true
+                    $process.Kill()
+                    $remaining = [int][Math]::Max(0, 10000 - $controlClock.ElapsedMilliseconds)
+                    if (-not $process.WaitForExit($remaining)) { $value.process.termination_error = 'exit_not_observed_before_deadline' }
+                  }
+                  if ($process.HasExited) { $value.process.exit_code = $process.ExitCode }
+                } catch { $value.process.termination_error = Limit-ControlError $_.Exception.Message }
+              }
+              $value.process.elapsed_ms = $controlClock.ElapsedMilliseconds
+              $process.Dispose()
+            }
+            return $value
+          }
+          function Control-PipeRecord($value, $stream, [int]$cap) {
+            $count = $value[$stream + '_count']
+            $captured = [Math]::Min($count, $cap)
+            return @{
+              observed_bytes = $count; captured_bytes = $captured; eof = $value[$stream + '_eof']; truncated = ($count -gt $cap)
+              raw_base64 = [Convert]::ToBase64String($value[$stream + '_buffer'], 0, $captured)
+              capture_error = $value.process.capture_error
+            }
+          }
+          function Write-ControlFallback($errorText, [bool]$truncated) {
+            $metadata = @{ phase = 'after_metadata_write'; retained = $controlGate.metadata_retained; write_attempted = $controlGate.metadata_write_attempted; write_error = $controlGate.metadata_write_error; truncated = $truncated }
+            $fallback = @{ schema = 1; captures_omitted = $true; path = $file; expected_sha256 = $env:EXPECTED_WORKFLOW_HASH; admitted_workflow_commit = '${{ github.workflow_sha }}'; collection_error = (Limit-ControlError $errorText); metadata = $metadata }
+            $line = 'CONTROL_WORKFLOW_EVIDENCE_JSON: ' + ($fallback | ConvertTo-Json -Depth 4 -Compress)
+            if ([Text.Encoding]::UTF8.GetByteCount($line + [Environment]::NewLine) -gt 8192) { $line = 'CONTROL_WORKFLOW_EVIDENCE_JSON: ' + (@{ schema = 1; captures_omitted = $true; collection_error = 'fallback_cap'; metadata = $metadata } | ConvertTo-Json -Depth 4 -Compress) }
+            Write-Output $line
+          }
+          function Write-ControlMetadata($record) {
+            $utf8 = [Text.UTF8Encoding]::new($false)
+            $before = $utf8.GetBytes(($record | ConvertTo-Json -Depth 10 -Compress))
+            if ($before.Length -gt 8192) { throw 'metadata_cap' }
+            $snapshotHash = Get-ControlDigest $before $before.Length
+            $controlGate.metadata_write_attempted = $true
+            $write = Write-ControlBytes 'control-workflow-byte-check.json' $before $before.Length
+            $controlGate.metadata_write_error = $write.write_error
+            $bindingOK = $false
+            if ($write.retained) {
+              $reader = $null
+              try {
+                $saved = [byte[]]::new(8193)
+                $count = 0
+                $eof = $false
+                $reader = [IO.File]::Open((Join-Path $controlEvidence 'control-workflow-byte-check.json'), [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+                while ($count -lt $saved.Length) {
+                  $read = $reader.Read($saved, $count, $saved.Length - $count)
+                  if ($read -eq 0) { $eof = $true; break }
+                  $count += $read
+                }
+                $bindingOK = $eof -and $count -eq $before.Length -and (Get-ControlDigest $saved $count) -ceq $snapshotHash
+                if (-not $bindingOK) { throw 'metadata_binding' }
+              } catch { $write.retained = $false; $write.write_error = Limit-ControlError $_.Exception.Message }
+              finally {
+                if ($null -ne $reader) {
+                  try { $reader.Dispose() } catch { $bindingOK = $false; $write.retained = $false; $write.write_error = Limit-ControlError $_.Exception.Message }
+                }
+              }
+            }
+            $controlGate.metadata_retained = $write.retained -and $bindingOK
+            $controlGate.metadata_write_error = $write.write_error
+            $record.metadata.phase = 'after_metadata_write'
+            $record.metadata.retained = $write.retained
+            $record.metadata.write_error = $write.write_error
+            $record.metadata.metadata_snapshot_bytes = $before.Length
+            $record.metadata.metadata_snapshot_sha256 = $snapshotHash
+            $fieldsMatch = $record.metadata.metadata_snapshot_bytes -eq $before.Length -and $record.metadata.metadata_snapshot_sha256 -ceq $snapshotHash
+            if (-not $fieldsMatch) { throw 'metadata_binding' }
+            $line = 'CONTROL_WORKFLOW_EVIDENCE_JSON: ' + ($record | ConvertTo-Json -Depth 10 -Compress)
+            if ($utf8.GetByteCount($line + [Environment]::NewLine) -gt 8192) { throw 'console_cap' }
+            Write-Output $line
+            $controlGate.after_bound = $controlGate.metadata_retained -and $bindingOK -and $fieldsMatch
+          }
+          $controlRecord = [ordered]@{
+            schema = 1; run_id = '${{ github.run_id }}'; run_attempt = '${{ github.run_attempt }}'; repository = '${{ github.repository }}'
+            workflow_ref = '${{ github.workflow_ref }}'; admitted_workflow_commit = '${{ github.workflow_sha }}'; path = $file; expected_sha256 = $env:EXPECTED_WORKFLOW_HASH
+            existing_materialization_command = 'git -c core.autocrlf=false -c core.eol=lf checkout-index --all --force'
+            existing_command_local_overrides = @{ 'core.autocrlf' = 'false'; 'core.eol' = 'lf' }
+            read_relationship = 'captured_buffer_is_authoritative; later_CopyItem_is_separate; no_atomic_snapshot_claim'
+            caps = @{ working = 65536; blob = 65536; git_stderr = 4096; settings_json = 20480; metadata = 8192; console = 8192; query_stdout = 2048; query_stderr = 1024; shared_deadline_ms = 10000 }
+            working_tree = (New-ControlCapture 'control-workflow-working-tree.bin')
+            immutable_blob = (New-ControlCapture 'control-workflow-git-blob.bin')
+            git_stderr = (New-ControlCapture 'control-workflow-git-stderr.bin')
+            blob_source_expression = ('${{ github.workflow_sha }}:' + $file); computed_git_blob_oid = $null; blob_process = $null; blob_collection_error = $null
+            settings = @{ artifact = 'control-workflow-settings.json'; captured_queries = 0; expected_queries = 4; query_statuses = @(); bytes = $null; sha256 = $null; retained = $false; truncated = $false; capture_error = $null; write_error = $null; scope = 'persistent_config_and_working_tree_attributes; command_overrides_separate' }
+            metadata = @{ phase = 'before_metadata_write'; retained = $null; write_error = $null; truncated = $false; metadata_snapshot_bytes = $null; metadata_snapshot_sha256 = $null }
+            collection_error = $null
+          }
+          $workingBuffer = [byte[]]::new(65537)
+          $workingCount = 0
+          $reader = $null
+          try {
+            $reader = [IO.File]::Open((Join-Path $controlDirectory $file), [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+            $controlRecord.working_tree.initial_length = $reader.Length
+            while ($workingCount -lt $workingBuffer.Length) {
+              $read = $reader.Read($workingBuffer, $workingCount, $workingBuffer.Length - $workingCount)
+              if ($read -eq 0) { $controlRecord.working_tree.eof = $true; break }
+              $workingCount += $read
+            }
+            $controlRecord.working_tree.final_length = $reader.Length
+            if ($controlRecord.working_tree.initial_length -ne $controlRecord.working_tree.final_length) { $controlRecord.working_tree.capture_error = 'working_length_changed' }
+            if ($controlRecord.working_tree.eof -and $workingCount -ne $controlRecord.working_tree.initial_length -and $null -eq $controlRecord.working_tree.capture_error) { $controlRecord.working_tree.capture_error = 'working_short_read' }
+            $controlRecord.working_tree.capture_complete = $controlRecord.working_tree.eof -and $workingCount -eq $controlRecord.working_tree.initial_length -and $null -eq $controlRecord.working_tree.capture_error
+          } catch { $controlRecord.working_tree.capture_error = Limit-ControlError $_.Exception.Message }
+          finally {
+            if ($null -ne $reader) {
+              try { $reader.Dispose() } catch { $controlRecord.working_tree.capture_error = Limit-ControlError $_.Exception.Message; $controlRecord.working_tree.capture_complete = $false }
+            }
+          }
+          Finish-ControlCapture $controlRecord.working_tree $workingBuffer $workingCount 65536
+          if ($controlRecord.working_tree.capture_complete -and $null -ne $controlRecord.working_tree.full_sha256) { $actual = $controlRecord.working_tree.full_sha256 }
+          $controlClock = [Diagnostics.Stopwatch]::StartNew()
+          try {
+            $blob = Invoke-ControlGit -arguments @('cat-file', 'blob', $controlRecord.blob_source_expression) -stdoutCap 65536 -stderrCap 4096
+            $controlRecord.blob_process = $blob.process
+            $controlRecord.immutable_blob.eof = $blob.stdout_eof
+            $controlRecord.immutable_blob.capture_complete = $blob.stdout_eof -and $blob.stderr_eof -and $blob.stdout_count -le 65536 -and $blob.stderr_count -le 4096 -and $blob.process.started -and $blob.process.exit_code -eq 0 -and -not $blob.process.timed_out -and -not $blob.process.termination_requested -and $null -eq $blob.process.capture_error -and $null -eq $blob.process.termination_error
+            if (-not $controlRecord.immutable_blob.capture_complete) { $controlRecord.immutable_blob.capture_error = $blob.process.capture_error; if ($null -eq $controlRecord.immutable_blob.capture_error) { $controlRecord.immutable_blob.capture_error = 'blob_incomplete_or_nonzero_exit' } }
+            Finish-ControlCapture $controlRecord.immutable_blob $blob.stdout_buffer $blob.stdout_count 65536
+            $controlRecord.git_stderr.eof = $blob.stderr_eof
+            $controlRecord.git_stderr.capture_complete = $blob.stderr_eof -and $blob.stderr_count -le 4096
+            if (-not $controlRecord.git_stderr.capture_complete) { $controlRecord.git_stderr.capture_error = $blob.process.capture_error }
+            Finish-ControlCapture $controlRecord.git_stderr $blob.stderr_buffer $blob.stderr_count 4096
+            if ($controlRecord.immutable_blob.capture_complete) {
+              $object = [IO.MemoryStream]::new()
+              $oidHasher = [Security.Cryptography.SHA1]::Create()
+              try {
+                $header = [Text.Encoding]::ASCII.GetBytes("blob $($blob.stdout_count)`0")
+                $object.Write($header, 0, $header.Length)
+                $object.Write($blob.stdout_buffer, 0, $blob.stdout_count)
+                $object.Position = 0
+                $controlRecord.computed_git_blob_oid = [BitConverter]::ToString($oidHasher.ComputeHash($object)).Replace('-', '').ToLowerInvariant()
+              } catch {
+                $controlRecord.immutable_blob.hash_error = Limit-ControlError $_.Exception.Message
+                $controlRecord.immutable_blob.capture_complete = $false
+                $controlRecord.immutable_blob.complete_byte_length = $null
+                $controlRecord.immutable_blob.prefix_sha256 = $controlRecord.immutable_blob.full_sha256
+                $controlRecord.immutable_blob.full_sha256 = $null
+              } finally { $oidHasher.Dispose(); $object.Dispose() }
+            }
+          } catch {
+            $controlRecord.blob_collection_error = Limit-ControlError $_.Exception.Message
+            $controlRecord.immutable_blob.capture_complete = $false
+            $controlRecord.immutable_blob.prefix_sha256 = $controlRecord.immutable_blob.full_sha256
+            $controlRecord.immutable_blob.full_sha256 = $null
+            $controlRecord.immutable_blob.complete_byte_length = $null
+            $controlRecord.computed_git_blob_oid = $null
+          }
+          try {
+            $queries = @(
+              @{ id = 'core-autocrlf'; args = @('config', '--null', '--show-origin', '--get-all', 'core.autocrlf') },
+              @{ id = 'core-eol'; args = @('config', '--null', '--show-origin', '--get-all', 'core.eol') },
+              @{ id = 'core-attributesfile'; args = @('config', '--null', '--show-origin', '--get-all', 'core.attributesfile') },
+              @{ id = 'path-attributes'; args = @('check-attr', '-z', 'text', 'eol', 'working-tree-encoding', 'filter', 'ident', '--', $file) }
+            )
+            $queryRows = [Collections.Generic.List[object]]::new()
+            foreach ($query in $queries) {
+              $value = Invoke-ControlGit -arguments $query.args -stdoutCap 2048 -stderrCap 1024
+              $state = 'FAILED_OR_PARTIAL'
+              $complete = $value.stdout_eof -and $value.stderr_eof -and $value.stdout_count -le 2048 -and $value.stderr_count -le 1024 -and $value.process.started -and -not $value.process.timed_out -and -not $value.process.termination_requested -and $null -eq $value.process.capture_error -and $null -eq $value.process.termination_error
+              if ($complete -and $value.process.exit_code -eq 0) { $state = 'VALUE_RAW' }
+              elseif ($complete -and $query.id -ne 'path-attributes' -and $value.process.exit_code -eq 1 -and $value.stdout_count -eq 0 -and $value.stderr_count -eq 0) { $state = 'UNSET' }
+              elseif (-not $value.process.started) { $state = 'NOTREACHED_OR_START_FAILED' }
+              $queryRows.Add(@{ id = $query.id; argv = $query.args; state = $state; stdout = (Control-PipeRecord $value 'stdout' 2048); stderr = (Control-PipeRecord $value 'stderr' 1024); process = $value.process })
+              $controlRecord.settings.captured_queries = $queryRows.Count
+              $controlRecord.settings.query_statuses += @{ id = $query.id; state = $state; exit_code = $value.process.exit_code }
+            }
+            $controlRecord.settings.captured_queries = $queryRows.Count
+            $settingsValue = @{ schema = 1; scope = $controlRecord.settings.scope; expected_queries = 4; queries = $queryRows }
+            $settingsBytes = [Text.UTF8Encoding]::new($false).GetBytes(($settingsValue | ConvertTo-Json -Depth 10 -Compress))
+            if ($settingsBytes.Length -gt 20480) {
+              $controlRecord.settings.truncated = $true; $controlRecord.settings.capture_error = 'settings_serialization_cap'
+              $settingsBytes = [Text.UTF8Encoding]::new($false).GetBytes('{"schema":1,"captures_omitted":true,"truncated":true,"capture_error":"settings_serialization_cap"}')
+            }
+            $controlRecord.settings.bytes = $settingsBytes.Length
+            $controlRecord.settings.sha256 = Get-ControlDigest $settingsBytes $settingsBytes.Length
+            $write = Write-ControlBytes 'control-workflow-settings.json' $settingsBytes $settingsBytes.Length
+            $controlRecord.settings.retained = $write.retained
+            $controlRecord.settings.write_error = $write.write_error
+          } catch { $controlRecord.settings.capture_error = Limit-ControlError $_.Exception.Message }
+          finally { $controlClock.Stop() }
+          try { Write-ControlMetadata $controlRecord }
+          catch { Write-ControlFallback $_.Exception.Message ($_.Exception.Message -in @('metadata_cap', 'console_cap')) }
+          } catch {
+          if ($null -ne $controlRecord) { $controlRecord.collection_error = Limit-ControlError $_.Exception.Message }
+          try { Write-ControlFallback $_.Exception.Message $false } catch { }
+          } finally {
+          # A known mismatch retains the original rejection even when diagnostics fail.
+          if ($null -ne $actual) {
+            if ($actual -cne $env:EXPECTED_WORKFLOW_HASH) { throw 'Workflow byte mismatch' }
+          }
+          if ($null -eq $actual -or $null -eq $controlRecord -or -not $controlRecord.working_tree.retained -or -not $controlGate.metadata_retained -or -not $controlGate.after_bound) { throw 'Workflow byte evidence capture failed' }
+          }
           Copy-Item $file "$env:RUNNER_TEMP/t021-evidence/workflow.yml"
       - uses: actions/checkout@v4
         with:

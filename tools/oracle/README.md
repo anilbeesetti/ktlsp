@@ -50,3 +50,29 @@ The initial incomplete manifest exists before launch. Final manifest records scr
 Supervision is explicitly Linux/macOS-only (other platforms fail before creating output or launching). Each child starts its own process group. All return paths attempt SIGKILL on that group, including after direct-child exit; normal completion also kills any same-group descendant that closed its pipes. Cleanup drains within its own deadline and observes/reaps the direct child without blocking. Descendants that escape into another group/session are outside containment, and grandchildren are reaped by their OS parent/init. Tests independently observe a descendant heartbeat stopping and pipe EOF after group termination. No claim of a general process sandbox or Windows support is made.
 
 **Official live execution remains blocked.** This child ran synthetic Rust peers only. A later separately admitted gate must authenticate publisher archive checksum/provenance, validate launcher-specific containment (including escaped groups), review isolation/arguments and admit actual official capture. An existing local official installation does not authorize this recorder to launch it. T045 remains open; no new official diagnostic or feature-parity evidence is produced here.
+
+## PR174 input validation (source only)
+
+`recorder::validate_pr174_inputs(identity_path, preflight_path, fixture_directory)`
+checks bounded proposed-run and preflight data for the two unchanged
+[PR174 fixtures](fixtures/official-pr174-symbols/README.md). Consistent inputs
+return `Ok(())`; invalid inputs return an error. It creates no evidence and
+spawns no process. This success is data validation, never launch authorization.
+No official CLI or recording path is delivered.
+
+Both JSON inputs are regular, nonsymlink files limited to 16 KiB; source/script
+files must exactly match embedded bytes, including UTF-8/newlines. The proposed
+identity schema pins the preparation contract and source baseline, repository,
+workflow-dispatch attempt 1 and finite original-run identifiers. Preflight must
+repeat that identity and fixed release/hash claims, command, limits and output
+path. Test source provides deliberately fabricated schema examples, never run
+evidence. Unknown or duplicate top-level, identity, pin and limit fields are refused.
+
+This checks data consistency only. Matching supplied hashes do not authenticate
+the publisher, actual executable bytes, run, permissions or authorization. The
+trusted host-supervisor handoff, effective isolation, runtime attestation and
+actual teardown remain unimplemented. A live recording entrypoint requires
+separate source/execution admission and independent review. Existing `record()`
+and `--synthetic-only` retain their scope, environment, limits and raw/error/
+cleanup behavior. No dependency, workflow, product or native default-test graph
+changes accompany this source preparation.

@@ -114,20 +114,39 @@ crash, and architect each approved the frozen contract, identified source
 findings, and rechecked the applied fixes with no remaining actionable finding.
 Fixes cover slash-based logical reactor keys, case-insensitive mutable versions,
 required XML attribute separators, and aggregate retained POM provenance paths.
-Review source SHA-256: `maven.rs`
+Initial reviewed source SHA-256 (head `c76afde3`): `maven.rs`
 `41a6027d786a9f269e0e4123caeb2d69b0d9953667d9f1c864d9580394c6ab14`;
 `tests/maven.rs`
 `48b76acd6af7aa5a46fc9c30724c557ef829e0d5b3f30b9b467c3afcb3265df0`.
 
 Local validation: first format check failed on unformatted newly authored
 source (exit 1); `cargo fmt --all` corrected it and subsequent pinned format
-checks passed. Both the first source and final changed-source compile-only
+checks passed. Both the first source and pre-BOM-fix changed-source compile-only
 `CARGO_BUILD_JOBS=2 cargo clippy --locked --workspace --all-targets -- -D warnings`
 passed (exit 0), under separately granted coordinator compile slots. No local
 native test binary ran. Metadata-only offline lock resolution changed only the
 ktlsp-import quick-xml edge and new quick-xml package/checksum; `cargo tree
 --locked --offline -p quick-xml --edges normal,build,dev,features` showed only
 existing memchr 2.8.3 with its std/alloc features, no build/dev dependency.
+
+The [first original hosted Native run](https://github.com/anilbeesetti/ktlsp/actions/runs/38687408968)
+(attempt 1, pull_request, head `c76afde3b3810ebcdb171ddd6b65e73b3c022aa1`)
+passed Format/Clippy but failed Tests (exit 101): Maven integration 10 passed,
+1 failed (`defaults_empty_lists_and_literal_comments`, original-byte root span
+assertion); both private budget tests passed. The workflow stopped at that
+failure, so it did not validate the remaining workspace suites.
+
+Root cause: pinned quick-xml removes the UTF-8 BOM without charging its bytes
+to buffer_position. Corrected source adds BOM length uniformly to parser
+start/end positions, and requires a declaration exactly after the optional BOM.
+The original failed assertion remains. A new regression freezes exact original
+root/Unicode source/dependency spans for all four BOM/declaration combinations,
+plus whitespace-before-declaration and double-BOM rejection. All three retained
+reviewers independently rechecked and approved this correction, without runtime
+execution. Corrected source SHA-256: `maven.rs`
+`da215516e28b03c08fb18139249db38a071bb307ea7b15ae86a0b3e721462600`;
+`tests/maven.rs`
+`167ba3279291d4114350f8cb4fb634cd1d2180c4cfdee352e0c07c4397050a1b`.
 
 These are source/compile approvals. Original unchanged hosted Linux Native CI
 and exact integration receipts remain delivery gates, recorded with the PR by

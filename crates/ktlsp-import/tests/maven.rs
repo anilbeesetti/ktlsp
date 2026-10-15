@@ -133,6 +133,7 @@ fn reactor_preserves_order_scopes_provenance_and_source_only_projection() {
 fn defaults_empty_lists_and_literal_comments() {
     for text in [
         SIMPLE.to_owned(),
+        format!("\u{feff}{SIMPLE}"),
         with("<build/><dependencies/><modules/>"),
         format!("\u{feff}<?xml version='1.0' encoding='utf-8' standalone='yes'?>{SIMPLE}"),
         SIMPLE.replace("org.example", "org.<!-- note -->example"),
@@ -629,4 +630,33 @@ fn retained_provenance_paths_share_the_aggregate_budget() {
         )
         .is_ok()
     );
+}
+
+#[test]
+fn bom_provenance_ranges_address_the_original_snapshot() {
+    let body = "<build><sourceDirectory>sources/日本</sourceDirectory></build><dependencies><dependency><groupId>x</groupId><artifactId>y</artifactId><version>1</version></dependency></dependencies>";
+    for prefix in [
+        "",
+        "\u{feff}",
+        "<?xml version='1.0'?>",
+        "\u{feff}<?xml version='1.0'?>",
+    ] {
+        let xml = format!("{prefix}{}", with(body));
+        let result = import(&xml).unwrap();
+        let module = &result.modules[0];
+        assert_eq!(module.source.range, Some(prefix.len()..xml.len()));
+        let root = &module.source_roots[0].source;
+        assert_eq!(
+            &xml[root.range.clone().unwrap()],
+            "<sourceDirectory>sources/日本</sourceDirectory>"
+        );
+        let dependency = &module.dependencies[0].source;
+        assert_eq!(
+            &xml[dependency.range.clone().unwrap()],
+            "<dependency><groupId>x</groupId><artifactId>y</artifactId><version>1</version></dependency>"
+        );
+    }
+    for prefix in ["\u{feff} <?xml version='1.0'?>", "\u{feff}\u{feff}"] {
+        assert!(import(&format!("{prefix}{SIMPLE}")).is_err());
+    }
 }

@@ -208,6 +208,8 @@ fn parse(pom: &str, text: &str) -> Result<Node, Error> {
         return Err(invalid(pom, 0, "invalid XML 1.0 character"));
     }
     let mut reader = NsReader::from_str(text);
+    // quick-xml strips the UTF-8 BOM without charging it to buffer_position.
+    let bom_bytes = usize::from(text.starts_with('\u{feff}')) * 3;
     reader.config_mut().check_comments = true;
     let mut stack: Vec<Node> = Vec::new();
     let mut root = None;
@@ -215,11 +217,11 @@ fn parse(pom: &str, text: &str) -> Result<Node, Error> {
         if count == MAX_EVENTS {
             return Err(Error::Budget("XML events"));
         }
-        let start = reader.buffer_position() as usize;
+        let start = reader.buffer_position() as usize + bom_bytes;
         let event = reader
             .read_event()
             .map_err(|_| invalid(pom, start, "malformed XML"))?;
-        let end = reader.buffer_position() as usize;
+        let end = reader.buffer_position() as usize + bom_bytes;
         let empty = matches!(event, Event::Empty(_));
         match event {
             Event::Start(tag) | Event::Empty(tag) => {
@@ -285,7 +287,7 @@ fn parse(pom: &str, text: &str) -> Result<Node, Error> {
             }
             Event::Comment(_) => {}
             Event::Decl(decl) => {
-                if start != 0 && !(start == 3 && text.starts_with('\u{feff}')) {
+                if start != bom_bytes {
                     return Err(invalid(pom, start, "declaration must be first"));
                 }
                 let value = std::str::from_utf8(decl.as_ref())

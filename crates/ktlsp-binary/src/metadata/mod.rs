@@ -18,6 +18,7 @@ pub mod payload;
 pub mod property_header;
 pub mod string_table;
 pub mod type_alias;
+pub mod type_alias_types;
 pub mod type_argument;
 pub mod type_arguments;
 pub mod type_header;

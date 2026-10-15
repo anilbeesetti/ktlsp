@@ -3,6 +3,7 @@
 //! does not preserve content-root boundaries, source types or classpath order.
 
 mod json;
+pub mod maven;
 
 use ktlsp_project::{DependencyScope, ModuleDependency, ProjectError, ProjectModel};
 use serde::de::DeserializeOwned;

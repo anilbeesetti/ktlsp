@@ -26,6 +26,7 @@ pub mod type_argument_types;
 pub mod type_arguments;
 pub mod type_header;
 pub mod type_parameter;
+pub mod type_parameter_bounds;
 pub mod type_table;
 pub mod value_parameter;
 pub mod value_parameter_types;

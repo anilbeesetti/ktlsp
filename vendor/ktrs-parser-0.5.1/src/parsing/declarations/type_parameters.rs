@@ -54,23 +54,35 @@ impl Parser {
             self.advance(); // LT
 
             let mut probe_tokens = 4096;
+            let mut refused_prefix = None;
             loop {
-                if recover_functions && self.at_generic_sibling_function(&mut probe_tokens) {
-                    self.error("Type parameter declaration expected");
-                    recovered = true;
-                    break;
+                if recover_functions {
+                    let (found, prefix) = self.at_generic_sibling_function(&mut probe_tokens);
+                    if found {
+                        self.error("Type parameter declaration expected");
+                        recovered = true;
+                        break;
+                    }
+                    if prefix.is_some() {
+                        refused_prefix = prefix;
+                        break;
+                    }
                 }
                 if self.at(COMMA) {
                     self.error_and_advance("Expecting type parameter declaration");
                 }
                 let complete = self.parse_type_parameter(recover_functions);
 
-                if recover_functions
-                    && complete
-                    && self.at_generic_sibling_function(&mut probe_tokens)
-                {
-                    recovered = true;
-                    break;
+                if recover_functions && complete {
+                    let (found, prefix) = self.at_generic_sibling_function(&mut probe_tokens);
+                    if found {
+                        recovered = true;
+                        break;
+                    }
+                    if prefix.is_some() {
+                        refused_prefix = prefix;
+                        break;
+                    }
                 }
 
                 if !self.at(COMMA) {
@@ -82,7 +94,21 @@ impl Parser {
                 }
             }
 
-            if recovered {
+            if let Some(end) = refused_prefix {
+                // Both probes reach here without moving the live candidate cursor.
+                let error = self.mark();
+                while self.my_builder.psi.current_lexeme < end {
+                    if self.eof() || self.my_builder.psi.current_lexeme >= end {
+                        break;
+                    }
+                    let before = self.my_builder.psi.current_lexeme;
+                    self.advance();
+                    if self.my_builder.psi.current_lexeme <= before {
+                        break;
+                    }
+                }
+                error.error(self, "Missing '>'");
+            } else if recovered {
                 self.error("Missing '>'");
             } else {
                 self.expect_3(GT, "Missing '>'", Some(recovery_set));
@@ -95,14 +121,14 @@ impl Parser {
         (result, recovered)
     }
 
-    fn at_generic_sibling_function(&self, remaining: &mut usize) -> bool {
+    fn at_generic_sibling_function(&self, remaining: &mut usize) -> (bool, Option<usize>) {
         if self.in_parameter_recovery_probe || *remaining == 0 {
-            return false;
+            return (false, None);
         }
         let psi = &self.my_builder.psi;
         let start = psi.shift_over_whitespace_forward(psi.current_lexeme);
         let Some(&kind) = psi.lex_types.get(start) else {
-            return false;
+            return (false, None);
         };
         let word = &psi.text[psi.lex_starts[start] as usize..psi.lex_starts[start + 1] as usize];
         if !matches!(kind, AT | FUN_KEYWORD | VAL_KEYWORD)
@@ -110,7 +136,7 @@ impl Parser {
             && !crate::kt_tokens::MODIFIER_KEYWORDS
                 .contains(crate::kt_tokens::soft_keyword_by_text(Some(word)))
         {
-            return false;
+            return (false, None);
         }
         // shortcut: prefixes exceeding 256 raw tokens/4096 bytes decline recovery; expand only with bounded corpus evidence.
         let limit = (start + 256.min(*remaining)).min(psi.lex_types.len());
@@ -123,7 +149,7 @@ impl Parser {
         }
         *remaining -= (end - start).max(1).min(*remaining);
         if start == end {
-            return false;
+            return (false, None);
         }
         let builder = PsiBuilder::from_lexemes(
             &psi.text[psi.lex_starts[start] as usize..psi.lex_starts[end] as usize],
@@ -158,6 +184,8 @@ impl Parser {
             Parser::create_for_top_level_non_lazy(SemanticWhitespaceAwarePsiBuilder::new(builder));
         probe.in_parameter_recovery_probe = true;
         let marker = probe.mark();
+        let mut longer_receiver = false;
+        let mut verified_prefix = None;
         let found = if kind == VAL_KEYWORD {
             probe.expect(VAL_KEYWORD) && probe.expect(IDENTIFIER) && probe.at(EQ)
         } else {
@@ -175,8 +203,33 @@ impl Parser {
                                 && (if probe.consume_if(COMMA) {
                                     probe.my_builder.get_token_text() != Some("suspend")
                                         && probe.expect(IDENTIFIER)
-                                        && probe.expect(GT)
-                                        && probe.expect(DOT)
+                                        && {
+                                            let mut complete = true;
+                                            let mut longer = false;
+                                            // The finite scratch window bounds each advancing comma/identifier pair.
+                                            while probe.consume_if(COMMA) {
+                                                longer = true;
+                                                if probe.my_builder.get_token_text()
+                                                    == Some("suspend")
+                                                    || !probe.expect(IDENTIFIER)
+                                                {
+                                                    complete = false;
+                                                    break;
+                                                }
+                                            }
+                                            let suffix = complete
+                                                && probe.expect(GT)
+                                                && (if longer {
+                                                    probe.consume_if(DOT)
+                                                } else {
+                                                    probe.consume_if(DOT)
+                                                        || probe.consume_if(SAFE_ACCESS)
+                                                        || (probe.consume_if(QUEST)
+                                                            && probe.expect(DOT))
+                                                });
+                                            longer_receiver = longer && suffix;
+                                            suffix
+                                        }
                                 } else {
                                     probe.expect(GT)
                                         && (probe.consume_if(DOT)
@@ -208,10 +261,30 @@ impl Parser {
                                 })
                         })
                 }
-                && probe.at(LPAR)
+                && {
+                    // Capture before at/eof can skip trivia beyond the verified name.
+                    let name_end = probe.my_builder.psi.current_lexeme;
+                    let found = probe.at(LPAR);
+                    if !found
+                        && longer_receiver
+                        && !probe.my_builder.psi.has_errors_after(marker)
+                        && probe.eof()
+                    {
+                        verified_prefix = start.checked_add(name_end).filter(|&prefix_end| {
+                            prefix_end > psi.current_lexeme
+                                && prefix_end <= end
+                                && generic_probe_token_fits(
+                                    psi.lex_starts[start],
+                                    psi.lex_starts[prefix_end],
+                                    eof,
+                                )
+                        });
+                    }
+                    found
+                }
         };
         marker.drop(&mut probe);
-        found
+        (found, verified_prefix)
     }
 
     fn completed_generic_bound(&self, first_event: usize, first_token: usize) -> bool {

@@ -1,0 +1,1216 @@
+{
+  "stage": "Independent literal contract; all product tests UNEXECUTED; helper-dependent expectations PROVISIONAL",
+  "symbols": {
+    "O": "size_of::<ConstructorOccurrence>()",
+    "S": "size_of::<constructor::ValueParameterBody>()",
+    "I": "size_of::<i32>()",
+    "P": "0 for zero elements; otherwise next power of two"
+  },
+  "fixtures": [
+    {
+      "name": "minimal",
+      "hex": "18 00",
+      "bytes": 2,
+      "sha256": "78a23af8da46b1b37e8767921a2d3f528fdc8eca37cea8aea775fd2b283d3776",
+      "parent_fields": 1,
+      "header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "constructors": [],
+      "minima": {
+        "bytes": 2,
+        "records": 2,
+        "work": "8",
+        "owned_bytes": "0"
+      },
+      "one_less": {
+        "bytes": {
+          "kind": "Wire.Limit(bytes)",
+          "offset": 0
+        },
+        "records": {
+          "kind": "Wire.Limit(records)",
+          "offset": 0
+        },
+        "work": {
+          "kind": "Wire.Limit(work)",
+          "offset": 0
+        },
+        "owned_bytes": null
+      },
+      "prefix_success_cuts": [
+        2
+      ]
+    },
+    {
+      "name": "empty_one",
+      "hex": "18 00 42 00",
+      "bytes": 4,
+      "sha256": "81d52172f678d6b02d1341df4860113b81359cdd7bb82a90404cbf79c731d6bf",
+      "parent_fields": 2,
+      "header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "constructors": [
+        {
+          "body_span": [
+            4,
+            4
+          ],
+          "flags": null,
+          "parameters": [],
+          "version_requirements": []
+        }
+      ],
+      "minima": {
+        "bytes": 4,
+        "records": 4,
+        "work": "16+O",
+        "owned_bytes": "O"
+      },
+      "one_less": {
+        "bytes": {
+          "kind": "Wire.Limit(bytes)",
+          "offset": 0
+        },
+        "records": {
+          "kind": "Wire.Limit(records)",
+          "offset": 2
+        },
+        "work": {
+          "kind": "Wire.Limit(work)",
+          "offset": 2
+        },
+        "owned_bytes": {
+          "kind": "Wire.Limit(owned_bytes)",
+          "offset": 2
+        }
+      },
+      "prefix_success_cuts": [
+        2,
+        4
+      ]
+    },
+    {
+      "name": "explicit",
+      "hex": "08 06 18 00 42 02 08 06",
+      "bytes": 8,
+      "sha256": "0871bd9a1f0605d703fb124ebeb07f207207fea595c9ecc84405e377838ce1f9",
+      "parent_fields": 3,
+      "header": {
+        "flags": 6,
+        "fq_name": 0
+      },
+      "constructors": [
+        {
+          "body_span": [
+            6,
+            8
+          ],
+          "flags": 6,
+          "parameters": [],
+          "version_requirements": []
+        }
+      ],
+      "minima": {
+        "bytes": 8,
+        "records": 7,
+        "work": "32+O",
+        "owned_bytes": "O"
+      },
+      "one_less": {
+        "bytes": {
+          "kind": "Wire.Limit(bytes)",
+          "offset": 0
+        },
+        "records": {
+          "kind": "Constructor.Limit(records)",
+          "offset": 6
+        },
+        "work": {
+          "kind": "Wire.Limit(work)",
+          "offset": 4
+        },
+        "owned_bytes": {
+          "kind": "Wire.Limit(owned_bytes)",
+          "offset": 4
+        }
+      },
+      "prefix_success_cuts": [
+        4,
+        8
+      ]
+    },
+    {
+      "name": "selected",
+      "hex": "18 00 42 13 08 00 12 02 10 05 f8 01 01 fa 01 02 02 03 12 00 f8 01 04",
+      "bytes": 23,
+      "sha256": "3264e35822200b6707e468e0b8663d95318301c3857d60bbca9dd4131eef6892",
+      "parent_fields": 2,
+      "header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "constructors": [
+        {
+          "body_span": [
+            4,
+            23
+          ],
+          "flags": 0,
+          "parameters": [
+            {
+              "span": [
+                4,
+                6
+              ],
+              "raw": "10 05"
+            },
+            {
+              "span": [
+                16,
+                16
+              ],
+              "raw": ""
+            }
+          ],
+          "version_requirements": [
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ],
+      "minima": {
+        "bytes": 23,
+        "records": 12,
+        "work": "93+O+2S+4I",
+        "owned_bytes": "O+2S+4I"
+      },
+      "one_less": {
+        "bytes": {
+          "kind": "Wire.Limit(bytes)",
+          "offset": 0
+        },
+        "records": {
+          "kind": "Constructor.Limit(records)",
+          "offset": 20
+        },
+        "work": {
+          "kind": "Wire.Limit(work)",
+          "offset": 2
+        },
+        "owned_bytes": {
+          "kind": "Wire.Limit(owned_bytes)",
+          "offset": 2
+        }
+      },
+      "prefix_success_cuts": [
+        2,
+        23
+      ]
+    },
+    {
+      "name": "repeated",
+      "hex": "18 00 42 00 42 02 08 06 42 00",
+      "bytes": 10,
+      "sha256": "61e5e294ee4ccbd3cd108f06885f7e93fda9d7d5b169e9333f096d154e8f67dd",
+      "parent_fields": 4,
+      "header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "constructors": [
+        {
+          "body_span": [
+            4,
+            4
+          ],
+          "flags": null,
+          "parameters": [],
+          "version_requirements": []
+        },
+        {
+          "body_span": [
+            6,
+            8
+          ],
+          "flags": 6,
+          "parameters": [],
+          "version_requirements": []
+        },
+        {
+          "body_span": [
+            10,
+            10
+          ],
+          "flags": null,
+          "parameters": [],
+          "version_requirements": []
+        }
+      ],
+      "minima": {
+        "bytes": 10,
+        "records": 9,
+        "work": "40+4O",
+        "owned_bytes": "4O"
+      },
+      "one_less": {
+        "bytes": {
+          "kind": "Wire.Limit(bytes)",
+          "offset": 0
+        },
+        "records": {
+          "kind": "Wire.Limit(records)",
+          "offset": 8
+        },
+        "work": {
+          "kind": "Wire.Limit(work)",
+          "offset": 8
+        },
+        "owned_bytes": {
+          "kind": "Wire.Limit(owned_bytes)",
+          "offset": 8
+        }
+      },
+      "prefix_success_cuts": [
+        2,
+        4,
+        8,
+        10
+      ]
+    },
+    {
+      "name": "outer_five",
+      "hex": "18 00 42 00 42 00 42 00 42 00 42 00",
+      "bytes": 12,
+      "sha256": "0f85f2c5bff62968ffa5861ecef584e4cf255488bb09b416ea364a8f0d18b50a",
+      "parent_fields": 6,
+      "header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "constructors": [
+        {
+          "body_span": [
+            4,
+            4
+          ],
+          "flags": null,
+          "parameters": [],
+          "version_requirements": []
+        },
+        {
+          "body_span": [
+            6,
+            6
+          ],
+          "flags": null,
+          "parameters": [],
+          "version_requirements": []
+        },
+        {
+          "body_span": [
+            8,
+            8
+          ],
+          "flags": null,
+          "parameters": [],
+          "version_requirements": []
+        },
+        {
+          "body_span": [
+            10,
+            10
+          ],
+          "flags": null,
+          "parameters": [],
+          "version_requirements": []
+        },
+        {
+          "body_span": [
+            12,
+            12
+          ],
+          "flags": null,
+          "parameters": [],
+          "version_requirements": []
+        }
+      ],
+      "minima": {
+        "bytes": 12,
+        "records": 12,
+        "work": "48+8O",
+        "owned_bytes": "8O"
+      },
+      "one_less": {
+        "bytes": {
+          "kind": "Wire.Limit(bytes)",
+          "offset": 0
+        },
+        "records": {
+          "kind": "Wire.Limit(records)",
+          "offset": 10
+        },
+        "work": {
+          "kind": "Wire.Limit(work)",
+          "offset": 10
+        },
+        "owned_bytes": {
+          "kind": "Wire.Limit(owned_bytes)",
+          "offset": 10
+        }
+      },
+      "prefix_success_cuts": [
+        2,
+        4,
+        6,
+        8,
+        10,
+        12
+      ]
+    },
+    {
+      "name": "parameters_five",
+      "hex": "18 00 42 0a 12 00 12 00 12 00 12 00 12 00",
+      "bytes": 14,
+      "sha256": "7f402c46ce8c8a303c66f397ee94ae0f2c5382de7e9ced2651abec205218b82d",
+      "parent_fields": 2,
+      "header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "constructors": [
+        {
+          "body_span": [
+            4,
+            14
+          ],
+          "flags": null,
+          "parameters": [
+            {
+              "span": [
+                2,
+                2
+              ],
+              "raw": ""
+            },
+            {
+              "span": [
+                4,
+                4
+              ],
+              "raw": ""
+            },
+            {
+              "span": [
+                6,
+                6
+              ],
+              "raw": ""
+            },
+            {
+              "span": [
+                8,
+                8
+              ],
+              "raw": ""
+            },
+            {
+              "span": [
+                10,
+                10
+              ],
+              "raw": ""
+            }
+          ],
+          "version_requirements": []
+        }
+      ],
+      "minima": {
+        "bytes": 14,
+        "records": 9,
+        "work": "56+O+8S",
+        "owned_bytes": "O+8S"
+      },
+      "one_less": {
+        "bytes": {
+          "kind": "Wire.Limit(bytes)",
+          "offset": 0
+        },
+        "records": {
+          "kind": "Constructor.Limit(records)",
+          "offset": 12
+        },
+        "work": {
+          "kind": "Wire.Limit(work)",
+          "offset": 2
+        },
+        "owned_bytes": {
+          "kind": "Wire.Limit(owned_bytes)",
+          "offset": 2
+        }
+      },
+      "prefix_success_cuts": [
+        2,
+        14
+      ]
+    },
+    {
+      "name": "packed_five",
+      "hex": "18 00 42 08 fa 01 05 00 00 00 00 00",
+      "bytes": 12,
+      "sha256": "e3a29aa2839cc92036437d24376683f9ec92e952d7e3b128cd8186e64809547c",
+      "parent_fields": 2,
+      "header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "constructors": [
+        {
+          "body_span": [
+            4,
+            12
+          ],
+          "flags": null,
+          "parameters": [],
+          "version_requirements": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "minima": {
+        "bytes": 12,
+        "records": 10,
+        "work": "57+O+8I",
+        "owned_bytes": "O+8I"
+      },
+      "one_less": {
+        "bytes": {
+          "kind": "Wire.Limit(bytes)",
+          "offset": 0
+        },
+        "records": {
+          "kind": "Constructor.Limit(records)",
+          "offset": 11
+        },
+        "work": {
+          "kind": "Wire.Limit(work)",
+          "offset": 2
+        },
+        "owned_bytes": {
+          "kind": "Wire.Limit(owned_bytes)",
+          "offset": 2
+        }
+      },
+      "prefix_success_cuts": [
+        2,
+        12
+      ]
+    },
+    {
+      "name": "opaque_class",
+      "hex": "18 00 40 07 45 00 00 00 00 41 00 00 00 00 00 00 00 00 4a 01 80 32 01 00",
+      "bytes": 24,
+      "sha256": "0d94c3f6c9871ee565c57fada8266a5fa84d414be112e10e614a8a30aa6057c9",
+      "parent_fields": 6,
+      "header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "constructors": [],
+      "minima": {
+        "bytes": 24,
+        "records": 12,
+        "work": "72",
+        "owned_bytes": "0"
+      },
+      "one_less": {
+        "bytes": {
+          "kind": "Wire.Limit(bytes)",
+          "offset": 0
+        },
+        "records": {
+          "kind": "Wire.Limit(records)",
+          "offset": 21
+        },
+        "work": {
+          "kind": "Wire.Limit(work)",
+          "offset": 21
+        },
+        "owned_bytes": null
+      },
+      "prefix_success_cuts": [
+        2,
+        4,
+        9,
+        18,
+        21,
+        24
+      ]
+    },
+    {
+      "name": "opaque_child",
+      "hex": "18 00 42 0d 12 01 80 fa 01 00 1a 01 00 a2 06 01 80",
+      "bytes": 17,
+      "sha256": "9354eea4aea2716b1e02a14ccb6a95f546d6149c7f3c713ec719452f6b88ef05",
+      "parent_fields": 2,
+      "header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "constructors": [
+        {
+          "body_span": [
+            4,
+            17
+          ],
+          "flags": null,
+          "parameters": [
+            {
+              "span": [
+                2,
+                3
+              ],
+              "raw": "80"
+            }
+          ],
+          "version_requirements": []
+        }
+      ],
+      "minima": {
+        "bytes": 17,
+        "records": 8,
+        "work": "63+O+S",
+        "owned_bytes": "O+S"
+      },
+      "one_less": {
+        "bytes": {
+          "kind": "Wire.Limit(bytes)",
+          "offset": 0
+        },
+        "records": {
+          "kind": "Constructor.Limit(records)",
+          "offset": 13
+        },
+        "work": {
+          "kind": "Wire.Limit(work)",
+          "offset": 2
+        },
+        "owned_bytes": {
+          "kind": "Wire.Limit(owned_bytes)",
+          "offset": 2
+        }
+      },
+      "prefix_success_cuts": [
+        2,
+        17
+      ]
+    },
+    {
+      "name": "signed",
+      "hex": "08 ff ff ff ff 0f 18 80 80 80 80 08 42 1b 08 ff ff ff ff ff ff ff ff ff 01 f8 01 ff ff ff ff 0f fa 01 06 ff ff ff ff 07 00",
+      "bytes": 41,
+      "sha256": "3e3c1275d95dc6a5bafd5df33e4f5ee1548c11e608898dc49c46a2f51864d7c9",
+      "parent_fields": 3,
+      "header": {
+        "flags": -1,
+        "fq_name": -2147483648
+      },
+      "constructors": [
+        {
+          "body_span": [
+            14,
+            41
+          ],
+          "flags": -1,
+          "parameters": [],
+          "version_requirements": [
+            -1,
+            2147483647,
+            0
+          ]
+        }
+      ],
+      "minima": {
+        "bytes": 41,
+        "records": 11,
+        "work": "138+O+4I",
+        "owned_bytes": "O+4I"
+      },
+      "one_less": {
+        "bytes": {
+          "kind": "Wire.Limit(bytes)",
+          "offset": 0
+        },
+        "records": {
+          "kind": "Constructor.Limit(records)",
+          "offset": 40
+        },
+        "work": {
+          "kind": "Wire.Limit(work)",
+          "offset": 12
+        },
+        "owned_bytes": {
+          "kind": "Wire.Limit(owned_bytes)",
+          "offset": 12
+        }
+      },
+      "prefix_success_cuts": [
+        12,
+        41
+      ]
+    },
+    {
+      "name": "nonminimal",
+      "hex": "18 00 c2 00 80 00",
+      "bytes": 6,
+      "sha256": "5bf307f18f0332c59c843cddac8895adf15c0f4231ffd0906e2c00d323ec1a23",
+      "parent_fields": 2,
+      "header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "constructors": [
+        {
+          "body_span": [
+            6,
+            6
+          ],
+          "flags": null,
+          "parameters": [],
+          "version_requirements": []
+        }
+      ],
+      "minima": {
+        "bytes": 6,
+        "records": 4,
+        "work": "20+O",
+        "owned_bytes": "O"
+      },
+      "one_less": {
+        "bytes": {
+          "kind": "Wire.Limit(bytes)",
+          "offset": 0
+        },
+        "records": {
+          "kind": "Wire.Limit(records)",
+          "offset": 2
+        },
+        "work": {
+          "kind": "Wire.Limit(work)",
+          "offset": 2
+        },
+        "owned_bytes": {
+          "kind": "Wire.Limit(owned_bytes)",
+          "offset": 2
+        }
+      },
+      "prefix_success_cuts": [
+        2,
+        6
+      ]
+    },
+    {
+      "name": "aliased_tag",
+      "hex": "18 00 c2 80 80 80 10 00",
+      "bytes": 8,
+      "sha256": "d0e77a5c550815834926580c39956111b192f4d3903863c548bf6b3f6f31180f",
+      "parent_fields": 2,
+      "header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "constructors": [
+        {
+          "body_span": [
+            8,
+            8
+          ],
+          "flags": null,
+          "parameters": [],
+          "version_requirements": []
+        }
+      ],
+      "minima": {
+        "bytes": 8,
+        "records": 4,
+        "work": "24+O",
+        "owned_bytes": "O"
+      },
+      "one_less": {
+        "bytes": {
+          "kind": "Wire.Limit(bytes)",
+          "offset": 0
+        },
+        "records": {
+          "kind": "Wire.Limit(records)",
+          "offset": 2
+        },
+        "work": {
+          "kind": "Wire.Limit(work)",
+          "offset": 2
+        },
+        "owned_bytes": {
+          "kind": "Wire.Limit(owned_bytes)",
+          "offset": 2
+        }
+      },
+      "prefix_success_cuts": [
+        2,
+        8
+      ]
+    },
+    {
+      "name": "unknown_then_empty",
+      "hex": "18 00 4a 01 00 42 00",
+      "bytes": 7,
+      "sha256": "dd960e9635089a21d050c3d93738359c5f44d274a871544f6577690349f50ac8",
+      "parent_fields": 3,
+      "header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "constructors": [
+        {
+          "body_span": [
+            7,
+            7
+          ],
+          "flags": null,
+          "parameters": [],
+          "version_requirements": []
+        }
+      ],
+      "minima": {
+        "bytes": 7,
+        "records": 6,
+        "work": "26+O",
+        "owned_bytes": "O"
+      },
+      "one_less": {
+        "bytes": {
+          "kind": "Wire.Limit(bytes)",
+          "offset": 0
+        },
+        "records": {
+          "kind": "Wire.Limit(records)",
+          "offset": 5
+        },
+        "work": {
+          "kind": "Wire.Limit(work)",
+          "offset": 5
+        },
+        "owned_bytes": {
+          "kind": "Wire.Limit(owned_bytes)",
+          "offset": 5
+        }
+      },
+      "prefix_success_cuts": [
+        2,
+        5,
+        7
+      ]
+    },
+    {
+      "name": "pair_class",
+      "hex": "08 87 08 18 00 2a 06 08 00 10 01 20 01 2a 06 08 01 10 02 20 01 32 06 30 03 6a 02 60 04 42 19 08 46 12 06 10 05 1a 02 38 00 12 06 10 06 1a 02 38 01 a2 06 04 08 07 10 08 4a 0a 10 0d 1a 02 30 0e 48 96 80 04 4a 0f 10 0f 1a 02 38 00 48 c6 83 04 a2 06 02 10 0a 4a 0f 10 10 1a 02 38 01 48 c6 83 04 a2 06 02 10 0a 4a 2f 10 11 1a 0e 12 04 12 02 38 00 12 04 12 02 38 01 30 00 32 08 08 02 10 05 1a 02 38 00 32 08 08 02 10 06 1a 02 38 01 48 c6 81 04 a2 06 02 10 12 4a 14 10 13 1a 02 30 14 32 08 10 15 1a 04 18 01 30 16 48 d6 83 04 4a 0a 10 17 1a 02 30 18 48 d6 81 04 52 17 10 05 1a 02 38 00 58 86 84 08 a2 06 0a 0a 02 10 0b 1a 04 08 09 10 0a 52 17 10 06 1a 02 38 01 58 86 84 08 a2 06 0a 0a 02 10 0b 1a 04 08 0c 10 0a a8 06 19",
+      "bytes": 238,
+      "sha256": "5a6bbbf0eb4405c5cc62f6a15c7e0e353e3d7bcc541589f5b085f50e45cd96cf",
+      "parent_fields": 15,
+      "header": {
+        "flags": 1031,
+        "fq_name": 0
+      },
+      "constructors": [
+        {
+          "body_span": [
+            31,
+            56
+          ],
+          "flags": 70,
+          "parameters": [
+            {
+              "span": [
+                4,
+                10
+              ],
+              "raw": "10 05 1a 02 38 00"
+            },
+            {
+              "span": [
+                12,
+                18
+              ],
+              "raw": "10 06 1a 02 38 01"
+            }
+          ],
+          "version_requirements": []
+        }
+      ],
+      "minima": {
+        "bytes": 238,
+        "records": 34,
+        "work": "569+O+2S",
+        "owned_bytes": "O+2S"
+      },
+      "one_less": {
+        "bytes": {
+          "kind": "Wire.Limit(bytes)",
+          "offset": 0
+        },
+        "records": {
+          "kind": "Wire.Limit(records)",
+          "offset": 235
+        },
+        "work": {
+          "kind": "Wire.Limit(work)",
+          "offset": 235
+        },
+        "owned_bytes": {
+          "kind": "Wire.Limit(owned_bytes)",
+          "offset": 29
+        }
+      },
+      "prefix_success_cuts": [
+        5,
+        13,
+        21,
+        29,
+        56,
+        68,
+        85,
+        102,
+        151,
+        173,
+        185,
+        210,
+        235,
+        238
+      ]
+    },
+    {
+      "name": "duplicate_scalars",
+      "hex": "08 01 18 01 42 02 08 01 08 06 18 00 42 04 08 06 08 00",
+      "bytes": 18,
+      "sha256": "cbbe194319222f228d6779c378061a56fe00f0e5da7e311f63c0636d4c0b4277",
+      "parent_fields": 6,
+      "header": {
+        "flags": 6,
+        "fq_name": 0
+      },
+      "constructors": [
+        {
+          "body_span": [
+            6,
+            8
+          ],
+          "flags": 1,
+          "parameters": [],
+          "version_requirements": []
+        },
+        {
+          "body_span": [
+            14,
+            18
+          ],
+          "flags": 0,
+          "parameters": [],
+          "version_requirements": []
+        }
+      ],
+      "minima": {
+        "bytes": 18,
+        "records": 15,
+        "work": "72+2O",
+        "owned_bytes": "2O"
+      },
+      "one_less": {
+        "bytes": {
+          "kind": "Wire.Limit(bytes)",
+          "offset": 0
+        },
+        "records": {
+          "kind": "Constructor.Limit(records)",
+          "offset": 16
+        },
+        "work": {
+          "kind": "Wire.Limit(work)",
+          "offset": 12
+        },
+        "owned_bytes": {
+          "kind": "Wire.Limit(owned_bytes)",
+          "offset": 12
+        }
+      },
+      "prefix_success_cuts": [
+        4,
+        8,
+        10,
+        12,
+        18
+      ]
+    },
+    {
+      "name": "two_allocating",
+      "hex": "18 00 42 05 12 00 f8 01 00 42 05 12 00 f8 01 00",
+      "bytes": 16,
+      "sha256": "7152d48170e1e3fb0555e6f831ccce893f7c49a9d507132305acb1a9a180e3bd",
+      "parent_fields": 3,
+      "header": {
+        "flags": null,
+        "fq_name": 0
+      },
+      "constructors": [
+        {
+          "body_span": [
+            4,
+            9
+          ],
+          "flags": null,
+          "parameters": [
+            {
+              "span": [
+                2,
+                2
+              ],
+              "raw": ""
+            }
+          ],
+          "version_requirements": [
+            0
+          ]
+        },
+        {
+          "body_span": [
+            11,
+            16
+          ],
+          "flags": null,
+          "parameters": [
+            {
+              "span": [
+                2,
+                2
+              ],
+              "raw": ""
+            }
+          ],
+          "version_requirements": [
+            0
+          ]
+        }
+      ],
+      "minima": {
+        "bytes": 16,
+        "records": 10,
+        "work": "64+2O+2S+2I",
+        "owned_bytes": "2O+2S+2I"
+      },
+      "one_less": {
+        "bytes": {
+          "kind": "Wire.Limit(bytes)",
+          "offset": 0
+        },
+        "records": {
+          "kind": "Constructor.Limit(records)",
+          "offset": 13
+        },
+        "work": {
+          "kind": "Wire.Limit(work)",
+          "offset": 9
+        },
+        "owned_bytes": {
+          "kind": "Wire.Limit(owned_bytes)",
+          "offset": 9
+        }
+      },
+      "prefix_success_cuts": [
+        2,
+        9,
+        16
+      ]
+    }
+  ],
+  "faults": [
+    {
+      "hex": "",
+      "kind": "Class.MissingFqName",
+      "offset": 0
+    },
+    {
+      "hex": "08 06",
+      "kind": "Class.MissingFqName",
+      "offset": 2
+    },
+    {
+      "hex": "42 01 00",
+      "kind": "Class.MissingFqName",
+      "offset": 3
+    },
+    {
+      "hex": "42 01 80 1a 00",
+      "kind": "Class.MissingFqName",
+      "offset": 5
+    },
+    {
+      "hex": "18 00 42 01 00",
+      "kind": "Constructor.InvalidFieldNumber",
+      "offset": 4
+    },
+    {
+      "hex": "18 00 42 01 80",
+      "kind": "Constructor.Truncated",
+      "offset": 5
+    },
+    {
+      "hex": "42 01 80 18 00",
+      "kind": "Constructor.Truncated",
+      "offset": 3
+    },
+    {
+      "hex": "18 00 42 01 0b",
+      "kind": "Constructor.UnsupportedGroup",
+      "offset": 4
+    },
+    {
+      "hex": "18 00 42 01 0e",
+      "kind": "Constructor.InvalidWireType",
+      "offset": 4
+    },
+    {
+      "hex": "18 00 42 06 12 80 80 80 80 08",
+      "kind": "Constructor.NegativeLength",
+      "offset": 5
+    },
+    {
+      "hex": "18 00 42 0b 08 80 80 80 80 80 80 80 80 80 80",
+      "kind": "Constructor.MalformedVarint",
+      "offset": 14
+    },
+    {
+      "hex": "18 00 42 0a 80 80 80 80 80 80 80 80 80 80",
+      "kind": "Constructor.MalformedVarint",
+      "offset": 13
+    },
+    {
+      "hex": "18 00 42 04 fa 01 01 80 08 06",
+      "kind": "Constructor.Truncated",
+      "offset": 8
+    },
+    {
+      "hex": "18 00 42 01 00 00",
+      "kind": "Class.Wire.InvalidFieldNumber",
+      "offset": 5
+    },
+    {
+      "hex": "18 00 42 01 80 08",
+      "kind": "Class.Wire.Truncated",
+      "offset": 6
+    },
+    {
+      "hex": "18 00 42 02 ff",
+      "kind": "Class.Wire.Truncated",
+      "offset": 5
+    },
+    {
+      "hex": "18 00 42 80 80 80 80 08",
+      "kind": "Class.Wire.NegativeLength",
+      "offset": 3
+    },
+    {
+      "hex": "18 00 43",
+      "kind": "Class.Wire.UnsupportedGroup",
+      "offset": 2
+    },
+    {
+      "hex": "18 00 46",
+      "kind": "Class.Wire.InvalidWireType",
+      "offset": 2
+    },
+    {
+      "hex": "18 00 42 00 42 01 80",
+      "kind": "Constructor.Truncated",
+      "offset": 7
+    },
+    {
+      "hex": "18 00 42 02 12 00 42 01 00",
+      "kind": "Constructor.InvalidFieldNumber",
+      "offset": 8
+    },
+    {
+      "hex": "18 00 42 01 00 42 01 0b",
+      "kind": "Constructor.InvalidFieldNumber",
+      "offset": 4
+    }
+  ],
+  "scalar_values": [
+    {
+      "hex": "00",
+      "i32": 0
+    },
+    {
+      "hex": "06",
+      "i32": 6
+    },
+    {
+      "hex": "ac 02",
+      "i32": 300
+    },
+    {
+      "hex": "ff ff ff ff 0f",
+      "i32": -1
+    },
+    {
+      "hex": "ff ff ff ff ff ff ff ff ff 01",
+      "i32": -1
+    },
+    {
+      "hex": "80 80 80 80 08",
+      "i32": -2147483648
+    },
+    {
+      "hex": "ff ff ff ff 07",
+      "i32": 2147483647
+    },
+    {
+      "hex": "80 00",
+      "i32": 0
+    },
+    {
+      "hex": "80 80 80 80 10",
+      "i32": 0
+    },
+    {
+      "hex": "80 80 80 80 80 80 80 80 80 02",
+      "i32": 0
+    }
+  ],
+  "prefix_rules": {
+    "zero": "Class.MissingFqName at0",
+    "non_success_cut": "Class.Wire.Truncated at cut, except listed missing-fq complete boundaries",
+    "missing_fq_boundaries": {
+      "explicit": [
+        2
+      ],
+      "signed": [
+        6
+      ],
+      "pair_class": [
+        3
+      ],
+      "duplicate_scalars": [
+        2
+      ]
+    },
+    "success": "same recognized Class scalars before cut; complete selected occurrences only, preserve original raw prefix pointer"
+  },
+  "tests_executed": false
+}

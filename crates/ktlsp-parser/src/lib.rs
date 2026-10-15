@@ -828,11 +828,22 @@ mod unix_io {
             closes: VecDeque<io::Result<()>>,
             sent: Vec<u8>,
             calls: [usize; 3],
+            cancel_on: Option<(usize, Arc<AtomicBool>)>,
+        }
+        impl Script {
+            fn signal_cancellation(&self, operation: usize) {
+                if let Some((selected, cancelled)) = &self.cancel_on
+                    && *selected == operation
+                {
+                    cancelled.store(true, Ordering::Relaxed);
+                }
+            }
         }
         impl Read for Script {
             fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
                 assert!(!buffer.is_empty() && buffer.len() <= CHUNK);
                 self.calls[0] += 1;
+                self.signal_cancellation(0);
                 let bytes = self
                     .reads
                     .pop_front()
@@ -846,6 +857,7 @@ mod unix_io {
             fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
                 assert!(!bytes.is_empty() && bytes.len() <= CHUNK);
                 self.calls[1] += 1;
+                self.signal_cancellation(1);
                 let count = self.writes.pop_front().unwrap_or(Ok(bytes.len()))?;
                 assert!(count <= bytes.len());
                 self.sent.extend_from_slice(&bytes[..count]);
@@ -858,6 +870,7 @@ mod unix_io {
         impl Exchange for Script {
             fn close_write(&mut self) -> io::Result<()> {
                 self.calls[2] += 1;
+                self.signal_cancellation(2);
                 self.closes.pop_front().unwrap_or(Ok(()))
             }
         }
@@ -1094,6 +1107,96 @@ mod unix_io {
                     }
                     assert_eq!(
                         peer.recv(&mut bytes).unwrap_err().kind(),
+                        io::ErrorKind::WouldBlock
+                    );
+                }
+            }
+        }
+
+        #[test]
+        fn terminal_read_and_status_errors_stop_before_write_or_retry() {
+            let deadline = Instant::now() + TIMEOUT;
+            let mut pump = Pump::default();
+            let mut script = Script::default();
+            script.reads.push_back(Err(io::ErrorKind::Other.into()));
+            let mut polls = 0;
+            assert_eq!(
+                error(pump.step(
+                    &mut script,
+                    b"writer-error",
+                    deadline,
+                    &AtomicBool::new(false),
+                    None,
+                    || {
+                        polls += 1;
+                        Ok(Some(exit(86)))
+                    }
+                )),
+                ParserError::Io
+            );
+            assert_eq!(polls, 0);
+            assert_eq!(script.calls, [1, 0, 0]);
+            let mut pump = Pump::default();
+            let mut script = Script::default();
+            assert_eq!(
+                error(pump.step(
+                    &mut script,
+                    b"writer-error",
+                    deadline,
+                    &AtomicBool::new(false),
+                    None,
+                    || {
+                        polls += 1;
+                        Err(io::ErrorKind::Interrupted.into())
+                    }
+                )),
+                ParserError::Io
+            );
+            assert_eq!(polls, 1);
+            assert_eq!(script.calls, [1, 0, 0]);
+        }
+
+        #[test]
+        fn post_success_cancellation_during_io_precedes_error_or_bytes() {
+            for operation in 0..3 {
+                for writer_error in [false, true] {
+                    let cancelled = Arc::new(AtomicBool::new(false));
+                    let mut script = Script {
+                        cancel_on: Some((operation, Arc::clone(&cancelled))),
+                        ..Script::default()
+                    };
+                    script.reads.push_back(Ok(vec![]));
+                    if writer_error {
+                        script
+                            .writes
+                            .push_back(Err(io::ErrorKind::BrokenPipe.into()));
+                    }
+                    let (socket, peer) = std::os::unix::net::UnixDatagram::pair().unwrap();
+                    socket.set_nonblocking(true).unwrap();
+                    peer.set_nonblocking(true).unwrap();
+                    let mut observer = DeadlineObserver {
+                        socket,
+                        evidence: DeadlineEvidence::default(),
+                    };
+                    let mut pump = Pump {
+                        exited: true,
+                        ..Pump::default()
+                    };
+                    assert_eq!(
+                        error(pump.step(
+                            &mut script,
+                            b"healthy",
+                            Instant::now() + TIMEOUT,
+                            &cancelled,
+                            Some(&mut observer),
+                            || panic!("already reaped")
+                        )),
+                        ParserError::Cancelled
+                    );
+                    assert_eq!(script.calls, [1, 1, 1]);
+                    assert!(!observer.evidence.deadline_selected);
+                    assert_eq!(
+                        peer.recv(&mut [0; 17]).unwrap_err().kind(),
                         io::ErrorKind::WouldBlock
                     );
                 }

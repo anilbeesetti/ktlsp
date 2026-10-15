@@ -1,4 +1,7 @@
 //! Rust-only fault executable and assert-based public-boundary suite.
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{
     Diagnostic, Element, FileKind, MAX_ALLOCATION_BYTES, MAX_OUTPUT_BYTES, Parser, ParserError,
     Reply, SnapshotResult, SourceSnapshot,
@@ -19,6 +22,7 @@ fn main() {
         fault_worker();
         return;
     }
+    let _functional = functional::serial();
     let faulty = Parser::new(std::env::current_exe().unwrap()).unwrap();
     let healthy = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
     for (source, expected) in [

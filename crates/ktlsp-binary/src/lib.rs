@@ -4,6 +4,8 @@ pub mod annotation_extensions;
 pub mod annotations;
 pub mod class_type_annotations;
 pub mod code;
+pub mod code_type_annotations;
+pub mod line_number_table;
 pub mod metadata;
 pub mod method_type_annotations;
 pub mod nesting;

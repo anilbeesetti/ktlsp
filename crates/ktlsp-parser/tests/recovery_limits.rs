@@ -1,3 +1,6 @@
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{FileKind, Parser, ParserError, SourceSnapshot};
 use std::{
     sync::atomic::AtomicBool,
@@ -6,6 +9,7 @@ use std::{
 
 #[test]
 fn annotation_probes_remain_bounded_through_production_snapshot_worker() {
+    let _functional = functional::serial();
     let parser = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
     for depth in [8, 12, 14, 16, 20, 30] {
         let mut parameter = "x: Int".to_string();
@@ -127,6 +131,7 @@ fn annotation_probes_remain_bounded_through_production_snapshot_worker() {
 
 #[test]
 fn repeated_recovery_keeps_every_original_declaration_until_diagnostic_gate() {
+    let _functional = functional::serial();
     let parser = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
     for count in [2, 20, 100] {
         let mut source = String::new();
@@ -237,6 +242,7 @@ fn repeated_recovery_keeps_every_original_declaration_until_diagnostic_gate() {
 
 #[test]
 fn generic_prefix_probe_thresholds_decline_without_losing_source() {
+    let _functional = functional::serial();
     let parser = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
     for (prefix, recovered) in [
         ("@A ".repeat(84), true),
@@ -315,6 +321,7 @@ fn generic_prefix_probe_thresholds_decline_without_losing_source() {
 
 #[test]
 fn large_leading_generic_trivia_keeps_copied_prefix_accounting() {
+    let _functional = functional::serial();
     let parser = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
     let trivia = "/*x*/ ".repeat(2200);
     // Blank lines keep ordinary declaration comment binders outside the fixture's ranges.
@@ -408,6 +415,7 @@ fn large_leading_generic_trivia_keeps_copied_prefix_accounting() {
 
 #[test]
 fn repeated_generic_recovery_and_failed_probes_keep_resource_gates() {
+    let _functional = functional::serial();
     let parser = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
     for count in [2, 20, 100] {
         let mut source = String::new();
@@ -508,6 +516,7 @@ fn repeated_generic_recovery_and_failed_probes_keep_resource_gates() {
 
 #[test]
 fn generic_scratch_annotations_disable_recursive_recovery_probes() {
+    let _functional = functional::serial();
     let parser = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
     for depth in [8, 12] {
         let mut parameter = "x: Int".to_string();

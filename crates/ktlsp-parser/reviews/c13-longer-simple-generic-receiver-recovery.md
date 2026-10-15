@@ -188,3 +188,30 @@ These checks and source-only reviews do not replace the preserved first failed
 Linux run or establish a passing repair runtime. Remote head remains original
 EFabc; unpublished draft readiness still requires completed retained SAME3
 packet review and ROOT admission for any later action.
+
+## N261 aggregate preceding-comment assertion erratum — preparation only
+
+The original accepted-aggregate assertion equated the recovered FUN start with
+its FUN_KEYWORD boundary. Existing top-level declaration closing uses
+PrecedingComments: one newline before a plain block comment and one newline
+after it bind that comment and the following newline to the function. The
+damaged CLASS/list ends before the comment; the recovery candidate remains the
+direct FUN_KEYWORD. This follows unchanged preamble.rs, declaration closing in
+abstract_kotlin_parsing.rs and binders.rs, rather than observed CST output.
+
+Only scratch_match=true aggregate-one-extra/exact gain inline assertions. Their
+unique direct KT_FILE-owned FUN is identified by its direct FUN_KEYWORD token at
+16458/16459. Exact FUN ranges are [12360,16487)/[12361,16488), with direct-owned
+4097-byte block comments [12360,16457)/[12361,16458). The newline before each
+comment and after each function remains root-owned; the newline between comment
+and keyword is function-owned. Strict damaged CLASS/list nonoverlap and all
+existing candidate/class/list/fresh-class/healthy checks remain required.
+
+This narrow contract erratum does not alter the shared start locator, the
+declined aggregate case, production/vendor/binders/budgets, historical tests or
+any frozen literal. All165 source/stale objects,48 full-CST expectations and
+231567 UTF16 entries remain byte-identical in the raw payload. The earlier
+test-byte preservation statement describes the preceding bounded-prefix repair;
+this later proposal changes only inline assertion code and this review note.
+No parser/tokenizer/runtime/format/build or CI rerun occurred in this preparation.
+The two-file proposal requires a new exact root source grant before application.

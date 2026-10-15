@@ -242,11 +242,62 @@ fn live_control(tree: &Parsed, case: &Value) {
                     class().end < candidate && class_list().end < candidate,
                     "{id}"
                 );
+                let (expected_candidate, function_start, function_end, comment_end) = match id {
+                    "aggregate-one-extra" => (16458, 12360, 16487, 16457),
+                    "aggregate-exact" => (16459, 12361, 16488, 16458),
+                    _ => panic!("{id}: unexpected accepted aggregate"),
+                };
+                assert_eq!(candidate, expected_candidate, "{id}");
+                let keywords: Vec<_> = elements
+                    .iter()
+                    .filter(|e| {
+                        e.token
+                            && e.kind == "FUN_KEYWORD"
+                            && (e.start, e.end) == (candidate, candidate + 3)
+                            && e.parent.is_some_and(|p| {
+                                elements[p].kind == "FUN" && elements[p].parent == Some(0)
+                            })
+                    })
+                    .collect();
+                assert_eq!(keywords.len(), 1, "{id}");
+                let function_index = keywords[0].parent.unwrap();
+                let function = &elements[function_index];
                 assert_eq!(
-                    top_level_function(candidate).unwrap().end,
-                    fresh - 1,
+                    (function.start, function.end),
+                    (function_start, function_end),
                     "{id}"
                 );
+                assert_eq!(function.end, fresh - 1, "{id}");
+                assert!(
+                    class().end < function.start && class_list().end < function.start,
+                    "{id}"
+                );
+                let comments: Vec<_> = elements
+                    .iter()
+                    .filter(|e| {
+                        e.token
+                            && e.kind == "BLOCK_COMMENT"
+                            && (e.start, e.end) == (function_start, comment_end)
+                    })
+                    .collect();
+                assert_eq!(comments.len(), 1, "{id}");
+                assert_eq!(comments[0].parent, Some(function_index), "{id}");
+                assert_eq!(comment_end - function_start, 4097, "{id}");
+                for (start, end, parent) in [
+                    (function_start - 1, function_start, 0),
+                    (comment_end, candidate, function_index),
+                    (function_end, fresh, 0),
+                ] {
+                    let newlines: Vec<_> = elements
+                        .iter()
+                        .filter(|e| {
+                            e.token && e.kind == "WHITE_SPACE" && (e.start, e.end) == (start, end)
+                        })
+                        .collect();
+                    assert_eq!(newlines.len(), 1, "{id}");
+                    assert_eq!(newlines[0].parent, Some(parent), "{id}");
+                    assert_eq!(&tree.source()[start..end], "\n", "{id}");
+                }
             } else {
                 assert!(
                     class().end > candidate && class_list().end > candidate,

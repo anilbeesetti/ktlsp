@@ -1,4 +1,7 @@
 //! Finite C13 generic receiver expectations frozen before implementation or runtime.
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{FileKind, Parsed, Parser, ParserError, SourceSnapshot};
 use serde_json::{Value, json};
 use std::io::Write;
@@ -193,6 +196,7 @@ fn compatibility(tree: &Parsed, case: &Value) {
 
 #[test]
 fn frozen_generic_receiver_contract_through_production_snapshot_worker() {
+    let _functional = functional::serial();
     let contract: Value = serde_json::from_str(FIXTURES).unwrap();
     let cases = contract["cases"].as_array().unwrap();
     assert_eq!(cases.len(), 84);

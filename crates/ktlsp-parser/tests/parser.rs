@@ -1,3 +1,6 @@
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{FileKind, MAX_NESTING, MAX_SOURCE_BYTES, Parser, ParserError};
 use std::{
     io::Write,
@@ -23,6 +26,7 @@ fn check(source: &str, kind: FileKind) -> ktlsp_parser::Parsed {
 }
 #[test]
 fn original_source_partition_crlf_unicode_and_script() {
+    let _functional = functional::serial();
     let parsed = check("// 😀\r\nval café = \"😀\"\r\n\r\n", FileKind::Source);
     let e = parsed
         .elements()
@@ -43,6 +47,7 @@ fn original_source_partition_crlf_unicode_and_script() {
 }
 #[test]
 fn malformed_eof_and_generated_unicode_are_lossless_or_explicitly_rejected() {
+    let _functional = functional::serial();
     for source in [
         "fun f(",
         "val x = \"😀",
@@ -84,6 +89,7 @@ fn malformed_eof_and_generated_unicode_are_lossless_or_explicitly_rejected() {
 }
 #[test]
 fn token_loss_is_rejected_and_next_parse_works() {
+    let _functional = functional::serial();
     for kind in [FileKind::Source, FileKind::Script] {
         assert_eq!(
             parser()
@@ -96,6 +102,7 @@ fn token_loss_is_rejected_and_next_parse_works() {
 }
 #[test]
 fn backtracking_regressions_are_bounded() {
+    let _functional = functional::serial();
     for depth in [8, 10, 12, 32] {
         let source = format!("val x = {}", "(a<".repeat(depth));
         let start = Instant::now();
@@ -119,6 +126,7 @@ fn backtracking_regressions_are_bounded() {
 }
 #[test]
 fn preflight_limits_and_cancel_do_not_launch_work() {
+    let _functional = functional::serial();
     assert_eq!(
         parser()
             .parse(
@@ -157,6 +165,7 @@ fn preflight_limits_and_cancel_do_not_launch_work() {
 
 #[test]
 fn actual_worker_output_count_limits_reject_without_partial_tree() {
+    let _functional = functional::serial();
     let source = "val x = 0\n".repeat(2000);
     assert!(source.len() < MAX_SOURCE_BYTES);
     assert_eq!(
@@ -170,6 +179,7 @@ fn actual_worker_output_count_limits_reject_without_partial_tree() {
 
 #[test]
 fn exact_input_boundary_and_actual_diagnostic_limit() {
+    let _functional = functional::serial();
     check(&" ".repeat(MAX_SOURCE_BYTES), FileKind::Source);
     let source = "?\n".repeat(257);
     assert_eq!(

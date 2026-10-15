@@ -1,0 +1,34 @@
+{
+  "stage": "authored data/source only; no local product/compiler/JVM/oracle execution",
+  "source_base": "5657b7cf12247f3c16f8c2ed2672f686b266a1de",
+  "source_tree": "99b3602c82b265ddc64a254890d9654320b189c8",
+  "positive_genuine_selected_coverage": "GAP; authored-only",
+  "source_contracts": [
+    "METADATA_FUNCTION_HEADER_SPEC.md",
+    "METADATA_TYPE_PARAMETER_SPEC.md"
+  ],
+  "files_sha256": {
+    "EXPECTATIONS.md": "d86f4df87f544c0bf36b3b97c712b19a605020bcee474cfbee890401640c4cb5",
+    "LICENSE.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "NOTICE.txt": "0b09a83d3ef7795c7dec65e815866597c066c53898f2852a76599b8f5552941a",
+    "PROTOBUF_LICENSE.txt": "2f706d67271d8db967046638e30f7887a5ba6e49593e6395e8145a7c9feab96a",
+    "README.md": "72be6b5aca87602117f19b608d25b83785e3bfe5a7b1e276675a8f640d8177a4",
+    "duplicates.hex": "5b758c83face207eb2d8f4e6da869fb1962e46733d14e4f51730fc1479dbaf29",
+    "minimal.hex": "87d20bd55a831dd84147d50239ef1ab8f4dce4efa12683ed7cca784b1ececef7",
+    "nonminimal.hex": "177c14d0b065caa08cb8aff8a8562f1129f33e068eb272bb818df197a62fa56c",
+    "opaque.hex": "3d6c0356515314fbe93a90560f7ec03e089f05a3230b06826b2283ace760c9b3",
+    "selected.hex": "ed5762260d9292e6e70ae1dee60626baf35abeaf001b705e9d889198f27c7c17",
+    "wrong_wire.hex": "05355cf4bd7e2ecdae5e8254a322a839175a8ce479c038edb0cbe8e9535d8cb6"
+  },
+  "empty_genuine_control": {
+    "class": "../metadata_constructor/Pair.class.bin",
+    "class_sha256": "8fed0fa88eb2df5723812a95330dee6bc91fd66b13906acb7906f9a813da9736",
+    "d1_sha256": "a4c2bf2d0bcd52aac574d156b413e3926cec249c5c2a23259d126c68872afa8e",
+    "function_body_d1_span": [
+      151,
+      198
+    ],
+    "source_provenance": "../metadata_function_parameters/PROVENANCE.json",
+    "compiler_provenance": "UNVERIFIED"
+  }
+}

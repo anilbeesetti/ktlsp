@@ -7,18 +7,20 @@ pub const MAX_FOLDS: usize = 10_000;
 pub const MAX_DIAGNOSTICS: usize = 256;
 pub const MAX_DEPTH: usize = 1024;
 
+#[derive(Debug)]
 struct Fold {
     start: usize,
     end: usize,
     kind: &'static str,
 }
+#[derive(Debug)]
 struct Diagnostic {
     start: usize,
     end: usize,
     code: &'static str,
     message: &'static str,
 }
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Analysis {
     folds: Vec<Fold>,
     diagnostics: Vec<Diagnostic>,
@@ -43,10 +45,20 @@ impl Analysis {
             self.folds.push(Fold { start, end, kind });
         }
     }
-    pub fn render(self, text: &str, line_only: bool) -> (Vec<Value>, Vec<Value>) {
+    pub fn render(&self, text: &str, line_only: bool) -> (Vec<Value>, Vec<Value>) {
+        self.render_outputs(text, line_only, &self.folds)
+    }
+    pub fn diagnostics(&self, text: &str) -> Vec<Value> {
+        self.render_outputs(text, false, &[]).1
+    }
+    fn render_outputs(
+        &self,
+        text: &str,
+        line_only: bool,
+        folds: &[Fold],
+    ) -> (Vec<Value>, Vec<Value>) {
         // Only retained output endpoints are indexed, then converted in one sweep.
-        let mut offsets: Vec<_> = self
-            .folds
+        let mut offsets: Vec<_> = folds
             .iter()
             .flat_map(|f| [f.start, f.end])
             .chain(self.diagnostics.iter().flat_map(|d| [d.start, d.end]))
@@ -55,9 +67,8 @@ impl Analysis {
         offsets.dedup();
         let positions = positions(text, &offsets);
         let at = |offset| positions[offsets.binary_search(&offset).expect("retained endpoint")];
-        let mut folds: Vec<_> = self
-            .folds
-            .into_iter()
+        let mut folds: Vec<_> = folds
+            .iter()
             .filter_map(|f| {
                 let start = at(f.start);
                 let end = at(f.end);
@@ -79,7 +90,7 @@ impl Analysis {
                 f["endLine"].as_u64(),
             )
         });
-        let diagnostics = self.diagnostics.into_iter().map(|d| {
+        let diagnostics = self.diagnostics.iter().map(|d| {
             json!({"range":Range{start:at(d.start),end:at(d.end)},"severity":1,"source":"ktlsp-lexical-structural","code":d.code,"message":d.message})
         }).collect();
         (folds, diagnostics)

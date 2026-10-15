@@ -1,4 +1,7 @@
 //! Finite property-header contract frozen before implementation; runtime evidence is separate.
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{FileKind, Parsed, Parser, ParserError, SourceSnapshot};
 use serde_json::{Value, json};
 use std::sync::atomic::AtomicBool;
@@ -209,6 +212,7 @@ fn check(tree: &Parsed, case: &Value) {
 
 #[test]
 fn ordinary_property_headers_recover_through_production_snapshot_worker() {
+    let _functional = functional::serial();
     let fixtures: Value = serde_json::from_str(FIXTURES).unwrap();
     let positives = fixtures["positive"].as_array().unwrap();
     let controls = fixtures["controls"].as_array().unwrap();

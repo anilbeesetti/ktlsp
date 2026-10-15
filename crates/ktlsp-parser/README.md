@@ -8,21 +8,63 @@ named rejection. Source is never replaced with parser-generated text. This crate
 has no server caller and advertises no provider. It is not full grammar, recovery,
 HIR, formatter or official Kotlin LSP parity.
 
-Each call starts one Rust worker, concurrently transfers input and drains stdout,
-checks cancellation/deadline every 2 ms, and checks direct-child cleanup before
-implicit scoped I/O joins on normal post-spawn completion. Successful waiting on
-the same owned child preserves the original result; unconfirmed cleanup returns
-`Io`, overriding and losing the original public error. `Io` is ambiguous and does
-not prove reaping or cleanup failure. Drop retains best-effort cleanup for
-unconfirmed state and unwinding; abort can skip it. Blocking waits and joins have
-no hard wall-time bound. This checked-completion change and its real-worker healthy
-snapshot test await runtime verification. Worker stderr is discarded (may contain
-source on upstream panics); no document is logged. The shipped trusted worker never
-spawns descendants. Callers must limit concurrent parse requests and install the matching worker.
+Each call starts one Rust worker. On Unix, the parent transfers input and drains
+stdout through one nonblocking `UnixStream` endpoint; the child's duplicated
+stdin/stdout endpoint stays blocking. Input uses byte offsets and explicit write
+half-close for EOF, including best-effort half-close after a failed write. Each
+iteration attempts at most one 8 KiB read and one 8 KiB write, one pending
+half-close and one child-status poll. Cancellation precedes the original 500 ms
+deadline. Productive iterations continue; idle iterations sleep 2 ms. No Unix
+I/O threads or scoped joins remain. Non-Unix retains the pipe/scoped-thread path.
+
+The Unix pump samples reader errors before child status; allocation exit86 and
+other failed exits precede a remembered writer error. After successful child
+exit, writer errors precede later reader errors, with cancellation/deadline
+checks before accepting either completion. This preserves these priorities,
+not asynchronous thread-arrival timing. Post-success deadline selection sends
+no grammar observation, as before. Observer validation still follows cleanup.
+
+On Unix, all Parser instances share eight reservations covering active children,
+pending cleanup and permanent failure pins. Admission happens before normalization,
+Command/observer allocation and terminal Once initialization. Once may block before
+the original exchange clock; cancellation is rechecked after initialization.
+A single retained cleanup reaper requests a 256 KiB stack and borrows each reserved
+Child in static storage. The caller closes its transport before publishing cleanup
+and observes it for 20 ms. The reaper requests termination and waits for that same
+child; no caller-side kill/wait/join remains on Unix.
+
+Confirmed same-child reaping preserves the selected result, even if the reaper
+has died elsewhere. With valid pending cleanup at observation expiry, an already
+selected error is preserved, but success becomes Io. Observed cleanup failure,
+invalid ownership or reaper death before confirmation overrides the result with Io.
+Optional deadline/copy receipts are read only after confirmed cleanup; otherwise
+sockets are dropped without a receive and receipts are Missing (deadline selection
+and send scalars remain recorded). A returned Timeout/Cancelled is not cleanup
+proof; late cleanup never revises a returned result.
+
+Caller buffers and observer endpoints remain inside the reservation until disposal.
+One canonical output Vec reserves before append; exposed capacity above 8,388,610
+bytes is dropped and rejected. Normalized input/map capacities are checked against
+65,536 bytes/65,537 words. These are requested-storage bounds, not a whole-process
+heap, allocator, stack or RSS bound. One blocked kill/wait stalls the sole reaper;
+eight sequential unconfirmed or failed reservations can exhaust admission despite
+functional fixture serialization. There is no replacement thread, queue, retry or
+production reset. Once, OS spawn/kill/wait and scheduling have no hard wall-time
+bound. The existing three-second fault-test assertion runs after return and cannot
+interrupt a hung call. Non-Unix retains synchronous cleanup and unbounded
+pipe/scoped-thread joins; an unjoined thread panic can prevent ordinary return.
+
+Worker stderr is discarded except for explicit bounded observations; upstream
+panics may contain source, and no document is logged. The trusted shipped worker
+never spawns descendants. Direct-child reaping does not establish descendant
+termination. Callers must install the matching trusted worker; this is not a sandbox.
 Editor consumers use `SourceSnapshot` and `Parser::parse_snapshot`; accepted
 `SnapshotResult::tree_for` rejects a changed document/revision/source/file kind.
-See [the exact declaration corpus and unresolved recovery gates](CORPUS.md). This synchronous
-API has no detached task or future whose drop could leave parsing running.
+See [the exact declaration corpus and unresolved recovery gates](CORPUS.md).
+Linux native checks do not establish Darwin/Windows reliability, resolve #96 or
+close B3/B4; historical MissingACK observations stay inconclusive. No comparative
+speed/RAM claim follows from the transport change. The parent capacity checks do not
+bound whole-process allocation, stack or RSS.
 
 Limits are enforced independently in parent and worker where applicable:
 

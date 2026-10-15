@@ -1,6 +1,7 @@
 //! Native LSP lifecycle, bounded document synchronization and lexical/structural
 //! providers. Semantic analysis and project import remain unsupported.
 
+mod cache;
 mod structure;
 mod uri;
 use ktlsp_protocol::{read_frame, write_frame};
@@ -58,6 +59,7 @@ impl Default for Configuration {
 pub struct Session {
     state: State,
     documents: HashMap<String, Document>,
+    analysis_cache: cache::Cache,
     open_bytes: usize,
     errors: Vec<String>,
     configuration: Configuration,
@@ -101,6 +103,7 @@ impl Session {
         Self {
             state: State::Uninitialized,
             documents: HashMap::new(),
+            analysis_cache: cache::Cache::default(),
             open_bytes: 0,
             errors: Vec::new(),
             configuration: Configuration::default(),
@@ -235,9 +238,10 @@ impl Session {
                     .documents
                     .get(uri)
                     .ok_or((-32602, "folding refers to unopened document"))?;
-                let analysis =
-                    structure::analyze(document.text(), self.configuration.folding_range_limit)
-                        .map_err(|e| (-32803, e))?;
+                let analysis = self
+                    .analysis_cache
+                    .get(uri, document, self.configuration.folding_range_limit)
+                    .map_err(|e| (-32803, e))?;
                 let (folds, _) =
                     analysis.render(document.text(), self.configuration.line_folding_only);
                 Ok(json!(folds))
@@ -314,11 +318,15 @@ impl Session {
                 .as_str()
                 .expect("validated URI");
             let document = self.documents.get(uri);
-            let diagnostics =
-                document.map_or_else(Vec::new, |doc| match structure::analyze(doc.text(), 0) {
-                    Ok(analysis) => analysis.render(doc.text(), false).1,
+            let diagnostics = document.map_or_else(Vec::new, |doc| {
+                match self
+                    .analysis_cache
+                    .get(uri, doc, self.configuration.folding_range_limit)
+                {
+                    Ok(analysis) => analysis.diagnostics(doc.text()),
                     Err(error) => structure::limit_diagnostic(error),
-                });
+                }
+            });
             let mut params = json!({"uri":uri,"diagnostics":diagnostics});
             if self.configuration.diagnostic_version_support
                 && let Some(doc) = document
@@ -358,6 +366,7 @@ impl Session {
         }
         let document = Document::new(version, text.into()).map_err(|e| e.to_string())?;
         self.documents.insert(uri.into(), document);
+        self.analysis_cache.invalidate(uri);
         self.open_bytes = bytes;
         Ok(())
     }
@@ -400,6 +409,7 @@ impl Session {
             return Err("aggregate open document size limit exceeded".into());
         }
         self.documents.insert(uri.into(), candidate);
+        self.analysis_cache.invalidate(uri);
         self.open_bytes = bytes;
         Ok(())
     }
@@ -407,6 +417,7 @@ impl Session {
         let map = object(params.ok_or("close params missing")?)?;
         let doc = object(required(map, "textDocument")?)?;
         let uri = uri_value(required(doc, "uri")?)?;
+        self.analysis_cache.invalidate(uri);
         if let Some(document) = self.documents.remove(uri) {
             self.open_bytes -= document.text().len();
         }

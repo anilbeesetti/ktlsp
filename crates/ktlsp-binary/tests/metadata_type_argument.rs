@@ -3,7 +3,7 @@ use ktlsp_binary::metadata::{
     name_resolver::Resolver,
     payload,
     type_argument::{Error, ErrorKind, InlineType, Limits, Projection, TypeArgument, decode},
-    type_arguments, type_header,
+    type_argument_types, type_arguments, type_header,
     wire::{self, Value},
 };
 use std::{mem::size_of, ops::Range};
@@ -804,18 +804,31 @@ fn genuine_pair_generic_return_composes_arguments_under_one_budget() {
         let nested = &decoded.inline_types[0];
         assert_eq!(nested.span, 2..4);
         assert_eq!(nested.raw, [56, id]);
-        let nested_type = type_header::decode(
-            nested.raw,
-            type_header::Limits {
-                bytes: 2,
-                records: 1,
-                work: 4,
+        let t = size_of::<type_argument_types::SelectedType<'_>>();
+        let typed = type_argument_types::decode(
+            argument,
+            type_argument_types::Limits {
+                bytes: 4,
+                records: 2,
+                nodes: 2,
+                depth: 2,
+                work: 12 + S + t,
+                owned_bytes: S + t,
             },
         )
         .unwrap();
+        assert_eq!(typed.raw, decoded.raw);
+        assert_eq!(typed.raw.as_ptr(), decoded.raw.as_ptr());
+        assert_eq!(
+            (typed.projection, typed.type_id),
+            (decoded.projection, decoded.type_id)
+        );
+        assert_eq!(typed.inline_types.len(), 1);
+        assert_eq!(typed.inline_types[0].span, nested.span);
+        let nested_type = &typed.inline_types[0].header;
         assert_eq!(
             nested_type,
-            type_header::TypeHeader {
+            &type_header::TypeHeader {
                 raw: nested.raw,
                 class_name: None,
                 flags: None,

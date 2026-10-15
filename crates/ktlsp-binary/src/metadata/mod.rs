@@ -5,6 +5,7 @@ pub mod class_constructors;
 pub mod class_header;
 pub mod class_member_names;
 pub mod class_supertypes;
+pub mod class_type_parameters;
 pub mod constructor;
 pub mod constructor_parameters;
 mod encoding;

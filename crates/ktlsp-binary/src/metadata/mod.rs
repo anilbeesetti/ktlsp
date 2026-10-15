@@ -10,6 +10,7 @@ pub mod constructor_parameters;
 mod encoding;
 pub mod function_header;
 pub mod function_parameters;
+pub mod function_type_parameters;
 pub mod function_types;
 mod header;
 pub mod jvm_method_signature;

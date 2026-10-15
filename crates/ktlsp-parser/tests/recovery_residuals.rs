@@ -1,4 +1,7 @@
 //! C17 known-defect fixtures; passing these assertions does not establish recovery.
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{FileKind, Parsed, Parser, SourceSnapshot};
 use std::sync::atomic::AtomicBool;
 
@@ -97,6 +100,7 @@ fn check(source: &str, expected: Vec<Declaration<'_>>, diagnostics: &[(usize, us
 
 #[test]
 fn missing_default_restores_later_function_as_sibling() {
+    let _functional = functional::serial();
     let source = "fun broken(x: Int =\nfun healthy() = 2";
     check(
         source,
@@ -110,6 +114,7 @@ fn missing_default_restores_later_function_as_sibling() {
 
 #[test]
 fn malformed_parenthesized_type_restores_later_function_as_sibling() {
+    let _functional = functional::serial();
     let source = "fun broken(x: (@A\nfun healthy() = 2";
     check(
         source,
@@ -123,6 +128,7 @@ fn malformed_parenthesized_type_restores_later_function_as_sibling() {
 
 #[test]
 fn malformed_parameter_annotation_restores_later_function_as_sibling() {
+    let _functional = functional::serial();
     let source = "fun broken(@A(\nfun healthy() = 2";
     check(
         source,

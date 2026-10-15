@@ -1,4 +1,7 @@
 //! #107 resource evidence: reconstructed production replies, never captured stdout.
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{
     Element, FileKind, MAX_DIAGNOSTICS, MAX_ELEMENTS, MAX_OUTPUT_BYTES, MAX_SOURCE_BYTES, Parsed,
     Parser, Reply, SourceSnapshot,
@@ -128,6 +131,7 @@ fn properties(tree: &Parsed, name: &str, repetitions: usize) {
 
 #[test]
 fn lf_production_replies_have_bounded_reconstructed_serialization() {
+    let _functional = functional::serial();
     assert_eq!(
         (
             MAX_SOURCE_BYTES,

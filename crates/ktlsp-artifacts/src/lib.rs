@@ -1,6 +1,8 @@
 //! Bounded exact Maven-layout lookup and caller-provided SHA-256 verification.
 //! See the crate README for the filesystem and integrity trust boundaries.
 
+pub mod lockfile;
+
 mod integrity;
 pub use integrity::{ExpectedDigestOrigin, IntegrityError, VerifiedArtifact, verify_sha256};
 

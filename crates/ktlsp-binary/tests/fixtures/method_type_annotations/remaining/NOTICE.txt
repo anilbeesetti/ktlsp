@@ -1,0 +1,5 @@
+Unmodified com/google/common/base/NullnessCasts.class from
+com.google.guava:guava:33.4.8-android, licensed Apache-2.0.
+See ../LICENSE.txt and provenance.json for existing primary byte pins.
+This is factual fixture attribution, not an upstream source-header reproduction.
+Selected source header unavailable/uninspected; compiler identity unknown.

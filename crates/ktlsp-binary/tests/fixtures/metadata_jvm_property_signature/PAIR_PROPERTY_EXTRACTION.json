@@ -1,0 +1,307 @@
+{
+  "stage": "CONTRACT/DATA ONLY; future Rust composition UNEXECUTED",
+  "class_path": "crates/ktlsp-binary/tests/fixtures/metadata_constructor/Pair.class.bin",
+  "class_size": 2983,
+  "class_sha256": "8fed0fa88eb2df5723812a95330dee6bc91fd66b13906acb7906f9a813da9736",
+  "artifact": "org.jetbrains.kotlin:kotlin-stdlib:2.3.20",
+  "origin": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.3.20/kotlin-stdlib-2.3.20.jar",
+  "jar_sha256": "0ae12504a5040ebaf37703908483420d1a5624dd1d93f357665f8c77c848a01e",
+  "entry": "kotlin/Pair.class",
+  "compiler_provenance": "UNVERIFIED; distribution version is not compiler proof",
+  "d1_cp_index": 89,
+  "d1_mutf8_classfile_span": [
+    1276,
+    1599
+  ],
+  "d1_sha256": "a4c2bf2d0bcd52aac574d156b413e3926cec249c5c2a23259d126c68872afa8e",
+  "d1_hex": "2e 0a 02 18 02 0a 02 08 02 0a 02 18 02 0a 02 18 02 0a 02 08 09 0a 02 10 0e 0a 02 08 05 0a 02 10 0b 0a 00 0a 02 10 00 0a 00 0a 02 10 08 0a 00 08 87 08 18 00 2a 06 08 00 10 01 20 01 2a 06 08 01 10 02 20 01 32 06 30 03 6a 02 60 04 42 19 08 46 12 06 10 05 1a 02 38 00 12 06 10 06 1a 02 38 01 a2 06 04 08 07 10 08 4a 0a 10 0d 1a 02 30 0e 48 96 80 04 4a 0f 10 0f 1a 02 38 00 48 c6 83 04 a2 06 02 10 0a 4a 0f 10 10 1a 02 38 01 48 c6 83 04 a2 06 02 10 0a 4a 2f 10 11 1a 0e 12 04 12 02 38 00 12 04 12 02 38 01 30 00 32 08 08 02 10 05 1a 02 38 00 32 08 08 02 10 06 1a 02 38 01 48 c6 81 04 a2 06 02 10 12 4a 14 10 13 1a 02 30 14 32 08 10 15 1a 04 18 01 30 16 48 d6 83 04 4a 0a 10 17 1a 02 30 18 48 d6 81 04 52 17 10 05 1a 02 38 00 58 86 84 08 a2 06 0a 0a 02 10 0b 1a 04 08 09 10 0a 52 17 10 06 1a 02 38 01 58 86 84 08 a2 06 0a 0a 02 10 0b 1a 04 08 0c 10 0a a8 06 19",
+  "string_table_d1_span": [
+    1,
+    47
+  ],
+  "class_body_d1_span": [
+    47,
+    285
+  ],
+  "d2": [
+    "Lkotlin/Pair;",
+    "A",
+    "B",
+    "Ljava/io/Serializable;",
+    "Lkotlin/io/Serializable;",
+    "first",
+    "second",
+    "<init>",
+    "(Ljava/lang/Object;Ljava/lang/Object;)V",
+    "getFirst",
+    "()Ljava/lang/Object;",
+    "Ljava/lang/Object;",
+    "getSecond",
+    "toString",
+    "",
+    "component1",
+    "component2",
+    "copy",
+    "(Ljava/lang/Object;Ljava/lang/Object;)Lkotlin/Pair;",
+    "equals",
+    "",
+    "other",
+    "",
+    "hashCode",
+    "",
+    "kotlin-stdlib"
+  ],
+  "properties": [
+    {
+      "property_field_d1_span": [
+        232,
+        257
+      ],
+      "property_body_d1_span": [
+        234,
+        257
+      ],
+      "parent_hex": "10 05 1a 02 38 00 58 86 84 08 a2 06 0a 0a 02 10 0b 1a 04 08 09 10 0a",
+      "parent_sha256": "d203f54609553942586a0f89eb6d21722c467429dd427089d95b9b566efb0ae8",
+      "extension_field_parent_span": [
+        10,
+        23
+      ],
+      "extension_body_parent_span": [
+        13,
+        23
+      ],
+      "extension_field_d1_span": [
+        244,
+        257
+      ],
+      "extension_body_d1_span": [
+        247,
+        257
+      ],
+      "field_signature_field_parent_span": [
+        13,
+        17
+      ],
+      "field_signature_body_parent_span": [
+        15,
+        17
+      ],
+      "getter_signature_field_parent_span": [
+        17,
+        23
+      ],
+      "getter_signature_body_parent_span": [
+        19,
+        23
+      ],
+      "field_signature_body_d1_span": [
+        249,
+        251
+      ],
+      "getter_signature_body_d1_span": [
+        253,
+        257
+      ],
+      "expected": {
+        "field": {
+          "name": null,
+          "desc": 11
+        },
+        "getter": {
+          "name": 9,
+          "desc": 10
+        },
+        "synthetic_method": null,
+        "setter": null,
+        "delegate_method": null
+      },
+      "encoded_getter_method": {
+        "ordinal": 1,
+        "span": [
+          2036,
+          2105
+        ],
+        "name_index": 23,
+        "descriptor_index": 24,
+        "name_cp_span": [
+          323,
+          331
+        ],
+        "descriptor_cp_span": [
+          334,
+          354
+        ],
+        "name": "getFirst",
+        "descriptor": "()Ljava/lang/Object;"
+      },
+      "encoded_fields_matching_only_descriptor": [
+        {
+          "ordinal": 0,
+          "span": [
+            1891,
+            1907
+          ],
+          "name_index": 14,
+          "descriptor_index": 15,
+          "name_cp_span": [
+            242,
+            247
+          ],
+          "descriptor_cp_span": [
+            250,
+            268
+          ],
+          "name": "first",
+          "descriptor": "Ljava/lang/Object;"
+        },
+        {
+          "ordinal": 1,
+          "span": [
+            1907,
+            1923
+          ],
+          "name_index": 18,
+          "descriptor_index": 15,
+          "name_cp_span": [
+            281,
+            287
+          ],
+          "descriptor_cp_span": [
+            250,
+            268
+          ],
+          "name": "second",
+          "descriptor": "Ljava/lang/Object;"
+        }
+      ]
+    },
+    {
+      "property_field_d1_span": [
+        257,
+        282
+      ],
+      "property_body_d1_span": [
+        259,
+        282
+      ],
+      "parent_hex": "10 06 1a 02 38 01 58 86 84 08 a2 06 0a 0a 02 10 0b 1a 04 08 0c 10 0a",
+      "parent_sha256": "9bb6592c7a52970bc3810221e15f8d9d8d305479678db6032c9ed56dfe0faa6a",
+      "extension_field_parent_span": [
+        10,
+        23
+      ],
+      "extension_body_parent_span": [
+        13,
+        23
+      ],
+      "extension_field_d1_span": [
+        269,
+        282
+      ],
+      "extension_body_d1_span": [
+        272,
+        282
+      ],
+      "field_signature_field_parent_span": [
+        13,
+        17
+      ],
+      "field_signature_body_parent_span": [
+        15,
+        17
+      ],
+      "getter_signature_field_parent_span": [
+        17,
+        23
+      ],
+      "getter_signature_body_parent_span": [
+        19,
+        23
+      ],
+      "field_signature_body_d1_span": [
+        274,
+        276
+      ],
+      "getter_signature_body_d1_span": [
+        278,
+        282
+      ],
+      "expected": {
+        "field": {
+          "name": null,
+          "desc": 11
+        },
+        "getter": {
+          "name": 12,
+          "desc": 10
+        },
+        "synthetic_method": null,
+        "setter": null,
+        "delegate_method": null
+      },
+      "encoded_getter_method": {
+        "ordinal": 2,
+        "span": [
+          2105,
+          2174
+        ],
+        "name_index": 26,
+        "descriptor_index": 24,
+        "name_cp_span": [
+          365,
+          374
+        ],
+        "descriptor_cp_span": [
+          334,
+          354
+        ],
+        "name": "getSecond",
+        "descriptor": "()Ljava/lang/Object;"
+      },
+      "encoded_fields_matching_only_descriptor": [
+        {
+          "ordinal": 0,
+          "span": [
+            1891,
+            1907
+          ],
+          "name_index": 14,
+          "descriptor_index": 15,
+          "name_cp_span": [
+            242,
+            247
+          ],
+          "descriptor_cp_span": [
+            250,
+            268
+          ],
+          "name": "first",
+          "descriptor": "Ljava/lang/Object;"
+        },
+        {
+          "ordinal": 1,
+          "span": [
+            1907,
+            1923
+          ],
+          "name_index": 18,
+          "descriptor_index": 15,
+          "name_cp_span": [
+            281,
+            287
+          ],
+          "descriptor_cp_span": [
+            250,
+            268
+          ],
+          "name": "second",
+          "descriptor": "Ljava/lang/Object;"
+        }
+      ]
+    }
+  ],
+  "resolver_rule": "Existing table compact record4 has range9 covering indices5..13; no transform/predefined/explicit string; original d2 selected. Future test MUST call current UTF16 Resolver.",
+  "coverage": "Two explicit getter tuples. Field descriptor only; field name absent and descriptor matches two actual fields. No field identity or other three slots genuine coverage.",
+  "operation": "Independent fixture CP/member transcription and literal checks only; no product/upstream/native/parser/JVM/compiler/oracle execution"
+}

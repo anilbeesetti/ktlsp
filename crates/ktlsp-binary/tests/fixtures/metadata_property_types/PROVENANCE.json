@@ -1,0 +1,78 @@
+{
+  "stage": "DATA ONLY independent held-byte verification",
+  "base": "efbfb991014f926ab2031d489a53a12ef386ed7b",
+  "artifact": "org.jetbrains.kotlin:kotlin-stdlib:2.3.20",
+  "origin": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.3.20/kotlin-stdlib-2.3.20.jar",
+  "jar_path": "/Users/anil/.gradle/wrapper/dists/gradle-9.5.0-bin/bvnork1r7n8i6kp5cnkibsc9q/gradle-9.5.0/lib/kotlin-stdlib-2.3.20.jar",
+  "jar_sha256": "0ae12504a5040ebaf37703908483420d1a5624dd1d93f357665f8c77c848a01e",
+  "entry": "kotlin/Pair.class",
+  "actual_existing_archive_entry_byte_identical": true,
+  "class_path": "/Users/anil/.codex/worktrees/t018-property-types-contract/ktlsp/crates/ktlsp-binary/tests/fixtures/metadata_constructor/Pair.class.bin",
+  "class_size": 2983,
+  "class_sha256": "8fed0fa88eb2df5723812a95330dee6bc91fd66b13906acb7906f9a813da9736",
+  "cp89_mutf8_span": [
+    1276,
+    1599
+  ],
+  "decoded_d1_length": 285,
+  "decoded_d1_sha256": "a4c2bf2d0bcd52aac574d156b413e3926cec249c5c2a23259d126c68872afa8e",
+  "decoded_d1_hex": "2e 0a 02 18 02 0a 02 08 02 0a 02 18 02 0a 02 18 02 0a 02 08 09 0a 02 10 0e 0a 02 08 05 0a 02 10 0b 0a 00 0a 02 10 00 0a 00 0a 02 10 08 0a 00 08 87 08 18 00 2a 06 08 00 10 01 20 01 2a 06 08 01 10 02 20 01 32 06 30 03 6a 02 60 04 42 19 08 46 12 06 10 05 1a 02 38 00 12 06 10 06 1a 02 38 01 a2 06 04 08 07 10 08 4a 0a 10 0d 1a 02 30 0e 48 96 80 04 4a 0f 10 0f 1a 02 38 00 48 c6 83 04 a2 06 02 10 0a 4a 0f 10 10 1a 02 38 01 48 c6 83 04 a2 06 02 10 0a 4a 2f 10 11 1a 0e 12 04 12 02 38 00 12 04 12 02 38 01 30 00 32 08 08 02 10 05 1a 02 38 00 32 08 08 02 10 06 1a 02 38 01 48 c6 81 04 a2 06 02 10 12 4a 14 10 13 1a 02 30 14 32 08 10 15 1a 04 18 01 30 16 48 d6 83 04 4a 0a 10 17 1a 02 30 18 48 d6 81 04 52 17 10 05 1a 02 38 00 58 86 84 08 a2 06 0a 0a 02 10 0b 1a 04 08 09 10 0a 52 17 10 06 1a 02 38 01 58 86 84 08 a2 06 0a 0a 02 10 0b 1a 04 08 0c 10 0a a8 06 19",
+  "properties": [
+    {
+      "id": "pair_first",
+      "field_d1_span": [
+        232,
+        257
+      ],
+      "body_d1_span": [
+        234,
+        257
+      ],
+      "parent_sha256": "d203f54609553942586a0f89eb6d21722c467429dd427089d95b9b566efb0ae8",
+      "selected_field_number": 3,
+      "child_parent_span": [
+        4,
+        6
+      ],
+      "child_d1_span": [
+        238,
+        240
+      ],
+      "child_hex": "38 00"
+    },
+    {
+      "id": "pair_second",
+      "field_d1_span": [
+        257,
+        282
+      ],
+      "body_d1_span": [
+        259,
+        282
+      ],
+      "parent_sha256": "9bb6592c7a52970bc3810221e15f8d9d8d305479678db6032c9ed56dfe0faa6a",
+      "selected_field_number": 3,
+      "child_parent_span": [
+        4,
+        6
+      ],
+      "child_d1_span": [
+        263,
+        265
+      ],
+      "child_hex": "38 01"
+    }
+  ],
+  "genuine_receiver": "ABSENT in these two Property bodies; not covered",
+  "compiler_provenance": "UNVERIFIED",
+  "pins": {
+    "/private/tmp/ktlsp-type-parameter-contract/sources/metadata.proto": "a08e508cc7d98cc225e8b0df7290724b545a0250f7d9c91460cfc1244a3c08e2",
+    "/private/tmp/ktlsp-type-parameter-contract/sources/ProtoBuf.java": "da7fa6f03c1afa3499086cb5a1f92471e3f327c8f43298ea8d9548b7e4753716",
+    "/private/tmp/ktlsp-type-parameter-contract/sources/CodedInputStream.java": "7fbb3aeebd3c3d5414d7171bc3ba2785de50b40863a4f381c4b43986e15784fe"
+  },
+  "notices": {
+    "LICENSE.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "NOTICE.txt": "0b09a83d3ef7795c7dec65e815866597c066c53898f2852a76599b8f5552941a",
+    "PROTOBUF_LICENSE.txt": "2f706d67271d8db967046638e30f7887a5ba6e49593e6395e8145a7c9feab96a"
+  }
+}

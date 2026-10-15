@@ -66,6 +66,13 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<Constructor<'_>, Error> {
         owned_bytes: limits.owned_bytes,
         ..Default::default()
     });
+    decode_with_budget(bytes, &mut budget)
+}
+
+pub(super) fn decode_with_budget<'a>(
+    bytes: &'a [u8],
+    budget: &mut string_table::Budget,
+) -> Result<Constructor<'a>, Error> {
     let mut out = Constructor {
         raw: bytes,
         flags: None,

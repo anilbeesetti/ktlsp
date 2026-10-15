@@ -1,0 +1,68 @@
+{
+  "stage": "DATA ONLY; actual Python standard-library assertions passed; no Rust/JVM/compiler/oracle",
+  "class_sha256": "8fed0fa88eb2df5723812a95330dee6bc91fd66b13906acb7906f9a813da9736",
+  "class_size": 2983,
+  "Metadata_d1_cp_index_verified_from_annotation": 89,
+  "cp_mutf8_span": [
+    1276,
+    1599
+  ],
+  "d1_length": 285,
+  "d1_sha256": "a4c2bf2d0bcd52aac574d156b413e3926cec249c5c2a23259d126c68872afa8e",
+  "payload_d1_span": [
+    47,
+    285
+  ],
+  "constructor_field_d1_span": [
+    76,
+    103
+  ],
+  "constructor_body_d1_span": [
+    78,
+    103
+  ],
+  "constructor_body_payload_span": [
+    31,
+    56
+  ],
+  "constructor_hex": "08 46 12 06 10 05 1a 02 38 00 12 06 10 06 1a 02 38 01 a2 06 04 08 07 10 08",
+  "constructor_sha256": "b10772c4ed0df9d57ce93391dcd7ba4b0940417c20c36a5916e99a150d63f4b6",
+  "parameter_constructor_spans": [
+    [
+      4,
+      10
+    ],
+    [
+      12,
+      18
+    ]
+  ],
+  "parameter_d1_spans": [
+    [
+      82,
+      88
+    ],
+    [
+      90,
+      96
+    ]
+  ],
+  "full_tuples": [
+    [
+      null,
+      5,
+      null,
+      null
+    ],
+    [
+      null,
+      6,
+      null,
+      null
+    ]
+  ],
+  "compiler_provenance": "UNVERIFIED; distribution version is not compiler proof",
+  "archive": "existing committed Pair.class only, no artifact search/download",
+  "byte_checks_passed": true,
+  "first_data_check_failure": "KeyError 0 caused by Python augmented q += 2*u2() losing u2 cursor update; corrected to independent count read, then all assertions passed. No product execution or content change."
+}

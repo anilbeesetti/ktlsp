@@ -643,3 +643,317 @@ first outcomes must be reviewed by retained SAME3. First contradiction preserves
 and STOPS, without output-derived tuning or unchanged retry. No merge lease or
 final integration cut has been assigned; no main chasing or native local runtime.
 BroaderC13/B3/B4GAP/fullB11UNVERIFIED/T008/T008aHOLD/#7/#83/#96OPEN/DarwinUNKNOWN.
+
+
+## C13 finite two-argument nonnullable receiver — source candidate
+
+Exact root-admitted base28ff42d743b6290b9a1e587e36eced80cebd6438,
+treef989c624b58fead0144ebe197967e6ff2291444d,
+soleparent9b4cf49e817d0bb30cbd2f09b674f91afb1aa5fd. PR231 OWNER+ROOT delivery
+released vendor ownership before this child. All ten delivered PR231 paths match
+reviewed provisional4c1bad2 by byte/hash and Git mode/type/blob. No other incoming
+delta is authored here. Frozen V2 contract manifest
+d8ebae1ed7c3bffcf8819bcee6ba179a4ac3e5a0ebf7e596b31d771915e908c3;
+actual preparation SAME3 approved corrected V2, preserving V1 findings.
+
+Only type_parameters.rs adds a COMMA arm requiring second non-bare-suspend
+IDENTIFIER, GT, DOT, direct name and complete LPAR. The one-argument nullable
+suffix remains unchanged. Nullable TWO arguments, trailing commas, extra/missing
+arguments, nullable/nested/qualified/annotated/variance/star/function/intersection
+arguments and hard in remain declined. Soft out and escaped names stay supported.
+No live grammar/helper/export/resource/worker/server/dependency change occurs.
+
+Focused131case/42exact/142131original position objects match frozen V2 exactly.
+Complete ordered error ownership retains duplicate zero-width EOF entries;
+nonempty filtering is used only for source partitions. Four stale identities
+include same-length2→3 for the65536-byte case, with separate65537InputLimit;
+strict healthy followups preserve old snapshot/tree/source. Only historical
+generic-receiver multiple-arguments gains one explicit dispatch. Its original
+46-byte input, all84embedded inputs/83other records/prior nullable overlays and
+malformed-prefix erratum remain exact, as does the full111nullable231 test.
+The canonical historical overlay adds only its necessary original_partitions
+schema for the unchanged adapter; frozen131 objects stay untouched.
+
+Owner and independent ADV each completed ONE fresh-authoritative ordered final
+archive→recovery.patch→formatting.patch replay, zero offsets/fuzz. Counts remain
+16behavior/50formatting/54final/4pristine, with53unchanged Rust files and only
+type_parameters.rs changed. All67other trackedvendor paths/notices/manifests/
+locks retain exact bytes. ADV receipt SHA256
+56c70f5f39eb1d0d5042bfe0e5929355b31674f83a9d1102545701a075c0ea74;
+its initial restricted DNS fetch failure is preserved before the authorized
+fresh fetch and replay. No redundant replay follows docs/harness-only changes.
+Final phase SHA256:
+- recovery.patch 1db8080819e4b5357e6bed3d75156b53050f3ee88d3f5fdf10aac75257b761c5
+- formatting.patch 3d010eb42f3c1006e2e2ab05b36899345da7ca071df6f38ec6c438da9a8276f3
+- formatted-sha256.json 085ecbe6f94b02dba681bca32fed7ef8aa13abce3977906aa186b36f9a14196b
+
+First pinned local format check and lockedworkspacealltargetsClippy passed;
+Clippy is COMPILEONLY. No local native/parser/worker/test/server/bench/JVM/oracle
+runtime is executed. Actual final-source and first ORIGINAL unchanged Linux
+Native Rust CI reviews by retained SAME3 are separate gates. Required hosted
+commands remain cargo fmt --all -- --check; cargo clippy --locked --workspace
+--all-targets -- -D warnings; cargo test --locked --workspace. Preserve first
+failure and STOP for independent source diagnosis/root correction grant; no
+output-derived expectation tuning or unchanged retry to green.
+
+Only nine granted source paths are owned. Initial publication needs passing
+source review; merge needs a later root stable integration cut/exclusive exact
+head-base lease, separate strict read-only EXIT0 valid guard and separate ordinary
+expected-head merge, then OWNER+ROOT original exact-main delivery proof. No main
+chasing, protection bypass/settings changes or force-main. See
+../../crates/ktlsp-parser/reviews/c13-two-argument-generic-receiver-recovery.md.
+BroaderC13/B3/B4 GAP, fullB11 UNVERIFIED, T008/T008a HOLD, #7/#83 OPEN and
+#96/Darwin UNKNOWN remain. No semantic/provider/full-parity/performance claim;
+native product/build/core/default tests stay Rust-only at the existing boundary.
+
+
+## C13 nullable two-argument receiver — source candidate
+
+This finite child follows delivered PR241 at exact
+`fe280c5fab13cde5a9bdf50893aee859fc626a2a`, tree
+`b32813f2f200741eb17365a6d7ef00155ce107de`, sole parent
+`77bd0ac8b4e74dadd037a3404b82dba7e004c395`. OWNER+ROOT original exact-main
+proof released its nine vendor/recovery paths; root then granted these ten paths.
+Relevant parser/lexer/Cargo/toolchain bytes match reviewed provisional9a1a33b;
+unrelated delivered integration changes stay intact. The sealed preparation
+manifest is `b9c4c4e2f8b532128d77052e18ac800607c7e2e3ef6e7dbc29de6bed81177da6`.
+Its corrected candidate was approved by retained architect/correctness/adversarial;
+the first audit redaction finding remains preserved and independently rechecked.
+
+Only the existing comma-arm suffix changes: after second non-bare-suspend
+IDENTIFIER and GT, accept DOT, SAFE_ACCESS, or QUEST then DOT, followed by direct
+IDENTIFIER and complete LPAR. Exactly two nonnullable unqualified identifier
+arguments on one unqualified receiver; only one nullable receiver suffix.
+One-argument/plain-two behavior, modifier/annotation gates, completed bounds,
+no generic fallthrough, bare suspend restrictions and all budgets stay intact.
+Nullable arguments, trailing commas, extra arguments, nested/qualified/annotated/
+variance/star/parenthesized/function/intersection types remain outside this child.
+Soft out/dynamic/escaped names retain existing syntax rules, without semantics.
+
+The new focused test embeds all156 frozen objects/51exact projections/206112
+original UTF16 entries unchanged. It checks exact snapshot/source association,
+lossless token partitions, selected parents/owners/names/diagnostics/tokens,
+complete ordered ERROR_ELEMENT ownership including duplicate zero-width EOF,
+all four stale identities and healthy followups retaining old trees. Raw QUEST
+and DOT are separate; scratch can join adjacent suffix as SAFE_ACCESS; live
+QUEST belongs to NULLABLE_TYPE and DOT to FUN. Forty-two raw256/byte4096 cuts,
+four +1 LPAR controls, whole-token caps,4096copied-token debit/reset, static EOF
+controls and original64KiB admission stay frozen. Full B11 remains UNVERIFIED.
+
+Only nine historical expectations gain additive stable-ID/source-equality
+selection: nullable111 multiple-arguments and twoarg131 cases48..55. Their raw
+payloads/input bytes, all other110/123records, prior nullable85/generic84 overlays,
+PAIR_AMENDMENT and malformed-prefix erratum stay unchanged. Helpers/selections
+outside these explicit branches stay intact; no compiler output supplies expected
+values. Counts111/131 describe unchanged original payloads, not amended projections.
+
+The changed current candidate requires new ordered patch evidence. Owner performed
+one fresh-authoritative original archive replay, recovery then formatting,
+zero offsets/fuzz,16behavior/50formatting/54final/4pristine. Only type_parameters.rs
+changes among54Rust files;53source and67other trackedvendor paths/notices/manifests/
+locks retain delivered bytes. Accepted prior behavioral phase data were verified
+against exact old patch bytes for construction; no redundant historical replay.
+Current phase hashes:
+- recovery.patch SHA256 `e1018f60be1c99c1e27c026a70b2e67bf326f973b39d42416d18209a6b9eddf3`
+- formatting.patch SHA256 `f14d022585a3d51ca286ca570f3ec9f72f791153d71551dce3dceac21efad4a7`
+- formatted-sha256.json SHA256 `944990615fde23fb4df2ed4688368de5d2ea4c4d9ee6dcb35942803963bdba7a`
+
+First pinned local format check and locked workspace/all-targets Clippy passed;
+Clippy is compile-only. No local native/parser/worker/test/server/bench/JVM/oracle
+runtime ran under issue96. Current independent ADV replay, complete ten-path
+source reviews and source readiness receipts are separate evidence; this note
+alone does not assert those approvals. No hosted CI ran in this source stage.
+
+Publication/commit/push/issue/PR/CI awaits separate root source-readiness grant.
+Later unchanged pinned format, locked Clippy and locked full-workspace tests
+must pass in original hosted Rust CI, preserving first outcomes and failures.
+Do not tune frozen expectations from output or rerun unchanged failures to green.
+Root must assign one final integration cut and exclusive exact-head/base lease;
+a fresh separate strictly read-only guard must return exit0 and complete parsed
+matching main/head/base/check/state/scope/config/clean reviewed facts before a
+separate ordinary expected-head protected merge. Preserve lease through squash
+tree/sole-parent verification and OWNER+ROOT original exact-main proof/release.
+No bypass/admin/settings/main force-push or main chasing.
+
+T008/T008a HOLD, broaderC13/B3/B4 GAP, fullB11 UNVERIFIED, #7/#83 OPEN,
+#96 local parser gate and Darwin UNKNOWN remain. No semantic/provider/full-parity/
+performance claim. Native product/build/core/default tests remain Rust-only;
+no bundled JVM/JDK/compiler/JNI/C/C++ analyzer/tree-sitter C. Existing optional
+external build tools and isolated oracle stay at their separate boundary, unused here.
+
+
+## C13 three-or-more simple generic receiver — source-only candidate
+
+Assigned delivered base `66d2a99c752f901dbe7a46a7fc5254cdd8a90484`, tree
+`c3e117c44097f533ef4a5440411be1e5b25a27a4`, sole parent
+`9bf15b653219f105b99a239121098cef2fd932df`. The explicit nine-path source grant
+has SHA256 `5ce8d8b6df203d600fe9894e02843a1585126b4f8824c84c1cf702aa8b3e48da`.
+Before edits, all1002 incoming mode/type/blob/SHA identities were verified against
+assigned66d2, and all1002 disk hashes matched that assigned base after one exact
+fast-forward. Separately, actual253 ten-path inputs and all141 relevant parser/
+text/vendor/Cargo/toolchain/workflow inputs matched accepted provisional68a. Frozen preparation remains a distinct fe280/provisional
+cut: CONTRACT_READY SHA256
+`6904e1e788d1b5535d2206431b84824fef786ce1dcb2709864002b720ff16299`, reviewed
+candidate `f7eee3691a9ce3a1b440fd6a784c7fc264b6512e635e4bd3d2c8405c0a05ba24`.
+
+Only the existing private `at_generic_sibling_function` comma arm changes
+production behavior. After the second identifier, each further successful
+iteration consumes COMMA and a non-bare-suspend IDENTIFIER. Failure exits and
+refuses; a boolean marks third-or-later arguments, requiring GT and plain DOT
+for that family. Existing one-/two-argument DOT/SAFE_ACCESS/(QUEST DOT) behavior
+and direct name plus observable LPAR remain. No new production helper/module/API,
+live type grammar, caller, worker, semantic provider or capability changes.
+Nullable N>=3 suffixes and nullable/nested/qualified/annotated/variance/star/
+function/intersection/empty/trailing/missing arguments remain excluded. Bare
+suspend receiver/every argument and hard in stay declined; escaped names, soft
+out, dynamic and trivia keep their existing syntax rules.
+
+The new focused test embeds all165 frozen objects/48 full token-inclusive CST
+expectations/231567 original-byte UTF16 entries unchanged as JSON values and
+source bytes. Exact parents/subtrees/token partitions/names/diagnostics/ordered
+ERROR_ELEMENT ownership preserve duplicate zero-width EOF markers. Strict live
+refusal never substitutes Coverage/resource/timeout/cancellation for success.
+All positions/four independent stale identities/SAME Parser healthy followup/
+unchanged old trees are asserted. LF/CRLF/loneCR, source65536/65537 admission,
+raw/byte cuts, whole-token straddles, source-dependent largest lists, leading4401
+trivia and actual aggregate4082/4083/4084 prior-copy carriers remain frozen.
+
+Exactly one historical expectation gets additive ID plus exact-source selection:
+nonnullable twoarg131 case44 `extra-third-argument`, literal
+`class Box<T\nfun Triple<String,Int,Any>.healthy() = 2`. All original raw131
+objects and existing nullable-two eight-ID overlay bytes stay unchanged;
+nullable-two case51 and all malformed comma controls remain declined.
+Other historical tests/dispatch helpers/source literals remain untouched.
+
+The existing cloned window FIRST bounds repetition to256 raw tokens/4096
+normalized bytes/effective EOF; every successful iteration advances. Whole copied
+windows debit the shared4096 classifier allowance before grammar, including
+failed windows and trailing/internal trivia. All source64KiB/worker500ms/64MiB
+requested allocation/cancellation/snapshot/other limits remain unchanged.
+Static arithmetic and compile success do not establish hard total work, RSS,
+stack, cleanup bounds, crash safety or full active-layer B11.
+
+Owner verified accepted prior behavioral phase bytes against exact delivered
+recovery/formatting patches without rerunning an old replay, applied only the
+new contiguous comma arm, then generated current patches. One fresh authoritative
+original archive download, checksum
+`ec8d43d9549490689477385c7678bbd22ecbc445973ab364e8ecb69dd4882bcc`, and one
+fresh extraction replayed current recovery then formatting with zero fuzz/offsets.
+All54 final hashes matched; counts16behavior/50formatting/4pristine. Only
+`src/parsing/declarations/type_parameters.rs` changes among54 Rust files;
+67 tracked vendor paths remain equal in total:53 unchanged Rust source files
+and14 other paths, including notices/manifests/locks.
+Initial source-stage phase hashes:
+- recovery.patch SHA256 `2436b50d6a879b1a80466f05af68e296143f1e13986621724cbb46d8969f9090`
+- formatting.patch SHA256 `50ebde4b22a76fc40cee49b795cf89981883c862577d6eee0f309c4d71a0dabc`
+- formatted-sha256.json SHA256 `54594b95342ee33292f0ea8f0cb78dab47dfebb8163e76120dee98e582e7ba2b`
+
+First pinned local `cargo +1.99.0 fmt --all -- --check` and compile-only
+`cargo +1.99.0 clippy --locked --workspace --all-targets -- -D warnings` passed.
+Clippy used an isolated temporary target directory and executed no test bodies.
+No local parser/tokenizer/worker/server/tests/bench/JVM/oracle runtime ran under
+#96. Independent adversarial pristine replay and retained SAME3 actual final
+source reviews are separate required receipts, not established by this note.
+No hosted CI, commit, push, issue or PR occurred in this source stage.
+
+SOURCE_READY requires coordinator acceptance before publication or hosted checks.
+Later original pinned hosted format/locked Clippy/full-workspace tests, reviewed
+head, exact base lease, fresh standalone read-only guard EXIT0/full PASS then
+separate ordinary expected-head merge and OWNER+ROOT exact-main delivery proof
+remain gated. No speculative main chase, bypass/admin/settings/force-main.
+
+C13/B3/B4 GAP, fullB11 UNVERIFIED, T008/T008a HOLD, #7/#83 OPEN and #96 Darwin
+UNKNOWN remain. No semantics/server providers/performance/full parity promotion.
+Native product/core/build/default tests remain Rust-only, with no bundled JVM/
+JDK/compiler/JNI/C/C++ analyzer/tree-sitter C. Optional existing external tools
+and isolated official oracle remain at their separate boundary, unused here.
+
+## N261 unpublished bounded declined-prefix repair draft
+
+Original PR261 head `efabccee5eb4eee6213d606b4bf9be16da67f70f`, base
+`46fd28ddba16ddd6d000588cae56548a7af3d732`, ran original Linux attempt1
+38661078501/job116182203658. The runner checkout `04f87b22d108a3b71b66e9d5690b492ac73edfe4`
+had the exact reviewed tree `1fc1f56d50a252ee99bd8aa8f865e3a2392dd8ad` and all1023
+source files. Format and locked all-target Clippy passed; workspace tests failed
+at `compact-n125` with `OutputLimit` after147 preceding N cases passed. Later17
+N cases and full-workspace completion remain unobserved. The partial run reported
+499 Rust passes, one failure and two ignored helpers; the expected656 total was
+not achieved. First raw output, original expectations and failed inspections are
+preserved separately and are never replaced by this draft.
+
+Source trace explains the failure: N125 needs direct LPAR at raw257, outside the
+unchanged256-token scratch window. Scratch correctly declines. The live missing-GT
+fallback consumes only FUN, then258 remaining significant terminals each receive
+a top-level error; together with MissingGT this yields259 diagnostics, exceeding
+the unchanged256 worker cap. This is a declined-path cascade, not widened scratch
+admission or a reason to raise worker limits.
+
+The exact seven-path draft grant SHA256
+`446f3aafeca10268b5bd44efd1c33e67853ec88609efb9c0222b4b03b7d3bdcc` permits only
+existing type_parameters.rs private predicate/classifier callers, this review
+text and five derived vendor artifacts. The same already-debited scratch parse
+may return a verified exclusive raw endpoint only after a clean N>=3 simple
+nonnullable receiver, GT, plain DOT and direct name, when final LPAR is absent
+because scratch reached EOF. Capture occurs immediately after name, before any
+trivia-skipping query; checked translation confines the endpoint to the copied
+window and effective EOF. Successful found, N1/N2, property, recursive, unverified
+and explicit-next-nonLPAR paths carry no endpoint.
+
+Both classifier call sites handle a returned endpoint immediately at the unchanged
+candidate cursor. Live recovery groups precisely that prefix into one MissingGT
+error, keeping recovered_function=false. Raw-index guards precede EOF/token
+queries; explicit EOF/progress protection prevents spinning. The following LPAR,
+trailing trivia, unverified suffix and later declarations are not consumed by
+this grouping. No second scan/copy/parser, new dependency or public API is added.
+
+Source-only retained reviews identify six affected ownership-only controls:
+`no-lpar`, `raw-cut-12`, `byte-cut-12`, `compact-n125`, `byte-lpar-over`, and
+`aggregate-one-less`. Each still declines sibling recovery, retains original
+CLASS/list beyond the candidate and has no candidate-root FUN. Aggregate fresh-list
+recovery and all48 exact full-CST expectations remain required. Independent
+historical audits of482 raw executable cases and14 overlay/erratum records find
+no new expectation amendments: historical case44 already observes LPAR and takes
+found=true, nullable/malformed/N1/N2 controls remain excluded.
+
+All165/new and131/historical test bytes, raw payloads, overlays, expected CST,
+ranges, diagnostics, UTF16 maps and stale identities remain unchanged. Raw256,
+byte4096, shared4096, diagnostics256, source64KiB and all worker limits remain
+unchanged. Static review and compilation do not prove the17 unobserved outcomes,
+allocation/deadline behavior, full active-EOF B11, crash safety or full parity.
+
+This is an unpublished source draft only: no new commit/push/fetch/incoming merge,
+public-body update, local parser/tokenizer/worker/test runtime or CI rerun is
+admitted. Remote PR261 remains pinned to originalEFabc through257 OWNER+ROOT
+delivery. Retained SAME2/architect changed-source reviews, pinned formatting,
+compile-only locked workspace/all-target Clippy and one fresh pristine ordered
+patch replay are required before REPAIR_SOURCE_READY; later runtime/publication/
+final-cut/merge gates remain separate. #96 Darwin UNKNOWN, C13/B3/B4 GAP,
+fullB11 UNVERIFIED, T008/T008a HOLD and #7/#83 OPEN remain unchanged.
+
+The archived initial behavior-to-final diff for type_parameters.rs also contained
+an inherited comma-arm fallback/nesting change; its formatting-only classification
+was inaccurate. This draft places that inherited behavior in recovery.patch by
+reconstructing the behavior file from repaired final source and restoring only
+three known formatting spans (imports and two expect calls). The other53 accepted
+behavior files remain byte-identical. New behavior-to-final differences for this
+file must be whitespace-only. Original patches and their hashes remain preserved;
+new phase counts and hashes are derived from the actual data, not assumed.
+
+Completed draft checks: pinned Rust1.99.0 formatting and compile-only locked
+workspace/all-target Clippy both exited0 for source SHA256
+873331a853582595578acb34cb5bd738ab19b648484cf6129e86a9a8f4bbf3a0.
+No test bodies or local parser/tokenizer/worker runtime were executed. One fresh
+pristine extraction and one current recovery-then-formatting replay passed with
+zero offsets/fuzz and exact54 final byte/hash matches; notices remained unchanged.
+Derived counts are16 behavior files,50 formatting files,54 final files and4
+pristine survivors. The two reconstructed single-line expect calls retain final
+trailing commas, so this file's new formatting delta is strictly whitespace-only.
+New draft phase hashes:
+- recovery.patch SHA256 `fcb338c7e9bdc60757e76f4f202c2585ae2ec11ab1626dfe97dde668e5f77eb5`
+- formatting.patch SHA256 `4b1abb4ab303923222fa4b0a2121afea2b9f8eaed33f380f95149ad4e3448aa4`
+- formatted-sha256.json SHA256 `0b56fc9a47b5b164e2ef4bea073d19af2ce924fddc3412dab30ba6f510c95aa1`
+
+These checks and source-only reviews do not replace the preserved first failed
+Linux run or establish a passing repair runtime. Remote head remains original
+EFabc; unpublished draft readiness still requires completed retained SAME3
+packet review and ROOT admission for any later action.

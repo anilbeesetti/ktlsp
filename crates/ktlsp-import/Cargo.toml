@@ -8,3 +8,4 @@ rust-version.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 ktlsp-project = { path = "../ktlsp-project" }
+quick-xml = { version = "=0.41.0", default-features = false }

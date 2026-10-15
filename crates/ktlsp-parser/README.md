@@ -24,29 +24,47 @@ checks before accepting either completion. This preserves these priorities,
 not asynchronous thread-arrival timing. Post-success deadline selection sends
 no grammar observation, as before. Observer validation still follows cleanup.
 
-Every ordinary post-spawn return checks synchronous cleanup of the same owned
-child. Confirmed cleanup preserves the selected result; unconfirmed cleanup
-returns ambiguous `Io`, overriding the original error. Drop retains best-effort
-kill/wait for unconfirmed state and unwinding; abort can skip it. Blocking OS
-spawn/kill/wait and scheduling have no hard wall-time bound. Conditional Unix
-progress assumes those operations return and requested termination/reaping
-completes; failed OS cleanup containment remains a gap. This removes Unix I/O
-joins without establishing a hard caller-return bound. Non-Unix joins also
-remain unbounded. The existing three-second fault-test elapsed assertion runs
-after return and cannot interrupt a hung call.
+On Unix, all Parser instances share eight reservations covering active children,
+pending cleanup and permanent failure pins. Admission happens before normalization,
+Command/observer allocation and terminal Once initialization. Once may block before
+the original exchange clock; cancellation is rechecked after initialization.
+A single retained cleanup reaper requests a 256 KiB stack and borrows each reserved
+Child in static storage. The caller closes its transport before publishing cleanup
+and observes it for 20 ms. The reaper requests termination and waits for that same
+child; no caller-side kill/wait/join remains on Unix.
+
+Confirmed same-child reaping preserves the selected result, even if the reaper
+has died elsewhere. With valid pending cleanup at observation expiry, an already
+selected error is preserved, but success becomes Io. Observed cleanup failure,
+invalid ownership or reaper death before confirmation overrides the result with Io.
+Optional deadline/copy receipts are read only after confirmed cleanup; otherwise
+sockets are dropped without a receive and receipts are Missing (deadline selection
+and send scalars remain recorded). A returned Timeout/Cancelled is not cleanup
+proof; late cleanup never revises a returned result.
+
+Caller buffers and observer endpoints remain inside the reservation until disposal.
+One canonical output Vec reserves before append; exposed capacity above 8,388,610
+bytes is dropped and rejected. Normalized input/map capacities are checked against
+65,536 bytes/65,537 words. These are requested-storage bounds, not a whole-process
+heap, allocator, stack or RSS bound. One blocked kill/wait stalls the sole reaper;
+eight sequential unconfirmed or failed reservations can exhaust admission despite
+functional fixture serialization. There is no replacement thread, queue, retry or
+production reset. Once, OS spawn/kill/wait and scheduling have no hard wall-time
+bound. The existing three-second fault-test assertion runs after return and cannot
+interrupt a hung call. Non-Unix retains synchronous cleanup and unbounded
+pipe/scoped-thread joins; an unjoined thread panic can prevent ordinary return.
 
 Worker stderr is discarded except for explicit bounded observations; upstream
 panics may contain source, and no document is logged. The trusted shipped worker
 never spawns descendants. Direct-child reaping does not establish descendant
-termination. Callers must limit concurrent requests and install the matching
-worker. This synchronous API has no detached task, reaper or global pool.
+termination. Callers must install the matching trusted worker; this is not a sandbox.
 Editor consumers use `SourceSnapshot` and `Parser::parse_snapshot`; accepted
 `SnapshotResult::tree_for` rejects a changed document/revision/source/file kind.
 See [the exact declaration corpus and unresolved recovery gates](CORPUS.md).
 Linux native checks do not establish Darwin/Windows reliability, resolve #96 or
 close B3/B4; historical MissingACK observations stay inconclusive. No comparative
-speed/RAM claim follows from the transport change. Collected-byte limits do not
-bound parent allocation capacity, stack or RSS.
+speed/RAM claim follows from the transport change. The parent capacity checks do not
+bound whole-process allocation, stack or RSS.
 
 Limits are enforced independently in parent and worker where applicable:
 

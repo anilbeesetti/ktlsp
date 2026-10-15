@@ -1,4 +1,7 @@
 //! One source-derived local destructuring fixture; runtime evidence is separate.
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{FileKind, Parsed, Parser, ParserError, SourceSnapshot};
 use ktlsp_text::{Position, TextError};
 use std::sync::atomic::AtomicBool;
@@ -299,6 +302,7 @@ fn check_snapshot(snapshot: &SourceSnapshot, revision: i64, source: &str) {
 
 #[test]
 fn local_destructuring_preserves_entries_parents_positions_and_snapshot() {
+    let _functional = functional::serial();
     let parser = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
     let snapshot = SourceSnapshot::new(DOCUMENT, 1, FileKind::Source, SOURCE).unwrap();
     let result = parser

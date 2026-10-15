@@ -15,6 +15,10 @@ use std::{
 #[cfg(any(not(unix), test))]
 use std::sync::mpsc;
 
+#[cfg(test)]
+#[path = "../tests/support/functional.rs"]
+mod functional_test;
+
 pub const MAX_SOURCE_BYTES: usize = 64 * 1024;
 pub const MAX_OUTPUT_BYTES: usize = 4 * 1024 * 1024;
 pub const MAX_ELEMENTS: usize = 16_384;
@@ -243,6 +247,15 @@ impl DeadlineObserver {
         self.evidence.decision_send =
             Some(self.socket.send(b"KTLSP-DUE-v1!!!!").map_err(|e| e.kind()));
     }
+    fn without_receipt(self) -> DeadlineEvidence {
+        let Self {
+            socket,
+            mut evidence,
+        } = self;
+        drop(socket);
+        evidence.receipt = DeadlineReceipt::Missing;
+        evidence
+    }
     fn finish(mut self) -> DeadlineEvidence {
         let mut bytes = [0; 17];
         self.evidence.receipt = match self.socket.recv(&mut bytes) {
@@ -431,7 +444,7 @@ impl GenericCopyObserver {
 }
 
 /// Caller supplies the trusted installed Rust worker's absolute path.
-/// Each call owns exactly one child; concurrent calls need caller-side admission.
+/// Unix calls share eight reservations, including pending or failed cleanup.
 pub struct Parser {
     worker: PathBuf,
 }
@@ -540,48 +553,77 @@ impl Parser {
             return Err(ParserError::Cancelled);
         }
         preflight(source)?;
-        let (normalized, map) = normalize(source);
-        let mut command = Command::new(&self.worker);
-        command.arg(match kind {
-            FileKind::Source => "--source",
-            FileKind::Script => "--script",
-        });
-        command.stderr(Stdio::null());
         #[cfg(unix)]
-        let mut observer = if evidence.is_some() {
-            Some(DeadlineObserver::new(&mut command).map_err(|_| ParserError::Io)?)
-        } else {
-            None
-        };
+        let mut lease = admission::reserve()?;
+        // Once initialization is outside the exchange clock and can block.
         #[cfg(unix)]
-        let copy_observer = if copy_evidence.is_some() {
-            Some(GenericCopyObserver::new(&mut command).map_err(|_| ParserError::Io)?)
-        } else {
-            None
-        };
-        let bytes = supervise(
-            command,
-            &normalized,
-            cancelled,
-            #[cfg(unix)]
-            observer.as_mut(),
-            #[cfg(unix)]
-            copy_observer.is_some(),
-        );
-        #[cfg(unix)]
-        if let (Some(observer), Some(evidence)) = (observer, evidence) {
-            *evidence = observer.finish();
-        }
-        #[cfg(unix)]
-        if let (Some(observer), Some(evidence)) = (copy_observer, copy_evidence) {
-            *evidence = observer.finish(&normalized);
-        }
-        let bytes = bytes?;
         if cancelled.load(Ordering::Relaxed) {
             return Err(ParserError::Cancelled);
         }
-        let reply: Reply = serde_json::from_slice(&bytes).map_err(|_| ParserError::InvalidTree)?;
-        validate(source, &normalized, &map, reply)
+        {
+            let (normalized, map) = normalize(source);
+            #[cfg(unix)]
+            if normalized.capacity() > MAX_SOURCE_BYTES || map.capacity() > MAX_SOURCE_BYTES + 1 {
+                return Err(ParserError::Io);
+            }
+            let mut command = Command::new(&self.worker);
+            command.arg(match kind {
+                FileKind::Source => "--source",
+                FileKind::Script => "--script",
+            });
+            command.stderr(Stdio::null());
+            #[cfg(unix)]
+            let mut observer = if evidence.is_some() {
+                Some(DeadlineObserver::new(&mut command).map_err(|_| ParserError::Io)?)
+            } else {
+                None
+            };
+            #[cfg(unix)]
+            let copy_observer = if copy_evidence.is_some() {
+                Some(GenericCopyObserver::new(&mut command).map_err(|_| ParserError::Io)?)
+            } else {
+                None
+            };
+            #[cfg(unix)]
+            let mut cleanup = admission::Cleanup::Failed;
+            let bytes = supervise(
+                command,
+                &normalized,
+                cancelled,
+                #[cfg(unix)]
+                observer.as_mut(),
+                #[cfg(unix)]
+                copy_observer.is_some(),
+                #[cfg(unix)]
+                &mut lease,
+                #[cfg(unix)]
+                &mut cleanup,
+            );
+            #[cfg(unix)]
+            if let (Some(observer), Some(evidence)) = (observer, evidence) {
+                *evidence = if cleanup == admission::Cleanup::Confirmed {
+                    observer.finish()
+                } else {
+                    observer.without_receipt()
+                };
+            }
+            #[cfg(unix)]
+            if let (Some(observer), Some(evidence)) = (copy_observer, copy_evidence) {
+                *evidence = if cleanup == admission::Cleanup::Confirmed {
+                    observer.finish(&normalized)
+                } else {
+                    drop(observer);
+                    GenericCopyEvidence::Missing
+                };
+            }
+            let bytes = bytes?;
+            if cancelled.load(Ordering::Relaxed) {
+                return Err(ParserError::Cancelled);
+            }
+            let reply: Reply =
+                serde_json::from_slice(&bytes).map_err(|_| ParserError::InvalidTree)?;
+            validate(source, &normalized, &map, reply)
+        }
     }
 }
 fn supervise(
@@ -590,6 +632,8 @@ fn supervise(
     cancelled: &AtomicBool,
     #[cfg(unix)] observer: Option<&mut DeadlineObserver>,
     #[cfg(unix)] preserve_copy_stderr: bool,
+    #[cfg(unix)] lease: &mut admission::Lease<'_>,
+    #[cfg(unix)] cleanup: &mut admission::Cleanup,
 ) -> Result<Vec<u8>, ParserError> {
     #[cfg(unix)]
     if observer.is_none() && !preserve_copy_stderr {
@@ -600,11 +644,743 @@ fn supervise(
     let deadline = Instant::now() + TIMEOUT;
     #[cfg(unix)]
     {
-        unix_io::supervise(command, normalized, cancelled, deadline, observer)
+        unix_io::supervise(
+            command, normalized, cancelled, deadline, observer, lease, cleanup,
+        )
     }
     #[cfg(not(unix))]
     {
         supervise_piped(command, normalized, cancelled, deadline)
+    }
+}
+
+#[cfg(unix)]
+mod admission {
+    use super::*;
+    use std::{
+        panic::catch_unwind,
+        sync::{
+            Mutex, MutexGuard, Once, TryLockError,
+            atomic::{AtomicU8, Ordering::SeqCst},
+        },
+        thread::JoinHandle,
+    };
+    const N: usize = 8;
+    const B: Duration = Duration::from_millis(20);
+    const POLL: Duration = Duration::from_millis(2);
+    const FREE: u8 = 0;
+    const ACTIVE: u8 = 1;
+    const WAITING: u8 = 2;
+    const ABANDONED: u8 = 3;
+    const CONFIRMED: u8 = 4;
+    const FAILED: u8 = 5;
+    const NOT_STARTED: u8 = 0;
+    const STARTING: u8 = 1;
+    const READY: u8 = 2;
+    const DEAD: u8 = 3;
+
+    struct Data {
+        child: Option<Child>,
+        attempted: bool,
+        reaped: bool,
+    }
+    fn valid_confirmation(attempted: bool, has_child: bool, reaped: bool) -> bool {
+        attempted && has_child && reaped
+    }
+    struct Slot {
+        state: AtomicU8,
+        data: Mutex<Data>,
+    }
+    impl Slot {
+        const fn new() -> Self {
+            Self {
+                state: AtomicU8::new(FREE),
+                data: Mutex::new(Data {
+                    child: None,
+                    attempted: false,
+                    reaped: false,
+                }),
+            }
+        }
+    }
+    static SLOTS: [Slot; N] = [const { Slot::new() }; N];
+    static INIT: Once = Once::new();
+    static SINGLETON: AtomicU8 = AtomicU8::new(NOT_STARTED);
+    static HANDLE: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
+
+    pub(super) struct Lease<'a> {
+        slot: &'a Slot,
+        guard: Option<MutexGuard<'a, Data>>,
+        armed: bool,
+    }
+    // Production entry is always the one process-global SLOTS array. The private
+    // reserve_on seam lets isolated capacity tests reuse the exact slot algorithm.
+    pub(super) fn reserve() -> Result<Lease<'static>, ParserError> {
+        let lease = Lease::reserve_on(&SLOTS)?;
+        start_reaper()?; // Empty reservation held during potentially blocking Once.
+        Ok(lease)
+    }
+    impl<'a> Lease<'a> {
+        // Call only after existing input-size/cancellation/preflight checks; all
+        // normalization/Command/socket allocations follow the returned reservation.
+        fn reserve_on(slots: &'a [Slot; N]) -> Result<Self, ParserError> {
+            for slot in slots {
+                if slot
+                    .state
+                    .compare_exchange(FREE, ACTIVE, SeqCst, SeqCst)
+                    .is_err()
+                {
+                    continue;
+                }
+                let guard = match slot.data.try_lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        slot.state.store(FAILED, SeqCst);
+                        return Err(ParserError::Io);
+                    }
+                };
+                let lease = Self {
+                    slot,
+                    guard: Some(guard),
+                    armed: true,
+                };
+                return Ok(lease);
+            }
+            Err(ParserError::Io)
+        }
+
+        // Command must be declared AFTER Lease so its transient child-end aliases
+        // drop first during unwind, and explicitly dropped immediately after spawn.
+        pub(super) fn spawn(&mut self, command: &mut Command) -> Result<(), ParserError> {
+            if SINGLETON.load(SeqCst) != READY {
+                return Err(ParserError::Io);
+            }
+            let data = self.guard.as_mut().ok_or(ParserError::Io)?;
+            // One attempt only, even if spawn returns Err without a Child handle.
+            if data.attempted || data.child.is_some() || data.reaped {
+                return Err(ParserError::Io);
+            }
+            data.attempted = true;
+            match command.spawn() {
+                Ok(child) => {
+                    data.child = Some(child);
+                    Ok(())
+                }
+                Err(_) => Err(ParserError::Io), // Drop pins attempted-without-Child; no retry.
+            }
+        }
+
+        pub(super) fn status(&mut self) -> std::io::Result<Option<std::process::ExitStatus>> {
+            let data = self
+                .guard
+                .as_mut()
+                .ok_or_else(|| std::io::Error::other("missing reserved child"))?;
+            let child = data
+                .child
+                .as_mut()
+                .ok_or_else(|| std::io::Error::other("missing reserved child"))?;
+            let status = child.try_wait()?;
+            if status.is_some() {
+                data.reaped = true;
+            }
+            Ok(status)
+        }
+
+        // E2 separates observed failure from unconfirmed observation expiry.
+        // All selected errors remain frozen outside this cleanup-status method.
+        pub(super) fn cleanup(&mut self) -> Cleanup {
+            let Some(data) = self.guard.as_ref() else {
+                self.slot.state.store(FAILED, SeqCst);
+                return Cleanup::Failed;
+            };
+            if let Some(cleanup) = initial_cleanup(
+                data.attempted,
+                data.child.is_some(),
+                data.reaped,
+                self.slot.state.load(SeqCst) == FAILED,
+                SINGLETON.load(SeqCst) == DEAD,
+            ) {
+                if cleanup == Cleanup::Failed {
+                    self.slot.state.store(FAILED, SeqCst);
+                }
+                return cleanup;
+            }
+            let origin = Instant::now(); // E1 origin, before WAITING publication.
+            self.slot.state.store(WAITING, SeqCst);
+            drop(self.guard.take());
+            loop {
+                let due_before = origin.elapsed() >= B;
+                let state = self.slot.state.load(SeqCst);
+                let dead = SINGLETON.load(SeqCst) == DEAD;
+                let due_after = origin.elapsed() >= B; // E1 decision clock.
+                if let Some(cleanup) = observation(state, dead, due_before, due_after) {
+                    return if cleanup == Cleanup::Confirmed {
+                        self.accept_confirmation()
+                    } else {
+                        if cleanup == Cleanup::Failed {
+                            self.slot.state.store(FAILED, SeqCst);
+                        }
+                        cleanup
+                    };
+                }
+                thread::sleep(POLL);
+            }
+        }
+        fn accept_confirmation(&mut self) -> Cleanup {
+            let guard = match self.slot.data.try_lock() {
+                Ok(guard) => guard,
+                Err(_) => {
+                    self.slot.state.store(FAILED, SeqCst);
+                    return Cleanup::Failed;
+                }
+            };
+            if !valid_confirmation(guard.attempted, guard.child.is_some(), guard.reaped) {
+                drop(guard);
+                self.slot.state.store(FAILED, SeqCst);
+                return Cleanup::Failed;
+            }
+            self.guard = Some(guard);
+            Cleanup::Confirmed
+        }
+    }
+
+    fn initial_cleanup(
+        attempted: bool,
+        has_child: bool,
+        reaped: bool,
+        failed: bool,
+        dead: bool,
+    ) -> Option<Cleanup> {
+        if failed || !attempted || !has_child {
+            Some(Cleanup::Failed)
+        } else if reaped {
+            Some(Cleanup::Confirmed)
+        } else if dead {
+            Some(Cleanup::Failed)
+        } else {
+            None
+        }
+    }
+
+    fn observation(state: u8, dead: bool, due_before: bool, due_after: bool) -> Option<Cleanup> {
+        // Sampled failure wins over both expiry clocks; late confirmation is unconfirmed.
+        if dead || !matches!(state, WAITING | CONFIRMED) {
+            Some(Cleanup::Failed)
+        } else if due_before || due_after {
+            Some(Cleanup::Unconfirmed)
+        } else if state == CONFIRMED {
+            Some(Cleanup::Confirmed)
+        } else {
+            None
+        }
+    }
+
+    // At most two CAS attempts: WAITING may race to CONFIRMED; FAILED is pinned.
+    fn abandon(state: &AtomicU8) {
+        if state
+            .compare_exchange(WAITING, ABANDONED, SeqCst, SeqCst)
+            .is_err()
+        {
+            let _ = state.compare_exchange(CONFIRMED, ABANDONED, SeqCst, SeqCst);
+        }
+    }
+    impl Drop for Lease<'_> {
+        fn drop(&mut self) {
+            if !self.armed {
+                return;
+            }
+            // Caller lexical resources have already dropped before this lease.
+            self.armed = false; // No destructor can touch a reused slot after publish.
+            if self.slot.state.load(SeqCst) == FAILED {
+                drop(self.guard.take()); // Preserve the pin and static Child/metadata.
+                return;
+            }
+            if let Some(mut data) = self.guard.take() {
+                let releasable =
+                    valid_confirmation(data.attempted, data.child.is_some(), data.reaped)
+                        || (!data.attempted && data.child.is_none() && !data.reaped);
+                if releasable {
+                    data.child = None; // Child is either absent or confirmed reaped.
+                    data.reaped = false;
+                    data.attempted = false;
+                    drop(data); // Mutex unlock precedes FREE publication.
+                    self.slot.state.store(FREE, SeqCst);
+                } else {
+                    let state = if data.attempted && data.child.is_some() && !data.reaped {
+                        ABANDONED
+                    } else {
+                        FAILED
+                    };
+                    drop(data);
+                    self.slot.state.store(state, SeqCst);
+                }
+            } else {
+                abandon(&self.slot.state); // Final invocation access; never FREE.
+            }
+        }
+    }
+
+    struct StartupGuard(bool);
+    impl Drop for StartupGuard {
+        fn drop(&mut self) {
+            if self.0 {
+                SINGLETON.store(DEAD, SeqCst);
+            }
+        }
+    }
+    struct ReaperDeath;
+    impl Drop for ReaperDeath {
+        fn drop(&mut self) {
+            SINGLETON.store(DEAD, SeqCst);
+        }
+    }
+    fn start_reaper() -> Result<(), ParserError> {
+        initialize(&INIT, &SINGLETON, start_reaper_once)
+    }
+    fn initialize(
+        init: &Once,
+        singleton: &AtomicU8,
+        start: impl FnOnce() -> Result<(), ParserError> + std::panic::UnwindSafe,
+    ) -> Result<(), ParserError> {
+        if singleton.load(SeqCst) == DEAD {
+            return Err(ParserError::Io);
+        }
+        // Once may block before the existing exchange clock. Catch INSIDE the
+        // initializer, so ordinary startup panic completes Once with terminal DEAD.
+        // Outer catch also contains poisoned-Once panic for already waiting callers.
+        let once_result = catch_unwind(|| {
+            init.call_once(|| {
+                let result = catch_unwind(start);
+                if !matches!(&result, Ok(Ok(()))) {
+                    singleton.store(DEAD, SeqCst);
+                }
+                drop(result); // A panicking payload Drop can poison Once; DEAD is already set.
+            })
+        });
+        if once_result.is_err() {
+            singleton.store(DEAD, SeqCst);
+        }
+        drop(once_result);
+        if singleton.load(SeqCst) == READY {
+            Ok(())
+        } else {
+            Err(ParserError::Io)
+        }
+    }
+    fn start_reaper_once() -> Result<(), ParserError> {
+        let mut startup = StartupGuard(true);
+        SINGLETON
+            .compare_exchange(NOT_STARTED, STARTING, SeqCst, SeqCst)
+            .map_err(|_| ParserError::Io)?;
+        let mut retained = HANDLE.try_lock().map_err(|_| ParserError::Io)?;
+        if retained.is_some() {
+            return Err(ParserError::Io);
+        }
+        let handle = thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(reaper)
+            .map_err(|_| ParserError::Io)?;
+        *retained = Some(handle); // Only this Once initializer can create/retain one.
+        drop(retained);
+        SINGLETON
+            .compare_exchange(STARTING, READY, SeqCst, SeqCst)
+            .map_err(|_| ParserError::Io)?;
+        startup.0 = false;
+        Ok(())
+    }
+
+    fn reaper() {
+        let _death = ReaperDeath; // First nonpanicking entry action.
+        loop {
+            if SINGLETON.load(SeqCst) == DEAD {
+                return;
+            }
+            for slot in &SLOTS {
+                reap_slot(slot);
+            }
+            thread::sleep(POLL);
+        }
+    }
+    fn reap_slot(slot: &Slot) {
+        let state = slot.state.load(SeqCst);
+        if !matches!(state, WAITING | ABANDONED) {
+            return;
+        }
+        let mut data = match slot.data.try_lock() {
+            Ok(data) => data,
+            Err(TryLockError::WouldBlock) => return,
+            Err(TryLockError::Poisoned(_)) => {
+                slot.state.store(FAILED, SeqCst);
+                return;
+            }
+        };
+        if !data.attempted || data.child.is_none() {
+            slot.state.store(FAILED, SeqCst);
+            return;
+        }
+        if !data.reaped {
+            let Some(child) = data.child.as_mut() else {
+                slot.state.store(FAILED, SeqCst);
+                return;
+            };
+            let _ = child.kill(); // One call; this can block the only reaper forever.
+            if child.wait().is_err() {
+                slot.state.store(FAILED, SeqCst);
+                return;
+            }
+            data.reaped = true;
+        }
+        if state == ABANDONED {
+            data.child = None; // Confirmed reaped AND caller resources already gone.
+            data.reaped = false;
+            data.attempted = false;
+            drop(data);
+            slot.state.store(FREE, SeqCst); // Last access for that old invocation.
+        } else {
+            drop(data);
+            // If caller won abandonment, the next sweep reclaims this confirmed Child.
+            let _ = slot
+                .state
+                .compare_exchange(WAITING, CONFIRMED, SeqCst, SeqCst);
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(super) enum Cleanup {
+        Confirmed,
+        Unconfirmed,
+        Failed,
+    }
+    pub(super) fn select_result(
+        selected: Result<Vec<u8>, ParserError>,
+        cleanup: Cleanup,
+    ) -> Result<Vec<u8>, ParserError> {
+        match cleanup {
+            Cleanup::Confirmed => selected,
+            Cleanup::Failed => Err(ParserError::Io),
+            Cleanup::Unconfirmed => match selected {
+                Err(error) => Err(error),
+                Ok(_) => Err(ParserError::Io), // Never return unconfirmed success.
+            },
+        }
+    }
+
+    #[cfg(test)]
+    mod finite_state_checks {
+        use super::*;
+        #[test]
+        fn valid_same_child_reap_confirms_after_unrelated_reaper_death() {
+            for dead in [false, true] {
+                assert_eq!(
+                    initial_cleanup(true, true, true, false, dead),
+                    Some(Cleanup::Confirmed)
+                );
+                assert_eq!(
+                    initial_cleanup(true, true, true, true, dead),
+                    Some(Cleanup::Failed)
+                );
+                assert_eq!(
+                    initial_cleanup(true, false, true, false, dead),
+                    Some(Cleanup::Failed)
+                );
+                assert_eq!(
+                    initial_cleanup(false, true, true, false, dead),
+                    Some(Cleanup::Failed)
+                );
+            }
+            assert_eq!(
+                initial_cleanup(true, true, false, false, true),
+                Some(Cleanup::Failed)
+            );
+            assert_eq!(initial_cleanup(true, true, false, false, false), None);
+        }
+        #[test]
+        fn cleanup_observation_failure_precedes_expiry_and_late_confirmation() {
+            for (before, after) in [(false, false), (false, true), (true, false), (true, true)] {
+                for state in [FREE, ACTIVE, ABANDONED, FAILED, u8::MAX] {
+                    assert_eq!(
+                        observation(state, false, before, after),
+                        Some(Cleanup::Failed)
+                    );
+                }
+                for state in [WAITING, CONFIRMED] {
+                    assert_eq!(
+                        observation(state, true, before, after),
+                        Some(Cleanup::Failed)
+                    );
+                    if before || after {
+                        assert_eq!(
+                            observation(state, false, before, after),
+                            Some(Cleanup::Unconfirmed)
+                        );
+                    }
+                }
+            }
+            assert_eq!(observation(WAITING, false, false, false), None);
+            assert_eq!(
+                observation(CONFIRMED, false, false, false),
+                Some(Cleanup::Confirmed)
+            );
+        }
+
+        #[test]
+        fn contending_once_callers_share_one_successful_initialization() {
+            use std::sync::{atomic::AtomicUsize, mpsc};
+            let init = Once::new();
+            let singleton = AtomicU8::new(NOT_STARTED);
+            let attempts = AtomicUsize::new(0);
+            thread::scope(|scope| {
+                // Disconnect the initializer gate before scope joins on unwind.
+                let (release, gate) = mpsc::channel::<()>();
+                let (started, entering) = mpsc::channel();
+                let (init, singleton, attempts) = (&init, &singleton, &attempts);
+                let first = scope.spawn(move || {
+                    initialize(init, singleton, || {
+                        attempts.fetch_add(1, SeqCst);
+                        singleton.store(STARTING, SeqCst);
+                        started.send(()).unwrap();
+                        gate.recv().unwrap();
+                        singleton.store(READY, SeqCst);
+                        Ok(())
+                    })
+                });
+                entering.recv().unwrap();
+                let (entered, second_entering) = mpsc::channel();
+                let (done, completed) = mpsc::channel();
+                let second = scope.spawn(move || {
+                    entered.send(()).unwrap();
+                    let result =
+                        initialize(init, singleton, || panic!("must not initialize twice"));
+                    done.send(result).unwrap();
+                    result
+                });
+                second_entering.recv().unwrap();
+                let premature = completed.try_recv();
+                let phase = singleton.load(SeqCst);
+                let released = release.send(());
+                drop(release);
+                assert!(matches!(premature, Err(mpsc::TryRecvError::Empty)));
+                assert_eq!(phase, STARTING);
+                released.unwrap();
+                assert_eq!(first.join().unwrap(), Ok(()));
+                assert_eq!(second.join().unwrap(), Ok(()));
+                assert_eq!(completed.recv().unwrap(), Ok(()));
+            });
+            assert_eq!(attempts.load(SeqCst), 1);
+            assert_eq!(singleton.load(SeqCst), READY);
+        }
+
+        #[test]
+        fn poisoned_or_busy_slot_is_permanently_pinned() {
+            for poison in [false, true] {
+                let slots = [const { Slot::new() }; N];
+                if poison {
+                    thread::scope(|scope| {
+                        let join = scope.spawn(|| {
+                            let _guard = slots[0].data.lock().unwrap();
+                            panic!("isolated slot poison");
+                        });
+                        assert!(join.join().is_err());
+                    });
+                }
+                let held = if poison {
+                    None
+                } else {
+                    Some(slots[0].data.lock().unwrap())
+                };
+                assert!(Lease::reserve_on(&slots).is_err());
+                drop(held);
+                assert_eq!(slots[0].state.load(SeqCst), FAILED);
+                let others: Vec<_> = (1..N).map(|_| Lease::reserve_on(&slots).unwrap()).collect();
+                assert!(Lease::reserve_on(&slots).is_err());
+                drop(others);
+                assert_eq!(slots[0].state.load(SeqCst), FAILED);
+                assert!(
+                    slots[1..]
+                        .iter()
+                        .all(|slot| slot.state.load(SeqCst) == FREE)
+                );
+            }
+        }
+
+        #[test]
+        fn abandonment_is_bounded_and_never_releases_capacity() {
+            for initial in [WAITING, CONFIRMED, FAILED] {
+                let state = AtomicU8::new(initial);
+                abandon(&state);
+                assert_eq!(
+                    state.load(SeqCst),
+                    if initial == FAILED { FAILED } else { ABANDONED }
+                );
+                assert_ne!(state.load(SeqCst), FREE);
+            }
+        }
+        #[test]
+        fn once_failure_and_panic_are_terminal_for_concurrent_callers() {
+            use std::sync::atomic::AtomicUsize;
+            for panic in [false, true] {
+                let init = Once::new();
+                let singleton = AtomicU8::new(NOT_STARTED);
+                let attempts = AtomicUsize::new(0);
+                thread::scope(|scope| {
+                    let joins: Vec<_> = (0..N + 1)
+                        .map(|_| {
+                            scope.spawn(|| {
+                                initialize(&init, &singleton, || {
+                                    attempts.fetch_add(1, SeqCst);
+                                    if panic {
+                                        panic!("isolated startup failure");
+                                    }
+                                    Err(ParserError::Io)
+                                })
+                            })
+                        })
+                        .collect();
+                    for join in joins {
+                        assert_eq!(join.join().unwrap(), Err(ParserError::Io));
+                    }
+                });
+                assert_eq!(attempts.load(SeqCst), 1);
+                assert_eq!(singleton.load(SeqCst), DEAD);
+                assert_eq!(
+                    initialize(&init, &singleton, || panic!("must not retry")),
+                    Err(ParserError::Io)
+                );
+            }
+        }
+        #[test]
+        fn ready_cannot_overwrite_early_death() {
+            let singleton = AtomicU8::new(STARTING);
+            singleton.store(DEAD, SeqCst);
+            assert!(
+                singleton
+                    .compare_exchange(STARTING, READY, SeqCst, SeqCst)
+                    .is_err()
+            );
+            assert_eq!(singleton.load(SeqCst), DEAD);
+        }
+        #[test]
+        fn fixed_slot_and_observation_budget() {
+            assert_eq!(N, 8);
+            assert_eq!(B, Duration::from_millis(20));
+            assert_eq!(8 * (65_536 + 65_537 * 8 + 8_388_610 + 8_192), 71_893_072);
+        }
+        #[test]
+        fn eight_local_reservations_reject_ninth_until_confirmed_empty_release() {
+            let slots = [const { Slot::new() }; N];
+            let held: Vec<_> = (0..N).map(|_| Lease::reserve_on(&slots).unwrap()).collect();
+            assert!(Lease::reserve_on(&slots).is_err());
+            assert!(slots.iter().all(|s| s.state.load(SeqCst) == ACTIVE));
+            drop(held);
+            assert!(slots.iter().all(|s| s.state.load(SeqCst) == FREE));
+        }
+        #[test]
+        fn isolated_concurrent_admission_holds_eight_before_ninth_rejection() {
+            use std::sync::mpsc;
+            let slots = [const { Slot::new() }; N];
+            thread::scope(|scope| {
+                // Closure-local senders disconnect on unwind before scope joins.
+                let mut releases = Vec::new();
+                let (ready, results) = mpsc::channel();
+                for _ in 0..N + 1 {
+                    let (release, gate) = mpsc::channel::<()>();
+                    releases.push(release);
+                    let ready = ready.clone();
+                    let slots = &slots;
+                    scope.spawn(move || {
+                        let held = Lease::reserve_on(slots);
+                        let _ = ready.send(held.is_ok());
+                        drop(ready); // Missing contender now disconnects results instead of stranding main.
+                        let _ = gate.recv();
+                        drop(held);
+                    });
+                }
+                drop(ready);
+                let outcomes: Vec<_> = (0..N + 1)
+                    .map(|_| {
+                        results
+                            .recv()
+                            .expect("each admitted contender reports once")
+                    })
+                    .collect();
+                let accepted = outcomes.iter().filter(|ok| **ok).count();
+                // Snapshot all outcomes while reservations remain held, then always
+                // release workers BEFORE an assertion can unwind into scope joins.
+                drop(releases);
+                assert_eq!((outcomes.len(), accepted), (9, 8));
+            });
+        }
+        #[test]
+        fn eight_sequential_unconfirmed_spawn_attempts_permanently_exhaust_local_gate() {
+            let slots = [const { Slot::new() }; N];
+            for _ in 0..N {
+                let mut lease = Lease::reserve_on(&slots).unwrap();
+                lease.guard.as_mut().unwrap().attempted = true;
+                drop(lease); // Exact production Drop branch for no returned Child.
+            }
+            assert!(slots.iter().all(|s| s.state.load(SeqCst) == FAILED));
+            assert!(Lease::reserve_on(&slots).is_err());
+        }
+        #[test]
+        fn unconfirmed_preserves_errors_but_never_success() {
+            for error in [
+                ParserError::Timeout,
+                ParserError::Cancelled,
+                ParserError::OutputLimit,
+                ParserError::WorkerFailed,
+                ParserError::AllocationLimit,
+                ParserError::Io,
+            ] {
+                assert_eq!(select_result(Err(error), Cleanup::Unconfirmed), Err(error));
+                assert_eq!(
+                    select_result(Err(error), Cleanup::Failed),
+                    Err(ParserError::Io)
+                );
+                assert_eq!(select_result(Err(error), Cleanup::Confirmed), Err(error));
+            }
+            assert_eq!(
+                select_result(Ok(Vec::new()), Cleanup::Unconfirmed),
+                Err(ParserError::Io)
+            );
+            assert_eq!(
+                select_result(Ok(Vec::new()), Cleanup::Failed),
+                Err(ParserError::Io)
+            );
+            assert_eq!(
+                select_result(Ok(Vec::new()), Cleanup::Confirmed),
+                Ok(Vec::new())
+            );
+        }
+
+        #[test]
+        fn invalid_confirmation_metadata_pins_instead_of_freeing() {
+            // Missing-Child/reaped uses real local slot metadata, no fake Child.
+            let slots = [const { Slot::new() }; N];
+            let mut lease = Lease::reserve_on(&slots).unwrap();
+            let slot = lease.slot;
+            let data = lease.guard.as_mut().unwrap();
+            data.attempted = true;
+            data.reaped = true;
+            assert_eq!(lease.cleanup(), Cleanup::Failed);
+            drop(lease);
+            assert_eq!(slot.state.load(SeqCst), FAILED);
+            assert!(slot.data.try_lock().unwrap().reaped); // Pin did not erase metadata.
+
+            let slots = [const { Slot::new() }; N];
+            let mut lease = Lease::reserve_on(&slots).unwrap();
+            let slot = lease.slot;
+            lease.guard.as_mut().unwrap().attempted = true;
+            drop(lease.guard.take());
+            slot.state.store(CONFIRMED, SeqCst); // Unreaped ownership cannot confirm.
+            assert_eq!(lease.accept_confirmation(), Cleanup::Failed);
+            drop(lease);
+            assert_eq!(slot.state.load(SeqCst), FAILED);
+            // Actual shared predicate additionally rejects an unreaped present Child.
+            assert!(!valid_confirmation(true, true, false));
+            assert!(!valid_confirmation(false, true, true));
+            assert!(!valid_confirmation(true, false, true));
+            assert!(valid_confirmation(true, true, true));
+        }
     }
 }
 
@@ -658,6 +1434,44 @@ mod unix_io {
         }
     }
     impl Pump {
+        fn reserve_output_room(&mut self, additional: usize) -> Result<(), ParserError> {
+            let needed = self
+                .output
+                .len()
+                .checked_add(additional)
+                .ok_or(ParserError::Io)?;
+            if needed > MAX_OUTPUT_BYTES + 1 {
+                return Err(ParserError::Io);
+            }
+            if needed > self.output.capacity() {
+                let target = self
+                    .output
+                    .capacity()
+                    .max(CHUNK)
+                    .checked_mul(2)
+                    .ok_or(ParserError::Io)?
+                    .max(needed)
+                    .min(8_388_610);
+                self.output
+                    .try_reserve_exact(target - self.output.len())
+                    .map_err(|_| ParserError::Io)?;
+            }
+            if self.output.capacity() > 8_388_610 {
+                drop(std::mem::take(&mut self.output));
+                return Err(ParserError::Io);
+            }
+            Ok(())
+        }
+        fn append(&mut self, bytes: &[u8]) {
+            if self.reserve_output_room(bytes.len()).is_err() {
+                self.reader = Some(Err(ParserError::Io));
+                return;
+            }
+            self.output.extend_from_slice(bytes);
+            if self.output.len() > MAX_OUTPUT_BYTES {
+                self.reader = Some(Err(ParserError::OutputLimit));
+            }
+        }
         fn read(&mut self, stream: &mut impl Read) -> bool {
             if self.reader.is_some() {
                 return false;
@@ -667,10 +1481,7 @@ mod unix_io {
             match stream.read(&mut buffer[..len]) {
                 Ok(0) => self.reader = Some(Ok(())),
                 Ok(count) => {
-                    self.output.extend_from_slice(&buffer[..count]);
-                    if self.output.len() > MAX_OUTPUT_BYTES {
-                        self.reader = Some(Err(ParserError::OutputLimit));
-                    }
+                    self.append(&buffer[..count]);
                 }
                 Err(error) if pending(&error) => return false,
                 Err(_) => self.reader = Some(Err(ParserError::Io)),
@@ -771,20 +1582,17 @@ mod unix_io {
         cancelled: &AtomicBool,
         deadline: Instant,
         mut observer: Option<&mut DeadlineObserver>,
+        lease: &mut admission::Lease<'_>,
+        cleanup: &mut admission::Cleanup,
     ) -> Result<Vec<u8>, ParserError> {
         let (parent, child_stream) = UnixStream::pair().map_err(|_| ParserError::Io)?;
         parent.set_nonblocking(true).map_err(|_| ParserError::Io)?;
         let child_output = child_stream.try_clone().map_err(|_| ParserError::Io)?;
-        let child = command
+        command
             .stdin(Stdio::from(OwnedFd::from(child_stream)))
             .stdout(Stdio::from(OwnedFd::from(child_output)))
-            .env_clear()
-            .spawn()
-            .map_err(|_| ParserError::Io)?;
-        let mut guard = ChildGuard {
-            child,
-            reaped: false,
-        };
+            .env_clear();
+        lease.spawn(&mut command)?;
         drop(command);
         let result = {
             // Close the parent endpoint before cleanup on both return and unwind.
@@ -797,13 +1605,7 @@ mod unix_io {
                     deadline,
                     cancelled,
                     observer.as_deref_mut(),
-                    || {
-                        let status = guard.child.try_wait()?;
-                        if status.is_some() {
-                            guard.reaped = true;
-                        }
-                        Ok(status)
-                    },
+                    || lease.status(),
                 )?;
                 match step {
                     Step::Complete(bytes) => return Ok(bytes),
@@ -812,8 +1614,8 @@ mod unix_io {
                 }
             })()
         };
-        guard.finish()?;
-        result
+        *cleanup = lease.cleanup();
+        admission::select_result(result, *cleanup)
     }
 
     #[cfg(test)]
@@ -897,6 +1699,58 @@ mod unix_io {
             match result {
                 Err(error) => error,
                 _ => panic!("expected rejected step"),
+            }
+        }
+
+        #[test]
+        fn post_success_capacity_failure_defers_to_writer_and_controls() {
+            let deadline = Instant::now() + TIMEOUT;
+            for cancelled_on_write in [false, true] {
+                let cancelled = Arc::new(AtomicBool::new(false));
+                let mut pump = Pump {
+                    exited: true,
+                    ..Pump::default()
+                };
+                assert_eq!(pump.reserve_output_room(usize::MAX), Err(ParserError::Io));
+                assert_eq!(pump.output.capacity(), 0);
+                pump.output = Vec::with_capacity(8_388_611);
+                pump.append(b"x");
+                assert_eq!(pump.reader, Some(Err(ParserError::Io)));
+                assert_eq!(pump.output.capacity(), 0);
+                let mut script = Script {
+                    writes: [Err(io::ErrorKind::WouldBlock.into())].into(),
+                    ..Script::default()
+                };
+                assert!(matches!(
+                    pump.step(&mut script, b"x", deadline, &cancelled, None, || panic!(
+                        "post-success never checks status"
+                    )),
+                    Ok(Step::Pending(false))
+                ));
+                assert_eq!(script.calls, [0, 1, 0]);
+                assert_eq!(pump.writer, None);
+                assert_eq!(pump.reader, Some(Err(ParserError::Io)));
+                script
+                    .writes
+                    .push_back(Err(io::ErrorKind::BrokenPipe.into()));
+                if cancelled_on_write {
+                    script.cancel_on = Some((1, Arc::clone(&cancelled)));
+                }
+                let selected = pump.step(&mut script, b"x", deadline, &cancelled, None, || {
+                    panic!("post-success never checks status")
+                });
+                assert_eq!(
+                    error(selected),
+                    if cancelled_on_write {
+                        ParserError::Cancelled
+                    } else {
+                        ParserError::Io
+                    }
+                );
+                assert_eq!(script.calls, [0, 2, 1]);
+                assert_eq!(pump.writer, Some(Err(ParserError::Io)));
+                assert_eq!(pump.input_close, Some(Ok(())));
+                assert_eq!(pump.reader, Some(Err(ParserError::Io)));
             }
         }
 
@@ -1351,10 +2205,12 @@ fn finish_io(
         .map(Ok)
         .unwrap_or_else(|| receiver.try_recv().map_err(|_| ParserError::Io)?)
 }
+#[cfg(not(unix))]
 struct ChildGuard {
     child: Child,
     reaped: bool,
 }
+#[cfg(not(unix))]
 impl ChildGuard {
     fn finish(&mut self) -> Result<(), ParserError> {
         if !self.reaped {
@@ -1365,6 +2221,7 @@ impl ChildGuard {
         Ok(())
     }
 }
+#[cfg(not(unix))]
 impl Drop for ChildGuard {
     fn drop(&mut self) {
         if !self.reaped {
@@ -1541,7 +2398,7 @@ mod tests {
         deadline_after: Duration,
         cancel: bool,
     ) -> Result<(), ParserError> {
-        let (release, gate) = mpsc::channel();
+        let (release, gate) = mpsc::channel::<()>();
         let (started, ready) = mpsc::channel();
         let (selected, result) = mpsc::channel();
         let cancelled = AtomicBool::new(false);
@@ -1934,6 +2791,7 @@ mod tests {
     }
     #[test]
     fn supervised_faults_terminate_and_allow_next_request() {
+        let _functional = crate::functional_test::serial();
         for (mode, expected) in [
             ("hang", ParserError::Timeout),
             ("no-read", ParserError::Timeout),
@@ -1943,6 +2801,10 @@ mod tests {
             ("exit-allocation", ParserError::AllocationLimit),
             ("exit-neighbor", ParserError::WorkerFailed),
         ] {
+            #[cfg(unix)]
+            let mut lease = admission::reserve().unwrap();
+            #[cfg(unix)]
+            let mut cleanup = admission::Cleanup::Failed;
             let mut command = Command::new(std::env::current_exe().unwrap());
             command.args(["--exact", "tests::fault_worker", "--ignored", "--nocapture"]);
             let source = if mode == "no-read" {
@@ -1959,6 +2821,10 @@ mod tests {
                 None,
                 #[cfg(unix)]
                 false,
+                #[cfg(unix)]
+                &mut lease,
+                #[cfg(unix)]
+                &mut cleanup,
             );
             if mode == "crash" {
                 // Abort completion can cross the deadline checked before exit status.
@@ -1977,6 +2843,10 @@ mod tests {
                 thread::sleep(Duration::from_millis(30));
                 cancel.store(true, Ordering::Relaxed);
             });
+            #[cfg(unix)]
+            let mut lease = admission::reserve().unwrap();
+            #[cfg(unix)]
+            let mut cleanup = admission::Cleanup::Failed;
             let mut command = Command::new(std::env::current_exe().unwrap());
             command.args(["--exact", "tests::fault_worker", "--ignored", "--nocapture"]);
             assert_eq!(
@@ -1987,11 +2857,19 @@ mod tests {
                     #[cfg(unix)]
                     None,
                     #[cfg(unix)]
-                    false
+                    false,
+                    #[cfg(unix)]
+                    &mut lease,
+                    #[cfg(unix)]
+                    &mut cleanup,
                 ),
                 Err(ParserError::Cancelled)
             );
         });
+        #[cfg(unix)]
+        let mut lease = admission::reserve().unwrap();
+        #[cfg(unix)]
+        let mut cleanup = admission::Cleanup::Failed;
         let mut command = Command::new(std::env::current_exe().unwrap());
         command.args(["--exact", "tests::fault_worker", "--ignored", "--nocapture"]);
         assert!(
@@ -2002,7 +2880,11 @@ mod tests {
                 #[cfg(unix)]
                 None,
                 #[cfg(unix)]
-                false
+                false,
+                #[cfg(unix)]
+                &mut lease,
+                #[cfg(unix)]
+                &mut cleanup,
             )
             .is_ok()
         );

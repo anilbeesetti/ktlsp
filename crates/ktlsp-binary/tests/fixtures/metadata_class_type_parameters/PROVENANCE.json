@@ -51,6 +51,15 @@
   "schema_pin_inherited": "Kotlin v2.3.20 d57eb4a26ed01ab03cf195da686c8047032ff16f",
   "metadata_proto_sha256_inherited": "a08e508cc7d98cc225e8b0df7290724b545a0250f7d9c91460cfc1244a3c08e2",
   "generated_java_sha256_inherited": "da7fa6f03c1afa3499086cb5a1f92471e3f327c8f43298ea8d9548b7e4753716",
-  "native_pipeline_at_source_authoring": "UNEXECUTED; hosted CI required",
+  "native_pipeline_at_source_authoring": "UNEXECUTED; original PR285 CI later passed the genuine Pair focused test but failed two authored-fixture sweeps, not a passing workspace receipt",
+  "authored_nonminimal_erratum": {
+    "original_run": 38703813611,
+    "original_head": "9853bc782dcb5a20d075272024611001d6ab9b7a",
+    "original_log_sha256": "22308a27e62eb0aeb8edef5467e191e0adf6ca8cb763cb0c776a6cfee7b70999",
+    "correction": "byte6 84->88 changes child length4 to intended8; values/spans/budgets/prefix tuples unchanged; static reviews missed the mismatch",
+    "original_accepted_expectations_sha256": "d89f57198113b5fa090993f4a058a224497fac974323ffe953b95fa583ef2af5",
+    "corrected_expectations_sha256": "45c32441c9be86bdd5d651cadd11998ec33cc63983f79df2e5d5171a432a18b0",
+    "original_sealed_packet_preserved": true
+  },
   "new_acquisition_repacking_compiler_jvm_oracle": false
 }

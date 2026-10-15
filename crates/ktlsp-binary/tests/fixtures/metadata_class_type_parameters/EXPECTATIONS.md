@@ -1,5 +1,13 @@
 # Literal expectations — independently authored before execution
 
+Erratum after original PR285 CI run38703813611 at head9853bc7: the accepted
+nonminimal literal incorrectly encoded child length4 (`84 00`) while its frozen
+body/span/budget tuples require8 (`88 00`). Correct only that authored length
+byte using the existing wire rules; all expected values/spans/budgets/prefix
+partitions below remain unchanged. Initial static reviews missed this mismatch.
+The original sealed freeze SHA256d89f57198113b5fa090993f4a058a224497fac974323ffe953b95fa583ef2af5
+and failed attempt1 remain preserved; this copied freeze records the correction.
+
 All tuples are prospective, source-derived requirements, never observed outputs.
 Generous limits unless a limit is specified. S=SelectedTypeParameter slot size,
 B=UpperBound slot size. Raw/borrowed pointer identities must accompany every
@@ -46,7 +54,7 @@ Exact(24,14,2,2,118+2B+S,16+2B+S). Nested group/ff bytes are opaque, not errors.
 Unselected malformed body control `18 00 32 01 ff 4a 01 80` succeeds[];
 exact(8,6,1,1,29,0). Only selected TypeParameter bodies are inspected.
 
-nonminimal.hex: `98 00 80 00 aa 00 84 00 88 00 80 00 90 00 81 00`
+nonminimal.hex: `98 00 80 00 aa 00 88 00 88 00 80 00 90 00 81 00`
 Result [(8..16,0,1)] exact(16,6,2,2,54+S,S). Existing low32 tag/length rules and
 nonminimal scalar varints apply. No new canonical-protobuf restriction.
 Signed parent inline `08 ff ff ff ff 0f 18 fe ff ff ff 0f 2a 04 08 00 10 00`

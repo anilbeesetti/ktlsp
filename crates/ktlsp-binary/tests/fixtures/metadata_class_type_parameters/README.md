@@ -1,8 +1,11 @@
 # Class TypeParameter composition fixtures
 
-All hex files except pair_class.hex are independently authored literals frozen
-before implementation/execution. EXPECTATIONS.md is the unchanged accepted
-literal freeze (SHA256d89f57198113b5fa090993f4a058a224497fac974323ffe953b95fa583ef2af5).
+All hex files except pair_class.hex are independently authored literals. Original
+PR285 CI exposed an authored nonminimal child-length typo: correct84→88 to encode
+the intended8 bytes. EXPECTATIONS.md retains the preimplementation tuples and
+documents that erratum (SHA25645c32441c9be86bdd5d651cadd11998ec33cc63983f79df2e5d5171a432a18b0).
+The original accepted freeze SHA256d89f57198113b5fa090993f4a058a224497fac974323ffe953b95fa583ef2af5
+and failed evidence remain preserved separately; the current copy is corrected.
 EXPECTATIONS.json is its compact index; tests assert literal tuples from this
 freeze, not decoder-produced expectations.
 

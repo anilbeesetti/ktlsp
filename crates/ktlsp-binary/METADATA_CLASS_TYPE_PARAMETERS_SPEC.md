@@ -12,6 +12,9 @@ providers, full initialization, performance or full Kotlin LSP parity.
 
 The unchanged preimplementation contract follows. Its literal expected data is
 tests/fixtures/metadata_class_type_parameters/EXPECTATIONS.md.
+That copied data now documents the one-byte nonminimal authored-length erratum
+found by original PR285 CI. Expected values/spans/budgets remain unchanged;
+the original sealed preparation packet is preserved separately.
 
 # T018 Class selected TypeParameter composition — preparation v1
 

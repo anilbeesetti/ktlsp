@@ -23,6 +23,18 @@ Original unchanged Linux Native Rust CI must establish Clippy/workspace results
 and receive completed CI review separately. Static source approval is not runtime
 validation or a merge lease. Preparation reviews remain separate.
 
+Original PR285 attempt1/run38703813611 at head9853bc7 passed Format and Clippy,
+then four focused tests passed and two failed with TypeParameter MissingName@12;
+workspace execution stopped there. The accepted nonminimal literal declared4
+child bytes with84 00, omitting its name from the child despite the frozen8-byte
+body/span/budget intent. Owner and all three initial static reviews missed this
+encoding mismatch. Correcting only the authored length byte84→88 preserves
+provider/test code, API and expected values/spans/budgets. Copied EXPECTATIONS.md
+documents the erratum and dependent hash receipts are updated. Original sealed
+TMP/failed raw evidence remains preserved (log SHA25622308a27e62eb0aeb8edef5467e191e0adf6ca8cb763cb0c776a6cfee7b70999).
+Targeted SAME2/architect correction rechecks and original CI on the new head
+are required; the failed run is not a passing workspace receipt.
+
 Residual limits: raw names/IDs, opaque deeper bounds, no name/type reconstruction,
 substitution/variance semantics, complete initialization, Function TypeParameter
 lane or server integration. Compiler provenance UNVERIFIED; no JVM/oracle run,

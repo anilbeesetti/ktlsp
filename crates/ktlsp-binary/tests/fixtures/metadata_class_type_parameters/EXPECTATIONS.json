@@ -1,7 +1,8 @@
 {
-  "status": "independent pre-execution literal freeze; source authoring has no runtime validation",
+  "status": "independent pre-execution tuples; copied literal freeze includes documented authored-length erratum after original PR285 CI failure",
   "authoritative": "EXPECTATIONS.md",
-  "authoritative_sha256": "d89f57198113b5fa090993f4a058a224497fac974323ffe953b95fa583ef2af5",
+  "authoritative_sha256": "45c32441c9be86bdd5d651cadd11998ec33cc63983f79df2e5d5171a432a18b0",
+  "original_accepted_sha256": "d89f57198113b5fa090993f4a058a224497fac974323ffe953b95fa583ef2af5",
   "S": "size_of::<SelectedTypeParameter>()",
   "B": "size_of::<UpperBound>()",
   "exact_bytes_records_nodes_depth_work_owned": {

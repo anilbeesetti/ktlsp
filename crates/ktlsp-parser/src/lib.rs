@@ -2011,7 +2011,7 @@ mod tests {
     #[ignore = "subprocess fault fixture"]
     fn fault_worker() {
         let mut source = String::new();
-        // The no-read fixture fills the input pipe before the parent can close it.
+        // The no-read fixture consumes one byte, then leaves the remaining input unread.
         let mut first = [0u8; 1];
         std::io::stdin().read_exact(&mut first).unwrap();
         if first[0] == b'x' {

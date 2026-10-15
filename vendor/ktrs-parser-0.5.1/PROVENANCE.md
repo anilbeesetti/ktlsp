@@ -890,7 +890,7 @@ All54 final hashes matched; counts16behavior/50formatting/4pristine. Only
 `src/parsing/declarations/type_parameters.rs` changes among54 Rust files;
 67 tracked vendor paths remain equal in total:53 unchanged Rust source files
 and14 other paths, including notices/manifests/locks.
-Current phase hashes:
+Initial source-stage phase hashes:
 - recovery.patch SHA256 `2436b50d6a879b1a80466f05af68e296143f1e13986621724cbb46d8969f9090`
 - formatting.patch SHA256 `50ebde4b22a76fc40cee49b795cf89981883c862577d6eee0f309c4d71a0dabc`
 - formatted-sha256.json SHA256 `54594b95342ee33292f0ea8f0cb78dab47dfebb8163e76120dee98e582e7ba2b`
@@ -914,3 +914,93 @@ UNKNOWN remain. No semantics/server providers/performance/full parity promotion.
 Native product/core/build/default tests remain Rust-only, with no bundled JVM/
 JDK/compiler/JNI/C/C++ analyzer/tree-sitter C. Optional existing external tools
 and isolated official oracle remain at their separate boundary, unused here.
+
+## N261 unpublished bounded declined-prefix repair draft
+
+Original PR261 head `efabccee5eb4eee6213d606b4bf9be16da67f70f`, base
+`46fd28ddba16ddd6d000588cae56548a7af3d732`, ran original Linux attempt1
+38661078501/job116182203658. The runner checkout `04f87b22d108a3b71b66e9d5690b492ac73edfe4`
+had the exact reviewed tree `1fc1f56d50a252ee99bd8aa8f865e3a2392dd8ad` and all1023
+source files. Format and locked all-target Clippy passed; workspace tests failed
+at `compact-n125` with `OutputLimit` after147 preceding N cases passed. Later17
+N cases and full-workspace completion remain unobserved. The partial run reported
+499 Rust passes, one failure and two ignored helpers; the expected656 total was
+not achieved. First raw output, original expectations and failed inspections are
+preserved separately and are never replaced by this draft.
+
+Source trace explains the failure: N125 needs direct LPAR at raw257, outside the
+unchanged256-token scratch window. Scratch correctly declines. The live missing-GT
+fallback consumes only FUN, then258 remaining significant terminals each receive
+a top-level error; together with MissingGT this yields259 diagnostics, exceeding
+the unchanged256 worker cap. This is a declined-path cascade, not widened scratch
+admission or a reason to raise worker limits.
+
+The exact seven-path draft grant SHA256
+`446f3aafeca10268b5bd44efd1c33e67853ec88609efb9c0222b4b03b7d3bdcc` permits only
+existing type_parameters.rs private predicate/classifier callers, this review
+text and five derived vendor artifacts. The same already-debited scratch parse
+may return a verified exclusive raw endpoint only after a clean N>=3 simple
+nonnullable receiver, GT, plain DOT and direct name, when final LPAR is absent
+because scratch reached EOF. Capture occurs immediately after name, before any
+trivia-skipping query; checked translation confines the endpoint to the copied
+window and effective EOF. Successful found, N1/N2, property, recursive, unverified
+and explicit-next-nonLPAR paths carry no endpoint.
+
+Both classifier call sites handle a returned endpoint immediately at the unchanged
+candidate cursor. Live recovery groups precisely that prefix into one MissingGT
+error, keeping recovered_function=false. Raw-index guards precede EOF/token
+queries; explicit EOF/progress protection prevents spinning. The following LPAR,
+trailing trivia, unverified suffix and later declarations are not consumed by
+this grouping. No second scan/copy/parser, new dependency or public API is added.
+
+Source-only retained reviews identify six affected ownership-only controls:
+`no-lpar`, `raw-cut-12`, `byte-cut-12`, `compact-n125`, `byte-lpar-over`, and
+`aggregate-one-less`. Each still declines sibling recovery, retains original
+CLASS/list beyond the candidate and has no candidate-root FUN. Aggregate fresh-list
+recovery and all48 exact full-CST expectations remain required. Independent
+historical audits of482 raw executable cases and14 overlay/erratum records find
+no new expectation amendments: historical case44 already observes LPAR and takes
+found=true, nullable/malformed/N1/N2 controls remain excluded.
+
+All165/new and131/historical test bytes, raw payloads, overlays, expected CST,
+ranges, diagnostics, UTF16 maps and stale identities remain unchanged. Raw256,
+byte4096, shared4096, diagnostics256, source64KiB and all worker limits remain
+unchanged. Static review and compilation do not prove the17 unobserved outcomes,
+allocation/deadline behavior, full active-EOF B11, crash safety or full parity.
+
+This is an unpublished source draft only: no new commit/push/fetch/incoming merge,
+public-body update, local parser/tokenizer/worker/test runtime or CI rerun is
+admitted. Remote PR261 remains pinned to originalEFabc through257 OWNER+ROOT
+delivery. Retained SAME2/architect changed-source reviews, pinned formatting,
+compile-only locked workspace/all-target Clippy and one fresh pristine ordered
+patch replay are required before REPAIR_SOURCE_READY; later runtime/publication/
+final-cut/merge gates remain separate. #96 Darwin UNKNOWN, C13/B3/B4 GAP,
+fullB11 UNVERIFIED, T008/T008a HOLD and #7/#83 OPEN remain unchanged.
+
+The archived initial behavior-to-final diff for type_parameters.rs also contained
+an inherited comma-arm fallback/nesting change; its formatting-only classification
+was inaccurate. This draft places that inherited behavior in recovery.patch by
+reconstructing the behavior file from repaired final source and restoring only
+three known formatting spans (imports and two expect calls). The other53 accepted
+behavior files remain byte-identical. New behavior-to-final differences for this
+file must be whitespace-only. Original patches and their hashes remain preserved;
+new phase counts and hashes are derived from the actual data, not assumed.
+
+Completed draft checks: pinned Rust1.99.0 formatting and compile-only locked
+workspace/all-target Clippy both exited0 for source SHA256
+873331a853582595578acb34cb5bd738ab19b648484cf6129e86a9a8f4bbf3a0.
+No test bodies or local parser/tokenizer/worker runtime were executed. One fresh
+pristine extraction and one current recovery-then-formatting replay passed with
+zero offsets/fuzz and exact54 final byte/hash matches; notices remained unchanged.
+Derived counts are16 behavior files,50 formatting files,54 final files and4
+pristine survivors. The two reconstructed single-line expect calls retain final
+trailing commas, so this file's new formatting delta is strictly whitespace-only.
+New draft phase hashes:
+- recovery.patch SHA256 `fcb338c7e9bdc60757e76f4f202c2585ae2ec11ab1626dfe97dde668e5f77eb5`
+- formatting.patch SHA256 `4b1abb4ab303923222fa4b0a2121afea2b9f8eaed33f380f95149ad4e3448aa4`
+- formatted-sha256.json SHA256 `0b56fc9a47b5b164e2ef4bea073d19af2ce924fddc3412dab30ba6f510c95aa1`
+
+These checks and source-only reviews do not replace the preserved first failed
+Linux run or establish a passing repair runtime. Remote head remains original
+EFabc; unpublished draft readiness still requires completed retained SAME3
+packet review and ROOT admission for any later action.

@@ -1,4 +1,7 @@
 //! One source-derived enum-entry acceptance fixture; runtime evidence is separate.
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{FileKind, Parsed, Parser, ParserError, SourceSnapshot};
 use ktlsp_text::Position;
 use std::sync::atomic::AtomicBool;
@@ -197,6 +200,7 @@ fn check_enum(tree: &Parsed) {
 
 #[test]
 fn bare_enum_entries_preserve_kinds_names_parents_and_snapshot() {
+    let _functional = functional::serial();
     let parser = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
     let snapshot = SourceSnapshot::new(DOCUMENT, 1, FileKind::Source, SOURCE).unwrap();
     let result = parser

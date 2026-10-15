@@ -1,5 +1,8 @@
 #![cfg(unix)]
 //! One finite production observation; machinery controls do not prove B3.
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{
     DeadlineReceipt, Element, FileKind, Parsed, Parser, ParserError, SourceSnapshot,
 };
@@ -57,6 +60,7 @@ fn healthy_elements(elements: &[Element], diagnostics: usize) {
 
 #[test]
 fn frozen_production_request_reports_first_outcome_and_normal_healthy_followup() {
+    let _functional = functional::serial();
     assert_eq!((SOURCE.len(), HEALTHY.len()), (44, 14));
     let parser = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
     let snapshot =

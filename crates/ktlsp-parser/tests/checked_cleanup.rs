@@ -1,8 +1,12 @@
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{FileKind, Parser, SourceSnapshot};
 use std::sync::atomic::AtomicBool;
 
 #[test]
 fn checked_cleanup_preserves_healthy_snapshots() {
+    let _functional = functional::serial();
     let parser = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
     let source = "val healthy=1\n";
     let expected = [

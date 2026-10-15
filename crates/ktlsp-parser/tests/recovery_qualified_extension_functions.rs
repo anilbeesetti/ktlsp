@@ -1,4 +1,7 @@
 //! Finite qualified receiver expectations frozen before source implementation or runtime.
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{FileKind, Parsed, Parser, ParserError, SourceSnapshot};
 use serde_json::{Value, json};
 use std::sync::atomic::AtomicBool;
@@ -238,6 +241,7 @@ fn compatibility(tree: &Parsed, case: &Value) {
 
 #[test]
 fn frozen_qualified_receiver_contract_through_production_snapshot_worker() {
+    let _functional = functional::serial();
     let cases: Vec<Value> = serde_json::from_str(FIXTURES).unwrap();
     assert_eq!(cases.len(), 59);
     assert_eq!(

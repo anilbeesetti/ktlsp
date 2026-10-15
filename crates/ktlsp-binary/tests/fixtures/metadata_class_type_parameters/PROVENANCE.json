@@ -1,0 +1,56 @@
+{
+  "source_admitted_base": "f9146027c072fdcc3d3ec1c34726678d6b5c5c8c",
+  "source_admitted_tree": "ce6fda78ca4faa2840079efa50f05d3735b4f712",
+  "accepted_contract_ready_sha256": "5d2a6507622609bd9473b2e167ea89eb24c5df84f9998a5b003b7767de26095b",
+  "accepted_compatibility_delta_sha256": "89968127b6caf1541010f736b571c7ad181202f863decf302192f82dfc3ccf55",
+  "delivered_helper_sha256": "aeec4edd9f84f994369caf1e0a1cc99fc7f0c03fecf902ce4fb6a020e7a21ce2",
+  "artifact": "org.jetbrains.kotlin:kotlin-stdlib:2.3.20",
+  "jar_sha256_inherited_not_rehashed": "0ae12504a5040ebaf37703908483420d1a5624dd1d93f357665f8c77c848a01e",
+  "existing_class": "crates/ktlsp-binary/tests/fixtures/metadata_constructor/Pair.class.bin",
+  "class_bytes": 2983,
+  "class_sha256": "8fed0fa88eb2df5723812a95330dee6bc91fd66b13906acb7906f9a813da9736",
+  "existing_extraction": "crates/ktlsp-binary/tests/fixtures/metadata_constructor/PAIR_EXTRACTION.json",
+  "extraction_sha256": "72b7caa3f873e076e305d0853b7432c5a909af2a94969181dd9103c94f237267",
+  "cp89_mutf8_classfile_span": [
+    1276,
+    1599
+  ],
+  "d1_bytes": 285,
+  "d1_sha256": "a4c2bf2d0bcd52aac574d156b413e3926cec249c5c2a23259d126c68872afa8e",
+  "class_d1_span": [
+    47,
+    285
+  ],
+  "class_body_bytes": 238,
+  "class_body_sha256": "5a6bbbf0eb4405c5cc62f6a15c7e0e353e3d7bcc541589f5b085f50e45cd96cf",
+  "selected_d1_spans": [
+    [
+      54,
+      60
+    ],
+    [
+      62,
+      68
+    ]
+  ],
+  "selected_class_spans": [
+    [
+      7,
+      13
+    ],
+    [
+      15,
+      21
+    ]
+  ],
+  "selected_hex": [
+    "08 00 10 01 20 01",
+    "08 01 10 02 20 01"
+  ],
+  "compiler_provenance": "UNVERIFIED; distribution version is not compiler proof",
+  "schema_pin_inherited": "Kotlin v2.3.20 d57eb4a26ed01ab03cf195da686c8047032ff16f",
+  "metadata_proto_sha256_inherited": "a08e508cc7d98cc225e8b0df7290724b545a0250f7d9c91460cfc1244a3c08e2",
+  "generated_java_sha256_inherited": "da7fa6f03c1afa3499086cb5a1f92471e3f327c8f43298ea8d9548b7e4753716",
+  "native_pipeline_at_source_authoring": "UNEXECUTED; hosted CI required",
+  "new_acquisition_repacking_compiler_jvm_oracle": false
+}

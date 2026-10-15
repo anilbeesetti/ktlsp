@@ -1,0 +1,219 @@
+{
+  "status": "independent pre-execution literal freeze; source authoring has no runtime validation",
+  "authoritative": "EXPECTATIONS.md",
+  "authoritative_sha256": "d89f57198113b5fa090993f4a058a224497fac974323ffe953b95fa583ef2af5",
+  "S": "size_of::<SelectedTypeParameter>()",
+  "B": "size_of::<UpperBound>()",
+  "exact_bytes_records_nodes_depth_work_owned": {
+    "minimal": [
+      2,
+      2,
+      1,
+      1,
+      "9",
+      "0"
+    ],
+    "selected": [
+      8,
+      6,
+      2,
+      2,
+      "34+S",
+      "S"
+    ],
+    "duplicates": [
+      14,
+      10,
+      3,
+      2,
+      "59+2S",
+      "2S"
+    ],
+    "three": [
+      20,
+      14,
+      4,
+      2,
+      "84+4S",
+      "4S"
+    ],
+    "scalars": [
+      26,
+      9,
+      2,
+      2,
+      "99+S",
+      "4+S"
+    ],
+    "presence": [
+      18,
+      11,
+      2,
+      2,
+      "74+S",
+      "S"
+    ],
+    "wrong_wire": [
+      9,
+      6,
+      1,
+      1,
+      "31",
+      "0"
+    ],
+    "opaque": [
+      24,
+      14,
+      2,
+      2,
+      "118+2B+S",
+      "16+2B+S"
+    ],
+    "nonminimal": [
+      16,
+      6,
+      2,
+      2,
+      "54+S",
+      "S"
+    ],
+    "pair_class": [
+      238,
+      36,
+      3,
+      2,
+      "563+2S",
+      "2S"
+    ]
+  },
+  "selected_spans_ids_names": {
+    "selected": [
+      [
+        4,
+        8,
+        0,
+        0
+      ]
+    ],
+    "duplicates": [
+      [
+        4,
+        8,
+        0,
+        0
+      ],
+      [
+        10,
+        14,
+        0,
+        0
+      ]
+    ],
+    "three": [
+      [
+        4,
+        8,
+        0,
+        0
+      ],
+      [
+        10,
+        14,
+        0,
+        0
+      ],
+      [
+        16,
+        20,
+        0,
+        0
+      ]
+    ],
+    "scalars": [
+      [
+        4,
+        26,
+        -1,
+        -2
+      ]
+    ],
+    "presence": [
+      [
+        4,
+        18,
+        0,
+        0
+      ]
+    ],
+    "opaque": [
+      [
+        4,
+        24,
+        0,
+        0
+      ]
+    ],
+    "nonminimal": [
+      [
+        8,
+        16,
+        0,
+        1
+      ]
+    ],
+    "pair_class": [
+      [
+        7,
+        13,
+        0,
+        1
+      ],
+      [
+        15,
+        21,
+        1,
+        2
+      ]
+    ],
+    "minimal": [],
+    "wrong_wire": []
+  },
+  "presence": {
+    "scalars": [
+      false,
+      "Inv"
+    ],
+    "presence": [
+      false,
+      "Out"
+    ],
+    "pair_class": [
+      null,
+      "Out"
+    ]
+  },
+  "opaque": {
+    "bound_ids": [
+      7,
+      8,
+      9,
+      10
+    ],
+    "child_relative_bound_spans": [
+      [
+        16,
+        16
+      ],
+      [
+        18,
+        20
+      ]
+    ],
+    "bound_hex": [
+      "",
+      "0b ff"
+    ]
+  },
+  "all_prefixes_and_errors": "full partitions, exact phase/offset and failure-charge arithmetic in EXPECTATIONS.md",
+  "no_full_parity_claim": true
+}

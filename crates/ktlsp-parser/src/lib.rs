@@ -1,4 +1,7 @@
 //! Isolated, bounded parser adoption gate. No grammar or semantic parity claim.
+pub mod lowering;
+pub mod structural_regions;
+
 use serde::{Deserialize, Serialize};
 use std::{
     io::{Read, Write},

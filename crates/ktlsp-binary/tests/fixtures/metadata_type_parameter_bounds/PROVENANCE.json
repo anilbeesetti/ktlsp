@@ -1,0 +1,17 @@
+{
+  "stage": "TEMP CONTRACT/DATA ONLY; unexecuted authored expectations",
+  "date": "2026-10-15",
+  "base": "6b965cfa8008df51deba5ff4a56be31e9b30d16b",
+  "fixture_kind": "independently authored hex; no tested encoder/decoder used",
+  "compiler_or_jvm_or_oracle_run": false,
+  "native_product_build_or_test_run": false,
+  "genuine_inline_bound_positive": "GAP: existing Pair TypeParameters contain no inline bounds",
+  "compiler_provenance": "UNVERIFIED",
+  "kotlin_source_commit": "d57eb4a26ed01ab03cf195da686c8047032ff16f",
+  "metadata_proto_sha256_inherited": "a08e508cc7d98cc225e8b0df7290724b545a0250f7d9c91460cfc1244a3c08e2",
+  "ProtoBuf_java_sha256_inherited": "da7fa6f03c1afa3499086cb5a1f92471e3f327c8f43298ea8d9548b7e4753716",
+  "coded_input_sha256_inherited": "7fbb3aeebd3c3d5414d7171bc3ba2785de50b40863a4f381c4b43986e15784fe",
+  "pin_verification": "existing committed provenance read; no fresh external source/artifact fetch",
+  "notices": "byte-identical copies of tests/fixtures/metadata_wire notices",
+  "genuine_zero_bound_reuse": "unchanged existing metadata_constructor Pair.class.bin and PAIR_EXTRACTION.json; no new artifact copy"
+}

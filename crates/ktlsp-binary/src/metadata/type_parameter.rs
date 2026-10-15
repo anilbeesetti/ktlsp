@@ -104,6 +104,13 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<TypeParameter<'_>, Error> 
         owned_bytes: limits.owned_bytes,
         ..Default::default()
     });
+    decode_with_budget(bytes, &mut budget)
+}
+
+pub(super) fn decode_with_budget<'a>(
+    bytes: &'a [u8],
+    budget: &mut string_table::Budget,
+) -> Result<TypeParameter<'a>, Error> {
     let mut pos = 0;
     let mut id = None;
     let mut name = None;

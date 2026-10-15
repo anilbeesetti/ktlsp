@@ -7,11 +7,13 @@ use std::{
     sync::{
         Arc, OnceLock,
         atomic::{AtomicBool, Ordering},
-        mpsc,
     },
     thread,
     time::{Duration, Instant},
 };
+
+#[cfg(any(not(unix), test))]
+use std::sync::mpsc;
 
 pub const MAX_SOURCE_BYTES: usize = 64 * 1024;
 pub const MAX_OUTPUT_BYTES: usize = 4 * 1024 * 1024;
@@ -586,7 +588,7 @@ fn supervise(
     mut command: Command,
     normalized: &str,
     cancelled: &AtomicBool,
-    #[cfg(unix)] mut observer: Option<&mut DeadlineObserver>,
+    #[cfg(unix)] observer: Option<&mut DeadlineObserver>,
     #[cfg(unix)] preserve_copy_stderr: bool,
 ) -> Result<Vec<u8>, ParserError> {
     #[cfg(unix)]
@@ -596,6 +598,654 @@ fn supervise(
     #[cfg(not(unix))]
     command.stderr(Stdio::null());
     let deadline = Instant::now() + TIMEOUT;
+    #[cfg(unix)]
+    {
+        unix_io::supervise(command, normalized, cancelled, deadline, observer)
+    }
+    #[cfg(not(unix))]
+    {
+        supervise_piped(command, normalized, cancelled, deadline)
+    }
+}
+
+#[cfg(unix)]
+mod unix_io {
+    use super::*;
+    use std::{
+        io,
+        net::Shutdown,
+        os::{fd::OwnedFd, unix::net::UnixStream},
+    };
+
+    const CHUNK: usize = 8192;
+
+    // The extra operation lets tests check half-close failures independently of writes.
+    trait Exchange: Read + Write {
+        fn close_write(&mut self) -> io::Result<()>;
+    }
+    impl Exchange for UnixStream {
+        fn close_write(&mut self) -> io::Result<()> {
+            self.shutdown(Shutdown::Write)
+        }
+    }
+
+    #[derive(Default)]
+    struct Pump {
+        offset: usize,
+        output: Vec<u8>,
+        reader: Option<Result<(), ParserError>>,
+        writer: Option<Result<(), ParserError>>,
+        input_close: Option<Result<(), ParserError>>,
+        exited: bool,
+    }
+    enum Step {
+        Pending(bool),
+        Complete(Vec<u8>),
+    }
+    fn pending(error: &io::Error) -> bool {
+        matches!(
+            error.kind(),
+            io::ErrorKind::WouldBlock | io::ErrorKind::Interrupted
+        )
+    }
+    fn control(deadline: Instant, cancelled: &AtomicBool) -> Result<(), ParserError> {
+        if cancelled.load(Ordering::Relaxed) {
+            Err(ParserError::Cancelled)
+        } else if Instant::now() >= deadline {
+            Err(ParserError::Timeout)
+        } else {
+            Ok(())
+        }
+    }
+    impl Pump {
+        fn read(&mut self, stream: &mut impl Read) -> bool {
+            if self.reader.is_some() {
+                return false;
+            }
+            let mut buffer = [0; CHUNK];
+            let len = CHUNK.min(MAX_OUTPUT_BYTES + 1 - self.output.len());
+            match stream.read(&mut buffer[..len]) {
+                Ok(0) => self.reader = Some(Ok(())),
+                Ok(count) => {
+                    self.output.extend_from_slice(&buffer[..count]);
+                    if self.output.len() > MAX_OUTPUT_BYTES {
+                        self.reader = Some(Err(ParserError::OutputLimit));
+                    }
+                }
+                Err(error) if pending(&error) => return false,
+                Err(_) => self.reader = Some(Err(ParserError::Io)),
+            }
+            true
+        }
+        fn write(&mut self, stream: &mut impl Write, input: &[u8]) -> bool {
+            if self.writer.is_some() || self.offset == input.len() {
+                return false;
+            }
+            let end = input.len().min(self.offset + CHUNK);
+            match stream.write(&input[self.offset..end]) {
+                Ok(0) => self.writer = Some(Err(ParserError::Io)),
+                Ok(count) => self.offset += count,
+                Err(error) if pending(&error) => return false,
+                Err(_) => self.writer = Some(Err(ParserError::Io)),
+            }
+            true
+        }
+        fn close_input(&mut self, stream: &mut impl Exchange, input_len: usize) -> bool {
+            if self.input_close.is_some()
+                || (self.offset != input_len && self.writer != Some(Err(ParserError::Io)))
+            {
+                return false;
+            }
+            match stream.close_write() {
+                Ok(()) => {
+                    self.input_close = Some(Ok(()));
+                    if self.writer.is_none() {
+                        self.writer = Some(Ok(()));
+                    }
+                }
+                Err(error) if pending(&error) => return false,
+                Err(_) => {
+                    self.input_close = Some(Err(ParserError::Io));
+                    self.writer = Some(Err(ParserError::Io));
+                }
+            }
+            true
+        }
+        fn step(
+            &mut self,
+            stream: &mut impl Exchange,
+            input: &[u8],
+            deadline: Instant,
+            cancelled: &AtomicBool,
+            observer: Option<&mut DeadlineObserver>,
+            status: impl FnOnce() -> io::Result<Option<std::process::ExitStatus>>,
+        ) -> Result<Step, ParserError> {
+            if let Err(error) = control(deadline, cancelled) {
+                if error == ParserError::Timeout
+                    && !self.exited
+                    && let Some(observer) = observer
+                {
+                    observer.select_deadline();
+                }
+                return Err(error);
+            }
+            let mut progress = self.read(stream);
+            if !self.exited {
+                if let Some(result) = self.reader {
+                    result?;
+                }
+                if let Some(status) = status().map_err(|_| ParserError::Io)? {
+                    if status.code() == Some(WORKER_ALLOCATION_LIMIT_EXIT_CODE) {
+                        return Err(ParserError::AllocationLimit);
+                    }
+                    if !status.success() {
+                        return Err(ParserError::WorkerFailed);
+                    }
+                    self.exited = true;
+                    // A phase transition must not consume a second I/O budget this tick.
+                    return Ok(Step::Pending(true));
+                }
+            }
+            progress |= self.write(stream, input);
+            // Writer failure still closes input, without turning the error into success.
+            progress |= self.close_input(stream, input.len());
+            if self.exited {
+                control(deadline, cancelled)?;
+                let Some(writer) = self.writer else {
+                    return Ok(Step::Pending(progress));
+                };
+                writer?;
+                control(deadline, cancelled)?;
+                if let Some(reader) = self.reader {
+                    reader?;
+                    return Ok(Step::Complete(std::mem::take(&mut self.output)));
+                }
+            }
+            Ok(Step::Pending(progress))
+        }
+    }
+
+    pub(super) fn supervise(
+        mut command: Command,
+        normalized: &str,
+        cancelled: &AtomicBool,
+        deadline: Instant,
+        mut observer: Option<&mut DeadlineObserver>,
+    ) -> Result<Vec<u8>, ParserError> {
+        let (parent, child_stream) = UnixStream::pair().map_err(|_| ParserError::Io)?;
+        parent.set_nonblocking(true).map_err(|_| ParserError::Io)?;
+        let child_output = child_stream.try_clone().map_err(|_| ParserError::Io)?;
+        let child = command
+            .stdin(Stdio::from(OwnedFd::from(child_stream)))
+            .stdout(Stdio::from(OwnedFd::from(child_output)))
+            .env_clear()
+            .spawn()
+            .map_err(|_| ParserError::Io)?;
+        let mut guard = ChildGuard {
+            child,
+            reaped: false,
+        };
+        drop(command);
+        let result = {
+            // Close the parent endpoint before cleanup on both return and unwind.
+            let mut stream = parent;
+            let mut pump = Pump::default();
+            (|| loop {
+                let step = pump.step(
+                    &mut stream,
+                    normalized.as_bytes(),
+                    deadline,
+                    cancelled,
+                    observer.as_deref_mut(),
+                    || {
+                        let status = guard.child.try_wait()?;
+                        if status.is_some() {
+                            guard.reaped = true;
+                        }
+                        Ok(status)
+                    },
+                )?;
+                match step {
+                    Step::Complete(bytes) => return Ok(bytes),
+                    Step::Pending(false) => thread::sleep(Duration::from_millis(2)),
+                    Step::Pending(true) => {}
+                }
+            })()
+        };
+        guard.finish()?;
+        result
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use std::{collections::VecDeque, os::unix::process::ExitStatusExt};
+
+        #[derive(Default)]
+        struct Script {
+            reads: VecDeque<io::Result<Vec<u8>>>,
+            writes: VecDeque<io::Result<usize>>,
+            closes: VecDeque<io::Result<()>>,
+            sent: Vec<u8>,
+            calls: [usize; 3],
+            cancel_on: Option<(usize, Arc<AtomicBool>)>,
+        }
+        impl Script {
+            fn signal_cancellation(&self, operation: usize) {
+                if let Some((selected, cancelled)) = &self.cancel_on
+                    && *selected == operation
+                {
+                    cancelled.store(true, Ordering::Relaxed);
+                }
+            }
+        }
+        impl Read for Script {
+            fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+                assert!(!buffer.is_empty() && buffer.len() <= CHUNK);
+                self.calls[0] += 1;
+                self.signal_cancellation(0);
+                let bytes = self
+                    .reads
+                    .pop_front()
+                    .unwrap_or_else(|| Err(io::ErrorKind::WouldBlock.into()))?;
+                assert!(bytes.len() <= buffer.len());
+                buffer[..bytes.len()].copy_from_slice(&bytes);
+                Ok(bytes.len())
+            }
+        }
+        impl Write for Script {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                assert!(!bytes.is_empty() && bytes.len() <= CHUNK);
+                self.calls[1] += 1;
+                self.signal_cancellation(1);
+                let count = self.writes.pop_front().unwrap_or(Ok(bytes.len()))?;
+                assert!(count <= bytes.len());
+                self.sent.extend_from_slice(&bytes[..count]);
+                Ok(count)
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                unreachable!()
+            }
+        }
+        impl Exchange for Script {
+            fn close_write(&mut self) -> io::Result<()> {
+                self.calls[2] += 1;
+                self.signal_cancellation(2);
+                self.closes.pop_front().unwrap_or(Ok(()))
+            }
+        }
+        fn exit(code: i32) -> std::process::ExitStatus {
+            std::process::ExitStatus::from_raw(code << 8)
+        }
+        fn step(
+            pump: &mut Pump,
+            script: &mut Script,
+            input: &[u8],
+            deadline: Instant,
+            status: Option<i32>,
+        ) -> Result<Step, ParserError> {
+            pump.step(
+                script,
+                input,
+                deadline,
+                &AtomicBool::new(false),
+                None,
+                || Ok(status.map(exit)),
+            )
+        }
+        fn error(result: Result<Step, ParserError>) -> ParserError {
+            match result {
+                Err(error) => error,
+                _ => panic!("expected rejected step"),
+            }
+        }
+
+        #[test]
+        fn productive_ticks_bound_both_directions_and_success_starts_a_new_tick() {
+            let deadline = Instant::now() + TIMEOUT;
+            let input = vec![b'x'; MAX_SOURCE_BYTES];
+            let mut script = Script::default();
+            script.reads.push_back(Ok(vec![b'x'; CHUNK]));
+            let mut pump = Pump::default();
+            assert!(matches!(
+                step(&mut pump, &mut script, &input, deadline, None),
+                Ok(Step::Pending(true))
+            ));
+            assert_eq!(script.calls, [1, 1, 0]);
+            assert_eq!((pump.offset, pump.output.len()), (CHUNK, CHUNK));
+            assert!(matches!(
+                step(&mut pump, &mut script, &input, deadline, Some(0)),
+                Ok(Step::Pending(true))
+            ));
+            assert_eq!(script.calls, [2, 1, 0]);
+            assert!(pump.exited);
+        }
+
+        #[test]
+        fn partial_utf8_and_pending_operations_preserve_bytes_and_tick_budgets() {
+            let deadline = Instant::now() + TIMEOUT;
+            let input = "utf8-😀".as_bytes();
+            let mut script = Script::default();
+            script
+                .reads
+                .push_back(Err(io::ErrorKind::Interrupted.into()));
+            script
+                .writes
+                .extend([Err(io::ErrorKind::WouldBlock.into()), Ok(6), Ok(3)]);
+            script.closes.extend([
+                Err(io::ErrorKind::Interrupted.into()),
+                Err(io::ErrorKind::WouldBlock.into()),
+                Ok(()),
+            ]);
+            let mut pump = Pump::default();
+            assert!(matches!(
+                step(&mut pump, &mut script, input, deadline, None),
+                Ok(Step::Pending(false))
+            ));
+            assert_eq!((pump.offset, script.calls), (0, [1, 1, 0]));
+            for _ in 0..4 {
+                step(&mut pump, &mut script, input, deadline, None).unwrap();
+            }
+            assert_eq!(script.sent, input);
+            assert_eq!(script.calls, [5, 3, 3]);
+            assert_eq!(pump.writer, Some(Ok(())));
+            assert_eq!(pump.input_close, Some(Ok(())));
+            step(&mut pump, &mut script, input, deadline, None).unwrap();
+            assert_eq!((script.calls[1], script.calls[2]), (3, 3));
+        }
+
+        #[test]
+        fn failed_writer_half_closes_without_becoming_success() {
+            for failure in [Ok(0), Err(io::ErrorKind::BrokenPipe.into())] {
+                let deadline = Instant::now() + TIMEOUT;
+                let mut script = Script::default();
+                script.writes.push_back(failure);
+                script
+                    .closes
+                    .extend([Err(io::ErrorKind::Interrupted.into()), Ok(())]);
+                let mut pump = Pump::default();
+                step(&mut pump, &mut script, b"writer-error", deadline, None).unwrap();
+                assert_eq!(pump.writer, Some(Err(ParserError::Io)));
+                assert_eq!(pump.input_close, None);
+                step(&mut pump, &mut script, b"writer-error", deadline, None).unwrap();
+                assert_eq!(pump.input_close, Some(Ok(())));
+                // Only input EOF makes this scripted child's successful exit ready.
+                assert_eq!(script.calls, [2, 1, 2]);
+                step(&mut pump, &mut script, b"writer-error", deadline, Some(0)).unwrap();
+                assert_eq!(
+                    error(step(
+                        &mut pump,
+                        &mut script,
+                        b"writer-error",
+                        deadline,
+                        None
+                    )),
+                    ParserError::Io
+                );
+                assert_eq!((script.calls[1], script.calls[2]), (1, 2));
+            }
+        }
+
+        #[test]
+        fn output_cap_requires_an_extra_byte_or_eof_and_stops_reading() {
+            for overflow in [false, true] {
+                let mut pump = Pump {
+                    output: vec![b'x'; MAX_OUTPUT_BYTES],
+                    ..Pump::default()
+                };
+                let mut script = Script::default();
+                script
+                    .reads
+                    .push_back(Ok(if overflow { vec![b'x'] } else { vec![] }));
+                assert!(pump.read(&mut script));
+                assert_eq!(
+                    pump.reader,
+                    Some(if overflow {
+                        Err(ParserError::OutputLimit)
+                    } else {
+                        Ok(())
+                    })
+                );
+                assert_eq!(pump.output.len(), MAX_OUTPUT_BYTES + usize::from(overflow));
+                assert!(!pump.read(&mut script));
+                assert_eq!(script.calls[0], 1);
+            }
+        }
+
+        #[test]
+        fn read_status_and_deferred_writer_error_priorities_are_preserved() {
+            let deadline = Instant::now() + TIMEOUT;
+            for code in [0, 1, 86, 87] {
+                let mut pump = Pump {
+                    output: vec![b'x'; MAX_OUTPUT_BYTES],
+                    ..Pump::default()
+                };
+                let mut script = Script::default();
+                script.reads.push_back(Ok(vec![b'x']));
+                assert_eq!(
+                    error(step(&mut pump, &mut script, b"", deadline, Some(code))),
+                    ParserError::OutputLimit
+                );
+                assert_eq!(script.calls, [1, 0, 0]);
+            }
+            for code in [1, 86, 87] {
+                let mut pump = Pump {
+                    writer: Some(Err(ParserError::Io)),
+                    ..Pump::default()
+                };
+                let mut script = Script::default();
+                script.reads.push_back(Ok(vec![]));
+                assert_eq!(
+                    error(step(&mut pump, &mut script, b"", deadline, Some(code))),
+                    if code == 86 {
+                        ParserError::AllocationLimit
+                    } else {
+                        ParserError::WorkerFailed
+                    }
+                );
+            }
+            for writer in [Ok(()), Err(ParserError::Io)] {
+                let mut pump = Pump {
+                    exited: true,
+                    writer: Some(writer),
+                    input_close: Some(Ok(())),
+                    output: vec![b'x'; MAX_OUTPUT_BYTES],
+                    ..Pump::default()
+                };
+                let mut script = Script::default();
+                script.reads.push_back(Ok(vec![b'x']));
+                assert_eq!(
+                    error(step(&mut pump, &mut script, b"", deadline, None)),
+                    if writer.is_err() {
+                        ParserError::Io
+                    } else {
+                        ParserError::OutputLimit
+                    }
+                );
+            }
+        }
+
+        #[test]
+        fn controls_precede_readiness_and_only_running_deadline_sends() {
+            for exited in [false, true] {
+                for cancel in [false, true] {
+                    let (socket, peer) = std::os::unix::net::UnixDatagram::pair().unwrap();
+                    socket.set_nonblocking(true).unwrap();
+                    peer.set_nonblocking(true).unwrap();
+                    let mut observer = DeadlineObserver {
+                        socket,
+                        evidence: DeadlineEvidence::default(),
+                    };
+                    let mut pump = Pump {
+                        exited,
+                        ..Pump::default()
+                    };
+                    let mut script = Script::default();
+                    let result = pump.step(
+                        &mut script,
+                        b"",
+                        Instant::now(),
+                        &AtomicBool::new(cancel),
+                        Some(&mut observer),
+                        || panic!("control must precede status"),
+                    );
+                    assert_eq!(
+                        error(result),
+                        if cancel {
+                            ParserError::Cancelled
+                        } else {
+                            ParserError::Timeout
+                        }
+                    );
+                    assert_eq!(script.calls, [0, 0, 0]);
+                    let selected = !exited && !cancel;
+                    assert_eq!(observer.evidence.deadline_selected, selected);
+                    let mut bytes = [0; 17];
+                    if selected {
+                        assert_eq!(peer.recv(&mut bytes).unwrap(), 16);
+                        assert_eq!(&bytes[..16], b"KTLSP-DUE-v1!!!!");
+                    }
+                    assert_eq!(
+                        peer.recv(&mut bytes).unwrap_err().kind(),
+                        io::ErrorKind::WouldBlock
+                    );
+                }
+            }
+        }
+
+        #[test]
+        fn terminal_read_and_status_errors_stop_before_write_or_retry() {
+            let deadline = Instant::now() + TIMEOUT;
+            let mut pump = Pump::default();
+            let mut script = Script::default();
+            script.reads.push_back(Err(io::ErrorKind::Other.into()));
+            let mut polls = 0;
+            assert_eq!(
+                error(pump.step(
+                    &mut script,
+                    b"writer-error",
+                    deadline,
+                    &AtomicBool::new(false),
+                    None,
+                    || {
+                        polls += 1;
+                        Ok(Some(exit(86)))
+                    }
+                )),
+                ParserError::Io
+            );
+            assert_eq!(polls, 0);
+            assert_eq!(script.calls, [1, 0, 0]);
+            let mut pump = Pump::default();
+            let mut script = Script::default();
+            assert_eq!(
+                error(pump.step(
+                    &mut script,
+                    b"writer-error",
+                    deadline,
+                    &AtomicBool::new(false),
+                    None,
+                    || {
+                        polls += 1;
+                        Err(io::ErrorKind::Interrupted.into())
+                    }
+                )),
+                ParserError::Io
+            );
+            assert_eq!(polls, 1);
+            assert_eq!(script.calls, [1, 0, 0]);
+        }
+
+        #[test]
+        fn post_success_cancellation_during_io_precedes_error_or_bytes() {
+            for operation in 0..3 {
+                for writer_error in [false, true] {
+                    let cancelled = Arc::new(AtomicBool::new(false));
+                    let mut script = Script {
+                        cancel_on: Some((operation, Arc::clone(&cancelled))),
+                        ..Script::default()
+                    };
+                    script.reads.push_back(Ok(vec![]));
+                    if writer_error {
+                        script
+                            .writes
+                            .push_back(Err(io::ErrorKind::BrokenPipe.into()));
+                    }
+                    let (socket, peer) = std::os::unix::net::UnixDatagram::pair().unwrap();
+                    socket.set_nonblocking(true).unwrap();
+                    peer.set_nonblocking(true).unwrap();
+                    let mut observer = DeadlineObserver {
+                        socket,
+                        evidence: DeadlineEvidence::default(),
+                    };
+                    let mut pump = Pump {
+                        exited: true,
+                        ..Pump::default()
+                    };
+                    assert_eq!(
+                        error(pump.step(
+                            &mut script,
+                            b"healthy",
+                            Instant::now() + TIMEOUT,
+                            &cancelled,
+                            Some(&mut observer),
+                            || panic!("already reaped")
+                        )),
+                        ParserError::Cancelled
+                    );
+                    assert_eq!(script.calls, [1, 1, 1]);
+                    assert!(!observer.evidence.deadline_selected);
+                    assert_eq!(
+                        peer.recv(&mut [0; 17]).unwrap_err().kind(),
+                        io::ErrorKind::WouldBlock
+                    );
+                }
+            }
+        }
+
+        #[test]
+        fn success_requires_input_half_close_and_preserves_collected_output() {
+            let deadline = Instant::now() + TIMEOUT;
+            let mut script = Script::default();
+            script.reads.extend([Ok(b"ok".to_vec()), Ok(vec![])]);
+            script
+                .closes
+                .extend([Err(io::ErrorKind::WouldBlock.into()), Ok(())]);
+            let mut pump = Pump::default();
+            step(&mut pump, &mut script, b"", deadline, None).unwrap();
+            assert_eq!(pump.writer, None);
+            step(&mut pump, &mut script, b"", deadline, Some(0)).unwrap();
+            assert_eq!(script.calls, [2, 0, 1]);
+            match step(&mut pump, &mut script, b"", deadline, None).unwrap() {
+                Step::Complete(bytes) => assert_eq!(bytes, b"ok"),
+                _ => panic!("expected complete exchange"),
+            }
+            assert_eq!(script.calls, [2, 0, 2]);
+            let mut pump = Pump::default();
+            let mut script = Script::default();
+            script
+                .closes
+                .push_back(Err(io::ErrorKind::NotConnected.into()));
+            step(&mut pump, &mut script, b"", deadline, None).unwrap();
+            assert_eq!(pump.writer, Some(Err(ParserError::Io)));
+            assert_eq!(pump.input_close, Some(Err(ParserError::Io)));
+            step(&mut pump, &mut script, b"", deadline, Some(0)).unwrap();
+            assert_eq!(
+                error(step(&mut pump, &mut script, b"", deadline, None)),
+                ParserError::Io
+            );
+            assert_eq!(script.calls[2], 1);
+        }
+    }
+}
+
+#[cfg(not(unix))]
+fn supervise_piped(
+    mut command: Command,
+    normalized: &str,
+    cancelled: &AtomicBool,
+    deadline: Instant,
+) -> Result<Vec<u8>, ParserError> {
     let child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -639,11 +1289,6 @@ fn supervise(
                     return Err(ParserError::Cancelled);
                 }
                 if Instant::now() >= deadline {
-                    #[cfg(unix)]
-                    if let Some(observer) = observer.as_deref_mut() {
-                        observer.select_deadline();
-                    }
-                    // Never wait for an observation before the existing cleanup.
                     return Err(ParserError::Timeout);
                 }
                 if output.is_none() {
@@ -672,6 +1317,7 @@ fn supervise(
         result
     })
 }
+#[cfg(any(not(unix), test))]
 fn join_io<T>(
     handle: thread::ScopedJoinHandle<'_, T>,
     deadline: Instant,
@@ -690,6 +1336,7 @@ fn join_io<T>(
         thread::sleep(Duration::from_millis(2));
     }
 }
+#[cfg(any(not(unix), test))]
 fn finish_io(
     writer: thread::ScopedJoinHandle<'_, std::io::Result<()>>,
     reader: thread::ScopedJoinHandle<'_, ()>,
@@ -1364,7 +2011,7 @@ mod tests {
     #[ignore = "subprocess fault fixture"]
     fn fault_worker() {
         let mut source = String::new();
-        // The no-read fixture fills the input pipe before the parent can close it.
+        // The no-read fixture consumes one byte, then leaves the remaining input unread.
         let mut first = [0u8; 1];
         std::io::stdin().read_exact(&mut first).unwrap();
         if first[0] == b'x' {

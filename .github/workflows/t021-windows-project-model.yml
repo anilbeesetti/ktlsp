@@ -55,8 +55,8 @@ jobs:
             powershell = $PSVersionTable.PSVersion.ToString()
           } | ConvertTo-Json | Set-Content "$evidence/identity.json"
           if ('${{ github.repository }}' -cne 'anilbeesetti/ktlsp' -or
-              '${{ github.ref }}' -cne 'refs/heads/codex/t021-windows-initial-lf-policy' -or
-              $env:ACTUAL_WORKFLOW_REF -cne 'anilbeesetti/ktlsp/.github/workflows/t021-windows-project-model.yml@refs/heads/codex/t021-windows-initial-lf-policy' -or
+              '${{ github.ref }}' -cne 'refs/heads/codex/t021-windows-control-checkout' -or
+              $env:ACTUAL_WORKFLOW_REF -cne 'anilbeesetti/ktlsp/.github/workflows/t021-windows-project-model.yml@refs/heads/codex/t021-windows-control-checkout' -or
               '${{ github.run_attempt }}' -cne '1' -or
               '${{ runner.os }}' -cne 'Windows' -or '${{ runner.arch }}' -cne 'X64' -or
               $env:EXPECTED_WORKFLOW_SHA -cnotmatch '^[0-9a-f]{40}$' -or
@@ -67,6 +67,12 @@ jobs:
           "CARGO_HOME=$env:RUNNER_TEMP/t021-cargo" >> $env:GITHUB_ENV
           "CARGO_TARGET_DIR=$env:RUNNER_TEMP/t021-target" >> $env:GITHUB_ENV
       - uses: actions/checkout@v4
+        env:
+          GIT_CONFIG_COUNT: '2'
+          GIT_CONFIG_KEY_0: core.autocrlf
+          GIT_CONFIG_VALUE_0: 'false'
+          GIT_CONFIG_KEY_1: core.eol
+          GIT_CONFIG_VALUE_1: lf
         with:
           ref: ${{ github.workflow_sha }}
           path: control

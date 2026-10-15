@@ -344,13 +344,22 @@ fn live_control(tree: &Parsed, case: &Value) {
                 retained_candidate(tree, candidate, 9, "CLASS", id);
                 required_errors(
                     tree,
-                    &[json!([
-                        candidate,
-                        candidate + 3,
-                        "Missing '>'",
-                        "TYPE_PARAMETER_LIST",
-                        "CLASS"
-                    ])],
+                    &[
+                        json!([
+                            candidate,
+                            candidate + 3,
+                            "Type parameter name expected",
+                            "TYPE_PARAMETER",
+                            "CLASS"
+                        ]),
+                        json!([
+                            candidate + 4,
+                            candidate + 7,
+                            "Missing '>'",
+                            "TYPE_PARAMETER_LIST",
+                            "CLASS"
+                        ]),
+                    ],
                     id,
                 );
             }

@@ -213,6 +213,7 @@ fn frozen_generic_receiver_contract_through_production_snapshot_worker() {
         1
     );
     let pair_amendment: Value = serde_json::from_str(PAIR_AMENDMENT).unwrap();
+    let qualified_amendment: Value = serde_json::from_str(QUALIFIED_GENERIC_AMENDMENT).unwrap();
     let parser = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
     for case in cases {
         let id = case["id"].as_str().unwrap();
@@ -242,7 +243,14 @@ fn frozen_generic_receiver_contract_through_production_snapshot_worker() {
         }
         assert_eq!(cursor, source.len(), "{id}");
         // This source-derived erratum supersedes only the malformed-prefix ownership assumption.
-        let expected_case = if id == "malformed-annotation-prefix" {
+        let expected_case = if id == "qualified-receiver" {
+            assert_eq!(
+                source,
+                qualified_amendment["source"].as_str().unwrap(),
+                "{id}"
+            );
+            &qualified_amendment
+        } else if id == "malformed-annotation-prefix" {
             assert_eq!(source, erratum["source"].as_str().unwrap(), "{id}");
             &erratum
         } else if matches!(id, "safe-nullable-receiver" | "spaced-nullable-receiver") {
@@ -338,20 +346,22 @@ fn frozen_generic_receiver_contract_through_production_snapshot_worker() {
                     };
                     assert_eq!(owner, expected[3], "{id}");
                 }
-                for expected in expected_case["original_partitions"].as_array().unwrap() {
-                    let kind = expected[0].as_str().unwrap();
-                    let start = expected[1].as_u64().unwrap() as usize;
-                    let end = expected[2].as_u64().unwrap() as usize;
-                    assert_eq!(
-                        elements
-                            .iter()
-                            .filter(|e| e.kind == kind
-                                && e.token == (kind == "WHITE_SPACE")
-                                && (e.start, e.end) == (start, end))
-                            .count(),
-                        1,
-                        "{id}: {expected}"
-                    );
+                if let Some(partitions) = expected_case["original_partitions"].as_array() {
+                    for expected in partitions {
+                        let kind = expected[0].as_str().unwrap();
+                        let start = expected[1].as_u64().unwrap() as usize;
+                        let end = expected[2].as_u64().unwrap() as usize;
+                        assert_eq!(
+                            elements
+                                .iter()
+                                .filter(|e| e.kind == kind
+                                    && e.token == (kind == "WHITE_SPACE")
+                                    && (e.start, e.end) == (start, end))
+                                .count(),
+                            1,
+                            "{id}: {expected}"
+                        );
+                    }
                 }
             }
         } else {
@@ -428,3 +438,6 @@ const NULLABLE_RECEIVER_AMENDMENTS: &str = r####"{"scope":"only two stable-ID ex
 
 // Only the unchanged multiple-arguments input gains this source-derived dispatch.
 const PAIR_AMENDMENT: &str = r####"{"id":"multiple-arguments","source":"class Box<T\nfun Pair<String,Int>.healthy() = 2","mode":"exact-selected-projection","projection":[["CLASS",0,11,"KT_FILE",null],["TYPE_PARAMETER_LIST",9,11,"CLASS",[0,11]],["TYPE_PARAMETER",10,11,"TYPE_PARAMETER_LIST",[0,11]],["FUN",12,46,"KT_FILE",null],["TYPE_REFERENCE",16,32,"FUN",[12,46]],["USER_TYPE",16,32,"TYPE_REFERENCE",[12,46]],["REFERENCE_EXPRESSION",16,20,"USER_TYPE",[12,46]],["TYPE_ARGUMENT_LIST",20,32,"USER_TYPE",[12,46]],["TYPE_PROJECTION",21,27,"TYPE_ARGUMENT_LIST",[12,46]],["TYPE_REFERENCE",21,27,"TYPE_PROJECTION",[12,46]],["USER_TYPE",21,27,"TYPE_REFERENCE",[12,46]],["REFERENCE_EXPRESSION",21,27,"USER_TYPE",[12,46]],["TYPE_PROJECTION",28,31,"TYPE_ARGUMENT_LIST",[12,46]],["TYPE_REFERENCE",28,31,"TYPE_PROJECTION",[12,46]],["USER_TYPE",28,31,"TYPE_REFERENCE",[12,46]],["REFERENCE_EXPRESSION",28,31,"USER_TYPE",[12,46]],["VALUE_PARAMETER_LIST",40,42,"FUN",[12,46]]],"declaration_names":[[0,6,9,"Box"],[12,33,40,"healthy"]],"diagnostics":[[11,11,"Missing '>'"]],"error_ownership":[[11,11,"TYPE_PARAMETER_LIST",["CLASS",0,11]]],"tokens":[["IDENTIFIER",16,20,"Pair","REFERENCE_EXPRESSION"],["LT",20,21,"<","TYPE_ARGUMENT_LIST"],["IDENTIFIER",21,27,"String","REFERENCE_EXPRESSION"],["COMMA",27,28,",","TYPE_ARGUMENT_LIST"],["IDENTIFIER",28,31,"Int","REFERENCE_EXPRESSION"],["GT",31,32,">","TYPE_ARGUMENT_LIST"],["DOT",32,33,".","FUN"],["IDENTIFIER",33,40,"healthy","FUN"],["LPAR",40,41,"(","VALUE_PARAMETER_LIST"],["RPAR",41,42,")","VALUE_PARAMETER_LIST"]],"authored_header_fragments":[["prefix",""],["fun","fun"],["after_fun"," "],["receiver","Pair"],["before_lt",""],["lt","<"],["after_lt",""],["arg1","String"],["before_comma",""],["comma",","],["after_comma",""],["arg2","Int"],["before_gt",""],["gt",">"],["before_dot",""],["dot","."],["before_name",""],["name","healthy"],["before_lpar",""],["lpar","("],["rpar",")"],["body"," = 2"]],"scratch_header":["FUN_KEYWORD","IDENTIFIER","LT","IDENTIFIER","COMMA","IDENTIFIER","GT","DOT","IDENTIFIER","LPAR"],"scratch_match":true,"live_path":"recovered-classifier-early-return","cursor_bounds":{"candidate":12,"classifier_end":11,"receiver":[16,32],"direct_name":[33,40],"parameter_list":[40,42],"function_end":46},"expectation_basis":"source-derived marker/control-flow literal; no lexer/parser/runtime output","bytes":46,"source_sha256":"b56bce7b1159a3102186c182f4b5aed41067408cb8d20bb6bdd7d2d07da85a6c","positions":{"0":[0,0],"1":[0,1],"2":[0,2],"3":[0,3],"4":[0,4],"5":[0,5],"6":[0,6],"7":[0,7],"8":[0,8],"9":[0,9],"10":[0,10],"11":[0,11],"12":[1,0],"13":[1,1],"14":[1,2],"15":[1,3],"16":[1,4],"17":[1,5],"18":[1,6],"19":[1,7],"20":[1,8],"21":[1,9],"22":[1,10],"23":[1,11],"24":[1,12],"25":[1,13],"26":[1,14],"27":[1,15],"28":[1,16],"29":[1,17],"30":[1,18],"31":[1,19],"32":[1,20],"33":[1,21],"34":[1,22],"35":[1,23],"36":[1,24],"37":[1,25],"38":[1,26],"39":[1,27],"40":[1,28],"41":[1,29],"42":[1,30],"43":[1,31],"44":[1,32],"45":[1,33],"46":[1,34]},"fourth_stale_source":{"strategy":"append one space","source":"class Box<T\nfun Pair<String,Int>.healthy() = 2 ","bytes":47,"source_sha256":"09da1a1f678cfc13a839feceebd07177dba08eea7476d13f9ef460eab5d5ea3f","expected":"SourceSnapshot construction succeeds; tree_for returns StaleSnapshot"},"original_partitions":[["CLASS",0,11],["WHITE_SPACE",11,12],["FUN",12,46]]}"####;
+
+// Exact-ID/source overlay; original historical payload remains frozen.
+const QUALIFIED_GENERIC_AMENDMENT: &str = r####"{"id":"qualified-receiver","source":"class Box<T\nfun pkg.List<String>.healthy() = 2","mode":"exact-selected-projection","expected_elements":[["KT_FILE",0,46,null,false],["PACKAGE_DIRECTIVE",0,0,0,false],["IMPORT_LIST",0,0,0,false],["CLASS",0,11,0,false],["CLASS_KEYWORD",0,5,3,true],["WHITE_SPACE",5,6,3,true],["IDENTIFIER",6,9,3,true],["TYPE_PARAMETER_LIST",9,11,3,false],["LT",9,10,7,true],["TYPE_PARAMETER",10,11,7,false],["IDENTIFIER",10,11,9,true],["ERROR_ELEMENT",11,11,7,false],["WHITE_SPACE",11,12,0,true],["FUN",12,46,0,false],["FUN_KEYWORD",12,15,13,true],["WHITE_SPACE",15,16,13,true],["TYPE_REFERENCE",16,32,13,false],["USER_TYPE",16,32,16,false],["USER_TYPE",16,19,17,false],["REFERENCE_EXPRESSION",16,19,18,false],["IDENTIFIER",16,19,19,true],["DOT",19,20,17,true],["REFERENCE_EXPRESSION",20,24,17,false],["IDENTIFIER",20,24,22,true],["TYPE_ARGUMENT_LIST",24,32,17,false],["LT",24,25,24,true],["TYPE_PROJECTION",25,31,24,false],["TYPE_REFERENCE",25,31,26,false],["USER_TYPE",25,31,27,false],["REFERENCE_EXPRESSION",25,31,28,false],["IDENTIFIER",25,31,29,true],["GT",31,32,24,true],["DOT",32,33,13,true],["IDENTIFIER",33,40,13,true],["VALUE_PARAMETER_LIST",40,42,13,false],["LPAR",40,41,34,true],["RPAR",41,42,34,true],["WHITE_SPACE",42,43,13,true],["EQ",43,44,13,true],["WHITE_SPACE",44,45,13,true],["INTEGER_CONSTANT",45,46,13,false],["INTEGER_LITERAL",45,46,40,true]],"cst_nodes":[["KT_FILE",0,46,null],["PACKAGE_DIRECTIVE",0,0,0],["IMPORT_LIST",0,0,0],["CLASS",0,11,0],["TYPE_PARAMETER_LIST",9,11,3],["TYPE_PARAMETER",10,11,4],["ERROR_ELEMENT",11,11,4],["FUN",12,46,0],["TYPE_REFERENCE",16,32,7],["USER_TYPE",16,32,8],["USER_TYPE",16,19,9],["REFERENCE_EXPRESSION",16,19,10],["REFERENCE_EXPRESSION",20,24,9],["TYPE_ARGUMENT_LIST",24,32,9],["TYPE_PROJECTION",25,31,13],["TYPE_REFERENCE",25,31,14],["USER_TYPE",25,31,15],["REFERENCE_EXPRESSION",25,31,16],["VALUE_PARAMETER_LIST",40,42,7],["INTEGER_CONSTANT",45,46,7]],"token_partition":[["CLASS_KEYWORD",0,5,"class",3],["WHITE_SPACE",5,6," ",3],["IDENTIFIER",6,9,"Box",3],["LT",9,10,"<",4],["IDENTIFIER",10,11,"T",5],["WHITE_SPACE",11,12,"\n",0],["FUN_KEYWORD",12,15,"fun",7],["WHITE_SPACE",15,16," ",7],["IDENTIFIER",16,19,"pkg",11],["DOT",19,20,".",9],["IDENTIFIER",20,24,"List",12],["LT",24,25,"<",13],["IDENTIFIER",25,31,"String",17],["GT",31,32,">",13],["DOT",32,33,".",7],["IDENTIFIER",33,40,"healthy",7],["LPAR",40,41,"(",18],["RPAR",41,42,")",18],["WHITE_SPACE",42,43," ",7],["EQ",43,44,"=",7],["WHITE_SPACE",44,45," ",7],["INTEGER_LITERAL",45,46,"2",19]],"declaration_names":[[0,6,9,"Box"],[12,33,40,"healthy"]],"projection":[["CLASS",0,11,"KT_FILE",null],["TYPE_PARAMETER_LIST",9,11,"CLASS",[0,11]],["TYPE_PARAMETER",10,11,"TYPE_PARAMETER_LIST",[0,11]],["FUN",12,46,"KT_FILE",null],["TYPE_REFERENCE",16,32,"FUN",[12,46]],["USER_TYPE",16,32,"TYPE_REFERENCE",[12,46]],["USER_TYPE",16,19,"USER_TYPE",[12,46]],["REFERENCE_EXPRESSION",16,19,"USER_TYPE",[12,46]],["REFERENCE_EXPRESSION",20,24,"USER_TYPE",[12,46]],["TYPE_ARGUMENT_LIST",24,32,"USER_TYPE",[12,46]],["TYPE_PROJECTION",25,31,"TYPE_ARGUMENT_LIST",[12,46]],["TYPE_REFERENCE",25,31,"TYPE_PROJECTION",[12,46]],["USER_TYPE",25,31,"TYPE_REFERENCE",[12,46]],["REFERENCE_EXPRESSION",25,31,"USER_TYPE",[12,46]],["VALUE_PARAMETER_LIST",40,42,"FUN",[12,46]]],"diagnostics":[[11,11,"Missing '>'"]],"error_ownership":[[11,11,"TYPE_PARAMETER_LIST",["CLASS",0,11]]],"basis":"Independent explicit source fragments and marker derivation; prospective unexecuted","scratch_match":true,"candidate_start":12,"bytes":46,"source_sha256":"6664c5d18f82a006e3199a200bf64bd33f5c873979c2dae94b3f3d28b7447ca0","positions":{"0":[0,0],"1":[0,1],"2":[0,2],"3":[0,3],"4":[0,4],"5":[0,5],"6":[0,6],"7":[0,7],"8":[0,8],"9":[0,9],"10":[0,10],"11":[0,11],"12":[1,0],"13":[1,1],"14":[1,2],"15":[1,3],"16":[1,4],"17":[1,5],"18":[1,6],"19":[1,7],"20":[1,8],"21":[1,9],"22":[1,10],"23":[1,11],"24":[1,12],"25":[1,13],"26":[1,14],"27":[1,15],"28":[1,16],"29":[1,17],"30":[1,18],"31":[1,19],"32":[1,20],"33":[1,21],"34":[1,22],"35":[1,23],"36":[1,24],"37":[1,25],"38":[1,26],"39":[1,27],"40":[1,28],"41":[1,29],"42":[1,30],"43":[1,31],"44":[1,32],"45":[1,33],"46":[1,34]},"fourth_stale_source":{"source":"class Box<T\nfun pkg.List<String>.healthy() = 2 ","bytes":47,"source_sha256":"859088fe8914af26e4ef22d3c57ce100364871edf93fd2a81feead75ef45210a"},"expected_subtree_end":[42,2,3,12,5,6,7,12,9,11,11,12,13,42,15,16,32,32,21,21,21,22,24,24,32,26,31,31,31,31,31,32,33,34,37,36,37,38,39,40,42,42],"tokens":[["CLASS_KEYWORD",0,5,"class","CLASS"],["WHITE_SPACE",5,6," ","CLASS"],["IDENTIFIER",6,9,"Box","CLASS"],["LT",9,10,"<","TYPE_PARAMETER_LIST"],["IDENTIFIER",10,11,"T","TYPE_PARAMETER"],["WHITE_SPACE",11,12,"\n","KT_FILE"],["FUN_KEYWORD",12,15,"fun","FUN"],["WHITE_SPACE",15,16," ","FUN"],["IDENTIFIER",16,19,"pkg","REFERENCE_EXPRESSION"],["DOT",19,20,".","USER_TYPE"],["IDENTIFIER",20,24,"List","REFERENCE_EXPRESSION"],["LT",24,25,"<","TYPE_ARGUMENT_LIST"],["IDENTIFIER",25,31,"String","REFERENCE_EXPRESSION"],["GT",31,32,">","TYPE_ARGUMENT_LIST"],["DOT",32,33,".","FUN"],["IDENTIFIER",33,40,"healthy","FUN"],["LPAR",40,41,"(","VALUE_PARAMETER_LIST"],["RPAR",41,42,")","VALUE_PARAMETER_LIST"],["WHITE_SPACE",42,43," ","FUN"],["EQ",43,44,"=","FUN"],["WHITE_SPACE",44,45," ","FUN"],["INTEGER_LITERAL",45,46,"2","INTEGER_CONSTANT"]],"receiver_tokens":[[16,19,"pkg","REFERENCE_EXPRESSION"],[20,24,"List","REFERENCE_EXPRESSION"],[25,31,"String","REFERENCE_EXPRESSION"]],"receiver_dots":[[19,20,"USER_TYPE"],[32,33,"FUN"]],"type_parameter_name":[10,11],"invalid_utf8_offsets":[]}"####;

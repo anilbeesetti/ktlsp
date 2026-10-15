@@ -1,5 +1,8 @@
 #![cfg(unix)]
 //! Frozen pre-runtime B11 contract; machinery controls are not production-copy evidence.
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{
     FileKind, GenericCopyEvidence, GenericCopyRecord, Parsed, Parser, ParserError, SnapshotResult,
     SourceSnapshot,
@@ -122,6 +125,7 @@ fn snapshot(case: &Value) -> SourceSnapshot {
 }
 #[test]
 fn frozen_production_copy_boundary_and_strict_ordinary_recovery() {
+    let _functional = functional::serial();
     let cases: Vec<Value> = serde_json::from_str(CASES).unwrap();
     let parser = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
     let healthy = &cases[2];

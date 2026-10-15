@@ -1,4 +1,7 @@
 //! C15 expectations are derived from source grammar before controlled Linux execution.
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{FileKind, Parsed, Parser, ParserError, SourceSnapshot};
 use std::sync::atomic::AtomicBool;
 
@@ -158,6 +161,7 @@ fn check(
 
 #[test]
 fn malformed_parenthesized_type_restores_complete_sibling_in_original_newlines() {
+    let _functional = functional::serial();
     for newline in ["\n", "\r\n", "\r"] {
         let start = 17 + newline.len();
         let end = start + 17;
@@ -196,6 +200,7 @@ fn malformed_parenthesized_type_restores_complete_sibling_in_original_newlines()
 
 #[test]
 fn annotated_function_type_preserves_its_parameters() {
+    let _functional = functional::serial();
     let outer = Some((0, 37));
     check(
         "fun f(x: (@A Int, String) -> Unit) {}",
@@ -227,6 +232,7 @@ fn annotated_function_type_preserves_its_parameters() {
 
 #[test]
 fn nested_nullable_function_type_stays_inside_parameter() {
+    let _functional = functional::serial();
     let outer = Some((0, 31));
     check(
         "fun f(x: ((Int) -> String)?) {}",
@@ -251,6 +257,7 @@ fn nested_nullable_function_type_stays_inside_parameter() {
 
 #[test]
 fn function_type_receiver_stays_inside_parameter() {
+    let _functional = functional::serial();
     let outer = Some((0, 33));
     check(
         "fun f(x: Int.(String) -> Unit) {}",
@@ -277,6 +284,7 @@ fn function_type_receiver_stays_inside_parameter() {
 
 #[test]
 fn constructor_annotated_function_type_keeps_constructor_ownership() {
+    let _functional = functional::serial();
     let outer = Some((0, 47));
     check(
         "class C(val callback: (@A Int, String) -> Unit)",

@@ -1,4 +1,7 @@
 //! Finite C13 two-argument generic receiver contract frozen before implementation or runtime.
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{FileKind, Parsed, Parser, ParserError, SourceSnapshot};
 use serde_json::{Value, json};
 use std::io::Write;
@@ -232,6 +235,7 @@ fn compatibility(tree: &Parsed, case: &Value) {
 
 #[test]
 fn frozen_two_argument_generic_receiver_contract_through_production_snapshot_worker() {
+    let _functional = functional::serial();
     let contract: Value = serde_json::from_str(FIXTURES).unwrap();
     let nullable_two_amendments: Value =
         serde_json::from_str(NULLABLE_TWO_ARGUMENT_AMENDMENTS).unwrap();

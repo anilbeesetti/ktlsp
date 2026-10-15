@@ -1,4 +1,7 @@
 //! Finite long-qualified receiver expectations frozen before source implementation or runtime.
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{FileKind, Parsed, Parser, ParserError, SourceSnapshot};
 use serde_json::{Value, json};
 use std::sync::atomic::AtomicBool;
@@ -264,6 +267,7 @@ fn compatibility(tree: &Parsed, case: &Value) {
 
 #[test]
 fn frozen_long_qualified_receiver_contract_through_production_snapshot_worker() {
+    let _functional = functional::serial();
     let fixtures: Value = serde_json::from_str(FIXTURES).unwrap();
     let positives = fixtures["positive"].as_array().unwrap();
     let controls = fixtures["controls"].as_array().unwrap();

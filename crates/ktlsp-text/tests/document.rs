@@ -409,3 +409,61 @@ fn generated_sequential_edits_match_byte_reference() {
         assert_eq!(document, before);
     }
 }
+
+#[test]
+fn competing_errors_preserve_precedence_and_indexed_batch_rollback() {
+    let mut document = Document::new(3, "a\rb\nc".into()).unwrap();
+    let original = document.clone();
+    let excessive = vec![full("bad"); MAX_CHANGES + 1];
+    assert_eq!(
+        document.apply_changes(3, &excessive),
+        Err(TextError::StaleVersion {
+            current: 3,
+            proposed: 3
+        })
+    );
+    assert_eq!(
+        document.apply_changes(4, &excessive),
+        Err(TextError::TooManyChanges {
+            count: MAX_CHANGES + 1,
+            limit: MAX_CHANGES
+        })
+    );
+    let reversed = Range {
+        start: pos(99, 1),
+        end: pos(99, 0),
+    };
+    let oversized = "x".repeat(MAX_DOCUMENT_BYTES + 1);
+    for (invalid, error) in [
+        (
+            change(reversed.start, reversed.end, Some(99), &oversized),
+            TextError::ReversedRange(reversed),
+        ),
+        (
+            change(pos(1, 1), pos(99, 0), Some(99), &oversized),
+            TextError::InvalidPosition(pos(1, 1)),
+        ),
+        (
+            change(pos(0, 0), pos(99, 0), Some(99), &oversized),
+            TextError::InvalidPosition(pos(99, 0)),
+        ),
+        (
+            change(pos(0, 0), pos(0, 1), Some(99), &oversized),
+            TextError::RangeLengthMismatch {
+                expected: 99,
+                actual: 1,
+            },
+        ),
+    ] {
+        // The first edit changes the CR seam and inserts an astral character.
+        assert_eq!(
+            document.apply_changes(4, &[change(pos(1, 0), pos(1, 1), None, "\n😀"), invalid]),
+            Err(error)
+        );
+        assert_eq!(document, original);
+    }
+    document
+        .apply_changes(4, &[change(pos(2, 0), pos(2, 1), Some(1), "done")])
+        .unwrap();
+    assert_eq!(document.text(), "a\rb\ndone");
+}

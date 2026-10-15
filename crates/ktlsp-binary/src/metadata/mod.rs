@@ -1,6 +1,7 @@
 //! Bounded Kotlin Metadata header/d1, raw wire, StringTableTypes and JVM names.
 //! No declaration/type reconstruction or Kotlin semantic analysis.
 
+pub mod class_constructors;
 pub mod class_header;
 pub mod class_member_names;
 pub mod class_supertypes;

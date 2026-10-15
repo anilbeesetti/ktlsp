@@ -1,0 +1,1631 @@
+{
+  "stage": "independently authored expectations frozen before source/Rust/runtime",
+  "symbols": "B=size_of::<constructor::ValueParameterBody>(); T=size_of::<SelectedValueParameter>(); I=size_of::<i32>()",
+  "fixtures": {
+    "empty": {
+      "literal_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "length": 0,
+      "flags": null,
+      "version_requirements": [],
+      "parameters": [],
+      "minima": {
+        "bytes": 0,
+        "records": 0,
+        "owned": "0",
+        "work": "0"
+      },
+      "prefix_cuts": [
+        {
+          "length": 0,
+          "success": {
+            "flags": null,
+            "version_requirements": [],
+            "parameters": []
+          }
+        }
+      ]
+    },
+    "selected": {
+      "literal_sha256": "6dcebec981ef3d045b4b554c75c8359d403571f43bbb6b0a1feb2f6612fa8e00",
+      "length": 21,
+      "flags": 6,
+      "version_requirements": [
+        1,
+        128,
+        2
+      ],
+      "parameters": [
+        {
+          "span": [
+            4,
+            12
+          ],
+          "tuple_flags_name_type_id_vararg_id": [
+            0,
+            5,
+            7,
+            8
+          ],
+          "raw_hex": "08 00 10 05 28 07 30 08",
+          "pointer": "input.as_ptr()+span.start"
+        }
+      ],
+      "minima": {
+        "bytes": 21,
+        "records": 10,
+        "owned": "B+4*I+T",
+        "work": "53+owned"
+      },
+      "prefix_cuts": [
+        {
+          "length": 0,
+          "success": {
+            "flags": null,
+            "version_requirements": [],
+            "parameters": []
+          }
+        },
+        {
+          "length": 1,
+          "error": [
+            "Wire(Truncated)",
+            1
+          ]
+        },
+        {
+          "length": 2,
+          "success": {
+            "flags": 6,
+            "version_requirements": [],
+            "parameters": []
+          }
+        },
+        {
+          "length": 3,
+          "error": [
+            "Wire(Truncated)",
+            3
+          ]
+        },
+        {
+          "length": 4,
+          "error": [
+            "Wire(Truncated)",
+            4
+          ]
+        },
+        {
+          "length": 5,
+          "error": [
+            "Wire(Truncated)",
+            5
+          ]
+        },
+        {
+          "length": 6,
+          "error": [
+            "Wire(Truncated)",
+            6
+          ]
+        },
+        {
+          "length": 7,
+          "error": [
+            "Wire(Truncated)",
+            7
+          ]
+        },
+        {
+          "length": 8,
+          "error": [
+            "Wire(Truncated)",
+            8
+          ]
+        },
+        {
+          "length": 9,
+          "error": [
+            "Wire(Truncated)",
+            9
+          ]
+        },
+        {
+          "length": 10,
+          "error": [
+            "Wire(Truncated)",
+            10
+          ]
+        },
+        {
+          "length": 11,
+          "error": [
+            "Wire(Truncated)",
+            11
+          ]
+        },
+        {
+          "length": 12,
+          "success": {
+            "flags": 6,
+            "version_requirements": [],
+            "parameters": [
+              {
+                "span": [
+                  4,
+                  12
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  0,
+                  5,
+                  7,
+                  8
+                ],
+                "raw_hex": "08 00 10 05 28 07 30 08",
+                "pointer": "input.as_ptr()+span.start"
+              }
+            ]
+          }
+        },
+        {
+          "length": 13,
+          "error": [
+            "Wire(Truncated)",
+            13
+          ]
+        },
+        {
+          "length": 14,
+          "error": [
+            "Wire(Truncated)",
+            14
+          ]
+        },
+        {
+          "length": 15,
+          "error": [
+            "Wire(Truncated)",
+            15
+          ]
+        },
+        {
+          "length": 16,
+          "error": [
+            "Wire(Truncated)",
+            16
+          ]
+        },
+        {
+          "length": 17,
+          "error": [
+            "Wire(Truncated)",
+            17
+          ]
+        },
+        {
+          "length": 18,
+          "success": {
+            "flags": 6,
+            "version_requirements": [
+              1,
+              128
+            ],
+            "parameters": [
+              {
+                "span": [
+                  4,
+                  12
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  0,
+                  5,
+                  7,
+                  8
+                ],
+                "raw_hex": "08 00 10 05 28 07 30 08",
+                "pointer": "input.as_ptr()+span.start"
+              }
+            ]
+          }
+        },
+        {
+          "length": 19,
+          "error": [
+            "Wire(Truncated)",
+            19
+          ]
+        },
+        {
+          "length": 20,
+          "error": [
+            "Wire(Truncated)",
+            20
+          ]
+        },
+        {
+          "length": 21,
+          "success": {
+            "flags": 6,
+            "version_requirements": [
+              1,
+              128,
+              2
+            ],
+            "parameters": [
+              {
+                "span": [
+                  4,
+                  12
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  0,
+                  5,
+                  7,
+                  8
+                ],
+                "raw_hex": "08 00 10 05 28 07 30 08",
+                "pointer": "input.as_ptr()+span.start"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "duplicates": {
+      "literal_sha256": "5517681c368dabf35a444a5e6427439085fab31ca4fa0c6a9b585afcaca1366d",
+      "length": 39,
+      "flags": 7,
+      "version_requirements": [
+        1,
+        1,
+        2
+      ],
+      "parameters": [
+        {
+          "span": [
+            9,
+            23
+          ],
+          "tuple_flags_name_type_id_vararg_id": [
+            0,
+            2,
+            4,
+            0
+          ],
+          "raw_hex": "10 01 10 02 08 01 08 00 28 03 28 04 30 00",
+          "pointer": "input.as_ptr()+span.start"
+        },
+        {
+          "span": [
+            25,
+            31
+          ],
+          "tuple_flags_name_type_id_vararg_id": [
+            null,
+            2,
+            null,
+            null
+          ],
+          "raw_hex": "10 02 1a 02 ff ff",
+          "pointer": "input.as_ptr()+span.start"
+        }
+      ],
+      "minima": {
+        "bytes": 39,
+        "records": 18,
+        "owned": "2*B+4*I+2*T",
+        "work": "98+owned"
+      },
+      "prefix_cuts": [
+        {
+          "length": 0,
+          "success": {
+            "flags": null,
+            "version_requirements": [],
+            "parameters": []
+          }
+        },
+        {
+          "length": 1,
+          "error": [
+            "Wire(Truncated)",
+            1
+          ]
+        },
+        {
+          "length": 2,
+          "success": {
+            "flags": 0,
+            "version_requirements": [],
+            "parameters": []
+          }
+        },
+        {
+          "length": 3,
+          "error": [
+            "Wire(Truncated)",
+            3
+          ]
+        },
+        {
+          "length": 4,
+          "success": {
+            "flags": 7,
+            "version_requirements": [],
+            "parameters": []
+          }
+        },
+        {
+          "length": 5,
+          "error": [
+            "Wire(Truncated)",
+            5
+          ]
+        },
+        {
+          "length": 6,
+          "error": [
+            "Wire(Truncated)",
+            6
+          ]
+        },
+        {
+          "length": 7,
+          "success": {
+            "flags": 7,
+            "version_requirements": [],
+            "parameters": []
+          }
+        },
+        {
+          "length": 8,
+          "error": [
+            "Wire(Truncated)",
+            8
+          ]
+        },
+        {
+          "length": 9,
+          "error": [
+            "Wire(Truncated)",
+            9
+          ]
+        },
+        {
+          "length": 10,
+          "error": [
+            "Wire(Truncated)",
+            10
+          ]
+        },
+        {
+          "length": 11,
+          "error": [
+            "Wire(Truncated)",
+            11
+          ]
+        },
+        {
+          "length": 12,
+          "error": [
+            "Wire(Truncated)",
+            12
+          ]
+        },
+        {
+          "length": 13,
+          "error": [
+            "Wire(Truncated)",
+            13
+          ]
+        },
+        {
+          "length": 14,
+          "error": [
+            "Wire(Truncated)",
+            14
+          ]
+        },
+        {
+          "length": 15,
+          "error": [
+            "Wire(Truncated)",
+            15
+          ]
+        },
+        {
+          "length": 16,
+          "error": [
+            "Wire(Truncated)",
+            16
+          ]
+        },
+        {
+          "length": 17,
+          "error": [
+            "Wire(Truncated)",
+            17
+          ]
+        },
+        {
+          "length": 18,
+          "error": [
+            "Wire(Truncated)",
+            18
+          ]
+        },
+        {
+          "length": 19,
+          "error": [
+            "Wire(Truncated)",
+            19
+          ]
+        },
+        {
+          "length": 20,
+          "error": [
+            "Wire(Truncated)",
+            20
+          ]
+        },
+        {
+          "length": 21,
+          "error": [
+            "Wire(Truncated)",
+            21
+          ]
+        },
+        {
+          "length": 22,
+          "error": [
+            "Wire(Truncated)",
+            22
+          ]
+        },
+        {
+          "length": 23,
+          "success": {
+            "flags": 7,
+            "version_requirements": [],
+            "parameters": [
+              {
+                "span": [
+                  9,
+                  23
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  0,
+                  2,
+                  4,
+                  0
+                ],
+                "raw_hex": "10 01 10 02 08 01 08 00 28 03 28 04 30 00",
+                "pointer": "input.as_ptr()+span.start"
+              }
+            ]
+          }
+        },
+        {
+          "length": 24,
+          "error": [
+            "Wire(Truncated)",
+            24
+          ]
+        },
+        {
+          "length": 25,
+          "error": [
+            "Wire(Truncated)",
+            25
+          ]
+        },
+        {
+          "length": 26,
+          "error": [
+            "Wire(Truncated)",
+            26
+          ]
+        },
+        {
+          "length": 27,
+          "error": [
+            "Wire(Truncated)",
+            27
+          ]
+        },
+        {
+          "length": 28,
+          "error": [
+            "Wire(Truncated)",
+            28
+          ]
+        },
+        {
+          "length": 29,
+          "error": [
+            "Wire(Truncated)",
+            29
+          ]
+        },
+        {
+          "length": 30,
+          "error": [
+            "Wire(Truncated)",
+            30
+          ]
+        },
+        {
+          "length": 31,
+          "success": {
+            "flags": 7,
+            "version_requirements": [],
+            "parameters": [
+              {
+                "span": [
+                  9,
+                  23
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  0,
+                  2,
+                  4,
+                  0
+                ],
+                "raw_hex": "10 01 10 02 08 01 08 00 28 03 28 04 30 00",
+                "pointer": "input.as_ptr()+span.start"
+              },
+              {
+                "span": [
+                  25,
+                  31
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  null,
+                  2,
+                  null,
+                  null
+                ],
+                "raw_hex": "10 02 1a 02 ff ff",
+                "pointer": "input.as_ptr()+span.start"
+              }
+            ]
+          }
+        },
+        {
+          "length": 32,
+          "error": [
+            "Wire(Truncated)",
+            32
+          ]
+        },
+        {
+          "length": 33,
+          "error": [
+            "Wire(Truncated)",
+            33
+          ]
+        },
+        {
+          "length": 34,
+          "error": [
+            "Wire(Truncated)",
+            34
+          ]
+        },
+        {
+          "length": 35,
+          "error": [
+            "Wire(Truncated)",
+            35
+          ]
+        },
+        {
+          "length": 36,
+          "success": {
+            "flags": 7,
+            "version_requirements": [
+              1,
+              1
+            ],
+            "parameters": [
+              {
+                "span": [
+                  9,
+                  23
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  0,
+                  2,
+                  4,
+                  0
+                ],
+                "raw_hex": "10 01 10 02 08 01 08 00 28 03 28 04 30 00",
+                "pointer": "input.as_ptr()+span.start"
+              },
+              {
+                "span": [
+                  25,
+                  31
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  null,
+                  2,
+                  null,
+                  null
+                ],
+                "raw_hex": "10 02 1a 02 ff ff",
+                "pointer": "input.as_ptr()+span.start"
+              }
+            ]
+          }
+        },
+        {
+          "length": 37,
+          "error": [
+            "Wire(Truncated)",
+            37
+          ]
+        },
+        {
+          "length": 38,
+          "error": [
+            "Wire(Truncated)",
+            38
+          ]
+        },
+        {
+          "length": 39,
+          "success": {
+            "flags": 7,
+            "version_requirements": [
+              1,
+              1,
+              2
+            ],
+            "parameters": [
+              {
+                "span": [
+                  9,
+                  23
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  0,
+                  2,
+                  4,
+                  0
+                ],
+                "raw_hex": "10 01 10 02 08 01 08 00 28 03 28 04 30 00",
+                "pointer": "input.as_ptr()+span.start"
+              },
+              {
+                "span": [
+                  25,
+                  31
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  null,
+                  2,
+                  null,
+                  null
+                ],
+                "raw_hex": "10 02 1a 02 ff ff",
+                "pointer": "input.as_ptr()+span.start"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "opaque": {
+      "literal_sha256": "6cc46db5aae41bc6bf5e65c0959023c5f8eafbfa0ded4ceaf075799f8164d3d7",
+      "length": 12,
+      "flags": null,
+      "version_requirements": [],
+      "parameters": [
+        {
+          "span": [
+            2,
+            12
+          ],
+          "tuple_flags_name_type_id_vararg_id": [
+            null,
+            0,
+            null,
+            null
+          ],
+          "raw_hex": "10 00 1a 01 ff 22 01 ff 3a 00",
+          "pointer": "input.as_ptr()+span.start"
+        }
+      ],
+      "minima": {
+        "bytes": 12,
+        "records": 5,
+        "owned": "B+T",
+        "work": "32+owned"
+      },
+      "prefix_cuts": [
+        {
+          "length": 0,
+          "success": {
+            "flags": null,
+            "version_requirements": [],
+            "parameters": []
+          }
+        },
+        {
+          "length": 1,
+          "error": [
+            "Wire(Truncated)",
+            1
+          ]
+        },
+        {
+          "length": 2,
+          "error": [
+            "Wire(Truncated)",
+            2
+          ]
+        },
+        {
+          "length": 3,
+          "error": [
+            "Wire(Truncated)",
+            3
+          ]
+        },
+        {
+          "length": 4,
+          "error": [
+            "Wire(Truncated)",
+            4
+          ]
+        },
+        {
+          "length": 5,
+          "error": [
+            "Wire(Truncated)",
+            5
+          ]
+        },
+        {
+          "length": 6,
+          "error": [
+            "Wire(Truncated)",
+            6
+          ]
+        },
+        {
+          "length": 7,
+          "error": [
+            "Wire(Truncated)",
+            7
+          ]
+        },
+        {
+          "length": 8,
+          "error": [
+            "Wire(Truncated)",
+            8
+          ]
+        },
+        {
+          "length": 9,
+          "error": [
+            "Wire(Truncated)",
+            9
+          ]
+        },
+        {
+          "length": 10,
+          "error": [
+            "Wire(Truncated)",
+            10
+          ]
+        },
+        {
+          "length": 11,
+          "error": [
+            "Wire(Truncated)",
+            11
+          ]
+        },
+        {
+          "length": 12,
+          "success": {
+            "flags": null,
+            "version_requirements": [],
+            "parameters": [
+              {
+                "span": [
+                  2,
+                  12
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  null,
+                  0,
+                  null,
+                  null
+                ],
+                "raw_hex": "10 00 1a 01 ff 22 01 ff 3a 00",
+                "pointer": "input.as_ptr()+span.start"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "three": {
+      "literal_sha256": "07641dd63f185782311752619c91e6f02b7997302be9c80f68e6e2112d454a12",
+      "length": 12,
+      "flags": null,
+      "version_requirements": [],
+      "parameters": [
+        {
+          "span": [
+            2,
+            4
+          ],
+          "tuple_flags_name_type_id_vararg_id": [
+            null,
+            0,
+            null,
+            null
+          ],
+          "raw_hex": "10 00",
+          "pointer": "input.as_ptr()+span.start"
+        },
+        {
+          "span": [
+            6,
+            8
+          ],
+          "tuple_flags_name_type_id_vararg_id": [
+            null,
+            1,
+            null,
+            null
+          ],
+          "raw_hex": "10 01",
+          "pointer": "input.as_ptr()+span.start"
+        },
+        {
+          "span": [
+            10,
+            12
+          ],
+          "tuple_flags_name_type_id_vararg_id": [
+            null,
+            2,
+            null,
+            null
+          ],
+          "raw_hex": "10 02",
+          "pointer": "input.as_ptr()+span.start"
+        }
+      ],
+      "minima": {
+        "bytes": 12,
+        "records": 6,
+        "owned": "4*B+4*T",
+        "work": "30+owned"
+      },
+      "prefix_cuts": [
+        {
+          "length": 0,
+          "success": {
+            "flags": null,
+            "version_requirements": [],
+            "parameters": []
+          }
+        },
+        {
+          "length": 1,
+          "error": [
+            "Wire(Truncated)",
+            1
+          ]
+        },
+        {
+          "length": 2,
+          "error": [
+            "Wire(Truncated)",
+            2
+          ]
+        },
+        {
+          "length": 3,
+          "error": [
+            "Wire(Truncated)",
+            3
+          ]
+        },
+        {
+          "length": 4,
+          "success": {
+            "flags": null,
+            "version_requirements": [],
+            "parameters": [
+              {
+                "span": [
+                  2,
+                  4
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  null,
+                  0,
+                  null,
+                  null
+                ],
+                "raw_hex": "10 00",
+                "pointer": "input.as_ptr()+span.start"
+              }
+            ]
+          }
+        },
+        {
+          "length": 5,
+          "error": [
+            "Wire(Truncated)",
+            5
+          ]
+        },
+        {
+          "length": 6,
+          "error": [
+            "Wire(Truncated)",
+            6
+          ]
+        },
+        {
+          "length": 7,
+          "error": [
+            "Wire(Truncated)",
+            7
+          ]
+        },
+        {
+          "length": 8,
+          "success": {
+            "flags": null,
+            "version_requirements": [],
+            "parameters": [
+              {
+                "span": [
+                  2,
+                  4
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  null,
+                  0,
+                  null,
+                  null
+                ],
+                "raw_hex": "10 00",
+                "pointer": "input.as_ptr()+span.start"
+              },
+              {
+                "span": [
+                  6,
+                  8
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  null,
+                  1,
+                  null,
+                  null
+                ],
+                "raw_hex": "10 01",
+                "pointer": "input.as_ptr()+span.start"
+              }
+            ]
+          }
+        },
+        {
+          "length": 9,
+          "error": [
+            "Wire(Truncated)",
+            9
+          ]
+        },
+        {
+          "length": 10,
+          "error": [
+            "Wire(Truncated)",
+            10
+          ]
+        },
+        {
+          "length": 11,
+          "error": [
+            "Wire(Truncated)",
+            11
+          ]
+        },
+        {
+          "length": 12,
+          "success": {
+            "flags": null,
+            "version_requirements": [],
+            "parameters": [
+              {
+                "span": [
+                  2,
+                  4
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  null,
+                  0,
+                  null,
+                  null
+                ],
+                "raw_hex": "10 00",
+                "pointer": "input.as_ptr()+span.start"
+              },
+              {
+                "span": [
+                  6,
+                  8
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  null,
+                  1,
+                  null,
+                  null
+                ],
+                "raw_hex": "10 01",
+                "pointer": "input.as_ptr()+span.start"
+              },
+              {
+                "span": [
+                  10,
+                  12
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  null,
+                  2,
+                  null,
+                  null
+                ],
+                "raw_hex": "10 02",
+                "pointer": "input.as_ptr()+span.start"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "pair_constructor": {
+      "literal_sha256": "b10772c4ed0df9d57ce93391dcd7ba4b0940417c20c36a5916e99a150d63f4b6",
+      "length": 25,
+      "flags": 70,
+      "version_requirements": [],
+      "parameters": [
+        {
+          "span": [
+            4,
+            10
+          ],
+          "tuple_flags_name_type_id_vararg_id": [
+            null,
+            5,
+            null,
+            null
+          ],
+          "raw_hex": "10 05 1a 02 38 00",
+          "pointer": "input.as_ptr()+span.start"
+        },
+        {
+          "span": [
+            12,
+            18
+          ],
+          "tuple_flags_name_type_id_vararg_id": [
+            null,
+            6,
+            null,
+            null
+          ],
+          "raw_hex": "10 06 1a 02 38 01",
+          "pointer": "input.as_ptr()+span.start"
+        }
+      ],
+      "minima": {
+        "bytes": 25,
+        "records": 8,
+        "owned": "2*B+2*T",
+        "work": "53+owned"
+      },
+      "prefix_cuts": [
+        {
+          "length": 0,
+          "success": {
+            "flags": null,
+            "version_requirements": [],
+            "parameters": []
+          }
+        },
+        {
+          "length": 1,
+          "error": [
+            "Wire(Truncated)",
+            1
+          ]
+        },
+        {
+          "length": 2,
+          "success": {
+            "flags": 70,
+            "version_requirements": [],
+            "parameters": []
+          }
+        },
+        {
+          "length": 3,
+          "error": [
+            "Wire(Truncated)",
+            3
+          ]
+        },
+        {
+          "length": 4,
+          "error": [
+            "Wire(Truncated)",
+            4
+          ]
+        },
+        {
+          "length": 5,
+          "error": [
+            "Wire(Truncated)",
+            5
+          ]
+        },
+        {
+          "length": 6,
+          "error": [
+            "Wire(Truncated)",
+            6
+          ]
+        },
+        {
+          "length": 7,
+          "error": [
+            "Wire(Truncated)",
+            7
+          ]
+        },
+        {
+          "length": 8,
+          "error": [
+            "Wire(Truncated)",
+            8
+          ]
+        },
+        {
+          "length": 9,
+          "error": [
+            "Wire(Truncated)",
+            9
+          ]
+        },
+        {
+          "length": 10,
+          "success": {
+            "flags": 70,
+            "version_requirements": [],
+            "parameters": [
+              {
+                "span": [
+                  4,
+                  10
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  null,
+                  5,
+                  null,
+                  null
+                ],
+                "raw_hex": "10 05 1a 02 38 00",
+                "pointer": "input.as_ptr()+span.start"
+              }
+            ]
+          }
+        },
+        {
+          "length": 11,
+          "error": [
+            "Wire(Truncated)",
+            11
+          ]
+        },
+        {
+          "length": 12,
+          "error": [
+            "Wire(Truncated)",
+            12
+          ]
+        },
+        {
+          "length": 13,
+          "error": [
+            "Wire(Truncated)",
+            13
+          ]
+        },
+        {
+          "length": 14,
+          "error": [
+            "Wire(Truncated)",
+            14
+          ]
+        },
+        {
+          "length": 15,
+          "error": [
+            "Wire(Truncated)",
+            15
+          ]
+        },
+        {
+          "length": 16,
+          "error": [
+            "Wire(Truncated)",
+            16
+          ]
+        },
+        {
+          "length": 17,
+          "error": [
+            "Wire(Truncated)",
+            17
+          ]
+        },
+        {
+          "length": 18,
+          "success": {
+            "flags": 70,
+            "version_requirements": [],
+            "parameters": [
+              {
+                "span": [
+                  4,
+                  10
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  null,
+                  5,
+                  null,
+                  null
+                ],
+                "raw_hex": "10 05 1a 02 38 00",
+                "pointer": "input.as_ptr()+span.start"
+              },
+              {
+                "span": [
+                  12,
+                  18
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  null,
+                  6,
+                  null,
+                  null
+                ],
+                "raw_hex": "10 06 1a 02 38 01",
+                "pointer": "input.as_ptr()+span.start"
+              }
+            ]
+          }
+        },
+        {
+          "length": 19,
+          "error": [
+            "Wire(Truncated)",
+            19
+          ]
+        },
+        {
+          "length": 20,
+          "error": [
+            "Wire(Truncated)",
+            20
+          ]
+        },
+        {
+          "length": 21,
+          "error": [
+            "Wire(Truncated)",
+            21
+          ]
+        },
+        {
+          "length": 22,
+          "error": [
+            "Wire(Truncated)",
+            22
+          ]
+        },
+        {
+          "length": 23,
+          "error": [
+            "Wire(Truncated)",
+            23
+          ]
+        },
+        {
+          "length": 24,
+          "error": [
+            "Wire(Truncated)",
+            24
+          ]
+        },
+        {
+          "length": 25,
+          "success": {
+            "flags": 70,
+            "version_requirements": [],
+            "parameters": [
+              {
+                "span": [
+                  4,
+                  10
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  null,
+                  5,
+                  null,
+                  null
+                ],
+                "raw_hex": "10 05 1a 02 38 00",
+                "pointer": "input.as_ptr()+span.start"
+              },
+              {
+                "span": [
+                  12,
+                  18
+                ],
+                "tuple_flags_name_type_id_vararg_id": [
+                  null,
+                  6,
+                  null,
+                  null
+                ],
+                "raw_hex": "10 06 1a 02 38 01",
+                "pointer": "input.as_ptr()+span.start"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "prefix_cut_count": 115,
+  "default_limit_errors": [
+    {
+      "case": "empty_parameter",
+      "hex": "12 00",
+      "error": [
+        "MissingName",
+        2
+      ]
+    },
+    {
+      "case": "missing_name_flags",
+      "hex": "12 02 08 00",
+      "error": [
+        "MissingName",
+        4
+      ]
+    },
+    {
+      "case": "wrong_wire_name",
+      "hex": "12 02 12 00",
+      "error": [
+        "MissingName",
+        4
+      ]
+    },
+    {
+      "case": "child_invalid_tag",
+      "hex": "12 01 00",
+      "error": [
+        "Wire(InvalidFieldNumber)",
+        2
+      ]
+    },
+    {
+      "case": "child_truncated_value",
+      "hex": "12 01 08",
+      "error": [
+        "Wire(Truncated)",
+        3
+      ]
+    },
+    {
+      "case": "child_group",
+      "hex": "12 01 0b",
+      "error": [
+        "Wire(UnsupportedGroup)",
+        2
+      ]
+    },
+    {
+      "case": "child_invalid_wire",
+      "hex": "12 01 0e",
+      "error": [
+        "Wire(InvalidWireType)",
+        2
+      ]
+    },
+    {
+      "case": "late_parent_invalid",
+      "hex": "12 00 00",
+      "error": [
+        "Wire(InvalidFieldNumber)",
+        2
+      ]
+    },
+    {
+      "case": "late_parent_truncated",
+      "hex": "12 01 00 08",
+      "error": [
+        "Wire(Truncated)",
+        4
+      ]
+    },
+    {
+      "case": "late_packed_truncated",
+      "hex": "12 00 fa 01 01 80",
+      "error": [
+        "Wire(Truncated)",
+        6
+      ]
+    },
+    {
+      "case": "second_missing_name",
+      "hex": "12 02 10 00 12 00",
+      "error": [
+        "MissingName",
+        6
+      ]
+    },
+    {
+      "case": "parent_negative_length",
+      "hex": "12 ff ff ff ff 0f",
+      "error": [
+        "Wire(NegativeLength)",
+        1
+      ]
+    },
+    {
+      "case": "child_negative_length",
+      "hex": "12 06 1a ff ff ff ff 0f",
+      "error": [
+        "Wire(NegativeLength)",
+        3
+      ]
+    },
+    {
+      "case": "child_malformed_varint",
+      "hex": "12 0b 10 80 80 80 80 80 80 80 80 80 80",
+      "error": [
+        "Wire(MalformedVarint)",
+        12
+      ]
+    },
+    {
+      "case": "parent_group",
+      "hex": "0b",
+      "error": [
+        "Wire(UnsupportedGroup)",
+        0
+      ]
+    },
+    {
+      "case": "parent_invalid_wire",
+      "hex": "0e",
+      "error": [
+        "Wire(InvalidWireType)",
+        0
+      ]
+    },
+    {
+      "case": "parent_invalid_tag",
+      "hex": "00",
+      "error": [
+        "Wire(InvalidFieldNumber)",
+        0
+      ]
+    },
+    {
+      "case": "nonfinal_missing_name",
+      "hex": "12 00 08 00",
+      "error": [
+        "MissingName",
+        2
+      ]
+    }
+  ],
+  "extra_literal_positives": [
+    {
+      "hex": "12 04 10 00 12 00",
+      "flags": null,
+      "ids": [],
+      "parameters": [
+        {
+          "span": [
+            2,
+            6
+          ],
+          "tuple": [
+            null,
+            0,
+            null,
+            null
+          ]
+        }
+      ],
+      "why": "wrong-wire name after present name never clears it"
+    },
+    {
+      "hex": "12 0c 10 ff ff ff ff 0f 28 80 80 80 80 08",
+      "flags": null,
+      "ids": [],
+      "parameters": [
+        {
+          "span": [
+            2,
+            14
+          ],
+          "tuple": [
+            null,
+            -1,
+            -2147483648,
+            null
+          ]
+        }
+      ],
+      "why": "low32 signed required name/type ID, no index validation"
+    },
+    {
+      "hex": "08 ff ff ff ff 0f f8 01 ff ff ff ff 0f",
+      "flags": -1,
+      "ids": [
+        -1
+      ],
+      "parameters": [],
+      "why": "signed constructor flags and raw version IDs"
+    },
+    {
+      "hex": "12 02 10 00 12 02 10 00",
+      "flags": null,
+      "ids": [],
+      "parameters": [
+        {
+          "span": [
+            2,
+            4
+          ],
+          "tuple": [
+            null,
+            0,
+            null,
+            null
+          ]
+        },
+        {
+          "span": [
+            6,
+            8
+          ],
+          "tuple": [
+            null,
+            0,
+            null,
+            null
+          ]
+        }
+      ],
+      "why": "identical repeated body remains two ordered occurrences"
+    }
+  ]
+}

@@ -176,7 +176,9 @@ impl Parser {
                                     probe.my_builder.get_token_text() != Some("suspend")
                                         && probe.expect(IDENTIFIER)
                                         && probe.expect(GT)
-                                        && probe.expect(DOT)
+                                        && (probe.consume_if(DOT)
+                                            || probe.consume_if(SAFE_ACCESS)
+                                            || (probe.consume_if(QUEST) && probe.expect(DOT)))
                                 } else {
                                     probe.expect(GT)
                                         && (probe.consume_if(DOT)

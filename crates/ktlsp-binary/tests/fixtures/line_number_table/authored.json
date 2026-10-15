@@ -1,0 +1,402 @@
+{
+  "kind": "independently authored literal LineNumberTable payloads; not compiler observations",
+  "cp": {
+    "0": "Unusable",
+    "1": "Utf8 LineNumberTable (15 units)",
+    "2": "Utf8 X (1 unit)",
+    "3": "Integer 0",
+    "4": "Unusable",
+    "5": "Utf8 LineNumberTable (distinct same-text slot)",
+    "6": "Utf8 units [0,55296] (2 units)",
+    "7": "Utf8 LineNumberTabl (14 units)"
+  },
+  "storage_symbols": {
+    "S": "size_of::<LineNumberTable>()",
+    "L": "size_of::<LineNumber>()"
+  },
+  "valid": [
+    {
+      "id": "V01-empty",
+      "name": 1,
+      "code_len": 1,
+      "hex": "0000",
+      "entries": [],
+      "spans": [],
+      "minimum": {
+        "bytes": 2,
+        "records": 1,
+        "work": 19,
+        "owned": "S"
+      }
+    },
+    {
+      "id": "V02-single",
+      "name": 1,
+      "code_len": 5,
+      "hex": "00010000000d",
+      "entries": [
+        [
+          0,
+          13
+        ]
+      ],
+      "spans": [
+        [
+          2,
+          6
+        ]
+      ],
+      "minimum": {
+        "bytes": 6,
+        "records": 2,
+        "work": 24,
+        "owned": "S+L"
+      }
+    },
+    {
+      "id": "V03-unsorted-duplicates",
+      "name": 1,
+      "code_len": 4,
+      "hex": "00050003ffff0000000000030001000300010001ffff",
+      "entries": [
+        [
+          3,
+          65535
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          1,
+          65535
+        ]
+      ],
+      "spans": [
+        [
+          2,
+          6
+        ],
+        [
+          6,
+          10
+        ],
+        [
+          10,
+          14
+        ],
+        [
+          14,
+          18
+        ],
+        [
+          18,
+          22
+        ]
+      ],
+      "minimum": {
+        "bytes": 22,
+        "records": 6,
+        "work": 44,
+        "owned": "S+5L"
+      }
+    },
+    {
+      "id": "V04-max-pc",
+      "name": 1,
+      "code_len": 65535,
+      "hex": "0001fffeffff",
+      "entries": [
+        [
+          65534,
+          65535
+        ]
+      ],
+      "spans": [
+        [
+          2,
+          6
+        ]
+      ],
+      "minimum": {
+        "bytes": 6,
+        "records": 2,
+        "work": 24,
+        "owned": "S+L"
+      }
+    },
+    {
+      "id": "V05-zero-line",
+      "name": 5,
+      "code_len": 1,
+      "hex": "000100000000",
+      "entries": [
+        [
+          0,
+          0
+        ]
+      ],
+      "spans": [
+        [
+          2,
+          6
+        ]
+      ],
+      "minimum": {
+        "bytes": 6,
+        "records": 2,
+        "work": 24,
+        "owned": "S+L"
+      }
+    }
+  ],
+  "composites": [
+    {
+      "id": "C01-multi-interleave",
+      "code_len": 5,
+      "attributes": [
+        {
+          "name": 1,
+          "hex": "00010000000d"
+        },
+        {
+          "name": 2,
+          "hex": "aabb"
+        },
+        {
+          "name": 5,
+          "hex": "0000"
+        },
+        {
+          "name": 1,
+          "hex": "00050003ffff0000000000030001000300010001ffff"
+        }
+      ],
+      "selected_names": [
+        1,
+        5,
+        1
+      ],
+      "selected_entries": [
+        [
+          [
+            0,
+            13
+          ]
+        ],
+        [],
+        [
+          [
+            3,
+            65535
+          ],
+          [
+            0,
+            0
+          ],
+          [
+            3,
+            1
+          ],
+          [
+            3,
+            1
+          ],
+          [
+            1,
+            65535
+          ]
+        ]
+      ],
+      "minimum": {
+        "bytes": 32,
+        "records": 10,
+        "work": 92,
+        "owned": "3S+6L"
+      }
+    },
+    {
+      "id": "C02-utf16-unknown",
+      "code_len": 1,
+      "attributes": [
+        {
+          "name": 6,
+          "hex": "dead"
+        }
+      ],
+      "selected_names": [],
+      "selected_entries": [],
+      "minimum": {
+        "bytes": 2,
+        "records": 1,
+        "work": 6,
+        "owned": "0"
+      }
+    },
+    {
+      "id": "C03-no-attributes",
+      "code_len": 1,
+      "attributes": [],
+      "selected_names": [],
+      "selected_entries": [],
+      "minimum": {
+        "bytes": 0,
+        "records": 0,
+        "work": 0,
+        "owned": "0"
+      }
+    },
+    {
+      "id": "C04-near-name",
+      "code_len": 1,
+      "attributes": [
+        {
+          "name": 7,
+          "hex": ""
+        }
+      ],
+      "selected_names": [],
+      "selected_entries": [],
+      "minimum": {
+        "bytes": 0,
+        "records": 1,
+        "work": 16,
+        "owned": "0"
+      }
+    },
+    {
+      "id": "C05-alias-same-payload",
+      "code_len": 5,
+      "attributes": [
+        {
+          "name": 1,
+          "hex": "00010000000d",
+          "alias": "same"
+        },
+        {
+          "name": 5,
+          "hex": "00010000000d",
+          "alias": "same"
+        }
+      ],
+      "selected_names": [
+        1,
+        5
+      ],
+      "selected_entries": [
+        [
+          [
+            0,
+            13
+          ]
+        ],
+        [
+          [
+            0,
+            13
+          ]
+        ]
+      ],
+      "minimum": {
+        "bytes": 12,
+        "records": 4,
+        "work": 48,
+        "owned": "2S+2L"
+      }
+    }
+  ],
+  "malformed": [
+    {
+      "id": "M01-no-count",
+      "hex": "",
+      "code_len": 1,
+      "error": "Truncated"
+    },
+    {
+      "id": "M02-half-count",
+      "hex": "00",
+      "code_len": 1,
+      "error": "Truncated"
+    },
+    {
+      "id": "M03-missing-entry",
+      "hex": "0001",
+      "code_len": 1,
+      "error": "Truncated"
+    },
+    {
+      "id": "M04-half-pc",
+      "hex": "000100",
+      "code_len": 1,
+      "error": "Truncated"
+    },
+    {
+      "id": "M05-missing-line-invalid-pc",
+      "hex": "00010001",
+      "code_len": 1,
+      "error": "Truncated"
+    },
+    {
+      "id": "M06-half-line",
+      "hex": "0001000000",
+      "code_len": 1,
+      "error": "Truncated"
+    },
+    {
+      "id": "M07-pc-at-end",
+      "hex": "00010001000d",
+      "code_len": 1,
+      "error": "Malformed(line number start pc)"
+    },
+    {
+      "id": "M08-pc-beyond",
+      "hex": "0001ffff0000",
+      "code_len": 65535,
+      "error": "Malformed(line number start pc)"
+    },
+    {
+      "id": "M09-empty-trailing",
+      "hex": "000000",
+      "code_len": 1,
+      "error": "Malformed(line number trailing bytes)"
+    },
+    {
+      "id": "M10-one-trailing",
+      "hex": "00010000000d00",
+      "code_len": 1,
+      "error": "Malformed(line number trailing bytes)"
+    },
+    {
+      "id": "M11-count-understates",
+      "hex": "00000000000d",
+      "code_len": 1,
+      "error": "Malformed(line number trailing bytes)"
+    },
+    {
+      "id": "M12-count-overstates",
+      "hex": "00020000000d",
+      "code_len": 1,
+      "error": "Truncated"
+    },
+    {
+      "id": "M13-max-count-short",
+      "hex": "ffff",
+      "code_len": 1,
+      "error": "Limit(line number records)"
+    },
+    {
+      "id": "M14-invalid-first-before-missing-second",
+      "hex": "00020001000d",
+      "code_len": 1,
+      "error": "Malformed(line number start pc)"
+    }
+  ]
+}

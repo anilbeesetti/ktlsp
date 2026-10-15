@@ -1,4 +1,7 @@
 //! C16 expectations are derived from source grammar before controlled Linux execution.
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{FileKind, Parsed, Parser, ParserError, SourceSnapshot};
 use std::sync::atomic::AtomicBool;
 
@@ -162,6 +165,7 @@ fn check(
 
 #[test]
 fn unclosed_parameter_annotation_restores_complete_sibling_in_original_newlines() {
+    let _functional = functional::serial();
     for newline in ["\n", "\r\n", "\r"] {
         let start = 14 + newline.len();
         let end = start + 17;
@@ -202,6 +206,7 @@ fn unclosed_parameter_annotation_restores_complete_sibling_in_original_newlines(
 
 #[test]
 fn complete_annotation_argument_preserves_anonymous_function_parameter() {
+    let _functional = functional::serial();
     let outer = Some((0, 35));
     let anonymous = Some((9, 23));
     check(
@@ -234,6 +239,7 @@ fn complete_annotation_argument_preserves_anonymous_function_parameter() {
 
 #[test]
 fn ordinary_call_argument_preserves_anonymous_function_local_property() {
+    let _functional = functional::serial();
     let outer = Some((0, 42));
     let anonymous = Some((18, 41));
     check(
@@ -256,6 +262,7 @@ fn ordinary_call_argument_preserves_anonymous_function_local_property() {
 
 #[test]
 fn complete_annotation_argument_preserves_anonymous_function_local_function() {
+    let _functional = functional::serial();
     let outer = Some((0, 46));
     let anonymous = Some((9, 34));
     let local = Some((17, 32));
@@ -287,6 +294,7 @@ fn complete_annotation_argument_preserves_anonymous_function_local_function() {
 }
 #[test]
 fn reparsed_anonymous_body_keeps_damaged_local_annotation_nested() {
+    let _functional = functional::serial();
     let outer = Some((0, 51));
     let anonymous = Some((10, 51));
     let local = Some((18, 49));

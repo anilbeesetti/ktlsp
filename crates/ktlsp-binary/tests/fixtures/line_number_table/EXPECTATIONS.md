@@ -1,0 +1,52 @@
+# Independently frozen expectations, not runtime results
+
+No Rust decoder source/build/runtime produced this packet. authored.json is literal authored data. Symbols S=size_of::<LineNumberTable>(), L=size_of::<LineNumber>(); tests use target-computed type sizes rather than assuming Rust repr or a host ABI. `LineNumber` numeric fields have no borrowed spans; entry spans below describe their source bytes for fixture inspection only.
+
+## Genuine held input
+
+Unchanged crates/ktlsp-binary/fixtures/t017c2/Unit.class: size781, SHA256896588212a98f36148f2fbe1ea2878d6ba23c6376c6346c765cec5ac0c5716ce, version52.0. Existing provenance records Kotlin stdlib2.3.20 distribution, not independently verified compiler provenance. Preserve/reuse existing Apache-2.0 LICENSE.txt and NOTICE.txt unchanged; fixture README must link them and provenance. No new third-party class or notice copy is required.
+
+CP38 Utf8 LineNumberTable spans[423,441), text bytes[426,441), 15 UTF16 units. CP39 LocalVariableTable spans[441,462), 18 units. Original ordered method tuples:
+
+- `<init>` flags2/name5/descriptor6, member[535,596), Code name37/header[543,549)/payload[549,596), max_stack1/max_locals1/code_length5, bytecode[557,562) hex2ab70008b1. Zero exceptions. Nested38 header[566,572), payload[572,578), Code-relative[23,29), hex00010000000d; count[572,574), entry[574,578), tuple(0,13). Nested39 header[578,584), payload[584,596), hex0001000000050009000a0000. LNT decode with ALL nested attrs: B18 R3 W56 O=S+L.
+- `toString` flags1/name11/descriptor12, member[596,667), Code name37/header[604,610)/payload[610,655), max_stack1/max_locals1/code_length3, bytecode[618,621) hex120fb0. Zero exceptions. Nested38 header[625,631), payload[631,637), Code-relative[21,27), hex00010000000e; count[631,633), entry[633,637), tuple(0,14). Nested39 header[637,643), payload[643,655), hex0001000000030009000a0000. Outer RuntimeInvisibleAnnotations name36/header[655,661)/payload[661,667), hex0001000d0000. LNT per-body B18 R3 W56 O=S+L.
+- `<clinit>` flags8/name16/descriptor6, member[667,704), Code name37/header[675,681)/payload[681,704), max_stack2/max_locals0/code_length11, bytecode[689,700) hexbb000259b70011b30014b1; zero exceptions/nested attributes. LNT returns[] under four zero limits.
+
+All spans half-open ABSOLUTE class offsets except explicitly Code-relative ones. Genuine coverage is exactly TWO single-entry LNTs; no compiler-observed multi-entry/order/duplicate/malformed/empty table or nonzero PC is claimed. Complete data-only extraction is in genuine-unit.json; independent actual bytes must agree with these literals.
+
+Future genuine Rust integration must include_bytes the actual781B file, parse_class, code::decode and LNT decode each body; assert all three original method/Code scalars/raw/bytecode/exception/nested name+payload tuples, output selected raw/name/entry tuples, exact original-allocation pointer starts, and original class/body/CP unchanged. Pointer identity assertions use UNIT[start..].as_ptr(), Code raw starts549/610/681, bytecode557/618/689, nested payloads572/584/631/643. Selected LNT raw pointers572/631, name38. Byte equality alone or constructing a forged CodeBody from literals does NOT establish this integration. No public entry-byte spans or PC lookup is promised.
+
+## Literal and aggregate minima
+
+V01 B2/R1/W19/S; V02 B6/R2/W24/S+L; V03 B22/R6/W44/S+5L; V04 B6/R2/W24/S+L; V05 B6/R2/W24/S+L. V03 keeps decreasing PCs/lines, identical tuples, repeated PC/different line, line0/65535. V04 accepts pc65534 in len65535. With len1, pc0 accepts; pc1 rejects; pc65535 rejects at len65535. Bytecode[0xff] is allowed because opcodes are not inspected.
+
+C01 multiple selected tables and ignored interleave: B6+2+2+22=32; R4attrs+6entries=10; W32+8+15+1+15+15+6=92; O3S+6L. C02 NUL/surrogate unknown B2 R1 W6 O0. C03 zero attributes B/R/W/O0. C04 near-name unknown B0 R1 W16 O0. C05 aliases same buffer counted twice B12 R4 W48 O2S+2L; selected text at distinct CP indices1/5 must both select. Future alias test must actually reuse the same &[u8], not two equal copies.
+
+Every valid V payload and each genuine selected payload must be tested at EVERY proper prefix under adequate limits -> Truncated. Preserve full valid bytecode length/CP/name. Full payload succeeds; append00 -> trailing bytes. V03 prefixes never reach malformed-PC errors because all frozen PCs valid. M01..M14 exact errors in authored.json. For M13 count65535, attrs1+entries65535 exceeds hard record65535; PUBLIC decode with raised caller limits returns Limit(line number records), never reaches Truncated. Truncated would describe the format in isolation without these caps, not this API. Do not lower/raise caps to obtain Truncated.
+
+## Error precedence and forged public model matrix
+
+Always adequate other limits unless stated. Preserve immutable input on success/error. Future tests:
+
+1. cp[] and cp.len65536 -> constant-pool-size error before bytecode/records. cp[Utf8 at0] length1 with attributes[] and bytecode len1 succeeds; slot-zero contents are unconsumed. Any attribute.name0 rejects constant-index, even this forged Utf8 slot0. CP usize counts checked before index conversion; names are u16.
+2. Bytecode lengths0 and65536 -> code-length error even with no attributes. len1 and65535 accept empty attribute list. Invalid unrelated Constant::Class(0), invalid unused pool data/slot0 and unrelated raw/exceptions/max_stack/max_locals are unvalidated; test forged disjoint raw/bytecode/attribute buffers and unrelated exceptions safely accepted. Do not claim source-span containment validation.
+3. Consumed names0/out-of-range65535/Unusable4 -> constant-index; name3 Integer -> UTF8-index. Empty/NUL/lone-surrogate/nonmatching/case-changed/near-prefix names remain unknown (test exact units). UTF16 name length is charged completely before comparison.
+4. With M01 first selected, later attribute wrong-kind name3, ample limits -> Truncated from first. With first unknown attr name3 and later M01 -> UTF8-index. With first valid selected followed by wrong name -> no partial output, UTF8-index.
+5. For V02 single selected, records0 -> records before attr/name/storage; work0 -> work at attr visit; bytes5 -> bytes before name; work6 -> work at payload charge (1+6); work7 -> work at lookup(1); work8 -> work at full15 text; work23 -> work at entry; exactW24 succeeds.
+6. For M01 valid selected name, O=S-1 -> owned-bytes before missing count; O=S with adequate others -> Truncated. For M03 count1, R1 -> records before missing entry; R2 and O=S+L-1 -> owned before missing entry; R2/O=S+L with M03 B2: visit1+payload2+lookup1+text15=19, so W19 -> work at entry20 before missing bytes; W20 -> Truncated. V02 W23 entry failure before any missing payload read. For M05 invalidPC1/missing line, ample -> Truncated; for complete M07 -> start-pc. M14 invalid first entry precedes missing second.
+7. Each positive B/R/W/O minimum from V/C/genuine succeeds, independent one-less returns matching Limit. Zero minima succeed at0. No per-table reset: C01/C05 one-less totals must fail even if each individual table fits. Empty selected tables still consume S and record1; ignored payload consumes B/W but no O.
+8. Empty table trailing bytes -> trailing; V03 invalid first PC patch(offset2=code_len) -> start-pc before later entries/trailing. Declared-count-under/over cases remain distinct.
+
+## Hard caps and hostile inputs, prospective native tests
+
+No local runtime allowed now. Later native tests include actual public hard-cap cases and small private arithmetic checks:
+
+- Records exact65535: one selected table count65534, raw u2(fffe)+65534 copies(00000000), bytecode len1 -> R65535/B262138/W327689/O=S+65534L. count65535 -> R65536 refuses records before reserve/read; raised caller caps do not alter this.
+- Bytes exact16777216: one UNKNOWN X attr of that length, bytecode len1, cp contains X -> R1/W16777219/O0; +1 -> bytes. Work fits hard67108864. No selected-entry reservation needed.
+- Work exact67108864 with B0: 1024 UNKNOWN attrs all same CP UTF16 length65534 (contents all X, so nonmatching) -> R1024/W1024*(2+65534)=67108864/O0. Repeat with name length65535 -> work failure; repeated borrowed names must be charged per occurrence. CP name allocation is caller-owned, not decoder-retained storage. Alternative malformed name indices must never be looked up before the specified work step.
+- Owned hard cap: default accepted public records bound makes some larger logical O unreachable for these small types; do not claim a public exact16777216 O test. Private Budget cap clamp, checked_add overflow and vector checked_mul overflow tests cover independent counter arithmetic. Ordinary positive minima/one-less O are public tests.
+- Deterministic bounded hostile payload corpus: all256 one-byte payloads; 256 two-byte pairs [i, i XOR 0xa5] for i=0..255 in ascending order; each one-bit flip (byte positions ascending, bit0..7) across V03 then init6B then toString6B; selected payload sizes0..256 in ascending order, filled with bytes from one continuous u32 LCG state initialized ONCE to 0x4c4e5431, advanced as state=(1664525*state+1013904223) modulo2^32, emitting state>>24 for each byte. This is1041 ordered payloads (256+256+272+257), retaining duplicates. Every one of1041 payload occurrences is supplied as the sole selected Attribute name1 with the authored CP and bytecode len4. Run each with default limits, then independently bytes0, records0, work0 and owned_bytes0 (all other fields default), then one mixed case bytes=min(payload.len(),8), records4, work32, owned_bytes=S+2L. Six limit settings times1041=6246 decode calls, no deduplication. Each returns Result without panic (may hit errors/limits); do not assert only Truncated or full semantic validity. Repeated attrs/aliases/huge counts/large names/near matches/wrong CP kinds combine with tiny limits. Keep seed/count fixed; finite probes are not exhaustive proof.
+
+No product decoder, compiler/JVM/oracle/native tests/bench ran. Expectations changes after future source disagreement require preserving first failure and actual spec/data review, never output tuning. #96/Darwin UNKNOWN remains.
+
+- Adversarial empty-table cohort:65535 selected `0000` payload aliases with name1, bytecode len1 -> B131070/R65535/W1245165/O65535S; all zero-entry vectors stay empty. Output uses fallible amortized try_reserve(1), never exact-one growth. Adding one attribute refuses records before iteration. This is prospective hosted evidence, not an allocator/performance benchmark.

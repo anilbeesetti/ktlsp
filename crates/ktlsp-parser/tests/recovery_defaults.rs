@@ -1,4 +1,7 @@
 //! C14 expectations are derived from source grammar before controlled Linux execution.
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{FileKind, Parsed, Parser, ParserError, SourceSnapshot};
 use std::sync::atomic::AtomicBool;
 
@@ -153,6 +156,7 @@ fn check(
 
 #[test]
 fn missing_default_restores_complete_named_sibling_in_original_newlines() {
+    let _functional = functional::serial();
     for newline in ["\n", "\r\n", "\r"] {
         let start = 19 + newline.len();
         let end = start + 17;
@@ -191,6 +195,7 @@ fn missing_default_restores_complete_named_sibling_in_original_newlines() {
 
 #[test]
 fn anonymous_function_and_object_defaults_keep_all_nested_owners() {
+    let _functional = functional::serial();
     let source = "fun f(x: () -> Int = fun(): Int { val local = 1; return local }, y: Any = object { val member = 2 }) {}";
     let outer = Some((0, 103));
     check(
@@ -226,6 +231,7 @@ fn anonymous_function_and_object_defaults_keep_all_nested_owners() {
 
 #[test]
 fn lambda_local_function_stays_inside_default_expression() {
+    let _functional = functional::serial();
     let source = "fun f(x: Int = run {\nfun local() = 1\nlocal()\n}) {}";
     let outer = Some((0, 50));
     check(
@@ -246,6 +252,7 @@ fn lambda_local_function_stays_inside_default_expression() {
 
 #[test]
 fn nested_calls_keep_their_parameter_extent() {
+    let _functional = functional::serial();
     let outer = Some((0, 40));
     check(
         "fun f(x: Int = nested(call(1, 2), 3)) {}",
@@ -263,6 +270,7 @@ fn nested_calls_keep_their_parameter_extent() {
 
 #[test]
 fn same_line_anonymous_function_remains_a_default() {
+    let _functional = functional::serial();
     let outer = Some((0, 34));
     check(
         "fun f(x: () -> Int = fun() = 1) {}",
@@ -285,6 +293,7 @@ fn same_line_anonymous_function_remains_a_default() {
 
 #[test]
 fn nonempty_named_header_retains_existing_expression_ownership() {
+    let _functional = functional::serial();
     // shortcut: broader named headers need a separate recovery contract.
     let outer = Some((0, 40));
     check(
@@ -314,6 +323,7 @@ fn nonempty_named_header_retains_existing_expression_ownership() {
 
 #[test]
 fn scratch_raw_token_and_byte_limits_decline_without_losing_default_tokens() {
+    let _functional = functional::serial();
     for (padding, recovered) in [
         (format!("/*{}*/", "x".repeat(4079)), true),
         (format!("/*{}*/", "x".repeat(4080)), false),

@@ -1,4 +1,7 @@
 //! Independently authored Kotlin 2.3 declaration baseline v1; no generated snapshots.
+#[path = "support/functional.rs"]
+mod functional;
+
 use ktlsp_parser::{FileKind, Parsed, Parser, ParserError, SourceSnapshot};
 use std::sync::atomic::AtomicBool;
 
@@ -111,6 +114,7 @@ fn check_tree(
 
 #[test]
 fn baseline_preamble_and_declaration_kinds() {
+    let _functional = functional::serial();
     let source = "package p\nimport a.b as c\nimport x.*\nclass C {}\ninterface I {}\nobject O {}\nfun f() = 1\nval x=1\ntypealias A=String\n";
     let parsed = check(
         source,
@@ -166,6 +170,7 @@ fn baseline_preamble_and_declaration_kinds() {
 
 #[test]
 fn baseline_modifiers_annotations_generics_constraints_and_nested_members() {
+    let _functional = functional::serial();
     let source = "@Deprecated(\"old\") public open class Box<T : Any> where T : Comparable<T> {\n private val value: T? = null\n fun T.echo(): T = this\n class Nested\n}\n";
     let parsed = check(
         source,
@@ -220,6 +225,7 @@ fn baseline_modifiers_annotations_generics_constraints_and_nested_members() {
 
 #[test]
 fn baseline_receivers_and_locals() {
+    let _functional = functional::serial();
     check(
         "val String.sizeHint: Int get() = length\nfun <T> T.echo(value: T): T where T: Any = value\n",
         &[
@@ -267,6 +273,7 @@ fn baseline_receivers_and_locals() {
 
 #[test]
 fn baseline_incomplete_declarations_retain_later_class() {
+    let _functional = functional::serial();
     for (prefix, kind, message) in [
         ("class", "CLASS", "Name expected"),
         ("interface", "CLASS", "Name expected"),
@@ -313,6 +320,7 @@ fn baseline_incomplete_declarations_retain_later_class() {
 
 #[test]
 fn baseline_incomplete_preamble_alias_star_and_annotation_recovery() {
+    let _functional = functional::serial();
     check(
         "package\nclass Later {}",
         &[
@@ -394,6 +402,7 @@ fn baseline_incomplete_preamble_alias_star_and_annotation_recovery() {
 
 #[test]
 fn baseline_original_unicode_newlines_backticks_and_eof() {
+    let _functional = functional::serial();
     for newline in ["\n", "\r\n", "\r"] {
         let source = format!("// 😀e\u{301}{newline}{newline}val `δ 😀` = 1{newline}{newline}");
         let parsed = check(
@@ -450,6 +459,7 @@ fn baseline_original_unicode_newlines_backticks_and_eof() {
 
 #[test]
 fn snapshots_reject_changed_revision_document_kind_and_reused_identity() {
+    let _functional = functional::serial();
     let original =
         SourceSnapshot::new("document-incarnation-1", 4, FileKind::Source, "val x=1\r\n").unwrap();
     let accepted = parser()
@@ -496,6 +506,7 @@ fn snapshots_reject_changed_revision_document_kind_and_reused_identity() {
 
 #[test]
 fn token_loss_still_rejects_coverage_and_allows_healthy_followup() {
+    let _functional = functional::serial();
     assert_eq!(
         parser()
             .parse(
@@ -521,6 +532,7 @@ fn token_loss_still_rejects_coverage_and_allows_healthy_followup() {
 
 #[test]
 fn malformed_parameter_lists_restore_original_snapshot_declarations() {
+    let _functional = functional::serial();
     for newline in ["\n", "\r\n", "\r"] {
         for (prefix, suffix, outer_kind, immediate_parent) in [
             ("", "", None, "KT_FILE"),
@@ -601,6 +613,7 @@ fn malformed_parameter_lists_restore_original_snapshot_declarations() {
 
 #[test]
 fn repeated_parameter_recovery_retains_annotation_prefix_and_eof() {
+    let _functional = functional::serial();
     let source = "fun broken(x: Int,\n@A public fun second(\ntypealias Later = String";
     let snapshot = SourceSnapshot::new("repeated-recovery", 3, FileKind::Source, source).unwrap();
     let result = parser()
@@ -653,6 +666,7 @@ fn repeated_parameter_recovery_retains_annotation_prefix_and_eof() {
 
 #[test]
 fn valid_parameter_contexts_preserve_default_declarations() {
+    let _functional = functional::serial();
     let source = "fun f(x: () -> Int = fun(): Int { val local = 1; return local }, y: Any = object { val member = 2 }) {}";
     let snapshot = SourceSnapshot::new("nested-defaults", 1, FileKind::Source, source).unwrap();
     let result = parser()
@@ -757,6 +771,7 @@ fn valid_parameter_contexts_preserve_default_declarations() {
 
 #[test]
 fn malformed_member_parameters_preserve_initializers_and_constructors() {
+    let _functional = functional::serial();
     let source =
         "class C { fun broken(\ninit { val local = 1 }\nconstructor() {}\nfun healthy() = 2\n}";
     let snapshot = SourceSnapshot::new("member-recovery", 1, FileKind::Source, source).unwrap();
@@ -831,6 +846,7 @@ fn malformed_member_parameters_preserve_initializers_and_constructors() {
 
 #[test]
 fn unclosed_classifier_generics_restore_named_sibling_snapshots() {
+    let _functional = functional::serial();
     for newline in ["\n", "\r\n", "\r"] {
         for (prefix, suffix, outer_kind, immediate_parent) in [
             ("", "", None, "KT_FILE"),
@@ -908,6 +924,7 @@ fn unclosed_classifier_generics_restore_named_sibling_snapshots() {
 
 #[test]
 fn generic_recovery_uses_header_grammar_without_newline_dependency() {
+    let _functional = functional::serial();
     for (separator, healthy, name, offset) in [
         ("\n", "fun healthy() = 2", "healthy", 4),
         (" ", "fun healthy() = 2", "healthy", 4),
@@ -935,6 +952,7 @@ fn generic_recovery_uses_header_grammar_without_newline_dependency() {
 
 #[test]
 fn valid_classifier_generics_and_nonclass_callers_are_preserved() {
+    let _functional = functional::serial();
     for (source, kind, name, offset, class_extent, parent, owner) in [
         (
             "class Box<\n @A out T : Map<String, List<Int>>,\n get : Comparable<get>,\n> where T : Any\nfun healthy() = 2",
@@ -1038,6 +1056,7 @@ fn valid_classifier_generics_and_nonclass_callers_are_preserved() {
 
 #[test]
 fn failed_generic_probes_preserve_type_parameters_and_existing_recovery() {
+    let _functional = functional::serial();
     for source in [
         "class Box<@A(1 < 2) public : Any>\nfun healthy() = 2",
         "class Box<public, private : Map<String, Int>>\nfun healthy() = 2",

@@ -1,0 +1,102 @@
+{
+  "stage": "independent preimplementation literal freeze; runtime validation pending",
+  "base": {
+    "head": "45619398c7d8d5ca7b59acc5178acb4b208a67ee",
+    "tree": "7049d191752446b7b696e27c4d08ac12a93798fc",
+    "sole_parent": "0007ac79eefc0771f06c26596f81baeaf5379312",
+    "branch": "codex/t018-type-argument-types-contract",
+    "clean": true
+  },
+  "contract_sha256": "027a11442a9e8ec35dc96d6daefe6ee15b8771953012628d85e40a870510a4f7",
+  "expectations_sha256": "86425365e8d8270e6f4b35137566bfdfb023dccfcf2a4ed139d993051f7c5c92",
+  "genuine_inputs": {
+    "crates/ktlsp-binary/tests/fixtures/metadata_type_argument/Pair.class.bin": {
+      "sha256": "8fed0fa88eb2df5723812a95330dee6bc91fd66b13906acb7906f9a813da9736",
+      "bytes": 2983,
+      "matches_initial9b": true
+    },
+    "crates/ktlsp-binary/tests/fixtures/metadata_type_argument/PAIR_EXTRACTION.json": {
+      "sha256": "3408eaa6c1bbf2a1d7b643853b753fb86c6c3c54ad973296b5d3b6241f13638e",
+      "bytes": 1688,
+      "matches_initial9b": true
+    },
+    "crates/ktlsp-binary/tests/fixtures/metadata_type_argument/LICENSE.txt": {
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "bytes": 11358,
+      "matches_initial9b": true
+    },
+    "crates/ktlsp-binary/tests/fixtures/metadata_type_argument/NOTICE.txt": {
+      "sha256": "0b09a83d3ef7795c7dec65e815866597c066c53898f2852a76599b8f5552941a",
+      "bytes": 482,
+      "matches_initial9b": true
+    },
+    "crates/ktlsp-binary/tests/fixtures/metadata_type_argument/PROTOBUF_LICENSE.txt": {
+      "sha256": "2f706d67271d8db967046638e30f7887a5ba6e49593e6395e8145a7c9feab96a",
+      "bytes": 1659,
+      "matches_initial9b": true
+    },
+    "crates/ktlsp-binary/tests/fixtures/metadata_type_argument/selected.hex": {
+      "sha256": "1321a5e1a82561127ca8661a0c0da54b18186874f07aff83e650d0a356e8d6d7",
+      "bytes": 24,
+      "matches_initial9b": true
+    },
+    "crates/ktlsp-binary/tests/fixtures/metadata_type_argument/duplicates.hex": {
+      "sha256": "1378a4c69bea4c6b51f0e490ef5f934866876068ff2591833c2b46fc2d025e53",
+      "bytes": 90,
+      "matches_initial9b": true
+    }
+  },
+  "literal_bytes": {
+    "empty": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "empty_inline": {
+      "bytes": 2,
+      "sha256": "08da7c45cb204377e7e42249cda5713fa865116ddbb4cb5a1949b2e5b438a6ab"
+    },
+    "pair0": {
+      "bytes": 4,
+      "sha256": "8d58868569815b00d2b4632755f35d9a5036e496daf861e1c3bf13f998d1e1ab"
+    },
+    "pair1": {
+      "bytes": 4,
+      "sha256": "924f4ca2c481529a0a3184a903824f7ba41990d7a37222caf145f88d14ed1ee3"
+    },
+    "selected": {
+      "bytes": 8,
+      "sha256": "3e5fc4e1391d5c0b46098e68fa4af3ec06fa9ce868b8bec1582f9f8270e847e7"
+    },
+    "duplicates": {
+      "bytes": 30,
+      "sha256": "607bc119fcb0cf438809e04d1593bb32881d267b0c0c424cfc00a3c91bbc5b97"
+    },
+    "repeated": {
+      "bytes": 8,
+      "sha256": "f2da589c44bf9248571e20b8c16a2681edbc84208d80cbdcf8af692c81b17666"
+    },
+    "wrong_wire": {
+      "bytes": 8,
+      "sha256": "ede9838d5ebf47c832b3f3ba92abc374af16e03a6e06ca8795dac33df77771a6"
+    },
+    "opaque_nested": {
+      "bytes": 6,
+      "sha256": "cd1d8d9e238df8c3a60609d59c8f3018e48c58047d700002ec5670fb24bf5429"
+    },
+    "opaque_extension": {
+      "bytes": 7,
+      "sha256": "57cd59d41c4d75978a8509fe372053123e01faf26263faa70f649c3ad5e664aa"
+    },
+    "child_wrong_wire": {
+      "bytes": 5,
+      "sha256": "f818e4d1f261bc1e9217ca53d60653a5845ed296caf3dab88e65d7d7e5a4852f"
+    },
+    "nonminimal_empty": {
+      "bytes": 4,
+      "sha256": "42334504b148f1ce9de98ca63bdd4c7d3948783a87ae1e5764390c467011ddf3"
+    }
+  },
+  "compiler_provenance": "UNVERIFIED; existing distribution pin is not compiler proof",
+  "schema": "Kotlin v2.3.20 d57eb4a26ed01ab03cf195da686c8047032ff16f; metadata.proto a08e508cc7d98cc225e8b0df7290724b545a0250f7d9c91460cfc1244a3c08e2, ProtoBuf.java da7fa6f03c1afa3499086cb5a1f92471e3f327c8f43298ea8d9548b7e4753716",
+  "no_native_JVM_oracle_or_encoder_execution": true
+}

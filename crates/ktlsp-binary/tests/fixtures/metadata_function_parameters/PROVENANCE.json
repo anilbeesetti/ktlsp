@@ -1,0 +1,104 @@
+{
+  "stage": "committed data reused only; no product/compiler/JVM/oracle execution",
+  "source_file": "crates/ktlsp-binary/tests/fixtures/metadata_constructor/PAIR_EXTRACTION.json",
+  "source_sha256": "72b7caa3f873e076e305d0853b7432c5a909af2a94969181dd9103c94f237267",
+  "artifact": "org.jetbrains.kotlin:kotlin-stdlib:2.3.20",
+  "origin": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.3.20/kotlin-stdlib-2.3.20.jar",
+  "jar_sha256": "0ae12504a5040ebaf37703908483420d1a5624dd1d93f357665f8c77c848a01e",
+  "class_file": "crates/ktlsp-binary/tests/fixtures/metadata_constructor/Pair.class.bin",
+  "class_sha256": "8fed0fa88eb2df5723812a95330dee6bc91fd66b13906acb7906f9a813da9736",
+  "class_size": 2983,
+  "d1_sha256": "a4c2bf2d0bcd52aac574d156b413e3926cec249c5c2a23259d126c68872afa8e",
+  "d1_size": 285,
+  "d1_cp_index": 89,
+  "mutf8_class_span": [
+    1276,
+    1599
+  ],
+  "class_d1_span": [
+    47,
+    285
+  ],
+  "compiler_provenance": "UNVERIFIED; distribution version is not compiler proof",
+  "functions": [
+    {
+      "fixture": "pair_copy.hex",
+      "field_d1_span": [
+        149,
+        198
+      ],
+      "body_d1_span": [
+        151,
+        198
+      ],
+      "body_class_span": [
+        104,
+        151
+      ],
+      "body_hex": "10 11 1a 0e 12 04 12 02 38 00 12 04 12 02 38 01 30 00 32 08 08 02 10 05 1a 02 38 00 32 08 08 02 10 06 1a 02 38 01 48 c6 81 04 a2 06 02 10 12",
+      "body_sha256": "5dae1b1ea1af2eb8c2689cbed584990e9c7fb4c5c9241c24f464566976923185",
+      "children": [
+        {
+          "body_function_span": [
+            20,
+            28
+          ],
+          "body_d1_span": [
+            171,
+            179
+          ],
+          "hex": "08 02 10 05 1a 02 38 00",
+          "sha256": "5e69b3242098f8535003d243576d62ef47247230f446879185e9e4c2ea46202d"
+        },
+        {
+          "body_function_span": [
+            30,
+            38
+          ],
+          "body_d1_span": [
+            181,
+            189
+          ],
+          "hex": "08 02 10 06 1a 02 38 01",
+          "sha256": "b88c7e0ce72ae86e3b7625ab22561b679d01800b00d1ab3cd41398a4082ee54c"
+        }
+      ]
+    },
+    {
+      "fixture": "pair_equals.hex",
+      "field_d1_span": [
+        198,
+        220
+      ],
+      "body_d1_span": [
+        200,
+        220
+      ],
+      "body_class_span": [
+        153,
+        173
+      ],
+      "body_hex": "10 13 1a 02 30 14 32 08 10 15 1a 04 18 01 30 16 48 d6 83 04",
+      "body_sha256": "9d7f74ccf4b1023c8a2a4e5e5f45981c3ac64b2a245dcecb9c0d94958487205c",
+      "children": [
+        {
+          "body_function_span": [
+            8,
+            16
+          ],
+          "body_d1_span": [
+            208,
+            216
+          ],
+          "hex": "10 15 1a 04 18 01 30 16",
+          "sha256": "6917475acfa9301dd4d688d04c0fc5a998424f629e4a3be289fab41018f56b33"
+        }
+      ]
+    }
+  ],
+  "notices": {
+    "LICENSE.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "NOTICE.txt": "0b09a83d3ef7795c7dec65e815866597c066c53898f2852a76599b8f5552941a",
+    "PROTOBUF_LICENSE.txt": "2f706d67271d8db967046638e30f7887a5ba6e49593e6395e8145a7c9feab96a"
+  }
+}

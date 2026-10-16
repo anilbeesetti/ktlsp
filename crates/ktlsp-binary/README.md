@@ -60,6 +60,49 @@ bytes matching member SHA-256
 `e288160745c56dff019f2af9393039558018308de89509bdd81a8535bfa9b03d`.
 This proof is classfile data consumption, not JVM verification or LSP parity.
 
+## Ordered archive class lookup (#353 / 330/17/7)
+
+`class_path::lookup_class(&roots, internal_name, java_release, &mut scratch)`
+queries borrowed `ClasspathRoot::Jar(&ZipDirectoryIndex)` and
+`ClasspathRoot::Jmod(&JmodDirectoryIndex)` values in caller-specified order.
+No caller ordinal, repeated indexing or owning self-reference is required.
+`None` means missing; the first matching root wins, retaining its index,
+central ordinal and `ClassRank`. Duplicate entries at the winning rank are
+ambiguous. Selected CRC/payload/class/name/version failures never fall through
+to an older version or a later root. Declared `this_class` UTF-16 must exactly
+match the requested Unicode scalar name, without normalization or replacement.
+Names are bounded UTF-8 JVM internal names; empty segments, controls, dot,
+semicolon, array prefix, backslash and colon are rejected. Archive names are
+compared as exact UTF-8 bytes, not platform paths or legacy code-page strings.
+
+JAR selection follows the [primary JAR specification](https://docs.oracle.com/en/java/javase/23/docs/specs/jar/jar.html)
+and [JEP 238](https://openjdk.org/jeps/238): only a well-formed actual manifest
+main section with case-insensitive `Multi-Release: true` (no value whitespace)
+enables versioning. CRLF/LF/CR and continued UTF-8 values are supported;
+`Manifest-Version` is required first in its specified case, headers are unique
+case-insensitively, physical lines are at most 72 bytes, values at most 65,535
+bytes, and the main section ends with an empty line. Named sections are ignored.
+Malformed/duplicate manifests error rather than silently enabling/disabling MR.
+Manifest archive names are found case-insensitively; multiple candidates error.
+The highest canonical decimal `N >= 9` not exceeding the explicit Java feature
+release wins, then base; `META-INF` contents are not versioned. Versioned classes
+must have major <= N+44; base/JMOD major <= requested release+44. Existing
+unsupported class versions/minors remain unsupported, not disguised as missing.
+JMOD queries only `classes/name.class` and never consult manifests or MR areas.
+
+Whole-query metadata preflight precedes allocation: at most 64 roots, 65,536
+aggregate entries, 16 MiB aggregate scanned name bytes (three bounded passes),
+256 KiB each manifest compressed/decoded size and 1 MiB aggregate manifest
+compressed+decoded sizes. Main sections allow at most 4,096 headers, with
+bounded temporary header/value storage. Selected payload and class output/work
+retain the existing archive/class-reader ceilings. Only one class is returned.
+Tests use unchanged genuine Commons Lang Builder and its Java 9 MR
+`module-info.class`; adversarial archives/classfiles are independently authored
+data. Nothing runs Java, reads paths, extracts files, follows manifest
+`Class-Path`, validates signatures, resolves modules or verifies API equivalence.
+This is ROOT/data-only groundwork, not SDK integration, JVM verification,
+semantic classpath resolution or full official Kotlin LSP parity.
+
 ## Encoded method type annotations
 
 `method_type_annotations::decode` composes declaration/extension/field data with all six legal method targets (0x01, 0x12, 0x14, 0x15, 0x16, 0x17), sharing one annotation budget. `target_type` retains the raw tag and `target_info: MethodTargetInfo` retains fixed-width indices. **Breaking API change:** `formal_parameter_index` was removed; formal-parameter data is now `MethodTargetInfo::FormalParameter(index)`. External field reads/literals/patterns and derived Debug/layout/size can change.

@@ -4,6 +4,7 @@ pub mod annotation_extensions;
 pub mod archive;
 pub use archive::{ZipClassError, parse_zip_class};
 pub mod annotations;
+pub mod class_path;
 pub mod class_type_annotations;
 pub mod code;
 pub mod code_type_annotations;

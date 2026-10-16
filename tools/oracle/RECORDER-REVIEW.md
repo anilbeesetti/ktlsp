@@ -65,6 +65,17 @@ enforcement and every denial probe on Linux, and refusal-only assertions on
 macOS. All three reviewers rechecked that source correction clear, without
 executing checks. Neither diagnostic was suppressed.
 
+The corrected `fc48aac560d6258884d4529f133a32f2831d936d` source passed optional
+format checking, strict locked all-target Clippy and the complete optional
+suite on macOS: 61 ordinary cases plus both isolated helper invocations.
+The confinement driver reported `ABI=None`, refusal, no child entry and no
+exercised denials; this is unsupported-platform refusal evidence only. The
+Rust synthetic recorder-to-`Evidence::load`/replay smoke also passed and remains
+explicitly nonofficial. A hosted Linux result must positively exercise ABI>=6,
+`ENFORCED`, same-UID direct-child and detached-exec-descendant denials; setup
+refusal cannot satisfy that test. Neither result substitutes for protected
+same-image calibration or an admitted official launch and authenticated receiver.
+
 ## #331 prior finite protected adapter source
 
 This source adds the fixed PR174 entrypoint and private official configuration

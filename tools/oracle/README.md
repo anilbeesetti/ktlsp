@@ -470,7 +470,9 @@ The nine ordinary finite cases each have their own protected artifact and
 unique fixed `PR174 receipt CASE` step. Cancellation preparation first proves
 the actual original peer and outside-step supervisor are active. Readiness is
 a protected host-root `calibration-observer-ready.json` receipt, not a marker
-under the UID65532-owned state mount. The preparation and timed commands both
+under the UID65532-owned state mount. Its complete synced staging file is
+published by atomic no-replace hard-link creation and staging unlink; concurrent
+publishers cannot overwrite the winner or expose partial JSON. The preparation and timed commands both
 join original live init/service PID-start identities, exact CID/daemon, armed
 clock and a finite one-minute reserve. Only then does the independently named
 `PR174 runner timeout calibration` step run a finite foreground wait, with

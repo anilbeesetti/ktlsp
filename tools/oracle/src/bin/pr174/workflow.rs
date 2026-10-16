@@ -272,10 +272,14 @@ fn workflow_publish_calibration_ready(dir: &Path, a: &Admission, b: &Binding, id
 }
 fn wf_publish_readiness_file(e: &mut Evidence, dir: &Path, ready: &WorkflowCancellationReady) -> Result<()> {
     let final_path = dir.join("calibration-observer-ready.json");
-    wf_require(!final_path.try_exists().map_err(|error| error.to_string())?, "readiness already published; no replacement")?;
     let next = dir.join("calibration-observer-ready.next");
     side_json(e,&next,ready)?;
-    fs::rename(next,final_path).map_err(|error| error.to_string())
+    wf_link_readiness_file(&next,&final_path)
+}
+fn wf_link_readiness_file(next: &Path, final_path: &Path) -> Result<()> {
+    // Link creation is an atomic no-replace publication, including concurrent publishers.
+    fs::hard_link(next,final_path).map_err(|error| error.to_string())?;
+    fs::remove_file(next).map_err(|error| error.to_string())
 }
 fn wf_verify_cancellation_ready(dir: &Path) -> Result<()> {
     let ready:WorkflowCancellationReady=load(&dir.join("calibration-observer-ready.json"))?;
@@ -913,7 +917,32 @@ mod workflow_source_tests {
         wf_publish_readiness_file(&mut evidence,&dir,&ready).unwrap();
         assert!(!next.exists());
         assert_eq!(fs::read(&final_path).unwrap(),wf_json(&ready).unwrap());
-        assert!(wf_publish_readiness_file(&mut evidence,&dir,&ready).is_err());
+        let mut replacement=ready;
+        replacement.nonce="c".repeat(64);
+        assert!(wf_publish_readiness_file(&mut evidence,&dir,&replacement).is_err());
+        let published:WorkflowCancellationReady=parse(&fs::read(&final_path).unwrap()).unwrap();
+        assert_eq!(published.nonce,"a".repeat(64));
+        assert_eq!(fs::read(&next).unwrap(),wf_json(&replacement).unwrap());
+        fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn synthetic_concurrent_completed_publishers_cannot_replace_the_winner() {
+        let unique=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let dir=std::env::temp_dir().join(format!("ktlsp-workflow-concurrent-{}-{unique}",std::process::id()));
+        fs::create_dir(&dir).unwrap();
+        let barrier=std::sync::Arc::new(std::sync::Barrier::new(2));
+        let final_path=dir.join("calibration-observer-ready.json");
+        let mut publishers=Vec::new();
+        for (name,bytes) in [("a.next",b"{\"complete\":\"a\"}".as_slice()),("b.next",b"{\"complete\":\"b\"}".as_slice())] {
+            let next=dir.join(name);make_file(&next,bytes,0o600).unwrap();
+            let final_path=final_path.clone();let barrier=barrier.clone();
+            publishers.push(std::thread::spawn(move || {barrier.wait();wf_link_readiness_file(&next,&final_path)}));
+        }
+        let successes=publishers.into_iter().map(|publisher|publisher.join().unwrap().is_ok()).filter(|success|*success).count();
+        assert_eq!(successes,1);
+        let final_bytes=fs::read(&final_path).unwrap();
+        assert!(final_bytes==b"{\"complete\":\"a\"}"||final_bytes==b"{\"complete\":\"b\"}");
+        assert_eq!(usize::from(dir.join("a.next").exists())+usize::from(dir.join("b.next").exists()),1);
         fs::remove_dir_all(dir).unwrap();
     }
 }

@@ -13,6 +13,8 @@ pub use super::package_member_names::Limits;
 pub enum Classifier {
     /// Checked ordinal in THIS result's original Class declarations, not an encoded ID.
     ClassParameter(usize),
+    /// Checked ordinal in THIS selected Function's original own declarations.
+    FunctionParameter(usize),
     /// Resolver-derived nominal identity, not a loaded class or global symbol ID.
     Class(class_id::ClassId),
 }
@@ -54,6 +56,7 @@ pub struct Function<'a> {
     pub body_span: Range<usize>,
     pub header: function_header::FunctionHeader<'a>,
     pub name: Vec<u16>,
+    pub type_parameters: Vec<Parameter<'a>>,
     pub parameters: Vec<ValueParameter<'a>>,
 }
 #[derive(Debug, PartialEq, Eq)]
@@ -73,7 +76,6 @@ pub enum ErrorKind {
     MissingOrdinal,
     NotFunction,
     UnsupportedFunction,
-    UnsupportedTypeParameters,
     UnsupportedParameter,
     UnsupportedVararg,
     MissingRole,
@@ -81,6 +83,8 @@ pub enum ErrorKind {
     DuplicateInlineRole,
     UnsupportedType,
     UnknownParameterId,
+    UnknownParameterName,
+    AmbiguousParameterName,
 }
 /// Decoded-d1-relative offsets; errors expose no partial declarations/context.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -115,6 +119,7 @@ fn classifier(
     header: &type_header::TypeHeader<'_>,
     start: usize,
     context: &class_context::Context<'_>,
+    own: &[Parameter<'_>],
     resolver: &mut name_resolver::Resolver<'_, '_>,
     budget: &mut string_table::Budget,
 ) -> Result<Classifier, Error> {
@@ -127,7 +132,7 @@ fn classifier(
         let offset = start + field.span.start;
         budget.wire.work(1, offset)?;
         match (field.number, field.value) {
-            (1 | 3 | 6 | 7, wire::Value::Varint(_)) => {}
+            (1 | 3 | 6 | 7 | 9, wire::Value::Varint(_)) => {}
             (1..=14, _) => return Err(failure(offset, ErrorKind::UnsupportedType)),
             _ => {}
         }
@@ -135,16 +140,26 @@ fn classifier(
     if header.flags.unwrap_or(0) != 0 {
         return Err(failure(start, ErrorKind::UnsupportedType));
     }
-    match (header.class_name, header.type_parameter) {
-        (Some(index), None) => {
+    match (
+        header.class_name,
+        header.type_parameter,
+        header.type_parameter_name,
+    ) {
+        (Some(index), None, None) => {
             let id = class_id::resolve(index, start, resolver, budget).map_err(|e| match e {
                 class_id::Error::Wire(e) => Error::from(e),
                 class_id::Error::Name(e) => failure(start, ErrorKind::Name(e)),
             })?;
             Ok(Classifier::Class(id))
         }
-        (None, Some(id)) => {
-            // ponytail: bounded linear ID lookup; no duplicate owning declaration index.
+        (None, Some(id), None) => {
+            // ponytail: bounded linear scoped lookup; no secondary owning index.
+            for (ordinal, parameter) in own.iter().enumerate() {
+                budget.wire.work(1, start)?;
+                if parameter.parameter.id == id {
+                    return Ok(Classifier::FunctionParameter(ordinal));
+                }
+            }
             for (ordinal, parameter) in context.parameters.iter().enumerate() {
                 budget.wire.work(1, start)?;
                 if parameter.parameter.id == id {
@@ -152,6 +167,35 @@ fn classifier(
                 }
             }
             Err(failure(start, ErrorKind::UnknownParameterId))
+        }
+        (None, None, Some(index)) => {
+            let query = resolver
+                .get_string_with_budget(index, budget)
+                .map_err(|e| failure(start, ErrorKind::Name(e)))?;
+            let mut found = None;
+            for (ordinal, parameter) in own.iter().enumerate() {
+                budget.wire.work(1, start)?;
+                if query.len() != parameter.name.len() {
+                    continue;
+                }
+                let mut equal = true;
+                for (left, right) in query.iter().zip(&parameter.name) {
+                    budget.wire.work(1, start)?;
+                    if left != right {
+                        equal = false;
+                        break;
+                    }
+                }
+                if equal {
+                    if found.is_some() {
+                        return Err(failure(start, ErrorKind::AmbiguousParameterName));
+                    }
+                    found = Some(ordinal);
+                }
+            }
+            found
+                .map(Classifier::FunctionParameter)
+                .ok_or(failure(start, ErrorKind::UnknownParameterName))
         }
         _ => Err(failure(start, ErrorKind::UnsupportedType)),
     }
@@ -162,6 +206,7 @@ fn parameter<'a>(
     span: Range<usize>,
     ordinal: usize,
     context: &class_context::Context<'_>,
+    own: &[Parameter<'_>],
     resolver: &mut name_resolver::Resolver<'_, '_>,
     budget: &mut string_table::Budget,
 ) -> Result<ValueParameter<'a>, Error> {
@@ -202,7 +247,7 @@ fn parameter<'a>(
     budget.node(2, type_start)?;
     let header = type_header::decode_with_budget(ty, &mut budget.wire)
         .map_err(|e| wire_error(type_start, e))?;
-    let classifier = classifier(&header, type_start, context, resolver, budget)?;
+    let classifier = classifier(&header, type_start, context, own, resolver, budget)?;
     let name = resolver
         .get_string_with_budget(raw.name, budget)
         .map_err(|e| failure(start, ErrorKind::Name(e)))?;
@@ -220,8 +265,9 @@ fn parameter<'a>(
 
 /// Select one original field9/wire2 by ALL-Class-field ordinal from the SAME Outcome.
 /// Every field6 value declaration is interpreted in order; unsupported types never
-/// disappear from the list. Inline type3 beats type-ID5; duplicate messages, table-only
-/// roles, Function-local parameters, name classifiers and vararg roles refuse.
+/// disappear from the list. Inline type3 beats type-ID5; duplicate messages,
+/// table-only roles and vararg roles refuse. ID searches own then Class declarations;
+/// NAME requires exactly one matching own resolved UTF-16 name, never a parent.
 /// Nullable presence is encoded marking, not effective bound-derived nullability.
 /// Return/receiver/context/contracts/JVM extensions and parent TypeTables stay opaque.
 /// One monotonic d1+d2/schema/wire/name/output allowance covers the entire operation.
@@ -261,7 +307,8 @@ pub fn decode<'a>(
     budget.node(2, start)?;
     let function_header = function_header::decode_with_budget(body, &mut budget.wire)
         .map_err(|e| failure(start + e.offset, ErrorKind::Function(e.kind)))?;
-    // Finish scope/shape admission BEFORE interpreting values through the Class scope.
+    // Finish ALL own declarations BEFORE interpreting any value, including late fields.
+    let mut type_parameters = Vec::new();
     let mut pos = 0;
     while pos < body.len() {
         let field = wire::field(body, &mut pos, body.len(), &mut budget.wire)
@@ -270,8 +317,19 @@ pub fn decode<'a>(
         budget.wire.work(1, offset)?;
         match (field.number, field.value) {
             (1 | 2 | 9, wire::Value::Varint(_)) | (6, wire::Value::Bytes(_)) => {}
-            (4, _) => return Err(failure(offset, ErrorKind::UnsupportedTypeParameters)),
-            (1 | 2 | 6 | 9, _) => return Err(failure(offset, ErrorKind::UnsupportedFunction)),
+            (4, wire::Value::Bytes(raw)) => {
+                class_context::push_parameter(
+                    raw,
+                    start + field.span.end - raw.len()..start + field.span.end,
+                    offset,
+                    &mut type_parameters,
+                    &mut resolver,
+                    &mut budget,
+                )?;
+            }
+            (1 | 2 | 4 | 6 | 9, _) => {
+                return Err(failure(offset, ErrorKind::UnsupportedFunction));
+            }
             _ => {}
         }
     }
@@ -291,6 +349,7 @@ pub fn decode<'a>(
                 offset..start + field.span.end,
                 parameters.len(),
                 &context,
+                &type_parameters,
                 &mut resolver,
                 &mut budget,
             )?;
@@ -306,6 +365,7 @@ pub fn decode<'a>(
             body_span: start..start + body.len(),
             header: function_header,
             name,
+            type_parameters,
             parameters,
         },
     })

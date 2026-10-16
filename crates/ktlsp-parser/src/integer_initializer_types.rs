@@ -98,6 +98,9 @@ fn infer_with_budget<'a>(
         if node.parent != Some(target_index) {
             return Err(IntegerInitializerError::UnsupportedContext);
         }
+        if !after_eq && (!node.token || budget.equal(&node.kind, "COLON")?) {
+            return Err(IntegerInitializerError::UnsupportedContext);
+        }
         if after_eq && !node.token {
             if budget.equal(&node.kind, "REFERENCE_EXPRESSION")? {
                 return Err(IntegerInitializerError::ReferenceInitializer);

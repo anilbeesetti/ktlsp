@@ -613,6 +613,7 @@ enum Tag {
     Parameters,
     Integer,
     Reference,
+    TypeReference,
     Error,
 }
 impl Tag {
@@ -629,7 +630,7 @@ impl Tag {
     }
 }
 fn tag(text: &str, i: usize, b: &mut Budget) -> Result<Tag> {
-    const TAGS: [(&str, Tag); 12] = [
+    const TAGS: [(&str, Tag); 13] = [
         ("KT_FILE", Tag::Root),
         ("PACKAGE_DIRECTIVE", Tag::Package),
         ("IMPORT_LIST", Tag::Imports),
@@ -641,6 +642,7 @@ fn tag(text: &str, i: usize, b: &mut Budget) -> Result<Tag> {
         ("VALUE_PARAMETER_LIST", Tag::Parameters),
         ("INTEGER_CONSTANT", Tag::Integer),
         ("REFERENCE_EXPRESSION", Tag::Reference),
+        ("TYPE_REFERENCE", Tag::TypeReference),
         ("ERROR_ELEMENT", Tag::Error),
     ];
     for (word, _) in TAGS {
@@ -670,6 +672,7 @@ struct Frame<'a> {
     emitted: bool,
     plain: u8,
     reference: bool,
+    annotated: bool,
 }
 impl Frame<'_> {
     const EMPTY: Self = Self {
@@ -687,6 +690,7 @@ impl Frame<'_> {
         emitted: false,
         plain: 0,
         reference: false,
+        annotated: false,
     };
 }
 const _: () = assert!(size_of::<Frame<'static>>() <= 128);
@@ -970,6 +974,28 @@ fn header_reference(
     header_segment(p, i + 1, token, counts, b)?;
     Ok(())
 }
+
+// Retained annotation syntax only. The producer's single unqualified user-type
+// path must be exact; value-reference ancestry is never activated by this path.
+fn simple_annotation(p: &Parsed, i: usize, b: &mut Budget) -> Result<()> {
+    let annotation = element(p, i, b)?;
+    let mut cursor = i + 1;
+    let (user_i, user) = header_expect(p, &mut cursor, annotation.subtree_end, b)?;
+    if user.token
+        || !b.equal(&user.kind, "USER_TYPE")?
+        || header_child(p, &mut cursor, annotation.subtree_end, b)?.is_some()
+    {
+        return Err(unsupported(i));
+    }
+    let mut cursor = user_i + 1;
+    let (reference_i, reference) = header_expect(p, &mut cursor, user.subtree_end, b)?;
+    let mut counts = Counts::default();
+    header_reference(p, reference_i, reference, &mut counts, b)?;
+    if header_child(p, &mut cursor, user.subtree_end, b)?.is_some() {
+        return Err(unsupported(i));
+    }
+    Ok(())
+}
 fn header_name<'a>(
     p: &'a Parsed,
     index: usize,
@@ -1167,6 +1193,9 @@ fn close_frames<'a>(
         {
             return Err(unsupported(f.index));
         }
+        if pass != Pass::Structure && f.annotated && f.plain != 4 {
+            return Err(unsupported(f.index));
+        }
         if pass != Pass::Structure {
             b.work(1)?;
             let complete = f.plain
@@ -1207,6 +1236,7 @@ fn context(t: Tag, parent: Option<Frame<'_>>, i: usize) -> Result<()> {
         Tag::Block | Tag::Parameters => p == Some(Tag::Fun),
         Tag::Integer => matches!(p, Some(Tag::Fun | Tag::Property)),
         Tag::Reference => p == Some(Tag::Property),
+        Tag::TypeReference => p == Some(Tag::Property),
         Tag::Error => p.is_some() && !matches!(p, Some(Tag::Package | Tag::Imports)),
     };
     if !allowed {
@@ -1312,11 +1342,19 @@ fn token<'a>(
                 f.emitted = true;
             }
         } else if !matches!(f.tag, Tag::Fun | Tag::Property)
-            || !b.one_of(&e.kind, &["EQ", "SEMICOLON"])?
+            || !(b.one_of(&e.kind, &["EQ", "SEMICOLON"])?
+                || (f.tag == Tag::Property && b.equal(&e.kind, "COLON")?))
         {
             return Err(unsupported(i));
+        } else if f.tag == Tag::Property && b.equal(&e.kind, "COLON")? {
+            if f.plain != 2 {
+                return Err(unsupported(i));
+            }
+            f.annotated = true;
+            plain_step(&mut f, 2, 5, b)?;
         } else if f.tag == Tag::Property && b.equal(&e.kind, "EQ")? {
-            plain_step(&mut f, 2, 3, b)?;
+            let expected = if f.annotated { 6 } else { 2 };
+            plain_step(&mut f, expected, 3, b)?;
         } else {
             f.plain = u8::MAX;
         }
@@ -1455,6 +1493,22 @@ fn walk<'a>(
         };
         if pass != Pass::Structure {
             context(t, parent, i)?;
+            if t == Tag::TypeReference {
+                let mut property = parent.ok_or(unsupported(i))?;
+                if depth != 4
+                    || frame(s, 0, b)?.tag != Tag::Root
+                    || frame(s, 1, b)?.tag != Tag::Fun
+                    || frame(s, 2, b)?.tag != Tag::Block
+                    || property.plain != 5
+                {
+                    return Err(unsupported(i));
+                }
+                simple_annotation(p, i, b)?;
+                plain_step(&mut property, 5, 6, b)?;
+                put_frame(s, depth - 1, property, b)?;
+                skip_until = e.subtree_end;
+                continue;
+            }
             if matches!(t, Tag::Package | Tag::Imports) {
                 if (t == Tag::Package && header_phase != 0)
                     || (t == Tag::Imports && header_phase > 1)
@@ -1923,6 +1977,13 @@ mod tests {
     }
 
     fn binding_fixture(bodies: &[&[(&str, Option<&str>)]]) -> SnapshotResult {
+        binding_fixture_with_annotations(bodies, false)
+    }
+
+    fn binding_fixture_with_annotations(
+        bodies: &[&[(&str, Option<&str>)]],
+        annotated: bool,
+    ) -> SnapshotResult {
         let mut tree = Tree::new();
         for body in bodies {
             tree.header("f");
@@ -1937,6 +1998,16 @@ mod tests {
                 tree.token("VAL_KEYWORD", "val");
                 tree.token("WHITE_SPACE", " ");
                 tree.token("IDENTIFIER", name);
+                if annotated {
+                    tree.token("COLON", ":");
+                    tree.open("TYPE_REFERENCE");
+                    tree.open("USER_TYPE");
+                    tree.open("REFERENCE_EXPRESSION");
+                    tree.token("IDENTIFIER", "Long");
+                    tree.close();
+                    tree.close();
+                    tree.close();
+                }
                 tree.token("EQ", "=");
                 tree.open(if reference.is_some() {
                     "REFERENCE_EXPRESSION"
@@ -2234,38 +2305,43 @@ mod tests {
         };
         // Synthetic tree tests accounting only; production behavior is asserted
         // separately in tests/local_value_occurrences.rs using the real worker.
-        let result = binding_fixture(&[&[("x", None), ("a", Some("x")), ("b", Some("x"))]]);
-        let lower = lower(&result).unwrap();
-        let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
-        let target = &lower.declarations()[1];
-        let mut b = ReferenceBudget::default();
-        assert_eq!(
-            occurrences_with_budget(&directory, &result, target, result.snapshot(), &mut b)
-                .unwrap()
-                .occurrences()
-                .len(),
-            2
-        );
-        let mut exact = ReferenceBudget {
-            work: WORK - b.work,
-        };
-        occurrences_with_budget(&directory, &result, target, result.snapshot(), &mut exact)
-            .unwrap();
-        assert_eq!(exact.work, WORK);
-        // Failure after earlier candidates were processed cannot publish a prefix.
-        for work in [WORK - b.work + 1, usize::MAX] {
-            let mut exhausted = ReferenceBudget { work };
-            assert_eq!(
-                occurrences_with_budget(
-                    &directory,
-                    &result,
-                    target,
-                    result.snapshot(),
-                    &mut exhausted
-                )
-                .unwrap_err(),
-                LocalBindingError::Resource
+        for annotated in [false, true] {
+            let result = binding_fixture_with_annotations(
+                &[&[("x", None), ("a", Some("x")), ("b", Some("x"))]],
+                annotated,
             );
+            let lower = lower(&result).unwrap();
+            let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
+            let target = &lower.declarations()[1];
+            let mut b = ReferenceBudget::default();
+            assert_eq!(
+                occurrences_with_budget(&directory, &result, target, result.snapshot(), &mut b)
+                    .unwrap()
+                    .occurrences()
+                    .len(),
+                2
+            );
+            let mut exact = ReferenceBudget {
+                work: WORK - b.work,
+            };
+            occurrences_with_budget(&directory, &result, target, result.snapshot(), &mut exact)
+                .unwrap();
+            assert_eq!(exact.work, WORK);
+            // Failure after earlier candidates were processed cannot publish a prefix.
+            for work in [WORK - b.work + 1, usize::MAX] {
+                let mut exhausted = ReferenceBudget { work };
+                assert_eq!(
+                    occurrences_with_budget(
+                        &directory,
+                        &result,
+                        target,
+                        result.snapshot(),
+                        &mut exhausted
+                    )
+                    .unwrap_err(),
+                    LocalBindingError::Resource
+                );
+            }
         }
     }
 

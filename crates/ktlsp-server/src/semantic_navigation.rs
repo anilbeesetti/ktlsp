@@ -1,7 +1,7 @@
 //! Deliberately finite local binding, never a global unresolved-name answer.
 use ktlsp_parser::{
     SnapshotResult, SourceSnapshot,
-    local_value_binding::bind_local_value,
+    local_value_binding::{LocalValueOccurrences, bind_local_value, local_value_occurrences},
     lowering::{lower_declarations, reference_site},
     structural_regions::build_regions,
 };
@@ -41,8 +41,20 @@ impl HoverFormat {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum Query {
-    Definition { offset: usize },
-    Hover { offset: usize, format: HoverFormat },
+    Definition {
+        offset: usize,
+    },
+    Hover {
+        offset: usize,
+        format: HoverFormat,
+    },
+    References {
+        offset: usize,
+        include_declaration: bool,
+    },
+    Highlights {
+        offset: usize,
+    },
 }
 
 pub(crate) fn render(
@@ -52,25 +64,71 @@ pub(crate) fn render(
 ) -> Result<Value, &'static str> {
     let tree = result.tree_for(snapshot).map_err(|_| UNSUPPORTED)?;
     let offset = match query {
-        Query::Definition { offset } | Query::Hover { offset, .. } => offset,
+        Query::Definition { offset }
+        | Query::Hover { offset, .. }
+        | Query::References { offset, .. }
+        | Query::Highlights { offset } => offset,
     };
     let mut references = tree.elements().iter().enumerate().filter(|(_, e)| {
         !e.token && e.kind == "REFERENCE_EXPRESSION" && e.start <= offset && offset < e.end
     });
-    let Some((index, _)) = references.next() else {
-        return Ok(Value::Null);
-    };
+    let reference = references.next();
     if references.next().is_some() {
         return Err(UNSUPPORTED);
     }
+    let occurrence_query = matches!(query, Query::References { .. } | Query::Highlights { .. });
+    if reference.is_none()
+        && (!occurrence_query
+            || !tree.elements().iter().any(|element| {
+                element.token
+                    && element.kind == "IDENTIFIER"
+                    && element.start <= offset
+                    && offset < element.end
+            }))
+    {
+        return Ok(Value::Null);
+    }
     let lowered = lower_declarations(result, snapshot).map_err(|_| UNSUPPORTED)?;
     let directory = build_regions(&lowered, result, snapshot).map_err(|_| UNSUPPORTED)?;
-    let site = reference_site(&lowered, result, snapshot, index).map_err(|_| UNSUPPORTED)?;
+    if occurrence_query {
+        let site = reference
+            .map(|(index, _)| reference_site(&lowered, result, snapshot, index))
+            .transpose()
+            .map_err(|_| UNSUPPORTED)?;
+        let target = if let Some(site) = &site {
+            bind_local_value(&directory, site, snapshot)
+                .map_err(|_| UNSUPPORTED)?
+                .target()
+        } else {
+            let mut declarations = lowered.declarations().iter().filter(|declaration| {
+                let range = declaration.name_range();
+                range.start <= offset && offset < range.end
+            });
+            let target = declarations.next().ok_or(UNSUPPORTED)?;
+            if declarations.next().is_some() {
+                return Err(UNSUPPORTED);
+            }
+            target
+        };
+        // This single call authenticates even unused declaration targets and
+        // atomically collects the complete bounded same-body occurrence set.
+        let occurrences = local_value_occurrences(&directory, result, target, snapshot)
+            .map_err(|_| UNSUPPORTED)?;
+        return render_occurrences(&occurrences, snapshot, query);
+    }
+    let site = reference_site(
+        &lowered,
+        result,
+        snapshot,
+        reference.expect("reference-only query checked").0,
+    )
+    .map_err(|_| UNSUPPORTED)?;
     let binding = bind_local_value(&directory, &site, snapshot).map_err(|_| UNSUPPORTED)?;
     let target = binding.target();
     let bytes = match query {
         Query::Definition { .. } => target.name_range(),
         Query::Hover { .. } => site.range(),
+        Query::References { .. } | Query::Highlights { .. } => unreachable!("rendered above"),
     };
     // Two authenticated original endpoints, using the existing UTF-16 sweep.
     let positions = crate::structure::positions(tree.source(), &[bytes.start, bytes.end]);
@@ -98,5 +156,66 @@ pub(crate) fn render(
             };
             Ok(json!({"contents":{"kind":kind,"value":value},"range":range}))
         }
+        Query::References { .. } | Query::Highlights { .. } => unreachable!("rendered above"),
     }
+}
+
+fn render_occurrences(
+    occurrences: &LocalValueOccurrences<'_>,
+    snapshot: &SourceSnapshot,
+    query: Query,
+) -> Result<Value, &'static str> {
+    let include_declaration = !matches!(
+        query,
+        Query::References {
+            include_declaration: false,
+            ..
+        }
+    );
+    let count = occurrences.occurrences().len() + usize::from(include_declaration);
+    // Same conservative 1 MiB rendering ceiling as document symbols, including
+    // worst-case JSON escaping of a repeated original URI. Kernel caps sites.
+    let uri_bytes = if matches!(query, Query::References { .. }) {
+        snapshot.document().len()
+    } else {
+        0
+    };
+    if 2 + count * (256 + 6 * uri_bytes) > 1024 * 1024 {
+        return Err("local occurrence rendered output limit exceeded");
+    }
+    let mut offsets = Vec::with_capacity(count * 2);
+    if include_declaration {
+        let range = occurrences.target().name_range();
+        offsets.extend([range.start, range.end]);
+    }
+    for site in occurrences.occurrences() {
+        let range = site.range();
+        offsets.extend([range.start, range.end]);
+    }
+    // The authenticated target precedes every retained site; sites are already
+    // unique and source ordered. One sorted original-byte UTF-16 sweep.
+    let positions = crate::structure::positions(snapshot.source(), &offsets);
+    let values = positions
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .enumerate()
+        .map(|(index, positions)| {
+            let range = Range {
+                start: positions[0],
+                end: positions[1],
+            };
+            if matches!(query, Query::References { .. }) {
+                json!({"uri":snapshot.document(),"range":range})
+            } else {
+                let kind = if include_declaration && index == 0 {
+                    3
+                } else {
+                    2
+                };
+                json!({"range":range,"kind":kind})
+            }
+        })
+        .collect::<Vec<_>>();
+    Ok(Value::Array(values))
 }

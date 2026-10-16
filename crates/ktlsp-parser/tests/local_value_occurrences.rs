@@ -108,7 +108,7 @@ fn production_complete_original_occurrences_and_unused_targets() {
 #[test]
 fn production_origin_and_all_snapshot_dimensions_are_authenticated() {
     let _serial = functional::serial();
-    let source = "fun f() { val x = 1; val y = x }\n";
+    let source = "fun f() { val x: Long = 1; val y: Int = x }\n";
     let result = parse(source);
     let snapshot = result.snapshot();
     let lowered = lower_declarations(&result, snapshot).unwrap();
@@ -159,6 +159,11 @@ fn production_ambiguity_unsupported_context_and_resource_are_atomic() {
     let _serial = functional::serial();
     for (source, ordinal, expected) in [
         (
+            "fun f() { val x: Long = 1; val a: Int = x; val `x`: Other = 2 }\n",
+            1,
+            LocalBindingError::AmbiguousLocal,
+        ),
+        (
             "fun f() { val x = 1; val a = x; val `x` = 2 }\n",
             1,
             LocalBindingError::AmbiguousLocal,
@@ -197,9 +202,9 @@ fn production_ambiguity_unsupported_context_and_resource_are_atomic() {
             "{source}"
         );
     }
-    let mut source = String::from("fun f() { val x = 1;");
+    let mut source = String::from("fun f() { val x: Long = 1;");
     for i in 0..200 {
-        write!(source, " val use{i} = x;").unwrap();
+        write!(source, " val use{i}: Int = x;").unwrap();
     }
     source.push_str(" }\n");
     let result = parse(&source);
@@ -211,4 +216,115 @@ fn production_ambiguity_unsupported_context_and_resource_are_atomic() {
             .unwrap_err(),
         LocalBindingError::Resource
     );
+}
+
+#[test]
+fn typed_local_annotations_are_syntax_not_occurrences_or_inferred_types() {
+    use ktlsp_parser::{
+        integer_initializer_types::{
+            IntegerInitializerError, IntegerType, infer_integer_initializer,
+        },
+        lowering::ReferenceSiteError,
+    };
+    let _serial = functional::serial();
+    for newline in ["\n", "\r\n"] {
+        let type_name = if newline == "\n" { "Long" } else { "`Long`" };
+        let source = format!(
+            "import elsewhere.Int{newline}class Int {{}}{newline}fun f() {{{newline} val `🦀`: {type_name} = 1; val y: Int = `🦀`; val z = y; val a = 2; val b: `🦀` = a{newline}}}"
+        );
+        let result = parse(&source);
+        let snapshot = result.snapshot();
+        let tree = result.tree_for(snapshot).unwrap();
+        assert!(tree.diagnostics().is_empty());
+        let lower = lower_declarations(&result, snapshot).unwrap();
+        let directory = build_regions(&lower, &result, snapshot).unwrap();
+        for (ordinal, reference, expected_type) in [
+            (2, source.find("= `🦀`").unwrap() + 2, None),
+            (3, source.find("= y").unwrap() + 2, None),
+            (5, source.rfind("= a").unwrap() + 2, Some(IntegerType::Int)),
+        ] {
+            let target = &lower.declarations()[ordinal];
+            let found = local_value_occurrences(&directory, &result, target, snapshot).unwrap();
+            assert_eq!(found.occurrences().len(), 1);
+            let site = &found.occurrences()[0];
+            assert_eq!(site.range().start, reference);
+            assert_eq!(
+                site.containing_property().cst_index(),
+                lower.declarations()[ordinal + 1].cst_index()
+            );
+            assert!(std::ptr::eq(found.target(), target));
+            assert_eq!(&source[target.name_range()], target.raw_name());
+            let binding = bind_local_value(&directory, site, snapshot).unwrap();
+            assert!(std::ptr::eq(binding.target(), target));
+            match expected_type {
+                Some(ty) => assert_eq!(
+                    infer_integer_initializer(&binding, snapshot)
+                        .unwrap()
+                        .default_type(),
+                    ty
+                ),
+                None => assert_eq!(
+                    infer_integer_initializer(&binding, snapshot).unwrap_err(),
+                    IntegerInitializerError::UnsupportedContext
+                ),
+            }
+        }
+        for (index, node) in tree.elements().iter().enumerate() {
+            if node.kind == "REFERENCE_EXPRESSION"
+                && node
+                    .parent
+                    .is_some_and(|parent| tree.elements()[parent].kind == "USER_TYPE")
+            {
+                assert_eq!(
+                    reference_site(&lower, &result, snapshot, index).unwrap_err(),
+                    ReferenceSiteError::UnsupportedContext
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn typed_local_unsupported_annotations_refuse_the_whole_projection() {
+    let _serial = functional::serial();
+    for annotation in [
+        "pkg.Int",
+        "Int?",
+        "List<Int>",
+        "@A Int",
+        "(Int)",
+        "() -> Int",
+        "Int & Any",
+        "dynamic",
+        "",
+        ": Int",
+        "Int: Long",
+        "= Int",
+    ] {
+        for typed_first in [true, false] {
+            let typed = format!("val x: {annotation} = 1;");
+            let source = if typed_first {
+                format!("fun f() {{ {typed} val y = x }}")
+            } else {
+                format!("fun f() {{ val before = 1; val y = before; {typed} }}")
+            };
+            let result = parse(&source);
+            assert!(
+                lower_declarations(&result, result.snapshot()).is_err(),
+                "{source}"
+            );
+        }
+    }
+    for source in [
+        "fun f() { val x Int = 1; val y = x }",
+        "fun f() { val x: Int; val y = x }",
+        "fun f() { val x = 1: Int; val y = x }",
+        "fun f() { val x: Int = = 1; val y = x }",
+    ] {
+        let result = parse(source);
+        assert!(
+            lower_declarations(&result, result.snapshot()).is_err(),
+            "{source}"
+        );
+    }
 }

@@ -561,7 +561,7 @@ fn actual_local_binding_definition_hover_ranges_and_refusals() {
         (4, "fun f() { val x = 1; val x = 2; val y = x }"),
         (5, "fun f() { var x = 1; val y = x }"),
         (6, "fun f(arg: Int) { val x = 1; val y = x }"),
-        (7, "fun f() { val x: Int = 1; val y = x }"),
+        (7, "fun f() { val x: Int? = 1; val y = x }"),
         (8, "fun f() { val x = 1; val y = x + 1 }"),
         (9, "val x = 1; val y = x"),
         (10, "fun f() { val x = x }"),
@@ -747,5 +747,553 @@ fn actual_hover_preserves_declaration_without_initializer_chasing_or_markdown_es
             json!({"textDocument":{"uri":URI},"position":{"line":0,"character":29}}),
         );
         assert_eq!(response["error"]["code"], -32803, "{response}");
+    }
+}
+
+fn references_params(source: &str, offset: usize, include: bool) -> Value {
+    let mut params = navigation_params(source, offset);
+    params["context"] = json!({"includeDeclaration":include});
+    params
+}
+fn references_range(source: &str, offset: usize, width: usize) -> Value {
+    json!(Range {
+        start: offset_to_position(source, offset).unwrap(),
+        end: offset_to_position(source, offset + width).unwrap(),
+    })
+}
+
+#[test]
+fn references_actual_paired_cli_declaration_use_utf16_and_existing_providers() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let source = "// 😀\r\nfun f() {\r\n val `x😀` = 1\r\n val y = `x😀`\r\n val z = `x😀`\r\n val unused = 2\r\n}\r\n";
+    let anchors: Vec<_> = source.match_indices("`x😀`").map(|(i, _)| i).collect();
+    let locations: Vec<_> = anchors
+        .iter()
+        .map(|&offset| json!({"uri":URI,"range":references_range(source, offset, "`x😀`".len())}))
+        .collect();
+    let highlights: Vec<_> = anchors.iter().enumerate().map(|(i, &offset)| {
+        json!({"range":references_range(source, offset, "`x😀`".len()),"kind":if i == 0 {3} else {2}})
+    }).collect();
+    // Incompatible hover must not disable either new provider.
+    let mut messages = vec![
+        json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{"capabilities":{"textDocument":{"hover":{"contentFormat":[]},"diagnostic":{},"documentSymbol":{"hierarchicalDocumentSymbolSupport":true}}}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
+    ];
+    let mut expected = vec![(json!("init"), Value::Null)];
+    for (index, &offset) in anchors.iter().enumerate() {
+        for include in [false, true] {
+            let id = json!(format!("refs-{index}-{include}"));
+            messages.push(json!({"jsonrpc":"2.0","id":id,"method":"textDocument/references","params":references_params(source, offset + 1, include)}));
+            expected.push((
+                id,
+                json!(if include {
+                    &locations[..]
+                } else {
+                    &locations[1..]
+                }),
+            ));
+        }
+        let id = if index == 0 {
+            json!(u64::MAX)
+        } else {
+            json!(format!("highlight-{index}"))
+        };
+        messages.push(json!({"jsonrpc":"2.0","id":id,"method":"textDocument/documentHighlight","params":navigation_params(source, offset + 1)}));
+        expected.push((id, json!(highlights)));
+    }
+    let unused = source.find("unused").unwrap();
+    for include in [false, true] {
+        let id = json!(format!("unused-{include}"));
+        messages.push(json!({"jsonrpc":"2.0","id":id,"method":"textDocument/references","params":references_params(source, unused, include)}));
+        expected.push((
+            id,
+            if include {
+                json!([{"uri":URI,"range":references_range(source, unused, 6)}])
+            } else {
+                json!([])
+            },
+        ));
+    }
+    messages.push(json!({"jsonrpc":"2.0","id":"unused-highlight","method":"textDocument/documentHighlight","params":navigation_params(source, unused)}));
+    expected.push((
+        json!("unused-highlight"),
+        json!([{"range":references_range(source, unused, 6),"kind":3}]),
+    ));
+    messages.push(json!({"jsonrpc":"2.0","id":"definition","method":"textDocument/definition","params":navigation_params(source, anchors[1])}));
+    expected.push((json!("definition"), locations[0].clone()));
+    messages.push(json!({"jsonrpc":"2.0","id":"pull","method":"textDocument/diagnostic","params":{"textDocument":{"uri":URI}}}));
+    expected.push((json!("pull"), json!({"kind":"full","items":[]})));
+    messages.push(json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}));
+    expected.push((json!("stop"), Value::Null));
+    messages.push(json!({"jsonrpc":"2.0","method":"exit"}));
+    let replies = Package::new(true).exchange(&messages);
+    assert_eq!(
+        replies.len(),
+        expected.len(),
+        "no duplicate/push output: {replies:?}"
+    );
+    for (id, payload) in &expected {
+        let matching: Vec<_> = replies
+            .iter()
+            .filter(|reply| reply.get("id") == Some(id))
+            .collect();
+        assert_eq!(
+            matching.len(),
+            1,
+            "original ID exactly once: {id}: {replies:?}"
+        );
+        if id != "init" {
+            assert_eq!(matching[0]["result"], *payload, "{id}: {replies:?}");
+            assert!(matching[0].get("error").is_none());
+        }
+    }
+    let caps = &replies[0]["result"]["capabilities"];
+    assert_eq!(caps["referencesProvider"], true);
+    assert_eq!(caps["documentHighlightProvider"], true);
+    assert_eq!(caps["definitionProvider"], true);
+    assert_eq!(caps["documentSymbolProvider"], true);
+    assert!(caps.get("hoverProvider").is_none());
+    let missing = Package::new(false).exchange(&messages);
+    assert_eq!(missing.len(), expected.len());
+    assert!(
+        missing[0]["result"]["capabilities"]
+            .get("referencesProvider")
+            .is_none()
+    );
+    assert!(
+        missing[0]["result"]["capabilities"]
+            .get("documentHighlightProvider")
+            .is_none()
+    );
+    for (id, _) in expected
+        .iter()
+        .filter(|(id, _)| id != "init" && id != "pull" && id != "stop")
+    {
+        let matching: Vec<_> = missing
+            .iter()
+            .filter(|reply| reply.get("id") == Some(id))
+            .collect();
+        assert_eq!(matching.len(), 1, "{id}: {missing:?}");
+        assert_eq!(matching[0]["error"]["code"], -32601);
+    }
+}
+
+#[test]
+fn typed_local_navigation_and_references_compose_over_paired_stdio() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    // The final annotation deliberately spells the value target's name.
+    // It must never become a value occurrence or a resolved builtin type.
+    let source = "// 😀\r\nclass Int {}\r\nfun f() {\r\n val `x😀`: Long = 1\r\n val y: Int = `x😀`\r\n val a = 2\r\n val b: `x😀` = a\r\n}\r\n";
+    let declaration = json!({"start":{"line":3,"character":5},"end":{"line":3,"character":10}});
+    let occurrence = json!({"start":{"line":4,"character":14},"end":{"line":4,"character":19}});
+    let use_params = json!({"textDocument":{"uri":URI},"position":{"line":4,"character":15}});
+    let messages = [
+        json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{"capabilities":{"textDocument":{"hover":{"contentFormat":["plaintext"]},"diagnostic":{}}}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":"typed-definition","method":"textDocument/definition","params":use_params}),
+        json!({"jsonrpc":"2.0","id":u64::MAX,"method":"textDocument/hover","params":use_params}),
+        json!({"jsonrpc":"2.0","id":"typed-references","method":"textDocument/references","params":{"textDocument":{"uri":URI},"position":{"line":3,"character":6},"context":{"includeDeclaration":true}}}),
+        json!({"jsonrpc":"2.0","id":"typed-highlights","method":"textDocument/documentHighlight","params":use_params}),
+        json!({"jsonrpc":"2.0","id":"untyped-definition","method":"textDocument/definition","params":{"textDocument":{"uri":URI},"position":{"line":6,"character":16}}}),
+        json!({"jsonrpc":"2.0","id":"pull","method":"textDocument/diagnostic","params":{"textDocument":{"uri":URI}}}),
+        json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ];
+    let replies = Package::new(true).exchange(&messages);
+    assert!(replies.iter().all(|reply| reply.get("id").is_some()));
+    assert!(
+        replies
+            .iter()
+            .map(|reply| &reply["id"])
+            .eq(messages.iter().filter_map(|message| message.get("id"))),
+        "original IDs exactly once; no duplicate or push output: {replies:?}"
+    );
+    let caps = &replies[0]["result"]["capabilities"];
+    assert_eq!(caps["hoverProvider"], true);
+    assert_eq!(caps["referencesProvider"], true);
+    assert_eq!(caps["documentHighlightProvider"], true);
+    let expected = [
+        (
+            json!("typed-definition"),
+            json!({"uri":URI,"range":declaration}),
+        ),
+        (
+            json!(u64::MAX),
+            json!({"contents":{"kind":"plaintext","value":"val `x😀`: Long = 1"},"range":occurrence}),
+        ),
+        (
+            json!("typed-references"),
+            json!([{"uri":URI,"range":declaration},{"uri":URI,"range":occurrence}]),
+        ),
+        (
+            json!("typed-highlights"),
+            json!([{"range":declaration,"kind":3},{"range":occurrence,"kind":2}]),
+        ),
+        (
+            json!("untyped-definition"),
+            json!({"uri":URI,"range":{"start":{"line":5,"character":5},"end":{"line":5,"character":6}}}),
+        ),
+        (json!("pull"), json!({"kind":"full","items":[]})),
+        (json!("stop"), Value::Null),
+    ];
+    for (id, payload) in expected {
+        let reply = replies.iter().find(|reply| reply["id"] == id).unwrap();
+        assert!(reply.get("error").is_none(), "{reply}");
+        assert_eq!(reply["result"], payload, "{reply}");
+    }
+}
+
+#[test]
+fn references_authenticated_targets_semantic_spelling_isolation_and_no_chasing() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let source = "fun f() { val `x` = 1; val other = 2; val other = 3; val a = x; val b = `x`; val c = a }\nfun g() { val x = 4; val y = x }";
+    let mut session = running(json!({}));
+    open(&mut session, source);
+    let declaration = source.find("`x`").unwrap();
+    let uses = [
+        source.find("= x").unwrap() + 2,
+        source.find("= `x`").unwrap() + 2,
+    ];
+    let expected = json!([
+        {"uri":URI,"range":references_range(source, declaration, 3)},
+        {"uri":URI,"range":references_range(source, uses[0], 1)},
+        {"uri":URI,"range":references_range(source, uses[1], 3)}
+    ]);
+    for offset in [declaration, uses[0], uses[1]] {
+        assert_eq!(
+            request(
+                &mut session,
+                "textDocument/references",
+                references_params(source, offset, true)
+            )["result"],
+            expected
+        );
+    }
+    let a = source.find("val a").unwrap() + 4;
+    let a_use = source.find("= a").unwrap() + 2;
+    assert_eq!(
+        request(
+            &mut session,
+            "textDocument/references",
+            references_params(source, a_use, true)
+        )["result"],
+        json!([{"uri":URI,"range":references_range(source,a,1)},{"uri":URI,"range":references_range(source,a_use,1)}])
+    );
+    let g_target = source.rfind("val x").unwrap() + 4;
+    let g_use = source.rfind("= x").unwrap() + 2;
+    assert_eq!(
+        request(
+            &mut session,
+            "textDocument/documentHighlight",
+            navigation_params(source, g_use)
+        )["result"],
+        json!([{"range":references_range(source,g_target,1),"kind":3},{"range":references_range(source,g_use,1),"kind":2}])
+    );
+    for method in ["textDocument/references", "textDocument/documentHighlight"] {
+        assert_eq!(
+            request(
+                &mut session,
+                method,
+                references_params(source, source.find(" { ").unwrap() + 2, true)
+            )["result"],
+            Value::Null
+        );
+        for offset in [declaration + 3, uses[0] + 1, uses[1] + 3] {
+            assert_eq!(
+                request(
+                    &mut session,
+                    method,
+                    references_params(source, offset, true)
+                )["result"],
+                Value::Null,
+                "token end is exclusive"
+            );
+        }
+    }
+    assert!(session.close().1);
+}
+
+#[test]
+fn references_invalid_params_unsupported_contexts_and_resource_fail_atomically() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = running(json!({}));
+    let source = "// 😀\r\nfun f() { val x = 1; val y = x }";
+    open(&mut session, source);
+    let offset = source.rfind("= x").unwrap() + 2;
+    for context in [
+        Value::Null,
+        json!({}),
+        json!({"includeDeclaration":null}),
+        json!({"includeDeclaration":1}),
+        json!({"includeDeclaration":"true"}),
+        json!([]),
+    ] {
+        let mut params = navigation_params(source, offset);
+        params["context"] = context;
+        assert_eq!(
+            request(&mut session, "textDocument/references", params)["error"]["code"],
+            -32602
+        );
+    }
+    assert_eq!(
+        request(
+            &mut session,
+            "textDocument/references",
+            navigation_params(source, offset)
+        )["error"]["code"],
+        -32602
+    );
+    for method in ["textDocument/references", "textDocument/documentHighlight"] {
+        for position in [
+            Value::Null,
+            json!({"line":1}),
+            json!({"line":1,"character":"1"}),
+            json!({"line":-1,"character":0}),
+            json!({"line":0,"character":4}),
+            json!({"line":100,"character":0}),
+        ] {
+            assert_eq!(
+                request(
+                    &mut session,
+                    method,
+                    json!({"textDocument":{"uri":URI},"position":position,"context":{"includeDeclaration":true}})
+                )["error"]["code"],
+                -32602
+            );
+        }
+        for params in [
+            json!({}),
+            json!({"textDocument":null}),
+            json!({"textDocument":{"uri":42}}),
+            json!({"textDocument":{"uri":"relative"},"position":{"line":0,"character":0},"context":{"includeDeclaration":true}}),
+            json!({"textDocument":{"uri":"untitled:closed"},"position":{"line":0,"character":0},"context":{"includeDeclaration":true}}),
+        ] {
+            assert_eq!(
+                request(&mut session, method, params)["error"]["code"],
+                -32602
+            );
+        }
+    }
+    for (i, (source, spelling)) in [
+        ("fun f() { val x = 1; val x = 2; val y = x }", "x"),
+        ("fun f() { val x = 1; val `x` = 2; val y = x }", "x"),
+        ("fun f() { val y = x; val x = 1 }", "x;"),
+        ("fun f() { val x = x }", "x }"),
+        ("fun f() { val y = unknown }", "unknown"),
+        ("fun f(arg: Int) { val x = 1; val y = x }", "x"),
+        ("fun f() { var x = 1; val y = x }", "x"),
+        ("val x = 1; val y = x", "x"),
+        ("fun f() { val x = 1; val y = x.member }", "x.member"),
+        ("fun f() { val x = 1; val y = x() }", "x()"),
+        ("fun f() { val x = 1; val y = x + 1 }", "x +"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        change(&mut session, i as i32 + 2, source);
+        let offset = source.rfind(spelling).unwrap();
+        for method in ["textDocument/references", "textDocument/documentHighlight"] {
+            let response = request(
+                &mut session,
+                method,
+                references_params(source, offset, true),
+            );
+            assert_eq!(response["error"]["code"], -32803, "{source}: {response}");
+            assert!(response.get("result").is_none());
+        }
+    }
+    // Unsupported declaration anchors are errors too, never fabricated [].
+    change(&mut session, 20, "val global = 1");
+    assert_eq!(
+        request(
+            &mut session,
+            "textDocument/references",
+            references_params("val global = 1", 4, false)
+        )["error"]["code"],
+        -32803
+    );
+    let large = format!(
+        "fun f() {{ val x = 1;{} }}",
+        " ".repeat(ktlsp_parser::MAX_SOURCE_BYTES)
+    );
+    change(&mut session, 21, &large);
+    for method in ["textDocument/references", "textDocument/documentHighlight"] {
+        assert_eq!(
+            request(&mut session, method, references_params(&large, 14, true))["error"]["code"],
+            -32803
+        );
+    }
+    for (i, (source, spelling)) in [
+        ("fun f() { val x = 1; val `x` = 2 }", "x"),
+        ("fun f(arg: Int) { val x = 1 }", "arg"),
+        ("class C { val member = 1 }", "member"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        change(&mut session, i as i32 + 22, source);
+        let offset = source.find(spelling).unwrap();
+        for method in ["textDocument/references", "textDocument/documentHighlight"] {
+            let response = request(
+                &mut session,
+                method,
+                references_params(source, offset, false),
+            );
+            assert_eq!(response["error"]["code"], -32803, "{source}: {response}");
+            assert!(response.get("result").is_none());
+        }
+    }
+    let source = format!(
+        "fun f() {{ val x = 1; {} }}",
+        (0..200)
+            .map(|i| format!("val use{i} = x; "))
+            .collect::<String>()
+    );
+    change(&mut session, 30, &source);
+    for method in ["textDocument/references", "textDocument/documentHighlight"] {
+        let response = request(&mut session, method, references_params(&source, 14, true));
+        assert_eq!(response["error"]["code"], -32803, "{response}");
+        assert!(
+            response.get("result").is_none(),
+            "work refusal cannot return a partial set"
+        );
+    }
+    assert!(session.close().1);
+}
+
+#[test]
+fn references_revisions_reopen_process_failure_and_rendered_uri_budget() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = running(json!({}));
+    let first = "fun f() { val first = 1; val y = first }";
+    open(&mut session, first);
+    let last = "fun f() { val last = 1; val y = last }";
+    change(&mut session, 2, last);
+    change(&mut session, 2, first); // Rejected stale edit preserves current bytes.
+    for method in ["textDocument/references", "textDocument/documentHighlight"] {
+        let response = request(
+            &mut session,
+            method,
+            references_params(last, last.rfind("last").unwrap(), true),
+        );
+        assert!(response["result"].is_array(), "{response}");
+        assert_eq!(response["result"][0]["range"], span(last, "last"));
+    }
+    notify(
+        &mut session,
+        "textDocument/didClose",
+        json!({"textDocument":{"uri":URI}}),
+    );
+    for method in ["textDocument/references", "textDocument/documentHighlight"] {
+        assert_eq!(
+            request(&mut session, method, references_params(last, 14, true))["error"]["code"],
+            -32602
+        );
+    }
+    open(&mut session, first);
+    assert_eq!(
+        request(
+            &mut session,
+            "textDocument/references",
+            references_params(first, 14, true)
+        )["result"][0]["range"],
+        span(first, "first")
+    );
+    assert!(session.close().1);
+
+    let mut failed = Session::with_parser(env!("CARGO_BIN_EXE_ktlsp")).unwrap();
+    initialize(&mut failed, json!({}));
+    open(&mut failed, first);
+    for method in ["textDocument/references", "textDocument/documentHighlight"] {
+        let response = request(&mut failed, method, references_params(first, 14, true));
+        assert_eq!(response["error"]["code"], -32803, "{response}");
+        assert!(response.get("result").is_none());
+    }
+    assert!(failed.close().1);
+
+    let long_uri = format!("untitled:{}", "a".repeat(8000));
+    let source = format!(
+        "fun f() {{ val x = 1; {} }}",
+        (0..24)
+            .map(|i| format!("val use{i} = x; "))
+            .collect::<String>()
+    );
+    let mut session = running(json!({}));
+    open_uri(&mut session, &long_uri, &source);
+    let mut params = references_params(&source, 14, true);
+    params["textDocument"]["uri"] = json!(long_uri);
+    let response = request(&mut session, "textDocument/references", params.clone());
+    assert_eq!(response["error"]["code"], -32803, "{response}");
+    assert!(response.get("result").is_none());
+    // Highlight ranges do not repeat URIs and remain usable on the same snapshot.
+    let response = request(&mut session, "textDocument/documentHighlight", params);
+    assert_eq!(response["result"].as_array().unwrap().len(), 25);
+    assert!(session.close().1);
+}
+
+#[test]
+fn typed_local_original_definition_hover_and_annotation_refusals() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = running(json!({}));
+    let source = "// 😀\r\nclass Int {}\r\nfun f() {\r\n val `x 😀`: `Long` = 1\r\n val y: Int = `x 😀`\r\n val z = y\r\n}";
+    open(&mut session, source);
+    for (needle, declaration, value) in [
+        ("`x 😀`", "`x 😀`", "val `x 😀`: `Long` = 1"),
+        ("y", "y", "val y: Int = `x 😀`"),
+    ] {
+        let reference = source.rfind(needle).unwrap();
+        let params = navigation_params(source, reference);
+        let definition = request(&mut session, "textDocument/definition", params.clone());
+        assert_eq!(
+            definition["result"],
+            json!({"uri":URI,"range":span(source, declaration)})
+        );
+        let hover = request(&mut session, "textDocument/hover", params);
+        assert_eq!(
+            hover["result"],
+            json!({
+                "contents":{"kind":"plaintext","value":value},
+                "range":{
+                    "start":offset_to_position(source, reference).unwrap(),
+                    "end":offset_to_position(source, reference + needle.len()).unwrap()
+                }
+            })
+        );
+    }
+    for annotation in ["`Long`", "Int ="] {
+        let response = request(
+            &mut session,
+            "textDocument/definition",
+            navigation_params(source, source.find(annotation).unwrap()),
+        );
+        assert_eq!(response["error"]["code"], -32803, "{response}");
+    }
+    for (index, annotation) in [
+        "pkg.Int",
+        "Int?",
+        "List<Int>",
+        "@A Int",
+        "(Int)",
+        "() -> Int",
+        "Int & Any",
+        "dynamic",
+        "",
+        ": Int",
+        "Int: Long",
+        "= Int",
+    ]
+    .iter()
+    .enumerate()
+    {
+        let source = format!("fun f() {{ val x: {annotation} = 1; val y = x }}");
+        change(&mut session, index as i32 + 2, &source);
+        let params = navigation_params(&source, source.rfind("= x").unwrap() + 2);
+        for method in ["textDocument/definition", "textDocument/hover"] {
+            let response = request(&mut session, method, params.clone());
+            assert_eq!(response["error"]["code"], -32803, "{source}: {response}");
+            assert!(response.get("result").is_none());
+        }
     }
 }

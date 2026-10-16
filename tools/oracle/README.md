@@ -562,3 +562,20 @@ remain real runtime prerequisites, not results established by this source.
 Change record: #352 adds only the optional manual workflow/native producer and
 unchanged pinned inventory data. No dispatch, privileged host/container/JVM
 execution, official evidence or native/default dependency change is implied.
+
+### Composed native mechanics verification
+
+The ROOT composition at `735775b758633ebc605a66a4a5159a1628ab736a`
+passed pinned Rust 1.99.0 format, locked all-target strict optional-workspace
+Clippy, actionlint of the manual workflow, and 119 passing test results.
+This count includes isolated helper executions; it is not an official capture
+or a parity percentage.
+
+ROOT separately invoked the actual recorder, receiver and replay CLIs against
+the controlled Rust `record-test-peer notices` process. The fresh capture
+completed; the receiver observed 103 frames, `officialSuccess: false`,
+unauthenticated provenance and unverified runtime/teardown. Replay matched the
+original Unicode ID, notifications and exit status without normalization.
+The temporary script was removed after observation. No parser, Docker, systemd,
+JVM or official workflow was run. The [step-log availability HOLD](RECEIVER.md#observed-step-log-availability-gate--runtime-hold)
+and independent runtime-admission requirements remain unchanged.

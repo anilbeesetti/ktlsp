@@ -108,7 +108,7 @@ impl Package {
             session.handle(request(
                 json!(0),
                 "initialize",
-                json!({"capabilities":{"textDocument":{"diagnostic":{}}}})
+                json!({"capabilities":{"workspace":{"workspaceEdit":{"documentChanges":true}},"textDocument":{"diagnostic":{},"rename":{"prepareSupport":true}}}})
             ))[0]["result"]["capabilities"]["documentSymbolProvider"],
             true
         );
@@ -327,7 +327,7 @@ impl Client {
         client.send(request(
             json!(0),
             "initialize",
-            json!({"capabilities":{"textDocument":{"diagnostic":{}}}}),
+            json!({"capabilities":{"workspace":{"workspaceEdit":{"documentChanges":true}},"textDocument":{"diagnostic":{},"rename":{"prepareSupport":true}}}}),
         ));
         assert_eq!(
             client.reply()["result"]["capabilities"]["documentSymbolProvider"],
@@ -486,12 +486,15 @@ fn navigation_uses_shared_wire_ids_cancellation_and_snapshot_guards() {
         ("textDocument/hover", "hover"),
         ("textDocument/references", "references"),
         ("textDocument/documentHighlight", "highlight"),
+        ("textDocument/prepareRename", "preparerename"),
+        ("textDocument/rename", "rename"),
+        ("textDocument/completion", "completion"),
     ] {
         let navigation = |id: Value| {
             request(
                 id,
                 method,
-                json!({"textDocument":{"uri":URI},"position":{"line":1,"character":0},"context":{"includeDeclaration":true}}),
+                json!({"textDocument":{"uri":URI},"position":{"line":1,"character":0},"context":{"includeDeclaration":true,"triggerKind":1},"newName":"fresh"}),
             )
         };
         let mut client = Client::new(&package);
@@ -503,6 +506,12 @@ fn navigation_uses_shared_wire_ids_cancellation_and_snapshot_guards() {
         client.send(cancel(json!("18446744073709551615")));
         client.send(cancel(json!(u64::MAX)));
         error(&client.reply(), json!(u64::MAX), -32800);
+        if method == "textDocument/completion" {
+            client.send(navigation(json!("completion-string")));
+            client.send(cancel(json!(0)));
+            client.send(cancel(json!("completion-string")));
+            error(&client.reply(), json!("completion-string"), -32800);
+        }
         client.send(navigation(json!(u64::MAX))); // Reuse does not reuse the cancelled generation.
         client.send(request(json!("stop"), "shutdown", Value::Null));
         error(&client.reply(), json!(u64::MAX), -32800);

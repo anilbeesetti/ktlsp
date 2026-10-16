@@ -126,6 +126,60 @@ Null/omitted roots mean unresolved roots, **not** a verified empty classpath.
 The pinned conversion performs filesystem/JDK-based root derivation and path
 handling that this native data-only contract intentionally does not claim.
 
+## Source-owner dependency class selection (#381 / #330)
+
+`dependency_class::select_class(&v2_workspace, source_path, internal_name,
+java_release, bindings, scratch)` is a finite, data-only native query. It returns
+the owning module and production source root even for successful absence; a
+selected actual class retains its library, mixed projected dependency ordinal,
+export bit, CLASSES-root ordinal/import path, retained artifact (digest and
+provenance), and existing classpath origin/entry/rank/decoded identity.
+
+Ownership and ordering come only from the private validated immutable v2
+projection, not mutable public importer sidecars. Paths must be absolute UTF-8,
+lexically normalized host paths under declared source roots, not content-root
+boundaries. Native Windows separators are accepted in query/provenance PathBufs;
+foreign backslashes on Unix are refused. Imported JSON still uses the importer's
+forward-slash/`<WORKSPACE>/` contract; that spelling is not a restriction on
+normalized native output paths. This is **not symlink-safe physical ownership**. Only production
+owners with direct COMPILE-library edges are admitted; test owners, module
+edges, other scopes, explicit/inherited SDK edges and SDK archives refuse.
+ModuleSource placement is irrelevant only because this selects a **dependency
+class**, not a source declaration competitor. Export bits are retained data,
+not an implementation of transitive propagation.
+
+Caller-retained immutable `VerifiedArtifact` bindings are keyed by library ID
+and binary-root ordinal. Every owner root must have exactly one binding and its
+retained provenance path must agree with the imported path before lookup or
+successful absence, including roots after an early match. Out-of-range bindings
+for owner-selected libraries refuse, including libraries with no binary roots.
+Unrelated libraries' bindings never grant visibility. Jar/Jmod kind is explicit,
+never guessed from filenames;
+all indexes are built through the existing archive decoders before lookup.
+Digest equality verifies bytes against the caller digest, **not** coordinate,
+path or digest authenticity. No filesystem reads, downloads or invented Maven
+provenance occur in the query.
+
+Ordered dependency/root precedence and MR/JMOD/name/version/CRC failure rules
+remain those of `ktlsp_binary::class_path::lookup_class`; a malformed winner is
+never skipped. Limits are 64 root occurrences, 65,536 aggregate directory
+entries and 16 MiB scanned directory names, plus existing index/artifact/lookup
+limits. Caller binding scans cap at 65,536 records and 16 MiB library-key bytes
+(including unrelated records). Source/provenance paths cap at the importer
+2 MiB path budget. Archive bytes stay borrowed; indexes are temporary metadata,
+not owning self-references or cached filesystem state.
+
+Tests compose authored imported JSON with retained genuine Commons Lang 3.17.0
+binary/source archives and canonical coordinates/digests: the actual
+`AppendableJoiner$Builder` class and the selected library's
+`AppendableJoiner.java` source candidate. Authored archive cases cover explicit
+JMOD kind, ordering, completeness, refusal and resource boundaries. Source
+attachment remains a path candidate, **not** proof of exact compilation or line
+provenance. Release is explicit, never inferred from SDK version or jvmTarget;
+the class reader still has its Java 23/non-preview ceiling. No full effective
+classpath, Kotlin reference resolution, source shadowing, access checking,
+type inference, SDK resolution or server/LSP capability is claimed.
+
 ## Next child
 
 Resolve SDK inheritance/path policy, resource/excluded roots, facets/plugins,

@@ -282,7 +282,7 @@ impl Declaration<'_> {
         self.incomplete
     }
 }
-fn semantic_spelling(raw: &str) -> Option<&str> {
+pub(super) fn semantic_spelling(raw: &str) -> Option<&str> {
     if raw.len() > SOURCE {
         return None;
     }
@@ -2429,6 +2429,71 @@ mod tests {
                         LocalBindingError::Resource
                     );
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn rename_conflict_analysis_uses_collection_budget_through_final_guard() {
+        use crate::local_value_binding::{LocalBindingError, LocalValueAnchor, rename_with_budget};
+        use crate::structural_regions::build_regions;
+        // Synthetic accounting only; real worker rename/reparse lives in the
+        // permanent hosted local_value_occurrences consumer.
+        let result = binding_fixture_with_annotations(
+            &[&[("x", None), ("a", Some("x")), ("b", Some("x"))]],
+            false,
+        );
+        let lower = lower(&result).unwrap();
+        let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
+        let anchor = LocalValueAnchor::Declaration(&lower.declarations()[1]);
+        let mut collection = ReferenceBudget::default();
+        crate::local_value_binding::occurrences_with_budget(
+            &directory,
+            &result,
+            anchor,
+            result.snapshot(),
+            &mut collection,
+        )
+        .unwrap();
+        for name in [None, Some("x"), Some("fresh")] {
+            let mut measured = ReferenceBudget::default();
+            rename_with_budget(
+                &directory,
+                &result,
+                anchor,
+                result.snapshot(),
+                name,
+                &mut measured,
+            )
+            .unwrap();
+            assert!(measured.work > collection.work);
+            let mut exact = ReferenceBudget {
+                work: WORK - measured.work,
+            };
+            rename_with_budget(
+                &directory,
+                &result,
+                anchor,
+                result.snapshot(),
+                name,
+                &mut exact,
+            )
+            .unwrap();
+            assert_eq!(exact.work, WORK);
+            for work in [WORK - measured.work + 1, WORK - collection.work, usize::MAX] {
+                let mut short = ReferenceBudget { work };
+                assert_eq!(
+                    rename_with_budget(
+                        &directory,
+                        &result,
+                        anchor,
+                        result.snapshot(),
+                        name,
+                        &mut short
+                    )
+                    .unwrap_err(),
+                    LocalBindingError::Resource
+                );
             }
         }
     }

@@ -672,3 +672,131 @@ with the same actual checkout and128 result rows. ROOT authenticated complete
 APIs/logs and retained the first-source proof independently. Final cleanup-source
 reviews/CI and guarded integration remain separate gates. #96/#377, B3,
 #46/license and full official parity remain open.
+
+## Guarded #378 main and actual extracted archives
+
+Final reviewed head `6b5b3370e903425d099500632a76f0409957386c` passed original
+Native38909677352 and platform38909676768 on all three hosts. Fresh separate
+read-only guards returned complete process/parsed exit0 before an ordinary
+expected-head squash delivered `f5f8a409dea209d44f9a9abe11c0becdf20f658e`,
+tree `dec41a980025893271eed04f2597ac2dca44ddd9`, sole parent594cc51.
+Independent reviewed-source OWNER and ROOT then authenticated original attempt1
+push/main Native38910636380/job117005284751: exact checkout/tree/sole parent,
+pinned mandatory steps,128 result rows,994 standard/doctest passes plus22
+separate worker fault cases. Only afterward was exclusive lease378 cleared.
+
+One separately admitted original manual packaging38911945117 used that verified
+main and workflow blob85809207c6f886db4839bb9b57cbbf42c57078a2. Linux117009717940
+and macOS117009718323 passed unfiltered full release workspace tests and the
+explicit actual extracted-pair CLI/16-reply smoke. ROOT and independent platform
+owners authenticated every original ZIP digest, TAR/sidecar,52-file inventory,
+51 inner checksums, notices/provenance, embedded evidence and separate decoded
+receipt; empty PATH/no Java-home variables, native architecture, exact IDs/ranges,
+empty stderr and borrowed-directory retention were observed. Downloaded binaries
+were inspected, never executed locally.
+
+Windows117009718630 FAILED the full workspace before staging. The actual
+definition reply at profile contentFormat:false was -32803, parser deadline
+exceeded; its missing result was not result:null. This establishes Timeout for
+that new invocation, not the earlier missing category or a phase/root cause.
+No Windows TAR/receipt exists. [Exact finite receipts and artifact hashes](https://github.com/anilbeesetti/ktlsp/issues/373#issuecomment-6218039840)
+leave #373/#46/#96/B3/#377/license and official-parity gates open.
+
+Unmerged diagnostic PR384 records selected timeout locations only after child
+cleanup/scoped-I/O closure. Original50df5bc checks passed without a marker;
+their Windows mode differed from the failed manual command. Changed06b998f
+matched the exact unfiltered default-capture command and also passed its first
+original checks without a marker. Neither establishes the missing phase or a
+repair, and no unchanged run is retried or instrumentation-alone merge admitted.
+
+## Next native completion, rename, tokens and binary consumers
+
+One verified incoming f5f8a409 receives independently reviewed #379 local-val
+prepare/rename, #380 lexical semantic-token transport, #381 source-owner dependency
+class selection, #382 eager local-value completion and #383 finite interpreted
+nominal metadata alias signatures. Public capability/semantic ceilings remain in
+the existing crate contracts; no full completion/rename/type/classpath claim follows.
+
+ROOT preserves all five sources and resolves common Session/query/provider
+branches without a second parser pipeline. The cancellation fixture retains all
+methods with a valid alphanumeric controlled-worker token and both required
+references/completion context fields. Full-union reviews found Windows
+ordinary/verbatim artifact-prefix mismatch and raw-u64 versus protobuf-int32 Type
+flags; both root causes were corrected with behavioral regressions. Provenance
+is not rewritten, no filesystem access enters the query, and last-scalar flags
+precedence/shared budgets remain intact.
+
+At reviewed source `1755e7fe18b2801e784342a9802ff335069fdf8d`, tree
+`3b58f119b2e374ff7a0b9f7380ef073774681977`, both full-union static rechecks
+cleared. The first strict compile check caught only a merged test-module placement
+lint; moving the unchanged module after providers was reviewed before the
+changed-source strict locked workspace/all-target Clippy passed. Native pure-data
+binary/import package tests passed526 cases. No local parser/server/worker/peer
+runtime was run.
+
+A throwaway actual public-API consumer used the immutable imported projection
+despite cleared mutable sidecars, selected genuine Commons Builder52/flags49 with
+4 fields/7 methods, and attached11798 original source bytes with SHA256
+bb5a9762fa8614c2a49e5ccb770f1378c60d5fdb7b8679039c85bdabe7f57315.
+The same executable decoded the genuine Package alias TypeParameterContainer to
+underlying/expanded kotlin.Any, nonnullable/nonlocal, despite an empty raw d2
+classifier entry requiring predefined-name resolution. Scripts were removed.
+These are combined native data observations, not Windows execution or CLI
+provider proof. First original hosted completion/rename/token payload readback,
+capture-only cleanup, final-source reviews/CI and guarded integration remain
+separate gates. Native-only/T004/#96 and full official parity limits remain.
+
+### PR385 first original combined execution and capture cleanup
+
+Two independent full27-file union source/docs rechecks cleared first-hosted head
+`95bebd7762be59a6420a9942069d7113996bdf55`, tree
+`a3140441914bbd998e0ab98af1f7de805f3a6bae`. ROOT published only the integration
+branch and draft [PR385](https://github.com/anilbeesetti/ktlsp/pull/385), preserving
+all component worktrees. Original attempt1 Native38920539902/job117039015622
+passed1035 cases; platform38920540091 macOS117039016182 passed1033 and
+Windows117039015825 passed980. Each complete census has130 result rows, zero
+failed/filtered and3 explicitly ignored fixtures, plus22 separate worker-protocol
+fault cases. Pinned format and strict locked workspace/all-target Clippy passed;
+Linux full workspace is debug, platform full workspace is release. No retries.
+
+Original APIs and authenticated retained artifacts independently establish actual
+checkout `5b8e59624be2853dece9d9015d2d385a73a01857`, that same tree, and ordered
+parents `[f5f8a409dea209d44f9a9abe11c0becdf20f658e,95bebd7762be59a6420a9942069d7113996bdf55]`.
+Both platform artifacts retain complete exit-zero original HEAD/tree/status,
+clean source, pinned compiler and successful format/Clippy/workspace receipts.
+Artifact12055145195 macOS SHA256
+dcf5dbf79319ef42da8d84f299d1b7d20bbbb7007d6646427f2f41dcd3676178;
+artifact12054219770 Windows SHA256
+91d970018f7612643a99cbd7b44f9d224c1475bdbaa5444d2d55ac6c2c6a2c70.
+ROOT and owner independently observed the Windows canonical-verbatim binding
+regression actually PASS; the consumer suite passed10 on each platform.
+
+ROOT directly read the complete actual completion, rename and lexical-token
+payloads. Each macOS/Windows pair is identical, with compact JSON SHA256:
+rename07cb0e79e1566b7acc6065bd6fde33ff6af4e692fc9dc4cde18595d531a3271d
+(5286 bytes); completione594513f704dd2bb690668c17e405418be093f6f299943f771eba5f01267b74a
+(4142 bytes); tokensa405e3958c7f98f87a8ba807abf4812c588bffab6559a9d4bc93c8f42fe428bf
+(1335 bytes). Independent implementation owners additionally authenticated and
+read both full rename/completion exchanges. Linux directly emitted equivalent
+rename/token payloads; completion eprintln is libtest-captured there, not observed.
+
+Actual rename carries original URI/version7, exact string/u64 IDs and two UTF-16
+edits; ROOT independently applied them to the captured CRLF/astral source and
+obtained exactly the actually reopened version8 text. Original annotation,
+comment and sibling stay unchanged; real followup references/definition select
+only the renamed local. Actual completion replaces the full backtick suffix token
+with the original parameter spelling, independently applies exactly, and the real
+followup definition returns parameter1:6–1:15. Hover-format refusal does not disable
+completion; resolve and missing-worker requests return-32601, never fake success.
+ROOT independently decoded every actual full/range/edited relative token tuple,
+including mixed CRLF/CR comment clipping, exact u64 ID and committed number→astral
+string change. Full pull reports remain empty without push duplicates.
+
+Only the three bounded temporary writers were removed after this readback;
+behavioral application/rebinding/decoding/ID/capability/cancellation assertions
+remain. Existing provider docs now enumerate all eight shared parser-backed
+methods rather than the historical five. Final cleanup-source reviews and
+original full hosted CI, separate fresh read-only guard/expected-head merge and
+independent OWNER+ROOT original exact-main acceptance are still required.
+No local parser/server/worker/peer runtime, official oracle, Windows archive,
+#377 root-cause/repair, first-party-license or full-parity acceptance is claimed.

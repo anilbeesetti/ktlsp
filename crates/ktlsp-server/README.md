@@ -1,6 +1,8 @@
 # Native server providers
 
-`ktlsp` supports bounded stdio lifecycle, open-document synchronization, `textDocument/foldingRange`, parser-backed syntactic `textDocument/documentSymbol`, finite local `textDocument/definition`, negotiated `textDocument/hover`, `textDocument/references` and `textDocument/documentHighlight`. Initialization advertises UTF-16, incremental sync and folding; parser-backed capabilities require the trusted matching worker, and only hover also requires a compatible content format. Clients advertising `textDocument.diagnostic` negotiate lexical/structural pull reports instead of legacy push diagnostics. Neither diagnostic path provides Kotlin compiler diagnostics.
+`ktlsp` supports bounded stdio lifecycle, document synchronization, folding, negotiated lexical semantic-token full/range transport, parser-backed syntactic symbols, finite local definition/hover/references/highlights, eager local-value completion, and guarded local-val prepare/rename. Initialization advertises only the implemented negotiated providers.
+
+Parser-backed capabilities require the trusted matching worker. Hover also requires a compatible content format; rename requires versioned `documentChanges`, with preparation advertised only when supported by the client. Lexical tokens need compatible token capabilities but no worker. Clients advertising `textDocument.diagnostic` negotiate lexical/structural pull reports instead of legacy push diagnostics. Neither diagnostics nor lexical token categories provide Kotlin compiler analysis or full semantic coloring.
 
 ## Build and distribute both executables
 
@@ -11,7 +13,7 @@ cargo build --locked --release -p ktlsp-server -p ktlsp-parser --bins
 
 Install **both** `ktlsp` and `ktlsp-parser-worker` from that same build into the same trusted directory (with `.exe` suffixes on Windows). The default CLI discovers the worker only beside its own executable, checking that the sibling is a regular executable file on Unix. There is no PATH, current-directory or environment-selected worker fallback. Installation trust and matching build identity are the distributor's responsibility; this is not a sandbox, signature check or version-authentication protocol.
 
-Without that sibling, synchronization/folding/lexical diagnostics remain available, `documentSymbolProvider`/`definitionProvider`/`hoverProvider`/`referencesProvider`/`documentHighlightProvider` are omitted and their requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. A configured worker that subsequently fails is a request failure, not a fabricated outline or binding. No JVM/JDK, Kotlin compiler or C parser is required.
+Without that sibling, synchronization/folding/lexical diagnostics and compatible lexical semantic tokens remain available, `documentSymbolProvider`/`definitionProvider`/`hoverProvider`/`referencesProvider`/`documentHighlightProvider`/`completionProvider`/`renameProvider` are omitted and their requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. A configured worker that subsequently fails is a request failure, not a fabricated outline or binding. No JVM/JDK, Kotlin compiler or C parser is required.
 
 ## Optional extracted-archive smoke (#373)
 
@@ -44,10 +46,9 @@ The permanent bounded decoded wire/CLI/provenance receipt is
 facts, complete inner checksums and the captured optional-test log. It is not
 inserted into its own TAR. Failure evidence remains always-uploaded; the package
 is uploaded only after the extracted smoke succeeds. Source and compile checks
-are not runtime proof: this optional test has not yet been exercised by #373.
-Its manual dispatch requires a new separate ROOT admission after reviewed source
-is merged and exact-main verified. #96, #46, the first-party-license hold and
-official/full-parity release gates remain open.
+are not runtime proof. The first separately admitted [original experiment38911945117](https://github.com/anilbeesetti/ktlsp/issues/373#issuecomment-6218039840), attempt1 at verified main `f5f8a409dea209d44f9a9abe11c0becdf20f658e`, actually exercised the extracted Linux/macOS pairs after full unfiltered release workspace tests. Independent platform owners and ROOT authenticated all archive bytes and directly read the 16-reply receipts with successful CLI/stdio, empty PATH/no Java-home variables and retained directories. These are finite observations at that source, not the current source's archive acceptance.
+
+Windows failed its full workspace before staging: an actual definition reply was `-32803`, `parser deadline exceeded`, not `result:null`; no Windows package or extracted receipt exists for that run. #373/#377 remain open, with phase/root cause unestablished. No unchanged retry or general platform/parity claim follows. Every later manual dispatch requires a separate ROOT admission after reviewed source and exact-main verification. #96, #46, the first-party-license hold and official/full-parity release gates remain open.
 
 ## Folding and diagnostics
 
@@ -56,6 +57,137 @@ Folding recognizes matched multiline `{}`, `()`, `[]`, block-comment tokens, raw
 On a mismatched closer, report it and discard/diagnose all pending openers. This conservative recovery cannot create crossing delimiter folds; complete valid pairs encountered later can still fold. Unmatched closers and remaining openers produce structural diagnostics. For legacy clients, accepted open/change notifications publish replacement diagnostics (including empty arrays); close clears them. Negotiated pull clients receive no duplicate push notifications. Rejected/stale/invalid edits preserve the current document. Push diagnostics include document versions only when `publishDiagnostics.versionSupport` is true; close clearing omits version.
 
 Missing/closed-document folding requests return invalid params (`-32602`), without reading disk. Malformed request params/client folding capabilities also return invalid params. Analysis exhaustion leaves an accepted document version intact, replaces stale diagnostics with one explicit `analysis-limit` warning, and fails folding with RequestFailed (`-32803`). Subsequent edits can recover normally.
+
+## Lexical semantic-token transport (#380)
+
+`textDocument/semanticTokens/full` and `/range` use the bounded native lossless
+lexer, without a parser worker. This is standard relative semantic-token
+**transport over lexical categories**, not official semantic coloring or full
+Kotlin LSP parity. Only positively known keyword, comment (including shebang),
+string (including raw strings/characters), number and operator tokens are
+emitted. Identifiers/backtick identifiers, punctuation and unknown tokens are
+omitted: no type/function/variable identity or modifiers are guessed. Templates
+remain opaque strings, including their interpolation expressions; parser-backed
+resolution is required to go beyond this ceiling.
+
+Initialization requires valid `textDocument.semanticTokens` string arrays for
+`tokenTypes`, `tokenModifiers` and `formats`, including `relative`, and at least
+one supported full/range request. The fixed native order
+`keyword, comment, string, number, operator` is intersected with client-supported
+types; an empty intersection or malformed/incompatible profile disables only
+this feature. The advertised legend contains that intersection and no modifiers.
+Full and range are independently gated (`true` or an object enables each);
+client delta support never enables server delta support. Unnegotiated methods
+and `/full/delta` return MethodNotFound (`-32601`). No delta, `resultId`, token
+cache, identifier resolution, background job or JVM dependency is added.
+
+Each synchronous query reads the current immutable open document, lexes once
+and sweeps source/UTF-16 positions once. Multiline tokens become positive-length,
+nonoverlapping single-physical-line fragments, excluding CR/LF; CRLF, lone CR,
+LF and astral characters retain exact UTF-16 coordinates. Range endpoints are
+strict, half-open document positions, with partial-token clipping. The first
+returned token is relative to document `(0,0)`, not the requested range start.
+Empty documents/ranges and files with no supported categories return `data: []`.
+Malformed/reversed/out-of-range/split-surrogate ranges and unopened URIs return
+InvalidParams (`-32602`), never clamped output.
+
+Existing 8 MiB source, 1,000,000 lexer-token, 256 lexical-diagnostic and 128
+scanner-context limits remain. At most **10,000 emitted fragments** and a
+conservative **1 MiB encoded result** are admitted. Five maximum-width u32
+integers plus separators cost at most 55 bytes per fragment plus 11 bytes for
+the result object, so the fragment bound is tighter than the byte bound.
+Checks precede appending; exhaustion rejects the whole query with RequestFailed
+(`-32803`), never truncates or substitutes empty success. Range queries count
+only emitted/clipped fragments but still lex and validate the complete source.
+Rejected document edits retain the prior version and token result.
+
+Permanent provider regressions decode real lexer output, negotiate independent
+request/type profiles, cover strict UTF-16/mixed terminators/opaque templates,
+edit rollback and exact resource boundaries. The real CLI regression decodes
+full/range results and an applied edit with exact string/u64 IDs and pull-mode
+diagnostics. Original hosted execution is recorded below; no local server/parser
+runtime is authorized under #96. Final cleanup-source CI and guarded integration
+remain separate gates; full official parity remains open.
+
+## Eager finite local completion (#382)
+
+With the trusted matching worker, `textDocument/completion` advertises only
+`completionProvider: {resolveProvider: false}`, independently of hover format
+negotiation. Missing workers omit that capability and return `-32601`.
+Completion uses the existing eight-job asynchronous parser pipeline, admission,
+cancellation, cleanup and exact incarnation/version/content publication guards;
+there is no new parser, source repair, source copy, pool or cache.
+
+The admitted site is a **nonempty existing whole-initializer identifier** in a
+complete ordinary named top-level block function. Bare and complete backtick
+tokens accept a caret inside or at their end; the original token start or just
+after its opening backtick permits an empty prefix. No initializer hole,
+unfinished quote, standalone expression, member/call/type/global context or
+damaged body is invented. These unsupported contexts return `-32803`, not an
+empty list. Strict invalid/split UTF-16 and unopened-document positions return
+`-32602`; navigation's existing half-open endpoints are unchanged.
+
+Exactly one `visible_local_values` query authenticates the original reference
+and same-function parameters/preceding immutable locals under its shared
+2,097,152-work and 1,024-value/131,072-byte storage ceilings. Local shadowing,
+parameter fallback in self-initializers, sibling isolation and visible-name
+ambiguity (including later duplicates) retain the producer API's atomic policy.
+Only the original token text before the caret is matched, case-sensitively and
+without normalization, against semantic spelling; opening/closing backticks are
+excluded separately. Output remains in original declaration order.
+
+The eager `CompletionList` has `isIncomplete: true`: further typing recomputes
+and replaces this finite list, not full Kotlin candidate completeness or
+official relevance ranking. A successfully authenticated universe with no
+prefix matches may return `items: []`. Each item has the original raw `label`,
+semantic `filterText`, Variable kind (`6`, including `val`) and a plain
+single-line `textEdit` replacing the **entire original token** with the target's
+raw spelling, including its original quotes. One UTF-16 sweep computes the
+shared replacement range. Before repeated JSON allocation, both rendering
+passes are bounded by a 131,072-byte spelling/prefix-work ceiling and a
+conservative 1 MiB escaped-output ceiling; exhaustion refuses the whole list.
+
+Real-worker regressions apply returned edits in memory and query the actual
+resulting source's definition, including suffix/quote replacement, CRLF,
+astral names, empty prefixes, parameter/local shadowing and atomic refusals.
+Paired CLI coverage also retains exact string/u64 IDs, missing-worker and
+hover-independent behavior; controlled failing peers cover cancellation and
+edit/close/reopen guards, never fabricated successful CST. ROOT and the owner
+independently read the original hosted wire, applied source and actual rebinding
+described below. No local server/parser runtime was run.
+
+No completion resolve, imports, snippets, commands, item data, dot triggers,
+type inference, damaged-syntax recovery or full/official completion parity is
+implemented or advertised. Type annotations remain retained syntax only.
+
+## Original hosted completion, rename and token proof
+
+At source `95bebd7762be59a6420a9942069d7113996bdf55`, original attempt1
+[Native38920539902](https://github.com/anilbeesetti/ktlsp/actions/runs/38920539902)
+and [platform38920540091](https://github.com/anilbeesetti/ktlsp/actions/runs/38920540091)
+passed pinned format, strict locked workspace/all-target Clippy and full workspace
+tests. Actual checkout `5b8e59624be2853dece9d9015d2d385a73a01857` has tree
+`a3140441914bbd998e0ab98af1f7de805f3a6bae` and ordered parents
+`[f5f8a409dea209d44f9a9abe11c0becdf20f658e,95bebd7762be59a6420a9942069d7113996bdf55]`.
+
+ROOT directly read all three actual payloads; macOS/Windows payloads agree exactly.
+Returned version7 rename edits replace only the original local name and bound use,
+preserving annotation/comment/sibling text; the actually reopened version8 source
+returns only the renamed declaration/use and its original definition. Completion
+replaces the complete original `` `couSuffix` `` token with `` `count😀` `` despite
+an inside caret, and the resulting real CLI definition returns parameter1:6–1:15.
+The exact u64 ID, CRLF/astral ranges, hover-independent capability and missing-worker
+refusals remain intact. ROOT independently applied both captured edit sets.
+
+ROOT independently decoded every actual relative full/range/edited token tuple:
+mixed CRLF/CR comment fragments clip correctly, and the committed edit changes the
+number into a four-UTF-16-unit astral string. Pull diagnostics return full `[]`
+without duplicate pushes. Linux additionally emitted matching rename/token payloads;
+completion's captured libtest output is available from the two platform jobs.
+Temporary writers were removed only after readback; behavioral assertions remain.
+This is finite source-specific native execution, not official equivalence, Windows
+packaging acceptance or an explanation/repair of #377. Final cleanup-source CI,
+guarded integration and independent original exact-main proof remain mandatory.
 
 ## Finite local definition and declaration hover
 
@@ -71,7 +203,7 @@ Non-reference positions can return null. Unsupported contexts/names, queried-nam
 
 `textDocument.hover.contentFormat` selects the first recognized client preference (`plaintext` or `markdown`); absent lists default to plaintext. Empty, malformed or wholly incompatible lists disable hover without breaking initialize or other providers. Markdown uses a Kotlin code fence longer than every backtick run in the source declaration, so untrusted source cannot close it; plaintext is emitted only when negotiated/defaulted. Source and response remain bounded by the existing parser input ceiling.
 
-All five parser consumers share **one** bounded job pipeline, parser instance, admission limits, cancellation/tombstones, cleanup ownership and incarnation/version/content publication guard. There is no second validator/pool, parse cache or extra source copy. #350 tests exercise actual paired stdio replies and controlled-peer cancellation separately; source/review/hosted receipts are not full navigation, oracle or platform proof. #96 remains open: no local parser/server runtime is authorized.
+All eight parser-backed methods share **one** bounded job pipeline, parser instance, admission limits, cancellation/tombstones, cleanup ownership and incarnation/version/content publication guard. There is no second validator/pool, parse cache or extra source copy. #350 tests exercise actual paired stdio replies and controlled-peer cancellation separately; source/review/hosted receipts are not full navigation, oracle or platform proof. #96 remains open: no local parser/server runtime is authorized.
 
 The [first original #351 Native run38866505501/job116860467519](https://github.com/anilbeesetti/ktlsp/actions/runs/38866505501/job/116860467519), attempt 1 at source `96b54047ee242e34a66f68020c79a47e620793eb`, checked merge `accd703dd2224301d1c8c44d1b2834a56a8b557f` into `bb6a75f61fd467c9b090210a369c7e1d225713d5`. Format and strict locked Clippy passed; workspace tests **failed** a new fixture's reply-count authoring error (six requests but expected seven). Actual failure wire retained the original definition `2:14–2:19`, plaintext declaration ``val `x😀` = 1`` and reference `2:33–2:38`, plus Combined/item outline and full empty pull without pushes. The other new real-worker semantic/refusal/hostile-fence/no-chasing cases and shared-wire cancellation/edit/reopen regression passed. The count was corrected from the six explicit source requests and independently source-rechecked by both reviewers; no unchanged retry or passing-full-run claim follows from this failure. Full negotiation and the direct-Write observation were not reached. Optional synthetic-tools [run38866505445](https://github.com/anilbeesetti/ktlsp/actions/runs/38866505445), attempt 1, passed both hosts; that is not official-oracle or platform proof.
 
@@ -169,7 +301,7 @@ Incomplete/error trees, unsupported declaration shapes (including destructuring 
 
 ### Cancellation and library lifetime
 
-`Session::handle` returns immediate responses; accepted parser-backed symbol/definition/hover/references/highlight requests return no immediate response. Call the nonblocking `Session::poll()` while continuing to service incoming messages to collect deferred responses. `Session::pending_requests()` includes cancelled work until its thread actually terminates. Existing parser-free requests remain immediate. The real-worker test request helper polls, and the packaged stdio client waits for each request before sending dependent edits or shutdown; bulk input does not imply synchronous completion order.
+`Session::handle` returns immediate responses; accepted parser-backed symbol/definition/hover/references/highlight/completion/prepareRename/rename requests return no immediate response. Call the nonblocking `Session::poll()` while continuing to service incoming messages to collect deferred responses. `Session::pending_requests()` includes cancelled work until its thread actually terminates. Existing parser-free requests remain immediate. The real-worker test request helper polls, and the packaged stdio client waits for each request before sending dependent edits or shutdown; bulk input does not imply synchronous completion order.
 
 A valid `$/cancelRequest` signals the exact active string/integer ID's `AtomicBool` passed to the existing Parser and returns that request's single RequestCancelled (`-32800`) response, never a notification response. Unknown IDs do nothing; invalid cancellation notifications produce bounded error records, not wire errors. IDs are reusable after their response, while old cancelled generations remain retained solely for cleanup. A duplicate still-active ID is rejected with InvalidRequest and null ID, without terminating the original request. Committed didChange/didClose invalidate matching work with ContentModified (`-32801`); rejected edits leave it alive. Stale/cancelled results never become empty success.
 
@@ -179,7 +311,7 @@ Shutdown and exit cancel owned jobs. `Session::close() -> (Vec<Value>, bool)` is
 
 EOF, fatal framing or broken output cancel jobs and attempt bounded cleanup. EOF is success only after shutdown; exit is success only after shutdown; any incomplete cleanup or output failure returns status 1 and controlled stderr. No writes are retried after broken output. Responses cannot be delivered after a broken transport, but work is still cancelled. Output write/flush, filesystem/handle operations and thread creation are synchronous OS calls: backpressure, OS scheduling or stuck OS calls have no hard real-time guarantee. The server does not hide a blocked join as successful cleanup.
 
-- At most **8 retained parser jobs per Session**, no waiting-job queue, and **8 owned parser thread handles process-wide**, shared across all five parser providers, with unfinished handles retained globally until joined. Capacity exhaustion returns RequestFailed (`-32803`) before copying source or spawning more work. These limits do not replace or weaken the parser's existing eight global Unix supervision reservations.
+- At most **8 retained parser jobs per Session**, no waiting-job queue, and **8 owned parser thread handles process-wide**, shared across all eight parser-backed methods, with unfinished handles retained globally until joined. Capacity exhaustion returns RequestFailed (`-32803`) before copying source or spawning more work. These limits do not replace or weaken the parser's existing eight global Unix supervision reservations.
 - Snapshot text is copied once into immutable shared storage; worker and owner share that snapshot. Each job has one bounded single-result channel, at most one rendered response, and one cancellation flag. A cancelled job releases its ID immediately but not its storage/admission slot before completion.
 - The incremental decoder retains at most one 8 KiB header and one 16 MiB payload plus the CLI's bounded read buffer. There is no accumulated input-frame queue or reader-thread lifetime to join.
 - Idle pending-input polls back off for 1 ms, so an immediately nonblocking
@@ -237,3 +369,44 @@ The line-comment subset has independently specified native regression fixtures f
 ## Local performance observation
 
 2026-10-12, macOS arm64 Apple M4 / 16 GiB, pinned Rust 1.99.0 release build. `/usr/bin/time -l target/release/deps/providers-7d4529ca788e2bde --exact many_folds_and_long_unicode_line_have_bounded_outputs --nocapture` measured 0.11 s wall time, 63,520,768 bytes maximum RSS and 62,390,752 bytes peak footprint for the complete test process (including generated source, retained JSON results and test harness). Within that run, 50,000 sequential multiline pairs (200,000 source bytes, result capped at 10,000) took 30.36 ms for open plus folding; a roughly 1.2 MB single Unicode line with 200,000 astral string characters and 200,000 single-line pairs, then one multiline pair, took 82.19 ms for change plus folding. An earlier run reported 45.93/84.13 ms. These are observations on one host, not budgets, isolated per-query memory, stable benchmarks or comparisons with the official server. Real native stdio also passes 30,000-fold/limit/recovery coverage.
+
+## Versioned finite local-val rename (#379)
+
+With the matching trusted parser worker and
+`workspace.workspaceEdit.documentChanges: true`, `textDocument/rename` supports
+the authenticated ordinary-function immutable local-val subset described above.
+`renameProvider` is `true` unless `textDocument.rename.prepareSupport: true`,
+when it is `{ "prepareProvider": true }` and `textDocument/prepareRename` is
+available. Missing versioned-edit support omits both methods, which return
+MethodNotFound rather than falling back to unversioned changes.
+
+Preparation returns the selected original declaration/use range and semantic
+placeholder. Rename returns one `WorkspaceEdit.documentChanges` text-document
+edit at the exact open URI and guarded current integer version, containing the
+original declaration-name and every bound whole-value use once, in nonoverlapping
+original-coordinate order, with the actual new spelling. Nothing is applied to
+disk or sent as a server-originated applyEdit/command/resolve request.
+
+Output names are deliberately bare ASCII: initial letter/underscore followed by
+letters/digits/underscores, excluding hard keywords and all-underscore names.
+Quoted or Unicode existing targets may become these supported names; new names
+are never autoquoted or normalized. Invalid names/URI/UTF-16/unopened-document
+requests return `-32602`. Unsupported bodies, parameters, ambiguous targets,
+same-function new-name parameter/local conflicts (including future declarations),
+potential new-name capture, semantic-work/storage exhaustion, source growth past
+64 KiB or escaped output past 1 MiB fail atomically with `-32803`. Quote removal
+with unchanged semantic spelling preserves existing shadow partitions.
+Unsafe lexical quote removal (such as an adjacent `val` keyword and quoted name)
+is refused even by preparation, rather than merging tokens in the edited source.
+Parameters are refused even if their current body uses are known: external
+named-argument calls are not covered.
+
+Both methods share the original asynchronous parser admission, cancellation,
+cleanup and incarnation/version/content publication guards (`-32800` cancellation,
+`-32801` stale). All bounds are checked before repeated replacement strings are
+materialized. This guarantees atomic computation/publication, not client rollback
+after applying an edit; standard versions cannot encode post-publication reopen
+incarnations. No workspace/member/parameter/full Kotlin rename, compiler conflict
+analysis or official rename equivalence is claimed. Permanent paired-worker tests
+apply the actual returned original-coordinate edits in memory and reparse/rebind;
+their actual hosted wire/application/rebinding observation is recorded above. No local runtime or full rename/parity claim follows.

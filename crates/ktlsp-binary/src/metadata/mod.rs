@@ -1,5 +1,5 @@
 //! Bounded Kotlin Metadata header/d1, raw wire, StringTableTypes and JVM names.
-//! No declaration/type reconstruction or Kotlin semantic analysis.
+//! Includes a finite nominal Package TypeAlias consumer, not general Kotlin analysis.
 
 pub mod class_constructors;
 pub mod class_header;
@@ -21,6 +21,7 @@ pub mod package_member_names;
 pub mod payload;
 pub mod property_header;
 pub mod property_types;
+pub mod resolved_alias_signature;
 pub mod string_table;
 pub mod type_alias;
 pub mod type_alias_types;

@@ -215,6 +215,18 @@ impl Parsed {
     ) -> Result<ktlsp_text::Position, ktlsp_text::TextError> {
         use ktlsp_text::{Position, TextError};
         const INVALID: u32 = u32::MAX;
+        if self.source.len() <= MAX_SOURCE_BYTES {
+            if !self.source.is_char_boundary(original_offset)
+                || (original_offset > 0
+                    && self.source.as_bytes().get(original_offset) == Some(&b'\n')
+                    && self.source.as_bytes()[original_offset - 1] == b'\r')
+            {
+                return Err(TextError::InvalidOffset(original_offset));
+            }
+            if original_offset == 0 {
+                return Ok(Position { line: 0, character: 0 });
+            }
+        }
         let Some(positions) = self.positions.get_or_init(|| {
             let entries = self.source.len().checked_add(1)?;
             let max_entries = MAX_SOURCE_BYTES.checked_add(1)?;

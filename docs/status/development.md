@@ -1666,3 +1666,51 @@ Native-only/T004/96 and existing source/work/storage/depth/timeout/cleanup
 ceilings remain.395/377 historical causes are still unknown. Full scopes,
 types/inference/applicability, formatting, tooling, SDK/library semantics,
 general platform/release/oracle-custody and official Kotlin LSP parity remain.
+
+### Measured native hot paths404/405: reviewed source, NOT yet timed after fix
+
+The same original final401 Native38972014385/job117212394570 raw log,
+294222bytes SHA256d2c5e13ca8eba1c75b4f2ac24693e811702d40ce58f259bd5e8a84766aef69ef,
+provided actual slow-case evidence; no unchanged run was repeated.
+Independent read-only scouts separated TWO causes, not one guessed timeout:
+four64KiB recovery cases repeatedly call Parsed::position for65537offsets,
+each scalar call rescanning byte0 (2147516416 cumulative advances/case).
+Their completion intervals total243.384s within301.056s combined suites;
+these intervals include case checks/healthyfollowups, NOT isolatedCPU profiles.
+Session's unchanged aggregate-limit case alone takes82.97s while17others
+finish~30ms; it opens eight8MiB single identifiers to exercise REAL64MiB
+capacity and synchronous diagnostics. That path is linear and NEVER calls
+Parsed::position. No old395/377 cause follows.
+
+Both source-only performance owners use SAME independently verified392 base.
+404de0ea5832872faa31c99545684e099c533453a76/treed65704fa02c64fac20c4de47199509daf392f722
+adds a private lazy immutable OnceLock original-position table: one forward
+source sweep, then arbitraryO(1) lookups, at most65537entries/524296 actual
+retained payload bytes per queried tree. Unavailable/excess storage is dropped
+and remembered asNone; exact old scalar behavior remains, not a new valid-
+coordinate failure or repeated allocation attempt. Every real/test/cloned-
+result constructor gets a fresh cache. ROOT additionally avoids initializing
+the cache for invalid bounded-source offsets and the trivial zero position.
+UTF8/CRLF interiors, newline starts, UTF16 astral/combining widths, EOF,
+reverse/repeated/random queries and old immutable snapshots remain exact.
+Parent-side cache payload is not a worker/query allowance or RSS guarantee;
+the documented memory tradeoff does not increase any existing cap.
+
+4056573bcf60c5b2862570612607bb45ea133213e16/tree1f3d3b6b0050373344774b74d8e295878ff41ccf
+removes duplicate identifier continuation decoding and unnecessary ASCII
+Unicode-table lookups through one forward iterator. First-character and
+nonASCII category admission, maximal spans, keywords/as?, diagnostics,
+templates and all limits stay unchanged. No extra allocation/registry/cache.
+Both owners obtained TWO separate independent static reviews; ROOT directly
+read all four receipts and composed sources without conflicts. New meaningful
+coordinate/identifier regressions retain every existing frozen packet,
+position loop, worker, healthyfollowup and actual eight8MiB aggregate fixture.
+No profile, corpus, source/depth/work/storage/timeout/cleanup bound or
+expectation was relaxed. A Session83-second fix is NOT established by source.
+
+The previously cleared12-file402/403 union is now expanded; prior clearances
+alone do not approve this source. New complete-union/affected exact-source
+reviews precede once-only formatting/strict compile/native data+lexer smoke
+and ORIGINAL full unchanged-profile hosted CI. Actual source/CST/edit packets
+still require independent OWNER+ROOT full readback before writer cleanup.
+All new checks/runtime/performance comparisons remain UNEXECUTED.

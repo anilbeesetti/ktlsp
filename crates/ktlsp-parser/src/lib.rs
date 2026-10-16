@@ -1,4 +1,5 @@
 //! Isolated, bounded parser adoption gate. No grammar or semantic parity claim.
+pub mod ancestor_candidates;
 pub mod declaration_name_index;
 pub mod lowering;
 pub mod structural_regions;

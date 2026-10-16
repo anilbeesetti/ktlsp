@@ -23,6 +23,7 @@ fn authenticate_step_cancellation(dir:&Path,a:&Admission,grant:&RootGrant,e:&mut
     let job:Value=parse(&gh(e,a,token,format!("repos/anilbeesetti/ktlsp/actions/jobs/{}",a.run.job_id),false)?)?;
     if job["id"]!=a.run.job_id||job["run_id"]!=a.run.run_id||job["head_sha"]!=a.run.source_head||job["run_attempt"]!=1{return Err("authenticated cancellation original job identity".into());}
     let steps=job["steps"].as_array().ok_or("authenticated original workflow steps unavailable")?;
+    if steps.iter().filter(|candidate|candidate["name"]==step.name).count()!=1{return Err("ambiguous original cancellation-step name; cannot attribute named runner cause".into());}
     let matches=steps.iter().filter(|s|s["number"]==step.number&&s["name"]==step.name).collect::<Vec<_>>();
     if matches.len()!=1||matches[0]["status"]!="completed"||!matches[0]["conclusion"].as_str().is_some_and(|s|matches!(s,"success"|"failure"|"cancelled")){return Err("actual runner-enforced cancellation step outcome unavailable".into());}
     // Authenticated original job logs are required, not exit130, an arbitrary marker or a peer claim.

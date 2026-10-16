@@ -729,12 +729,16 @@ mod host {
     fn api_identity(run: &Value, job: &Value, commit: &Value, r: &OriginalRun) -> Result<()> {
         if run["id"] != r.run_id
             || run["run_attempt"] != 1
+            || run["status"] != "in_progress"
+            || !run.get("conclusion").is_some_and(Value::is_null)
             || run["event"] != "workflow_dispatch"
             || run["head_sha"] != r.source_head
             || run["check_suite_id"] != r.suite_id
             || run["repository"]["full_name"] != "anilbeesetti/ktlsp"
             || run["path"] != ".github/workflows/t045-pr174-official-symbols.yml"
             || job["id"] != r.job_id
+            || job["status"] != "in_progress"
+            || !job.get("conclusion").is_some_and(Value::is_null)
             || job["run_id"] != r.run_id
             || job["head_sha"] != r.source_head
             || commit["sha"] != r.source_head
@@ -4051,9 +4055,9 @@ mod host {
                 source_head: "a".repeat(40),
                 source_tree: "b".repeat(40),
             };
-            let value = json!({"id":1,"run_attempt":1,"event":"workflow_dispatch","head_sha":run.source_head,"check_suite_id":3,"repository":{"full_name":"anilbeesetti/ktlsp"},"path":".github/workflows/t045-pr174-official-symbols.yml"});
+            let value = json!({"id":1,"run_attempt":1,"status":"in_progress","conclusion":null,"event":"workflow_dispatch","head_sha":run.source_head,"check_suite_id":3,"repository":{"full_name":"anilbeesetti/ktlsp"},"path":".github/workflows/t045-pr174-official-symbols.yml"});
             let job =
-                json!({"id":2,"run_id":1,"head_sha":run.source_head,"labels":["ubuntu-24.04"]});
+                json!({"id":2,"run_id":1,"status":"in_progress","conclusion":null,"head_sha":run.source_head,"labels":["ubuntu-24.04"]});
             let commit = json!({"sha":run.source_head,"tree":{"sha":run.source_tree}});
             assert!(api_identity(&value, &job, &commit, &run).is_ok());
             let mut bad = value.clone();
@@ -4062,6 +4066,14 @@ mod host {
             let mut bad = job.clone();
             bad["run_id"] = json!(9);
             assert!(api_identity(&value, &bad, &commit, &run).is_err());
+            let mut completed = value.clone();
+            completed["status"] = json!("completed");
+            completed["conclusion"] = json!("success");
+            assert!(api_identity(&completed, &job, &commit, &run).is_err());
+            let mut completed_job = job;
+            completed_job["status"] = json!("completed");
+            completed_job["conclusion"] = json!("success");
+            assert!(api_identity(&value, &completed_job, &commit, &run).is_err());
         }
     }
 }

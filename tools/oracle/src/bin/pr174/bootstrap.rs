@@ -220,6 +220,9 @@ fn supervisor_exec_start(value:&str,exe:&str,mode:&str,dir:&Path)->bool {
         && values.contains(&"ignore_errors=no")
 }
 
+fn bootstrap_receipt_complete(value:&BootstrapReceipt,nonce:&str)->bool {
+    value.schema_version==1&&value.scope=="PR174_BOOTSTRAP"&&digest(nonce)&&value.nonce==nonce&&value.error.is_none()&&!value.official_capture_success&&value.evidence_complete&&(1..=126976).contains(&value.evidence_bytes)&&value.evidence_sha256.as_deref().is_some_and(digest)
+}
 fn bootstrap_receipt_gate(dir:&Path,a:&Admission)->Result<()> {
     let end=mono_ms()?.checked_add(10000).ok_or("bootstrap gate deadline overflow")?.min(a.preparation_deadline_ms);
     loop {
@@ -227,7 +230,7 @@ fn bootstrap_receipt_gate(dir:&Path,a:&Admission)->Result<()> {
             Ok(_)=>{
                 let path=dir.join("bootstrap-receipt.json");protected(&path,false)?;
                 let value:BootstrapReceipt=parse(&read_file(&path,4096)?)?;
-                if value.schema_version!=1||value.scope!="PR174_BOOTSTRAP"||value.nonce!=a.nonce||value.error.is_some()||value.official_capture_success||!value.evidence_complete||value.evidence_bytes>126976{return Err("original bootstrap did not complete; no CREATE permission".into());}
+                if !bootstrap_receipt_complete(&value,&a.nonce){return Err("original bootstrap did not complete; no CREATE permission".into());}
                 let evidence=dir.join("bootstrap/observer.evidence");protected(&evidence,false)?;
                 if fs::metadata(&evidence).map_err(|e|e.to_string())?.len()!=value.evidence_bytes||value.evidence_sha256.as_deref()!=Some(sha_path(&evidence,a.preparation_deadline_ms)?.as_str()){return Err("original bootstrap raw evidence binding changed; no CREATE".into());}
                 return Ok(());
@@ -252,5 +255,21 @@ mod bootstrap_source_tests {
         assert!(!supervisor_exec_start(valid,"/usr/local/bin/host","supervise",dir));
         assert!(!supervisor_exec_start(&format!("{valid} {valid}"),"/usr/local/bin/host","calibrate",dir));
         assert!(!supervisor_exec_start("{ path=/bin/sh ; argv[]=/bin/sh -c evil ; ignore_errors=no }","/usr/local/bin/host","calibrate",dir));
+    }
+    #[test]
+    fn synthetic_bootstrap_prefix_cannot_authorize_create_when_incomplete() {
+        let nonce="1".repeat(64);
+        let mut receipt=BootstrapReceipt{schema_version:1,scope:"PR174_BOOTSTRAP".into(),nonce:nonce.clone(),error:None,official_capture_success:false,evidence_bytes:128,evidence_sha256:Some("2".repeat(64)),evidence_complete:true};
+        assert!(bootstrap_receipt_complete(&receipt,&nonce)); // Synthetic consistency, never ROOT authority.
+        receipt.error=Some("original piped-core refusal".into());
+        assert!(!bootstrap_receipt_complete(&receipt,&nonce));
+        receipt.error=None;receipt.evidence_complete=false;
+        assert!(!bootstrap_receipt_complete(&receipt,&nonce));
+        receipt.evidence_complete=true;receipt.evidence_bytes=0;
+        assert!(!bootstrap_receipt_complete(&receipt,&nonce));
+        receipt.evidence_bytes=126977;
+        assert!(!bootstrap_receipt_complete(&receipt,&nonce));
+        receipt.evidence_bytes=128;receipt.evidence_sha256=None;
+        assert!(!bootstrap_receipt_complete(&receipt,&nonce));
     }
 }

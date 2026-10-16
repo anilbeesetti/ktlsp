@@ -194,6 +194,17 @@ impl<'t, 'a> Resolver<'t, 'a> {
         out
     }
 
+    pub(super) fn is_local_class_name_with_budget(
+        &mut self,
+        index: i32,
+        budget: &mut super::string_table::Budget,
+    ) -> Result<bool, Error> {
+        self.work = budget.wire.work;
+        let out = self.is_local_class_name(index);
+        budget.wire.work = self.work;
+        out
+    }
+
     fn query(&mut self, error: Error) -> Result<(), Error> {
         debit(&mut self.queries, 1, error.limit("queries"))?;
         debit(&mut self.work, 1, error.limit("work"))

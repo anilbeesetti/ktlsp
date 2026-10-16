@@ -66,9 +66,11 @@ Work is logical accounting, not instruction/latency measurement. No independent
 hard-work/owned/node runtime witness is claimed when preceding caps dominate.
 
 Literal fixtures/provenance are [documented here](tests/fixtures/metadata_type_alias_types/README.md).
-All ten are authored, not genuine/compiler-generated TypeAlias positives; genuine
-inline-TypeAlias positive coverage remains GAP. Existing source pins/notices and
-compiler provenance limitations are preserved. No Kotlin compiler/JVM/oracle
+All ten are authored, not genuine/compiler-generated TypeAlias positives; this
+raw composition lane has no genuine positive. The separate #383 nominal signature
+consumer uses the existing genuine `metadata_package_member_names/KTypeParameterBaseKt.class.bin`
+inline-TypeAlias fixture; this does not broaden this API's raw occurrence contract.
+Existing source pins/notices and compiler provenance limitations are preserved. No Kotlin compiler/JVM/oracle
 invocation or new artifact retrieval. #18/#68 stay open; #96 local runtime HOLD/Darwin UNKNOWN; T008/T008a HOLD,
 C13/B3/B4 GAP, full B11 UNVERIFIED unchanged.
 

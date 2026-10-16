@@ -88,7 +88,9 @@ mod host {
     include!("pr174/action.rs");
     include!("pr174/confinement.rs");
     include!("pr174/workflow.rs");
-    mod materializer { include!("pr174/materializer.rs"); }
+    mod materializer {
+        include!("pr174/materializer.rs");
+    }
 
     #[derive(Deserialize, Serialize)]
     #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -611,7 +613,8 @@ mod host {
             .mode(mode)
             .open(p)
             .map_err(|e| e.to_string())?;
-        f.set_permissions(fs::Permissions::from_mode(mode)).map_err(|e| e.to_string())?;
+        f.set_permissions(fs::Permissions::from_mode(mode))
+            .map_err(|e| e.to_string())?;
         // Failed writes remain tombstones: removing a cancellation latch could permit START.
         write(&mut f, b).map_err(|e| e.to_string())
     }
@@ -655,7 +658,10 @@ mod host {
         protected(&std::env::current_exe().map_err(|e| e.to_string())?, false)?;
         let r = &a.run;
         if a.schema_version != 1
-            || !matches!(a.scope.as_str(), "PR174_HOST_EXECUTION_ADMITTED" | "PR174_RUST_CALIBRATION_ADMITTED")
+            || !matches!(
+                a.scope.as_str(),
+                "PR174_HOST_EXECUTION_ADMITTED" | "PR174_RUST_CALIBRATION_ADMITTED"
+            )
             || a.contract_sha256 != CONTRACT
             || a.nonce != dir.file_name().and_then(|s| s.to_str()).unwrap_or("")
             || r.repository != "anilbeesetti/ktlsp"
@@ -996,7 +1002,7 @@ mod host {
             return Err("pinned image identity/volumes".into());
         }
         e.append(&json!({"kind":"original-host","bootId":a.boot_id,"supervisorCgroup":cg,"osReleaseHex":raw_hex(&os_release()?),"kernelHex":raw_hex(&read_file(Path::new("/proc/sys/kernel/osrelease"),1024)?),"apiAuthenticated":true,"authority":"reviewed ROOT/bootstrap custody; receiver independently verifies original artifacts"}),false)?;
-        measure_child_confinement(dir,a,e)?;
+        measure_child_confinement(dir, a, e)?;
         Ok(cg.into())
     }
     fn empty(v: &Value) -> bool {
@@ -1075,7 +1081,11 @@ mod host {
         for p in ["fixture", "distribution", "tool", "preflight"] {
             mkdir(&state.join(p), 0o755)?;
         }
-        side_json(e, &dir.join("state-mount.json"), &state_mount_identity(dir)?)?;
+        side_json(
+            e,
+            &dir.join("state-mount.json"),
+            &state_mount_identity(dir)?,
+        )?;
         Ok(())
     }
 
@@ -1135,8 +1145,8 @@ mod host {
             return Err("original init ancestry changed".into());
         }
         let cmdline = read_file(&path.join("cmdline"), INPUT_BYTES)?;
-        let parent_proc = fs::metadata(&path).map_err(|e|e.to_string())?;
-        if !recorder && (parent_proc.uid()!=0 || parent_proc.gid()!=0) {
+        let parent_proc = fs::metadata(&path).map_err(|e| e.to_string())?;
+        if !recorder && (parent_proc.uid() != 0 || parent_proc.gid() != 0) {
             return Err("launcher parent lacks original nondumpable recorder proc custody".into());
         }
         if recorder {
@@ -1240,11 +1250,7 @@ mod host {
                 ),
             ]);
         }
-        v.extend([
-            "--entrypoint".into(),
-            entrypoint(a),
-            a.image.clone(),
-        ]);
+        v.extend(["--entrypoint".into(), entrypoint(a), a.image.clone()]);
         v.extend(entry_arguments(dir, a)?);
         Ok(v)
     }
@@ -1968,10 +1974,12 @@ mod host {
             if !recorder && !official {
                 continue;
             }
-            let proc_custody = fs::metadata(&p).map_err(|e|e.to_string())?;
+            let proc_custody = fs::metadata(&p).map_err(|e| e.to_string())?;
             // Setup can precede the production hook. Only policy-ready recorder observations qualify;
             // missing such an original observation at normal exit still fails runtime attestation.
-            if recorder && (proc_custody.uid()!=0 || proc_custody.gid()!=0) { continue; }
+            if recorder && (proc_custody.uid() != 0 || proc_custody.gid() != 0) {
+                continue;
+            }
             let stat = read_file(&p.join("stat"), 4096)?;
             let stamp = process_start(&stat)?;
             if stamp.0 != pid {
@@ -2467,13 +2475,44 @@ mod host {
             e.failed = true;
             e
         });
-        let (mut service_end, mut clock_valid) = cleanup_clock(dir, b, &mut e, mono_ms()?, resuming);
+        let (mut service_end, mut clock_valid) =
+            cleanup_clock(dir, b, &mut e, mono_ms()?, resuming);
         if !direct_prearm {
-            let measured = e.checked(&b.systemctl,&args(&["show","--property=ExecMainStartTimestampMonotonic",&format!("{}.service",unit(&b.nonce,"cleanup"))]),service_end)
-                .and_then(|raw|properties(&raw))
-                .and_then(|values|values.get("ExecMainStartTimestampMonotonic").ok_or_else(||"cleanup systemd start timestamp unavailable".into()).and_then(|value|value.parse::<u64>().map_err(|_|"numeric timestamp".to_string()).or_else(|_|systemctl_usec(value))))
-                .and_then(|start|{let start=start/1000;if start==0||start>mono_ms()?{return Err("actual cleanup systemd start timestamp invalid".into());}start.checked_add(60000).ok_or("cleanup service deadline overflow".into())});
-            match measured {Ok(actual_end)=>service_end=service_end.min(actual_end),Err(_)=>clock_valid=false}
+            let measured = e
+                .checked(
+                    &b.systemctl,
+                    &args(&[
+                        "show",
+                        "--property=ExecMainStartTimestampMonotonic",
+                        &format!("{}.service", unit(&b.nonce, "cleanup")),
+                    ]),
+                    service_end,
+                )
+                .and_then(|raw| properties(&raw))
+                .and_then(|values| {
+                    values
+                        .get("ExecMainStartTimestampMonotonic")
+                        .ok_or_else(|| "cleanup systemd start timestamp unavailable".into())
+                        .and_then(|value| {
+                            value
+                                .parse::<u64>()
+                                .map_err(|_| "numeric timestamp".to_string())
+                                .or_else(|_| systemctl_usec(value))
+                        })
+                })
+                .and_then(|start| {
+                    let start = start / 1000;
+                    if start == 0 || start > mono_ms()? {
+                        return Err("actual cleanup systemd start timestamp invalid".into());
+                    }
+                    start
+                        .checked_add(60000)
+                        .ok_or("cleanup service deadline overflow".into())
+                });
+            match measured {
+                Ok(actual_end) => service_end = service_end.min(actual_end),
+                Err(_) => clock_valid = false,
+            }
         }
         // Preserve 10s for immutable export and 2s for its final outcome inside the SAME 60s unit.
         let end = service_end.saturating_sub(12_000);
@@ -2642,9 +2681,11 @@ mod host {
         match export {
             Err(error) => {
                 let bytes = serde_json::to_vec(&json!({"scope":"PR174_EXPORT_FAILURE","error":error,"officialCaptureSuccess":false})).map_err(|e|e.to_string())?;
-                if bytes.len() <= 2048 { let _ = make_file(&dir.join("export-failure.json"), &bytes, 0o400); }
-            },
-            Ok(_)=>{},
+                if bytes.len() <= 2048 {
+                    let _ = make_file(&dir.join("export-failure.json"), &bytes, 0o400);
+                }
+            }
+            Ok(_) => {}
         }
         Ok(result)
     }
@@ -2952,8 +2993,16 @@ mod host {
         root_authority(dir, &a)?;
         bootstrap_receipt_gate(dir, &a)?;
         let mut e = Evidence::preflight();
-        e.limit = OBSERVER_BYTES - 131_072 - 16_384 - 16_384 - 8_192
-            - if calibration_case(dir, &a)? == Some(CalibrationCase::WorkflowStepCancel) {131_072}else{0};
+        e.limit = OBSERVER_BYTES
+            - 131_072
+            - 16_384
+            - 16_384
+            - 8_192
+            - if calibration_case(dir, &a)? == Some(CalibrationCase::WorkflowStepCancel) {
+                131_072
+            } else {
+                0
+            };
         let mut cg = String::new();
         let mut stamp = None;
         let mut known: Option<Binding> = None;
@@ -3057,9 +3106,12 @@ mod host {
                     true,
                 ),
                 CaptureStep::Seal => {
-                    if calibration_case(dir, &a)?.is_some() { seal_calibration(dir, &a, &cid, &mut e) }
-                    else { seal_handoff(dir, &a, &cid, &mut e) }
-                },
+                    if calibration_case(dir, &a)?.is_some() {
+                        seal_calibration(dir, &a, &cid, &mut e)
+                    } else {
+                        seal_handoff(dir, &a, &cid, &mut e)
+                    }
+                }
                 CaptureStep::Arm => {
                     if a.preparation_deadline_ms
                         < mono_ms()?
@@ -3118,15 +3170,21 @@ mod host {
                     Ok(())
                 }
                 CaptureStep::Observe => {
-                    if let Some(case) = calibration_case(dir, &a)? { observe_calibration(dir, &a, b, &mut e, case) }
-                    else { observe(dir, &a, b, &mut e) }
-                },
+                    if let Some(case) = calibration_case(dir, &a)? {
+                        observe_calibration(dir, &a, b, &mut e, case)
+                    } else {
+                        observe(dir, &a, b, &mut e)
+                    }
+                }
                 _ => Err("invalid lifecycle phase".into()),
             }
         });
         let _=e.append(&json!({"kind":"supervisor-final","captureError":run.as_ref().err(),"containerId":known.as_ref().map(|b|&b.container_id),"officialCaptureSuccess":false,"closure":"UNKNOWN until independent cleanup receipt"}),true);
-        if e.file.is_none() && !e.pending.is_empty()
-            && fs::symlink_metadata(dir.join("receipts/observer.evidence")).is_err_and(|error|error.kind()==ErrorKind::NotFound) {
+        if e.file.is_none()
+            && !e.pending.is_empty()
+            && fs::symlink_metadata(dir.join("receipts/observer.evidence"))
+                .is_err_and(|error| error.kind() == ErrorKind::NotFound)
+        {
             // Preserve pre-CREATE raw failure prefixes without duplicating an already charged partial observer file.
             let _ = make_file(&dir.join("preflight-failure.evidence"), &e.pending, 0o600);
         }
@@ -3137,8 +3195,10 @@ mod host {
     }
     pub fn entry() -> Result<Value> {
         let argv: Vec<_> = std::env::args().skip(1).collect();
-        if argv.as_slice()==["describe-template"] {
-            return Ok(json!({"schemaVersion":1,"scope":"PR174_CONTAINMENT_TEMPLATE_SOURCE","containmentTemplateSha256":containment_template_sha256()?,"profile":child_confinement::profile(),"runtimeAuthority":"NONE; exact source policy only, no kernel/launch/calibration fact"}));
+        if argv.as_slice() == ["describe-template"] {
+            return Ok(
+                json!({"schemaVersion":1,"scope":"PR174_CONTAINMENT_TEMPLATE_SOURCE","containmentTemplateSha256":containment_template_sha256()?,"profile":child_confinement::profile(),"runtimeAuthority":"NONE; exact source policy only, no kernel/launch/calibration fact"}),
+            );
         }
         if !cfg!(target_os = "linux") {
             return Err(
@@ -3154,7 +3214,10 @@ mod host {
         if unsafe { geteuid() } != 0 {
             return Err("protected host execution requires OS root".into());
         }
-        if argv.first().is_some_and(|mode| mode.starts_with("workflow-")) {
+        if argv
+            .first()
+            .is_some_and(|mode| mode.starts_with("workflow-"))
+        {
             return workflow_entry(&argv);
         }
         if argv.as_slice() == ["bootstrap", STAGING] {
@@ -3178,7 +3241,7 @@ mod host {
                     return Err("official and Rust-only calibration entry scopes differ".into());
                 }
                 supervise(dir)
-            },
+            }
             "export" => protected_export(dir),
             "await-calibration" => await_calibration(dir),
             "release-calibration" => release_calibration(dir),
@@ -4097,8 +4160,7 @@ mod host {
                 source_tree: "b".repeat(40),
             };
             let value = json!({"id":1,"run_attempt":1,"status":"in_progress","conclusion":null,"event":"workflow_dispatch","head_sha":run.source_head,"check_suite_id":3,"repository":{"full_name":"anilbeesetti/ktlsp"},"path":".github/workflows/t045-pr174-official-symbols.yml"});
-            let job =
-                json!({"id":2,"run_id":1,"status":"in_progress","conclusion":null,"head_sha":run.source_head,"labels":["ubuntu-24.04"]});
+            let job = json!({"id":2,"run_id":1,"status":"in_progress","conclusion":null,"head_sha":run.source_head,"labels":["ubuntu-24.04"]});
             let commit = json!({"sha":run.source_head,"tree":{"sha":run.source_tree}});
             assert!(api_identity(&value, &job, &commit, &run).is_ok());
             let mut bad = value.clone();

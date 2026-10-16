@@ -912,7 +912,10 @@ fn typed_local_navigation_and_references_compose_over_paired_stdio() {
     assert!(replies.iter().all(|reply| reply.get("id").is_some()));
     assert_eq!(
         replies.iter().map(|reply| &reply["id"]).collect::<Vec<_>>(),
-        messages.iter().filter_map(|message| message.get("id")).collect::<Vec<_>>(),
+        messages
+            .iter()
+            .filter_map(|message| message.get("id"))
+            .collect::<Vec<_>>(),
         "original IDs exactly once; no duplicate or push output: {replies:?}"
     );
     let caps = &replies[0]["result"]["capabilities"];
@@ -920,11 +923,26 @@ fn typed_local_navigation_and_references_compose_over_paired_stdio() {
     assert_eq!(caps["referencesProvider"], true);
     assert_eq!(caps["documentHighlightProvider"], true);
     let expected = [
-        (json!("typed-definition"), json!({"uri":URI,"range":declaration})),
-        (json!(u64::MAX), json!({"contents":{"kind":"plaintext","value":"val `x😀`: Long = 1"},"range":occurrence})),
-        (json!("typed-references"), json!([{"uri":URI,"range":declaration},{"uri":URI,"range":occurrence}])),
-        (json!("typed-highlights"), json!([{"range":declaration,"kind":3},{"range":occurrence,"kind":2}])),
-        (json!("untyped-definition"), json!({"uri":URI,"range":{"start":{"line":5,"character":5},"end":{"line":5,"character":6}}})),
+        (
+            json!("typed-definition"),
+            json!({"uri":URI,"range":declaration}),
+        ),
+        (
+            json!(u64::MAX),
+            json!({"contents":{"kind":"plaintext","value":"val `x😀`: Long = 1"},"range":occurrence}),
+        ),
+        (
+            json!("typed-references"),
+            json!([{"uri":URI,"range":declaration},{"uri":URI,"range":occurrence}]),
+        ),
+        (
+            json!("typed-highlights"),
+            json!([{"range":declaration,"kind":3},{"range":occurrence,"kind":2}]),
+        ),
+        (
+            json!("untyped-definition"),
+            json!({"uri":URI,"range":{"start":{"line":5,"character":5},"end":{"line":5,"character":6}}}),
+        ),
         (json!("pull"), json!({"kind":"full","items":[]})),
         (json!("stop"), Value::Null),
     ];

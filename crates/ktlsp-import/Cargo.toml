@@ -11,3 +11,6 @@ ktlsp-project = { path = "../ktlsp-project" }
 ktlsp-artifacts = { path = "../ktlsp-artifacts" }
 ktlsp-binary = { path = "../ktlsp-binary" }
 quick-xml = { version = "=0.41.0", default-features = false }
+
+[dev-dependencies]
+sha2 = "=0.10.9"

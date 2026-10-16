@@ -133,7 +133,7 @@ fn runtime(files: &Files, b: &ExportBinding, expected: &RootGrant) -> Result<()>
             let stat = original_stat(&text_hex(&r["statHex"])?)?;
             require(r["hostPid"].as_u64() == Some(stat.0) && r["starttime"].as_u64() == Some(stat.1) && r["namespace"] == identity["pidNamespace"] && text_hex(&r["cgroupHex"])?.trim() == format!("0::{}",identity["cgroup"].as_str().ok_or("missing cgroup")?),"original process identity mismatch")?;
             let status = text_hex(&r["statusHex"])?;
-            for (name,expected) in [("NoNewPrivs:","1"),("CapEff:","0000000000000000"),("CapPrm:","0000000000000000")] {
+            for (name,expected) in [("NoNewPrivs:","1"),("Seccomp:","2"),("CapEff:","0000000000000000"),("CapPrm:","0000000000000000")] {
                 require(status.lines().find_map(|l|l.strip_prefix(name)).is_some_and(|s|s.trim() == expected),"original security status mismatch")?;
             }
             for name in ["Uid:","Gid:"] {
@@ -143,6 +143,7 @@ fn runtime(files: &Files, b: &ExportBinding, expected: &RootGrant) -> Result<()>
             require(limits.lines().find_map(|l|l.strip_prefix("Max core file size")).is_some_and(|s|s.split_whitespace().take(2).collect::<Vec<_>>() == ["0","0"]),"original core limit mismatch")?;
             let role = r["role"].as_str().ok_or("host missing independently joinable executable/JVM inode measurements")?;
             if role == "recorder" {
+                require(r["procDirectoryUid"] == 0 && r["procDirectoryGid"] == 0,"original recorder proc directory lacks independent nondumpable custody")?;
                 let nspid = status.lines().find_map(|l|l.strip_prefix("NSpid:")).ok_or("actual recorder namespace PID absent")?.split_whitespace().map(str::parse::<u64>).collect::<std::result::Result<Vec<_>,_>>().map_err(|_|"invalid recorder namespace PIDs")?;
                 require(nspid.len() == 2 && nspid[0] == stat.0 && custody["parentPid"].as_u64() == nspid.last().copied(),"measured confined-child writer is not original recorder")?;
             }
@@ -365,6 +366,9 @@ fn calibration_processes(files: &Files,b: &ExportBinding,peer: &crate::calibrati
             let status = text_hex(&r["statusHex"])?;
             let ids = status.lines().find_map(|l|l.strip_prefix("NSpid:")).ok_or("calibration NSpid absent")?.split_whitespace().map(str::parse::<u64>).collect::<std::result::Result<Vec<_>,_>>().map_err(|_|"calibration invalid namespace PID")?;
             if ids.last().copied() != Some(p.pid as u64) {continue;}
+            if index == 0 && peer.case == authority::CalibrationCase::BoundaryDenials {
+                require(r["procDirectoryUid"] == 0 && r["procDirectoryGid"] == 0,"original denial driver proc directory lacks independent nondumpable custody")?;
+            }
             let stat = original_stat(&text_hex(&r["statHex"])?)?;
             require(ids.len() == 2 && ids[0] == stat.0 && r["hostPid"].as_u64() == Some(stat.0) && stat.1 == p.start_time_ticks && r["starttime"].as_u64() == Some(stat.1) && r["child"] == (index != 0) && r["case"] == peer.case.as_str() && r["namespace"] == identity["pidNamespace"] && text_hex(&r["cgroupHex"])?.trim() == format!("0::{}",identity["cgroup"].as_str().ok_or("calibration cgroup absent")?),"calibration original raw PID/start/ns/cgroup mismatch")?;
             require(r["exeDevice"].as_u64() == Some(p.executable_device) && r["exeInode"].as_u64() == Some(p.executable_inode) && r["exeDevice"] == r["sealedExecutableDevice"] && r["exeInode"] == r["sealedExecutableInode"],"calibration original sealed executable mismatch")?;

@@ -69,11 +69,12 @@ pub enum Outcome<'a> {
     },
 }
 
-pub(super) struct Budget {
+pub(super) struct Budget<'b> {
     limits: Limits,
     code_units: usize,
     fields: usize,
     work: usize,
+    composite: Option<&'b mut super::string_table::Budget>,
 }
 fn charge(used: &mut usize, n: usize, limit: usize, label: &'static str) -> Result<(), Error> {
     *used = used.checked_add(n).ok_or(Error::Limit(label))?;
@@ -82,8 +83,8 @@ fn charge(used: &mut usize, n: usize, limit: usize, label: &'static str) -> Resu
     }
     Ok(())
 }
-impl Budget {
-    fn new(limits: Limits) -> Self {
+impl<'b> Budget<'b> {
+    pub(super) fn new(limits: Limits) -> Self {
         let hard = Limits::default();
         Self {
             limits: Limits {
@@ -95,10 +96,25 @@ impl Budget {
             code_units: 0,
             fields: 0,
             work: 0,
+            composite: None,
         }
+    }
+    pub(super) fn composed(budget: &'b mut super::string_table::Budget) -> Self {
+        Self { composite: Some(budget), ..Self::new(Limits::default()) }
+    }
+    fn push<T>(&mut self, values: &mut Vec<T>, value: T) -> Result<(), Error> {
+        if let Some(budget) = &mut self.composite {
+            return budget.push(values, value, 0).map_err(composite_error);
+        }
+        values.try_reserve(1).map_err(|_| Error::Limit("metadata allocation"))?;
+        values.push(value);
+        Ok(())
     }
     fn fields(&mut self, n: usize) -> Result<(), Error> {
         charge(&mut self.fields, n, self.limits.fields, "metadata fields")?;
+        if let Some(budget) = &mut self.composite {
+            budget.wire.records(n).map_err(composite_error)?;
+        }
         self.work(n)
     }
     fn text(&mut self, text: &[u16]) -> Result<(), Error> {
@@ -111,13 +127,28 @@ impl Budget {
         self.work(text.len())
     }
     pub(super) fn work(&mut self, n: usize) -> Result<(), Error> {
-        charge(&mut self.work, n, self.limits.work, "metadata work")
+        charge(&mut self.work, n, self.limits.work, "metadata work")?;
+        if let Some(budget) = &mut self.composite {
+            budget.wire.work(n, 0).map_err(composite_error)?;
+        }
+        Ok(())
     }
     pub(super) fn output(&mut self, n: usize) -> Result<(), Error> {
         if n > self.limits.output_bytes {
             return Err(Error::Limit("metadata output bytes"));
         }
+        if let Some(budget) = &mut self.composite {
+            budget.input(n).map_err(composite_error)?;
+            budget.allocation(n).map_err(composite_error)?;
+        }
         self.work(n)
+    }
+}
+
+fn composite_error(error: super::wire::Error) -> Error {
+    match error.kind {
+        super::wire::ErrorKind::Limit(label) => Error::Limit(label),
+        _ => Error::Malformed("metadata composite budget"),
     }
 }
 
@@ -131,7 +162,13 @@ pub fn decode<'a>(
     input: &'a DeclarationAnnotations<'a>,
     limits: Limits,
 ) -> Result<Outcome<'a>, Error> {
-    let mut budget = Budget::new(limits);
+    decode_with_budget(input, &mut Budget::new(limits))
+}
+
+pub(super) fn decode_with_budget<'a>(
+    input: &'a DeclarationAnnotations<'a>,
+    budget: &mut Budget<'_>,
+) -> Result<Outcome<'a>, Error> {
     budget.fields(input.class.len())?;
     budget.fields(input.fields.len())?;
     budget.fields(input.methods.len())?;
@@ -170,13 +207,16 @@ pub fn decode<'a>(
         present: 0,
         k: 1,
         mv: vec![],
-        bv: vec![1, 0, 3],
+        bv: vec![],
         d1: vec![],
         d2: vec![],
         xs: &[],
         pn: &[],
         xi: 0,
     };
+    for value in [1, 0, 3] {
+        budget.push(&mut header.bv, value)?;
+    }
     budget.fields(raw.elements.len())?;
     let mut unknown = false;
     for (i, element) in raw.elements.iter().enumerate() {
@@ -197,12 +237,12 @@ pub fn decode<'a>(
         header.present |= 1 << slot;
         match slot {
             0 => header.k = integer(&element.value)?,
-            1 => header.mv = integers(&element.value, &mut budget)?,
-            2 => header.bv = integers(&element.value, &mut budget)?,
-            3 => header.d1 = strings(&element.value, &mut budget)?,
-            4 => header.d2 = strings(&element.value, &mut budget)?,
-            5 => header.xs = string(&element.value, &mut budget)?,
-            6 => header.pn = string(&element.value, &mut budget)?,
+            1 => header.mv = integers(&element.value, budget)?,
+            2 => header.bv = integers(&element.value, budget)?,
+            3 => header.d1 = strings(&element.value, budget)?,
+            4 => header.d2 = strings(&element.value, budget)?,
+            5 => header.xs = string(&element.value, budget)?,
+            6 => header.pn = string(&element.value, budget)?,
             7 => header.xi = integer(&element.value)?,
             _ => unreachable!(),
         }
@@ -219,7 +259,7 @@ pub fn decode<'a>(
     if let Some(reason) = reason {
         return Ok(Outcome::Unsupported { header, reason });
     }
-    let bytes = super::encoding::decode(&header.d1, &mut budget)?;
+    let bytes = super::encoding::decode(&header.d1, budget)?;
     Ok(Outcome::Decoded { header, bytes })
 }
 
@@ -237,7 +277,12 @@ fn array<'a, 'b>(value: &'b Value<'a>, budget: &mut Budget) -> Result<&'b [Value
     Ok(values)
 }
 fn integers(value: &Value<'_>, budget: &mut Budget) -> Result<Vec<i32>, Error> {
-    array(value, budget)?.iter().map(integer).collect()
+    let mut out = Vec::new();
+    for value in array(value, budget)? {
+        let value = integer(value)?;
+        budget.push(&mut out, value)?;
+    }
+    Ok(out)
 }
 fn string<'a>(value: &Value<'a>, budget: &mut Budget) -> Result<&'a [u16], Error> {
     let Value::String(text) = value else {
@@ -247,8 +292,10 @@ fn string<'a>(value: &Value<'a>, budget: &mut Budget) -> Result<&'a [u16], Error
     Ok(text)
 }
 fn strings<'a>(value: &Value<'a>, budget: &mut Budget) -> Result<Vec<&'a [u16]>, Error> {
-    array(value, budget)?
-        .iter()
-        .map(|value| string(value, budget))
-        .collect()
+    let mut out = Vec::new();
+    for value in array(value, budget)? {
+        let text = string(value, budget)?;
+        budget.push(&mut out, text)?;
+    }
+    Ok(out)
 }

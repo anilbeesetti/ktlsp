@@ -42,6 +42,25 @@ pub(super) fn resolve(
     resolver: &mut name_resolver::Resolver<'_, '_>,
     budget: &mut string_table::Budget,
 ) -> Result<ClassId, Error> {
+    resolve_inner(index, offset, resolver, budget, false)
+}
+
+pub(super) fn resolve_owner(
+    index: i32,
+    offset: usize,
+    resolver: &mut name_resolver::Resolver<'_, '_>,
+    budget: &mut string_table::Budget,
+) -> Result<ClassId, Error> {
+    resolve_inner(index, offset, resolver, budget, true)
+}
+
+fn resolve_inner(
+    index: i32,
+    offset: usize,
+    resolver: &mut name_resolver::Resolver<'_, '_>,
+    budget: &mut string_table::Budget,
+    owner: bool,
+) -> Result<ClassId, Error> {
     let mut text = resolver
         .get_string_with_budget(index, budget)
         .map_err(Error::Name)?;
@@ -51,6 +70,16 @@ pub(super) fn resolve(
     // Kotlin ClassId.fromString: last slash BEFORE first backtick, not last slash overall.
     // One bounded scan selects the package; one in-place pass preserves lone surrogates.
     budget.wire.work(text.len(), offset)?;
+    if owner {
+        budget.wire.work(text.len(), offset)?;
+    }
+    if owner && (local || text.contains(&u16::from(b'`'))) {
+        return Err(Error::Name(name_resolver::Error {
+            kind: name_resolver::ErrorKind::InvalidIndex,
+            index: Some(index),
+            record: None,
+        }));
+    }
     let mut split = None;
     for (i, &unit) in text.iter().enumerate() {
         if unit == u16::from(b'`') {

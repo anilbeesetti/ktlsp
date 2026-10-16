@@ -66,10 +66,11 @@ pub enum Value<'a> {
 type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Default)]
-pub(crate) struct Budget {
+pub(crate) struct Budget<'b> {
     bytes: usize,
     nodes: usize,
     work: usize,
+    composite: Option<&'b mut crate::metadata::string_table::Budget>,
 }
 fn charge(used: &mut usize, n: usize, max: usize, label: &'static str) -> Result<()> {
     *used = used.checked_add(n).ok_or(Error::Limit(label))?;
@@ -78,12 +79,40 @@ fn charge(used: &mut usize, n: usize, max: usize, label: &'static str) -> Result
     }
     Ok(())
 }
-impl Budget {
+impl<'b> Budget<'b> {
+    pub(crate) fn composed(budget: &'b mut crate::metadata::string_table::Budget) -> Self {
+        Self { composite: Some(budget), ..Self::default() }
+    }
     pub(crate) fn nodes(&mut self, n: usize) -> Result<()> {
-        charge(&mut self.nodes, n, MAX_RECORDS, "annotation nodes")
+        charge(&mut self.nodes, n, MAX_RECORDS, "annotation nodes")?;
+        if let Some(budget) = &mut self.composite {
+            budget.nodes(n).map_err(composite_error)?;
+            budget.wire.records(n).map_err(composite_error)?;
+        }
+        Ok(())
     }
     pub(crate) fn work(&mut self, n: usize) -> Result<()> {
-        charge(&mut self.work, n, MAX_VALIDATION_UNITS, "annotation work")
+        charge(&mut self.work, n, MAX_VALIDATION_UNITS, "annotation work")?;
+        if let Some(budget) = &mut self.composite {
+            budget.wire.work(n, 0).map_err(composite_error)?;
+        }
+        Ok(())
+    }
+    fn bytes(&mut self, n: usize) -> Result<()> {
+        charge(&mut self.bytes, n, MAX_BYTES, "annotation bytes")?;
+        if let Some(budget) = &mut self.composite {
+            budget.input(n).map_err(composite_error)?;
+            budget.wire.work(n, 0).map_err(composite_error)?;
+        }
+        Ok(())
+    }
+    fn push<T>(&mut self, values: &mut Vec<T>, value: T) -> Result<()> {
+        if let Some(budget) = &mut self.composite {
+            return budget.push(values, value, 0).map_err(composite_error);
+        }
+        values.try_reserve(1).map_err(|_| Error::Limit("annotation allocation"))?;
+        values.push(value);
+        Ok(())
     }
     pub(crate) fn text<'a>(&mut self, cp: &'a [Constant], index: u16) -> Result<&'a [u16]> {
         self.work(1)?;
@@ -91,8 +120,22 @@ impl Budget {
             return Err(Error::Malformed("annotation constant index"));
         }
         let text = crate::utf16(cp, index)?;
+        if self.composite.is_some() && text.len() > crate::descriptors::MAX_UNITS {
+            return Err(Error::Limit("constant UTF16 units"));
+        }
         self.work(text.len())?;
+        if let Some(budget) = &mut self.composite {
+            // Prepay the downstream name/descriptor validation scans of CP text.
+            budget.wire.work(text.len() * 2, 0).map_err(composite_error)?;
+        }
         Ok(text)
+    }
+}
+
+fn composite_error(error: crate::metadata::wire::Error) -> Error {
+    match error.kind {
+        crate::metadata::wire::ErrorKind::Limit(label) => Error::Limit(label),
+        _ => Error::Malformed("annotation composite budget"),
     }
 }
 
@@ -129,10 +172,12 @@ pub(crate) fn decode_with_budget<'a>(
     let mut fields = Vec::new();
     let mut methods = Vec::new();
     for member in &class.fields {
-        fields.push(attributes(class, &member.attributes, budget)?);
+        let attrs = attributes(class, &member.attributes, budget)?;
+        budget.push(&mut fields, attrs)?;
     }
     for member in &class.methods {
-        methods.push(attributes(class, &member.attributes, budget)?);
+        let attrs = attributes(class, &member.attributes, budget)?;
+        budget.push(&mut methods, attrs)?;
     }
     Ok(DeclarationAnnotations {
         class: class_annotations,
@@ -150,12 +195,7 @@ fn attributes<'a>(
     let mut seen = [false; 2];
     let mut out = Vec::new();
     for attr in attrs {
-        charge(
-            &mut budget.bytes,
-            attr.bytes.len(),
-            MAX_BYTES,
-            "annotation bytes",
-        )?;
+        budget.bytes(attr.bytes.len())?;
         let name = budget.text(&class.constants, attr.name)?;
         let (slot, visibility) = if crate::eq(name, "RuntimeVisibleAnnotations") {
             (0, Visibility::RuntimeVisible)
@@ -180,15 +220,16 @@ fn attributes<'a>(
         budget.nodes(count)?;
         let mut annotations = Vec::new();
         for _ in 0..count {
-            annotations.push(annotation(&mut r, &class.constants, budget, 1)?);
+            let value = annotation(&mut r, &class.constants, budget, 1)?;
+            budget.push(&mut annotations, value)?;
         }
         if r.at != attr.bytes.len() {
             return Err(Error::Malformed("annotation trailing bytes"));
         }
-        out.push(AnnotationAttribute {
+        budget.push(&mut out, AnnotationAttribute {
             visibility,
             annotations,
-        });
+        })?;
     }
     Ok(out)
 }
@@ -236,7 +277,7 @@ pub(crate) fn annotation<'a>(
         }
         budget.nodes(1)?;
         let value = value(r, cp, budget, depth + 1)?;
-        elements.push(Element { name, value });
+        budget.push(&mut elements, Element { name, value })?;
     }
     Ok(Annotation {
         descriptor,
@@ -276,7 +317,8 @@ pub(crate) fn value<'a>(
             budget.nodes(count)?;
             let mut values = Vec::new();
             for _ in 0..count {
-                values.push(value(r, cp, budget, depth + 1)?);
+                let item = value(r, cp, budget, depth + 1)?;
+                budget.push(&mut values, item)?;
             }
             Value::Array(values)
         }

@@ -2,9 +2,9 @@
 use ktlsp_parser::{
     SnapshotResult, SourceSnapshot,
     local_value_binding::{
-        LocalValueAnchor, LocalValueOccurrences, bind_lexical_type_parameter, bind_local_value,
-        bind_local_function_callee,
-        guarded_local_value_rename, local_value_occurrences, visible_local_values,
+        LocalValueAnchor, LocalValueOccurrences, bind_lexical_type_parameter,
+        bind_local_function_callee, bind_local_value, guarded_local_value_rename,
+        local_value_occurrences, visible_local_values,
     },
     lowering::{lower_declarations, reference_site},
     structural_regions::build_regions,

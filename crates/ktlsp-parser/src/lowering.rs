@@ -1227,7 +1227,11 @@ fn close_frames<'a>(
             let complete = f.plain
                 == match f.tag {
                     Tag::Fun | Tag::Property => 4,
-                    Tag::Block | Tag::Parameters | Tag::TypeParameters | Tag::Call | Tag::Arguments => 2,
+                    Tag::Block
+                    | Tag::Parameters
+                    | Tag::TypeParameters
+                    | Tag::Call
+                    | Tag::Arguments => 2,
                     Tag::Integer | Tag::Reference => 1,
                     Tag::Parameter => 6,
                     Tag::TypeParameter => 2,
@@ -1985,7 +1989,9 @@ mod tests {
             tree.token("SEMICOLON", ";");
             tree.open("CALL_EXPRESSION");
             tree.open("REFERENCE_EXPRESSION");
-            if n == 0 { selected = tree.elements.len() - 1; }
+            if n == 0 {
+                selected = tree.elements.len() - 1;
+            }
             tree.token("IDENTIFIER", "target");
             tree.close();
             tree.open("VALUE_ARGUMENT_LIST");
@@ -1998,13 +2004,32 @@ mod tests {
         let lower = lower(&result).unwrap();
         let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
         let mut measured = ReferenceBudget::default();
-        let binding = callable_with_budget(&directory, &result, selected, result.snapshot(), &mut measured).unwrap();
+        let binding = callable_with_budget(
+            &directory,
+            &result,
+            selected,
+            result.snapshot(),
+            &mut measured,
+        )
+        .unwrap();
         assert!(std::ptr::eq(binding.target(), &lower.declarations()[1]));
-        let mut exact = ReferenceBudget { work: WORK - measured.work };
+        let mut exact = ReferenceBudget {
+            work: WORK - measured.work,
+        };
         callable_with_budget(&directory, &result, selected, result.snapshot(), &mut exact).unwrap();
         assert_eq!(exact.work, WORK);
         for work in [WORK - measured.work + 1, usize::MAX] {
-            assert_eq!(callable_with_budget(&directory, &result, selected, result.snapshot(), &mut ReferenceBudget { work }).unwrap_err(), LocalBindingError::Resource);
+            assert_eq!(
+                callable_with_budget(
+                    &directory,
+                    &result,
+                    selected,
+                    result.snapshot(),
+                    &mut ReferenceBudget { work }
+                )
+                .unwrap_err(),
+                LocalBindingError::Resource
+            );
         }
     }
 

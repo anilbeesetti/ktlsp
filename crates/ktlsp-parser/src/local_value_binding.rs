@@ -193,18 +193,20 @@ impl<'a> BodyCheck<'a, '_> {
         self.finish(arguments, list.subtree_end)?;
         self.finish(index, node.subtree_end)?;
         let target = callable_target(
-            self.directory, self.parsed, function, body, index, reference, self.b,
+            self.directory,
+            self.parsed,
+            function,
+            body,
+            index,
+            reference,
+            self.b,
         )?;
         if self.selected == Some(callee) {
             self.selected_target = Some(target);
         }
         Ok(())
     }
-    fn function(
-        &mut self,
-        declaration: &'a Declaration<'a>,
-        body_index: usize,
-    ) -> Result<()> {
+    fn function(&mut self, declaration: &'a Declaration<'a>, body_index: usize) -> Result<()> {
         let function_index = declaration.cst_index();
         let function = self.b.element(self.parsed, function_index)?;
         if function.token || function.parent != Some(0) || declaration.incomplete() {
@@ -302,10 +304,18 @@ pub struct LocalFunctionBinding<'a> {
     callee: &'a Element,
 }
 impl<'a> LocalFunctionBinding<'a> {
-    pub fn target(&self) -> &'a Declaration<'a> { self.target }
-    pub fn function(&self) -> &'a Declaration<'a> { self.function }
-    pub fn body(&self) -> &'a Region<'a> { self.body }
-    pub fn callee(&self) -> &'a Element { self.callee }
+    pub fn target(&self) -> &'a Declaration<'a> {
+        self.target
+    }
+    pub fn function(&self) -> &'a Declaration<'a> {
+        self.function
+    }
+    pub fn body(&self) -> &'a Region<'a> {
+        self.body
+    }
+    pub fn callee(&self) -> &'a Element {
+        self.callee
+    }
 }
 
 /// Authenticate the entire ordinary outer body and every call under one budget.
@@ -315,7 +325,13 @@ pub fn bind_local_function_callee<'a>(
     callee_index: usize,
     current: &SourceSnapshot,
 ) -> Result<LocalFunctionBinding<'a>> {
-    callable_with_budget(directory, result, callee_index, current, &mut ReferenceBudget::default())
+    callable_with_budget(
+        directory,
+        result,
+        callee_index,
+        current,
+        &mut ReferenceBudget::default(),
+    )
 }
 
 pub(super) fn callable_with_budget<'a>(
@@ -333,14 +349,19 @@ pub(super) fn callable_with_budget<'a>(
     if callee.token || !b.equal(&callee.kind, "REFERENCE_EXPRESSION")? {
         return Err(LocalBindingError::UnsupportedContext);
     }
-    let call = b.element(parsed, callee.parent.ok_or(LocalBindingError::UnsupportedContext)?)?;
+    let call = b.element(
+        parsed,
+        callee.parent.ok_or(LocalBindingError::UnsupportedContext)?,
+    )?;
     if call.token || !b.equal(&call.kind, "CALL_EXPRESSION")? {
         return Err(LocalBindingError::UnsupportedContext);
     }
     let body_index = call.parent.ok_or(LocalBindingError::UnsupportedContext)?;
     let (_, body) = find_body(directory, body_index, b)?;
     let body_node = b.element(parsed, body_index)?;
-    let function_index = body_node.parent.ok_or(LocalBindingError::UnsupportedContext)?;
+    let function_index = body_node
+        .parent
+        .ok_or(LocalBindingError::UnsupportedContext)?;
     let mut function = None;
     for declaration in directory.lowered().declarations() {
         b.charge(1)?;
@@ -350,11 +371,23 @@ pub(super) fn callable_with_budget<'a>(
     }
     let function = function.ok_or(LocalBindingError::UnsupportedContext)?;
     let mut check = BodyCheck {
-        parsed, directory, selected: Some(callee_index), selected_target: None, cursor: 0, b,
+        parsed,
+        directory,
+        selected: Some(callee_index),
+        selected_target: None,
+        cursor: 0,
+        b,
     };
     check.function(function, body_index)?;
-    let target = check.selected_target.ok_or(LocalBindingError::UnsupportedContext)?;
-    Ok(LocalFunctionBinding { target, function, body, callee })
+    let target = check
+        .selected_target
+        .ok_or(LocalBindingError::UnsupportedContext)?;
+    Ok(LocalFunctionBinding {
+        target,
+        function,
+        body,
+        callee,
+    })
 }
 
 // Private lookup is called only by the complete-body walk, never recursively
@@ -369,26 +402,41 @@ fn callable_target<'a>(
     b: &mut ReferenceBudget,
 ) -> Result<&'a Declaration<'a>> {
     b.charge(1)?;
-    let raw = parsed.source().get(callee.start..callee.end)
+    let raw = parsed
+        .source()
+        .get(callee.start..callee.end)
         .ok_or(LocalBindingError::UnsupportedContext)?;
-    let spelling = b.spelling(raw)?.ok_or(LocalBindingError::UnsupportedSpelling)?;
+    let spelling = b
+        .spelling(raw)?
+        .ok_or(LocalBindingError::UnsupportedSpelling)?;
     let (body_ordinal, _) = find_body(directory, body, b)?;
     let mut target = None;
     for (ordinal, declaration) in directory.lowered().declarations().iter().enumerate() {
         b.charge(3)?;
         let parameter = b.equal(declaration.kind(), "VALUE_PARAMETER")?
-            && declaration.owner().and_then(|owner| directory.lowered().declarations().get(owner))
+            && declaration
+                .owner()
+                .and_then(|owner| directory.lowered().declarations().get(owner))
                 .is_some_and(|owner| std::ptr::eq(owner, function));
-        let local = directory.memberships().get(ordinal)
-            .ok_or(LocalBindingError::InvalidOrigin)?.region() == body_ordinal;
-        if !parameter && !local { continue; }
+        let local = directory
+            .memberships()
+            .get(ordinal)
+            .ok_or(LocalBindingError::InvalidOrigin)?
+            .region()
+            == body_ordinal;
+        if !parameter && !local {
+            continue;
+        }
         if declaration.incomplete() || local && declaration.cst_parent_index() != Some(body) {
             return Err(LocalBindingError::UnsupportedContext);
         }
         // Inspect every relevant spelling before any candidate eligibility.
-        let name = b.spelling(declaration.raw_name())?
+        let name = b
+            .spelling(declaration.raw_name())?
             .ok_or(LocalBindingError::UnsupportedSpelling)?;
-        if !b.equal(name, spelling)? { continue; }
+        if !b.equal(name, spelling)? {
+            continue;
+        }
         if parameter || !b.equal(declaration.kind(), "FUN")? {
             return Err(LocalBindingError::AmbiguousLocal);
         }
@@ -408,8 +456,17 @@ fn callable_target<'a>(
 
 // Only after BodyCheck proves every call is a local FUN may its callee be
 // excluded from value occurrences. Unknown reference roles still refuse.
-fn non_value_reference(parsed: &Parsed, element: &Element, b: &mut ReferenceBudget) -> Result<bool> {
-    let parent = b.element(parsed, element.parent.ok_or(LocalBindingError::UnsupportedContext)?)?;
+fn non_value_reference(
+    parsed: &Parsed,
+    element: &Element,
+    b: &mut ReferenceBudget,
+) -> Result<bool> {
+    let parent = b.element(
+        parsed,
+        element
+            .parent
+            .ok_or(LocalBindingError::UnsupportedContext)?,
+    )?;
     Ok(!parent.token
         && (b.equal(&parent.kind, "USER_TYPE")? || b.equal(&parent.kind, "CALL_EXPRESSION")?))
 }
@@ -575,7 +632,14 @@ pub(super) fn type_parameter_with_budget<'a>(
     {
         return Err(LocalBindingError::UnsupportedContext);
     }
-    BodyCheck { parsed, directory, selected: None, selected_target: None, cursor: 0, b }
+    BodyCheck {
+        parsed,
+        directory,
+        selected: None,
+        selected_target: None,
+        cursor: 0,
+        b,
+    }
     .function(function, body.cst_index())?;
     b.charge(5)?;
     let raw = parsed
@@ -662,7 +726,14 @@ fn binding_target_with_budget<'a>(
     let spelling = b
         .spelling(site.raw_spelling())?
         .ok_or(LocalBindingError::UnsupportedSpelling)?;
-    BodyCheck { parsed, directory, selected: None, selected_target: None, cursor: 0, b }
+    BodyCheck {
+        parsed,
+        directory,
+        selected: None,
+        selected_target: None,
+        cursor: 0,
+        b,
+    }
     .function(site.function(), site.body_index())?;
     let (body_ordinal, body) = find_body(directory, site.body_index(), b)?;
     let (local, parameter) = value_candidates(
@@ -897,7 +968,14 @@ pub(super) fn visible_with_budget<'a>(
     b.spelling(site.raw_spelling())?
         .ok_or(LocalBindingError::UnsupportedSpelling)?;
     let parsed = site.tree(current, b)?;
-    BodyCheck { parsed, directory, selected: None, selected_target: None, cursor: 0, b }
+    BodyCheck {
+        parsed,
+        directory,
+        selected: None,
+        selected_target: None,
+        cursor: 0,
+        b,
+    }
     .function(site.function(), site.body_index())?;
     let (body_ordinal, body) = find_body(directory, site.body_index(), b)?;
 
@@ -1194,7 +1272,14 @@ pub(super) fn occurrences_with_budget<'a>(
     {
         return Err(LocalBindingError::UnsupportedContext);
     }
-    BodyCheck { parsed, directory, selected: None, selected_target: None, cursor: 0, b }
+    BodyCheck {
+        parsed,
+        directory,
+        selected: None,
+        selected_target: None,
+        cursor: 0,
+        b,
+    }
     .function(function, body_index)?;
     let spelling = b
         .spelling(target.raw_name())?

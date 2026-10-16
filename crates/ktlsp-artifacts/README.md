@@ -100,8 +100,20 @@ byte 4; the 64 MiB artifact cap includes the header. See the
 This is data only: no JDK/JVM execution, SDK discovery, section-name validation,
 module visibility/resolution, or server capability.
 
-Fixtures are independently authored temporary local files; default tests are
-Rust-only and execute no JVM/Gradle/Maven. No official oracle comparison is claimed.
+### Selected JImage 1.0 resources
+
+`index_jimage(&verified)` validates the complete endian-aware image index before
+exact MUTF-8 module/resource selection. A private `JimageResource` retains the
+whole image artifact, caller provenance, slot, location and original stored span.
+Stored resources borrow original bytes; native `zip` uses bounded zlib/Adler32
+decoding, including nested layers. Unknown configurations/codecs and `compact-cp`
+refuse explicitly, without partial output or fallback. See [JIMAGE.md](JIMAGE.md).
+The existing 64 MiB carrier limit remains; this does not discover or bind an SDK.
+
+Non-JImage fixtures are independently authored temporary local files. JImage
+tests additionally retain the four pinned MIT upstream images and original class
+as data with full provenance/inventory; no generator is executed. Default tests
+are Rust-only and execute no JVM/Gradle/Maven. No official oracle comparison is claimed.
 Parent T020 remains open. Authenticated checksum acquisition and bounded archive verification,
 remote transport/cache mutation, lockfiles, dependency graphs, metadata-driven
 snapshot/dynamic resolution and Gradle layouts need subsequent child tickets.

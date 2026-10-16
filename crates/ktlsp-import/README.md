@@ -187,3 +187,70 @@ compiler/language/output settings, special library metadata and build provenance
 in separately bounded contracts with original-schema fixtures and comparisons.
 This subset does not implement full T021, Gradle/Maven/JPS import, dependency
 resolution or compiler semantics.
+
+## Original JPS declared-source projection (#396 / #330)
+
+`jps::source_projection(absolute_project_directory, &[jps::Document { path, bytes }])`
+consumes a caller snapshot containing `.idea/modules.xml` and exactly its
+referenced `.iml` documents. There is no I/O, discovery, physical existence or
+symlink check. Snapshot keys are project-relative or absolute host paths;
+normalized duplicates, missing/unreferenced documents, duplicate references and
+ambiguous filename-without-`.iml` module identities refuse atomically.
+Manifest order, not snapshot order, selects modules; content/source declaration
+order selects roots. Every module retains its full original `.iml` element and
+manifest reference ranges, and every root retains its original sourceFolder
+element range and normalized original document path (including BOM offsets).
+
+`ImportedSources::declared_source_projection()` exposes the existing validated
+`ktlsp_project::ProjectModel`. Existing `serde_json::to_vec` and
+`ktlsp_project::from_json` provide its immediate serialization/reload consumer.
+This explicitly named result is **declared roots only**, not effective workspace
+membership, a complete JPS model, or an empty effective classpath. It is not
+`v2::ImportedWorkspace`. Java language/output settings and recognized leaf
+source/module/library/JDK/inheritedJdk order entries are outside this operation.
+Inline module-library schemas, other components/facets, resources/custom types,
+nonempty package prefixes, exclusions/patterns and unknown elements/attributes
+refuse. `<exclude-output/>` is recognized, but any declared source intersecting
+an explicitly declared excluded compiler output refuses; inherited output paths
+are never invented. Nonintersecting outputs do not establish effective membership.
+
+Only JAVA_MODULE/version4 and ProjectModuleManager/version4 schema is supported.
+Missing source type selects test only for `isTestSource="true"`, otherwise
+production. Explicit `java-source`/`java-test` takes precedence over that flag;
+`generated` is orthogonal/default-false. Present booleans require `true`/`false`.
+No source defaults are invented. Roots must remain under their declared content
+path. Native model validation rejects duplicate/conflicting root ownership,
+including kind/generated ancestry conflicts; same-kind nested roots are retained.
+
+Paths expand only leading `$PROJECT_DIR$`/`$MODULE_DIR$` at a path boundary.
+Macro suffixes normalize lexically, including `..`; filesystem-root escapes,
+recursive/unknown macros, foreign drives/UNC/device paths and archive URLs refuse.
+XML URL attributes require `file://`; their bounded UTF-8 percent decoding is
+distinct from literal filepath attributes (`%20` is literal in filepath).
+Encoded separators/NUL/macros and URL queries/fragments refuse. Both manifest
+spellings, when supplied, must normalize to the same path. No global defaults,
+environment variables, filesystem probes or foreign-platform path guesses occur.
+
+XML is strict UTF-8/XML1.0, optionally BOM/declaration, with bounded predefined
+and numeric attribute references and XML whitespace normalization. Namespaces,
+DTD/external entities, XInclude, CDATA/processing instructions, non-whitespace
+text, duplicate/adjacent attributes, illegal scalars and unknown XML refuse.
+Limits compose across the entire call: 128 documents, 64 KiB/document, 1 MiB
+input and decoded-attribute bytes, 8,192 XML events, depth32, 16 attributes/tag,
+4 KiB pre-normalization path and 1 MiB aggregate paths (including provenance),
+100,000 counted structural work and 8 MiB aggregate allocated-storage allowance.
+Fallible geometric buffer reservations charge actual retained capacities, even
+for temporary documents; quick-xml scratch and existing model-loader allocations
+are conservatively reserved before delegation. The model envelope is eight times
+serialized bytes plus512 bytes per module/root; this is an operation allocation
+allowance, not an allocator hook/RSS guarantee. Serialized projection remains
+bounded by the existing 2 MiB native limit; no per-document allowance resets.
+
+Original unmodified release-pinned JpsJavaModule XML and Apache2 license/notices
+are in `tests/fixtures/jps`. Authored tests cover original provenance/roundtrip,
+order/generated/type defaults, Unicode/escapes/BOM, late atomic refusals,
+intersections, paths/XML security and boundaries. No test, format, compile or
+runtime observation is asserted by these source fixtures. Supplementary IntelliJ
+`188b7ef96f72c032b7ee232ba6f5ec3dac9448f8` research is not proven release-matched.
+Full JPS dependencies/SDK/compiler/resource/exclusion/facet/build integration and
+official runtime parity remain required work.

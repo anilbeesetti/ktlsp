@@ -1,0 +1,8 @@
+Original unmodified JpsJavaModule input fixtures (.idea/modules.xml and moduleB.iml)
+from Kotlin/kotlin-lsp commit 4acdb6ec74bbcfe0d30f7ecbcae053bf729b1748:
+https://github.com/Kotlin/kotlin-lsp/tree/4acdb6ec74bbcfe0d30f7ecbcae053bf729b1748/workspace-import/test/testData/jps/JpsJavaModule
+Copyright 2000-2025 JetBrains s.r.o. and contributors.
+Licensed under Apache License 2.0; the original LICENSE.txt is included here.
+These are original input XML, not exported workspace.json or runtime observations.
+Supplementary IntelliJ 188b7ef96f72c032b7ee232ba6f5ec3dac9448f8 schema research
+is NOT established to match the release's IntelliJ implementation.

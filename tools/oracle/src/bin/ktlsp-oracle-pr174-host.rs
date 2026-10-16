@@ -1683,6 +1683,20 @@ mod host {
             false,
         )
     }
+    fn cancellation_latched(dir: &Path) -> Result<bool> {
+        match fs::symlink_metadata(dir.join("cleanup-requested")) {
+            Ok(_) => Ok(true),
+            Err(error) if error.kind() == ErrorKind::NotFound => Ok(false),
+            Err(error) => Err(error.to_string()),
+        }
+    }
+    fn latch_cleanup(dir: &Path) -> Result<()> {
+        if cancellation_latched(dir)? {
+            Ok(())
+        } else {
+            make_file(&dir.join("cleanup-requested"), b"", 0o600)
+        }
+    }
     fn request_cleanup_external(dir: &Path, b: &Binding) -> Result<bool> {
         request_cleanup_external_with(dir, b, |path| protected(path, false))
     }
@@ -1691,11 +1705,7 @@ mod host {
         b: &Binding,
         custody: impl FnOnce(&Path) -> Result<()>,
     ) -> Result<bool> {
-        let latch = if dir.join("cleanup-requested").exists() {
-            Ok(())
-        } else {
-            make_file(&dir.join("cleanup-requested"), b"", 0o600)
-        };
+        let latch = latch_cleanup(dir);
         let mut dispatched = false;
         dispatch_despite_latch_error(latch, || {
             let path = dir.join("cleanup-service-ready");
@@ -2833,10 +2843,7 @@ mod host {
     }
     fn start_allowed(dir: &Path, b: &Binding, now: u64) -> Result<()> {
         if b.armed_ms.is_none_or(|t| now >= t.saturating_add(540_000))
-            || dir
-                .join("cleanup-requested")
-                .try_exists()
-                .map_err(|e| e.to_string())?
+            || cancellation_latched(dir)?
             || dir
                 .join("teardown-receipt.json")
                 .try_exists()
@@ -3160,10 +3167,14 @@ mod host {
             return Err("usage: ktlsp-oracle-pr174-host supervise|cleanup|request-cleanup /run/ktlsp-pr174/NONCE".into());
         }
         let dir = directory(&argv[1])?;
-        match argv[0].as_str() {
-            "supervise" => supervise(&dir),
+        entry_mode(&argv[0], &dir)
+    }
+    // The caller has already validated OS root and the protected nonce directory.
+    fn entry_mode(mode: &str, dir: &Path) -> Result<Value> {
+        match mode {
+            "supervise" => supervise(dir),
             "cleanup" => {
-                let b = binding(&dir)?;
+                let b = binding(dir)?;
                 let expected = format!("0::/system.slice/{}.service", unit(&b.nonce, "cleanup"));
                 if String::from_utf8_lossy(&read_file(Path::new("/proc/self/cgroup"), INPUT_BYTES)?)
                     .trim()
@@ -3178,12 +3189,23 @@ mod host {
                 {
                     return load(&dir.join("teardown-receipt.json"));
                 }
-                cleanup_bound(&dir, &b, false)
+                cleanup_bound(dir, &b, false)
             }
 
             "request-cleanup" => {
-                let b = binding(&dir)?;
-                let dispatched = request_cleanup_external(&dir, &b)?;
+                let latch = latch_cleanup(dir);
+                let mut dispatched = false;
+                dispatch_despite_latch_error(latch, || {
+                    match fs::symlink_metadata(dir.join("binding.json")) {
+                        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
+                        Err(error) => return Err(error.to_string()),
+                        Ok(_) => {}
+                    }
+                    // Existing-but-invalid custody/data is an error, not an unknown binding.
+                    let b = binding(dir)?;
+                    dispatched = request_cleanup_external(dir, &b)?;
+                    Ok(())
+                })?;
                 Ok(json!({"status":if dispatched {"CLEANUP_REQUESTED"} else {"CLEANUP_LATCHED"}}))
             }
             _ => Err("unknown fixed host mode".into()),
@@ -3247,7 +3269,7 @@ mod host {
             c
         }
         #[test]
-        #[ignore = "Rust command-reader peer; invoked only by bounded_command_reads_fragmented_caps_and_timeout"]
+        #[ignore = "Rust executable peer; invoked by command-reader and early-cancellation regressions"]
         fn command_peer() {
             match std::env::var("KTLSP_HOST_TEST_PEER").unwrap().as_str() {
                 "empty" => {}
@@ -3262,11 +3284,94 @@ mod host {
                         std::io::stdout().write_all(&[b'x'; 4096]).unwrap();
                     }
                 }
+                "early-cancel" => {
+                    for state in [
+                        "preflight",
+                        "prepare",
+                        "create",
+                        "invalid-binding",
+                        "preexisting-latch",
+                        "symlink-latch",
+                    ] {
+                        let temp = Temp::new();
+                        if state == "prepare" {
+                            fs::create_dir(temp.0.join("receipts")).unwrap();
+                        }
+                        if state == "create" {
+                            fs::write(temp.0.join("container"), b"synthetic created").unwrap();
+                        }
+                        if state == "invalid-binding" {
+                            fs::write(temp.0.join("binding.json"), b"{").unwrap();
+                        }
+                        if state == "preexisting-latch" {
+                            fs::write(temp.0.join("cleanup-requested"), b"preserve cancellation")
+                                .unwrap();
+                        }
+                        if state == "symlink-latch" {
+                            std::os::unix::fs::symlink("absent", temp.0.join("cleanup-requested"))
+                                .unwrap();
+                        }
+                        // Only protected-directory admission is bypassed; use the real CLI mode.
+                        let result = entry_mode("request-cleanup", &temp.0);
+                        if state == "invalid-binding" {
+                            assert!(result.is_err());
+                        } else {
+                            assert_eq!(result.as_ref().unwrap()["status"], "CLEANUP_LATCHED");
+                        }
+                        assert!(cancellation_latched(&temp.0).unwrap());
+                        let b = binding_fixture();
+                        if state == "create" {
+                            // Publication after cancellation cannot make START legal again.
+                            fs::write(temp.0.join("binding.json"), serde_json::to_vec(&b).unwrap())
+                                .unwrap();
+                        }
+                        assert!(start_allowed(&temp.0, &b, 2000).is_err());
+                        assert!(!temp.0.join("commands").exists());
+                        if state == "preexisting-latch" {
+                            assert_eq!(
+                                fs::read(temp.0.join("cleanup-requested")).unwrap(),
+                                b"preserve cancellation"
+                            );
+                        }
+                        if state == "symlink-latch" {
+                            assert_eq!(
+                                fs::read_link(temp.0.join("cleanup-requested")).unwrap(),
+                                Path::new("absent")
+                            );
+                        }
+                        println!(
+                            "EARLY_CANCEL_SMOKE {}",
+                            json!({"state":state,"status":if result.is_ok(){"CLEANUP_LATCHED"}else{"ERROR_LATCHED"},"startAllowed":false,"serviceDispatched":false,"officialCaptureSuccess":false})
+                        );
+                    }
+                }
                 "blocked" => loop {
                     std::thread::yield_now();
                 },
                 _ => panic!("unknown synthetic peer mode"),
             }
+        }
+        #[test]
+        fn executable_early_cancellation_precedes_binding_and_excludes_start() {
+            let out = bounded_command(
+                peer("early-cancel"),
+                16_384,
+                Instant::now() + Duration::from_secs(5),
+            )
+            .unwrap();
+            assert!(out.ok(), "{}", String::from_utf8_lossy(&out.stderr));
+            let text = String::from_utf8(out.stdout).unwrap();
+            for state in [
+                "preflight",
+                "prepare",
+                "create",
+                "invalid-binding",
+                "preexisting-latch",
+                "symlink-latch",
+            ] {
+                assert!(text.contains(&format!("\"state\":\"{state}\"")), "{text}");
+            }
+            print!("{text}");
         }
         #[test]
         fn bounded_command_reads_fragmented_caps_and_timeout() {

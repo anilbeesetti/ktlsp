@@ -141,6 +141,26 @@ types, stable cross-revision symbols or a new server capability.
   returns every half-open containing region in directory order; brace bytes
   count, EOF matches nothing. It neither authenticates a reference occurrence
   nor converts UTF-16 positions; callers convert against the identical source.
+- `lowering::reference_site` authenticates an original whole-initializer
+  `REFERENCE_EXPRESSION` and its sole identifier token against the exact lowerer,
+  parsed tree, result and current snapshot. Private fields retain borrowed origin,
+  original range/spelling, containing property, body CST index and function.
+  `ReferenceSite::semantic_spelling` reuses the declaration spelling helper.
+- `local_value_binding::bind_local_value` validates the complete ordinary top-level
+  zero-parameter function body once, then returns the original borrowed site,
+  identical body region and unique preceding complete direct local `val`.
+  Only plain immutable untyped vals with integer or whole-identifier initializers
+  are admitted. Semantic-equivalent duplicates of the queried name anywhere in
+  that body, including later duplicates, refuse the query; unsupported candidate
+  spellings never disappear from the search. Containing and later declarations
+  never bind the occurrence. Initializers are not chased transitively.
+  Origin, stale, unsupported context/spelling, ambiguity, no eligible local and
+  resource errors expose no target; no eligible local is not global unresolvedness.
+  One checked 2,097,152-unit work budget charges snapshot comparisons, traversal,
+  validation and compared bytes. The query allocates nothing and is nonrecursive.
+  This is library-only and is not complete references, nested/outer lookup,
+  parameter/receiver/import/overload resolution, types, stable cross-revision
+  identity, official navigation evidence or a new server capability.
 
 These consumers retain immutable producer association and require a synchronized
 current-document recheck before publication. Document/revision/kind/source

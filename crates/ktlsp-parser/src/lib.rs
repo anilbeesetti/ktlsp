@@ -740,6 +740,20 @@ mod admission {
         },
         thread::JoinHandle,
     };
+    // Temporary #337 changed-source hosted failure probe; no source/URI/ID bytes.
+    static CLEANUP_FAILURE_TRACES: AtomicU8 = AtomicU8::new(16);
+    // One CAS only: contention may omit a record, never wrap the trace budget.
+
+    // One temporary scalar record per original lease, emitted after selection.
+    type CleanupFailureTrace = (
+        &'static str,
+        Option<u32>,
+        u8,
+        u8,
+        Option<(Duration, Duration)>,
+        Cleanup,
+        bool,
+    );
     const N: usize = 8;
     const B: Duration = Duration::from_millis(20);
     const POLL: Duration = Duration::from_millis(2);
@@ -787,6 +801,8 @@ mod admission {
         slot: &'a Slot,
         guard: Option<MutexGuard<'a, Data>>,
         armed: bool,
+        cleanup_probe: Option<CleanupFailureTrace>,
+        spawn_probe: Option<(std::io::ErrorKind, Option<i32>)>,
     }
     // Production entry is always the one process-global SLOTS array. The private
     // reserve_on seam lets isolated capacity tests reuse the exact slot algorithm.
@@ -796,6 +812,34 @@ mod admission {
         Ok(lease)
     }
     impl<'a> Lease<'a> {
+        pub(super) fn emit_cleanup_failure_trace(&self) {
+            if let Some((phase, child_pid, initial_state, observed_state, samples, cleanup, dead)) =
+                &self.cleanup_probe
+                && let remaining @ 1..=u8::MAX = CLEANUP_FAILURE_TRACES.load(SeqCst)
+                && CLEANUP_FAILURE_TRACES
+                    .compare_exchange(remaining, remaining - 1, SeqCst, SeqCst)
+                    .is_ok()
+            {
+                let _ = writeln!(
+                    std::io::stderr().lock(),
+                    "KTLSP_CLEANUP_FAILURE_V1 phase={phase} child_pid={child_pid:?} thread={:?} initial_state={initial_state} observed_state={observed_state} slot_state_now={} elapsed_samples={samples:?} cleanup={cleanup:?} reaper_dead={dead}",
+                    thread::current().id(),
+                    self.slot.state.load(SeqCst),
+                );
+            }
+            if let Some((kind, os_error)) = &self.spawn_probe
+                && let remaining @ 1..=u8::MAX = CLEANUP_FAILURE_TRACES.load(SeqCst)
+                && CLEANUP_FAILURE_TRACES
+                    .compare_exchange(remaining, remaining - 1, SeqCst, SeqCst)
+                    .is_ok()
+            {
+                let _ = writeln!(
+                    std::io::stderr().lock(),
+                    "KTLSP_CLEANUP_FAILURE_V1 phase=spawn-error thread={:?} kind={kind:?} os_error={os_error:?}",
+                    thread::current().id(),
+                );
+            }
+        }
         // Call only after existing input-size/cancellation/preflight checks; all
         // normalization/Command/socket allocations follow the returned reservation.
         fn reserve_on(slots: &'a [Slot; N]) -> Result<Self, ParserError> {
@@ -818,6 +862,8 @@ mod admission {
                     slot,
                     guard: Some(guard),
                     armed: true,
+                    cleanup_probe: None,
+                    spawn_probe: None,
                 };
                 return Ok(lease);
             }
@@ -828,6 +874,15 @@ mod admission {
         // drop first during unwind, and explicitly dropped immediately after spawn.
         pub(super) fn spawn(&mut self, command: &mut Command) -> Result<(), ParserError> {
             if SINGLETON.load(SeqCst) != READY {
+                let _ = self.cleanup_probe.get_or_insert((
+                    "spawn-reaper-unavailable",
+                    None,
+                    self.slot.state.load(SeqCst),
+                    self.slot.state.load(SeqCst),
+                    None,
+                    Cleanup::Failed,
+                    SINGLETON.load(SeqCst) == DEAD,
+                ));
                 return Err(ParserError::Io);
             }
             let data = self.guard.as_mut().ok_or(ParserError::Io)?;
@@ -841,7 +896,10 @@ mod admission {
                     data.child = Some(child);
                     Ok(())
                 }
-                Err(_) => Err(ParserError::Io), // Drop pins attempted-without-Child; no retry.
+                Err(error) => {
+                    self.spawn_probe = Some((error.kind(), error.raw_os_error()));
+                    Err(ParserError::Io) // Drop pins attempted-without-Child; no retry.
+                }
             }
         }
 
@@ -864,10 +922,21 @@ mod admission {
         // E2 separates observed failure from unconfirmed observation expiry.
         // All selected errors remain frozen outside this cleanup-status method.
         pub(super) fn cleanup(&mut self) -> Cleanup {
+            let initial_state = self.slot.state.load(SeqCst);
             let Some(data) = self.guard.as_ref() else {
                 self.slot.state.store(FAILED, SeqCst);
+                let _ = self.cleanup_probe.get_or_insert((
+                    "missing-owned-data",
+                    None,
+                    initial_state,
+                    initial_state,
+                    None,
+                    Cleanup::Failed,
+                    SINGLETON.load(SeqCst) == DEAD,
+                ));
                 return Cleanup::Failed;
             };
+            let child_pid = data.child.as_ref().map(Child::id);
             if let Some(cleanup) = initial_cleanup(
                 data.attempted,
                 data.child.is_some(),
@@ -877,6 +946,15 @@ mod admission {
             ) {
                 if cleanup == Cleanup::Failed {
                     self.slot.state.store(FAILED, SeqCst);
+                    let _ = self.cleanup_probe.get_or_insert((
+                        "initial-ownership",
+                        child_pid,
+                        initial_state,
+                        initial_state,
+                        None,
+                        cleanup,
+                        SINGLETON.load(SeqCst) == DEAD,
+                    ));
                 }
                 return cleanup;
             }
@@ -884,12 +962,14 @@ mod admission {
             self.slot.state.store(WAITING, SeqCst);
             drop(self.guard.take());
             loop {
-                let due_before = origin.elapsed() >= B;
+                let elapsed_before = origin.elapsed();
+                let due_before = elapsed_before >= B;
                 let state = self.slot.state.load(SeqCst);
                 let dead = SINGLETON.load(SeqCst) == DEAD;
-                let due_after = origin.elapsed() >= B; // E1 decision clock.
+                let elapsed_after = origin.elapsed();
+                let due_after = elapsed_after >= B; // E1 decision clock.
                 if let Some(cleanup) = observation(state, dead, due_before, due_after) {
-                    return if cleanup == Cleanup::Confirmed {
+                    let cleanup = if cleanup == Cleanup::Confirmed {
                         self.accept_confirmation()
                     } else {
                         if cleanup == Cleanup::Failed {
@@ -897,21 +977,59 @@ mod admission {
                         }
                         cleanup
                     };
+                    if cleanup != Cleanup::Confirmed {
+                        let probe = self.cleanup_probe.get_or_insert((
+                            "cleanup-observation",
+                            child_pid,
+                            initial_state,
+                            state,
+                            Some((elapsed_before, elapsed_after)),
+                            cleanup,
+                            dead,
+                        ));
+                        probe.1 = child_pid; // Cached from this lease's original owned Child.
+                        probe.4 = Some((elapsed_before, elapsed_after));
+                    }
+                    return cleanup;
                 }
                 thread::sleep(POLL);
             }
         }
         fn accept_confirmation(&mut self) -> Cleanup {
+            let initial_state = self.slot.state.load(SeqCst);
             let guard = match self.slot.data.try_lock() {
                 Ok(guard) => guard,
-                Err(_) => {
+                Err(error) => {
+                    let phase = match error {
+                        TryLockError::WouldBlock => "confirmation-lock-busy",
+                        TryLockError::Poisoned(_) => "confirmation-lock-poisoned",
+                    };
                     self.slot.state.store(FAILED, SeqCst);
+                    let _ = self.cleanup_probe.get_or_insert((
+                        phase,
+                        None,
+                        initial_state,
+                        initial_state,
+                        None,
+                        Cleanup::Failed,
+                        SINGLETON.load(SeqCst) == DEAD,
+                    ));
                     return Cleanup::Failed;
                 }
             };
             if !valid_confirmation(guard.attempted, guard.child.is_some(), guard.reaped) {
+                let child_pid = guard.child.as_ref().map(Child::id);
                 drop(guard);
                 self.slot.state.store(FAILED, SeqCst);
+                let _ = self.cleanup_probe.get_or_insert((
+                    "invalid-confirmation",
+                    child_pid,
+                    initial_state,
+                    initial_state,
+                    None,
+                    Cleanup::Failed,
+                    SINGLETON.load(SeqCst) == DEAD,
+                ));
                 return Cleanup::Failed;
             }
             self.guard = Some(guard);
@@ -1743,17 +1861,23 @@ mod unix_io {
         cleanup.1 = false;
         let spawned = lease.spawn(&mut command);
         #[cfg(not(test))]
-        spawned?;
+        if let Err(error) = spawned {
+            let selected = Err(error);
+            lease.emit_cleanup_failure_trace();
+            return selected;
+        }
         #[cfg(test)]
         if let Some(observation) = &mut observation {
             observation.spawned(spawned);
         }
         #[cfg(test)]
         if let Err(error) = spawned {
+            let selected = Err(error);
+            lease.emit_cleanup_failure_trace();
             if let Some(observation) = observation {
-                observation.finish(&Err(error), cleanup.0, std::io::stderr().lock());
+                observation.finish(&selected, cleanup.0, std::io::stderr().lock());
             }
-            return Err(error);
+            return selected;
         }
         drop(command);
         let result = {
@@ -1803,16 +1927,17 @@ mod unix_io {
         };
         cleanup.0 = lease.cleanup();
         cleanup.1 = cleanup.0 == admission::Cleanup::Confirmed;
+        let result = admission::select_result(result, cleanup.0);
+        lease.emit_cleanup_failure_trace();
         #[cfg(test)]
         {
-            let result = admission::select_result(result, cleanup.0);
             if let Some(observation) = observation {
                 observation.finish(&result, cleanup.0, std::io::stderr().lock());
             }
             result
         }
         #[cfg(not(test))]
-        admission::select_result(result, cleanup.0)
+        result
     }
 
     #[cfg(test)]

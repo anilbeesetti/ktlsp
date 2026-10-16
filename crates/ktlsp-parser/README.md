@@ -35,9 +35,35 @@ pending cleanup and permanent failure pins. Admission happens before normalizati
 Command/observer allocation and terminal Once initialization. Once may block before
 the original exchange clock; cancellation is rechecked after initialization.
 A single retained cleanup reaper requests a 256 KiB stack and borrows each reserved
-Child in static storage. The caller closes its transport before publishing cleanup
-and observes it for 20 ms. The reaper requests termination and waits for that same
-child; no caller-side kill/wait/join remains on Unix.
+Child in static storage. Each reservation retains the originating thread handle
+under the same metadata mutex as its Child. The caller closes its transport,
+publishes cleanup, drops that mutex, and then unparks the retained reaper. The
+reaper requests termination and waits for that same child; no caller-side
+kill/wait/join remains on Unix.
+
+Cleanup still has its original strict 20 ms observation grace, with clock samples
+both before and after the ownership/death observation. Reaper and owner use
+`park_timeout` with the existing 2 ms cap instead of timer-only sleeps. Before
+publishing confirmation or failure, the reaper captures the original owner and
+releases the metadata mutex; only then does it publish and unpark that owner.
+Thus immediate confirmation consumption cannot mistake the reaper's own lock for
+invalid ownership. Stored unpark tokens cover notification before parking;
+spurious or stale tokens only trigger another unchanged state/deadline check.
+Slot reuse clears the retained owner, and an already captured notification still
+targets the old thread, never a later reservation. Startup/reaper failure also
+wakes registered waiters. There are still eight slots and one retained reaper;
+no per-request reader thread, queue, or new cleanup deadline is introduced.
+
+The original changed-source macOS probe run
+[38889917253, job 116936629275](https://github.com/anilbeesetti/ktlsp/actions/runs/38889917253/job/116936629275)
+on source `51f011a9b34b8b53ef519fdb939fe7cb2181cb96` observed same-child
+`CONFIRMED` only after the 20 ms grace (including a 21.5645 ms CLI sample and
+a 30.648 ms controlled Session sample). It did not timestamp publication, prove
+confirmation occurred within grace, or establish OS timer coalescing as the cause.
+The notification repair requires its own changed-source hosted evidence. Waking
+a thread does not guarantee the scheduler runs it within grace: late or otherwise
+unproved cleanup still fails closed, with no later promotion of the original
+request's boolean.
 
 Confirmed same-child reaping preserves the selected result, even if the reaper
 has died elsewhere. With valid pending cleanup at observation expiry, an already

@@ -64,49 +64,11 @@ struct PendingParser {
     cancelled: Arc<AtomicBool>,
     result: Receiver<(ParserResult, bool)>,
     outcome: Arc<AtomicU8>,
-    // Temporary probe key: the actual owned worker thread, not a client ID.
-    probe_thread: thread::ThreadId,
 }
 impl PendingParser {
     fn cancel(&mut self, code: i32, message: &str) -> Option<Value> {
         self.cancelled.store(true, Ordering::Relaxed);
         self.id.take().map(|id| response_error(id, code, message))
-    }
-}
-
-// Temporary #337 changed-source hosted failure probe; no source/URI/ID bytes.
-static CLEANUP_FAILURE_TRACES: AtomicU8 = AtomicU8::new(16);
-// One CAS only: contention may omit a record, never wrap the trace budget.
-fn trace_parser_cleanup_failure(
-    phase: &str,
-    pending: Option<&PendingParser>,
-    pending_count: usize,
-    outcome: Option<u8>,
-    error_code: Option<i32>,
-    missing: Option<TryRecvError>,
-    session: (State, bool),
-) {
-    if let remaining @ 1..=u8::MAX = CLEANUP_FAILURE_TRACES.load(Ordering::Relaxed)
-        && CLEANUP_FAILURE_TRACES
-            .compare_exchange(
-                remaining,
-                remaining - 1,
-                Ordering::Relaxed,
-                Ordering::Relaxed,
-            )
-            .is_ok()
-    {
-        let _ = writeln!(
-            std::io::stderr().lock(),
-            "KTLSP_SESSION_CLEANUP_FAILURE_V1 phase={phase} pending={pending_count} outcome={outcome:?} thread={:?} incarnation={:?} revision={:?} id_active={:?} cancelled={:?} error_code={error_code:?} missing={missing:?} state={:?} accumulated_proof={}",
-            pending.map(|pending| pending.probe_thread),
-            pending.map(|pending| pending.incarnation),
-            pending.map(|pending| pending.snapshot.revision()),
-            pending.map(|pending| pending.id.is_some()),
-            pending.map(|pending| pending.cancelled.load(Ordering::Relaxed)),
-            session.0,
-            session.1,
-        );
     }
 }
 
@@ -542,7 +504,6 @@ impl Session {
                 let _ = sender.send((result, cleanup_confirmed));
             })
             .map_err(|_| (-32803, "parser worker could not start"))?;
-        let probe_thread = thread.thread().id();
         let outcome = Arc::new(AtomicU8::new(0));
         threads[slot] = Some(ParserThread {
             handle: thread,
@@ -555,7 +516,6 @@ impl Session {
             cancelled,
             result,
             outcome,
-            probe_thread,
         });
         Ok(())
     }
@@ -577,44 +537,15 @@ impl Session {
             let mut pending = self.pending_parser.swap_remove(index);
             let result = if outcome != 1 {
                 self.cleanup_confirmed = false;
-                trace_parser_cleanup_failure(
-                    "thread-outcome",
-                    Some(&pending),
-                    self.pending_parser.len(),
-                    Some(outcome),
-                    None,
-                    None,
-                    (self.state, self.cleanup_confirmed),
-                );
                 Err((-32803, "parser worker failed"))
             } else {
                 match pending.result.try_recv() {
                     Ok((result, cleanup_confirmed)) => {
                         self.cleanup_confirmed &= cleanup_confirmed;
-                        if !cleanup_confirmed {
-                            trace_parser_cleanup_failure(
-                                "parser-proof",
-                                Some(&pending),
-                                self.pending_parser.len(),
-                                Some(outcome),
-                                result.as_ref().err().map(|(code, _)| *code),
-                                None,
-                                (self.state, self.cleanup_confirmed),
-                            );
-                        }
                         result
                     }
-                    Err(missing) => {
+                    Err(TryRecvError::Empty | TryRecvError::Disconnected) => {
                         self.cleanup_confirmed = false;
-                        trace_parser_cleanup_failure(
-                            "missing-completion",
-                            Some(&pending),
-                            self.pending_parser.len(),
-                            Some(outcome),
-                            None,
-                            Some(missing),
-                            (self.state, self.cleanup_confirmed),
-                        );
                         Err((-32803, "parser worker failed"))
                     }
                 }
@@ -670,22 +601,11 @@ impl Session {
                 thread::sleep(Duration::from_millis(2));
             }
         }
-        let clean = self.pending_parser.is_empty() && self.cleanup_confirmed;
-        if !clean {
-            trace_parser_cleanup_failure(
-                "close",
-                self.pending_parser.first(),
-                self.pending_parser.len(),
-                self.pending_parser
-                    .first()
-                    .map(|pending| pending.outcome.load(Ordering::Relaxed)),
-                None,
-                None,
-                (self.state, self.cleanup_confirmed),
-            );
-        }
         self.state = State::Exited;
-        (responses, clean)
+        (
+            responses,
+            self.pending_parser.is_empty() && self.cleanup_confirmed,
+        )
     }
     fn document_diagnostics(&mut self, uri: &str) -> Option<(i32, Vec<Value>)> {
         let document = self.documents.get(uri)?;

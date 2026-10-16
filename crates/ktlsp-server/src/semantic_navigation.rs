@@ -1,5 +1,10 @@
 //! Deliberately finite local binding, never a global unresolved-name answer.
-use ktlsp_parser::{SnapshotResult, SourceSnapshot, local_value_binding::bind_local_value, lowering::{lower_declarations, reference_site}, structural_regions::build_regions};
+use ktlsp_parser::{
+    SnapshotResult, SourceSnapshot,
+    local_value_binding::bind_local_value,
+    lowering::{lower_declarations, reference_site},
+    structural_regions::build_regions,
+};
 use ktlsp_text::Range;
 use serde_json::{Value, json};
 
@@ -12,7 +17,10 @@ pub(crate) enum HoverFormat {
 }
 impl HoverFormat {
     pub(crate) fn negotiate(capabilities: &Value) -> Option<Self> {
-        let Some(hover) = capabilities.get("textDocument").and_then(|text| text.get("hover")) else {
+        let Some(hover) = capabilities
+            .get("textDocument")
+            .and_then(|text| text.get("hover"))
+        else {
             return Some(Self::Plaintext);
         };
         let hover = hover.as_object()?;
@@ -37,7 +45,11 @@ pub(crate) enum Query {
     Hover { offset: usize, format: HoverFormat },
 }
 
-pub(crate) fn render(result: &SnapshotResult, snapshot: &SourceSnapshot, query: Query) -> Result<Value, &'static str> {
+pub(crate) fn render(
+    result: &SnapshotResult,
+    snapshot: &SourceSnapshot,
+    query: Query,
+) -> Result<Value, &'static str> {
     let tree = result.tree_for(snapshot).map_err(|_| UNSUPPORTED)?;
     let offset = match query {
         Query::Definition { offset } | Query::Hover { offset, .. } => offset,
@@ -62,7 +74,10 @@ pub(crate) fn render(result: &SnapshotResult, snapshot: &SourceSnapshot, query: 
     };
     // Two authenticated original endpoints, using the existing UTF-16 sweep.
     let positions = crate::structure::positions(tree.source(), &[bytes.start, bytes.end]);
-    let range = Range { start: positions[0], end: positions[1] };
+    let range = Range {
+        start: positions[0],
+        end: positions[1],
+    };
     match query {
         Query::Definition { .. } => Ok(json!({"uri":snapshot.document(), "range":range})),
         Query::Hover { format, .. } => {
@@ -72,7 +87,11 @@ pub(crate) fn render(result: &SnapshotResult, snapshot: &SourceSnapshot, query: 
                 HoverFormat::Markdown => {
                     // Longer than EVERY source run, so untrusted names/comments
                     // cannot terminate the code block. Source is parser-bounded.
-                    let longest = declaration.split(|c| c != '`').map(str::len).max().unwrap_or(0);
+                    let longest = declaration
+                        .split(|c| c != '`')
+                        .map(str::len)
+                        .max()
+                        .unwrap_or(0);
                     let fence = "`".repeat(3.max(longest + 1));
                     ("markdown", format!("{fence}kotlin\n{declaration}\n{fence}"))
                 }

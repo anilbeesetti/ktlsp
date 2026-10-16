@@ -518,18 +518,41 @@ fn actual_local_binding_definition_hover_ranges_and_refusals() {
     let reference = source.rfind("`x 😀`").unwrap();
     let params = navigation_params(source, reference + 1);
     let definition = request(&mut session, "textDocument/definition", params.clone());
-    assert_eq!(definition["result"], json!({"uri":URI,"range":span(source, "`x 😀`")}));
+    assert_eq!(
+        definition["result"],
+        json!({"uri":URI,"range":span(source, "`x 😀`")})
+    );
     let hover = request(&mut session, "textDocument/hover", params);
-    assert_eq!(hover["result"], json!({
-        "contents":{"kind":"plaintext","value":"val `x 😀` = 1"},
-        "range":{"start":{"line":3,"character":9},"end":{"line":3,"character":15}}
-    }));
+    assert_eq!(
+        hover["result"],
+        json!({
+            "contents":{"kind":"plaintext","value":"val `x 😀` = 1"},
+            "range":{"start":{"line":3,"character":9},"end":{"line":3,"character":15}}
+        })
+    );
     // End-exclusive reference selection, and no invented result on a declaration.
     for offset in [source.find("`x 😀`").unwrap(), reference + "`x 😀`".len()] {
-        assert_eq!(request(&mut session, "textDocument/definition", navigation_params(source, offset))["result"], Value::Null);
+        assert_eq!(
+            request(
+                &mut session,
+                "textDocument/definition",
+                navigation_params(source, offset)
+            )["result"],
+            Value::Null
+        );
     }
-    for position in [json!({"line":0,"character":4}), json!({"line":50,"character":0}), json!({"line":1,"character":-1}), json!({"line":1}), Value::Null] {
-        let response = request(&mut session, "textDocument/hover", json!({"textDocument":{"uri":URI},"position":position}));
+    for position in [
+        json!({"line":0,"character":4}),
+        json!({"line":50,"character":0}),
+        json!({"line":1,"character":-1}),
+        json!({"line":1}),
+        Value::Null,
+    ] {
+        let response = request(
+            &mut session,
+            "textDocument/hover",
+            json!({"textDocument":{"uri":URI},"position":position}),
+        );
         assert_eq!(response["error"]["code"], -32602, "{response}");
     }
     for (version, source) in [
@@ -544,25 +567,47 @@ fn actual_local_binding_definition_hover_ranges_and_refusals() {
         (10, "fun f() { val x = x }"),
     ] {
         change(&mut session, version, source);
-        let reference = if source.contains("unknown") { source.find("unknown").unwrap() } else { source.rfind("= x").unwrap() + 2 };
+        let reference = if source.contains("unknown") {
+            source.find("unknown").unwrap()
+        } else {
+            source.rfind("= x").unwrap() + 2
+        };
         for method in ["textDocument/definition", "textDocument/hover"] {
             let response = request(&mut session, method, navigation_params(source, reference));
             assert_eq!(response["error"]["code"], -32803, "{source}: {response}");
             assert!(response.get("result").is_none());
         }
     }
-    notify(&mut session, "textDocument/didClose", json!({"textDocument":{"uri":URI}}));
-    assert_eq!(request(&mut session, "textDocument/definition", json!({"textDocument":{"uri":URI},"position":{"line":0,"character":0}}))["error"]["code"], -32602);
+    notify(
+        &mut session,
+        "textDocument/didClose",
+        json!({"textDocument":{"uri":URI}}),
+    );
+    assert_eq!(
+        request(
+            &mut session,
+            "textDocument/definition",
+            json!({"textDocument":{"uri":URI},"position":{"line":0,"character":0}})
+        )["error"]["code"],
+        -32602
+    );
 }
 
 #[test]
 fn actual_packaged_stdio_navigation_negotiation_and_existing_providers() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
-    let source = "// 😀\r\nclass Combined { val item = 1 }\r\nfun f() { val `x😀` = 1; val y = `x😀` }";
+    let source =
+        "// 😀\r\nclass Combined { val item = 1 }\r\nfun f() { val `x😀` = 1; val y = `x😀` }";
     for (profile, expected_kind) in [
         (json!({}), Some("plaintext")),
-        (json!({"contentFormat":["unknown","markdown","plaintext"]}), Some("markdown")),
-        (json!({"contentFormat":["plaintext","markdown"]}), Some("plaintext")),
+        (
+            json!({"contentFormat":["unknown","markdown","plaintext"]}),
+            Some("markdown"),
+        ),
+        (
+            json!({"contentFormat":["plaintext","markdown"]}),
+            Some("plaintext"),
+        ),
         (json!({"contentFormat":["unknown"]}), None),
         (json!({"contentFormat":[]}), None),
         (json!({"contentFormat":false}), None),
@@ -585,33 +630,56 @@ fn actual_packaged_stdio_navigation_negotiation_and_existing_providers() {
         ];
         let replies = Package::new(true).exchange(&messages);
         assert_eq!(replies.len(), 7, "{replies:?}");
-        assert!(replies.iter().all(|reply| reply.get("id").is_some()), "no duplicate push");
+        assert!(
+            replies.iter().all(|reply| reply.get("id").is_some()),
+            "no duplicate push"
+        );
         let caps = &replies[0]["result"]["capabilities"];
         assert_eq!(caps["positionEncoding"], "utf-16");
         assert_eq!(caps["definitionProvider"], true);
         assert_eq!(caps.get("hoverProvider").is_some(), expected_kind.is_some());
         let definition = replies.iter().find(|r| r["id"] == "definition").unwrap();
-        assert_eq!(definition["result"], json!({"uri":URI,"range":span(source, "`x😀`")}));
+        assert_eq!(
+            definition["result"],
+            json!({"uri":URI,"range":span(source, "`x😀`")})
+        );
         let hover = replies.iter().find(|r| r["id"] == u64::MAX).unwrap();
         if let Some(kind) = expected_kind {
             assert_eq!(hover["result"]["contents"]["kind"], kind, "{hover}");
-            let expected = if kind == "markdown" { "```kotlin\nval `x😀` = 1\n```" } else { "val `x😀` = 1" };
+            let expected = if kind == "markdown" {
+                "```kotlin\nval `x😀` = 1\n```"
+            } else {
+                "val `x😀` = 1"
+            };
             assert_eq!(hover["result"]["contents"]["value"], expected);
-            assert_eq!(hover["result"]["range"], json!({"start":{"line":2,"character":33},"end":{"line":2,"character":38}}));
+            assert_eq!(
+                hover["result"]["range"],
+                json!({"start":{"line":2,"character":33},"end":{"line":2,"character":38}})
+            );
             // Original direct-Write wire evidence; never a synthetic CST response.
-            writeln!(std::io::stderr(), "navigation-original-wire-v1: definition={definition} hover={hover}").unwrap();
+            writeln!(
+                std::io::stderr(),
+                "navigation-original-wire-v1: definition={definition} hover={hover}"
+            )
+            .unwrap();
         } else {
             assert_eq!(hover["error"]["code"], -32601);
         }
         let symbols = replies.iter().find(|r| r["id"] == 4).unwrap();
         assert_eq!(symbols["result"][0]["name"], "Combined");
         assert_eq!(symbols["result"][0]["children"][0]["name"], "item");
-        assert_eq!(replies.iter().find(|r| r["id"] == 5).unwrap()["result"], json!({"kind":"full","items":[]}));
+        assert_eq!(
+            replies.iter().find(|r| r["id"] == 5).unwrap()["result"],
+            json!({"kind":"full","items":[]})
+        );
         let missing = Package::new(false).exchange(&messages);
         let caps = &missing[0]["result"]["capabilities"];
         assert!(caps.get("definitionProvider").is_none() && caps.get("hoverProvider").is_none());
         for id in [json!("definition"), json!(u64::MAX)] {
-            assert_eq!(missing.iter().find(|r| r["id"] == id).unwrap()["error"]["code"], -32601);
+            assert_eq!(
+                missing.iter().find(|r| r["id"] == id).unwrap()["error"]["code"],
+                -32601
+            );
         }
     }
 }
@@ -620,26 +688,48 @@ fn actual_packaged_stdio_navigation_negotiation_and_existing_providers() {
 fn actual_hover_preserves_declaration_without_initializer_chasing_or_markdown_escape() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let mut session = Session::with_parser(worker()).unwrap();
-    let initialized = request(&mut session, "initialize", json!({"capabilities":{"textDocument":{"hover":{"contentFormat":["markdown"]}}}}));
+    let initialized = request(
+        &mut session,
+        "initialize",
+        json!({"capabilities":{"textDocument":{"hover":{"contentFormat":["markdown"]}}}}),
+    );
     assert_eq!(initialized["result"]["capabilities"]["hoverProvider"], true);
     notify(&mut session, "initialized", json!({}));
     let declaration = "val /*\r\n````\r\n[untrusted](https://invalid.test)\r\n*/ `x` = 1";
     let source = format!("fun f() {{ {declaration}; val y = `x`; val z = y }}");
     open(&mut session, &source);
     let reference = source.rfind("`x`").unwrap();
-    let hover = request(&mut session, "textDocument/hover", navigation_params(&source, reference));
-    assert_eq!(hover["result"]["contents"]["value"], format!("`````kotlin\n{declaration}\n`````"), "{hover}");
+    let hover = request(
+        &mut session,
+        "textDocument/hover",
+        navigation_params(&source, reference),
+    );
+    assert_eq!(
+        hover["result"]["contents"]["value"],
+        format!("`````kotlin\n{declaration}\n`````"),
+        "{hover}"
+    );
     let reference = source.rfind("= y").unwrap() + 2;
     let params = navigation_params(&source, reference);
     let definition = request(&mut session, "textDocument/definition", params.clone());
-    assert_eq!(definition["result"], json!({"uri":URI,"range":span(&source, "y")}));
+    assert_eq!(
+        definition["result"],
+        json!({"uri":URI,"range":span(&source, "y")})
+    );
     let hover = request(&mut session, "textDocument/hover", params);
-    assert_eq!(hover["result"]["contents"]["value"], "```kotlin\nval y = `x`\n```", "{hover}");
+    assert_eq!(
+        hover["result"]["contents"]["value"], "```kotlin\nval y = `x`\n```",
+        "{hover}"
+    );
     let mut failed = Session::with_parser(env!("CARGO_BIN_EXE_ktlsp")).unwrap();
     initialize(&mut failed, json!({}));
     open(&mut failed, "fun f() { val x = 1; val y = x }");
     for method in ["textDocument/definition", "textDocument/hover"] {
-        let response = request(&mut failed, method, json!({"textDocument":{"uri":URI},"position":{"line":0,"character":29}}));
+        let response = request(
+            &mut failed,
+            method,
+            json!({"textDocument":{"uri":URI},"position":{"line":0,"character":29}}),
+        );
         assert_eq!(response["error"]["code"], -32803, "{response}");
     }
 }

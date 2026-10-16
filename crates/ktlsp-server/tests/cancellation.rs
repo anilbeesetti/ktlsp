@@ -480,8 +480,17 @@ fn interactive_stdio_cancels_active_work_and_cleans_shutdown_exit_and_eof() {
 fn navigation_uses_shared_wire_ids_cancellation_and_snapshot_guards() {
     let _serial = SERIAL.lock().unwrap_or_else(|poison| poison.into_inner());
     let package = Package::new();
-    for (method, token) in [("textDocument/definition", "definition"), ("textDocument/hover", "hover")] {
-        let navigation = |id: Value| request(id, method, json!({"textDocument":{"uri":URI},"position":{"line":1,"character":0}}));
+    for (method, token) in [
+        ("textDocument/definition", "definition"),
+        ("textDocument/hover", "hover"),
+    ] {
+        let navigation = |id: Value| {
+            request(
+                id,
+                method,
+                json!({"textDocument":{"uri":URI},"position":{"line":1,"character":0}}),
+            )
+        };
         let mut client = Client::new(&package);
         client.send(open(token));
         client.send(navigation(json!(u64::MAX)));
@@ -500,7 +509,10 @@ fn navigation_uses_shared_wire_ids_cancellation_and_snapshot_guards() {
 
         for (suffix, mutation) in [
             ("edit", change(2, "new")),
-            ("reopen", notify("textDocument/didClose", json!({"textDocument":{"uri":URI}}))),
+            (
+                "reopen",
+                notify("textDocument/didClose", json!({"textDocument":{"uri":URI}})),
+            ),
         ] {
             let token = format!("{token}{suffix}");
             let mut session = package.session(&token);
@@ -508,7 +520,10 @@ fn navigation_uses_shared_wire_ids_cancellation_and_snapshot_guards() {
             package.started(&token);
             assert!(session.handle(change(1, "rejected")).is_empty());
             assert_eq!(session.drain_errors().len(), 1);
-            assert!(session.poll().is_empty(), "rejected edit leaves original work active");
+            assert!(
+                session.poll().is_empty(),
+                "rejected edit leaves original work active"
+            );
             let responses = session.handle(mutation);
             assert_eq!(responses.len(), 1);
             error(&responses[0], json!("stale"), -32801);

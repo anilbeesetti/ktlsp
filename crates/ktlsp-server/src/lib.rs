@@ -272,7 +272,8 @@ impl Session {
         if !valid_id(id) {
             return invalid(self);
         }
-        if self.pending_parser
+        if self
+            .pending_parser
             .iter()
             .any(|pending| pending.id.as_ref() == Some(id))
         {
@@ -282,8 +283,11 @@ impl Session {
                 "request id is already active",
             )];
         }
-        if matches!(method, "textDocument/documentSymbol" | "textDocument/definition" | "textDocument/hover")
-            && self.state == State::Running {
+        if matches!(
+            method,
+            "textDocument/documentSymbol" | "textDocument/definition" | "textDocument/hover"
+        ) && self.state == State::Running
+        {
             return match self.start_parser(id.clone(), method, params) {
                 Ok(()) => Vec::new(),
                 Err((code, message)) => vec![response_error(id.clone(), code, message)],
@@ -323,7 +327,9 @@ impl Session {
             .map_err(|e| (-32602, e))?;
             self.symbol_client = symbol_client;
             self.hover_format = semantic_navigation::HoverFormat::negotiate(
-                params.and_then(|p| p.get("capabilities")).expect("validated capabilities")
+                params
+                    .and_then(|p| p.get("capabilities"))
+                    .expect("validated capabilities"),
             );
             self.configuration = configuration;
             self.pull_diagnostics = pull_diagnostics;
@@ -400,7 +406,10 @@ impl Session {
         method: &str,
         params: Option<&Value>,
     ) -> Result<(), (i32, &'static str)> {
-        let provider = self.parser_provider.as_ref().ok_or((-32601, "Method not found"))?;
+        let provider = self
+            .parser_provider
+            .as_ref()
+            .ok_or((-32601, "Method not found"))?;
         if method == "textDocument/hover" && self.hover_format.is_none() {
             return Err((-32601, "Method not found"));
         }
@@ -412,22 +421,28 @@ impl Session {
             .and_then(|d| required(d, "uri"))
             .and_then(uri_value)
             .map_err(|e| (-32602, e))?;
-        let document = self.documents.get(uri)
+        let document = self
+            .documents
+            .get(uri)
             .ok_or((-32602, "parser request refers to unopened document"))?;
         let query = if method == "textDocument/documentSymbol" {
             None
         } else {
-            let position = map.get("position")
+            let position = map
+                .get("position")
                 .ok_or((-32602, "position missing"))
-                .and_then(|value| serde_json::from_value::<ktlsp_text::Position>(value.clone())
-                    .map_err(|_| (-32602, "invalid UTF-16 position")))?;
+                .and_then(|value| {
+                    serde_json::from_value::<ktlsp_text::Position>(value.clone())
+                        .map_err(|_| (-32602, "invalid UTF-16 position"))
+                })?;
             let offset = ktlsp_text::position_to_offset(document.text(), position)
                 .map_err(|_| (-32602, "invalid UTF-16 position"))?;
             Some(if method == "textDocument/definition" {
                 semantic_navigation::Query::Definition { offset }
             } else {
                 semantic_navigation::Query::Hover {
-                    offset, format: self.hover_format.expect("hover format checked"),
+                    offset,
+                    format: self.hover_format.expect("hover format checked"),
                 }
             })
         };
@@ -437,13 +452,21 @@ impl Session {
         if self.pending_parser.len() >= MAX_PENDING_PARSER_REQUESTS {
             return Err((-32803, "parser worker capacity exhausted"));
         }
-        let mut threads = PARSER_THREADS.try_lock()
+        let mut threads = PARSER_THREADS
+            .try_lock()
             .map_err(|_| (-32803, "parser worker admission unavailable"))?;
         reap_parser_threads(&mut threads);
-        let slot = threads.iter().position(Option::is_none)
+        let slot = threads
+            .iter()
+            .position(Option::is_none)
             .ok_or((-32803, "parser worker capacity exhausted"))?;
-        let snapshot = SourceSnapshot::new(uri, i64::from(document.version()), FileKind::Source, document.text())
-            .map_err(|_| (-32803, "snapshot exceeds parser limits"))?;
+        let snapshot = SourceSnapshot::new(
+            uri,
+            i64::from(document.version()),
+            FileKind::Source,
+            document.text(),
+        )
+        .map_err(|_| (-32803, "snapshot exceeds parser limits"))?;
         let incarnation = self.incarnations[uri];
         let worker_snapshot = snapshot.clone();
         let provider = Arc::clone(provider);
@@ -454,7 +477,8 @@ impl Session {
         let thread = thread::Builder::new()
             .name("ktlsp-parser".into())
             .spawn(move || {
-                let (parsed, cleanup_confirmed) = provider.parse(&worker_snapshot, &worker_cancelled);
+                let (parsed, cleanup_confirmed) =
+                    provider.parse(&worker_snapshot, &worker_cancelled);
                 let result = (|| {
                     let parsed = parsed.map_err(|error| {
                         if error == ParserError::Cancelled {
@@ -470,7 +494,8 @@ impl Session {
                         semantic_navigation::render(&parsed, &worker_snapshot, query)
                             .map_err(|error| (-32803, error))
                     } else {
-                        let tree = parsed.tree_for(&worker_snapshot)
+                        let tree = parsed
+                            .tree_for(&worker_snapshot)
                             .map_err(|_| (-32801, "parser snapshot is stale"))?;
                         document_symbols::render(tree, &client, worker_snapshot.document())
                             .map_err(|error| (-32803, error))
@@ -480,9 +505,17 @@ impl Session {
             })
             .map_err(|_| (-32803, "parser worker could not start"))?;
         let outcome = Arc::new(AtomicU8::new(0));
-        threads[slot] = Some(ParserThread { handle: thread, outcome: Arc::clone(&outcome) });
+        threads[slot] = Some(ParserThread {
+            handle: thread,
+            outcome: Arc::clone(&outcome),
+        });
         self.pending_parser.push(PendingParser {
-            id: Some(id), snapshot, incarnation, cancelled, result, outcome,
+            id: Some(id),
+            snapshot,
+            incarnation,
+            cancelled,
+            result,
+            outcome,
         });
         Ok(())
     }
@@ -632,7 +665,8 @@ impl Session {
                 .and_then(|map| required(map, "id"))
                 .and_then(|id| valid_id(id).then_some(id).ok_or("invalid cancellation id"));
             return match id {
-                Ok(id) => self.pending_parser
+                Ok(id) => self
+                    .pending_parser
                     .iter_mut()
                     .find(|pending| pending.id.as_ref() == Some(id))
                     .and_then(|pending| pending.cancel(-32800, "Request cancelled"))

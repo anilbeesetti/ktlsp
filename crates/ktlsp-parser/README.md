@@ -473,20 +473,20 @@ evidence and integration verification remain ROOT-gated under #96.
   only; complete semantic BodyCheck and non_value_reference are unchanged, so
   newly admitted rich calls/parameterized local functions still atomically refuse
   all existing rich-body semantic consumers.
-  `tests/call_syntax.rs` contains original supervised-worker identity, role,
-  ownership, edit/reparse/rebinding, foreign/stale and refusal assertions, plus a
-  retained full actual-source/CST/public-output writer. Synthetic accounting tests
-  cover exact/one-over/overflow and call-then-parameter shared work/storage.
-  This is source-only work: no local runtime, format/build/lint/test, CI or fresh
-  hosted observation is claimed. Under separate ROOT admission, run the original
-  unfiltered checks and `cargo test --locked -p ktlsp-parser --test call_syntax --
-  --nocapture` on a hosted parser-authorized machine. Read every complete
-  `CALL_SYNTAX_ACTUAL_BEGIN` through `CALL_SYNTAX_ACTUAL_END` packet, including
-  source bytes, complete CST, call roles and selected parameter-owner/ordinals.
-  OWNER and ROOT must independently read actual packets before removing only the
-  writer; pointer assertions remain permanent. Existing paired-CLI empty-call and
-  mixed value/type/callee edit/rebinding regressions remain required. No signature
-  help or official Kotlin parity is established; #96 remains unchanged.
+  `tests/call_syntax.rs` retains original supervised-worker identity, role,
+  ownership, actual edit/reparse/rebinding and foreign/stale/refusal assertions.
+  Synthetic accounting tests cover exact/one-over/overflow and call-then-parameter
+  shared work/storage. PR406's first original Linux/macOS/Windows full workflows
+  passed; independent OWNER and ROOT completely read all ten original actual
+  source/CST/declaration/projection packets and the four-edit record per platform
+  artifact, independently applied those actual edits and matched the full
+  reparsed source. Only then were temporary JSON writers/bookkeeping removed;
+  permanent pointer assertions, actual edits and post-binding queries remain.
+  [Exact first-source receipts and limits](../../docs/status/development.md#first-original406-full-ci-and-actual-source-readback)
+  are not capture-free final-source or exact-main acceptance. Those require their
+  own original full CI and guarded integration; no filtered rerun substitutes.
+  Existing paired-CLI mixed value/type/callee regressions remain required.
+  No signature help or official Kotlin parity is established; #96 is unchanged.
 - `lowering::reference_site` authenticates an original whole-initializer
   `REFERENCE_EXPRESSION` and its sole identifier token against the exact lowerer,
   parsed tree, result and current snapshot. Private fields retain borrowed origin,

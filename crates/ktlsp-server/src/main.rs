@@ -8,7 +8,7 @@ fn main() {
                 Ok(input) => ktlsp_server::run(
                     &mut io::BufReader::new(input),
                     &mut io::stdout().lock(),
-                    &mut io::stderr().lock(),
+                    &mut io::stderr(),
                 ),
                 Err(error) => {
                     eprintln!("ktlsp: {error}");

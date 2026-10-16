@@ -194,6 +194,24 @@ types, stable cross-revision symbols or a new server capability.
   the literal's default `Int`; an annotated containing val does not invalidate
   inference for a different untyped target. Original declarations and hover text
   retain annotations unchanged. This finite extension is not Kotlin type resolution.
+  At component source `9363430fb9543569bbe31603b0b3690f8aee2cae`, original
+  [attempt-1 Linux CI38884530092/job116918948331](https://github.com/anilbeesetti/ktlsp/actions/runs/38884530092/job/116918948331)
+  passed pinned format, strict locked workspace Clippy and full workspace tests:
+  962 passes, zero failures, two ignored, plus 22 separate protocol fault cases.
+  Actual checkout `c0554127ded7a16f3c1f08e11da4893f9d0f69a0` had tree
+  `3e807212e5b0f32320b7caa6ad51b532b5e01357` and ordered parents
+  `[abe98694226c86fced3aed31691b8f0945a565e0,9363430fb9543569bbe31603b0b3690f8aee2cae]`.
+  Owner and Root independently read two actual producer trees, six production
+  binding/occurrence/integer-query payloads and two real-worker Session JSON
+  definition/hover payloads. Annotated targets refused integer-default inference;
+  an untyped target retained `Int` despite its annotated containing val. Original
+  target association, LF/CRLF/nonBMP ranges and exact declaration hover were
+  preserved, excluding type-name references. This is Session-provider evidence,
+  not typed packaged CLI/stdio or general type resolution. Temporary observation
+  writers are removed; permanent behavioral assertions remain. This receipt
+  covers the original component source, not cleanup-head runtime validation,
+  composed integration or Darwin reliability; no local parser/runtime tests ran
+  and #96 remains OPEN/UNKNOWN. See [#363 / PR365 receipt](https://github.com/anilbeesetti/ktlsp/pull/365#issuecomment-6213206923).
 - `local_value_binding::bind_local_value` validates the complete ordinary top-level
   zero-parameter function body once, then returns the original borrowed site,
   identical body region and unique preceding complete direct local `val`.

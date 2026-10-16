@@ -778,10 +778,6 @@ fn typed_local_original_definition_hover_and_annotation_refusals() {
                 }
             })
         );
-        std::io::Write::write_all(
-            &mut std::io::stderr().lock(),
-            format!("{}\n", json!({"kind":"typed-local-wire","source":source,"definition":definition,"hover":hover})).as_bytes(),
-        ).unwrap();
     }
     for annotation in ["`Long`", "Int ="] {
         let response = request(

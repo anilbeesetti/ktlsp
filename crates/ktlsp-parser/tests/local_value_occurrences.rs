@@ -236,18 +236,6 @@ fn typed_local_annotations_are_syntax_not_occurrences_or_inferred_types() {
         let snapshot = result.snapshot();
         let tree = result.tree_for(snapshot).unwrap();
         assert!(tree.diagnostics().is_empty());
-        let annotation_nodes: Vec<_> = tree.elements().iter().enumerate()
-            .filter(|(_, node)| matches!(node.kind.as_str(), "TYPE_REFERENCE" | "USER_TYPE" | "REFERENCE_EXPRESSION" | "COLON"))
-            .map(|(index, node)| serde_json::json!({
-                "index":index,"kind":node.kind,"token":node.token,
-                "start":node.start,"end":node.end,"parent":node.parent,"subtreeEnd":node.subtree_end
-            })).collect();
-        let producer_proof = serde_json::json!({"kind":"typed-local-producer","source":source,"nodes":annotation_nodes});
-        std::io::Write::write_all(
-            &mut std::io::stderr().lock(),
-            format!("{producer_proof}\n").as_bytes(),
-        )
-        .unwrap();
         let lower = lower_declarations(&result, snapshot).unwrap();
         let directory = build_regions(&lower, &result, snapshot).unwrap();
         for (ordinal, reference, expected_type) in [
@@ -280,23 +268,6 @@ fn typed_local_annotations_are_syntax_not_occurrences_or_inferred_types() {
                     IntegerInitializerError::UnsupportedContext
                 ),
             }
-            let proof = serde_json::json!({
-                "kind":"typed-local-production",
-                "source":source,
-                "target":target.raw_name(),
-                "targetRange":[target.name_range().start,target.name_range().end],
-                "siteRange":[site.range().start,site.range().end],
-                "siteUtf16":[ktlsp_text::offset_to_position(&source, site.range().start).unwrap(),ktlsp_text::offset_to_position(&source, site.range().end).unwrap()],
-                "declaration": &source[target.range()],
-                "integerDefault":expected_type.map(|ty|format!("{ty:?}")),
-                "integerRefusal":expected_type.is_none(),
-                "originalTarget":std::ptr::eq(binding.target(), target),
-            });
-            std::io::Write::write_all(
-                &mut std::io::stderr().lock(),
-                format!("{proof}\n").as_bytes(),
-            )
-            .unwrap();
         }
         for (index, node) in tree.elements().iter().enumerate() {
             if node.kind == "REFERENCE_EXPRESSION"

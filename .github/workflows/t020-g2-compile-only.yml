@@ -69,7 +69,7 @@ jobs:
             GITHUB_REF="$GITHUB_REF" GITHUB_WORKFLOW_REF="$GITHUB_WORKFLOW_REF" \
             GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" \
             G2_PAYLOAD_COMMIT="$G2_PAYLOAD_COMMIT" G2_ADMISSION_SHA256="$G2_ADMISSION_SHA256" \
-            /usr/bin/python3 ./route.py "$G2_MODE" "$PWD" "$G2_WORKSPACE/control" "$G2_WORK" "$G2_RESULTS"
+            /usr/bin/python3 -I ./route.py "$G2_MODE" "$PWD" "$G2_WORKSPACE/control" "$G2_WORK" "$G2_RESULTS"
       - name: Preserve allowlisted receipts and partial compile artifacts
         if: ${{ always() && steps.route.outputs.results_path != '' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

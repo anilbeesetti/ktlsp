@@ -1,6 +1,6 @@
 #![cfg(any(target_os = "linux", target_os = "macos"))]
 use ktlsp_oracle_replay::recorder::{CaptureLimits, record};
-use ktlsp_protocol::read_frame;
+use ktlsp_protocol::{read_frame, write_frame};
 use serde_json::{Value, json};
 use std::{
     fs,
@@ -113,29 +113,101 @@ fn exact_raw_offsets_fragmentation_and_isolation() {
 }
 #[test]
 fn partial_malformed_and_unknown_request_keep_raw_evidence() {
-    for (mode, needle) in [
-        ("partial-eof", "partial"),
-        ("bad-frame-tail", "Content-Length"),
-        ("bad-json-tail", "JSON"),
-        ("server-request", "server request"),
+    for mode in [
+        "partial-eof",
+        "bad-frame-tail",
+        "bad-json-tail",
+        "server-request",
     ] {
         let (dir, report) = capture(mode, &script(), limits());
+        // The first I/O/protocol error depends on scheduling; retained evidence
+        // and failure/cleanup facts are the contract, not diagnostic wording.
         assert_eq!(report["complete"], false);
-        assert!(
-            report["failureReason"].as_str().unwrap().contains(needle),
-            "{report}"
-        );
+        assert_eq!(report["scriptCompleted"], false);
+        assert_eq!(report["export"]["complete"], false);
+        assert!(!dir.0.join("transcript.json").exists());
+        assert!(!dir.0.join("metadata.json").exists());
         let raw = fs::read(dir.0.join("stdout.raw")).unwrap();
-        assert!(!raw.is_empty());
+        let expected = match mode {
+            "partial-eof" => b"Content-Length: 20\r\n\r\n{".to_vec(),
+            "bad-frame-tail" => b"Content-Length: -1\r\n\r\nmalformed-tail".to_vec(),
+            "bad-json-tail" => {
+                let mut frame = Vec::new();
+                write_frame(&mut frame, b"{").unwrap();
+                frame.extend_from_slice(b"raw-tail");
+                frame
+            }
+            "server-request" => {
+                let mut frame = Vec::new();
+                write_frame(
+                    &mut frame,
+                    &serde_json::to_vec(
+                        &json!({"jsonrpc":"2.0","id":9,"method":"workspace/configuration"}),
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+                frame
+            }
+            _ => unreachable!(),
+        };
+        assert_eq!(raw, expected, "{mode}");
+        assert_eq!(report["stdout"]["bytes"], raw.len());
+        assert_eq!(report["stdout"]["observedBytes"], raw.len());
+        assert_eq!(report["stdout"]["unpersistedBytes"], 0);
+        assert_eq!(report["stdout"]["storageFailed"], false);
+        assert_eq!(report["stdout"]["truncated"], false);
+        assert_eq!(report["stdout"]["eof"], true);
+        assert_eq!(report["stdout"]["undecodedEnd"], raw.len());
         assert_eq!(
-            report["stdout"]["bytes"].as_u64().unwrap(),
-            raw.len() as u64
+            report["stdout"]["undecodedStart"],
+            if mode == "server-request" {
+                raw.len()
+            } else {
+                0
+            }
         );
-        if mode.contains("tail") {
-            assert!(raw.ends_with(b"tail"));
-            assert_eq!(report["stdout"]["undecodedStart"], 0);
+        assert_eq!(
+            report["stdoutFrames"].as_array().unwrap().len(),
+            if mode == "server-request" { 1 } else { 0 }
+        );
+        let intended = fs::read(dir.0.join("client-intended.raw")).unwrap();
+        let messages = script();
+        let mut offset = 0;
+        for (index, frame) in report["clientFrames"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .enumerate()
+        {
+            let mut expected = Vec::new();
+            write_frame(
+                &mut expected,
+                &serde_json::to_vec(&messages[index]).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(frame["start"], offset);
+            offset += expected.len();
+            assert_eq!(frame["end"], offset);
+            assert_eq!(frame["persistedBytes"], expected.len());
+            assert_eq!(frame["intendedLength"], expected.len());
+            assert!(frame["acceptedBytes"].as_u64().unwrap() <= expected.len() as u64);
+            assert_eq!(&intended[offset - expected.len()..offset], expected);
         }
+        assert_eq!(intended.len(), offset);
         assert_eq!(report["exit"]["observed"], true);
+        assert!(report["exit"]["code"].is_i64() || report["exit"]["signal"].is_i64());
+        assert_eq!(report["cleanup"]["forcedTermination"], true);
+        let cleanup = &report["cleanup"];
+        assert!(cleanup["groupKillAttempted"].is_boolean(), "{report}");
+        if cleanup["error"].is_null() {
+            assert_eq!(cleanup["groupKillAttempted"], true, "{report}");
+        } else {
+            assert!(
+                cleanup["error"].as_str().is_some_and(|s| !s.is_empty()),
+                "{report}"
+            );
+        }
     }
 }
 #[test]

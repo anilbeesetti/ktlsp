@@ -16,6 +16,7 @@ permissions:
 jobs:
   synthetic-tools:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
@@ -29,4 +30,4 @@ jobs:
       - name: Clippy optional workspace
         run: cargo clippy --locked --manifest-path tools/oracle/Cargo.toml --all-targets -- -D warnings
       - name: Synthetic Rust peer tests only
-        run: cargo test --locked --manifest-path tools/oracle/Cargo.toml
+        run: cargo test --locked --manifest-path tools/oracle/Cargo.toml --no-fail-fast

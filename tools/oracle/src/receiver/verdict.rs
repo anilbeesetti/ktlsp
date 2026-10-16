@@ -118,6 +118,7 @@ fn original_stat(raw: &str) -> Result<(u64,u64)> {
 }
 fn runtime(files: &Files, b: &ExportBinding, expected: &RootGrant) -> Result<()> {
     let observations = lines(files,"receipts/observer.evidence",786432)?;
+    let custody = writer_custody(files,b,expected,&observations)?;
     let identity = json_bytes(file(files,"process-identity.json")?)?;
     require(identity["cgroup"] == format!("/system.slice/docker-{}.scope",b.container_id),"original cgroup/CID mismatch")?;
     let mut roles = BTreeSet::new();
@@ -141,6 +142,10 @@ fn runtime(files: &Files, b: &ExportBinding, expected: &RootGrant) -> Result<()>
             let limits = text_hex(&r["limitsHex"])?;
             require(limits.lines().find_map(|l|l.strip_prefix("Max core file size")).is_some_and(|s|s.split_whitespace().take(2).collect::<Vec<_>>() == ["0","0"]),"original core limit mismatch")?;
             let role = r["role"].as_str().ok_or("host missing independently joinable executable/JVM inode measurements")?;
+            if role == "recorder" {
+                let nspid = status.lines().find_map(|l|l.strip_prefix("NSpid:")).ok_or("actual recorder namespace PID absent")?.split_whitespace().map(str::parse::<u64>).collect::<std::result::Result<Vec<_>,_>>().map_err(|_|"invalid recorder namespace PIDs")?;
+                require(nspid.len() == 2 && nspid[0] == stat.0 && custody["parentPid"].as_u64() == nspid.last().copied(),"measured confined-child writer is not original recorder")?;
+            }
             require(["recorder","launcher"].contains(&role) && r["exeDevice"].as_u64().is_some() && r["exeInode"].as_u64().is_some_and(|n| n>0) && r["exeDevice"] == r["sealedExecutableDevice"] && r["exeInode"] == r["sealedExecutableInode"],"sealed original executable identity mismatch")?;
             let argv = unhex(&r["cmdlineHex"])?;
             let expected_argv = if role == "launcher" { vec!["/tmp/ktlsp-t045-pr174-host/distribution/kotlin-server-263.6379.0/bin/intellij-server","--stdio","--data-sharing=none","--region=apac","--system-path=/tmp/ktlsp-t045-pr174-host/capture/system"] } else { vec!["/tmp/ktlsp-t045-pr174-host/tool/ktlsp-oracle-official-pr174","--identity","/tmp/ktlsp-t045-pr174-host/preflight/identity.json","--preflight","/tmp/ktlsp-t045-pr174-host/preflight/host-preflight.json","--authorization","/tmp/ktlsp-t045-pr174-host/preflight/launch-authorization.json","--fixture-directory","/tmp/ktlsp-t045-pr174-host/fixture"] };
@@ -330,6 +335,7 @@ fn calibration(files: &Files, expected: &RootGrant, supplied: &[(super::Receiver
         require(grant.source_head == expected.source_head && grant.source_tree == expected.source_tree && grant.workflow_sha256 == expected.workflow_sha256 && grant.host_binary_sha256 == expected.host_binary_sha256 && grant.peer_sha256 == expected.peer_sha256 && grant.containment_template_sha256 == expected.containment_template_sha256 && grant.image == expected.image && grant.image_id == expected.image_id && grant.host == expected.host && b.boot_id == report.boot_id && b.daemon_id == report.daemon_id,"calibration same original host/image/config mismatch")?;
         teardown(&artifact.files,&b,!case.case.forced())?;
         let observations = lines(&artifact.files,"receipts/observer.evidence",786432)?;
+        host_custody(&artifact.files,&b,grant,&observations)?;
         let peer_bytes = file(&artifact.files,"capture/calibration-peer.json")?;
         let peer: crate::calibration_peer::Report = serde_json::from_value(json_bytes(peer_bytes)?).map_err(|e|e.to_string())?;
         peer.validate_case(case.case)?;
@@ -374,9 +380,6 @@ fn calibration_processes(files: &Files,b: &ExportBinding,peer: &crate::calibrati
     Ok(())
 }
 
-#[cfg(test)]
-#[path = "receipt_tests.rs"]
-mod receipt_tests;
 
 fn authenticated_provenance(a: &AuthenticatedArtifact,admission: &super::ReceiverAdmission) -> Result<ExportBinding> {
     admission.validate()?;
@@ -403,3 +406,29 @@ fn forced_calibration_action(files: &Files,b: &ExportBinding,case: authority::Ca
     require(stat == (action.init_pid as u64,action.init_starttime) && state["Running"] == true && state["Restarting"] == false && state["Dead"] == false && state["OOMKilled"] == false && state["Pid"] == action.init_pid && raw["restartCount"] == 0,"calibration action did not observe original live init/noOOM/noRestart")?;
     Ok(())
 }
+fn confinement_receipt(raw: Value) -> Result<Value> {
+    let typed: crate::recorder::confinement::Receipt = serde_json::from_value(raw).map_err(|e|e.to_string())?;
+    typed.validate_enforced(typed.parent_pid)?;
+    require(typed.parent_pid > 1,"original writer namespace PID must follow original init")?;
+    serde_json::to_value(typed).map_err(|e|e.to_string())
+}
+fn host_custody(files: &Files,b: &ExportBinding,grant: &RootGrant,observations: &[Value]) -> Result<()> {
+    let measurement: authority::ConfinementMeasurement = authority::decode(file(files,"child-confinement-profile.json")?)?;
+    measurement.validate(grant,&b.nonce,&b.boot_id,&b.daemon_id)?;
+    let actual = serde_json::to_value(measurement).map_err(|e|e.to_string())?;
+    let mut rows = observations.iter().filter(|r|r["kind"] == "child-confinement-preflight");
+    require(rows.next() == Some(&actual) && rows.next().is_none(),"independent original host profile/ABI observation missing/ambiguous")?;
+    Ok(())
+}
+fn writer_custody(files: &Files,b: &ExportBinding,grant: &RootGrant,observations: &[Value]) -> Result<Value> {
+    host_custody(files,b,grant,observations)?;
+    let receipt = confinement_receipt(json_bytes(file(files,"capture/child-confinement.json")?)?)?;
+    let manifest = json_bytes(file(files,"capture/manifest.json")?)?;
+    let metadata = json_bytes(file(files,"capture/metadata.json")?)?;
+    require(manifest["childConfinement"] == receipt && metadata["childConfinement"] == receipt,"original writer custody receipt/file/manifest/metadata mismatch")?;
+    Ok(receipt)
+}
+
+#[cfg(test)]
+#[path = "receipt_tests.rs"]
+mod receipt_tests;

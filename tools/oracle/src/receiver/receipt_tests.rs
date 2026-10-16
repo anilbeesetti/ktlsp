@@ -83,3 +83,14 @@ fn forced_case_requires_original_live_action_then_actual_kill_wait137_and_no_oom
     assert!(forced_calibration_action(&f,&b,authority::CalibrationCase::WorkflowStepCancel,&[observation(&action)],Some(500001)).is_err());
     assert!(forced_calibration_action(&f,&b,authority::CalibrationCase::WorkflowStepCancel,&[observation(&action)],Some(500000)).is_ok());
 }
+
+#[test]
+fn missing_or_refused_writer_custody_cannot_authenticate_same_uid_capture() {
+    assert!(confinement_receipt(Value::Null).is_err());
+    let required=serde_json::to_value(crate::recorder::confinement::profile()).unwrap();
+    // Deliberately NOT an enforced receipt: no ABI or nondumpable measurement.
+    for outcome in ["NOT_RUN","REFUSED_NO_OFFICIAL_EXEC","ENFORCED_BEFORE_EXEC"] {
+        let raw=json!({"schemaVersion":1,"profile":required,"landlockAbi":null,"parentPid":0,"parentDumpable":null,"hookOutcome":outcome});
+        assert!(confinement_receipt(raw).is_err());
+    }
+}

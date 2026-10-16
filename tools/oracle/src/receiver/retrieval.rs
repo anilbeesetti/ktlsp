@@ -47,8 +47,8 @@ fn command(program: &str, args: &[&str], cap: usize) -> Result<Vec<u8>> {
             Err(e) if matches!(e.kind(),std::io::ErrorKind::WouldBlock|std::io::ErrorKind::Interrupted) => (),
             Err(e) => { let _ = child.kill(); let _ = child.wait(); return Err(e.to_string()); }
         }
-        if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
-            if eof { require(status.success(),"fixed retrieval command failed")?; return Ok(bytes); }
+        if let Some(status) = child.try_wait().map_err(|e| e.to_string())? && eof {
+            require(status.success(),"fixed retrieval command failed")?; return Ok(bytes);
         }
         if Instant::now() >= end { let _ = child.kill(); let _ = child.wait(); return Err("retrieval deadline/EOF missing".into()); }
         std::thread::sleep(Duration::from_millis(1));
@@ -203,9 +203,6 @@ fn crc32(bytes: &[u8]) -> u32 {
     !bytes.iter().fold(!0u32, |crc,b| (crc >> 8) ^ TABLE[((crc ^ *b as u32) & 255) as usize])
 }
 
-#[cfg(test)]
-#[path = "zip_tests.rs"]
-mod zip_tests;
 
 fn zip_extra(extra: &[u8]) -> Result<()> {
     let mut pos = 0;
@@ -218,3 +215,6 @@ fn zip_extra(extra: &[u8]) -> Result<()> {
     }
     Ok(())
 }
+#[cfg(test)]
+#[path = "zip_tests.rs"]
+mod zip_tests;

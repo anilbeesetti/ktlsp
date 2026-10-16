@@ -83,7 +83,27 @@ All inventory members are independently size-checked and SHA-256 hashed.
 Official exports need the actual Admission/ROOT grant/calibration/workflow,
 protected cleanup binding/process identity/arm/START/cleanup clock receipts,
 preflight identity/preflight/authorization, observer and cleanup evidence, final
-teardown receipt and six capture files. Missing failed finals remain missing.
+teardown receipt, six protocol capture files, protected host
+`child-confinement-profile.json` and original `capture/child-confinement.json`.
+Missing failed finals remain missing.
+The shared typed host measurement must match the actual independent pre-START
+ABI/profile observation, exact admitted source/template and boot/daemon/nonce.
+The shared recorder `Receipt::validate_enforced` must accept the exact production
+policy and measured nondumpable parent/ABI/enforcement; its original parent PID
+is joined to the actual recorder's namespace PID. File/manifest/metadata receipts
+must agree. Mere 0600/0700 permissions do **not** isolate same-UID JVM descendants;
+post-closure copying/hashing alone cannot authenticate original child exit or raw
+bytes. Official success requires the real shared child-only production custody
+hook and authenticated same-profile Rust denial calibration, not a claimed flag.
+Absent/unsupported/refused/unmeasured custody never grants official success.
+
+Forced calibration cases require bound actual live-original-init action evidence
+plus ordered successful exact-CID kill, wait137 and stopped inspection with no
+OOM/restart. Workflow-step timeout additionally requires actual outside-step
+service action observation after the authenticated original step completion time.
+Cleanup independently joins original arm/clock and actual systemd service start,
+the 60-second clamp, 12-second teardown reserve and 2-second completion reserve.
+Unfinished, prematurely dead or partially exported cases cannot pass calibration.
 
 Only bounded stored/deflate ZIP is accepted (32 MiB archive/expanded total,
 8 MiB/member, 48 members). ZIP64, encryption, comments, multidisk, unsafe or

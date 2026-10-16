@@ -63,9 +63,6 @@ pub(super) fn timeout(job: &Value,name: &str,number: u32,job_logs: &[u8],step_lo
     unix_ms(step["completed_at"].as_str().ok_or("original timeout-step completion missing")?)
 }
 
-#[cfg(test)]
-#[path = "custody_tests.rs"]
-mod custody_tests;
 
 fn unix_ms(timestamp: &str) -> Result<u64> {
     let s = utc_second(timestamp)?;
@@ -85,3 +82,6 @@ fn unix_ms(timestamp: &str) -> Result<u64> {
     }
     Ok((((days*24+hour)*60+minute)*60+second)*1000+fraction)
 }
+#[cfg(test)]
+#[path = "custody_tests.rs"]
+mod custody_tests;

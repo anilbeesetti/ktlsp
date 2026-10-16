@@ -207,6 +207,111 @@ jobs:
           tar -czf "$env:RUNNER_TEMP/$name.tar.gz" -C $stage .
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           "$((Get-FileHash -LiteralPath "$env:RUNNER_TEMP/$name.tar.gz" -Algorithm SHA256).Hash.ToLowerInvariant())  $name.tar.gz" | Set-Content "$env:RUNNER_TEMP/$name.tar.gz.sha256" -Encoding utf8NoBOM
+      - name: Verify and smoke the actual extracted archive
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUNNER_OS_NAME: ${{ runner.os }}
+          RUNNER_ARCH_NAME: ${{ runner.arch }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidence = "$env:RUNNER_TEMP/native-package-evidence"
+          $name = "ktlsp-experimental-$env:RUNNER_OS_NAME-$env:RUNNER_ARCH_NAME-$env:SOURCE_SHA"
+          $archive = "$env:RUNNER_TEMP/$name.tar.gz"
+          $checksum = (Get-Content -LiteralPath "$archive.sha256" -Raw).TrimEnd()
+          $outerHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($checksum -cne "$outerHash  $name.tar.gz") { throw 'Outer TAR checksum mismatch before extraction' }
+          Copy-Item -LiteralPath "$archive.sha256" -Destination "$evidence/extracted-archive.sha256"
+          # Exclusive creation, no reuse/removal of another owner's directory.
+          $extract = Join-Path $env:RUNNER_TEMP ("native-package-extracted-" + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $extract | Out-Null
+          @{ archive = $archive; sha256 = $outerHash; extracted_directory = $extract; outer_verified_before_extraction = $true } |
+            ConvertTo-Json | Set-Content "$evidence/extracted-verification.json" -Encoding utf8NoBOM
+          tar -xzf $archive -C $extract
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $entries = @(Get-ChildItem -LiteralPath $extract -Recurse -Force)
+          if (@($entries | Where-Object { $_.Attributes -band [System.IO.FileAttributes]::ReparsePoint }).Count -ne 0) {
+            throw 'Extracted package contains a symbolic link/reparse point'
+          }
+          $files = @($entries | Where-Object { -not $_.PSIsContainer } | ForEach-Object {
+            [System.IO.Path]::GetRelativePath($extract, $_.FullName).Replace('\', '/')
+          })
+          $actual = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+          foreach ($file in $files) { if (-not $actual.Add($file)) { throw 'Duplicate extracted file' } }
+          $hashed = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+          foreach ($line in Get-Content -LiteralPath "$extract/SHA256SUMS") {
+            if ($line -cnotmatch '^([0-9a-f]{64})  (.+)$') { throw 'Malformed inner checksum record' }
+            $expectedHash = $Matches[1]
+            $relative = $Matches[2]
+            if ($relative.Contains('\') -or $relative.StartsWith('/') -or $relative.Contains(':') -or
+                @($relative.Split('/') | Where-Object { $_ -cin @('', '.', '..') }).Count -ne 0 -or
+                $relative -ceq 'SHA256SUMS' -or -not $actual.Contains($relative) -or -not $hashed.Add($relative)) {
+              throw "Unsafe, duplicate or absent inner checksum path: $relative"
+            }
+            $hash = (Get-FileHash -LiteralPath (Join-Path $extract $relative) -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($hash -cne $expectedHash) { throw "Inner checksum mismatch: $relative" }
+          }
+          if (-not $hashed.Add('SHA256SUMS') -or -not $hashed.SetEquals($actual)) {
+            throw 'Inner checksums do not cover every extracted file exactly once'
+          }
+          $provenance = Get-Content -LiteralPath "$extract/provenance.json" -Raw | ConvertFrom-Json
+          $identity = Get-Content -LiteralPath "$extract/build-evidence/identity.json" -Raw | ConvertFrom-Json
+          $preflight = Get-Content -LiteralPath "$extract/build-evidence/source-preflight.json" -Raw | ConvertFrom-Json
+          $tree = (Get-Content -LiteralPath "$evidence/source-tree.txt" -Raw).Trim()
+          $innerTree = (Get-Content -LiteralPath "$extract/build-evidence/source-tree.txt" -Raw).Trim()
+          $contents = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+          foreach ($file in $provenance.contents) { if (-not $contents.Add($file)) { throw 'Duplicate provenance content' } }
+          if (-not $contents.SetEquals($actual) -or $provenance.experimental -cne $true -or
+              $provenance.repository -cne $env:REPOSITORY -or $provenance.commit -cne $env:SOURCE_SHA -or
+              $provenance.workflow_sha -cne $env:WORKFLOW_SHA -or $provenance.tree -cne $tree -or $innerTree -cne $tree -or
+              $provenance.run_url -cne "https://github.com/$env:REPOSITORY/actions/runs/$env:RUN_ID/attempts/$env:RUN_ATTEMPT" -or
+              $provenance.runner_os -cne $env:RUNNER_OS_NAME -or $provenance.runner_arch -cne $env:RUNNER_ARCH_NAME -or
+              $identity.source_sha -cne $env:SOURCE_SHA -or $identity.workflow_sha -cne $env:WORKFLOW_SHA -or
+              $identity.repository -cne $env:REPOSITORY -or $identity.run_id -cne $env:RUN_ID -or
+              $identity.run_attempt -cne $env:RUN_ATTEMPT -or $identity.runner_os -cne $env:RUNNER_OS_NAME -or
+              $identity.runner_arch -cne $env:RUNNER_ARCH_NAME -or
+              $preflight.source_sha -cne $env:SOURCE_SHA -or @($preflight.operands.head).Count -ne 1 -or
+              $preflight.operands.head[0] -cne $env:SOURCE_SHA -or @($preflight.operands.tree).Count -ne 1 -or
+              $preflight.operands.tree[0] -cne $tree -or @($preflight.operands.status).Count -ne 0) {
+            throw 'Extracted provenance/source/workflow/run identity mismatch'
+          }
+          foreach ($pair in @(
+            @('Cargo.lock', "$extract/build-evidence/Cargo.lock"),
+            @('.github/workflows/native-packaging-experiment.yml', "$extract/build-evidence/native-packaging-experiment.yml")
+          )) {
+            if ((Get-FileHash -LiteralPath $pair[0] -Algorithm SHA256).Hash -cne
+                (Get-FileHash -LiteralPath $pair[1] -Algorithm SHA256).Hash) { throw 'Extracted locked source/workflow bytes differ' }
+          }
+          Copy-Item -LiteralPath "$extract/provenance.json", "$extract/SHA256SUMS" -Destination $evidence
+          @{
+            archive = $archive; sha256 = $outerHash; extracted_directory = $extract
+            outer_verified_before_extraction = $true; complete_inner_verified_before_execution = $true
+            verified_files = $actual.Count; source_sha = $env:SOURCE_SHA; tree = $tree
+            workflow_sha = $env:WORKFLOW_SHA; run_id = $env:RUN_ID; run_attempt = $env:RUN_ATTEMPT
+          } | ConvertTo-Json | Set-Content "$evidence/extracted-verification.json" -Encoding utf8NoBOM
+          # Rust owns all CLI/semantic runtime checks; the optional test borrows
+          # these exact extracted paths, never CARGO_BIN_EXE or staging copies.
+          $env:KTLSP_EXTRACTED_PACKAGE_DIR = $extract
+          cargo +1.99.0 test --locked --release -p ktlsp-server --test document_symbols extracted_archive_smoke -- --ignored --exact --nocapture 2>&1 |
+            Tee-Object "$evidence/extracted-smoke.txt"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path -LiteralPath $extract -PathType Container)) { throw 'Borrowed extraction directory was deleted' }
+          if (Select-String -Path "$evidence/extracted-smoke.txt" -Pattern 'rust-objcopy|libLLVM|SIGABRT|signal: 6|failed to strip|stripping.*failed' -Quiet) {
+            throw 'Artifact smoke build-child/stripping diagnostic requires investigation'
+          }
+          $receiptLines = @(Get-Content -LiteralPath "$evidence/extracted-smoke.txt" | Where-Object { $_.StartsWith('EXTRACTED_ARCHIVE_SMOKE_RECEIPT=') })
+          if ($receiptLines.Count -ne 1) { throw 'Missing or duplicate actual extracted smoke receipt' }
+          $receiptText = $receiptLines[0].Substring('EXTRACTED_ARCHIVE_SMOKE_RECEIPT='.Length)
+          if ([System.Text.Encoding]::UTF8.GetByteCount($receiptText) -gt 65536) { throw 'Oversized extracted smoke receipt' }
+          $receipt = $receiptText | ConvertFrom-Json
+          if (-not $receipt.borrowed_directory_retained -or $receipt.provenance.commit -cne $env:SOURCE_SHA -or
+              $receipt.provenance.tree -cne $tree -or $receipt.provenance.workflow_sha -cne $env:WORKFLOW_SHA -or
+              $receipt.provenance.run_url -cne $provenance.run_url) { throw 'Actual smoke receipt identity mismatch' }
+          # Post-execution wire belongs ONLY to the separate evidence artifact.
+          $receiptText | Set-Content "$evidence/extracted-smoke.json" -Encoding utf8NoBOM
       - name: Preserve original native evidence, including failures
         if: ${{ always() }}
         uses: actions/upload-artifact@v4

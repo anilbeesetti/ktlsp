@@ -13,6 +13,42 @@ Install **both** `ktlsp` and `ktlsp-parser-worker` from that same build into the
 
 Without that sibling, synchronization/folding/lexical diagnostics remain available, `documentSymbolProvider`/`definitionProvider`/`hoverProvider`/`referencesProvider`/`documentHighlightProvider` are omitted and their requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. A configured worker that subsequently fails is a request failure, not a fabricated outline or binding. No JVM/JDK, Kotlin compiler or C parser is required.
 
+## Optional extracted-archive smoke (#373)
+
+The existing manual experimental packaging workflow keeps the full unfiltered
+locked **release workspace tests first**, then checks the just-created TAR's outer
+SHA-256 before creating a fresh extraction directory. After extraction it verifies
+every inner checksum, exact file inventory, provenance, admitted source/tree,
+workflow bytes, lockfile and original run/attempt identities **before execution**.
+Only then does the separately identified ignored Rust integration test run:
+
+```sh
+KTLSP_EXTRACTED_PACKAGE_DIR=/absolute/verified/extracted/package \
+  cargo +1.99.0 test --locked --release -p ktlsp-server --test document_symbols \
+  extracted_archive_smoke -- --ignored --exact --nocapture
+```
+
+An absent/invalid directory fails this explicit invocation; it is never a
+success-shaped skip. Default native tests do not require an archive or JDK and
+do **not** exercise this ignored test. The smoke runs the actual extracted server
+`--help`, `--version` and matching sibling-worker stdio with empty PATH and
+JAVA_HOME/JDK_HOME removed. It reuses the ordinary-parameter/local-shadow fixture,
+original string/u64 request IDs, CRLF/non-BMP UTF-16 ranges, definition/hover,
+references/highlights and full empty pull diagnostics without duplicate pushes.
+All processes must exit successfully with empty stderr. The borrowing exchange
+helper never deletes the extraction directory; only exclusively created `Package`
+test directories have deletion ownership, and retained extraction is asserted.
+
+The permanent bounded decoded wire/CLI/provenance receipt is
+`extracted-smoke.json` in the **separate evidence ZIP**, alongside verification
+facts, complete inner checksums and the captured optional-test log. It is not
+inserted into its own TAR. Failure evidence remains always-uploaded; the package
+is uploaded only after the extracted smoke succeeds. Source and compile checks
+are not runtime proof: this optional test has not yet been exercised by #373.
+Its manual dispatch requires a new separate ROOT admission after reviewed source
+is merged and exact-main verified. #96, #46, the first-party-license hold and
+official/full-parity release gates remain open.
+
 ## Folding and diagnostics
 
 Folding recognizes matched multiline `{}`, `()`, `[]`, block-comment tokens, raw-string tokens and groups of consecutive whole-line `//` comments. Comment groups need at least two adjacent physical lines with only space/tab/form-feed indentation before `//`; blank lines, code, inline comments and opaque tokens separate groups. Their ranges start at the first slash and end after the last comment's content, including trailing spaces but excluding its terminator. LF, CRLF, lone CR and EOF are supported. Strings/templates, characters, backtick identifiers and comments remain opaque to delimiter matching. The complete opaque raw-string/comment token may fold; nested template expressions/comment interiors do not create outer-file folds. Single-line ranges are omitted. Unterminated multiline comments/raw strings can fold to their token end while their lexical diagnostic remains visible. Imports, declarations and semantic structure are outside this declared subset.

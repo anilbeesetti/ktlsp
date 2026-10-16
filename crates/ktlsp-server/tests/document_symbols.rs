@@ -5,7 +5,7 @@ use ktlsp_text::{Range, offset_to_position};
 use serde_json::{Value, json};
 use std::{
     io::Write,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::Mutex,
 };
@@ -374,53 +374,54 @@ impl Package {
         Self(directory)
     }
     fn exchange(&self, messages: &[Value]) -> Vec<Value> {
-        let mut child = Command::new(
-            self.0
-                .join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX)),
-        )
+        exchange_directory(&self.0, messages)
+    }
+}
+// This directory is borrowed: only Package owns cleanup of its exclusive creation.
+fn exchange_directory(directory: &Path, messages: &[Value]) -> Vec<Value> {
+    let mut child = Command::new(directory.join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX)))
         .arg("--stdio")
         .env("PATH", "")
         .env_remove("JAVA_HOME")
         .env_remove("JDK_HOME")
-        .current_dir(&self.0)
+        .current_dir(directory)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-        let mut input = child.stdin.take().unwrap();
-        let mut reader = std::io::BufReader::new(child.stdout.take().unwrap());
-        let mut responses: Vec<Value> = Vec::new();
-        for message in messages {
-            ktlsp_protocol::write_frame(&mut input, &serde_json::to_vec(message).unwrap()).unwrap();
-            input.flush().unwrap();
-            // Requests really finish before later edits/shutdown. Bulk-writing
-            // the entire session would now legitimately cancel/stale symbols.
-            if let Some(id) = message.get("id") {
-                loop {
-                    let frame = ktlsp_protocol::read_frame(&mut reader).unwrap().unwrap();
-                    let response: Value = serde_json::from_slice(&frame).unwrap();
-                    let matched = response.get("id") == Some(id);
-                    responses.push(response);
-                    if matched {
-                        break;
-                    }
+    let mut input = child.stdin.take().unwrap();
+    let mut reader = std::io::BufReader::new(child.stdout.take().unwrap());
+    let mut responses: Vec<Value> = Vec::new();
+    for message in messages {
+        ktlsp_protocol::write_frame(&mut input, &serde_json::to_vec(message).unwrap()).unwrap();
+        input.flush().unwrap();
+        // Requests really finish before later edits/shutdown. Bulk-writing
+        // the entire session would now legitimately cancel/stale symbols.
+        if let Some(id) = message.get("id") {
+            loop {
+                let frame = ktlsp_protocol::read_frame(&mut reader).unwrap().unwrap();
+                let response: Value = serde_json::from_slice(&frame).unwrap();
+                let matched = response.get("id") == Some(id);
+                responses.push(response);
+                if matched {
+                    break;
                 }
             }
         }
-        drop(input);
-        while let Some(frame) = ktlsp_protocol::read_frame(&mut reader).unwrap() {
-            responses.push(serde_json::from_slice(&frame).unwrap());
-        }
-        let output = child.wait_with_output().unwrap();
-        assert!(output.status.success(), "{:?}", output.status);
-        assert!(
-            output.stderr.is_empty(),
-            "{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-        responses
     }
+    drop(input);
+    while let Some(frame) = ktlsp_protocol::read_frame(&mut reader).unwrap() {
+        responses.push(serde_json::from_slice(&frame).unwrap());
+    }
+    let output = child.wait_with_output().unwrap();
+    assert!(output.status.success(), "{:?}", output.status);
+    assert!(
+        output.stderr.is_empty(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    responses
 }
 impl Drop for Package {
     fn drop(&mut self) {
@@ -948,6 +949,11 @@ fn typed_local_navigation_and_references_compose_over_paired_stdio() {
 #[test]
 fn parameter_shadowing_and_native_providers_compose_over_paired_stdio() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let package = Package::new(true);
+    parameter_shadowing_exchange(&package.0);
+}
+
+fn parameter_shadowing_exchange(directory: &Path) -> Value {
     let source = "// 😀\r\nclass Int {}\r\nfun f(`p🦀`: Long, unused: Int,) {\r\n val a: `p🦀` = `p🦀`\r\n val `p🦀` = `p🦀`\r\n val b = `p🦀`\r\n}\r\nfun g(`p🦀`: Int) {\r\n val c = `p🦀`\r\n}\r\n";
     let at = |line, character| json!({"textDocument":{"uri":URI},"position":{"line":line,"character":character}});
     let refs = |line, character, include| json!({"textDocument":{"uri":URI},"position":{"line":line,"character":character},"context":{"includeDeclaration":include}});
@@ -981,7 +987,7 @@ fn parameter_shadowing_and_native_providers_compose_over_paired_stdio() {
         json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
         json!({"jsonrpc":"2.0","method":"exit"}),
     ];
-    let replies = Package::new(true).exchange(&messages);
+    let replies = exchange_directory(directory, &messages);
     assert!(replies.iter().all(|reply| reply.get("id").is_some()));
     assert!(
         replies
@@ -990,6 +996,17 @@ fn parameter_shadowing_and_native_providers_compose_over_paired_stdio() {
             .eq(messages.iter().filter_map(|message| message.get("id"))),
         "original IDs exactly once; no duplicate or push output: {replies:?}"
     );
+    let capabilities = &replies[0]["result"]["capabilities"];
+    assert_eq!(capabilities["positionEncoding"], "utf-16");
+    for provider in [
+        "documentSymbolProvider",
+        "definitionProvider",
+        "hoverProvider",
+        "referencesProvider",
+        "documentHighlightProvider",
+    ] {
+        assert_eq!(capabilities[provider], true, "{capabilities}");
+    }
     let expected = [
         (
             json!("parameter-definition"),
@@ -1053,6 +1070,63 @@ fn parameter_shadowing_and_native_providers_compose_over_paired_stdio() {
         .unwrap();
     assert_eq!(annotation["error"]["code"], -32803);
     assert!(annotation.get("result").is_none());
+    json!({"requests":messages,"responses":replies,"exit_code":0,"stderr":""})
+}
+
+#[test]
+#[ignore = "requires an explicitly admitted extracted native package; never part of default native tests"]
+fn extracted_archive_smoke() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let directory = PathBuf::from(
+        std::env::var_os("KTLSP_EXTRACTED_PACKAGE_DIR")
+            .expect("KTLSP_EXTRACTED_PACKAGE_DIR must name the verified extracted package"),
+    );
+    assert!(directory.is_absolute() && directory.is_dir(), "{directory:?}");
+    let directory = directory.canonicalize().unwrap();
+    let executable = directory.join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX));
+    let worker = directory.join(format!(
+        "ktlsp-parser-worker{}",
+        std::env::consts::EXE_SUFFIX
+    ));
+    assert!(executable.is_file() && worker.is_file());
+    let provenance: Value =
+        serde_json::from_slice(&std::fs::read(directory.join("provenance.json")).unwrap()).unwrap();
+    let mut cli = Vec::new();
+    for argument in ["--help", "--version"] {
+        let output = Command::new(&executable)
+            .arg(argument)
+            .env("PATH", "")
+            .env_remove("JAVA_HOME")
+            .env_remove("JDK_HOME")
+            .current_dir(&directory)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{:?}", output.status);
+        assert!(output.stderr.is_empty(), "{:?}", output.stderr);
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        if argument == "--version" {
+            assert_eq!(stdout.trim_end(), concat!("ktlsp ", env!("CARGO_PKG_VERSION")));
+        } else {
+            assert!(stdout.contains("Usage: ktlsp [--stdio | --help | --version]"));
+        }
+        cli.push(json!({"argument":argument,"stdout":stdout,"stderr":"","exit_code":output.status.code()}));
+    }
+    let wire = parameter_shadowing_exchange(&directory);
+    assert!(directory.is_dir() && executable.is_file() && worker.is_file());
+    let receipt = serde_json::to_string(&json!({
+        "extracted_directory":directory,
+        "server":executable,
+        "worker":worker,
+        "provenance":provenance,
+        "environment":{"PATH":"","JAVA_HOME":null,"JDK_HOME":null},
+        "cli":cli,
+        "wire":wire,
+        "borrowed_directory_retained":true
+    }))
+    .unwrap();
+    assert!(receipt.len() <= 65536, "artifact smoke receipt exceeds 64 KiB");
+    // Captured permanently in the separate evidence ZIP, never inserted into its own TAR.
+    println!("EXTRACTED_ARCHIVE_SMOKE_RECEIPT={receipt}");
 }
 
 #[test]

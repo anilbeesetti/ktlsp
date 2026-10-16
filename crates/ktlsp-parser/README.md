@@ -117,7 +117,29 @@ types, stable cross-revision symbols or a new server capability.
 - `lowering::lower_declarations` borrows declarations and existing syntax errors
   from a validated source snapshot, preserving original byte/name spans, CST
   parents, result-local owners and incompleteness. Unsupported syntax rejects
-  the whole operation; package/import nodes are admitted only when empty.
+  the whole operation, including malformed/error-bearing package/import headers.
+  Root recovery errors between a nonempty preamble and the first declaration also
+  refuse: the producer can recover malformed header tails outside the header node,
+  so publishing only its valid prefix would silently lose malformed syntax.
+  #346 adds borrowed `package()` / ordered `imports()` projections from the pinned
+  producer's validated preamble shapes. Qualified names retain original CST index,
+  raw spelling/range and ordered `segments()`; segment dots inside backticks stay
+  inside that component. Supported semantic spellings reuse the declaration helper
+  unchanged, without Unicode normalization; unsupported spellings reject atomically.
+  Imports distinguish named vs `on_demand()` and expose a separate optional alias.
+  Duplicate import records remain in source order; this is not compiler duplicate-
+  import checking. Headers are neither declarations nor resolved symbols, and do
+  not change declaration ordinals, structural regions or local-reference binding.
+  Empty producer package/import nodes remain supported. File annotations, modifiers
+  and other unsupported header shapes remain refused; NativeSourceFile admission
+  is unchanged. Projection uses the existing shared 2,097,152-work-unit and
+  131,072-byte requested/retained-capacity budgets, with at most 1,024 total nonempty
+  package/import directives and 1,024 total name/alias components, checked before
+  reservation/emission. Qualified components borrow CST/source with no component
+  allocation or recursive traversal. Production-parser fixture tests cover LF/CRLF,
+  UTF-16 positions, backtick dots, named/star/alias/duplicate imports and the actual
+  authenticated f/x/y binding consumer. Hosted execution is required under #96;
+  this source change alone is not hosted proof or package/import resolution.
 - Reference-bearing functions require an ordinary top-level zero-parameter
   function with an ordered brace body of plain immutable untyped local `val`s,
   whose initializers are integer constants or whole bare-identifier reference
@@ -169,6 +191,62 @@ revision. Their checked work/capacity limits and allocation refusals are
 incremental bounds, not whole-process allocation, RSS, stack or time guarantees.
 The raw-name index may scan quadratically within its charged work limit;
 ancestor queries use fixed storage and position queries allocate nothing.
+
+### Bounded positive integer initializer types (#330 / T012 child)
+
+`integer_initializer_types::infer_integer_initializer` accepts only a private-field
+`LocalValueBinding` and current snapshot. It authenticates that binding's original
+tree using `ReferenceSite::tree`, then inspects only its already-validated direct
+target initializer, without validating the complete body again. Success borrows
+the original binding, integer token and original source spelling/span, with an
+exact nonnegative `u64` value and default `Int`, `Long`, `UInt` or `ULong`.
+An unsuffixed signed value defaults to `Int` through 2,147,483,647 and `Long`
+through 9,223,372,036,854,775,807. `u`/`U` defaults to `UInt` through
+4,294,967,295, otherwise `ULong` through 18,446,744,073,709,551,615.
+`L` forces `Long`; `uL`/`UL` forces `ULong`. Lowercase `l` is refused.
+Decimal, `0x`/`0X` hexadecimal and `0b`/`0B` binary spellings permit repeated
+underscores only between digits; decimal leading zeroes are invalid.
+Invalid spelling and overflow return errors, never a fallback type.
+
+Rules were read before implementation from the pinned
+[Kotlin specification, integer literals](https://github.com/Kotlin/kotlin-spec/blob/7fccf8d6ee8210612ee8d55fa2a24fbb7c3ceea9/docs/src/md/kotlin.core/expressions.md#integer-literals)
+and Kotlin v2.2.20 source commit `693c44ee79f62895a9b92bdd60fdd7a9bc29a975`:
+[numeric suffix/range decoding](https://github.com/JetBrains/kotlin/blob/693c44ee79f62895a9b92bdd60fdd7a9bc29a975/compiler/psi/psi-api/src/org/jetbrains/kotlin/psi/utils/ConstantExpressionUtils.kt),
+[literal lexer](https://github.com/JetBrains/kotlin/blob/693c44ee79f62895a9b92bdd60fdd7a9bc29a975/compiler/psi/parser/src/org/jetbrains/kotlin/lexer/Kotlin.flex),
+[lowercase-long rejection](https://github.com/JetBrains/kotlin/blob/693c44ee79f62895a9b92bdd60fdd7a9bc29a975/compiler/frontend/src/org/jetbrains/kotlin/resolve/constants/CompileTimeConstantChecker.java)
+and [default signed/unsigned selection](https://github.com/JetBrains/kotlin/blob/693c44ee79f62895a9b92bdd60fdd7a9bc29a975/compiler/frontend/src/org/jetbrains/kotlin/resolve/constants/evaluate/ConstantExpressionEvaluator.kt).
+The Rust implementation is independent; these source rules are not an execution
+of the official LSP, a language-version configuration or full T012 acceptance.
+
+Reference initializers refuse without chasing. Expected types, integer-literal
+constraint types, unary minus (including minimum signed values), folding,
+smart casts, overloads, generics and external lookup are excluded.
+Origin/stale/resource errors remain distinct. One checked 2,097,152-unit query
+budget charges snapshot/source comparisons, target visits/kind comparisons and
+raw literal bytes; the query allocates nothing and is nonrecursive. This is a
+library-only subset with no server capability, stable revision identity or
+whole-process memory/time bound. Native consumer tests require actual parser
+production of signed and unsigned cases and admission of the frozen invalid/
+overflow spellings all the way to the integer query: an upstream refusal fails
+the test rather than substituting decoder-only evidence. Hosted execution
+evidence must be recorded separately from source.
+
+ROOT composed #346/PR348 source `e9f8aeec5396c6f76a4c76ab8b5f74ea78dfd337`
+and #347/PR349 source `749ed9854f7b16ab8b2975234d1c58bff378743b` on verified
+incoming main `bb6a75f61fd467c9b090210a369c7e1d225713d5`.
+[Original package/import CI38866350684/job116859972463](https://github.com/anilbeesetti/ktlsp/actions/runs/38866350684/job/116859972463)
+passed 896 workspace tests; its actual LF/CRLF production consumer retained
+authenticated reference/binding origin. The earlier malformed-header assertion
+failure was fixed in the shared lowerer, not relaxed: recovered error-bearing
+header tails now refuse the whole projection.
+[Original integer CI38865103037/job116855978067](https://github.com/anilbeesetti/ktlsp/actions/runs/38865103037/job/116855978067)
+passed 895 workspace tests. ROOT authenticated thirteen direct production
+observations across Int/Long/UInt/ULong boundaries and spelling variants,
+retaining original binding/literal/source associations; strict negative cases
+also reached the actual producer. Only the temporary stderr proof writers were
+removed after those observations; permanent behavioral assertions remain.
+Those are source-component receipts, not final aggregate CI or merge evidence.
+No local parser runtime ran; #96 and full semantic parity remain open.
 
 At #333 source head `a22b54619f6996e03cceee56362453a9b846d574`,
 [original attempt-1 Linux CI38857165917/job116831130221](https://github.com/anilbeesetti/ktlsp/actions/runs/38857165917/job/116831130221)

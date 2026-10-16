@@ -461,40 +461,8 @@ pub(crate) fn callable_parameters_with_budget<'a>(
         at: function.cst_index() + 1,
         b,
     };
-    cursor.expect(function.cst_index(), node.subtree_end, "FUN_KEYWORD", true)?;
-    let (_, name) = cursor.expect(function.cst_index(), node.subtree_end, "IDENTIFIER", true)?;
-    cursor.spelling(name)?;
-    let (list_index, list) = cursor.expect(
-        function.cst_index(),
-        node.subtree_end,
-        "VALUE_PARAMETER_LIST",
-        false,
-    )?;
-    let (_, open_paren) = cursor.expect(list_index, list.subtree_end, "LPAR", true)?;
-    let start = cursor.at;
-    let mut count = 0usize;
-    while !cursor.is(list_index, list.subtree_end, "RPAR")? {
-        let parameter = parameter(
-            &mut cursor,
-            lowered,
-            owner_ordinal,
-            list_index,
-            list.subtree_end,
-            count,
-        )?;
-        count = count.checked_add(1).ok_or(ReferenceSiteError::Resource)?;
-        if parameter.comma.is_none() {
-            break;
-        }
-    }
-    let (_, close_paren) = cursor.expect(list_index, list.subtree_end, "RPAR", true)?;
-    cursor.finish(list_index, list.subtree_end)?;
-    let (body_index, body) =
-        cursor.expect(function.cst_index(), node.subtree_end, "BLOCK", false)?;
-    cursor.expect(body_index, body.subtree_end, "LBRACE", true)?;
-    cursor.expect(body_index, body.subtree_end, "RBRACE", true)?;
-    cursor.finish(body_index, body.subtree_end)?;
-    cursor.finish(function.cst_index(), node.subtree_end)?;
+    let (list_index, list, open_paren, close_paren, start, count, body) =
+        local_parameter_layout(&mut cursor, lowered, owner_ordinal, function)?;
     let mut parameters = Vec::new();
     cursor.b.reserve(&mut parameters, count)?;
     cursor.at = start;
@@ -523,6 +491,52 @@ pub(crate) fn callable_parameters_with_budget<'a>(
         parameters,
         body,
     })
+}
+
+// The same allocation-free local header/body validation serves syntax projection
+// and the complete classifier namespace proof. No callable is selected here.
+fn local_parameter_layout<'a>(
+    cursor: &mut Cursor<'a, '_>,
+    lowered: &'a LoweredDeclarations<'a>,
+    owner_ordinal: usize,
+    function: &Declaration<'a>,
+) -> Result<(usize, &'a Element, &'a Element, &'a Element, usize, usize, &'a Element)> {
+    let node = cursor.b.element(cursor.parsed, function.cst_index())?;
+    cursor.expect(function.cst_index(), node.subtree_end, "FUN_KEYWORD", true)?;
+    let (_, name) = cursor.expect(function.cst_index(), node.subtree_end, "IDENTIFIER", true)?;
+    cursor.spelling(name)?;
+    let (list_index, list) = cursor.expect(
+        function.cst_index(),
+        node.subtree_end,
+        "VALUE_PARAMETER_LIST",
+        false,
+    )?;
+    let (_, open_paren) = cursor.expect(list_index, list.subtree_end, "LPAR", true)?;
+    let start = cursor.at;
+    let mut count = 0usize;
+    while !cursor.is(list_index, list.subtree_end, "RPAR")? {
+        let parameter = parameter(
+            cursor,
+            lowered,
+            owner_ordinal,
+            list_index,
+            list.subtree_end,
+            count,
+        )?;
+        count = count.checked_add(1).ok_or(ReferenceSiteError::Resource)?;
+        if parameter.comma.is_none() {
+            break;
+        }
+    }
+    let (_, close_paren) = cursor.expect(list_index, list.subtree_end, "RPAR", true)?;
+    cursor.finish(list_index, list.subtree_end)?;
+    let (body_index, body) =
+        cursor.expect(function.cst_index(), node.subtree_end, "BLOCK", false)?;
+    cursor.expect(body_index, body.subtree_end, "LBRACE", true)?;
+    cursor.expect(body_index, body.subtree_end, "RBRACE", true)?;
+    cursor.finish(body_index, body.subtree_end)?;
+    cursor.finish(function.cst_index(), node.subtree_end)?;
+    Ok((list_index, list, open_paren, close_paren, start, count, body))
 }
 
 fn parameter<'a>(
@@ -565,4 +579,74 @@ fn parameter<'a>(
         annotation,
         comma,
     })
+}
+
+/// Validate the entire ordinary outer type namespace, without allocating call or
+/// parameter projections and without deciding whether any call is applicable.
+pub(crate) fn validate_type_namespace<'a>(
+    lowered: &'a LoweredDeclarations<'a>,
+    parsed: &'a Parsed,
+    function: &'a Declaration<'a>,
+    body_index: usize,
+    b: &mut ReferenceBudget,
+) -> Result<()> {
+    let node = b.element(parsed, function.cst_index())?;
+    if function.incomplete() || function.owner().is_some() || node.parent != Some(0) {
+        return Err(UNSUPPORTED);
+    }
+    let mut cursor = Cursor { parsed, at: function.cst_index() + 1, b };
+    cursor.expect(function.cst_index(), node.subtree_end, "FUN_KEYWORD", true)?;
+    if cursor.is(function.cst_index(), node.subtree_end, "TYPE_PARAMETER_LIST")? {
+        let (index, list) = cursor.expect(function.cst_index(), node.subtree_end, "TYPE_PARAMETER_LIST", false)?;
+        cursor.b.charge(list.subtree_end - index)?;
+        cursor.at = list.subtree_end;
+    }
+    cursor.expect(function.cst_index(), node.subtree_end, "IDENTIFIER", true)?;
+    let (parameters, list) = cursor.expect(function.cst_index(), node.subtree_end, "VALUE_PARAMETER_LIST", false)?;
+    // The authenticated lowerer already proved every ordinary outer parameter.
+    cursor.b.charge(list.subtree_end - parameters)?;
+    cursor.at = list.subtree_end;
+    let (block, body) = cursor.expect(function.cst_index(), node.subtree_end, "BLOCK", false)?;
+    if block != body_index {
+        return Err(UNSUPPORTED);
+    }
+    cursor.expect(block, body.subtree_end, "LBRACE", true)?;
+    while !cursor.is(block, body.subtree_end, "RBRACE")? {
+        if cursor.is(block, body.subtree_end, "SEMICOLON")? {
+            cursor.expect(block, body.subtree_end, "SEMICOLON", true)?;
+        } else if cursor.is(block, body.subtree_end, "FUN")? {
+            let (index, local) = cursor.expect(block, body.subtree_end, "FUN", false)?;
+            let (ordinal, local_declaration) = declaration(lowered, index, cursor.b)?;
+            let (outer_ordinal, _) = declaration(lowered, function.cst_index(), cursor.b)?;
+            if local_declaration.owner() != Some(outer_ordinal) {
+                return Err(UNSUPPORTED);
+            }
+            local_parameter_layout(&mut cursor, lowered, ordinal, local_declaration)?;
+            cursor.at = local.subtree_end;
+        } else if cursor.is(block, body.subtree_end, "CALL_EXPRESSION")? {
+            let (index, call) = cursor.expect(block, body.subtree_end, "CALL_EXPRESSION", false)?;
+            cursor.reference(index, call.subtree_end)?;
+            let (arguments, list) = cursor.expect(index, call.subtree_end, "VALUE_ARGUMENT_LIST", false)?;
+            cursor.expect(arguments, list.subtree_end, "LPAR", true)?;
+            let mut count = 0usize;
+            while !cursor.is(arguments, list.subtree_end, "RPAR")? {
+                let argument = cursor.argument(arguments, list.subtree_end, count)?;
+                count = count.checked_add(1).ok_or(ReferenceSiteError::Resource)?;
+                if argument.comma.is_none() { break; }
+            }
+            cursor.expect(arguments, list.subtree_end, "RPAR", true)?;
+            cursor.finish(arguments, list.subtree_end)?;
+            cursor.finish(index, call.subtree_end)?;
+        } else {
+            let (index, property) = cursor.expect(block, body.subtree_end, "PROPERTY", false)?;
+            declaration(lowered, index, cursor.b)?;
+            // Complete original immutable simple-initializer/annotation grammar
+            // was validated by lowering, not inferred from a property's name.
+            cursor.b.charge(property.subtree_end - index)?;
+            cursor.at = property.subtree_end;
+        }
+    }
+    cursor.expect(block, body.subtree_end, "RBRACE", true)?;
+    cursor.finish(block, body.subtree_end)?;
+    cursor.finish(function.cst_index(), node.subtree_end)
 }

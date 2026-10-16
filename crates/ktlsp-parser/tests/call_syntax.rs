@@ -389,7 +389,7 @@ fn actual_edits_reparse_original_syntax_and_rebind_existing_empty_proof() {
 }
 
 #[test]
-fn newly_lowered_rich_syntax_still_atomically_refuses_all_semantic_consumers() {
+fn rich_syntax_admits_only_the_closed_type_namespace_not_value_or_callee_consumers() {
     let _serial = functional::serial();
     for extra in ["target(first=p, second=2L)", "target(1)", "target()"] {
         let source = format!(
@@ -452,30 +452,22 @@ fn newly_lowered_rich_syntax_still_atomically_refuses_all_semantic_consumers() {
             LocalBindingError::UnsupportedContext
         );
         assert_eq!(
-            bind_lexical_type_parameter(&directory, &result, annotation, current).unwrap_err(),
-            LocalBindingError::UnsupportedContext
+            bind_lexical_type_parameter(&directory, &result, annotation, current)
+                .unwrap().target().raw_name(),
+            "T"
         );
-        assert_eq!(
+        for found in [
             type_parameter_occurrences(
-                &directory,
-                &result,
-                TypeParameterAnchor::AnnotationReference(annotation),
-                current
-            )
-            .unwrap_err(),
-            LocalBindingError::UnsupportedContext
-        );
-        assert_eq!(
+                &directory, &result, TypeParameterAnchor::AnnotationReference(annotation), current,
+            ).unwrap(),
             guarded_type_parameter_rename(
-                &directory,
-                &result,
-                TypeParameterAnchor::AnnotationReference(annotation),
-                current,
-                Some("Fresh")
-            )
-            .unwrap_err(),
-            LocalBindingError::UnsupportedContext
-        );
+                &directory, &result, TypeParameterAnchor::AnnotationReference(annotation),
+                current, Some("Fresh"),
+            ).unwrap(),
+        ] {
+            assert_eq!(found.target().raw_name(), "T");
+            assert_eq!(found.occurrences().len(), 2);
+        }
     }
 }
 

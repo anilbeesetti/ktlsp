@@ -358,7 +358,7 @@ impl ReferenceBudget {
     }
 }
 
-fn authenticated_tree<'a>(
+pub(crate) fn authenticated_tree<'a>(
     lowered: &'a LoweredDeclarations<'a>,
     result: &'a SnapshotResult,
     current: &SourceSnapshot,
@@ -396,8 +396,22 @@ pub fn reference_site<'a>(
     current: &SourceSnapshot,
     expression_index: usize,
 ) -> std::result::Result<ReferenceSite<'a>, ReferenceSiteError> {
-    let mut budget = ReferenceBudget::default();
-    let parsed = authenticated_tree(lowered, result, current, &mut budget)?;
+    reference_site_with_budget(
+        lowered,
+        result,
+        current,
+        expression_index,
+        &mut ReferenceBudget::default(),
+    )
+}
+pub(crate) fn reference_site_with_budget<'a>(
+    lowered: &'a LoweredDeclarations<'a>,
+    result: &'a SnapshotResult,
+    current: &SourceSnapshot,
+    expression_index: usize,
+    budget: &mut ReferenceBudget,
+) -> std::result::Result<ReferenceSite<'a>, ReferenceSiteError> {
+    let parsed = authenticated_tree(lowered, result, current, budget)?;
     let expression = budget.element(parsed, expression_index)?;
     let token_index = expression_index
         .checked_add(1)
@@ -1604,6 +1618,49 @@ mod tests {
                 .unwrap_err(),
             LocalBindingError::UnsupportedContext
         );
+    }
+
+    #[test]
+    fn occurrence_query_shares_budget_through_final_emission_and_refuses_atomically() {
+        use crate::{
+            local_value_binding::{LocalBindingError, occurrences_with_budget},
+            structural_regions::build_regions,
+        };
+        // Synthetic tree tests accounting only; production behavior is asserted
+        // separately in tests/local_value_occurrences.rs using the real worker.
+        let result = binding_fixture(&[&[("x", None), ("a", Some("x")), ("b", Some("x"))]]);
+        let lower = lower(&result).unwrap();
+        let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
+        let target = &lower.declarations()[1];
+        let mut b = ReferenceBudget::default();
+        assert_eq!(
+            occurrences_with_budget(&directory, &result, target, result.snapshot(), &mut b)
+                .unwrap()
+                .occurrences()
+                .len(),
+            2
+        );
+        let mut exact = ReferenceBudget {
+            work: WORK - b.work,
+        };
+        occurrences_with_budget(&directory, &result, target, result.snapshot(), &mut exact)
+            .unwrap();
+        assert_eq!(exact.work, WORK);
+        // Failure after earlier candidates were processed cannot publish a prefix.
+        for work in [WORK - b.work + 1, usize::MAX] {
+            let mut exhausted = ReferenceBudget { work };
+            assert_eq!(
+                occurrences_with_budget(
+                    &directory,
+                    &result,
+                    target,
+                    result.snapshot(),
+                    &mut exhausted
+                )
+                .unwrap_err(),
+                LocalBindingError::Resource
+            );
+        }
     }
 
     fn structure(result: &SnapshotResult) -> Result<Counts> {

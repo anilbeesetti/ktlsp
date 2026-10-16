@@ -161,6 +161,27 @@ types, stable cross-revision symbols or a new server capability.
   This is library-only and is not complete references, nested/outer lookup,
   parameter/receiver/import/overload resolution, types, stable cross-revision
   identity, official navigation evidence or a new server capability.
+- `local_value_binding::local_value_occurrences` authenticates one original
+  declaration against the identical directory/lowerer/result, including unused
+  targets, and returns that borrowed target/body plus original authenticated
+  whole-initializer sites in source order. Only references which the existing
+  binder assigns to the identical target are included; self/forward and unrelated
+  names do not become references. Query-name duplicates refuse even unused
+  targets; unrelated duplicates do not make this target ambiguous. The entire
+  ordinary function and every candidate spelling must be admitted.
+  All authentication, snapshot/name comparisons, scanning, binding and emission
+  share one checked 2,097,152-unit work budget, without per-candidate resets.
+  Before allocation, a count pass bounds storage to 1,024 sites / 131,072 bytes;
+  reservation failures or excessive returned capacity refuse the whole query.
+  Borrowed source/producer objects are not copied. Repeated binding and
+  authentication scans are quadratic in admitted input, including snapshot bytes;
+  large otherwise valid bodies can therefore return `Resource`, never a partial
+  publishable result. This is a library prerequisite, not a references provider,
+  full Kotlin resolution, official navigation equivalence or capability change.
+  Permanent `tests/local_value_occurrences.rs` assertions use the production
+  parser and emit original source/CST/raw-span/UTF-16 observations in hosted CI.
+  At source preparation these assertions have not run; no local parser execution
+  is authorized under #96. See child #357 under #330 (T027/#27).
 
 These consumers retain immutable producer association and require a synchronized
 current-document recheck before publication. Document/revision/kind/source

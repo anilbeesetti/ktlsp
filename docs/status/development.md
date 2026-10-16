@@ -1200,3 +1200,61 @@ JPS XML declared-source projection to three isolated owners from ONLY verified
 Cargo, union/runtime admission, original CI and integration remain ROOT-owned.
 These are pending implementations, not new capabilities or completed parity.
 
+### Type-role, JVM-method and original-XML consumer composition
+
+ROOT composed three isolated, independently reviewed components from the single
+verified6a621285 incoming main; user/older/component worktrees remain preserved.
+
+|Child|Exact selected component head|Declared operation|
+|---|---|---|
+|392|7cde8254517d82b25e8c6f85e8f55ea75bca069e|Original same-function typeparameter occurrences and guarded versioned rename|
+|394|05ece9f87ab14de6de8da32b127a9a5b326d9e73|Supplied-model Metadata to unique original JVM method identity|
+|396|b0f3f114a70b33df2efe30d6a2e62d11f3986f2e|Original JPS XML to validated declared-source projection|
+
+Each exact head/tree has separate functionality/adversarial static clearances
+and changed-head rechecks; ROOT read those independent reports. Composition
+has no conflicts, Cargo/dependency/lock/workflow/vendor changes or bound raises.
+No compilation/runtime/test evidence is implied by static clearance.
+
+392 keeps value/callee/type roles disjoint and validates a complete function
+once under one query budget. All parameter/local annotations, including those
+before the body and unrelated names/unused targets, participate in capture
+preservation. Contextual output names are checked before same-name unquoting.
+Versioned actual-returned edits are applied in original-coordinate-safe order
+before edited-source rebinding tests. Existing unrelated refusals remain.
+TEMP_392 producer/identity/wire writers are deliberately retained pending
+ROOT and independent owner actual hosted readback; they are not yet observations.
+
+394 internally extracts the supplied public ClassFile model's Metadata rather
+than trusting a foreign Header/Outcome. It selects all-Class-field ordinals,
+uses explicit JVM descriptors with pinned absent-name defaults, maps typed
+owner names and requires a unique complete UTF16 tuple among original methods.
+Returned methods/CP descriptors stay borrowed; decoded-d1 storage is owned once.
+Private shared-budget seams preserve existing callers. Supplied-model authority
+is not archive-byte/SDK authentication or a JVM verifier. Static CP0 and composed
+annotation-grammar undercharging findings were fixed at shared consuming points
+and independently rechecked with meaningful regression coverage.
+
+396 consumes only caller snapshot bytes, preserves original XML provenance,
+manifest/source order and declared root kinds, then uses existing native model
+validation/serialization. No filesystem/SDK/build execution or effective JPS
+membership/classpath claim. Unknown source-affecting semantics, malformed or
+ambiguous documents and exhausted aggregate XML/path/storage/output work refuse
+atomically. Genuine release-pinned original XML and Apache2 notices are retained.
+Review fixes include diagnostic/allocation envelopes and native Windows path
+semantics; static clearance is not Windows execution proof.
+
+ROOT's full-union reviews, pinned format/strict compile, native binary/import
+DATA suites and actual genuine external PUBLIC-API smoke remain mandatory.
+Kotlin parser/server/Session/worker/peer paths run ONLY through separately
+admitted original hosted full CI, with direct actual392 packet readback before
+capture cleanup and final exact-head review/checks. Fresh guarded integration
+and independent OWNER+ROOT original exact-main proof are still required.
+395/377/96/B3, official-custody, release/license and full parity remain open.
+
+Separate independent398/JImage and399/Java24-25 data owners also use verified
+6a621285; their unverified source is NOT part of this composition. 397/KDoc
+is researched/queued after392, not implemented. Full formatting is not ready
+for a parity claim: native rules, effective settings/read authority and actual
+official option/EditorConfig precedence remain missing rather than guessed.
+

@@ -140,6 +140,30 @@ then actual ordered Git parents matching the original event base/head before
 native execution. Neither refusal diagnosed the Windows source guard or observed
 the macOS parser.
 
+The later original changed-source release run
+[38875113607/job116888168806](https://github.com/anilbeesetti/ktlsp/actions/runs/38875113607/job/116888168806),
+at `0e8027d4905cf4ff7a66c3d860683112d98a8ef3`, passed source guards, format,
+strict Clippy and the parser library: 94 passed, zero failed, one ignored,
+including the previously failing strict oversize supervision case. It then failed two worker
+binary fixtures independently: the bounded queue-fill fixture received Darwin
+`ENOBUFS` (55) instead of `WouldBlock`, while the sampled-checkpoint fixture's
+post-disarm receive returned `ConnectionReset` after its sole worker endpoint
+was dropped. These use thread-local observer state; this was not mutex poisoning.
+The release workspace run did not pass.
+
+The worker-fixture repair classifies `ENOBUFS` as queue saturation only on Apple
+targets and only in the finite nonblocking fill fixture; all other errors remain
+fatal. The 4096-send bound is unchanged. A worker-endpoint alias now stays alive
+through empty-queue assertions, matching production's retained original stderr
+fd after the observer clone is dropped. This tests absence of an extra ACK
+without requiring any particular peer-close errno. The explicit peer-loss case
+still drops the parent endpoint and verifies disarm without receiving from it.
+The backpressure case drains exactly its queued noise after the first sampled
+attempt, then verifies no late ACK when capacity returns. Production checkpoint
+sampling, exact challenge validation, one ACK attempt and no-retry semantics are
+unchanged. This fixture source repair still requires an original changed-source
+hosted run; it establishes no full-workspace pass or #96 resolution.
+
 Limits are enforced independently in parent and worker where applicable:
 
 | Resource | Limit |

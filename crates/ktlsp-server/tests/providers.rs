@@ -22,11 +22,6 @@ fn running(capabilities: Value) -> Session {
         initialized["result"]["capabilities"]["foldingRangeProvider"],
         true
     );
-    assert!(
-        initialized["result"]["capabilities"]
-            .get("diagnosticProvider")
-            .is_none()
-    );
     notify(&mut session, "initialized", json!({}));
     session
 }
@@ -78,7 +73,14 @@ fn committed_official_fixture_comparison_keeps_protocol_differences_visible() {
         json!([{"startLine":0,"endLine":2,"startCharacter":11,"endCharacter":1,"kind":"region","collapsedText":"{...}"}])
     );
     let mut session = running(initialize["message"]["params"]["capabilities"].clone());
-    assert_eq!(open(&mut session, source)["diagnostics"], json!([]));
+    assert!(
+        notify(
+            &mut session,
+            "textDocument/didOpen",
+            json!({"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}),
+        )
+        .is_empty()
+    );
     let native = folding(&mut session)["result"].clone();
     assert_eq!(native, json!([{"startLine":0,"endLine":2,"kind":"region"}]));
     assert_ne!(native, official); // Character/collapsedText mismatch is deliberate, not normalized away.
@@ -333,4 +335,149 @@ fn generated_arbitrary_utf8_provider_corpus_stays_live_with_valid_ranges() {
         }
         assert!(folding(&mut session).get("result").is_some());
     }
+}
+
+#[test]
+fn negotiated_pull_reports_current_utf16_diagnostics_without_duplicate_push() {
+    let mut session = Session::new();
+    let initialized = request(
+        &mut session,
+        "initialize",
+        json!({"capabilities":{"textDocument":{"diagnostic":{}}}}),
+    );
+    let provider = &initialized["result"]["capabilities"]["diagnosticProvider"];
+    assert_eq!(provider["interFileDependencies"], false);
+    assert_eq!(provider["workspaceDiagnostics"], false);
+    notify(&mut session, "initialized", json!({}));
+    assert!(
+        notify(
+            &mut session,
+            "textDocument/didOpen",
+            json!({"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":"\"😀\" ]"}}),
+        )
+        .is_empty()
+    );
+    let params = json!({"textDocument":{"uri":URI},"previousResultId":"client-token"});
+    let report = request(&mut session, "textDocument/diagnostic", params.clone());
+    assert_eq!(report["result"]["kind"], "full");
+    assert!(report["result"].get("resultId").is_none());
+    assert_eq!(report["result"]["items"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        report["result"]["items"][0]["range"],
+        json!({"start":{"line":0,"character":5},"end":{"line":0,"character":6}})
+    );
+    assert!(change(&mut session, 2, "").is_empty());
+    assert_eq!(
+        request(&mut session, "textDocument/diagnostic", params.clone())["result"],
+        json!({"kind":"full","items":[]})
+    );
+    assert!(change(&mut session, 2, "]").is_empty());
+    assert_eq!(
+        request(&mut session, "textDocument/diagnostic", params.clone())["result"]["items"],
+        json!([])
+    );
+    assert!(
+        notify(
+            &mut session,
+            "textDocument/didClose",
+            json!({"textDocument":{"uri":URI}}),
+        )
+        .is_empty()
+    );
+    assert_eq!(
+        request(&mut session, "textDocument/diagnostic", params.clone())["error"]["code"],
+        -32602
+    );
+    assert!(
+        notify(
+            &mut session,
+            "textDocument/didOpen",
+            json!({"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":"]"}}),
+        )
+        .is_empty()
+    );
+    let report = request(&mut session, "textDocument/diagnostic", params);
+    assert_eq!(
+        report["result"]["items"][0]["range"],
+        json!({"start":{"line":0,"character":0},"end":{"line":0,"character":1}})
+    );
+}
+
+#[test]
+fn pull_negotiation_is_atomic_and_legacy_push_remains_available() {
+    for diagnostic in [
+        Value::Null,
+        json!(true),
+        json!({"dynamicRegistration":0}),
+        json!({"relatedDocumentSupport":"true"}),
+    ] {
+        let mut session = Session::new();
+        assert_eq!(
+            request(
+                &mut session,
+                "initialize",
+                json!({"capabilities":{"textDocument":{"diagnostic":diagnostic}}}),
+            )["error"]["code"],
+            -32602
+        );
+        assert_eq!(session.state(), ktlsp_server::State::Uninitialized);
+        let initialized = request(&mut session, "initialize", json!({"capabilities":{}}));
+        assert!(
+            initialized["result"]["capabilities"]
+                .get("diagnosticProvider")
+                .is_none()
+        );
+        notify(&mut session, "initialized", json!({}));
+        assert_eq!(
+            open(&mut session, "]")["diagnostics"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            request(&mut session, "textDocument/diagnostic", json!({}))["error"]["code"],
+            -32601
+        );
+    }
+}
+
+#[test]
+fn pull_limits_are_visible_and_invalid_queries_do_not_change_the_document() {
+    let mut session = running(json!({"textDocument":{"diagnostic":{}}}));
+    assert!(notify(
+        &mut session,
+        "textDocument/didOpen",
+        json!({"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":"(".repeat(1025)}}),
+    )
+    .is_empty());
+    let report = request(
+        &mut session,
+        "textDocument/diagnostic",
+        json!({"textDocument":{"uri":URI}}),
+    );
+    assert_eq!(report["result"]["kind"], "full");
+    assert_eq!(report["result"]["items"][0]["code"], "analysis-limit");
+    for params in [
+        Value::Null,
+        json!({}),
+        json!({"textDocument":{"uri":"untitled:missing"}}),
+        json!({"textDocument":{"uri":URI},"identifier":1}),
+        json!({"textDocument":{"uri":URI},"previousResultId":null}),
+    ] {
+        assert_eq!(
+            request(&mut session, "textDocument/diagnostic", params)["error"]["code"],
+            -32602
+        );
+    }
+    assert_eq!(session.document(URI).unwrap().version(), 1);
+    assert!(change(&mut session, 2, "").is_empty());
+    assert_eq!(
+        request(
+            &mut session,
+            "textDocument/diagnostic",
+            json!({"textDocument":{"uri":URI}}),
+        )["result"],
+        json!({"kind":"full","items":[]})
+    );
 }

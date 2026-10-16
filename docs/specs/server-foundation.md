@@ -19,3 +19,9 @@ Absolute URI validation uses RFC 3986 generic ASCII syntax (including percent en
 Additional bounds: 8 KiB per URI/workspace-folder name, 128 workspace folders, 128 retained notification-error records (then an explicit suppression record). Errors never quote document content, URI strings or method strings. Wire JSON uses serde_json's default recursion limit; framing limits apply before JSON decode. The synchronous foundation has no asynchronous work, cancellation/progress/project/file-watch providers, semantic features, persistence or official differential verification.
 
 Run the native binary as `cargo run --locked -p ktlsp-server --bin ktlsp`; with no arguments it uses framed LSP on stdio. `--help` and `--version` print CLI output. Core operation does not execute or require Java or project build tools. Optional tooling policy is defined in the current repository parity specification.
+
+## Lexical pull diagnostics
+
+Clients advertising an object `textDocument.diagnostic` negotiate `diagnosticProvider` with `interFileDependencies:false` and `workspaceDiagnostics:false`. Open/change/close then emit no push diagnostics. Clients without that capability retain push diagnostics and receive method-not-found for `textDocument/diagnostic`.
+
+Pull requests read the current open document through the existing bounded lexical/structural cache and return `{kind:"full",items:[...]}`. No result IDs or unchanged reports are produced. Invalid request shapes and missing/closed documents return invalid-params without mutation; analysis-limit diagnostics remain visible. UTF-16 ranges, atomic edits and close/reopen invalidation are unchanged. Compiler/inspection diagnostics, related documents, workspace diagnostics, refresh/progress and asynchronous cancellation are not provided.

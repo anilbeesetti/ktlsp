@@ -65,7 +65,6 @@ jobs:
             --target-dir "$RUNNER_TEMP/pr174-build" \
             --bin ktlsp-oracle-pr174-host --bin ktlsp-oracle-official-pr174 \
             --bin ktlsp-oracle-calibration-peer
-      # No privileged installation/preparation precedes this authenticated source gate.
       - name: Authenticate owner source admission
         timeout-minutes: 17
         env: &api-token
@@ -114,7 +113,6 @@ jobs:
           ARTIFACT_ID: ${{ steps.proposal.outputs.artifact-id }}
         run: sudo "$PR174_HOST" workflow-approve "$ARTIFACT_ID"
 
-      # Default success() gates every START. Always collectors never erase a failed START.
       - id: case_normal
         timeout-minutes: 12
         run: sudo "$PR174_HOST" workflow-case normal
@@ -327,8 +325,13 @@ jobs:
           ARTIFACT_ID: ${{ steps.upload_cancel.outputs.artifact-id }}
         run: *receipt
       - name: Authenticate protected cohort and runner timeout
+        id: collect
         timeout-minutes: 8
         run: sudo "$PR174_HOST" workflow-collect
+      - if: ${{ always() && steps.collect.outcome != 'skipped' }}
+        uses: *upload
+        timeout-minutes: 3
+        with: {name: pr174-collection, path: /etc/ktlsp-pr174/uploads/collection, compression-level: 0, if-no-files-found: error, include-hidden-files: true}
       - id: calibration_report
         uses: *upload
         timeout-minutes: 3

@@ -274,15 +274,13 @@ fn wf_publish_readiness_file(e: &mut Evidence, dir: &Path, ready: &WorkflowCance
     let final_path = dir.join("calibration-observer-ready.json");
     let next = dir.join("calibration-observer-ready.next");
     side_json(e,&next,ready)?;
-    wf_link_readiness_file(&next,&final_path)
-}
-fn wf_link_readiness_file(next: &Path, final_path: &Path) -> Result<()> {
-    // Link creation is an atomic no-replace publication, including concurrent publishers.
-    fs::hard_link(next,final_path).map_err(|error| error.to_string())?;
-    fs::remove_file(next).map_err(|error| error.to_string())
+    publish_complete_no_replace(&next,&final_path)
 }
 fn wf_verify_cancellation_ready(dir: &Path) -> Result<()> {
-    let ready:WorkflowCancellationReady=load(&dir.join("calibration-observer-ready.json"))?;
+    let ready_path=dir.join("calibration-observer-ready.json");
+    let ready:WorkflowCancellationReady=load(&ready_path)?;
+    wf_require(fs::symlink_metadata(&ready_path).map_err(|error|error.to_string())?.nlink()==1,
+        "protected readiness receipt must retain single-link custody")?;
     let a:Admission=load(&dir.join("admission.json"))?;let b=binding(dir)?;
     let identity:ProcessIdentity=load(&dir.join("process-identity.json"))?;
     let now=mono_ms()?;let end=now.checked_add(10000).ok_or("cancellation readiness deadline")?;
@@ -614,9 +612,18 @@ fn wf_case_dir(name: &str) -> Result<PathBuf> {
     directory(&Path::new(ROOT).join(record.nonce).to_string_lossy())
 }
 fn wf_wait_export(dir: &Path) -> Result<()> {
-    let end = Instant::now() + Duration::from_secs(600);
+    // Six minutes leave the existing eight-minute collector step its copy/failure/output reserve.
+    wf_wait_export_until(dir, Instant::now() + Duration::from_secs(360))
+}
+fn wf_wait_export_until(dir: &Path, end: Instant) -> Result<()> {
+    let binding=dir.join("export/export-binding.json");
     loop {
-        if dir.join("export/export-binding.json").try_exists().map_err(|e| e.to_string())? { protected(&dir.join("export/export-binding.json"), false)?; return Ok(()); }
+        if binding.try_exists().map_err(|e|e.to_string())? {
+            protected(&binding,false)?;
+            wf_require(fs::symlink_metadata(&binding).map_err(|e|e.to_string())?.nlink()==1,
+                "protected export binding must retain single-link custody")?;
+            return Ok(());
+        }
         wf_require(Instant::now() < end, "finite original outside-step closure/export unavailable; UNKNOWN")?;
         std::thread::sleep(Duration::from_millis(20));
     }
@@ -737,7 +744,7 @@ fn wf_receipt(name: &str, artifact_id: u64) -> Result<Value> {
     if name!="official" {release_calibration(&dir)?;}
     Ok(json!({"status":"PROTECTED_UPLOAD_RECORDED","artifactId":artifact_id}))
 }
-fn wf_collect() -> Result<Value> {
+fn wf_collect_inner() -> Result<Value> {
     wf_previous_complete()?;
     let mut locations=Vec::new();
     for case in CalibrationCase::ALL {
@@ -752,6 +759,62 @@ fn wf_collect() -> Result<Value> {
     mkdir(&output, 0o755)?;
     make_file(&output.join("calibration.json"), &raw, 0o644)?;
     Ok(result)
+}
+fn wf_collection_result(target: &Path, collected: &Result<Value>, snapshot: &Result<Vec<&'static str>>) -> Result<()> {
+    let bytes=wf_json(&json!({"schemaVersion":1,"scope":"PR174_PROTECTED_COLLECTION",
+        "status":if collected.is_ok()&&snapshot.as_ref().is_ok_and(|missing|missing.is_empty()){"COLLECTION_COMPLETED"}else{"UNKNOWN"},
+        "collectionError":collected.as_ref().err(),"snapshotError":snapshot.as_ref().err(),
+        "missingFacts":snapshot.as_ref().ok(),"collectionResult":collected.as_ref().ok(),
+        "officialCaptureSuccess":false}))?;
+    wf_require(bytes.len()<=131072,"bounded collection result exceeded; initial UNKNOWN snapshot retained")?;
+    make_file(&target.join("collection-result.json"),&bytes,0o444)
+}
+fn wf_collection_snapshot(target: &Path) -> Result<Vec<&'static str>> {
+    let end=mono_ms()?.checked_add(10000).ok_or("collection evidence copy deadline")?;
+    let mut missing=Vec::new();
+    let files=[
+        (Path::new(STAGING).join("calibration-cases.json"),"calibration-cases.json",16384),
+        (Path::new(STAGING).join("collected-calibration.json"),"collected-calibration.json",16384),
+        (Path::new(STAGING).join("root-authorization.json"),"root-authorization.json",16384),
+        (Path::new(STAGING).join("workflow.yml"),"workflow.yml",16384),
+        (Path::new(WF_ROOT).join("request.json"),"request.json",16384),
+        (Path::new(WF_ROOT).join("source-admission.json"),"source-admission.json",16384),
+        (Path::new(WF_ROOT).join("calibration-approval.json"),"calibration-approval.json",16384),
+        (Path::new(WF_ROOT).join("proposal-artifact.json"),"proposal-artifact.json",16384),
+    ];
+    let cancellation = match wf_case_dir("workflow-step-cancel") {
+        Ok(dir)=>Some((dir.join("cancellation-authentication.json"),"cancellation-authentication.json",262144)),
+        Err(_)=>{missing.push("original-workflow-step-cancel-directory");None},
+    };
+    // Preserve the actual timeout authentication result first, even if a later metadata copy fails.
+    for (source,name,cap) in cancellation.into_iter().chain(files) {
+        match fs::symlink_metadata(&source) {
+            Err(error) if error.kind()==ErrorKind::NotFound=>missing.push(name),
+            Err(error)=>return Err(error.to_string()),
+            Ok(_)=>copy_sealed(&source,&target.join(name),cap,0o444,end)?,
+        }
+    }
+    Ok(missing)
+}
+fn wf_collection_started(target: &Path) -> Result<()> {
+    let started=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|_|"collection clock before epoch")?.as_millis();
+    // This actual entered/UNKNOWN fact exists before any collector API operation can fail or stall.
+    make_file(&target.join("collection-start.json"),&wf_json(&json!({"schemaVersion":1,
+        "scope":"PR174_PROTECTED_COLLECTION","status":"IN_PROGRESS_UNKNOWN","startedUnixMs":started,
+        "officialCaptureSuccess":false}))?,0o444)
+}
+fn wf_collect() -> Result<Value> {
+    protected(Path::new(WF_ROOT),true)?;
+    let target=Path::new(WF_ROOT).join("uploads/collection");
+    mkdir(&target,0o755)?;
+    wf_collection_started(&target)?;
+    let collected=wf_collect_inner();
+    let snapshot=wf_collection_snapshot(&target);
+    wf_collection_result(&target,&collected,&snapshot)?;
+    match (collected,snapshot) {
+        (Ok(value),Ok(missing)) if missing.is_empty()=>Ok(value),
+        _=>Err("original cohort collection UNKNOWN; actual protected collection evidence retained for always upload; no official START".into()),
+    }
 }
 fn wf_official(calibration_artifact_id: u64) -> Result<Value> {
     wf_previous_complete()?;
@@ -936,13 +999,32 @@ mod workflow_source_tests {
         for (name,bytes) in [("a.next",b"{\"complete\":\"a\"}".as_slice()),("b.next",b"{\"complete\":\"b\"}".as_slice())] {
             let next=dir.join(name);make_file(&next,bytes,0o600).unwrap();
             let final_path=final_path.clone();let barrier=barrier.clone();
-            publishers.push(std::thread::spawn(move || {barrier.wait();wf_link_readiness_file(&next,&final_path)}));
+            publishers.push(std::thread::spawn(move || {barrier.wait();publish_complete_no_replace(&next,&final_path)}));
         }
         let successes=publishers.into_iter().map(|publisher|publisher.join().unwrap().is_ok()).filter(|success|*success).count();
         assert_eq!(successes,1);
         let final_bytes=fs::read(&final_path).unwrap();
         assert!(final_bytes==b"{\"complete\":\"a\"}"||final_bytes==b"{\"complete\":\"b\"}");
         assert_eq!(usize::from(dir.join("a.next").exists())+usize::from(dir.join("b.next").exists()),1);
+        fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn synthetic_expired_export_wait_retains_actual_unknown_collection_facts() {
+        let unique=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let dir=std::env::temp_dir().join(format!("ktlsp-workflow-collection-{}-{unique}",std::process::id()));
+        fs::create_dir(&dir).unwrap();
+        wf_collection_started(&dir).unwrap();
+        let collected:Result<Value>=wf_wait_export_until(&dir,Instant::now()).map(|()|Value::Null);
+        assert!(collected.is_err());
+        wf_collection_result(&dir,&collected,&Ok(vec!["cancellation-authentication.json"])).unwrap();
+        let started:Value=parse(&fs::read(dir.join("collection-start.json")).unwrap()).unwrap();
+        let result:Value=parse(&fs::read(dir.join("collection-result.json")).unwrap()).unwrap();
+        assert_eq!(started["status"],"IN_PROGRESS_UNKNOWN");
+        assert!(started["startedUnixMs"].as_u64().is_some_and(|time|time>0));
+        assert_eq!(result["status"],"UNKNOWN");
+        assert_eq!(result["collectionError"],json!(collected.as_ref().err()));
+        assert!(result["collectionResult"].is_null());
+        assert!(!dir.join("collected-calibration.json").exists());
         fs::remove_dir_all(dir).unwrap();
     }
 }

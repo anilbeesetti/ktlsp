@@ -49,6 +49,18 @@ EOF, fatal framing or broken output cancel jobs and attempt bounded cleanup. EOF
 
 Hosted cancellation regressions use a compiled controlled **failing Rust peer** through the real Parser supervisor and packaged stdio. They check active-work cancellation, exact string/u64 IDs, wrong/invalid IDs, duplicate IDs, ID reuse, committed versus rejected edits, identical close/reopen, shutdown/exit/EOF and resource recovery. This is cancellation-mechanics coverage, not a fabricated successful CST or official oracle evidence; actual symbol/range assertions remain in the real matching-worker suite. No local parser/supervision runtime is authorized under #96.
 
+At #337 source head `c908d13bf458da4934369e251dc2611f7877116d`,
+[original attempt-1 Linux CI38860743651/job116842212955](https://github.com/anilbeesetti/ktlsp/actions/runs/38860743651/job/116842212955)
+passed pinned format, strict locked workspace Clippy and 891 workspace tests.
+ROOT authenticated checkout `d5be0216bcc6dc2f104fbf55239f5fc5825296dd`,
+ordered parents `[a52f9518ff1532c25aff8fc1bdb1c566a05526b4,c908d13bf458da4934369e251dc2611f7877116d]`
+and tree `8f2960f1ee34b78dd35ec80b91596493bb8cbde0`.
+The hosted interactive consumer received RequestCancelled (`-32800`) with
+the original string ID `"active"` while stdin remained open; its controlled-peer
+cleanup and Linux PID-reaping assertions passed. Only the temporary observation
+writer was removed after inspection. This is not successful-CST or official
+oracle proof; final root-composition reviews, CI and integration remain separate.
+
 ### Independent limits
 
 - Synchronization still accepts up to **8 MiB** per document; document symbols accept only the parser's **64 KiB** original/normalized UTF-8 source ceiling. Larger open documents remain synchronized and usable by lexical providers, but symbol requests explicitly fail.
@@ -73,7 +85,7 @@ Retain at most `min(client rangeLimit, 10,000)` multiline fold candidates, inclu
 
 Each analysis scans the bounded lexer token partition with an iterative stack. Whole-line eligibility and one pending comment group use constant auxiliary state in the existing byte/token sweep; there is no backward line scan or accumulated-group rescan. Recovery consumes each stack entry once. Only retained output endpoints (at most 20,512) are sorted/deduplicated and converted in one UTF-16 sweep; no per-token scan from the document or line start. Source/token work is linear; bounded output sorting/index lookup is O(k log k).
 
-One session cache retains the most recent document's raw analysis (or static limit error), shared by push/pull diagnostics and folding. Its exact key is URI/version plus the analysis-relevant folding range limit; the private document store invalidates it after committed edits and on close/reopen. Rejected edits preserve the current analysis. Another document's analysis evicts it before scanning. Retention is independent of open-document count: one URI of at most 8 KiB, at most 10,000 fold and 256 diagnostic records, and bounded vector spare capacity; no source or token copy. Diagnostics render only diagnostic endpoints; folding renders current `lineFoldingOnly` fields. There is no new external dependency, semantic provider, or measured latency/RSS claim. Analysis stays synchronous; asynchronous cancellation and complete syntax/semantic parity remain later work.
+One session cache retains the most recent document's raw analysis (or static limit error), shared by push/pull diagnostics and folding. Its exact key is URI/version plus the analysis-relevant folding range limit; the private document store invalidates it after committed edits and on close/reopen. Rejected edits preserve the current analysis. Another document's analysis evicts it before scanning. Retention is independent of open-document count: one URI of at most 8 KiB, at most 10,000 fold and 256 diagnostic records, and bounded vector spare capacity; no source or token copy. Diagnostics render only diagnostic endpoints; folding renders current `lineFoldingOnly` fields. There is no new external dependency, semantic provider, or measured latency/RSS claim. Lexical analysis stays synchronous; only native document-symbol jobs currently support cooperative cancellation. Cancellable lexical analysis and complete syntax/semantic parity remain later work.
 
 ## Official observation comparison
 

@@ -474,7 +474,4 @@ fn interactive_stdio_cancels_active_work_and_cleans_shutdown_exit_and_eof() {
             );
         }
     }
-    if std::env::var_os("GITHUB_ACTIONS").is_some() {
-        writeln!(std::io::stderr().lock(), "KT337_HOSTED_INTERACTIVE_CANCELLATION: active string/u64 IDs, wrong-ID isolation, ID reuse, partial-header completion, shutdown/exit/EOF/broken-output cleanup; controlled failing Rust peer, not official/CST proof; actual decoded cancel reply={response}").unwrap();
-    }
 }

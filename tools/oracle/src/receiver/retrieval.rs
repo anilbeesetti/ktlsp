@@ -78,10 +78,7 @@ fn command(program: &str, args: &[&str], cap: usize) -> Result<Vec<u8>> {
                 if matches!(
                     e.kind(),
                     std::io::ErrorKind::WouldBlock | std::io::ErrorKind::Interrupted
-                ) =>
-            {
-                ()
-            }
+                ) => {}
             Err(e) => {
                 let _ = child.kill();
                 let _ = child.wait();

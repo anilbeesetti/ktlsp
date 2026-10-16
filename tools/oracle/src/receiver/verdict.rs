@@ -264,7 +264,9 @@ fn unhex(v: &Value) -> Result<Vec<u8>> {
         "hex byte bound",
     )?;
     s.as_bytes()
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|b| {
             let a = (b[0] as char).to_digit(16).ok_or("invalid hex")?;
             let c = (b[1] as char).to_digit(16).ok_or("invalid hex")?;

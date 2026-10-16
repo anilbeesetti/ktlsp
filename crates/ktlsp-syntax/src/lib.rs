@@ -262,9 +262,17 @@ impl Lexer<'_> {
                 self.number()?;
                 TokenKind::Number
             } else if is_letter(c) {
-                self.bump();
-                while self.peek().is_some_and(is_identifier_part) {
-                    self.bump();
+                self.pos += c.len_utf8();
+                for next in self.source[self.pos..].chars() {
+                    let continues = if next.is_ascii() {
+                        next.is_ascii_alphanumeric() || next == '_'
+                    } else {
+                        is_identifier_part(next)
+                    };
+                    if !continues {
+                        break;
+                    }
+                    self.pos += next.len_utf8();
                 }
                 if &self.source[start..self.pos] == "as" && self.peek() == Some('?') {
                     self.bump();

@@ -1599,3 +1599,230 @@ full hosted CI; first-head acceptance is NOT final-head or main acceptance.
 No local parser/server/Session/worker/peer runtime, JVM, oracle, dependency,
 Cargo/lock/workflow/vendor change, unchanged CI retry or relaxed bound occurred.
 397 is not yet delivered;395/377 causes remain unknown,96 and full parity open.
+
+#### Delivered401: source-owned prose KDoc with independent exact-main proof
+
+Reviewed capture-free5388880d038920dbefefcadaa5ddd7d9156900d1/tree03c1c5504a6b8210cefe0dd8f754cf43bfc9ca6e
+received six independent exact component/full12-file functionality/adversarial
+clears, pinned format check and strict locked workspace/alltarget Clippy.
+OWN original final Native38972014385/job117212394570 and platform38972014234/
+Mac117212393986/Win117212394318 passed1174/1172/1121 respectively, each
+138rows0failed3ignored0filtered0measured including32doc. Separate22faultcases
+are not docs. Actual testmerge2101df9beb648503a8ac76d036f98f68855c1b90 has that
+exact tree and orderedparents[bc5c6760,5388880d]; complete original bytes,
+ZIPdigests/sourcepreflight/bytepolicy/cleancheckout/exits/mandatory steps and
+unfiltered counts independently accepted by OWNER+ROOT.
+
+Separate fresh strictly-readonly guard exitedprocess0/parsed0 with exact
+exclusivebase/head/tree/scope12/config4/check3/status0/original2workflows+
+allmandatoryjobs/cleanreviewedidentity. Ordinary expected-head PR401 squash
+produced3920ab7d22ce4d89023291f2801500e598e24bb0, identical03c1c tree and
+SOLE parentbc5c6760b596721d4f627cc1d89c579be20c406c. Independent OWNER+ROOT
+fresh original exact-main38973388351/job117216883736 attempt1 push/main
+verified full392 checkout and all mandatory pinned checks:1174=1142ordinary+
+32doc,138rows0failed3ignored0filtered0measured plus22 separate faultcases.
+Complete raw292841bytes SHA256e44a23abfd88a9dc8ddf4b351ab742add4171f14c376cc1c5329c1cf1eb2a34a.
+Lease401 CLEARED;397 closed/completed. No local parser/server/Session/worker/
+peer runtime, unchanged retry or relaxed bounds. All WTs preserved.
+
+### Original call syntax403 and selected metadata parameter402 composition
+
+Two genuine source-only lanes worked in parallel DURING401 original CI,
+both from SAME verifiedbc5 incomingmain, without checks/publication.
+402 component40b9d34eed42b16ad7f37ad7d4a605aed2e31b8e/tree36124565311452d70e62189cc2232d72eebac1b8
+and403a4cc0901f11af3ec47ba9e4a1177502dda7b717c/treea3d75c8ba8989bd474efd6033aa856902f3641ea
+each completed independent functionality/adversarial static reviews and
+exact revised-source rechecks. ROOT directly read all four receipts.
+ONLY after independently verified392 main did ROOT create the new root
+integration WT and compose both sources, without conflicts; old/component/
+delivered/user WTs remain frozen/preserved. No Cargo/dependency/lock/vendor/
+workflow or provider-capability changes.
+
+403 projects original call/list/argument/label/value identities and parameters
+OF an explicitly selected original local FUN, not parameters OF a resolved
+call. Existing initializer ReferenceSite and strict semantic BodyCheck retain
+their roles; richer bodies still refuse. Same query budget spans original
+authentication/validation/count/reserve/emit and cumulative actual storage.
+No name/arity-only binding, inferred builtin, applicability or signature help.
+402 internally selects ONE Function by ALL-Class-field ordinal from the same
+Metadata Outcome and authentic owner/names, preserves every original value
+declaration, binds exact Class parameter IDs or genuine nominal ClassIds and
+retains original bytes/ranges/nullability/rawflags. Function-local scope,
+table-only/vararg/richer forms refuse; no default/JVM mapping is fabricated.
+
+ROOT completed403's observation-only evidence before any hosted admission:
+reuse the existing structured JSON actual-source/full-CST/projection capture,
+including original lowered declaration ordinals/owners, instead of introducing
+a Rust-debug evidence parser. The actual-edit regression now captures its
+original selected call/parameters plus actual four byte-range/text edits BEFORE
+applying them, then retains actual version2 reparse/rebinding output. Production
+and every permanent assertion/application remain unchanged. Both affected
+reviewers and two separate complete-union reviewers must recheck exact source.
+All new402/403 formatting/build/tests/runtime/smoke/hosted proof remain
+UNEXECUTED; the prepared external genuine Pair API smoke is not execution.
+397's prior pass is not acceptance for this composition.
+
+Native-only/T004/96 and existing source/work/storage/depth/timeout/cleanup
+ceilings remain.395/377 historical causes are still unknown. Full scopes,
+types/inference/applicability, formatting, tooling, SDK/library semantics,
+general platform/release/oracle-custody and official Kotlin LSP parity remain.
+
+### Measured native hot paths404/405: reviewed source, NOT yet timed after fix
+
+The same original final401 Native38972014385/job117212394570 raw log,
+294222bytes SHA256d2c5e13ca8eba1c75b4f2ac24693e811702d40ce58f259bd5e8a84766aef69ef,
+provided actual slow-case evidence; no unchanged run was repeated.
+Independent read-only scouts separated TWO causes, not one guessed timeout:
+four64KiB recovery cases repeatedly call Parsed::position for65537offsets,
+each scalar call rescanning byte0 (2147516416 cumulative advances/case).
+Their completion intervals total243.384s within301.056s combined suites;
+these intervals include case checks/healthyfollowups, NOT isolatedCPU profiles.
+Session's unchanged aggregate-limit case alone takes82.97s while17others
+finish~30ms; it opens eight8MiB single identifiers to exercise REAL64MiB
+capacity and synchronous diagnostics. That path is linear and NEVER calls
+Parsed::position. No old395/377 cause follows.
+
+Both source-only performance owners use SAME independently verified392 base.
+404de0ea5832872faa31c99545684e099c533453a76/treed65704fa02c64fac20c4de47199509daf392f722
+adds a private lazy immutable OnceLock original-position table: one forward
+source sweep, then arbitraryO(1) lookups, at most65537entries/524296 actual
+retained payload bytes per queried tree. Unavailable/excess storage is dropped
+and remembered asNone; exact old scalar behavior remains, not a new valid-
+coordinate failure or repeated allocation attempt. Every real/test/cloned-
+result constructor gets a fresh cache. ROOT additionally avoids initializing
+the cache for invalid bounded-source offsets and the trivial zero position.
+UTF8/CRLF interiors, newline starts, UTF16 astral/combining widths, EOF,
+reverse/repeated/random queries and old immutable snapshots remain exact.
+Parent-side cache payload is not a worker/query allowance or RSS guarantee;
+the documented memory tradeoff does not increase any existing cap.
+
+4056573bcf60c5b2862570612607bb45ea133213e16/tree1f3d3b6b0050373344774b74d8e295878ff41ccf
+removes duplicate identifier continuation decoding and unnecessary ASCII
+Unicode-table lookups through one forward iterator. First-character and
+nonASCII category admission, maximal spans, keywords/as?, diagnostics,
+templates and all limits stay unchanged. No extra allocation/registry/cache.
+Both owners obtained TWO separate independent static reviews; ROOT directly
+read all four receipts and composed sources without conflicts. New meaningful
+coordinate/identifier regressions retain every existing frozen packet,
+position loop, worker, healthyfollowup and actual eight8MiB aggregate fixture.
+No profile, corpus, source/depth/work/storage/timeout/cleanup bound or
+expectation was relaxed. A Session83-second fix is NOT established by source.
+
+The previously cleared12-file402/403 union is now expanded; prior clearances
+alone do not approve this source. New complete-union/affected exact-source
+reviews precede once-only formatting/strict compile/native data+lexer smoke
+and ORIGINAL full unchanged-profile hosted CI. Actual source/CST/edit packets
+still require independent OWNER+ROOT full readback before writer cleanup.
+All new checks/runtime/performance comparisons remain UNEXECUTED.
+
+#### Exact first19-source static, native data and real API verification
+
+Both independent complete19-file reviews and all six affected component
+functionality/adversarial rechecks cleared51db6f91c31ec93a91d28c61dc8723c9aeefcb31/tree4bd4048b559bf56c8d9046bdbefce97d9b52e16d.
+ROOT oncefmt exited0; both complete-union and all affected exact formatted
+rechecks then cleared347463e0cada6e33b1acaed25660bfc6d18fd89f/treecab6dff1184de764dd991ff5c22d97e279232c4a.
+Strict pinned locked workspace/alltargets Clippy --keep-going -Dwarnings
+exited0 on that source. Native BINARY DATA ONLY suite passed529cases across
+57result rows,0failed/ignored/measured/filtered; no local parser/server test ran.
+
+ROOT ACTUALLY compiled and ran two standalone public native Rust consumers
+against Cargo-reported same-source rlibs, bothcompile/run0 with emptyerr.
+Genuine Pair2983bytes ->class->annotations->same retainedMetadata Outcome
+gave d1285/owner47..285; copy151..198 first171..179/type177..179 ->
+originalClassdeclaration54..60/ID0/ordinal0 and second181..189/type187..189 ->
+62..68/ID1/ordinal1, bothOUT/nullableNone/rawflagsSome2/defaulttrue.
+Equals200..220/other208..216/type212..216 yielded REAL resolver-derived
+kotlin/Any localfalse, nullableSomeTrue despite rawd2index22empty.
+WrongALLClassordinal3 actually refusedNotFunction at60. SameOutcome raw
+pointer+byte identity assertions passed for owner/functions/values/Types/
+declarations. The throwaway does not separately print declarationA/Bspellings
+or outerfields; the permanent genuine API test covers those additional facts.
+
+The purelexical string-data consumer returned15 exact original tokens across
+35bytes with originalUnicodecategory transitions, keywords/as?, combining/
+OtherNumber boundaries; actual printed diagnostics27..29 and32..34 were
+independently read. MAX8388608bytes yielded oneIdentifier0..8388608,
+0diagnostics;8388609 correctly refusedSourceTooLarge. Its one localARMdebug
+96054083ns observation is NOT comparative speedup/Session timing evidence.
+This lexical primitive is not the Kotlin parser; no local Session/worker/peer
+or JVM/oracle ran. ROOT+independent owners read COMPLETE actual sources,
+commands and outputs before ONLY two throwaway Rust sources were removed.
+Full source/proof bytes and permanent assertions remain retained.
+
+402/403/404/405 hosted fullDEBUG+platform execution, actual403CST/projection/
+edit readback, cache corpus behavior and comparable performance remain
+UNEXECUTED. Exact documentation-source recheck and OWN first original hosted
+CI remain required; native data proof never substitutes for parser/CLI proof.
+
+#### First original406 full CI and actual source readback
+
+The preceding UNEXECUTED statements describe earlier checkpoints. Exact first
+head a76f85cea447c54a6c9f0736d5a4d7d6a479b6e7/treecceb03198a5dd923ba9915ab37d643f9417f8747
+now passed its OWN ORIGINAL attempt1 workflows, with no retry or changed profile.
+Actual testmerge b81697f9ef8d96ff8b38912fa431c897b5044265 has that exact tree
+and ordered parents [3920ab7d22ce4d89023291f2801500e598e24bb0,a76f85ce].
+Native38978091403/job117232248174 passed1190=1158ordinary+32doc;
+platform38978091597 Mac117232248517 passed1188=1156+32 and
+Windows117232248669 passed1137=1105+32. Each has140result rows,
+0failed/3ignored/0measured/0filtered, plus22 SEPARATE protocol fault cases.
+All mandatory pinned format/lockedClippy/unfiltered workspace tests succeeded.
+Native raw296058bytes SHA256593aaf14feca7916396f4d2abdc340da0a09c6c5368bf620824db9ca40417134
+was completely read and independently authenticated by ROOT and its OWNER.
+
+ROOT authenticated both original18-member platform ZIPs, source-preflight,
+complete native/PowerShell byte policy, clean actual source/tree/parents and
+all recorded exits0. Mac artifact12079149578/54074bytes has
+SHA256682227237cf1c1923c4f4ee54228a43dc54dc611cf0ec6b832803802eb1513c6;
+Windows12080176746/49081bytes has
+SHA25659496e88cb8103160c83425615beea123fb233885ca0fd91cc252a289b7b7f77.
+Independent403 OWNER and ROOT each FULLY read all10 actual complete
+source/CST/declaration/projection packets plus ONE four-edit record PERHOST,
+not expected echoes or counts. Both serialized payloads112482bytes have
+SHA2569316f7f5de8d85347e98ea0061b7def43db7b9b5bc0b892aaf00843a9d4d9ab5.
+Every UTF8 boundary, lossless token partition, parent/subtree/child partition,
+declaration ordinal/owner, callee/label/value role, delimiter/comma and
+selected local parameter identity/order was checked, including Unicode/
+comments/CRLF/loneCR/duplicates/unknown names/mismatched arities.
+Both independently ACTUALLY applied original edits67..85→empty,
+60..66→fresh,24..46→empty,17..23→fresh in recorded descending order.
+The entire55byte result matched actual revision2:
+`fun outer(){ fun fresh(){}; val x=1; fresh(); val y=x }`.
+The actual selected original fresh declaration and x/y context remained.
+Pointer identity, stale refusal and value/callee rebinding are separately
+proved by successful assertion-bearing hosted tests, not JSON equality.
+Linux's raw log has NO positive403 capture packets; no Linux payload claim.
+Only AFTER both full reads ROOT removed temporary JSON writers/bookkeeping;
+every permanent assertion and actual edit application remains, including
+the post-rebinding selected-parameter query. Full proof stays retained under
+`/private/tmp/ktlsp-406-first-platform-38978091597/`.
+
+Independent404/405 owners and ROOT read complete ORIGINAL old/new Native
+raw logs and verified unchanged corpus/loops/real eight8MiB aggregate case.
+
+| Observed complete case/executable | Original401 seconds | First406 seconds |
+|---|---:|---:|
+| 64KiB longer-simple receiver case | 63.4100483 | 0.0325110 |
+| 64KiB qualified receiver case | 61.7083814 | 0.0359793 |
+| 64KiB nullable two-argument receiver case | 63.0678637 | 0.0354994 |
+| 64KiB two-argument receiver case | 55.1976965 | 0.0370442 |
+| Entire18-test Session executable | 82.97 | 3.13 |
+
+These are one hosted comparison's consecutive COMPLETE case-outcome
+timestamp intervals or executable summary, NOT isolated CPU timings,
+repeatability/RSS/reliability proof or platform-release equivalence.
+All four frozen source files/position loops are unchanged; expectation totals
+231567/262756/206112/142131 are SOURCE-DERIVED entries, not printed actual
+position counters. Successful exhaustive assertions/healthyfollowups remain.
+Session's8x8MiB/64MiB admission/rejection/version/release/reuse fixture is
+byte-identical and all18 pass; no bound/worker/deadline/cleanup was relaxed.
+Other provider executable time11.47→20.41s precludes blanket speedup claims.
+Whole Native job9m1s→2m50s is observational, not isolated attribution.
+395/377 historical causes remain UNKNOWN;96 quarantine remains unchanged.
+
+This is FIRST-SOURCE acceptance, not final-source or integration acceptance.
+Capture-free final source still requires exact independent full-union/
+affected reviews, strict compile and OWN ORIGINAL full hosted workflows,
+then a separate fresh strictly-readonly process0/parsed0 exclusive-base
+guard, ordinary expected-head merge, actual tree/soleparent and independent
+OWNER+ROOT original exact-main full CI before its lease can clear.
+No full signatures/applicability/type inference/tooling/oracle/full parity.

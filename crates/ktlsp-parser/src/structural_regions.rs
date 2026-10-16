@@ -471,6 +471,26 @@ fn walk<'a>(
                     .filter(|owner| *owner < ordinal)
                     .and_then(|owner| out.lowered.declarations().get(owner))
                     .ok_or(invalid(i))?;
+                let ordinary_owner = if function.parent == Some(0) {
+                    true
+                } else if value_parameter {
+                    b.work(3)?;
+                    let block = function
+                        .parent
+                        .and_then(|index| p.elements().get(index))
+                        .ok_or(invalid(i))?;
+                    let outer = block
+                        .parent
+                        .and_then(|index| p.elements().get(index))
+                        .ok_or(invalid(i))?;
+                    !block.token
+                        && b.equal(&block.kind, "BLOCK")?
+                        && !outer.token
+                        && b.equal(&outer.kind, "FUN")?
+                        && outer.parent == Some(0)
+                } else {
+                    false
+                };
                 if pe.token
                     || !b.equal(
                         &pe.kind,
@@ -481,7 +501,7 @@ fn walk<'a>(
                         },
                     )?
                     || function.token
-                    || function.parent != Some(0)
+                    || !ordinary_owner
                     || !b.equal(&function.kind, "FUN")?
                     || owner.cst_index() != function_index
                     || !b.equal(owner.kind(), "FUN")?
@@ -619,6 +639,7 @@ mod tests {
                     .unwrap(),
                 parsed: Parsed {
                     source,
+                    positions: std::sync::OnceLock::new(),
                     elements: self.elements,
                     diagnostics: self.diagnostics,
                 },
@@ -646,6 +667,7 @@ mod tests {
             snapshot: r.snapshot.clone(),
             parsed: Parsed {
                 source: r.parsed.source.clone(),
+                positions: std::sync::OnceLock::new(),
                 elements: r.parsed.elements.clone(),
                 diagnostics: r.parsed.diagnostics.clone(),
             },

@@ -107,6 +107,30 @@ termination. Callers must install the matching trusted worker; this is not a san
 Editor consumers use `SourceSnapshot` and `Parser::parse_snapshot`; accepted
 `SnapshotResult::tree_for` rejects a changed document/revision/source/file kind.
 See [the exact declaration corpus and unresolved recovery gates](CORPUS.md).
+
+`Parsed::position` lazily retains an immutable original-byte UTF-16 table, built
+in one forward source sweep for arbitrary-order constant-time lookups. Trees
+whose positions are never queried allocate no table. At the unchanged 64 KiB
+source ceiling, at most 65,537 two-u32 entries occupy 524,296 payload bytes per
+queried tree. Fallible reservation checks actual Vec capacity with checked byte
+arithmetic against that bound; excess capacity is dropped, not retained. Vec
+storage is retained without a boxed-slice shrink/reallocation. Allocation refusal
+is remembered once per tree and preserves the exact scalar conversion instead
+of adding a valid-offset error or repeatedly trying allocation. This trades
+parent-side retained storage for eliminating repeated source rescans; it changes
+neither worker/query allowances nor source limits and is not an allocator/RSS
+guarantee. Larger future source ceilings would require reconsidering this table.
+Strict UTF-8/CRLF interiors remain invalid; source, snapshot and old-tree identity
+are unchanged. No measured speedup is claimed before changed-source hosted CI.
+
+For #404, ROOT's admitted original full Native debug workspace/platform run must
+retain all frozen position totals (231,567 / 262,756 / 206,112 / 142,131). Compare
+the unchanged 65,536-byte cap-case completion intervals, in longer-simple /
+qualified / nullable-two / two-argument order, against 63.4100483 / 61.7083814 /
+63.0678637 / 55.1976965 seconds from original Native job 117212394570. These
+intervals include case assertions and healthy followups, not isolated CPU time;
+release/platform timings are separate compatibility evidence, not debug parity.
+
 Linux native checks do not establish Darwin/Windows reliability, resolve #96 or
 close B3/B4; historical MissingACK observations stay inconclusive. No comparative
 speed/RAM claim follows from the transport change. The parent capacity checks do not
@@ -279,7 +303,9 @@ error. Error recovery is ktrs behavior, not a compiler diagnostic claim.
 
 CRLF and lone CR normalize to LF only inside parsing. A boundary map converts all
 returned spans to original source; a normalized LF covers the entire original
-CRLF. `Parsed::position` delegates UTF-16/invalid-boundary handling to ktlsp-text.
+CRLF. `Parsed::position` preserves ktlsp-text's strict UTF-16/invalid-boundary
+behavior through the bounded lazy original-source table described above, with
+scalar ktlsp-text conversion when table storage is unavailable.
 Worker checks original normalized tree spelling and missed-token reports; parent
 checks rooted preorder/containment/depth, UTF-8 spans, exact token partition,
 diagnostic/count limits, and bounded JSON. The token-loss regression is rejected
@@ -378,10 +404,11 @@ evidence and integration verification remain ROOT-gated under #96.
   UTF-16 positions, backtick dots, named/star/alias/duplicate imports and the actual
   authenticated f/x/y binding consumer. Hosted execution is required under #96;
   this source change alone is not hosted proof or package/import resolution.
-- Reference-, parameter- or leading-type-parameter-bearing functions require an ordinary named top-level
-  function with an ordered brace body of plain immutable local `val`s, optionally
-  annotated with one simple (bare or backtick) type-name, whose initializers are
-  integer constants or whole-identifier reference subtrees. Ordinary parameters
+- Reference-, parameter- or leading-type-parameter-bearing outer functions require
+  an ordinary named top-level function with an ordered brace body of plain
+  immutable local `val`s, direct calls and ordinary direct local functions.
+  Local initializers remain integer constants or whole-identifier references;
+  optional annotations retain one simple bare/backtick type name. Ordinary parameters
   require exactly a name, colon and the same simple type-name shape, separated
   by commas with one optional trailing comma after a real parameter. Positive
   complete shape is mandatory even when the parser reports no diagnostics or
@@ -391,7 +418,7 @@ evidence and integration verification remain ROOT-gated under #96.
   where clauses, empty/malformed/post-name/second lists remain refused, as do
   missing/reordered/repeated syntax, defaults, vararg, richer types,
   receivers/context/explicit returns, expression bodies,
-  members/constructors/lambdas/nesting/destructuring and relevant recovery.
+  members/constructors/lambdas/deeper nesting/destructuring and relevant recovery.
   This is syntax admission, not generic inference or semantic non-nullability:
   unbounded `T` has implicit bound `Any?`, despite having no nullable syntax.
 - `Declaration::semantic_spelling` separately supports ASCII bare names and
@@ -402,10 +429,11 @@ evidence and integration verification remain ROOT-gated under #96.
   ordered declaration memberships. Equal bytes from an independent parse do
   not establish origin. Regions and declaration owners are not Kotlin scopes.
   Original `VALUE_PARAMETER` and `TYPE_PARAMETER` declarations retain their
-  original parameter-list parent and enclosing function owner ordinal. Header
-  parameters remain file structural members, not file-visible bindings; locals
-  remain block members. No property, `val` text or body membership is fabricated,
-  and raw name indices are not visibility rules.
+  original parameter-list parent and enclosing function owner ordinal. Top-level
+  header parameters remain file structural members; direct local-function header
+  parameters remain members of the enclosing outer block, not of the local
+  function's own body. Neither membership establishes visibility. No property,
+  `val` text or body membership is fabricated, and raw name indices are not visibility rules.
 - `declaration_name_index` groups exact **raw** spellings within an identical
   borrowed region, retaining duplicates and result-local declaration ordinals.
   `ancestor_candidates` returns all such groups along structural ancestors,
@@ -415,6 +443,50 @@ evidence and integration verification remain ROOT-gated under #96.
   returns every half-open containing region in directory order; brace bytes
   count, EOF matches nothing. It neither authenticates a reference occurrence
   nor converts UTF-16 positions; callers convert against the identical source.
+- `call_syntax::call_site(lowered, result, current, call_index)` selects an
+  **original** standalone direct `CALL_EXPRESSION`. It retains the original call,
+  callee reference/name, argument list/parentheses, enclosing function/body and
+  source-ordered argument records. Each record borrows its original wrapper,
+  integer/simple-reference expression/token, optional named-label wrapper/reference/
+  identifier/equals and following comma (including a trailing comma). Empty lists,
+  unknown callees, repeated labels and mismatched names/arity/type spellings are
+  syntax views, not successful invocations. Qualified/safe/chained/expression
+  callees, type arguments, spread, trailing lambdas, nested/richer values,
+  incomplete/error-bearing lists and unsupported ancestry refuse atomically.
+- `call_syntax::callable_parameters(lowered, result, current, original_function)`
+  takes an explicitly selected original local `FUN` **Declaration**, never a
+  callee or name. Only direct ordinary non-generic local functions with empty
+  bodies and required simple-typed parameters qualify. Returned parameter records
+  preserve original borrowed Declaration identity, parameter-list ordinal,
+  annotation syntax and following comma; declaration name/full ranges remain on
+  the original Declaration. Duplicate names stay distinct. Defaults, modifiers,
+  varargs, receivers and richer types refuse; raw `Int`/`T` never resolves a type.
+  Parameter declaration order is independent of call argument order.
+  Both kernels retain the existing monotonic ReferenceBudget across authentication,
+  source/name comparison, role/delimiter inspection, count/reserve/emission and
+  final construction. Fallible exact reservation is bounded cumulatively to
+  131,072 requested/actual retained bytes and 1,024 records per vector; work stays
+  at 2,097,152 units. Composition uses the private shared-budget kernels, not
+  chained public-query resets. These finite borrowed syntax views add no target
+  selection, argument-to-parameter mapping, applicability, inferred type, active
+  parameter/signature, provider or capability. `ReferenceSite` remains initializer-
+  only; complete semantic BodyCheck and non_value_reference are unchanged, so
+  newly admitted rich calls/parameterized local functions still atomically refuse
+  all existing rich-body semantic consumers.
+  `tests/call_syntax.rs` retains original supervised-worker identity, role,
+  ownership, actual edit/reparse/rebinding and foreign/stale/refusal assertions.
+  Synthetic accounting tests cover exact/one-over/overflow and call-then-parameter
+  shared work/storage. PR406's first original Linux/macOS/Windows full workflows
+  passed; independent OWNER and ROOT completely read all ten original actual
+  source/CST/declaration/projection packets and the four-edit record per platform
+  artifact, independently applied those actual edits and matched the full
+  reparsed source. Only then were temporary JSON writers/bookkeeping removed;
+  permanent pointer assertions, actual edits and post-binding queries remain.
+  [Exact first-source receipts and limits](../../docs/status/development.md#first-original406-full-ci-and-actual-source-readback)
+  are not capture-free final-source or exact-main acceptance. Those require their
+  own original full CI and guarded integration; no filtered rerun substitutes.
+  Existing paired-CLI mixed value/type/callee regressions remain required.
+  No signature help or official Kotlin parity is established; #96 is unchanged.
 - `lowering::reference_site` authenticates an original whole-initializer
   `REFERENCE_EXPRESSION` and its sole identifier token against the exact lowerer,
   parsed tree, result and current snapshot. Private fields retain borrowed origin,

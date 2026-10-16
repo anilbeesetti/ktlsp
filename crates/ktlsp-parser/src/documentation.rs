@@ -593,6 +593,7 @@ mod tests {
                 .unwrap(),
             parsed: Parsed {
                 source,
+                positions: std::sync::OnceLock::new(),
                 diagnostics: vec![],
                 elements: vec![
                     e("KT_FILE", 0, 25, None, 16, false),

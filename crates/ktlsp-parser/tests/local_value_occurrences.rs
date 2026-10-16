@@ -1643,10 +1643,11 @@ fn type_parameter_occurrences_preserve_original_type_value_and_callee_partitions
                         .iter()
                         .position(|d| std::ptr::eq(d, bound.target()))
                         .unwrap();
+                    let value_target = &lower.declarations()[ordinal];
                     values.push((
-                        site.containing_property().raw_name(),
-                        bound.target().kind(),
-                        bound.target().raw_name(),
+                        &actual[site.containing_property().name_range()],
+                        value_target.kind(),
+                        value_target.raw_name(),
                         ordinal,
                     ));
                 }

@@ -3,3 +3,9 @@ name = "ktlsp-binary"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+
+[dependencies]
+ktlsp-artifacts = { path = "../ktlsp-artifacts" }
+
+[dev-dependencies]
+sha2 = { version = "=0.10.9", default-features = false, features = ["std", "force-soft"] }

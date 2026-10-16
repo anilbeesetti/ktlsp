@@ -44,7 +44,15 @@ fn end() -> Vec<Value> {
     ]
 }
 fn execute(input: Vec<u8>, fragmented: bool) -> std::process::Output {
+    execute_with_arguments(input, fragmented, &[])
+}
+fn execute_with_arguments(
+    input: Vec<u8>,
+    fragmented: bool,
+    arguments: &[&str],
+) -> std::process::Output {
     let mut child = Command::new(env!("CARGO_BIN_EXE_ktlsp"))
+        .args(arguments)
         .env("PATH", "")
         .env_remove("JAVA_HOME")
         .env_remove("JDK_HOME")
@@ -99,6 +107,55 @@ fn native_subprocess_lifecycle_unicode_changes_and_stdout_cleanliness() {
     assert_eq!(responses[2]["id"], json!(u64::MAX));
     assert_eq!(responses[2]["error"]["code"], -32601);
     assert_eq!(responses[3]["result"], Value::Null);
+}
+
+#[test]
+fn explicit_stdio_and_default_launch_use_utf16_after_encoding_fallback() {
+    let messages = [
+        request(
+            json!("init"),
+            "initialize",
+            json!({"capabilities":{"general":{"positionEncodings":["utf-8","utf-32","future-encoding"]}}}),
+        ),
+        notification("initialized", json!({})),
+        notification(
+            "textDocument/didOpen",
+            json!({"textDocument":{"uri":"untitled:fallback","languageId":"kotlin","version":1,"text":"val s = \"😀\"; {\r\n}\r\n"}}),
+        ),
+        notification(
+            "textDocument/didChange",
+            json!({"textDocument":{"uri":"untitled:fallback","version":2},"contentChanges":[{"range":{"start":{"line":0,"character":9},"end":{"line":0,"character":11}},"rangeLength":2,"text":"x"}]}),
+        ),
+        request(
+            json!("fold"),
+            "textDocument/foldingRange",
+            json!({"textDocument":{"uri":"untitled:fallback"}}),
+        ),
+        request(json!("shutdown"), "shutdown", Value::Null),
+        notification("exit", Value::Null),
+    ];
+    for arguments in [&[][..], &["--stdio"][..]] {
+        let output = execute_with_arguments(encode(&messages), true, arguments);
+        assert!(output.status.success());
+        assert!(output.stderr.is_empty());
+        let responses = decode(&output.stdout);
+        assert_eq!(responses.len(), 5);
+        let capabilities = &responses[0]["result"]["capabilities"];
+        assert_eq!(capabilities["positionEncoding"], "utf-16");
+        assert_eq!(capabilities["textDocumentSync"]["change"], 2);
+        assert_eq!(capabilities["foldingRangeProvider"], true);
+        for response in &responses[1..3] {
+            assert_eq!(response["method"], "textDocument/publishDiagnostics");
+            assert_eq!(response["params"]["diagnostics"], json!([]));
+        }
+        assert_eq!(responses[3]["id"], "fold");
+        assert_eq!(
+            responses[3]["result"],
+            json!([{"startLine":0,"endLine":1,"startCharacter":13,"endCharacter":1,"kind":"region"}])
+        );
+        assert_eq!(responses[4]["id"], "shutdown");
+        assert_eq!(responses[4]["result"], Value::Null);
+    }
 }
 
 #[test]
@@ -189,20 +246,24 @@ fn cli_help_version_and_unknown_arguments_work_without_java_path() {
         assert!(output.stderr.is_empty());
         let stdout = String::from_utf8(output.stdout).unwrap();
         assert!(stdout.contains("ktlsp"));
-        if argument.contains("help") {
-            assert!(stdout.contains("stdio"));
-            assert!(stdout.contains("JVM"));
-        }
         if argument.contains("version") {
             assert!(stdout.contains("0.1.0"));
         }
     }
-    let output = Command::new(env!("CARGO_BIN_EXE_ktlsp"))
-        .arg("--unsupported")
-        .output()
-        .unwrap();
-    assert_eq!(output.status.code(), Some(2));
-    assert!(output.stdout.is_empty());
+    for arguments in [
+        &["--unsupported"][..],
+        &["--stdio", "--unsupported"][..],
+        &["--stdio", "--stdio"][..],
+        &["--help", "--stdio"][..],
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_ktlsp"))
+            .args(arguments)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2));
+        assert!(output.stdout.is_empty());
+        assert!(!output.stderr.is_empty());
+    }
 }
 
 #[test]

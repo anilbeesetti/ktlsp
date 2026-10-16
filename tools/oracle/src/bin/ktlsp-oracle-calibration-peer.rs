@@ -1864,7 +1864,6 @@ mod peer {
                 );
             }
         }
-
     }
 
     #[cfg(target_os = "linux")]

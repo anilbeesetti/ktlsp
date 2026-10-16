@@ -42,8 +42,8 @@ impl<'a> ZipDirectoryIndex<'a> {
     /// central-record ordinal. Bounds, agreement and declared-envelope overlap
     /// checks precede ZIP CRC-32 verification. No names select a duplicate winner.
     ///
-    /// Descriptor tails, unselected CRC/agreement and whole-archive validity
-    /// remain unchecked. Limits apply to each call, not a session; see ZIP_STORED.md.
+    /// Descriptor tails participate in envelope validation. Unselected CRC and
+    /// local agreement remain unchecked; limits apply per call, see ZIP_STORED.md.
     ///
     /// ```compile_fail
     /// use ktlsp_artifacts::{ZipDirectoryIndex, VerifiedArtifact};
@@ -70,6 +70,16 @@ impl<'a> ZipDirectoryIndex<'a> {
     /// }
     /// ```
     pub fn stored_payload(&self, ordinal: usize) -> Result<&'a [u8], ZipStoredError> {
+        let (payload, offset) = self.selected_payload(ordinal, 0)?;
+        self.check_crc(ordinal, offset, payload)?;
+        Ok(payload)
+    }
+
+    pub(super) fn selected_payload(
+        &self,
+        ordinal: usize,
+        method: u16,
+    ) -> Result<(&'a [u8], usize), ZipStoredError> {
         let entry = self
             .entries
             .get(ordinal)
@@ -78,7 +88,7 @@ impl<'a> ZipDirectoryIndex<'a> {
                 entries: self.entries.len(),
             })?;
         let c = entry.central_offset;
-        if entry.method != 0 {
+        if entry.method != method {
             return Err(ZipStoredError::Structure(
                 ZipIndexError::UnsupportedMethod {
                     offset: c + 10,
@@ -86,7 +96,7 @@ impl<'a> ZipDirectoryIndex<'a> {
                 },
             ));
         }
-        if entry.flags & !0x0800 != 0 {
+        if entry.flags & !0x0808 != 0 {
             return Err(ZipStoredError::Structure(ZipIndexError::UnsupportedFlags {
                 offset: c + 8,
                 flags: entry.flags,
@@ -98,7 +108,7 @@ impl<'a> ZipDirectoryIndex<'a> {
         let headers = self
             .entries
             .len()
-            .checked_mul(31)
+            .checked_mul(47)
             .ok_or(ZipStoredError::Structure(ZipIndexError::Limit {
                 offset: h,
                 field: "stored work units",
@@ -129,7 +139,7 @@ impl<'a> ZipDirectoryIndex<'a> {
         let method = u16_at(fixed, 8);
         let version = u16_at(fixed, 4);
         let flags = u16_at(fixed, 6);
-        if method != 0 {
+        if method != entry.method {
             return Err(ZipStoredError::Structure(
                 ZipIndexError::UnsupportedMethod {
                     offset: h + 8,
@@ -150,7 +160,7 @@ impl<'a> ZipDirectoryIndex<'a> {
                 ZipIndexError::UnsupportedEncryption { offset: h + 6 },
             ));
         }
-        if flags & !0x0800 != 0 {
+        if flags & !0x0808 != 0 {
             return Err(ZipStoredError::Structure(ZipIndexError::UnsupportedFlags {
                 offset: h + 6,
                 flags,
@@ -165,13 +175,31 @@ impl<'a> ZipDirectoryIndex<'a> {
             ),
             (6, "flags", u32::from(flags), u32::from(entry.flags)),
             (8, "method", u32::from(method), u32::from(entry.method)),
-            (14, "crc32", u32_at(fixed, 14), entry.crc32),
-            (18, "compressed size", compressed, entry.compressed_size),
+            (
+                14,
+                "crc32",
+                u32_at(fixed, 14),
+                if flags & 8 != 0 { 0 } else { entry.crc32 },
+            ),
+            (
+                18,
+                "compressed size",
+                compressed,
+                if flags & 8 != 0 {
+                    0
+                } else {
+                    entry.compressed_size
+                },
+            ),
             (
                 22,
                 "uncompressed size",
                 uncompressed,
-                entry.uncompressed_size,
+                if flags & 8 != 0 {
+                    0
+                } else {
+                    entry.uncompressed_size
+                },
             ),
         ] {
             if local != central {
@@ -181,7 +209,7 @@ impl<'a> ZipDirectoryIndex<'a> {
                 });
             }
         }
-        if compressed != uncompressed {
+        if method == 0 && entry.compressed_size != entry.uncompressed_size {
             return Err(ZipStoredError::Structure(malformed(
                 h + 22,
                 "stored sizes differ",
@@ -262,7 +290,18 @@ impl<'a> ZipDirectoryIndex<'a> {
         let q = p
             .checked_add(size)
             .ok_or_else(|| ZipStoredError::Structure(malformed(p, "payload span overflow")))?;
-        limit(size, MAX_PAYLOAD, p, "stored payload bytes").map_err(ZipStoredError::Structure)?;
+        limit(
+            size,
+            MAX_PAYLOAD,
+            p,
+            if method == 0 {
+                "stored payload bytes"
+            } else {
+                "compressed payload bytes"
+            },
+        )
+        .map_err(ZipStoredError::Structure)?;
+        let envelope_end = self.descriptor_end(ordinal, q)?;
         for (j, other) in self.entries.iter().enumerate() {
             if j == ordinal {
                 continue;
@@ -285,6 +324,12 @@ impl<'a> ZipDirectoryIndex<'a> {
                     "competing local header signature",
                 )));
             }
+            if (u16_at(fixed, 6) ^ other.flags) & 8 != 0 {
+                return Err(ZipStoredError::Disagreement {
+                    offset: hj + 6,
+                    field: "descriptor flag",
+                });
+            }
             let bj = fixed_end
                 .checked_add(usize::from(u16_at(fixed, 26)))
                 .and_then(|n| n.checked_add(usize::from(u16_at(fixed, 28))))
@@ -303,8 +348,8 @@ impl<'a> ZipDirectoryIndex<'a> {
             let ej = bj.checked_add(size).ok_or_else(|| {
                 ZipStoredError::Structure(malformed(hj, "competing local span overflow"))
             })?;
-            // shortcut: descriptor tails are outside these declared compressed envelopes; extend only with a separate descriptor contract.
-            if h < ej && hj < q {
+            let ej = self.descriptor_end(j, ej)?;
+            if h < ej && hj < envelope_end {
                 return Err(ZipStoredError::Overlap {
                     offset: h,
                     other_ordinal: j,
@@ -313,16 +358,72 @@ impl<'a> ZipDirectoryIndex<'a> {
         }
         charge(&mut work, size, MAX_WORK, p, "stored work units")
             .map_err(ZipStoredError::Structure)?;
-        let payload = &self.bytes[p..q];
+        Ok((&self.bytes[p..q], p))
+    }
+
+    pub(super) fn check_crc(
+        &self,
+        ordinal: usize,
+        offset: usize,
+        payload: &[u8],
+    ) -> Result<(), ZipStoredError> {
+        let entry = &self.entries[ordinal];
         let actual = crc32(payload);
         if actual != entry.crc32 {
             return Err(ZipStoredError::CrcMismatch {
-                offset: p,
+                offset,
                 expected: entry.crc32,
                 actual,
             });
         }
-        Ok(payload)
+        Ok(())
+    }
+
+    // Bit 3 has a single local policy: all three local CRC/size fields are zero.
+    // Central claims delimit data; a descriptor can never extend that stream.
+    fn descriptor_end(&self, ordinal: usize, at: usize) -> Result<usize, ZipStoredError> {
+        let entry = &self.entries[ordinal];
+        if entry.flags & 8 == 0 {
+            return Ok(at);
+        }
+        let bytes = &self.bytes[..self.directory_start];
+        let matches_zip64 = |start: usize| {
+            bytes.get(start..start + 20).is_some_and(|d| {
+                u32_at(d, 0) == entry.crc32
+                    && (u64::from(u32_at(d, 4)) | (u64::from(u32_at(d, 8)) << 32))
+                        == u64::from(entry.compressed_size)
+                    && (u64::from(u32_at(d, 12)) | (u64::from(u32_at(d, 16)) << 32))
+                        == u64::from(entry.uncompressed_size)
+            })
+        };
+        if matches_zip64(at)
+            || (bytes.get(at..at + 4) == Some(b"PK\x07\x08") && matches_zip64(at + 4))
+        {
+            return Err(ZipStoredError::Structure(ZipIndexError::UnsupportedZip64 {
+                offset: at,
+            }));
+        }
+        let matches = |start: usize| {
+            bytes.get(start..start + 12).is_some_and(|d| {
+                u32_at(d, 0) == entry.crc32
+                    && u32_at(d, 4) == entry.compressed_size
+                    && u32_at(d, 8) == entry.uncompressed_size
+            })
+        };
+        let unsigned = matches(at);
+        let signed = bytes.get(at..at + 4) == Some(b"PK\x07\x08") && matches(at + 4);
+        match (unsigned, signed) {
+            (true, false) => Ok(at + 12),
+            (false, true) => Ok(at + 16),
+            (true, true) => Err(ZipStoredError::Structure(malformed(
+                at,
+                "ambiguous descriptor",
+            ))),
+            (false, false) => Err(ZipStoredError::Structure(malformed(
+                at,
+                "descriptor disagreement or truncation",
+            ))),
+        }
     }
 }
 

@@ -51,6 +51,31 @@ placement, errors/nonzero exits, record/byte ceilings and premature responses.
 No parser, JVM, Docker or systemd launch occurred. The two Linux-only custody
 regressions and Linux compilation are hosted-check requirements, not local facts.
 
+Original PR338 head `266843824194cf5826f86bdcd97cf152add07982` hosted run
+`38857754048` passed Linux compilation, both custody regressions and all 12 PR174
+mechanics cases, then failed the historical recorder test's incidental primary
+error wording assertion. The actual retained observation was incomplete capture,
+71 intended/0 accepted client bytes, child exit0, exact 23-byte partial stdout
+and a BrokenPipe first failure. It is retained as a failure, not retried unchanged.
+The optional macOS leg was cancelled by matrix fail-fast; it was not a Mac
+product-test failure. Separate native PR run `38857754012` passed.
+
+ROOT rejected changing production error precedence to satisfy wording. The
+correction deletes that needle assertion and instead requires exact emitted raw
+bytes, offsets/counters, client persisted/accepted bounds, observed exit and
+cleanup, incomplete capture and absent consumer export. Malformed-frame peers
+emit their bounded frame+tail in one pipe write so a userspace buffering race
+cannot leave an un-emitted tail. Recorder production semantics and all existing
+limits/deadlines remain unchanged; an uncommitted post-failure decoding proposal
+was removed rather than shipped.
+Both independent reviewers cleared the test/fixture correction. Its first strict
+Clippy attempt caught the fixture's ABI-compatible but noncanonical `write`
+pointer spelling; the declaration now uses `*const c_void` with an explicit
+pointer cast, without lint suppression. Both reviewers rechecked that correction.
+Final corrected-source optional format check, strict locked all-target Clippy
+and full synthetic suite passed locally: the same 55 ordinary cases plus two
+actually exercised ignored helpers, with no production/limit change.
+
 ## Historical PR300 source-review checkpoint
 
 PR174 source preparation adds a working input-consistency validator.

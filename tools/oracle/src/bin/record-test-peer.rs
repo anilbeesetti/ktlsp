@@ -8,6 +8,23 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
+fn malformed_stdout(bytes: &[u8]) {
+    #[cfg(unix)]
+    {
+        unsafe extern "C" {
+            fn write(fd: i32, bytes: *const std::ffi::c_void, length: usize) -> isize;
+        }
+        // SAFETY: stdout is our live blocking pipe; these fixed fixtures fit
+        // PIPE_BUF. One write exposes the malformed frame and tail atomically.
+        assert!(bytes.len() < 512);
+        assert_eq!(
+            unsafe { write(1, bytes.as_ptr().cast(), bytes.len()) },
+            bytes.len() as isize
+        );
+    }
+    #[cfg(not(unix))]
+    io::stdout().write_all(bytes).unwrap();
+}
 fn stall() -> ! {
     loop {
         thread::sleep(Duration::from_secs(1));
@@ -94,12 +111,14 @@ fn main() {
         return;
     }
     if mode == "bad-frame-tail" {
-        print!("Content-Length: -1\r\n\r\nmalformed-tail");
+        malformed_stdout(b"Content-Length: -1\r\n\r\nmalformed-tail");
         return;
     }
     if mode == "bad-json-tail" {
-        write_frame(&mut io::stdout(), b"{").unwrap();
-        print!("raw-tail");
+        let mut bytes = Vec::new();
+        write_frame(&mut bytes, b"{").unwrap();
+        bytes.extend_from_slice(b"raw-tail");
+        malformed_stdout(&bytes);
         return;
     }
     if mode == "stderr-flood" || mode == "both-flood" {

@@ -118,6 +118,9 @@ types, stable cross-revision symbols or a new server capability.
   from a validated source snapshot, preserving original byte/name spans, CST
   parents, result-local owners and incompleteness. Unsupported syntax rejects
   the whole operation, including malformed/error-bearing package/import headers.
+  Root recovery errors between a nonempty preamble and the first declaration also
+  refuse: the producer can recover malformed header tails outside the header node,
+  so publishing only its valid prefix would silently lose malformed syntax.
   #346 adds borrowed `package()` / ordered `imports()` projections from the pinned
   producer's validated preamble shapes. Qualified names retain original CST index,
   raw spelling/range and ordered `segments()`; segment dots inside backticks stay

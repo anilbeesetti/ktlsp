@@ -1452,6 +1452,16 @@ fn walk<'a>(
                 skip_until = e.subtree_end;
                 continue;
             }
+            // Preamble parsing can finish a valid prefix before malformed tail
+            // tokens; top-level recovery then emits a sibling ERROR_ELEMENT.
+            b.work(1)?;
+            if t == Tag::Error
+                && parent.is_some_and(|f| f.tag == Tag::Root)
+                && header_phase < 3
+                && counts.directives != 0
+            {
+                return Err(unsupported(i));
+            }
             if t != Tag::Root {
                 header_phase = 3;
             }
@@ -1726,6 +1736,43 @@ mod tests {
             lower(&tree.finish()),
             Err(LoweringError::Unsupported { .. })
         ));
+    }
+
+    #[test]
+    fn recovered_preamble_tail_is_not_published_as_a_valid_prefix() {
+        for package in [true, false] {
+            let mut tree = Tree::new();
+            if package {
+                tree.open("PACKAGE_DIRECTIVE");
+                tree.token("PACKAGE_KEYWORD", "package");
+                tree.open("REFERENCE_EXPRESSION");
+                tree.token("IDENTIFIER", "a");
+                tree.close();
+                tree.close();
+            }
+            tree.open("IMPORT_LIST");
+            if !package {
+                import(&mut tree, "a");
+            }
+            tree.close();
+            tree.open("ERROR_ELEMENT");
+            let start = tree.source.len();
+            tree.token("RANGE", "..");
+            tree.close();
+            tree.diagnostics.push(Diagnostic {
+                start,
+                end: tree.source.len(),
+                message: "Expecting a top level declaration".into(),
+            });
+            let result = tree.finish();
+            let mut budget = Budget::default();
+            assert!(matches!(
+                lower_with_budget(&result, result.snapshot(), &mut budget),
+                Err(LoweringError::Unsupported { .. })
+            ));
+            assert_eq!(budget.reservations, 0);
+            assert_eq!(budget.emitted, 0);
+        }
     }
 
     #[test]

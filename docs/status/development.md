@@ -1107,3 +1107,52 @@ exact reviews/full original native/platformCI, fresh separate read-only guard/
 expected-head merge/actual tree+soleparent/OWNER+ROOToriginalmain remain required.
 Full parity,96/B3/46/license/official and377cause gates are not closed.
 
+### Original macOS cancellation failure and bounded observation (#395)
+
+The capture-free8be92e7fb45833ca53fdc58345f49c1d99be3d6c/tree90d978a8
+did not pass all gates. Original Native38943194925/job117115694417
+passed1075+22 and platform38943194927/Windows117115694759 passed1020+22,
+but macOS117115694418 failed with1072passed/1failed. Each complete census
+has132rows/3ignored/0filtered. Actual checkoutca733b5ece7f7777fdb29a87cc588f2340949a6a
+has reviewed tree90d978a8 and ordered parents[c4,8be]. ROOT and an independent
+owner authenticated original APIs, raw logs and both source-preflight ZIPs.
+The existing interactive cancellation test observed exit1 versus required0.
+Its shared helper asserted before reading stderr, losing the exact expected-zero
+subcase and child error. ParserTimeout, cleanup failure and root cause are not
+established. #395 remains OPEN/UNKNOWN; earlier e24 green checks do not erase it.
+
+Two independent source investigations found no incident-specific repair.
+Strict20ms cleanup observation can conservatively refuse under an allowed
+interleaving; that is not observed cause. Accepting late confirmation, raising
+grace or weakening zero-exit/error assertions is not a repair.
+
+Diagnostic-only d50972f72a265c641f041c4ac81570e140b45a21/treef10d4dfb
+received two expanded22-file static observation clearances and passed pinned
+format/strict locked workspace-all-target Clippy. Its own original attempt1
+Native38945638770/job117123930855 passed1075+22;
+platform38945638717/macOS117123930208 passed1073+22 and
+Windows117123930809 passed1020+22, each132rows/0failed/3ignored/0filtered.
+Actual checkouta8b3b6d566785f65dcce92f17d606eb183f22b2c has exact treef10d4dfb
+and ordered parents[c4,d509]; the older event merge SHA was not substituted.
+Authenticated artifacts12065517503/macOS and12066775087/Windows retain complete
+clean preflight and zero mandatory exits.
+
+ROOT and the independent owner directly read102 actual records per host:
+76 received replies and26 completed-process exits. Both formerly ambiguous
+zero-expected paths observed exit0/empty stderr; the released reissued request
+observed-32803/parser worker failed, not Timeout. Exact u64MAX/string IDs,
+cancellation reasons, shutdown-null, nonzero exit/EOF and actual broken-output
+errors were retained. Corresponding records agree except OS-specific pipe-error
+wording. Linux passed the complete suite but exposed no successful capture
+records. None of this diagnoses the old failure or proves a lifecycle repair.
+
+Temporary reply/exit writers were removed only after both readers completed.
+Caller propagation and draining completed-child stderr BEFORE the unchanged
+status assertion remain, with stdin still held open and every original wait,
+exit/error/duplicate-output and cleanup assertion unchanged. No production
+supervisor, resource bound, deadline, parser guard or feature acceptance changed.
+The final capture-free product still requires its own exact expanded-union
+reviews, full original checks and all guarded integration/main-evidence gates.
+Unresolved395/377/96/B3 and official/release/full-parity limits remain separate.
+
+

@@ -343,16 +343,9 @@ impl Client {
     }
     #[track_caller]
     fn reply(&self) -> Value {
-        let reply = self
-            .replies
+        self.replies
             .recv_timeout(Duration::from_secs(2))
-            .expect("interactive stdio response timeout");
-        let caller = std::panic::Location::caller();
-        eprintln!(
-            "CANCELLATION_REPLY_V1 {}",
-            json!({"callerLine":caller.line(),"reply":reply})
-        );
-        reply
+            .expect("interactive stdio response timeout")
     }
     #[track_caller]
     fn finish(self, expected: i32) {
@@ -374,12 +367,6 @@ impl Client {
         };
         let mut errors = String::new();
         std::io::Read::read_to_string(self.child.stderr.as_mut().unwrap(), &mut errors).unwrap();
-        let caller = std::panic::Location::caller();
-        eprintln!(
-            "CANCELLATION_EXIT_V1 {}",
-            json!({"callerLine":caller.line(),"expected":expected,
-                "actual":status.code(),"stderr":errors})
-        );
         assert_eq!(status.code(), Some(expected), "server stderr: {errors}");
         self.input.take();
         if let Some(reader) = self.reader.take() {

@@ -1156,3 +1156,47 @@ reviews, full original checks and all guarded integration/main-evidence gates.
 Unresolved395/377/96/B3 and official/release/full-parity limits remain separate.
 
 
+### Verified local-call, applied-return and structural-action delivery (PR393)
+
+[PR393](https://github.com/anilbeesetti/ktlsp/pull/393) delivered389/390/391.
+Reviewed capture-freef03e441b9c5f3fbd22498a6007bcc32fdd0faa31 had two
+independent full22-file product reviews with no actionable source findings.
+Its own original Native38947579646/job117130498540 passed1075+22;
+platform38947579596/macOS117130497862 passed1073+22 and
+Windows117130498114 passed1020+22. All132rows/job have0failed/3ignored/0filtered.
+Actual tested4448a7903662fa1649ef4c47d19a8649df25347e has exact reviewed
+tree2a44fef2e548b8db2946d85f9a1b58cf274f3672 and ordered parents[c4,f03].
+
+ROOT separately inspected fresh strictly read-only guard process0/parsed0,
+exact remote main/head/base/tree/parents, clean local reviewed identity,
+complete22scope/configuration4/3successfulchecks/0statuses/2originalworkflows.
+Only then did a separate ordinary expected-head squash merge execute.
+Actual main6a62128542955a6c0c75154716de238bf589041d has identical reviewed
+tree2a44 and soleparentc4c7c6dfe72aa28fbb327e9581916eddc375d4ad.
+
+ROOT and independent OWNER StructuralQuickfixImplementation authenticated
+[original exact-main38949030791/job117135423997](https://github.com/anilbeesetti/ktlsp/actions/runs/38949030791/job/117135423997):
+push/main attempt1, exact checkout6a621285, pinned Rust1.99, format,
+strict locked workspace-all-target Clippy and unfiltered full workspace
+passed1075+22;132rows/0failed/3ignored/0filtered. Full raw log279802bytes
+SHA25667fb932e538350423ff0e76215497f4000d3cd023008c43e8e0ac61499379881.
+The exclusive base lease remained held through actual tree/soleparent and
+both original-main proofs, then cleared. GitHub CLI watch network
+failures were monitoring transport failures, not CI reruns or accepted failures.
+
+First actual producer/CLI and applied-edit evidence above remains source-
+specific and unchanged; the native Pair.copy public-API smoke and491-case
+binary data suite passed. Temporary writers were removed only after readback.
+Original8be macOS failure395 is still OPEN/UNKNOWN; neither later passing
+source nor this merge diagnoses its lost subcase/stderr or repairs its cause.
+No strict cleanup/deadline/assertion relaxation or local Kotlin parser,
+server/Session/worker/peer runtime occurred. 377/96/B3/official/license/release
+and full-parity gates remain open.
+
+ROOT admitted392/typeparameter occurrences+safe versioned rename,
+394/supplied-ClassFile Metadata-to-original-method identity and396/original
+JPS XML declared-source projection to three isolated owners from ONLY verified
+6a621285. Each receives two independent static review slots; common docs,
+Cargo, union/runtime admission, original CI and integration remain ROOT-owned.
+These are pending implementations, not new capabilities or completed parity.
+

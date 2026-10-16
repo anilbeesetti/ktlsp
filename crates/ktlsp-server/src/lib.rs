@@ -334,8 +334,11 @@ impl Session {
             )
             .map_err(|e| (-32602, e))?;
             let rename_client = semantic_navigation::RenameClient::parse(
-                params.and_then(|p| p.get("capabilities")).expect("validated capabilities"),
-            ).map_err(|e| (-32602, e))?;
+                params
+                    .and_then(|p| p.get("capabilities"))
+                    .expect("validated capabilities"),
+            )
+            .map_err(|e| (-32602, e))?;
             self.rename_client = rename_client;
             self.symbol_client = symbol_client;
             self.hover_format = semantic_navigation::HoverFormat::negotiate(
@@ -358,7 +361,9 @@ impl Session {
                 if self.rename_client.document_changes {
                     result["capabilities"]["renameProvider"] = if self.rename_client.prepare {
                         json!({"prepareProvider":true})
-                    } else { json!(true) };
+                    } else {
+                        json!(true)
+                    };
                 }
             }
             if pull_diagnostics {
@@ -434,7 +439,8 @@ impl Session {
         }
         if matches!(method, "textDocument/rename" | "textDocument/prepareRename")
             && (!self.rename_client.document_changes
-                || (method == "textDocument/prepareRename" && !self.rename_client.prepare)) {
+                || (method == "textDocument/prepareRename" && !self.rename_client.prepare))
+        {
             return Err((-32601, "Method not found"));
         }
         let map = params
@@ -484,14 +490,20 @@ impl Session {
                 "textDocument/documentHighlight" => {
                     semantic_navigation::Query::Highlights { offset }
                 }
-                "textDocument/prepareRename" => semantic_navigation::Query::PrepareRename { offset },
+                "textDocument/prepareRename" => {
+                    semantic_navigation::Query::PrepareRename { offset }
+                }
                 "textDocument/rename" => {
-                    let name = required(map, "newName").and_then(|v| v.as_str()
-                        .ok_or("newName must be a string")).map_err(|e| (-32602, e))?;
+                    let name = required(map, "newName")
+                        .and_then(|v| v.as_str().ok_or("newName must be a string"))
+                        .map_err(|e| (-32602, e))?;
                     if !ktlsp_parser::local_value_binding::valid_local_rename_name(name) {
                         return Err((-32602, "unsupported ASCII rename spelling"));
                     }
-                    semantic_navigation::Query::Rename { offset, new_name: name.to_owned() }
+                    semantic_navigation::Query::Rename {
+                        offset,
+                        new_name: name.to_owned(),
+                    }
                 }
                 "textDocument/hover" => semantic_navigation::Query::Hover {
                     offset,

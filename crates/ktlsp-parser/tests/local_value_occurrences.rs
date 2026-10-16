@@ -302,9 +302,14 @@ fn production_ambiguity_unsupported_context_and_resource_are_atomic() {
     );
     assert_eq!(
         ktlsp_parser::local_value_binding::guarded_local_value_rename(
-            &directory, &result, LocalValueAnchor::Declaration(&lowered.declarations()[1]),
-            current, Some("fresh"),
-        ).unwrap_err(), LocalBindingError::Resource
+            &directory,
+            &result,
+            LocalValueAnchor::Declaration(&lowered.declarations()[1]),
+            current,
+            Some("fresh"),
+        )
+        .unwrap_err(),
+        LocalBindingError::Resource
     );
 }
 
@@ -552,12 +557,27 @@ fn rename_guard_preserves_original_partitions_and_refuses_capture() {
         ("fun f() { val y = 2; val x = 1 }", 2, "y", false),
         ("fun f(y: T) { val x = 1 }", 2, "y", false),
         ("fun f() { val x = 1; val a = `y` }", 1, "y", false),
-        ("fun f() { val before = y; val x = 1; val a = x }", 2, "y", true),
+        (
+            "fun f() { val before = y; val x = 1; val a = x }",
+            2,
+            "y",
+            true,
+        ),
         ("fun f() { val x = y; val a = x }", 1, "y", true),
         ("fun f() { val x = 1; val `y` = 2 }", 1, "y", false),
         ("fun f(p: T) { val x = p }", 1, "fresh", false),
-        ("fun f(p: T) { val before = p; val `p` = p; val after = p }", 3, "p", true),
-        ("fun f(p: T) { val before = p; val `p` = p; val after = p }", 3, "fresh", true),
+        (
+            "fun f(p: T) { val before = p; val `p` = p; val after = p }",
+            3,
+            "p",
+            true,
+        ),
+        (
+            "fun f(p: T) { val before = p; val `p` = p; val after = p }",
+            3,
+            "fresh",
+            true,
+        ),
     ] {
         let result = parse(source);
         let current = result.snapshot();
@@ -568,25 +588,46 @@ fn rename_guard_preserves_original_partitions_and_refuses_capture() {
         assert_eq!(found.is_ok(), expected, "{source}: {found:?}");
         if let Ok(found) = found {
             if let Some(site) = found.occurrences().first() {
-                let by_use = guarded_local_value_rename(&directory, &result,
-                    LocalValueAnchor::ReferenceExpression(site.expression_index()), current, Some(name)).unwrap();
+                let by_use = guarded_local_value_rename(
+                    &directory,
+                    &result,
+                    LocalValueAnchor::ReferenceExpression(site.expression_index()),
+                    current,
+                    Some(name),
+                )
+                .unwrap();
                 assert!(std::ptr::eq(by_use.target(), found.target()));
-                assert_eq!(by_use.occurrences().iter().map(|s| s.range()).collect::<Vec<_>>(),
-                    found.occurrences().iter().map(|s| s.range()).collect::<Vec<_>>());
+                assert_eq!(
+                    by_use
+                        .occurrences()
+                        .iter()
+                        .map(|s| s.range())
+                        .collect::<Vec<_>>(),
+                    found
+                        .occurrences()
+                        .iter()
+                        .map(|s| s.range())
+                        .collect::<Vec<_>>()
+                );
             }
             let mut edited = source.to_owned();
             let mut ranges = vec![found.target().name_range()];
             ranges.extend(found.occurrences().iter().map(|s| s.range()));
             let original_count = ranges.len();
-            for range in ranges.into_iter().rev() { edited.replace_range(range, name); }
+            for range in ranges.into_iter().rev() {
+                edited.replace_range(range, name);
+            }
             let reparsed = parse(&edited);
             let new_lower = lower_declarations(&reparsed, reparsed.snapshot()).unwrap();
             let new_directory = build_regions(&new_lower, &reparsed, reparsed.snapshot()).unwrap();
             let rebound = guarded_local_value_rename(
-                &new_directory, &reparsed,
+                &new_directory,
+                &reparsed,
                 LocalValueAnchor::Declaration(&new_lower.declarations()[ordinal]),
-                reparsed.snapshot(), None,
-            ).unwrap();
+                reparsed.snapshot(),
+                None,
+            )
+            .unwrap();
             assert_eq!(rebound.occurrences().len() + 1, original_count);
             assert_eq!(rebound.target().semantic_spelling(), Some(name));
         }
@@ -603,18 +644,42 @@ fn rename_guard_authenticates_origin_snapshot_and_resource() {
     let lower = lower_declarations(&result, current).unwrap();
     let foreign = lower_declarations(&result, current).unwrap();
     let directory = build_regions(&lower, &result, current).unwrap();
-    assert_eq!(guarded_local_value_rename(&directory, &result,
-        LocalValueAnchor::Declaration(&foreign.declarations()[1]), current, Some("fresh"))
-        .unwrap_err(), LocalBindingError::InvalidOrigin);
+    assert_eq!(
+        guarded_local_value_rename(
+            &directory,
+            &result,
+            LocalValueAnchor::Declaration(&foreign.declarations()[1]),
+            current,
+            Some("fresh")
+        )
+        .unwrap_err(),
+        LocalBindingError::InvalidOrigin
+    );
     let stale = SourceSnapshot::new("local-occurrences", 8, FileKind::Source, source).unwrap();
-    assert_eq!(guarded_local_value_rename(&directory, &result,
-        LocalValueAnchor::Declaration(&lower.declarations()[1]), &stale, Some("fresh"))
-        .unwrap_err(), LocalBindingError::StaleSnapshot);
+    assert_eq!(
+        guarded_local_value_rename(
+            &directory,
+            &result,
+            LocalValueAnchor::Declaration(&lower.declarations()[1]),
+            &stale,
+            Some("fresh")
+        )
+        .unwrap_err(),
+        LocalBindingError::StaleSnapshot
+    );
     // Valid shape, but its validation alone cannot fit the one semantic budget.
     let huge = "a".repeat(ktlsp_parser::MAX_SOURCE_BYTES);
-    assert_eq!(guarded_local_value_rename(&directory, &result,
-        LocalValueAnchor::Declaration(&lower.declarations()[1]), current, Some(&huge))
-        .unwrap_err(), LocalBindingError::Resource);
+    assert_eq!(
+        guarded_local_value_rename(
+            &directory,
+            &result,
+            LocalValueAnchor::Declaration(&lower.declarations()[1]),
+            current,
+            Some(&huge)
+        )
+        .unwrap_err(),
+        LocalBindingError::Resource
+    );
 }
 
 #[test]
@@ -630,30 +695,48 @@ fn rename_quote_removal_refuses_keyword_token_merging_before_preparation() {
         let current = result.snapshot();
         let lower = lower_declarations(&result, current).unwrap();
         let directory = build_regions(&lower, &result, current).unwrap();
-        let original = local_value_occurrences(&directory, &result,
-            LocalValueAnchor::Declaration(&lower.declarations()[1]), current).unwrap();
+        let original = local_value_occurrences(
+            &directory,
+            &result,
+            LocalValueAnchor::Declaration(&lower.declarations()[1]),
+            current,
+        )
+        .unwrap();
         assert_eq!(original.occurrences().len(), 1);
         for anchor in [
             LocalValueAnchor::Declaration(original.target()),
             LocalValueAnchor::ReferenceExpression(original.occurrences()[0].expression_index()),
         ] {
             for name in [None, Some("x"), Some("fresh")] {
-                let guarded = guarded_local_value_rename(&directory, &result, anchor, current, name);
+                let guarded =
+                    guarded_local_value_rename(&directory, &result, anchor, current, name);
                 if !safe {
                     assert_eq!(guarded.unwrap_err(), LocalBindingError::UnsupportedContext);
                 } else {
                     let guarded = guarded.unwrap();
                     if let Some(name) = name {
                         let mut edited = source.to_owned();
-                        for range in guarded.occurrences().iter().map(|s| s.range()).rev()
-                            .chain(std::iter::once(guarded.target().name_range())) {
+                        for range in guarded
+                            .occurrences()
+                            .iter()
+                            .map(|s| s.range())
+                            .rev()
+                            .chain(std::iter::once(guarded.target().name_range()))
+                        {
                             edited.replace_range(range, name);
                         }
                         let reparsed = parse(&edited);
                         let lower = lower_declarations(&reparsed, reparsed.snapshot()).unwrap();
-                        let directory = build_regions(&lower, &reparsed, reparsed.snapshot()).unwrap();
-                        let rebound = guarded_local_value_rename(&directory, &reparsed,
-                            LocalValueAnchor::Declaration(&lower.declarations()[1]), reparsed.snapshot(), None).unwrap();
+                        let directory =
+                            build_regions(&lower, &reparsed, reparsed.snapshot()).unwrap();
+                        let rebound = guarded_local_value_rename(
+                            &directory,
+                            &reparsed,
+                            LocalValueAnchor::Declaration(&lower.declarations()[1]),
+                            reparsed.snapshot(),
+                            None,
+                        )
+                        .unwrap();
                         assert_eq!(rebound.occurrences().len(), 1);
                         assert_eq!(rebound.target().semantic_spelling(), Some(name));
                     }

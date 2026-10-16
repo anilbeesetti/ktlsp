@@ -453,7 +453,14 @@ pub fn guarded_local_value_rename<'a>(
     current: &SourceSnapshot,
     new_name: Option<&str>,
 ) -> Result<LocalValueOccurrences<'a>> {
-    rename_with_budget(directory, result, anchor, current, new_name, &mut ReferenceBudget::default())
+    rename_with_budget(
+        directory,
+        result,
+        anchor,
+        current,
+        new_name,
+        &mut ReferenceBudget::default(),
+    )
 }
 
 pub(super) fn rename_with_budget<'a>(
@@ -476,30 +483,44 @@ pub(super) fn rename_with_budget<'a>(
         return Err(LocalBindingError::UnsupportedContext);
     }
     for range in std::iter::once(found.target.name_range())
-        .chain(found.occurrences.iter().map(|site| site.range())) {
+        .chain(found.occurrences.iter().map(|site| site.range()))
+    {
         b.charge(4)?;
         let bytes = current.source().as_bytes();
         let before = range.start.checked_sub(1).and_then(|i| bytes.get(i));
         let after = bytes.get(range.end);
-        if [before, after].into_iter().flatten()
-            .any(|byte| byte.is_ascii_alphanumeric() || *byte == b'_' || !byte.is_ascii()) {
+        if [before, after]
+            .into_iter()
+            .flatten()
+            .any(|byte| byte.is_ascii_alphanumeric() || *byte == b'_' || !byte.is_ascii())
+        {
             // Removing quotes from val`x` would produce valfresh, not a
             // declaration. Check every original boundary even for preparation
             // and unchanged semantic spelling; never add unrequested trivia.
             return Err(LocalBindingError::UnsupportedContext);
         }
     }
-    let Some(new_name) = new_name else { return Ok(found) };
-    let old_name = b.spelling(found.target.raw_name())?
+    let Some(new_name) = new_name else {
+        return Ok(found);
+    };
+    let old_name = b
+        .spelling(found.target.raw_name())?
         .ok_or(LocalBindingError::UnsupportedSpelling)?;
     if b.equal(old_name, new_name)? {
         // Quote removal changes spelling, not identity. Keep parameter/local
         // shadow partitions rather than rejecting the existing parameter.
         return Ok(found);
     }
-    let function = directory.lowered().declarations().get(
-        found.target.owner().ok_or(LocalBindingError::InvalidOrigin)?
-    ).ok_or(LocalBindingError::InvalidOrigin)?;
+    let function = directory
+        .lowered()
+        .declarations()
+        .get(
+            found
+                .target
+                .owner()
+                .ok_or(LocalBindingError::InvalidOrigin)?,
+        )
+        .ok_or(LocalBindingError::InvalidOrigin)?;
     let body_index = found.body.cst_index();
     let (ordinal, _) = find_body(directory, body_index, b)?;
     let (local, parameter) =
@@ -510,16 +531,20 @@ pub(super) fn rename_with_budget<'a>(
     let parsed = authenticated_tree(directory.lowered(), result, current, b)?;
     for index in body_index..found.body.subtree_end() {
         let element = b.element(parsed, index)?;
-        if element.token || !b.equal(&element.kind, "REFERENCE_EXPRESSION")?
-            || annotation_reference(parsed, element, b)? {
+        if element.token
+            || !b.equal(&element.kind, "REFERENCE_EXPRESSION")?
+            || annotation_reference(parsed, element, b)?
+        {
             continue;
         }
         let site = reference_site_with_budget(directory.lowered(), result, current, index, b)?;
-        let spelling = b.spelling(site.raw_spelling())?
+        let spelling = b
+            .spelling(site.raw_spelling())?
             .ok_or(LocalBindingError::UnsupportedSpelling)?;
         if b.equal(spelling, new_name)?
             && site.containing_property().cst_index() > found.target.cst_index()
-            && found.target.range().end <= site.range().start {
+            && found.target.range().end <= site.range().start
+        {
             // No global resolver exists. A previously unresolved value may be
             // external; never turn it into a newly captured local reference.
             return Err(LocalBindingError::UnsupportedContext);
@@ -708,12 +733,15 @@ mod occurrence_storage_tests {
         for valid in ["x", "_x", "x_0", "field", "get", "value"] {
             assert!(valid_local_rename_name(valid), "{valid}");
         }
-        for invalid in ["", "_", "___", "fun", "val", "typeof", "1x", "`x`",
-            "a.b", "a/b", "a\\b", "a:b", "a;b", "a[b", "a<b", "a>b",
-            "a b", "a\tb", "a\0b", "a\nb", "é", "x😀"] {
+        for invalid in [
+            "", "_", "___", "fun", "val", "typeof", "1x", "`x`", "a.b", "a/b", "a\\b", "a:b",
+            "a;b", "a[b", "a<b", "a>b", "a b", "a\tb", "a\0b", "a\nb", "é", "x😀",
+        ] {
             assert!(!valid_local_rename_name(invalid), "{invalid:?}");
         }
-        assert!(!valid_local_rename_name(&"x".repeat(crate::MAX_SOURCE_BYTES + 1)));
+        assert!(!valid_local_rename_name(
+            &"x".repeat(crate::MAX_SOURCE_BYTES + 1)
+        ));
     }
 
     #[test]

@@ -52,7 +52,7 @@ impl Analysis {
     pub fn diagnostics(&self, text: &str) -> Vec<Value> {
         self.render_outputs(text, false, &[]).1
     }
-    pub fn trailing_closer(&self, text: &str) -> Option<(usize, usize, char)> {
+    pub fn trailing_closer(&self, text: &str) -> Option<(usize, usize, &'static str)> {
         let [diagnostic] = self.diagnostics.as_slice() else {
             return None;
         };
@@ -62,13 +62,13 @@ impl Analysis {
         {
             return None;
         }
-        let closer = match text.get(diagnostic.start..diagnostic.end)? {
-            ")" => ')',
-            "]" => ']',
-            "}" => '}',
+        let title = match text.get(diagnostic.start..diagnostic.end)? {
+            ")" => "Remove unmatched trailing ')'",
+            "]" => "Remove unmatched trailing ']'",
+            "}" => "Remove unmatched trailing '}'",
             _ => return None,
         };
-        Some((diagnostic.start, diagnostic.end, closer))
+        Some((diagnostic.start, diagnostic.end, title))
     }
     fn render_outputs(
         &self,

@@ -456,7 +456,7 @@ impl Session {
                     .map_err(|e| (-32803, e))?;
                 if permits
                     && document.version() != i32::MAX
-                    && let Some((token_start, token_end, closer)) =
+                    && let Some((token_start, token_end, title)) =
                         analysis.trailing_closer(document.text())
                     && (if start == end {
                         token_start <= start && start <= token_end
@@ -464,14 +464,20 @@ impl Session {
                         start < token_end && token_start < end
                     })
                 {
-                    let positions =
-                        structure::positions(document.text(), &[token_start, token_end]);
+                    let edit_start =
+                        ktlsp_text::offset_to_position(document.text(), token_start)
+                            .map_err(|_| (-32803, "invalid structural closer range"))?;
+                    // The authenticated closer is one ASCII code unit, not a newline.
+                    let edit_end = ktlsp_text::Position {
+                        line: edit_start.line,
+                        character: edit_start.character + 1,
+                    };
                     return Ok(json!([{
-                        "title":format!("Remove unmatched trailing '{closer}'"),
+                        "title":title,
                         "kind":"quickfix",
                         "edit":{"documentChanges":[{
                             "textDocument":{"uri":uri,"version":document.version()},
-                            "edits":[{"range":ktlsp_text::Range {start:positions[0],end:positions[1]},"newText":""}]
+                            "edits":[{"range":ktlsp_text::Range {start:edit_start,end:edit_end},"newText":""}]
                         }]}
                     }]));
                 }

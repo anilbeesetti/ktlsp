@@ -19,9 +19,17 @@ fn worker() -> PathBuf {
     ))
 }
 fn request(session: &mut Session, method: &str, params: Value) -> Value {
-    session
-        .handle(json!({"jsonrpc":"2.0","id":1,"method":method,"params":params}))
-        .remove(0)
+    let mut responses =
+        session.handle(json!({"jsonrpc":"2.0","id":1,"method":method,"params":params}));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    while responses.is_empty() && std::time::Instant::now() < deadline {
+        responses.extend(session.poll());
+        if responses.is_empty() {
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+    }
+    assert_eq!(responses.len(), 1, "{responses:?}");
+    responses.remove(0)
 }
 fn notify(session: &mut Session, method: &str, params: Value) {
     session.handle(json!({"jsonrpc":"2.0","method":method,"params":params}));
@@ -380,11 +388,30 @@ impl Package {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-        let mut input = Vec::new();
+        let mut input = child.stdin.take().unwrap();
+        let mut reader = std::io::BufReader::new(child.stdout.take().unwrap());
+        let mut responses: Vec<Value> = Vec::new();
         for message in messages {
             ktlsp_protocol::write_frame(&mut input, &serde_json::to_vec(message).unwrap()).unwrap();
+            input.flush().unwrap();
+            // Requests really finish before later edits/shutdown. Bulk-writing
+            // the entire session would now legitimately cancel/stale symbols.
+            if let Some(id) = message.get("id") {
+                loop {
+                    let frame = ktlsp_protocol::read_frame(&mut reader).unwrap().unwrap();
+                    let response: Value = serde_json::from_slice(&frame).unwrap();
+                    let matched = response.get("id") == Some(id);
+                    responses.push(response);
+                    if matched {
+                        break;
+                    }
+                }
+            }
         }
-        child.stdin.take().unwrap().write_all(&input).unwrap();
+        drop(input);
+        while let Some(frame) = ktlsp_protocol::read_frame(&mut reader).unwrap() {
+            responses.push(serde_json::from_slice(&frame).unwrap());
+        }
         let output = child.wait_with_output().unwrap();
         assert!(output.status.success(), "{:?}", output.status);
         assert!(
@@ -392,11 +419,6 @@ impl Package {
             "{}",
             String::from_utf8_lossy(&output.stderr)
         );
-        let mut reader = std::io::Cursor::new(output.stdout);
-        let mut responses = Vec::new();
-        while let Some(frame) = ktlsp_protocol::read_frame(&mut reader).unwrap() {
-            responses.push(serde_json::from_slice(&frame).unwrap());
-        }
         responses
     }
 }

@@ -468,12 +468,40 @@ impl Parser {
         snapshot: &SourceSnapshot,
         cancelled: &AtomicBool,
     ) -> Result<SnapshotResult, ParserError> {
-        let mut parsed = self.parse(snapshot.source(), snapshot.kind, cancelled)?;
-        parsed.source = Arc::clone(&snapshot.source);
-        Ok(SnapshotResult {
-            snapshot: snapshot.clone(),
-            parsed,
-        })
+        self.parse_snapshot_with_cleanup(snapshot, cancelled).0
+    }
+    /// Preserve the normal parse result and report this invocation's cleanup.
+    /// True means no child ownership/spawn attempt, or this attempt's same child
+    /// was confirmed reaped (and non-Unix scoped I/O has exited) before return.
+    /// False means unproved closure, not proof that a child remains alive.
+    /// It is never revised from later/global state. Joining the caller is not
+    /// child-closure proof. Limits, selected errors and the Unix 20 ms cleanup
+    /// observation remain unchanged.
+    pub fn parse_snapshot_with_cleanup(
+        &self,
+        snapshot: &SourceSnapshot,
+        cancelled: &AtomicBool,
+    ) -> (Result<SnapshotResult, ParserError>, bool) {
+        let mut cleanup = true;
+        let result = self
+            .parse_inner(
+                snapshot.source(),
+                snapshot.kind,
+                cancelled,
+                &mut cleanup,
+                #[cfg(unix)]
+                None,
+                #[cfg(unix)]
+                None,
+            )
+            .map(|mut parsed| {
+                parsed.source = Arc::clone(&snapshot.source);
+                SnapshotResult {
+                    snapshot: snapshot.clone(),
+                    parsed,
+                }
+            });
+        (result, cleanup)
     }
     /// Finite Unix observation; overhead is unmeasured and missing receipts are inconclusive.
     #[cfg(unix)]
@@ -484,11 +512,13 @@ impl Parser {
         cancelled: &AtomicBool,
     ) -> (Result<SnapshotResult, ParserError>, DeadlineEvidence) {
         let mut evidence = DeadlineEvidence::default();
+        let mut cleanup = true;
         let result = self
             .parse_inner(
                 snapshot.source(),
                 snapshot.kind,
                 cancelled,
+                &mut cleanup,
                 Some(&mut evidence),
                 None,
             )
@@ -510,11 +540,13 @@ impl Parser {
         cancelled: &AtomicBool,
     ) -> (Result<SnapshotResult, ParserError>, GenericCopyEvidence) {
         let mut evidence = GenericCopyEvidence::Missing;
+        let mut cleanup = true;
         let result = self
             .parse_inner(
                 snapshot.source(),
                 snapshot.kind,
                 cancelled,
+                &mut cleanup,
                 None,
                 Some(&mut evidence),
             )
@@ -534,10 +566,12 @@ impl Parser {
         kind: FileKind,
         cancelled: &AtomicBool,
     ) -> Result<Parsed, ParserError> {
+        let mut cleanup = true;
         self.parse_inner(
             source,
             kind,
             cancelled,
+            &mut cleanup,
             #[cfg(unix)]
             None,
             #[cfg(unix)]
@@ -549,6 +583,7 @@ impl Parser {
         source: &str,
         kind: FileKind,
         cancelled: &AtomicBool,
+        cleanup_status: &mut bool,
         #[cfg(unix)] evidence: Option<&mut DeadlineEvidence>,
         #[cfg(unix)] copy_evidence: Option<&mut GenericCopyEvidence>,
     ) -> Result<Parsed, ParserError> {
@@ -591,11 +626,13 @@ impl Parser {
                 None
             };
             #[cfg(unix)]
-            let mut cleanup = admission::Cleanup::Failed;
+            let mut cleanup = (admission::Cleanup::Failed, true);
             let bytes = supervise(
                 command,
                 &normalized,
                 cancelled,
+                #[cfg(not(unix))]
+                cleanup_status,
                 #[cfg(unix)]
                 observer.as_mut(),
                 #[cfg(unix)]
@@ -606,8 +643,12 @@ impl Parser {
                 &mut cleanup,
             );
             #[cfg(unix)]
+            {
+                *cleanup_status = cleanup.1;
+            }
+            #[cfg(unix)]
             if let (Some(observer), Some(evidence)) = (observer, evidence) {
-                *evidence = if cleanup == admission::Cleanup::Confirmed {
+                *evidence = if cleanup.0 == admission::Cleanup::Confirmed {
                     observer.finish()
                 } else {
                     observer.without_receipt()
@@ -615,7 +656,7 @@ impl Parser {
             }
             #[cfg(unix)]
             if let (Some(observer), Some(evidence)) = (copy_observer, copy_evidence) {
-                *evidence = if cleanup == admission::Cleanup::Confirmed {
+                *evidence = if cleanup.0 == admission::Cleanup::Confirmed {
                     observer.finish(&normalized)
                 } else {
                     drop(observer);
@@ -636,10 +677,11 @@ fn supervise(
     mut command: Command,
     normalized: &str,
     cancelled: &AtomicBool,
+    #[cfg(not(unix))] cleanup_status: &mut bool,
     #[cfg(unix)] observer: Option<&mut DeadlineObserver>,
     #[cfg(unix)] preserve_copy_stderr: bool,
     #[cfg(unix)] lease: &mut admission::Lease<'_>,
-    #[cfg(unix)] cleanup: &mut admission::Cleanup,
+    #[cfg(unix)] cleanup: &mut (admission::Cleanup, bool),
 ) -> Result<Vec<u8>, ParserError> {
     #[cfg(unix)]
     if observer.is_none() && !preserve_copy_stderr {
@@ -656,7 +698,7 @@ fn supervise(
     }
     #[cfg(not(unix))]
     {
-        supervise_piped(command, normalized, cancelled, deadline)
+        supervise_piped(command, normalized, cancelled, deadline, cleanup_status)
     }
 }
 
@@ -1589,7 +1631,7 @@ mod unix_io {
         deadline: Instant,
         mut observer: Option<&mut DeadlineObserver>,
         lease: &mut admission::Lease<'_>,
-        cleanup: &mut admission::Cleanup,
+        cleanup: &mut (admission::Cleanup, bool),
     ) -> Result<Vec<u8>, ParserError> {
         let (parent, child_stream) = UnixStream::pair().map_err(|_| ParserError::Io)?;
         parent.set_nonblocking(true).map_err(|_| ParserError::Io)?;
@@ -1598,6 +1640,7 @@ mod unix_io {
             .stdin(Stdio::from(OwnedFd::from(child_stream)))
             .stdout(Stdio::from(OwnedFd::from(child_output)))
             .env_clear();
+        cleanup.1 = false;
         lease.spawn(&mut command)?;
         drop(command);
         let result = {
@@ -1620,8 +1663,9 @@ mod unix_io {
                 }
             })()
         };
-        *cleanup = lease.cleanup();
-        admission::select_result(result, *cleanup)
+        cleanup.0 = lease.cleanup();
+        cleanup.1 = cleanup.0 == admission::Cleanup::Confirmed;
+        admission::select_result(result, cleanup.0)
     }
 
     #[cfg(test)]
@@ -2105,7 +2149,9 @@ fn supervise_piped(
     normalized: &str,
     cancelled: &AtomicBool,
     deadline: Instant,
+    cleanup_status: &mut bool,
 ) -> Result<Vec<u8>, ParserError> {
+    *cleanup_status = false;
     let child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -2174,6 +2220,7 @@ fn supervise_piped(
         })();
         // Check cleanup before the scope joins potentially blocked I/O threads.
         guard.finish()?;
+        *cleanup_status = true;
         result
     })
 }
@@ -2796,6 +2843,27 @@ mod tests {
         }
     }
     #[test]
+    fn request_cleanup_reports_no_spawn_for_cancel_and_preflight_rejection() {
+        let parser = Parser::new(std::env::current_exe().unwrap()).unwrap();
+        let snapshot =
+            SourceSnapshot::new("cancel-before-spawn", 1, FileKind::Source, "class C").unwrap();
+        let (result, closed) =
+            parser.parse_snapshot_with_cleanup(&snapshot, &AtomicBool::new(true));
+        assert_eq!(result.unwrap_err(), ParserError::Cancelled);
+        assert!(closed);
+        let snapshot = SourceSnapshot::new(
+            "preflight-before-spawn",
+            1,
+            FileKind::Source,
+            "{".repeat(MAX_NESTING + 1),
+        )
+        .unwrap();
+        let (result, closed) =
+            parser.parse_snapshot_with_cleanup(&snapshot, &AtomicBool::new(false));
+        assert_eq!(result.unwrap_err(), ParserError::NestingLimit);
+        assert!(closed);
+    }
+    #[test]
     fn supervised_faults_terminate_and_allow_next_request() {
         let _functional = crate::functional_test::serial();
         for (mode, expected) in [
@@ -2810,7 +2878,9 @@ mod tests {
             #[cfg(unix)]
             let mut lease = admission::reserve().unwrap();
             #[cfg(unix)]
-            let mut cleanup = admission::Cleanup::Failed;
+            let mut cleanup = (admission::Cleanup::Failed, true);
+            #[cfg(not(unix))]
+            let mut cleanup = true;
             let mut command = Command::new(std::env::current_exe().unwrap());
             command.args(["--exact", "tests::fault_worker", "--ignored", "--nocapture"]);
             let source = if mode == "no-read" {
@@ -2823,6 +2893,8 @@ mod tests {
                 command,
                 &source,
                 &AtomicBool::new(false),
+                #[cfg(not(unix))]
+                &mut cleanup,
                 #[cfg(unix)]
                 None,
                 #[cfg(unix)]
@@ -2852,7 +2924,9 @@ mod tests {
             #[cfg(unix)]
             let mut lease = admission::reserve().unwrap();
             #[cfg(unix)]
-            let mut cleanup = admission::Cleanup::Failed;
+            let mut cleanup = (admission::Cleanup::Failed, true);
+            #[cfg(not(unix))]
+            let mut cleanup = true;
             let mut command = Command::new(std::env::current_exe().unwrap());
             command.args(["--exact", "tests::fault_worker", "--ignored", "--nocapture"]);
             assert_eq!(
@@ -2860,6 +2934,8 @@ mod tests {
                     command,
                     "hang",
                     &cancel,
+                    #[cfg(not(unix))]
+                    &mut cleanup,
                     #[cfg(unix)]
                     None,
                     #[cfg(unix)]
@@ -2875,7 +2951,9 @@ mod tests {
         #[cfg(unix)]
         let mut lease = admission::reserve().unwrap();
         #[cfg(unix)]
-        let mut cleanup = admission::Cleanup::Failed;
+        let mut cleanup = (admission::Cleanup::Failed, true);
+        #[cfg(not(unix))]
+        let mut cleanup = true;
         let mut command = Command::new(std::env::current_exe().unwrap());
         command.args(["--exact", "tests::fault_worker", "--ignored", "--nocapture"]);
         assert!(
@@ -2883,6 +2961,8 @@ mod tests {
                 command,
                 "healthy",
                 &AtomicBool::new(false),
+                #[cfg(not(unix))]
+                &mut cleanup,
                 #[cfg(unix)]
                 None,
                 #[cfg(unix)]

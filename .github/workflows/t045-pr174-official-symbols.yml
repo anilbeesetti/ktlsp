@@ -7,7 +7,7 @@ on:
         type: string
         required: true
       source_comment:
-        description: Owner source approval ID
+        description: Owner approval ID
         type: string
         required: true
       calibration_comment:
@@ -281,14 +281,6 @@ jobs:
         timeout-minutes: 3
         env: {CASE: boundary-denials, ARTIFACT_ID: '${{ steps.upload_boundary.outputs.artifact-id }}'}
         run: *receipt
-      - id: disposal
-        if: ${{ always() && steps.case_normal.outcome != 'skipped' }}
-        timeout-minutes: 1
-        run: sudo "$PR174_HOST" workflow-disposal-snapshot
-      - if: ${{ always() && steps.disposal.outcome != 'skipped' }}
-        uses: *upload
-        timeout-minutes: 3
-        with: {name: pr174-disposal, path: /etc/ktlsp-pr174/uploads/disposal, compression-level: 0, if-no-files-found: error, include-hidden-files: true}
 
       - id: cancel_start
         timeout-minutes: 12
@@ -312,6 +304,14 @@ jobs:
         timeout-minutes: 3
         env: {CASE: workflow-step-cancel, ARTIFACT_ID: '${{ steps.upload_cancel.outputs.artifact-id }}'}
         run: *receipt
+      - id: disposal
+        if: ${{ always() && steps.case_normal.outcome != 'skipped' }}
+        timeout-minutes: 1
+        run: sudo "$PR174_HOST" workflow-disposal-snapshot
+      - if: ${{ always() && steps.disposal.outcome != 'skipped' }}
+        uses: *upload
+        timeout-minutes: 3
+        with: {name: pr174-disposal, path: /etc/ktlsp-pr174/uploads/disposal, compression-level: 0, if-no-files-found: error, include-hidden-files: true}
       - name: Authenticate protected cohort and runner timeout
         id: collect
         timeout-minutes: 8

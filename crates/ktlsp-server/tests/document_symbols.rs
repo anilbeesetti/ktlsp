@@ -1407,3 +1407,259 @@ fn typed_local_original_definition_hover_and_annotation_refusals() {
         }
     }
 }
+
+#[test]
+fn declaration_name_hover_actual_worker_and_paired_cli() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let property = "val /*\r\n````\r\n*/ `same😀` = 1";
+    let function = "fun same(`same😀`: Long) {\r\n val `same😀` = 1\r\n val read = `same😀`\r\n}";
+    let source = format!("// 😀\r\nclass same {{}}\r\n{property}\r\n{function}\r\n");
+    let parameter = source.find("`same😀`: Long").unwrap();
+    let local = source.find("val `same😀`").unwrap();
+    let cases = [
+        (
+            source.find("class same").unwrap() + 6,
+            "same",
+            "// 😀\r\nclass same {}",
+        ),
+        (
+            source.find(property).unwrap() + property.find("`same😀`").unwrap(),
+            "`same😀`",
+            property,
+        ),
+        (source.find(function).unwrap() + 4, "same", function),
+        (parameter, "`same😀`", "`same😀`: Long"),
+        (local + 4, "`same😀`", "val `same😀` = 1"),
+    ];
+    let package = Package::new(true);
+    for (profile, markdown) in [
+        (json!({}), false),
+        (
+            json!({"contentFormat":["unknown","markdown","plaintext"]}),
+            true,
+        ),
+        (json!({"contentFormat":["plaintext","markdown"]}), false),
+    ] {
+        let mut session = Session::with_parser(worker()).unwrap();
+        let init = json!({"capabilities":{"textDocument":{"hover":profile,"diagnostic":{}}}});
+        assert_eq!(
+            request(&mut session, "initialize", init.clone())["result"]["capabilities"]["hoverProvider"],
+            true
+        );
+        notify(&mut session, "initialized", json!({}));
+        open(&mut session, &source);
+        let mut messages = vec![
+            json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":init}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
+        ];
+        let mut expected = Vec::new();
+        for (index, (start, name, declaration)) in cases.iter().enumerate() {
+            let range = json!(Range {
+                start: offset_to_position(&source, *start).unwrap(),
+                end: offset_to_position(&source, start + name.len()).unwrap(),
+            });
+            let value = if markdown {
+                let longest = declaration.split(|c| c != '`').map(str::len).max().unwrap();
+                let fence = "`".repeat(3.max(longest + 1));
+                format!("{fence}kotlin\n{declaration}\n{fence}")
+            } else {
+                declaration.to_string()
+            };
+            let result = json!({"contents":{"kind":if markdown {"markdown"} else {"plaintext"},"value":value},"range":range});
+            // Both endpoints inside the actual token select the same declaration.
+            for offset in [*start, start + name.len() - 1] {
+                let params = navigation_params(&source, offset);
+                let hover = request(&mut session, "textDocument/hover", params.clone());
+                assert_eq!(hover["result"], result, "{hover}");
+                let definition = request(&mut session, "textDocument/definition", params);
+                assert_eq!(definition["result"], Value::Null, "{definition}");
+            }
+            let id = if index == 0 {
+                json!(u64::MAX)
+            } else {
+                json!(format!("decl-{index}"))
+            };
+            messages.push(json!({"jsonrpc":"2.0","id":id,"method":"textDocument/hover","params":navigation_params(&source,*start)}));
+            expected.push((id, result));
+            let end = request(
+                &mut session,
+                "textDocument/hover",
+                navigation_params(&source, start + name.len()),
+            );
+            assert_eq!(end["result"], Value::Null, "{end}");
+        }
+        for offset in [
+            0,
+            source.find("class").unwrap(),
+            source.find('{').unwrap(),
+            source.len(),
+        ] {
+            let response = request(
+                &mut session,
+                "textDocument/hover",
+                navigation_params(&source, offset),
+            );
+            assert_eq!(response["result"], Value::Null, "{response}");
+        }
+        messages.extend([
+            json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let replies = package.exchange(&messages);
+        assert!(
+            replies
+                .iter()
+                .map(|reply| &reply["id"])
+                .eq(messages.iter().filter_map(|message| message.get("id"))),
+            "{replies:?}"
+        );
+        for (id, result) in expected {
+            let reply = replies.iter().find(|reply| reply["id"] == id).unwrap();
+            assert_eq!(reply["result"], result, "{reply}");
+        }
+        // Temporary bounded actual wire capture for ROOT's first hosted read.
+        if let Some(directory) = std::env::var_os("KTLSP_DECLARATION_HOVER_PROOF_DIR") {
+            let bytes = serde_json::to_vec(&json!({"source":source,"markdown":markdown,"profile":profile,"messages":messages,"replies":replies})).unwrap();
+            assert!(bytes.len() <= 65536);
+            std::fs::create_dir_all(&directory).unwrap();
+            let name = if markdown {
+                "markdown.json"
+            } else if profile.get("contentFormat").is_some() {
+                "plaintext.json"
+            } else {
+                "default.json"
+            };
+            std::fs::write(PathBuf::from(directory).join(name), bytes).unwrap();
+        }
+    }
+}
+
+#[test]
+fn declaration_hover_refusals_do_not_fall_back_to_enclosing_names() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = running(json!({}));
+    for (source, needle) in [
+        ("fun f(p: Long) { val x = missing }", "missing"),
+        ("fun f(p: Long) { val x: Long = p }", "Long"),
+        ("fun f() { val x = call() }", "call"),
+        ("fun f() { val broken = }", "broken"),
+        ("fun f() { var mutable = 1 }", "mutable"),
+    ] {
+        open(&mut session, source);
+        let reply = request(
+            &mut session,
+            "textDocument/hover",
+            navigation_params(source, source.rfind(needle).unwrap()),
+        );
+        assert_eq!(reply["error"]["code"], -32803, "{source}: {reply}");
+        assert!(reply.get("result").is_none());
+        notify(
+            &mut session,
+            "textDocument/didClose",
+            json!({"textDocument":{"uri":URI}}),
+        );
+    }
+    // Non-name positions retain the cheap null path even for unsupported trees.
+    let source = "fun f() { var mutable = call() }";
+    open(&mut session, source);
+    for offset in [0, source.find('{').unwrap(), source.len()] {
+        let reply = request(
+            &mut session,
+            "textDocument/hover",
+            navigation_params(source, offset),
+        );
+        assert_eq!(reply["result"], Value::Null, "{reply}");
+    }
+}
+
+#[test]
+fn declaration_hover_paired_lf_boundaries_negotiation_and_refusals() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let source = "class Box {}\nfun f(p: Long) { val x = 1; val y = x }\n";
+    let at = |offset| navigation_params(source, offset);
+    let package = Package::new(true);
+    for profile in [
+        json!({}),
+        json!({"contentFormat":["markdown"]}),
+        json!({"contentFormat":[]}),
+        json!({"contentFormat":[false,"plaintext"]}),
+    ] {
+        let enabled = profile.get("contentFormat").is_none()
+            || profile["contentFormat"] == json!(["markdown"]);
+        let mut messages = vec![
+            json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{"capabilities":{"textDocument":{"hover":profile,"diagnostic":{}}}}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
+            json!({"jsonrpc":"2.0","id":"name","method":"textDocument/hover","params":at(6)}),
+            json!({"jsonrpc":"2.0","id":"definition","method":"textDocument/definition","params":at(6)}),
+        ];
+        for (id, offset) in [
+            ("end", 9),
+            ("keyword", 0),
+            ("space", 5),
+            ("brace", 10),
+            ("eof", source.len()),
+        ] {
+            messages.push(
+                json!({"jsonrpc":"2.0","id":id,"method":"textDocument/hover","params":at(offset)}),
+            );
+        }
+        messages.extend([
+            json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let replies = package.exchange(&messages);
+        assert!(
+            replies
+                .iter()
+                .map(|reply| &reply["id"])
+                .eq(messages.iter().filter_map(|message| message.get("id")))
+        );
+        assert_eq!(
+            replies[0]["result"]["capabilities"]
+                .get("hoverProvider")
+                .is_some(),
+            enabled
+        );
+        for reply in &replies[1..replies.len() - 1] {
+            if reply["id"] == "definition" {
+                assert_eq!(reply["result"], Value::Null, "{reply}");
+            } else if !enabled {
+                assert_eq!(reply["error"]["code"], -32601, "{reply}");
+            } else if reply["id"] == "name" {
+                let markdown = profile["contentFormat"] == json!(["markdown"]);
+                assert_eq!(
+                    reply["result"],
+                    json!({"contents":{"kind":if markdown {"markdown"} else {"plaintext"},"value":if markdown {"```kotlin\nclass Box {}\n```"} else {"class Box {}"}},"range":{"start":{"line":0,"character":6},"end":{"line":0,"character":9}}}),
+                    "{reply}"
+                );
+            } else {
+                assert_eq!(reply["result"], Value::Null, "{reply}");
+            }
+        }
+        let missing = Package::new(false).exchange(&messages);
+        assert!(
+            missing[0]["result"]["capabilities"]
+                .get("hoverProvider")
+                .is_none()
+        );
+        assert!(
+            missing[1..missing.len() - 1]
+                .iter()
+                .all(|reply| reply["error"]["code"] == -32601)
+        );
+    }
+    let source = "fun f(p: Long) { val x = missing }";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{"capabilities":{"textDocument":{"diagnostic":{}}}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":"refuse","method":"textDocument/hover","params":navigation_params(source,source.find("missing").unwrap())}),
+        json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ];
+    let replies = package.exchange(&messages);
+    assert_eq!(replies[1]["error"]["code"], -32803, "{replies:?}");
+    assert!(replies[1].get("result").is_none());
+}

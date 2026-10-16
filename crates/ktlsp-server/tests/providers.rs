@@ -924,3 +924,381 @@ fn invalid_semantic_ranges_take_precedence_over_resource_exhaustion() {
         -32803
     );
 }
+
+fn action_capabilities(pull: bool) -> Value {
+    let mut capabilities = json!({
+        "workspace":{"workspaceEdit":{"documentChanges":true}},
+        "textDocument":{
+            "codeAction":{"codeActionLiteralSupport":{"codeActionKind":{"valueSet":["refactor"]}}},
+            "publishDiagnostics":{"versionSupport":true}
+        }
+    });
+    if pull {
+        capabilities["textDocument"]["diagnostic"] = json!({});
+    }
+    capabilities
+}
+
+fn action_params(range: Value) -> Value {
+    json!({"textDocument":{"uri":URI},"range":range,"context":{"diagnostics":[]}})
+}
+
+fn action_range(start: u32, end: u32) -> Value {
+    json!({"start":{"line":1,"character":start},"end":{"line":1,"character":end}})
+}
+
+fn actions(session: &mut Session, params: Value) -> Value {
+    request(session, "textDocument/codeAction", params)
+}
+
+#[test]
+fn structural_actions_apply_the_actual_versioned_edit_and_refresh_both_diagnostic_modes() {
+    for pull in [false, true] {
+        for closer in [')', ']', '}'] {
+            let mut session = running(action_capabilities(pull));
+            let source = format!("val s = \"😀\"\r\n{closer} \t\r\n\u{c}");
+            let opened = notify(
+                &mut session,
+                "textDocument/didOpen",
+                json!({"textDocument":{"uri":URI,"languageId":"kotlin","version":7,"text":source}}),
+            );
+            let diagnostics = if pull {
+                assert!(opened.is_empty());
+                request(
+                    &mut session,
+                    "textDocument/diagnostic",
+                    json!({"textDocument":{"uri":URI}}),
+                )["result"]["items"]
+                    .clone()
+            } else {
+                assert_eq!(opened[0]["params"]["version"], 7);
+                opened[0]["params"]["diagnostics"].clone()
+            };
+            assert_eq!(
+                diagnostics,
+                json!([{
+                    "range":action_range(0,1),"severity":1,"source":"ktlsp-lexical-structural",
+                    "code":"structural","message":"unexpected or mismatched closing delimiter"
+                }])
+            );
+            let reply = actions(&mut session, action_params(action_range(0, 1)));
+            assert_eq!(
+                reply["result"],
+                json!([{
+                    "title":format!("Remove unmatched trailing '{closer}'"),"kind":"quickfix",
+                    "edit":{"documentChanges":[{
+                        "textDocument":{"uri":URI,"version":7},
+                        "edits":[{"range":action_range(0,1),"newText":""}]
+                    }]}
+                }])
+            );
+            assert_eq!(session.document(URI).unwrap().text(), source);
+            assert_eq!(session.document(URI).unwrap().version(), 7);
+            let document_edit = &reply["result"][0]["edit"]["documentChanges"][0];
+            let edit = &document_edit["edits"][0];
+            let change = ktlsp_text::TextChange {
+                range: Some(serde_json::from_value(edit["range"].clone()).unwrap()),
+                range_length: None,
+                text: edit["newText"].as_str().unwrap().into(),
+            };
+            let mut applied = session.document(URI).unwrap().clone();
+            applied
+                .apply_changes(8, std::slice::from_ref(&change))
+                .unwrap();
+            assert_eq!(applied.text(), "val s = \"😀\"\r\n \t\r\n\u{c}");
+            let changed = notify(
+                &mut session,
+                "textDocument/didChange",
+                json!({"textDocument":{"uri":document_edit["textDocument"]["uri"],"version":8},
+                    "contentChanges":[change]}),
+            );
+            assert_eq!(session.document(URI).unwrap(), &applied);
+            assert_eq!(session.document(URI).unwrap().version(), 8);
+            if pull {
+                assert!(changed.is_empty());
+                assert_eq!(
+                    request(
+                        &mut session,
+                        "textDocument/diagnostic",
+                        json!({"textDocument":{"uri":URI}})
+                    )["result"],
+                    json!({"kind":"full","items":[]})
+                );
+            } else {
+                assert_eq!(changed[0]["params"]["version"], 8);
+                assert_eq!(changed[0]["params"]["diagnostics"], json!([]));
+            }
+            assert_eq!(
+                actions(&mut session, action_params(action_range(0, 0)))["result"],
+                json!([])
+            );
+        }
+    }
+}
+
+#[test]
+fn structural_action_selection_kind_and_client_diagnostics_are_not_authority() {
+    let mut session = running(action_capabilities(false));
+    open(&mut session, "val s = \"😀\"\r\n) \t");
+    for (start, end, expected) in [
+        (0, 0, 1),
+        (1, 1, 1),
+        (0, 1, 1),
+        (0, 3, 1),
+        (1, 2, 0),
+        (2, 2, 0),
+    ] {
+        let result = actions(&mut session, action_params(action_range(start, end)));
+        assert_eq!(result["result"].as_array().unwrap().len(), expected);
+    }
+    for (only, expected) in [
+        (json!([]), 0),
+        (json!(["quickfix"]), 1),
+        (json!([""]), 1),
+        (json!(["quickfix.foo"]), 0),
+        (json!(["quick"]), 0),
+        (json!(["refactor"]), 0),
+        (json!(["quickfix.foo", "quickfix"]), 1),
+    ] {
+        let mut params = action_params(action_range(0, 1));
+        params["context"]["only"] = only;
+        assert_eq!(
+            actions(&mut session, params)["result"]
+                .as_array()
+                .unwrap()
+                .len(),
+            expected
+        );
+    }
+    let forged = json!([{"range":{"start":{"line":999,"character":0},"end":{"line":999,"character":1}},
+        "message":"invented","code":"not-current","data":{"edit":"not authoritative"}}]);
+    for trigger in [1, 2] {
+        let mut params = action_params(action_range(0, 1));
+        params["context"]["diagnostics"] = forged.clone();
+        params["context"]["triggerKind"] = json!(trigger);
+        assert_eq!(
+            actions(&mut session, params)["result"][0]["edit"]["documentChanges"][0]["textDocument"]
+                ["version"],
+            1
+        );
+    }
+    change(&mut session, 2, "val s = \"😀\"\r\n ");
+    let mut params = action_params(action_range(0, 1));
+    params["context"]["diagnostics"] = forged;
+    assert_eq!(actions(&mut session, params)["result"], json!([]));
+}
+
+#[test]
+fn structural_actions_refuse_opaque_mismatched_multiple_lexical_and_nontrailing_tokens() {
+    for source in [
+        "[)",
+        "[)]",
+        "\"\\q\")",
+        "\"unterminated",
+        "(",
+        "))",
+        ") // comment",
+        ") /* comment */",
+        ")x",
+        ")\"ok\"",
+        ")\u{b}",
+        "\")\"",
+        "'}'",
+        "`]`",
+        "/* ) */",
+        "\"${f(\")\")}\"",
+        "\"\"\" ] \"\"\"",
+    ] {
+        let mut session = running(action_capabilities(false));
+        open(&mut session, source);
+        let params = action_params(
+            json!({"start":{"line":0,"character":0},"end":{"line":0,"character":source.encode_utf16().count()}}),
+        );
+        assert_eq!(
+            actions(&mut session, params)["result"],
+            json!([]),
+            "{source:?}"
+        );
+    }
+    let mut session = running(action_capabilities(false));
+    open(&mut session, ")");
+    assert_eq!(
+        actions(
+            &mut session,
+            action_params(json!({"start":{"line":0,"character":0},"end":{"line":0,"character":1}}))
+        )["result"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    change(&mut session, 2, &")".repeat(257));
+    assert_eq!(
+        actions(
+            &mut session,
+            action_params(json!({"start":{"line":0,"character":0},"end":{"line":0,"character":1}}))
+        )["result"],
+        json!([])
+    );
+    for (index, source) in ["{".repeat(1025), "()".repeat(500_001), "/*".repeat(129)]
+        .iter()
+        .enumerate()
+    {
+        change(&mut session, index as i32 + 3, source);
+        assert_eq!(
+            actions(
+                &mut session,
+                action_params(
+                    json!({"start":{"line":0,"character":0},"end":{"line":0,"character":0}})
+                )
+            )["error"]["code"],
+            -32803
+        );
+    }
+}
+
+#[test]
+fn structural_action_negotiation_and_malformed_consumed_shapes_are_strict() {
+    for capabilities in [
+        json!({}),
+        json!({"workspace":{"workspaceEdit":{"documentChanges":true}}}),
+        json!({"textDocument":{"codeAction":{"codeActionLiteralSupport":{"codeActionKind":{"valueSet":["quickfix"]}}}}}),
+    ] {
+        let mut session = Session::new();
+        let initialized = request(
+            &mut session,
+            "initialize",
+            json!({"capabilities":capabilities}),
+        );
+        assert!(
+            initialized["result"]["capabilities"]
+                .get("codeActionProvider")
+                .is_none()
+        );
+        notify(&mut session, "initialized", json!({}));
+        assert_eq!(
+            actions(&mut session, action_params(action_range(0, 1)))["error"]["code"],
+            -32601
+        );
+    }
+    let mut session = Session::new();
+    let initialized = request(
+        &mut session,
+        "initialize",
+        json!({"capabilities":action_capabilities(false)}),
+    );
+    assert_eq!(
+        initialized["result"]["capabilities"]["codeActionProvider"],
+        json!({"codeActionKinds":["quickfix"],"resolveProvider":false})
+    );
+    for invalid in [
+        json!(null),
+        json!({"codeActionLiteralSupport":false}),
+        json!({"codeActionLiteralSupport":{"codeActionKind":{"valueSet":[1]}}}),
+        json!({"codeActionLiteralSupport":{"codeActionKind":{}}}),
+        json!({"dynamicRegistration":1}),
+        json!({"resolveSupport":{"properties":[false]}}),
+    ] {
+        let mut capabilities = action_capabilities(false);
+        capabilities["textDocument"]["codeAction"] = invalid;
+        let mut session = Session::new();
+        assert_eq!(
+            request(
+                &mut session,
+                "initialize",
+                json!({"capabilities":capabilities})
+            )["error"]["code"],
+            -32602
+        );
+    }
+    let mut session = running(action_capabilities(false));
+    open(&mut session, "val s = \"😀\"\r\n)");
+    for range in [
+        action_range(1, 0),
+        action_range(0, 2),
+        json!({"start":{"line":0,"character":10},"end":{"line":1,"character":1}}),
+        json!({"start":{"line":2,"character":0},"end":{"line":2,"character":0}}),
+        json!({"start":{"line":0,"character":2147483648u64},"end":{"line":1,"character":0}}),
+        json!({"start":{"line":0,"character":0}}),
+        Value::Null,
+    ] {
+        assert_eq!(
+            actions(&mut session, action_params(range))["error"]["code"],
+            -32602
+        );
+    }
+    for context in [
+        json!({}),
+        json!({"diagnostics":null}),
+        json!({"diagnostics":[{}]}),
+        json!({"diagnostics":[],"only":null}),
+        json!({"diagnostics":[],"only":[1]}),
+        json!({"diagnostics":[],"triggerKind":0}),
+        json!({"diagnostics":[],"triggerKind":1.5}),
+        json!({"diagnostics":[{"range":action_range(0,1),"message":2}]}),
+        json!({"diagnostics":[{"range":action_range(0,1),"message":"x","code":{}}]}),
+        json!({"diagnostics":[{"range":action_range(0,1),"message":"x","severity":5}]}),
+    ] {
+        let mut params = action_params(action_range(0, 1));
+        params["context"] = context;
+        assert_eq!(actions(&mut session, params)["error"]["code"], -32602);
+    }
+    for uri in [
+        json!("relative"),
+        json!("file:///not-open.kt"),
+        json!(5),
+        json!(format!("untitled:{}", "x".repeat(8192))),
+    ] {
+        let mut params = action_params(action_range(0, 1));
+        params["textDocument"]["uri"] = uri;
+        assert_eq!(actions(&mut session, params)["error"]["code"], -32602);
+    }
+    assert_eq!(
+        request(&mut session, "codeAction/resolve", json!({}))["error"]["code"],
+        -32601
+    );
+    assert_eq!(
+        request(&mut session, "workspace/executeCommand", json!({}))["error"]["code"],
+        -32601
+    );
+}
+
+#[test]
+fn structural_actions_follow_only_committed_changes_close_reopen_and_max_version() {
+    let mut session = running(action_capabilities(false));
+    open(&mut session, "val s = \"😀\"\r\n)");
+    let params = action_params(action_range(0, 1));
+    let original = actions(&mut session, params.clone());
+    assert!(change(&mut session, 1, "").is_empty());
+    assert_eq!(actions(&mut session, params.clone()), original);
+    assert!(notify(&mut session,"textDocument/didChange",
+        json!({"textDocument":{"uri":URI,"version":2},"contentChanges":[
+            {"range":action_range(0,1),"text":""},
+            {"range":{"start":{"line":0,"character":10},"end":{"line":0,"character":11}},"text":"x"}]})).is_empty());
+    assert_eq!(session.document(URI).unwrap().version(), 1);
+    assert_eq!(session.document(URI).unwrap().text(), "val s = \"😀\"\r\n)");
+    assert_eq!(actions(&mut session, params.clone()), original);
+    change(&mut session, 2, "val s = \"😀\"\r\n]");
+    assert_eq!(
+        actions(&mut session, params.clone())["result"][0]["title"],
+        "Remove unmatched trailing ']'"
+    );
+    assert_eq!(
+        actions(&mut session, params.clone())["result"][0]["edit"]["documentChanges"][0]["textDocument"]
+            ["version"],
+        2
+    );
+    notify(
+        &mut session,
+        "textDocument/didClose",
+        json!({"textDocument":{"uri":URI}}),
+    );
+    assert_eq!(
+        actions(&mut session, params.clone())["error"]["code"],
+        -32602
+    );
+    open(&mut session, "val s = \"😀\"\r\n ");
+    assert_eq!(actions(&mut session, params.clone())["result"], json!([]));
+    change(&mut session, i32::MAX, "val s = \"😀\"\r\n}");
+    assert_eq!(actions(&mut session, params)["result"], json!([]));
+}

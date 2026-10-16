@@ -224,7 +224,10 @@ impl Parsed {
                 return Err(TextError::InvalidOffset(original_offset));
             }
             if original_offset == 0 {
-                return Ok(Position { line: 0, character: 0 });
+                return Ok(Position {
+                    line: 0,
+                    character: 0,
+                });
             }
         }
         let Some(positions) = self.positions.get_or_init(|| {
@@ -236,11 +239,24 @@ impl Parsed {
             }
             let mut positions = Vec::new();
             positions.try_reserve_exact(entries).ok()?;
-            if positions.capacity().checked_mul(std::mem::size_of::<Position>())? > max_bytes {
+            if positions
+                .capacity()
+                .checked_mul(std::mem::size_of::<Position>())?
+                > max_bytes
+            {
                 return None;
             }
-            positions.resize(entries, Position { line: INVALID, character: INVALID });
-            let mut position = Position { line: 0, character: 0 };
+            positions.resize(
+                entries,
+                Position {
+                    line: INVALID,
+                    character: INVALID,
+                },
+            );
+            let mut position = Position {
+                line: 0,
+                character: 0,
+            };
             let mut characters = self.source.char_indices().peekable();
             while let Some((offset, character)) = characters.next() {
                 positions[offset] = position;
@@ -2846,7 +2862,9 @@ mod tests {
     fn positions_preserve_strict_original_coordinates_in_arbitrary_order() {
         use ktlsp_text::{Position, TextError};
         fn reference(source: &str, offset: usize) -> Result<Position, TextError> {
-            let prefix = source.get(..offset).ok_or(TextError::InvalidOffset(offset))?;
+            let prefix = source
+                .get(..offset)
+                .ok_or(TextError::InvalidOffset(offset))?;
             if prefix.ends_with('\r') && source[offset..].starts_with('\n') {
                 return Err(TextError::InvalidOffset(offset));
             }
@@ -2858,9 +2876,19 @@ mod tests {
                 line += 1;
                 last = next;
             }
-            Ok(Position { line, character: last.encode_utf16().count() as u32 })
+            Ok(Position {
+                line,
+                character: last.encode_utf16().count() as u32,
+            })
         }
-        for source in ["", "\r\n", "\r", "\n", "a😀e\u{301}\r\nβ\r中\n\0\u{2028}z\r\n", "😀"] {
+        for source in [
+            "",
+            "\r\n",
+            "\r",
+            "\n",
+            "a😀e\u{301}\r\nβ\r中\n\0\u{2028}z\r\n",
+            "😀",
+        ] {
             let parsed = Parsed {
                 source: Arc::from(source),
                 elements: vec![],
@@ -2876,7 +2904,11 @@ mod tests {
             order.extend(0..=source.len() + 2);
             order.extend([usize::MAX, 0, source.len(), 0, usize::MAX]);
             for offset in order {
-                assert_eq!(parsed.position(offset), reference(source, offset), "{source:?} at {offset}");
+                assert_eq!(
+                    parsed.position(offset),
+                    reference(source, offset),
+                    "{source:?} at {offset}"
+                );
             }
         }
     }

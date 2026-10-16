@@ -172,7 +172,10 @@ fn genuine_pair_copy_and_equals_preserve_same_outcome_original_identity() {
         assert_eq!(declaration.parameter.id, ordinal as i32);
         assert_eq!(declaration.body_span, declaration_span);
         borrowed(declaration.parameter.raw, bytes, declaration_span);
-        assert_eq!(declaration.name, units(if ordinal == 0 { "A" } else { "B" }));
+        assert_eq!(
+            declaration.name,
+            units(if ordinal == 0 { "A" } else { "B" })
+        );
         assert_eq!(
             declaration.parameter.variance,
             Some(metadata::type_parameter::Variance::Out)
@@ -209,7 +212,11 @@ fn genuine_pair_copy_and_equals_preserve_same_outcome_original_identity() {
     assert_eq!(id.relative_class_name(), units("Any"));
     assert!(!id.local);
     for declaration in &equals.parameters {
-        borrowed(declaration.parameter.raw, bytes, declaration.body_span.clone());
+        borrowed(
+            declaration.parameter.raw,
+            bytes,
+            declaration.body_span.clone(),
+        );
     }
 }
 
@@ -293,7 +300,10 @@ fn inline_precedence_presence_and_retained_raw_flag_accessors() {
     }
     let mut duplicate = value_body(4, &leaf(0));
     duplicate.extend(message(3, &leaf(1)));
-    assert_eq!(kind(&message(6, &duplicate)), ErrorKind::DuplicateInlineRole);
+    assert_eq!(
+        kind(&message(6, &duplicate)),
+        ErrorKind::DuplicateInlineRole
+    );
     assert_eq!(kind(&message(6, &[0x10, 4])), ErrorKind::MissingRole);
     assert_eq!(
         kind(&message(6, &[0x10, 4, 0x28, 0])),
@@ -316,15 +326,26 @@ fn inline_precedence_presence_and_retained_raw_flag_accessors() {
 #[test]
 fn nominal_resolution_uses_real_operations_predefined_local_and_lossless_utf16() {
     for (record, encoded, expected) in [
-        (vec![0x18, 1], units("a/b/Outer$Inner"), units("Outer.Inner")),
-        (vec![0x18, 2], units("La/b/Outer$Inner;"), units("Outer.Inner")),
+        (
+            vec![0x18, 1],
+            units("a/b/Outer$Inner"),
+            units("Outer.Inner"),
+        ),
+        (
+            vec![0x18, 2],
+            units("La/b/Outer$Inner;"),
+            units("Outer.Inner"),
+        ),
     ] {
         let mut table = message(1, &[8, 6]); // First six fallback names.
         table.extend(message(1, &record));
         table.extend(scalar(5, 6)); // Local membership refers to actual nominal index.
         let mut names = NAMES.to_vec();
         names[6] = &encoded;
-        let input = input(class_with_table(&fields(&value(4, &[0x30, 6])), &table), &names);
+        let input = input(
+            class_with_table(&fields(&value(4, &[0x30, 6])), &table),
+            &names,
+        );
         let result = decode(&input, 3, Limits::default()).unwrap();
         let Classifier::Class(id) = &result.function.parameters[0].classifier else {
             panic!("nominal")
@@ -335,7 +356,10 @@ fn nominal_resolution_uses_real_operations_predefined_local_and_lossless_utf16()
     }
     let mut table = message(1, &[8, 6]);
     table.extend(message(1, &[0x10, 0])); // Actual predefined index0 = kotlin/Any.
-    let predefined = input(class_with_table(&fields(&value(4, &[0x30, 6])), &table), NAMES);
+    let predefined = input(
+        class_with_table(&fields(&value(4, &[0x30, 6])), &table),
+        NAMES,
+    );
     let result = decode(&predefined, 3, Limits::default()).unwrap();
     let Classifier::Class(id) = &result.function.parameters[0].classifier else {
         panic!("predefined nominal")

@@ -456,14 +456,27 @@ impl ReferenceBudget {
         if count > DECLARATIONS {
             return Err(ReferenceSiteError::Resource);
         }
-        let bytes = count.checked_mul(size_of::<T>()).ok_or(ReferenceSiteError::Resource)?;
-        self.requested = self.requested.checked_add(bytes).ok_or(ReferenceSiteError::Resource)?;
+        let bytes = count
+            .checked_mul(size_of::<T>())
+            .ok_or(ReferenceSiteError::Resource)?;
+        self.requested = self
+            .requested
+            .checked_add(bytes)
+            .ok_or(ReferenceSiteError::Resource)?;
         if self.requested > REQUESTED {
             return Err(ReferenceSiteError::Resource);
         }
-        output.try_reserve_exact(count).map_err(|_| ReferenceSiteError::Resource)?;
-        let actual = output.capacity().checked_mul(size_of::<T>()).ok_or(ReferenceSiteError::Resource)?;
-        self.retained = self.retained.checked_add(actual).ok_or(ReferenceSiteError::Resource)?;
+        output
+            .try_reserve_exact(count)
+            .map_err(|_| ReferenceSiteError::Resource)?;
+        let actual = output
+            .capacity()
+            .checked_mul(size_of::<T>())
+            .ok_or(ReferenceSiteError::Resource)?;
+        self.retained = self
+            .retained
+            .checked_add(actual)
+            .ok_or(ReferenceSiteError::Resource)?;
         if self.retained > RETAINED {
             return Err(ReferenceSiteError::Resource);
         }
@@ -1344,10 +1357,12 @@ fn close_frames<'a>(
 fn ordinary_function_path(s: &[Frame<'_>; DEPTH], depth: usize, b: &mut Budget) -> Result<bool> {
     Ok(match depth {
         2 => frame(s, 0, b)?.tag == Tag::Root && frame(s, 1, b)?.tag == Tag::Fun,
-        4 => frame(s, 0, b)?.tag == Tag::Root
-            && frame(s, 1, b)?.tag == Tag::Fun
-            && frame(s, 2, b)?.tag == Tag::Block
-            && frame(s, 3, b)?.tag == Tag::Fun,
+        4 => {
+            frame(s, 0, b)?.tag == Tag::Root
+                && frame(s, 1, b)?.tag == Tag::Fun
+                && frame(s, 2, b)?.tag == Tag::Block
+                && frame(s, 3, b)?.tag == Tag::Fun
+        }
         _ => false,
     })
 }
@@ -1366,7 +1381,10 @@ fn context(t: Tag, parent: Option<Frame<'_>>, i: usize) -> Result<()> {
         Tag::TypeParameters => p == Some(Tag::Fun),
         Tag::TypeParameter => p == Some(Tag::TypeParameters),
         Tag::Integer => matches!(p, Some(Tag::Fun | Tag::Property | Tag::Argument)),
-        Tag::Reference => matches!(p, Some(Tag::Property | Tag::Call | Tag::Argument | Tag::ArgumentName)),
+        Tag::Reference => matches!(
+            p,
+            Some(Tag::Property | Tag::Call | Tag::Argument | Tag::ArgumentName)
+        ),
         Tag::Call => p == Some(Tag::Block),
         Tag::Arguments => p == Some(Tag::Call),
         Tag::Argument => p == Some(Tag::Arguments),
@@ -2089,7 +2107,10 @@ mod tests {
                     &result,
                     reference,
                     result.snapshot(),
-                    &mut ReferenceBudget { work, ..ReferenceBudget::default() },
+                    &mut ReferenceBudget {
+                        work,
+                        ..ReferenceBudget::default()
+                    },
                 )
                 .unwrap_err(),
                 LocalBindingError::Resource,
@@ -2140,7 +2161,10 @@ mod tests {
                             anchor,
                             result.snapshot(),
                             name,
-                            &mut ReferenceBudget { work, ..ReferenceBudget::default() },
+                            &mut ReferenceBudget {
+                                work,
+                                ..ReferenceBudget::default()
+                            },
                         )
                         .unwrap_err(),
                         LocalBindingError::Resource,
@@ -2217,7 +2241,10 @@ mod tests {
                     &result,
                     selected,
                     result.snapshot(),
-                    &mut ReferenceBudget { work, ..ReferenceBudget::default() }
+                    &mut ReferenceBudget {
+                        work,
+                        ..ReferenceBudget::default()
+                    }
                 )
                 .unwrap_err(),
                 LocalBindingError::Resource
@@ -2241,7 +2268,9 @@ mod tests {
         tree.open("VALUE_PARAMETER_LIST");
         tree.token("LPAR", "(");
         for name in ["first", "second"] {
-            if name == "second" { tree.token("COMMA", ","); }
+            if name == "second" {
+                tree.token("COMMA", ",");
+            }
             tree.open("VALUE_PARAMETER");
             tree.token("IDENTIFIER", name);
             tree.token("COLON", ":");
@@ -2270,7 +2299,9 @@ mod tests {
         tree.open("VALUE_ARGUMENT_LIST");
         tree.token("LPAR", "(");
         for value in ["1", "2"] {
-            if value == "2" { tree.token("COMMA", ","); }
+            if value == "2" {
+                tree.token("COMMA", ",");
+            }
             tree.open("VALUE_ARGUMENT");
             tree.open("INTEGER_CONSTANT");
             tree.token("INTEGER_LITERAL", value);
@@ -2284,21 +2315,41 @@ mod tests {
         let lower = lower(&result).unwrap();
         let function = &lower.declarations()[1];
         let mut measured = ReferenceBudget::default();
-        let call = call_site_with_budget(&lower, &result, result.snapshot(), selected, &mut measured).unwrap();
+        let call =
+            call_site_with_budget(&lower, &result, result.snapshot(), selected, &mut measured)
+                .unwrap();
         assert_eq!(call.arguments().len(), 2);
         let after_call = measured.work;
-        let parameters = callable_parameters_with_budget(&lower, &result, result.snapshot(), function, &mut measured).unwrap();
+        let parameters = callable_parameters_with_budget(
+            &lower,
+            &result,
+            result.snapshot(),
+            function,
+            &mut measured,
+        )
+        .unwrap();
         assert_eq!(parameters.parameters().len(), 2);
         let total = measured.work;
         let requested = measured.requested;
         let retained = measured.retained;
         for (cost, select_parameters) in [(after_call, false), (total - after_call, true)] {
             for (extra, succeeds) in [(0, true), (1, false)] {
-                let mut b = ReferenceBudget { work: WORK - cost + extra, ..ReferenceBudget::default() };
+                let mut b = ReferenceBudget {
+                    work: WORK - cost + extra,
+                    ..ReferenceBudget::default()
+                };
                 let outcome = if select_parameters {
-                    callable_parameters_with_budget(&lower, &result, result.snapshot(), function, &mut b).map(|_| ())
+                    callable_parameters_with_budget(
+                        &lower,
+                        &result,
+                        result.snapshot(),
+                        function,
+                        &mut b,
+                    )
+                    .map(|_| ())
                 } else {
-                    call_site_with_budget(&lower, &result, result.snapshot(), selected, &mut b).map(|_| ())
+                    call_site_with_budget(&lower, &result, result.snapshot(), selected, &mut b)
+                        .map(|_| ())
                 };
                 if succeeds {
                     outcome.unwrap();
@@ -2308,8 +2359,15 @@ mod tests {
                 }
             }
         }
-        for (work, succeeds) in [(WORK - total, true), (WORK - total + 1, false), (usize::MAX, false)] {
-            let mut b = ReferenceBudget { work, ..ReferenceBudget::default() };
+        for (work, succeeds) in [
+            (WORK - total, true),
+            (WORK - total + 1, false),
+            (usize::MAX, false),
+        ] {
+            let mut b = ReferenceBudget {
+                work,
+                ..ReferenceBudget::default()
+            };
             let first = call_site_with_budget(&lower, &result, result.snapshot(), selected, &mut b);
             if work == usize::MAX {
                 assert_eq!(first.unwrap_err(), ReferenceSiteError::Resource);
@@ -2317,7 +2375,13 @@ mod tests {
             }
             first.unwrap();
             assert!(b.work >= after_call);
-            let second = callable_parameters_with_budget(&lower, &result, result.snapshot(), function, &mut b);
+            let second = callable_parameters_with_budget(
+                &lower,
+                &result,
+                result.snapshot(),
+                function,
+                &mut b,
+            );
             if succeeds {
                 second.unwrap();
                 assert_eq!(b.work, WORK);
@@ -2332,12 +2396,26 @@ mod tests {
             (usize::MAX, 0, false),
             (0, usize::MAX, false),
         ] {
-            let mut b = ReferenceBudget { requested: requested_start, retained: retained_start, ..ReferenceBudget::default() };
+            let mut b = ReferenceBudget {
+                requested: requested_start,
+                retained: retained_start,
+                ..ReferenceBudget::default()
+            };
             let first = call_site_with_budget(&lower, &result, result.snapshot(), selected, &mut b);
             match first {
                 Ok(_first) => {
-                    let second = callable_parameters_with_budget(&lower, &result, result.snapshot(), function, &mut b);
-                    if succeeds { second.unwrap(); } else { assert_eq!(second.unwrap_err(), ReferenceSiteError::Resource); }
+                    let second = callable_parameters_with_budget(
+                        &lower,
+                        &result,
+                        result.snapshot(),
+                        function,
+                        &mut b,
+                    );
+                    if succeeds {
+                        second.unwrap();
+                    } else {
+                        assert_eq!(second.unwrap_err(), ReferenceSiteError::Resource);
+                    }
                 }
                 Err(error) => {
                     assert!(!succeeds);
@@ -2346,8 +2424,14 @@ mod tests {
             }
         }
         let mut b = ReferenceBudget::default();
-        assert_eq!(b.reserve(&mut Vec::<u64>::new(), usize::MAX), Err(ReferenceSiteError::Resource));
-        let mut b = ReferenceBudget { work: WORK - 1, ..ReferenceBudget::default() };
+        assert_eq!(
+            b.reserve(&mut Vec::<u64>::new(), usize::MAX),
+            Err(ReferenceSiteError::Resource)
+        );
+        let mut b = ReferenceBudget {
+            work: WORK - 1,
+            ..ReferenceBudget::default()
+        };
         b.charge(1).unwrap();
         assert_eq!(b.charge(1), Err(ReferenceSiteError::Resource));
         assert_eq!(b.charge(usize::MAX), Err(ReferenceSiteError::Resource));
@@ -2886,15 +2970,24 @@ mod tests {
             let mut b = ReferenceBudget::default();
             bind_with_budget(&directory, &site, result.snapshot(), &mut b).unwrap();
             work.push(b.work);
-            let mut exact = ReferenceBudget { work: WORK - b.work, ..ReferenceBudget::default() };
+            let mut exact = ReferenceBudget {
+                work: WORK - b.work,
+                ..ReferenceBudget::default()
+            };
             bind_with_budget(&directory, &site, result.snapshot(), &mut exact).unwrap();
             assert_eq!(exact.work, WORK);
-            let mut over = ReferenceBudget { work: WORK - b.work + 1, ..ReferenceBudget::default() };
+            let mut over = ReferenceBudget {
+                work: WORK - b.work + 1,
+                ..ReferenceBudget::default()
+            };
             assert_eq!(
                 bind_with_budget(&directory, &site, result.snapshot(), &mut over).unwrap_err(),
                 LocalBindingError::Resource
             );
-            let mut overflow = ReferenceBudget { work: usize::MAX, ..ReferenceBudget::default() };
+            let mut overflow = ReferenceBudget {
+                work: usize::MAX,
+                ..ReferenceBudget::default()
+            };
             assert_eq!(
                 bind_with_budget(&directory, &site, result.snapshot(), &mut overflow).unwrap_err(),
                 LocalBindingError::Resource
@@ -2967,7 +3060,10 @@ mod tests {
                 );
                 if let Some(cost) = declaration_cost {
                     // Exactly enough for collection cannot also hide use lookup.
-                    let mut shared = ReferenceBudget { work: WORK - cost, ..ReferenceBudget::default() };
+                    let mut shared = ReferenceBudget {
+                        work: WORK - cost,
+                        ..ReferenceBudget::default()
+                    };
                     assert_eq!(
                         occurrences_with_budget(
                             &directory,
@@ -2982,12 +3078,18 @@ mod tests {
                 } else {
                     declaration_cost = Some(measured.work);
                 }
-                let mut exact = ReferenceBudget { work: WORK - measured.work, ..ReferenceBudget::default() };
+                let mut exact = ReferenceBudget {
+                    work: WORK - measured.work,
+                    ..ReferenceBudget::default()
+                };
                 occurrences_with_budget(&directory, &result, anchor, result.snapshot(), &mut exact)
                     .unwrap();
                 assert_eq!(exact.work, WORK);
                 for work in [WORK - measured.work + 1, usize::MAX] {
-                    let mut exhausted = ReferenceBudget { work, ..ReferenceBudget::default() };
+                    let mut exhausted = ReferenceBudget {
+                        work,
+                        ..ReferenceBudget::default()
+                    };
                     assert_eq!(
                         occurrences_with_budget(
                             &directory,
@@ -3038,7 +3140,10 @@ mod tests {
             )
             .unwrap();
             assert!(measured.work > collection.work);
-            let mut exact = ReferenceBudget { work: WORK - measured.work, ..ReferenceBudget::default() };
+            let mut exact = ReferenceBudget {
+                work: WORK - measured.work,
+                ..ReferenceBudget::default()
+            };
             rename_with_budget(
                 &directory,
                 &result,
@@ -3050,7 +3155,10 @@ mod tests {
             .unwrap();
             assert_eq!(exact.work, WORK);
             for work in [WORK - measured.work + 1, WORK - collection.work, usize::MAX] {
-                let mut short = ReferenceBudget { work, ..ReferenceBudget::default() };
+                let mut short = ReferenceBudget {
+                    work,
+                    ..ReferenceBudget::default()
+                };
                 assert_eq!(
                     rename_with_budget(
                         &directory,
@@ -3103,7 +3211,10 @@ mod tests {
             assert!(std::ptr::eq(found.values()[0], &lower.declarations()[1]));
             assert!(std::ptr::eq(found.values()[1], &lower.declarations()[2]));
             assert!(measured.work > selection.work + 2);
-            let mut exact = ReferenceBudget { work: WORK - measured.work, ..ReferenceBudget::default() };
+            let mut exact = ReferenceBudget {
+                work: WORK - measured.work,
+                ..ReferenceBudget::default()
+            };
             visible_with_budget(&directory, &result, index, result.snapshot(), &mut exact).unwrap();
             assert_eq!(exact.work, WORK);
             // A one-unit short budget returns no result; omitting initial
@@ -3113,7 +3224,10 @@ mod tests {
                 WORK - (measured.work - selection.work),
                 usize::MAX,
             ] {
-                let mut exhausted = ReferenceBudget { work, ..ReferenceBudget::default() };
+                let mut exhausted = ReferenceBudget {
+                    work,
+                    ..ReferenceBudget::default()
+                };
                 assert_eq!(
                     visible_with_budget(
                         &directory,

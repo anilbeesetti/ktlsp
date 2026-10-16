@@ -14,6 +14,52 @@ Success is **not JVM verification**. Attribute interiors (Code, BootstrapMethods
 
 Format contract: [JVMS Java SE 23 chapter 4](https://docs.oracle.com/javase/specs/jvms/se23/html/jvms-4.html). This reader implements only the subset above.
 
+## Selected archive classfiles
+
+`parse_zip_class(&index, ordinal, &mut scratch)` is the production composition of
+`ktlsp-artifacts` payload validation with `parse_class`. Method 0 borrows the
+retained verified artifact; method 8 borrows caller-reusable `Vec<u8>` scratch.
+There is no owning self-referential wrapper or payload copy. Hold scratch while
+the returned class borrows its attribute bytes. `ZipClassError` distinguishes
+stored/deflated validation from the original classfile error; no errors are
+swallowed and no different entry is guessed.
+
+The caller supplies an indexed central ordinal, not an archive-name winner.
+Duplicate names are not resolved. This API does not implement manifest,
+multi-release, signature, class linkage, semantic symbols or server integration.
+No extraction, network or Java is used. Payload flags, local placeholders,
+descriptors and independent compressed/decoded/work ceilings are specified in
+[the artifacts payload contract](../ktlsp-artifacts/ZIP_STORED.md).
+
+`tests/archive.rs` includes the unchanged genuine Commons Lang 3.17.0 JAR in
+`fixtures/t017c1/commons-lang3-3.17.0.jar.bin`. Existing `provenance.json` records
+the source URL, archive SHA-256 and extracted member hashes; bundled Apache
+LICENSE/NOTICE files are unchanged. A temporary explicit canonical Maven
+repository feeds lookup, caller SHA-256, directory indexing and ordinal 31 into
+`parse_zip_class`. Assertions retain exact Builder identity, class/member flags,
+field/method descriptors, interface, attribute structure and decoded bytes.
+Default tests are offline and require neither Java nor Maven/ZIP executables.
+
+Consumer-visible regressions also exercise stored/deflated methods, signed and
+unsigned descriptors, placeholder policy, signature-valued CRCs, ZIP64 rejection,
+malformed/truncated/trailing streams, CRC, exact decoded lengths, compressed and
+decoded ceilings, scratch reuse/error clearing and competing descriptor extents.
+Two small independent boundary inputs, `fixtures/zip-zero-8388608.deflate.bin`
+and `zip-zero-8388609.deflate.bin`, are raw DEFLATE produced as data by Python
+zlib level 9 (`compressobj(level=9, wbits=-15)`) from that many zero bytes:
+
+| Input | Compressed bytes | SHA-256 |
+| --- | ---: | --- |
+| 8,388,608 zeros | 8,157 | `11c267075b9c8783848d51618de3aa1f46ee79ed089538459a7383c7848b8218` |
+| 8,388,609 zeros | 8,157 | `3e46a1d86f76a8fdad7b606e977e0a5e30e26e02de550de8c7d077e4579ced49` |
+
+An authorized locked package-test wave passed, and a separate offline
+throwaway production API consumer observed `AppendableJoiner$Builder` 52.0,
+flags `0x0031`, Supplier interface, four fields, seven methods and 2,510 decoded
+bytes matching member SHA-256
+`e288160745c56dff019f2af9393039558018308de89509bdd81a8535bfa9b03d`.
+This proof is classfile data consumption, not JVM verification or LSP parity.
+
 ## Encoded method type annotations
 
 `method_type_annotations::decode` composes declaration/extension/field data with all six legal method targets (0x01, 0x12, 0x14, 0x15, 0x16, 0x17), sharing one annotation budget. `target_type` retains the raw tag and `target_info: MethodTargetInfo` retains fixed-width indices. **Breaking API change:** `formal_parameter_index` was removed; formal-parameter data is now `MethodTargetInfo::FormalParameter(index)`. External field reads/literals/patterns and derived Debug/layout/size can change.

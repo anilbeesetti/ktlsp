@@ -7,9 +7,9 @@ uncompressed sizes and local-header offsets. The archive comment is a raw slice.
 All bytes come from the retained verified allocation: no filesystem read,
 provenance update, archive/name copy or unverified byte-slice entry point.
 Caller-provided SHA256 equality does not authenticate the digest, coordinate or
-publisher. `index_zip_directory` validates directory metadata only. The separate
-[`stored_payload`](ZIP_STORED.md) operation validates one selected supported
-stored entry; neither operation provides extraction or name lookup.
+publisher. `index_zip_directory` validates directory metadata only. Separate
+[`stored_payload` / `deflated_payload`](ZIP_STORED.md) operations validate one
+selected ordinal; none provides extraction or name lookup.
 
 ## Acceptance policy
 
@@ -127,14 +127,14 @@ Referenced layout only, no copied specification prose or implementation source.
 The restrictions above are this finite child's compatibility policies, not a
 claim that all rejected ZIPs violate the broader format.
 
-Selected supported stored-entry local/central agreement, payload spans,
-declared-envelope overlap and CRC checks belong to the separate
-[`stored_payload`](ZIP_STORED.md) operation, with its held-source/runtime limits
-documented there. Descriptor tails, archive-wide span/overlap validation,
-bounded decompression/output/ratio/aggregate limits, JAR manifest,
-multi-release/signature behavior, duplicate selection and safe consumers,
-ZIP64/wider compatibility and authenticated digest acquisition require separately
-reviewed children. No extraction safety, whole-archive/JAR validity, library
+Selected stored/deflated local/central agreement, bounded payload access, CRC
+and declared-envelope overlap (including competing descriptor tails) belong to
+the separate [payload operations](ZIP_STORED.md). Their limits do not change this
+directory-only contract. Archive-wide span/overlap validation, aggregate session
+budgets, JAR manifest/multi-release/signature behavior, duplicate selection,
+extraction safety, ZIP64/wider compatibility and authenticated digest acquisition
+remain deferred. `ktlsp-binary` consumes selected ordinals as classfile data;
+this does not establish whole-archive/JAR validity. No claim about library
 semantics, full T020, T008 admission, performance advantage or official Kotlin LSP
 parity is established; parent #20 remains open. No server/import/project/SDK
 consumer or capability is added.

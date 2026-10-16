@@ -257,7 +257,7 @@ const CASES: &[Case] = &[
         bytes: include_bytes!("local-flag-bit-3.bin"),
         digest: [115, 50, 124, 229, 56, 144, 60, 30, 37, 66, 74, 184, 46, 15, 2, 92, 136, 43, 217, 3, 129, 46, 188, 208, 72, 11, 22, 225, 245, 206, 1, 105],
         ordinal: 0,
-        expected: Expected::Stored(ZipStoredError::Structure(ZipIndexError::UnsupportedFlags { offset: 6, flags: 8 })),
+        expected: Expected::Stored(ZipStoredError::Disagreement { offset: 6, field: "flags" }),
     },
     Case {
         name: "local-flag-bit-4",
@@ -677,7 +677,7 @@ const CASES: &[Case] = &[
         bytes: include_bytes!("central-descriptor-before-local-signature.bin"),
         digest: [128, 61, 154, 49, 148, 192, 204, 210, 77, 4, 67, 198, 87, 224, 46, 16, 88, 208, 241, 24, 103, 40, 186, 22, 121, 172, 177, 249, 224, 109, 22, 213],
         ordinal: 0,
-        expected: Expected::Stored(ZipStoredError::Structure(ZipIndexError::UnsupportedFlags { offset: 48, flags: 8 })),
+        expected: Expected::Stored(ZipStoredError::Structure(ZipIndexError::Malformed { offset: 0, reason: "local header signature" })),
     },
     Case {
         name: "alias-local-offset",
@@ -726,7 +726,7 @@ const CASES: &[Case] = &[
         bytes: include_bytes!("unselected-deflate-descriptor-envelope.bin"),
         digest: [78, 107, 153, 247, 79, 75, 78, 166, 74, 137, 211, 103, 16, 23, 195, 93, 153, 210, 166, 240, 121, 74, 243, 162, 212, 200, 156, 201, 195, 75, 233, 59],
         ordinal: 0,
-        expected: Expected::Payload { start: 31, end: 40, crc: 3421780262, bytes: &[49,50,51,52,53,54,55,56,57] },
+        expected: Expected::Stored(ZipStoredError::Structure(ZipIndexError::Malformed { offset: 77, reason: "descriptor disagreement or truncation" })),
     },
     Case {
         name: "unselected-aliases-disjoint-from-selected",
@@ -740,7 +740,7 @@ const CASES: &[Case] = &[
         bytes: include_bytes!("descriptor-tail-overlaps-selected-header-gap.bin"),
         digest: [210, 24, 85, 141, 29, 62, 166, 59, 204, 93, 58, 227, 160, 33, 212, 75, 227, 169, 189, 69, 209, 230, 144, 162, 197, 239, 122, 222, 222, 158, 71, 204],
         ordinal: 1,
-        expected: Expected::Payload { start: 82, end: 83, crc: 1255198513, bytes: &[66] },
+        expected: Expected::Stored(ZipStoredError::Overlap { offset: 51, other_ordinal: 0 }),
     },
     Case {
         name: "claimed-header-at-directory",

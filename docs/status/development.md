@@ -1329,3 +1329,13 @@ before/after claim; both exact changed-head rechecks remain required.
 ROOT also directly SHA-256 checked all four images, both modern JARs,
 Object/Pair class bytes and both JPS XML originals against retained provenance.
 
+Both full-union and all ten affected-component reviewers cleared formatted
+bf7734ccc3755d9ca349cf0e8c56f96d9fd53966/tree68744178328d97bcf0cb7edda03c8a1fa12a09e0
+statically. ROOT's first strict locked all-target workspace Clippy then
+exited101 with E0282 at the shared authored JImage builder:77: an unconstrained
+payload Vec extended from borrowed bytes. ROOT traced both artifact/binary
+test consumers and made its intended byte element type explicit as Vec<u8>.
+No test/runtime was run to reconfirm that compiler report. This correction
+requires exact rechecks and a new strict compilation; native data/smoke and
+hosted/full-workspace runtime gates remain unexercised.
+

@@ -74,7 +74,7 @@ pub fn image(records: &[Record]) -> Image {
     let mut strings = b"\0zip\0compact-cp\0unknown\0".to_vec();
     let mut intern = std::collections::BTreeMap::<Vec<u8>, u64>::new();
     let mut attrs = Vec::new();
-    let mut payload = Vec::new();
+    let mut payload: Vec<u8> = Vec::new();
     for r in records {
         let mut values = [0u64; 7];
         for (n, part) in [&r.module, &r.parent, &r.base, &r.extension]

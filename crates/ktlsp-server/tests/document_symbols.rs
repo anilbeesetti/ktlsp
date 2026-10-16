@@ -458,8 +458,14 @@ fn packaged_stdio_combines_symbols_pull_and_mandatory_utf16_fallback() {
     let capabilities = &replies[0]["result"]["capabilities"];
     assert_eq!(capabilities["positionEncoding"], "utf-16");
     assert_eq!(capabilities["documentSymbolProvider"], true);
-    assert_eq!(capabilities["diagnosticProvider"]["interFileDependencies"], false);
-    assert_eq!(capabilities["diagnosticProvider"]["workspaceDiagnostics"], false);
+    assert_eq!(
+        capabilities["diagnosticProvider"]["interFileDependencies"],
+        false
+    );
+    assert_eq!(
+        capabilities["diagnosticProvider"]["workspaceDiagnostics"],
+        false
+    );
     let symbols = replies.iter().find(|reply| reply["id"] == 2).unwrap();
     assert_eq!(symbols["result"][0]["name"], "Combined");
     assert_eq!(symbols["result"][0]["children"][0]["name"], "item");

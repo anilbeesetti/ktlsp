@@ -1339,3 +1339,52 @@ No test/runtime was run to reconfirm that compiler report. This correction
 requires exact rechecks and a new strict compilation; native data/smoke and
 hosted/full-workspace runtime gates remain unexercised.
 
+#### Actual native DATA and public-API verification
+
+At353f0995f1b8492a68f51f7060febc5ae37f23eb/tree0a7d51d9a1364dd0c3684a820e33ca6f0a239e69,
+ROOT passed strict locked all-target workspace Clippy with --keep-going and
+-D warnings. The additional flag collects all diagnostics; it does not weaken
+warning/error policy. Local Rust/cargo1.99.0, rustc b940084d7, host
+aarch64-apple-darwin were observed, not assumed.
+
+The preceding changed-source checks also exposed two default-field initializer
+lints, a manual-divisibility lint and a role-audit E0597. ROOT used equivalent
+direct Limits initializers and the native nonzero-divisor predicate. The audit
+retains its actual pointer-derived target ordinal, borrowing original property
+name bytes from the authenticated source range and target kind/name from the
+same stable lowering, rather than the iteration-local ReferenceSite. No string
+copies, unsafe workaround, production API change, weakened assertions, raised
+bounds or suppressions were introduced. Each correction received both exact
+ROOT full-union and affected-component static rechecks before compilation.
+
+ROOT ran cargo test --locked for ONLY ktlsp-artifacts, ktlsp-binary and
+ktlsp-import:696 passed across73 actual result rows;0 failed/ignored/measured/
+filtered, process0. The complete62698-byte native DATA log has SHA-256
+efe339086add9b70e74e0cfd766e18c0d28eed77f2225add61a5fbce4040c95c.
+This is not a local workspace/parser/server/Session/worker/peer run.
+
+Three throwaway standalone Rust executables linked actual Cargo-reported
+public rlibs, rather than private helpers or copied models. Each actual
+compilation/execution exited0 with empty stderr; ROOT and the four separate
+component owners directly read the complete commands, source and outputs:
+
+| Consumer | Actual native public-API observation |
+| --- | --- |
+|394|Genuine Pair constructor selector5→original method0/CP8,9 and copy9→method6/CP50,51; original Member/name/descriptor/typed-owner pointers, exact d1 member/extension ranges/defaults, two parameters/three receiver-inclusive slots; selectors3/MAX refused.|
+|396|Genuine moduleB source39..562, manifest reference123..213, production root325..392 and test399..466; exact original XML bytes/document paths, real native project serialization/reload and input permutation equal.|
+|398|Both stored and both compressed original images admitted; exact java.base/java/lang/Object.class, slot6/location63or67, original spans7109..7269/3142..3306, actual160-byte67.0 declared Object; retained artifact/provenance pointers, stored borrowing, compressed byte equality and extensionless payload checked.|
+|399|Both pinned genuine JCL archives→ZIP74/78 entries→Serializable15 with actual113/72 bytes and68.0/69.0; inherited readers/Metadata absence, same classpath origin,25-at-release24 refused as69>68; Object40/42 each12 methods and12 decoded Code bodies, actual extraction equal to retained original class fixtures.|
+
+The smoke sources were removed ONLY after ROOT and independent owner readback;
+complete immutable command/output/rlib records remain verification artifacts.
+Meaningful permanent boundary/identity/error tests remain in the source.
+None of this establishes mutable-model archive authentication, effective JPS,
+stock SDK/compiler/verifier authority, Miri safety, Windows execution, full
+runtime-image coverage or Java/Kotlin/LSP semantic parity.
+
+392's actual original/edited CST, identity and returned CLI edit/readback must
+still be observed in the original hosted full-workspace platform jobs.
+Its TEMP_392 writers remain deliberately intact until ROOT and independent
+owner have read those actual payloads. Full native/platform original CI,
+capture-free final own-source CI and guarded integration remain required.
+

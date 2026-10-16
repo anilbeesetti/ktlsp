@@ -880,6 +880,62 @@ fn references_actual_paired_cli_declaration_use_utf16_and_existing_providers() {
 }
 
 #[test]
+fn typed_local_navigation_and_references_compose_over_paired_stdio() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    // The final annotation deliberately spells the value target's name.
+    // It must never become a value occurrence or a resolved builtin type.
+    let source = "// 😀\r\nclass Int {}\r\nfun f() {\r\n val `x😀`: Long = 1\r\n val y: Int = `x😀`\r\n val a = 2\r\n val b: `x😀` = a\r\n}\r\n";
+    let declaration = json!({"start":{"line":3,"character":5},"end":{"line":3,"character":10}});
+    let occurrence = json!({"start":{"line":4,"character":14},"end":{"line":4,"character":19}});
+    let use_params = json!({"textDocument":{"uri":URI},"position":{"line":4,"character":15}});
+    let messages = [
+        json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{"capabilities":{"textDocument":{"hover":{"contentFormat":["plaintext"]},"diagnostic":{}}}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":"typed-definition","method":"textDocument/definition","params":use_params}),
+        json!({"jsonrpc":"2.0","id":u64::MAX,"method":"textDocument/hover","params":use_params}),
+        json!({"jsonrpc":"2.0","id":"typed-references","method":"textDocument/references","params":{"textDocument":{"uri":URI},"position":{"line":3,"character":6},"context":{"includeDeclaration":true}}}),
+        json!({"jsonrpc":"2.0","id":"typed-highlights","method":"textDocument/documentHighlight","params":use_params}),
+        json!({"jsonrpc":"2.0","id":"untyped-definition","method":"textDocument/definition","params":{"textDocument":{"uri":URI},"position":{"line":6,"character":16}}}),
+        json!({"jsonrpc":"2.0","id":"pull","method":"textDocument/diagnostic","params":{"textDocument":{"uri":URI}}}),
+        json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ];
+    let replies = Package::new(true).exchange(&messages);
+    let _ = std::io::stdout().lock().write_all(
+        format!(
+            "TYPED_REFERENCES_UNION_DIRECT_WIRE {}\n",
+            json!({"source":source,"requests":messages,"responses":replies})
+        )
+        .as_bytes(),
+    );
+    assert!(replies.iter().all(|reply| reply.get("id").is_some()));
+    assert_eq!(
+        replies.iter().map(|reply| &reply["id"]).collect::<Vec<_>>(),
+        messages.iter().filter_map(|message| message.get("id")).collect::<Vec<_>>(),
+        "original IDs exactly once; no duplicate or push output: {replies:?}"
+    );
+    let caps = &replies[0]["result"]["capabilities"];
+    assert_eq!(caps["hoverProvider"], true);
+    assert_eq!(caps["referencesProvider"], true);
+    assert_eq!(caps["documentHighlightProvider"], true);
+    let expected = [
+        (json!("typed-definition"), json!({"uri":URI,"range":declaration})),
+        (json!(u64::MAX), json!({"contents":{"kind":"plaintext","value":"val `x😀`: Long = 1"},"range":occurrence})),
+        (json!("typed-references"), json!([{"uri":URI,"range":declaration},{"uri":URI,"range":occurrence}])),
+        (json!("typed-highlights"), json!([{"range":declaration,"kind":3},{"range":occurrence,"kind":2}])),
+        (json!("untyped-definition"), json!({"uri":URI,"range":{"start":{"line":5,"character":5},"end":{"line":5,"character":6}}})),
+        (json!("pull"), json!({"kind":"full","items":[]})),
+        (json!("stop"), Value::Null),
+    ];
+    for (id, payload) in expected {
+        let reply = replies.iter().find(|reply| reply["id"] == id).unwrap();
+        assert!(reply.get("error").is_none(), "{reply}");
+        assert_eq!(reply["result"], payload, "{reply}");
+    }
+}
+
+#[test]
 fn references_authenticated_targets_semantic_spelling_isolation_and_no_chasing() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let source = "fun f() { val `x` = 1; val other = 2; val other = 3; val a = x; val b = `x`; val c = a }\nfun g() { val x = 4; val y = x }";

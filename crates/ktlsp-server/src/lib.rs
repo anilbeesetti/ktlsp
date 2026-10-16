@@ -290,6 +290,7 @@ impl Session {
                 | "textDocument/hover"
                 | "textDocument/references"
                 | "textDocument/documentHighlight"
+                | "textDocument/completion"
         ) && self.state == State::Running
         {
             return match self.start_parser(id.clone(), method, params) {
@@ -344,6 +345,7 @@ impl Session {
                 result["capabilities"]["definitionProvider"] = json!(true);
                 result["capabilities"]["referencesProvider"] = json!(true);
                 result["capabilities"]["documentHighlightProvider"] = json!(true);
+                result["capabilities"]["completionProvider"] = json!({"resolveProvider":false});
                 if self.hover_format.is_some() {
                     result["capabilities"]["hoverProvider"] = json!(true);
                 }
@@ -463,10 +465,12 @@ impl Session {
                 "textDocument/documentHighlight" => {
                     semantic_navigation::Query::Highlights { offset }
                 }
-                _ => semantic_navigation::Query::Hover {
+                "textDocument/completion" => semantic_navigation::Query::Completion { offset },
+                "textDocument/hover" => semantic_navigation::Query::Hover {
                     offset,
                     format: self.hover_format.expect("hover format checked"),
                 },
+                _ => return Err((-32601, "Method not found")),
             })
         };
         if document.text().len() > ktlsp_parser::MAX_SOURCE_BYTES {

@@ -1,7 +1,7 @@
 //! Real trusted-worker CST consumers. Build BOTH binaries before running this test.
 //! No synthetic worker replies, parser bypass, or local #96 reliability claim.
 use ktlsp_server::Session;
-use ktlsp_text::{Range, offset_to_position};
+use ktlsp_text::{Range, offset_to_position, position_to_offset};
 use serde_json::{Value, json};
 use std::{
     io::Write,
@@ -1730,4 +1730,243 @@ fn declaration_hover_paired_lf_boundaries_negotiation_and_refusals() {
     let replies = package.exchange(&messages);
     assert_eq!(replies[1]["error"]["code"], -32803, "{replies:?}");
     assert!(replies[1].get("result").is_none());
+}
+
+fn apply_completion(source: &str, item: &Value, caret: usize) -> (String, usize) {
+    let edit = &item["textEdit"];
+    let range: Range = serde_json::from_value(edit["range"].clone()).unwrap();
+    let start = position_to_offset(source, range.start).unwrap();
+    let end = position_to_offset(source, range.end).unwrap();
+    assert_eq!(range.start.line, range.end.line);
+    assert!(start <= caret && caret <= end);
+    let raw = item["label"].as_str().unwrap();
+    assert_eq!(item["kind"], 6);
+    assert_eq!(edit["newText"], raw);
+    assert_eq!(item.as_object().unwrap().len(), 4);
+    let mut applied = source.to_owned();
+    applied.replace_range(start..end, raw);
+    (applied, start)
+}
+
+#[test]
+fn completion_real_items_replace_original_tokens_and_rebind_every_candidate() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    // Unknown but complete tokens, including a quoted astral prefix and CRLF.
+    // Every item is applied, reparsed and actually bound, not just counted.
+    for (token, relative, expected) in [
+        ("coSuffix", 2, vec!["count", "`counter`"]),
+        ("co", 2, vec!["count", "`counter`"]),
+        ("coSuffix", 0, vec!["param", "count", "`counter`", "`😀target`"]),
+        ("`coSuffix`", 3, vec!["count", "`counter`"]),
+        ("`co`", 4, vec!["count", "`counter`"]),
+        ("`co`", 3, vec!["count", "`counter`"]),
+        ("`co`", 1, vec!["param", "count", "`counter`", "`😀target`"]),
+        ("`co`", 0, vec!["param", "count", "`counter`", "`😀target`"]),
+        ("`😀suffix`", 5, vec!["`😀target`"]),
+        ("Co", 2, vec![]),
+        ("zzz", 3, vec![]),
+    ] {
+        let source = format!(
+            "// 😀\r\nfun f(param: Long) {{\r\n val count: Int = 1\r\n val `counter` = 2\r\n val `😀target` = 3\r\n val chosen = {token}\r\n}}\r\nfun g() {{ val sibling = 4 }}\r\n"
+        );
+        let start = source.find(&format!("= {token}")).unwrap() + 2;
+        let caret = start + relative;
+        let mut session = running(json!({}));
+        open(&mut session, &source);
+        let response = request(
+            &mut session,
+            "textDocument/completion",
+            navigation_params(&source, caret),
+        );
+        assert_eq!(response["result"]["isIncomplete"], true, "{response}");
+        let items = response["result"]["items"].as_array().unwrap();
+        assert_eq!(
+            items.iter().map(|item| item["label"].as_str().unwrap()).collect::<Vec<_>>(),
+            expected,
+            "{source}: {response}"
+        );
+        let mut version = 2;
+        for item in items {
+            let raw = item["label"].as_str().unwrap();
+            assert_eq!(item["filterText"], raw.trim_matches('`'));
+            assert_eq!(item["textEdit"]["range"], references_range(&source, start, token.len()));
+            let (applied, use_start) = apply_completion(&source, item, caret);
+            assert_eq!(&applied[use_start..use_start + raw.len()], raw);
+            assert!(!applied.contains("Suffix") && !applied.contains("suffix"));
+            change(&mut session, version, &applied);
+            version += 1;
+            let bound = request(
+                &mut session,
+                "textDocument/definition",
+                navigation_params(&applied, use_start),
+            );
+            assert_eq!(bound["result"], json!({"uri":URI,"range":span(&applied, raw)}), "{bound}");
+        }
+        assert!(session.close().1);
+    }
+}
+
+#[test]
+fn completion_visibility_self_initializers_shadowing_and_future_ambiguity_are_atomic() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    for (source, expected_target) in [
+        ("fun f(`p`: Int) { val p = p; val after = p }", "`p`"),
+        ("fun f(`p`: Int) { val p = 1; val after = pSuffix }", "p"),
+        ("fun f() { val first = missing; val later = 1; val `later` = 2 }", ""),
+        ("fun f() { val own = own }", ""),
+        ("fun g(other: Int) { val sibling = 1 }\nfun f() { val y = missing }", ""),
+    ] {
+        let token = if source.contains("pSuffix") { "pSuffix" } else if source.contains("= p;") { "p" } else if source.contains("missing") { "missing" } else { "own" };
+        let start = source.find(&format!("= {token}")).unwrap() + 2;
+        let mut session = running(json!({}));
+        open(&mut session, source);
+        let response = request(&mut session, "textDocument/completion", navigation_params(source, start));
+        assert_eq!(response["result"]["isIncomplete"], true, "{response}");
+        let items = response["result"]["items"].as_array().unwrap();
+        if expected_target.is_empty() {
+            assert!(items.is_empty(), "{response}");
+        } else {
+            assert_eq!(items.len(), 1, "{response}");
+            let item = &items[0];
+            assert_eq!(item["label"], expected_target);
+            let (applied, use_start) = apply_completion(source, item, start);
+            change(&mut session, 2, &applied);
+            let bound = request(&mut session, "textDocument/definition", navigation_params(&applied, use_start));
+            let target_start = if expected_target == "p" {
+                applied.find("val p").unwrap() + 4
+            } else {
+                applied.find(expected_target).unwrap()
+            };
+            assert_eq!(bound["result"], json!({"uri":URI,"range":references_range(&applied,target_start,expected_target.len())}), "{bound}");
+        }
+        assert!(session.close().1);
+    }
+    let mut session = running(json!({}));
+    open(&mut session, "");
+    for (i, (source, needle)) in [
+        ("fun f(p: Int, `p`: Int) { val y = unknown }", "unknown"),
+        ("fun f() { val x = 1; val y = unknown; val `x` = 2 }", "unknown"),
+        ("fun f() { val a = 1; val x = 1; val x = 2; val y = unknown }", "unknown"),
+        ("fun f() { val x = 1; val y = }", "= }"),
+        ("fun f() { val x = 1; val y = `co }", "`co"),
+        ("fun f() { val x = 1; val y = co", "co"),
+        ("fun f() { val x = 1; co }", "co"),
+        ("fun f() { val x = 1; val y = co.member }", "co.member"),
+        ("fun f() { val x = 1; val y = co() }", "co()"),
+        ("val global = 1; val y = co", "co"),
+        ("fun f() { val x = 1; val y: Type = co }", "Type"),
+        ("fun f() { val café = 1; val y = co }", "co"),
+        ("fun f() { val x = 1; val y = co; var later = 1 }", "co"),
+        ("fun f(p: Int = 1) { val y = co }", "co"),
+    ].into_iter().enumerate() {
+        change(&mut session, i as i32 + 2, source);
+        let response = request(&mut session, "textDocument/completion", navigation_params(source, source.rfind(needle).unwrap()));
+        assert_eq!(response["error"]["code"], -32803, "{source}: {response}");
+        assert!(response.get("result").is_none());
+    }
+    assert!(session.close().1);
+}
+
+#[test]
+fn completion_params_resource_refusal_and_reopen_do_not_invent_empty_results() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = running(json!({}));
+    let source = "// 😀\r\nfun f() { val count = 1; val y = co }";
+    open(&mut session, source);
+    for params in [
+        json!({}),
+        json!({"textDocument":{"uri":"untitled:closed"},"position":{"line":0,"character":0}}),
+        json!({"textDocument":{"uri":URI},"position":{"line":0,"character":4}}),
+        json!({"textDocument":{"uri":URI},"position":{"line":99,"character":0}}),
+        json!({"textDocument":{"uri":URI},"position":{"line":-1,"character":0}}),
+        json!({"textDocument":{"uri":URI},"position":{"line":1,"character":"2"}}),
+    ] {
+        assert_eq!(request(&mut session, "textDocument/completion", params)["error"]["code"], -32602);
+    }
+    for (i, source) in [
+        format!("fun f() {{ val y = co; {} }}", " ".repeat(ktlsp_parser::MAX_SOURCE_BYTES)),
+        format!("fun f() {{ {} val y = co }}", (0..200).map(|i| format!("val value{i} = 1; ")).collect::<String>()),
+        format!("fun f() {{ val `{}` = 1; val y = co }}", "x".repeat(60_000)),
+    ].into_iter().enumerate() {
+        change(&mut session, i as i32 + 2, &source);
+        let response = request(&mut session, "textDocument/completion", navigation_params(&source, source.rfind("co").unwrap()));
+        assert_eq!(response["error"]["code"], -32803, "{response}");
+        assert!(response.get("result").is_none());
+    }
+    notify(&mut session, "textDocument/didClose", json!({"textDocument":{"uri":URI}}));
+    assert_eq!(request(&mut session, "textDocument/completion", navigation_params(source, source.rfind("co").unwrap()))["error"]["code"], -32602);
+    let reopened = "fun f(fresh: Long) { val y = fr }";
+    open(&mut session, reopened);
+    let response = request(&mut session, "textDocument/completion", navigation_params(reopened, reopened.rfind("fr").unwrap() + 2));
+    assert_eq!(response["result"]["items"][0]["label"], "fresh", "{response}");
+    assert_eq!(response["result"]["items"].as_array().unwrap().len(), 1);
+    assert!(session.close().1);
+}
+
+#[test]
+fn completion_actual_paired_cli_application_rebinding_and_hover_independence() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let source = "// 😀\r\nfun f(`count😀`: Long) {\r\n val chosen = `couSuffix`\r\n}\r\n";
+    let start = source.find("`couSuffix`").unwrap();
+    let caret = start + 4;
+    let params = navigation_params(source, caret);
+    let init = json!({"jsonrpc":"2.0","id":"initialize","method":"initialize","params":{"capabilities":{"general":{"positionEncodings":["utf-8"]},"textDocument":{"hover":{"contentFormat":false},"diagnostic":{}}}}});
+    let messages = vec![
+        init.clone(),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":u64::MAX,"method":"textDocument/completion","params":params}),
+        json!({"jsonrpc":"2.0","id":"hover","method":"textDocument/hover","params":navigation_params(source, caret)}),
+        json!({"jsonrpc":"2.0","id":"resolve","method":"completionItem/resolve","params":{}}),
+        json!({"jsonrpc":"2.0","id":"shutdown","method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ];
+    let package = Package::new(true);
+    let replies = package.exchange(&messages);
+    assert_eq!(replies.len(), 6, "{replies:?}");
+    assert!(replies.iter().all(|reply| reply.get("method").is_none()));
+    assert!(replies.iter().filter_map(|reply| reply.get("id")).eq(messages.iter().filter_map(|message| message.get("id"))));
+    let caps = &replies[0]["result"]["capabilities"];
+    assert_eq!(caps["completionProvider"], json!({"resolveProvider":false}));
+    assert_eq!(caps["positionEncoding"], "utf-16");
+    assert!(caps.get("hoverProvider").is_none());
+    let response = &replies[1];
+    assert_eq!(response["id"], json!(u64::MAX));
+    assert_eq!(response["result"]["isIncomplete"], true, "{response}");
+    assert_eq!(response["result"]["items"].as_array().unwrap().len(), 1);
+    let item = &response["result"]["items"][0];
+    assert_eq!(item["label"], "`count😀`");
+    assert_eq!(item["filterText"], "count😀");
+    assert_eq!(item["textEdit"]["range"], references_range(source, start, "`couSuffix`".len()));
+    let (applied, use_start) = apply_completion(source, item, caret);
+    assert_eq!(applied, source.replace("`couSuffix`", "`count😀`"));
+    let bound_messages = [
+        init,
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":applied}}}),
+        json!({"jsonrpc":"2.0","id":"rebound","method":"textDocument/definition","params":navigation_params(&applied,use_start)}),
+        json!({"jsonrpc":"2.0","id":"shutdown","method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ];
+    let rebound = package.exchange(&bound_messages);
+    assert_eq!(rebound.len(), 3, "{rebound:?}");
+    assert_eq!(rebound[1]["id"], "rebound");
+    assert_eq!(rebound[1]["result"], json!({"uri":URI,"range":span(&applied,"`count😀`")}), "{rebound:?}");
+    for reply in &replies[2..4] {
+        assert_eq!(reply["error"]["code"], -32601);
+    }
+    let missing = Package::new(false).exchange(&messages);
+    assert_eq!(missing.len(), replies.len());
+    assert!(missing[0]["result"]["capabilities"].get("completionProvider").is_none());
+    assert_eq!(missing[1]["error"]["code"], -32601);
+    assert_eq!(missing[1]["id"], json!(u64::MAX));
+    // TEMP #382: direct bounded harness capture for ROOT's first hosted read.
+    // Remove only this writer after readback; keep every assertion above.
+    let capture = serde_json::to_string(&json!({
+        "completionRequests":messages,"completionReplies":replies,
+        "appliedSource":applied,"bindingRequests":bound_messages,"bindingReplies":rebound,
+        "missingWorkerReplies":missing
+    })).unwrap();
+    assert!(capture.len() <= 65_536);
+    eprintln!("KTLSP_COMPLETION_382_WIRE {capture}");
 }

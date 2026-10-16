@@ -378,10 +378,11 @@ evidence and integration verification remain ROOT-gated under #96.
   UTF-16 positions, backtick dots, named/star/alias/duplicate imports and the actual
   authenticated f/x/y binding consumer. Hosted execution is required under #96;
   this source change alone is not hosted proof or package/import resolution.
-- Reference-, parameter- or leading-type-parameter-bearing functions require an ordinary named top-level
-  function with an ordered brace body of plain immutable local `val`s, optionally
-  annotated with one simple (bare or backtick) type-name, whose initializers are
-  integer constants or whole-identifier reference subtrees. Ordinary parameters
+- Reference-, parameter- or leading-type-parameter-bearing outer functions require
+  an ordinary named top-level function with an ordered brace body of plain
+  immutable local `val`s, direct calls and ordinary direct local functions.
+  Local initializers remain integer constants or whole-identifier references;
+  optional annotations retain one simple bare/backtick type name. Ordinary parameters
   require exactly a name, colon and the same simple type-name shape, separated
   by commas with one optional trailing comma after a real parameter. Positive
   complete shape is mandatory even when the parser reports no diagnostics or
@@ -391,7 +392,7 @@ evidence and integration verification remain ROOT-gated under #96.
   where clauses, empty/malformed/post-name/second lists remain refused, as do
   missing/reordered/repeated syntax, defaults, vararg, richer types,
   receivers/context/explicit returns, expression bodies,
-  members/constructors/lambdas/nesting/destructuring and relevant recovery.
+  members/constructors/lambdas/deeper nesting/destructuring and relevant recovery.
   This is syntax admission, not generic inference or semantic non-nullability:
   unbounded `T` has implicit bound `Any?`, despite having no nullable syntax.
 - `Declaration::semantic_spelling` separately supports ASCII bare names and
@@ -402,10 +403,11 @@ evidence and integration verification remain ROOT-gated under #96.
   ordered declaration memberships. Equal bytes from an independent parse do
   not establish origin. Regions and declaration owners are not Kotlin scopes.
   Original `VALUE_PARAMETER` and `TYPE_PARAMETER` declarations retain their
-  original parameter-list parent and enclosing function owner ordinal. Header
-  parameters remain file structural members, not file-visible bindings; locals
-  remain block members. No property, `val` text or body membership is fabricated,
-  and raw name indices are not visibility rules.
+  original parameter-list parent and enclosing function owner ordinal. Top-level
+  header parameters remain file structural members; direct local-function header
+  parameters remain members of the enclosing outer block, not of the local
+  function's own body. Neither membership establishes visibility. No property,
+  `val` text or body membership is fabricated, and raw name indices are not visibility rules.
 - `declaration_name_index` groups exact **raw** spellings within an identical
   borrowed region, retaining duplicates and result-local declaration ordinals.
   `ancestor_candidates` returns all such groups along structural ancestors,
@@ -415,6 +417,50 @@ evidence and integration verification remain ROOT-gated under #96.
   returns every half-open containing region in directory order; brace bytes
   count, EOF matches nothing. It neither authenticates a reference occurrence
   nor converts UTF-16 positions; callers convert against the identical source.
+- `call_syntax::call_site(lowered, result, current, call_index)` selects an
+  **original** standalone direct `CALL_EXPRESSION`. It retains the original call,
+  callee reference/name, argument list/parentheses, enclosing function/body and
+  source-ordered argument records. Each record borrows its original wrapper,
+  integer/simple-reference expression/token, optional named-label wrapper/reference/
+  identifier/equals and following comma (including a trailing comma). Empty lists,
+  unknown callees, repeated labels and mismatched names/arity/type spellings are
+  syntax views, not successful invocations. Qualified/safe/chained/expression
+  callees, type arguments, spread, trailing lambdas, nested/richer values,
+  incomplete/error-bearing lists and unsupported ancestry refuse atomically.
+- `call_syntax::callable_parameters(lowered, result, current, original_function)`
+  takes an explicitly selected original local `FUN` **Declaration**, never a
+  callee or name. Only direct ordinary non-generic local functions with empty
+  bodies and required simple-typed parameters qualify. Returned parameter records
+  preserve original borrowed Declaration identity, parameter-list ordinal,
+  annotation syntax and following comma; declaration name/full ranges remain on
+  the original Declaration. Duplicate names stay distinct. Defaults, modifiers,
+  varargs, receivers and richer types refuse; raw `Int`/`T` never resolves a type.
+  Parameter declaration order is independent of call argument order.
+  Both kernels retain the existing monotonic ReferenceBudget across authentication,
+  source/name comparison, role/delimiter inspection, count/reserve/emission and
+  final construction. Fallible exact reservation is bounded cumulatively to
+  131,072 requested/actual retained bytes and 1,024 records per vector; work stays
+  at 2,097,152 units. Composition uses the private shared-budget kernels, not
+  chained public-query resets. These finite borrowed syntax views add no target
+  selection, argument-to-parameter mapping, applicability, inferred type, active
+  parameter/signature, provider or capability. `ReferenceSite` remains initializer-
+  only; complete semantic BodyCheck and non_value_reference are unchanged, so
+  newly admitted rich calls/parameterized local functions still atomically refuse
+  all existing rich-body semantic consumers.
+  `tests/call_syntax.rs` contains original supervised-worker identity, role,
+  ownership, edit/reparse/rebinding, foreign/stale and refusal assertions, plus a
+  retained full actual-source/CST/public-output writer. Synthetic accounting tests
+  cover exact/one-over/overflow and call-then-parameter shared work/storage.
+  This is source-only work: no local runtime, format/build/lint/test, CI or fresh
+  hosted observation is claimed. Under separate ROOT admission, run the original
+  unfiltered checks and `cargo test --locked -p ktlsp-parser --test call_syntax --
+  --nocapture` on a hosted parser-authorized machine. Read every complete
+  `CALL_SYNTAX_ACTUAL_BEGIN` through `CALL_SYNTAX_ACTUAL_END` packet, including
+  source bytes, complete CST, call roles and selected parameter-owner/ordinals.
+  OWNER and ROOT must independently read actual packets before removing only the
+  writer; pointer assertions remain permanent. Existing paired-CLI empty-call and
+  mixed value/type/callee edit/rebinding regressions remain required. No signature
+  help or official Kotlin parity is established; #96 remains unchanged.
 - `lowering::reference_site` authenticates an original whole-initializer
   `REFERENCE_EXPRESSION` and its sole identifier token against the exact lowerer,
   parsed tree, result and current snapshot. Private fields retain borrowed origin,

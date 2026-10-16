@@ -1,5 +1,6 @@
 //! Isolated, bounded parser adoption gate. No grammar or semantic parity claim.
 pub mod ancestor_candidates;
+pub mod call_syntax;
 pub mod declaration_name_index;
 pub mod documentation;
 pub mod integer_initializer_types;

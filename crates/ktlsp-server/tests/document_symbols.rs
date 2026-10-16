@@ -677,12 +677,6 @@ fn actual_packaged_stdio_navigation_negotiation_and_existing_providers() {
                 hover["result"]["range"],
                 json!({"start":{"line":2,"character":33},"end":{"line":2,"character":38}})
             );
-            // Original direct-Write wire evidence; never a synthetic CST response.
-            writeln!(
-                std::io::stderr(),
-                "navigation-original-wire-v1: definition={definition} hover={hover}"
-            )
-            .unwrap();
         } else {
             assert_eq!(hover["error"]["code"], -32601);
         }

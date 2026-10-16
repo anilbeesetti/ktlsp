@@ -90,7 +90,9 @@ mod linux {
     const INNER: &str = "/tmp/ktlsp-t045-pr174-host";
     const CAPTURE: &str = "/tmp/ktlsp-t045-pr174-host/capture";
     const PHASE: Duration = Duration::from_secs(60);
-    const SESSION: Duration = Duration::from_secs(300);
+    // The host exercises its 300s session timeout first; this independent finite fallback
+    // stays inside the shared 540s watchdog trigger, never races the intended host kill.
+    const SESSION: Duration = Duration::from_secs(530);
     const NOFOLLOW: i32 = 0x20000;
     const NONBLOCK: i32 = 0x800;
     unsafe extern "C" {

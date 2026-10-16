@@ -97,6 +97,7 @@ fn copy_sealed(source:&Path,target:&Path,cap:u64,mode:u32,end:u64)->Result<()> {
     let mut buffer=[0u8;65536]; let mut size=0u64;
     loop { if mono_ms()?>=end{return Err("bootstrap copy deadline".into());} let n=input.read(&mut buffer).map_err(|e|e.to_string())?; if n==0{break;} size+=n as u64;if size>cap{return Err("bootstrap input grew".into());}output.write_all(&buffer[..n]).map_err(|e|e.to_string())?; }
     if size!=metadata.len(){return Err("bootstrap input changed".into());}
+    output.set_permissions(fs::Permissions::from_mode(mode)).map_err(|e|e.to_string())?;
     output.sync_all().map_err(|e|e.to_string())?;
     if sha_path(source,end)?!=sha_path(target,end)?{return Err("bootstrap copy source changed".into());} Ok(())
 }
@@ -104,10 +105,13 @@ fn grant_claim(grant:&RootGrant)->Result<PathBuf> {
     Ok(Path::new(ROOT).join("grant-claims").join(sha_bytes(&serde_json::to_vec(grant).map_err(|e|e.to_string())?)))
 }
 fn no_disposal_failure()->Result<()> {
-    match fs::symlink_metadata(Path::new(ROOT).join("preparation-disposal-failed")) {
-        Err(error) if error.kind()==ErrorKind::NotFound=>Ok(()),
-        _=>Err("prior preparation disposal failed; no later launch admission".into()),
+    for name in ["preparation-disposal-failed","preparation-disposal-in-progress"] {
+        match fs::symlink_metadata(Path::new(ROOT).join(name)) {
+            Err(error) if error.kind()==ErrorKind::NotFound=>{},
+            _=>return Err("prior preparation disposal failed/incomplete; no later launch admission".into()),
+        }
     }
+    Ok(())
 }
 #[derive(Serialize,Deserialize)]
 #[serde(deny_unknown_fields,rename_all="camelCase")]

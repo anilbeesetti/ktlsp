@@ -85,6 +85,7 @@ mod host {
     include!("pr174/export.rs");
     include!("pr174/collect.rs");
     include!("pr174/storage.rs");
+    include!("pr174/action.rs");
     mod materializer { include!("pr174/materializer.rs"); }
 
     #[derive(Deserialize, Serialize)]
@@ -608,6 +609,7 @@ mod host {
             .mode(mode)
             .open(p)
             .map_err(|e| e.to_string())?;
+        f.set_permissions(fs::Permissions::from_mode(mode)).map_err(|e| e.to_string())?;
         // Failed writes remain tombstones: removing a cancellation latch could permit START.
         write(&mut f, b).map_err(|e| e.to_string())
     }
@@ -921,12 +923,15 @@ mod host {
             .strip_prefix("0::")
             .ok_or("unified host cgroup required")?;
         let wanted = format!("/system.slice/{}.service", unit(&a.nonce, "supervisor"));
+        let self_stat = read_file(Path::new("/proc/self/stat"), 4096)?;
         if cg != wanted
             || !String::from_utf8_lossy(&read_file(Path::new("/proc/1/comm"), 128)?)
                 .starts_with("systemd")
+            || parent_pid(&self_stat)? != 1
         {
             return Err("supervisor is not the dedicated outside-step system service".into());
         }
+        e.append(&json!({"kind":"outside-step-supervisor","statHex":raw_hex(&self_stat),"cgroup":cg,"pid1CommHex":raw_hex(&read_file(Path::new("/proc/1/comm"),128)?)}),false)?;
         core_policy(e)?;
         attest_mounts(dir, None, e)?;
         input_pins(dir, a, e)?;
@@ -2468,8 +2473,18 @@ mod host {
             e.failed = true;
             e
         });
-        let (end, clock_valid) = cleanup_clock(dir, b, &mut e, mono_ms()?, resuming);
+        let (mut service_end, mut clock_valid) = cleanup_clock(dir, b, &mut e, mono_ms()?, resuming);
+        if !direct_prearm {
+            let measured = e.checked(&b.systemctl,&args(&["show","--property=ExecMainStartTimestampMonotonic",&format!("{}.service",unit(&b.nonce,"cleanup"))]),service_end)
+                .and_then(|raw|properties(&raw))
+                .and_then(|values|values.get("ExecMainStartTimestampMonotonic").ok_or_else(||"cleanup systemd start timestamp unavailable".into()).and_then(|value|value.parse::<u64>().map_err(|_|"numeric timestamp".to_string()).or_else(|_|systemctl_usec(value))))
+                .and_then(|start|{let start=start/1000;if start==0||start>mono_ms()?{return Err("actual cleanup systemd start timestamp invalid".into());}start.checked_add(60000).ok_or("cleanup service deadline overflow".into())});
+            match measured {Ok(actual_end)=>service_end=service_end.min(actual_end),Err(_)=>clock_valid=false}
+        }
+        // Preserve 10s for immutable export and 2s for its final outcome inside the SAME 60s unit.
+        let end = service_end.saturating_sub(12_000);
         let budget = CleanupBudget { end };
+        let _ = e.append(&json!({"kind":"cleanup-export-budget","teardownEndMs":end,"exportEndMs":service_end.saturating_sub(2_000),"serviceEndMs":service_end}),false);
         let mut facts = ClosureFacts {
             proofs: !b.uncertain,
             deadline_valid: clock_valid,
@@ -2609,7 +2624,7 @@ mod host {
         facts.deadline_valid &= mono_ms()? <= end;
         facts.evidence_complete = !e.failed;
         let confirmed = facts.confirmed();
-        let result = json!({"schemaVersion":1,"containerId":b.container_id,"nonce":b.nonce,"bootId":b.boot_id,"teardown":if confirmed{"CONTAINER_TEARDOWN_CONFIRMED"}else{"UNKNOWN"},"officialCaptureSuccess":false,"reason":"receiver review required; host/daemon/partial closure is never clean","directPrearm":direct_prearm,"endMs":end});
+        let result = json!({"schemaVersion":1,"containerId":b.container_id,"nonce":b.nonce,"bootId":b.boot_id,"teardown":if confirmed{"CONTAINER_TEARDOWN_CONFIRMED"}else{"UNKNOWN"},"officialCaptureSuccess":false,"reason":"receiver review required; host/daemon/partial closure is never clean","directPrearm":direct_prearm,"endMs":service_end});
         side(
             &mut e,
             &dir.join("teardown-receipt.json"),
@@ -2629,19 +2644,13 @@ mod host {
         drop(e);
         // The unique outside-step cleanup owner also preserves the protected export after runner-step loss.
         // Export failure never rewrites the original teardown result.
-        let export = protected_export(dir);
+        let export = protected_export_until(dir, service_end.saturating_sub(2_000));
         match export {
             Err(error) => {
                 let bytes = serde_json::to_vec(&json!({"scope":"PR174_EXPORT_FAILURE","error":error,"officialCaptureSuccess":false})).map_err(|e|e.to_string())?;
                 if bytes.len() <= 2048 { let _ = make_file(&dir.join("export-failure.json"), &bytes, 0o400); }
             },
-            Ok(_) => if let Err(error) = release_calibration_preparation(dir) {
-                let bytes = serde_json::to_vec(&json!({"scope":"PR174_PREPARATION_RELEASE_FAILURE","nonce":b.nonce,"error":error,"containerClosureUnchanged":true,"nextLaunchAllowed":false})).map_err(|e|e.to_string())?;
-                if bytes.len() <= 2048 {
-                    let _ = make_file(&dir.join("preparation-release-failure.json"), &bytes, 0o400);
-                    let _ = make_file(&Path::new(ROOT).join("preparation-disposal-failed"), &bytes, 0o400);
-                }
-            },
+            Ok(_)=>{},
         }
         Ok(result)
     }
@@ -3163,6 +3172,8 @@ mod host {
                 supervise(dir)
             },
             "export" => protected_export(dir),
+            "await-calibration" => await_calibration(dir),
+            "release-calibration" => release_calibration(dir),
             "cleanup" => {
                 let b = binding(dir)?;
                 let expected = format!("0::/system.slice/{}.service", unit(&b.nonce, "cleanup"));

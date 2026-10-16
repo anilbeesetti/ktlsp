@@ -503,12 +503,24 @@ impl Session {
                 let (parsed, cleanup_confirmed) =
                     provider.parse(&worker_snapshot, &worker_cancelled);
                 let result = (|| {
-                    let parsed = parsed.map_err(|error| {
-                        if error == ParserError::Cancelled {
-                            (-32800, "Request cancelled")
-                        } else {
-                            (-32803, "parser failed or exceeded its resource limits")
+                    let parsed = parsed.map_err(|error| match error {
+                        ParserError::Cancelled => (-32800, "Request cancelled"),
+                        ParserError::InputLimit => (-32803, "parser input limit exceeded"),
+                        ParserError::NestingLimit => (-32803, "parser nesting limit exceeded"),
+                        ParserError::OutputLimit => (-32803, "parser output limit exceeded"),
+                        ParserError::AllocationLimit => {
+                            (-32803, "parser worker allocation limit exceeded")
                         }
+                        ParserError::Coverage => {
+                            (-32803, "parser output coverage validation failed")
+                        }
+                        ParserError::InvalidTree => {
+                            (-32803, "parser output tree validation failed")
+                        }
+                        ParserError::Timeout => (-32803, "parser deadline exceeded"),
+                        ParserError::WorkerFailed => (-32803, "parser worker failed"),
+                        ParserError::Io => (-32803, "parser I/O or cleanup failed"),
+                        ParserError::StaleSnapshot => (-32803, "parser output snapshot mismatch"),
                     })?;
                     if worker_cancelled.load(Ordering::Relaxed) {
                         return Err((-32800, "Request cancelled"));

@@ -268,7 +268,14 @@ fn workflow_publish_calibration_ready(dir: &Path, a: &Admission, b: &Binding, id
         case,nonce:a.nonce.clone(),container_id:b.container_id.clone(),boot_id:a.boot_id.clone(),daemon_id:a.daemon_id.clone(),
         init_pid:identity.init_pid,init_starttime:identity.init_start,supervisor_pid,supervisor_starttime,
         armed_ms:b.armed_ms.ok_or("unarmed original cancellation case")?,observed_ms:mono_ms()?};
-    side_json(e,&dir.join("calibration-observer-ready.json"),&ready)
+    wf_publish_readiness_file(e,dir,&ready)
+}
+fn wf_publish_readiness_file(e: &mut Evidence, dir: &Path, ready: &WorkflowCancellationReady) -> Result<()> {
+    let final_path = dir.join("calibration-observer-ready.json");
+    wf_require(!final_path.try_exists().map_err(|error| error.to_string())?, "readiness already published; no replacement")?;
+    let next = dir.join("calibration-observer-ready.next");
+    side_json(e,&next,ready)?;
+    fs::rename(next,final_path).map_err(|error| error.to_string())
 }
 fn wf_verify_cancellation_ready(dir: &Path) -> Result<()> {
     let ready:WorkflowCancellationReady=load(&dir.join("calibration-observer-ready.json"))?;
@@ -884,5 +891,29 @@ mod workflow_source_tests {
         graph["data"]["node"]["body"]=json!("approved bytes");
         graph["data"]["node"].as_object_mut().unwrap().remove("lastEditedAt");
         assert!(wf_comment_body(&owner,&comment,&graph).is_err());
+    }
+    #[test]
+    fn synthetic_readiness_publication_never_exposes_partial_json() {
+        let unique = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let dir = std::env::temp_dir().join(format!("ktlsp-workflow-ready-{}-{unique}",std::process::id()));
+        fs::create_dir(&dir).unwrap();
+        let ready = WorkflowCancellationReady {schema_version:1,scope:"PR174_ORIGINAL_CANCELLATION_PEER_READY".into(),
+            case:CalibrationCase::WorkflowStepCancel,nonce:"a".repeat(64),container_id:"b".repeat(64),
+            boot_id:"synthetic-boot".into(),daemon_id:"synthetic-daemon".into(),init_pid:11,init_starttime:12,
+            supervisor_pid:13,supervisor_starttime:14,armed_ms:15,observed_ms:16};
+        let next = dir.join("calibration-observer-ready.next");
+        let final_path = dir.join("calibration-observer-ready.json");
+        make_file(&next,b"{",0o600).unwrap();
+        let mut evidence=Evidence::preflight();
+        assert!(wf_publish_readiness_file(&mut evidence,&dir,&ready).is_err());
+        assert!(!final_path.exists());
+        assert_eq!(fs::read(&next).unwrap(),b"{");
+        fs::remove_file(&next).unwrap();
+        let mut evidence=Evidence::preflight();
+        wf_publish_readiness_file(&mut evidence,&dir,&ready).unwrap();
+        assert!(!next.exists());
+        assert_eq!(fs::read(&final_path).unwrap(),wf_json(&ready).unwrap());
+        assert!(wf_publish_readiness_file(&mut evidence,&dir,&ready).is_err());
+        fs::remove_dir_all(dir).unwrap();
     }
 }

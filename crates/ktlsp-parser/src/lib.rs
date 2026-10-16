@@ -233,6 +233,11 @@ struct DeadlineObserver {
     socket: std::os::unix::net::UnixDatagram,
     evidence: DeadlineEvidence,
 }
+
+#[cfg(unix)]
+fn is_deadline_ack(bytes: &[u8]) -> bool {
+    bytes == b"KTLSP-EOF-v1!!!!"
+}
 #[cfg(unix)]
 impl DeadlineObserver {
     fn new(command: &mut Command) -> std::io::Result<Self> {
@@ -266,8 +271,8 @@ impl DeadlineObserver {
         let mut bytes = [0; 17];
         self.evidence.receipt = match self.socket.recv(&mut bytes) {
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => DeadlineReceipt::Missing,
-            Ok(16)
-                if bytes[..16] == *b"KTLSP-EOF-v1!!!!"
+            Ok(count)
+                if is_deadline_ack(&bytes[..count])
                     && self.evidence.deadline_selected
                     && self.evidence.decision_send == Some(Ok(16)) =>
             {
@@ -1598,7 +1603,26 @@ mod unix_io {
             .stdin(Stdio::from(OwnedFd::from(child_stream)))
             .stdout(Stdio::from(OwnedFd::from(child_output)))
             .env_clear();
-        lease.spawn(&mut command)?;
+        #[cfg(test)]
+        let mut observation = if observer.is_none() {
+            native_io_observation::Observation::requested(&mut command, deadline)
+        } else {
+            None
+        };
+        let spawned = lease.spawn(&mut command);
+        #[cfg(not(test))]
+        spawned?;
+        #[cfg(test)]
+        if let Some(observation) = &mut observation {
+            observation.spawned(spawned);
+        }
+        #[cfg(test)]
+        if let Err(error) = spawned {
+            if let Some(observation) = observation {
+                observation.finish(&Err(error), *cleanup, std::io::stderr().lock());
+            }
+            return Err(error);
+        }
         drop(command);
         let result = {
             // Close the parent endpoint before cleanup on both return and unwind.
@@ -1612,8 +1636,28 @@ mod unix_io {
                     cancelled,
                     observer.as_deref_mut(),
                     || lease.status(),
-                )?;
-                match step {
+                );
+                #[cfg(test)]
+                if let Some(observation) = &mut observation {
+                    use native_io_observation::{Decision, Sample};
+                    observation.tick(Sample {
+                        read_bytes: match &step {
+                            Ok(Step::Complete(bytes)) => bytes.len(),
+                            _ => pump.output.len(),
+                        },
+                        written_bytes: pump.offset,
+                        reader: pump.reader,
+                        writer: pump.writer,
+                        input_close: pump.input_close,
+                        exited: pump.exited,
+                        decision: match &step {
+                            Ok(Step::Pending(progress)) => Decision::Pending(*progress),
+                            Ok(Step::Complete(_)) => Decision::Complete,
+                            Err(error) => Decision::Error(*error),
+                        },
+                    });
+                }
+                match step? {
                     Step::Complete(bytes) => return Ok(bytes),
                     Step::Pending(false) => thread::sleep(Duration::from_millis(2)),
                     Step::Pending(true) => {}
@@ -1621,6 +1665,15 @@ mod unix_io {
             })()
         };
         *cleanup = lease.cleanup();
+        #[cfg(test)]
+        {
+            let result = admission::select_result(result, *cleanup);
+            if let Some(observation) = observation {
+                observation.finish(&result, *cleanup, std::io::stderr().lock());
+            }
+            result
+        }
+        #[cfg(not(test))]
         admission::select_result(result, *cleanup)
     }
 
@@ -2098,6 +2151,9 @@ mod unix_io {
         }
     }
 }
+
+#[cfg(all(test, unix))]
+mod native_io_observation;
 
 #[cfg(not(unix))]
 fn supervise_piped(
@@ -2898,10 +2954,14 @@ mod tests {
     #[test]
     #[ignore = "subprocess fault fixture"]
     fn fault_worker() {
+        #[cfg(unix)]
+        native_io_observation::child_stage(1);
         let mut source = String::new();
         // The no-read fixture consumes one byte, then leaves the remaining input unread.
         let mut first = [0u8; 1];
         std::io::stdin().read_exact(&mut first).unwrap();
+        #[cfg(unix)]
+        native_io_observation::child_stage(2);
         if first[0] == b'x' {
             loop {
                 thread::sleep(Duration::from_secs(1));
@@ -2909,14 +2969,19 @@ mod tests {
         }
         source.push(first[0] as char);
         std::io::stdin().read_to_string(&mut source).unwrap();
+        #[cfg(unix)]
+        native_io_observation::child_stage(3);
         match source.as_str() {
             "hang" => loop {
                 thread::sleep(Duration::from_secs(1));
             },
             "oversize" => {
-                std::io::stdout()
-                    .write_all(&vec![b'x'; MAX_OUTPUT_BYTES + 1])
-                    .unwrap();
+                let output = vec![b'x'; MAX_OUTPUT_BYTES + 1];
+                #[cfg(unix)]
+                native_io_observation::child_stage(4);
+                std::io::stdout().write_all(&output).unwrap();
+                #[cfg(unix)]
+                native_io_observation::child_stage(5);
             }
             "crash" => std::process::abort(),
             "exit-failure" => std::process::exit(1),
@@ -2969,7 +3034,9 @@ mod deadline_tests {
                 DeadlineReceipt::Invalid,
             ),
             (
-                vec![vec![b'X'; 4096]],
+                // Exercise receive-buffer truncation with a transmittable datagram:
+                // Darwin's default Unix datagram send limit can be below 4096.
+                vec![b"KTLSP-EOF-v1!!!!xx".to_vec()],
                 true,
                 Some(Ok(16)),
                 DeadlineReceipt::Invalid,
@@ -3003,6 +3070,15 @@ mod deadline_tests {
             };
             assert_eq!(observer.finish().receipt, expected);
         }
+    }
+
+    #[test]
+    fn oversized_ack_bytes_are_rejected_independently_of_datagram_send_limits() {
+        let mut bytes = vec![b'x'; 4096];
+        bytes[..16].copy_from_slice(b"KTLSP-EOF-v1!!!!");
+        assert!(!is_deadline_ack(&bytes));
+        assert!(!is_deadline_ack(&bytes[..17]));
+        assert!(is_deadline_ack(&bytes[..16]));
     }
 
     #[test]

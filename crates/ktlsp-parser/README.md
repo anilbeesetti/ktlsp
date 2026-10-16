@@ -68,6 +68,43 @@ close B3/B4; historical MissingACK observations stay inconclusive. No comparativ
 speed/RAM claim follows from the transport change. The parent capacity checks do not
 bound whole-process allocation, stack or RSS.
 
+### macOS fault evidence (#332)
+
+The original macOS release run
+[38854469458/job116822734134](https://github.com/anilbeesetti/ktlsp/actions/runs/38854469458/job/116822734134)
+failed the 4096-byte deadline-receipt datagram send with `Message too long`, and
+selected `Timeout` rather than the required `OutputLimit` for the oversize fixture.
+The receipt regression now sends an 18-byte valid-prefix datagram, which still
+exercises truncation by the consumer's 17-byte receive buffer. A separate
+4096-byte valid-prefix byte-slice regression preserves exact acknowledgement
+rejection without assuming the OS can transmit that datagram.
+
+The oversize cause is not established by those logs. The pump reads at most
+8 KiB per tick; an idle tick sleeps 2 ms, so repeated producer/readiness gaps
+could consume the unchanged 500 ms deadline before 4 MiB + 1 bytes arrive.
+This is a hypothesis, not a native-I/O fix or macOS reliability claim.
+For ROOT-admitted **changed-source hosted** tests, set
+`KTLSP_NATIVE_IO_OBSERVE=1` and run the release workspace tests with `--nocapture`.
+Only the unit-test fault-worker command is observed; no product instrumentation
+or parser/source logging is compiled into ordinary builds.
+
+`KTLSP_NATIVE_IO_V1` records spawn completion, first read/write, input half-close,
+output EOF, observed successful exit, idle/total tick counts, the final 32 scalar
+pump states, and selected result/cleanup. At most eight child-stage receipts are
+retained: 1 = fixture entered, 2 = first input byte, 3 = input EOF,
+4 = oversize output buffer ready immediately before the stdout write call,
+5 = that write returns. Stage 4 does not prove the write has executed.
+Reads/counts include subprocess test-harness stdout, not only fixture bytes.
+Receipt timestamps are parent receive times, not child execution timestamps;
+absent stages remain inconclusive. Each collection tick/final drain receives at
+most eight tiny datagrams. Setup/send/logging failures never substitute a product
+result. Logging does not retry or flush, but a blocking stderr sink can delay
+return. Observation has unmeasured
+timing effects and leaves cancellation-before-deadline, the original deadline,
+exact input/output bounds, and failure-visible `OutputLimit` assertions unchanged.
+Local parser runtime remains prohibited under #96. Hosted macOS release full
+workspace and supervision proof is still required; #96 remains OPEN/UNKNOWN.
+
 Limits are enforced independently in parent and worker where applicable:
 
 | Resource | Limit |

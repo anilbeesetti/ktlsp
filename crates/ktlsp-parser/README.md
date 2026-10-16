@@ -44,6 +44,20 @@ sockets are dropped without a receive and receipts are Missing (deadline selecti
 and send scalars remain recorded). A returned Timeout/Cancelled is not cleanup
 proof; late cleanup never revises a returned result.
 
+`Parser::parse_snapshot_with_cleanup(&SourceSnapshot, &AtomicBool)` returns the
+unchanged normal parse result together with one request-specific boolean. True
+means this invocation made no child ownership/spawn attempt, or its same child
+was actually confirmed reaped before return (and non-Unix scoped I/O exited).
+False means closure is unproved, not that a child is necessarily still alive.
+The flag becomes false before the actual spawn attempt and only existing
+same-child cleanup confirmation can set it true. It is not inferred from thread
+completion, global counts or a later reaper state; no original result is revised.
+The result-only `parse`/`parse_snapshot` APIs retain their existing semantics via
+the same parse/supervise pipeline. No limits, deadlines, selected errors or Unix
+20 ms observation grace are relaxed. The server consumes the reporting API and
+permanently fails terminal cleanup status if any owned request reports false or
+its symbol thread panics, even if reaping might complete later.
+
 Caller buffers and observer endpoints remain inside the reservation until disposal.
 One canonical output Vec reserves before append; exposed capacity above 8,388,610
 bytes is dropped and rejected. Normalized input/map capacities are checked against

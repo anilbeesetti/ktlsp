@@ -7,6 +7,7 @@
 use std::collections::TryReserveError;
 use std::fmt;
 use std::io::{self, BufRead, Write};
+use std::task::Poll;
 
 /// Maximum complete header section, including the terminating CRLF-CRLF.
 pub const MAX_HEADER_BYTES: usize = 8 * 1024;
@@ -71,59 +72,96 @@ impl From<io::Error> for ProtocolError {
 /// is an error. Unknown syntactically valid ASCII headers are ignored. Header
 /// names and charset values are case insensitive. JSON and UTF-8 payload
 /// validation belong to the caller.
+/// This blocking adapter cannot retain a partial frame across WouldBlock;
+/// use `FrameReader::poll` for nonblocking/timed streams.
 pub fn read_frame<R: BufRead>(reader: &mut R) -> Result<Option<Vec<u8>>, ProtocolError> {
-    let Some(header) = read_header(reader)? else {
-        return Ok(None);
-    };
-    let length = payload_length(&header)?;
-    if length > MAX_PAYLOAD_BYTES {
-        return Err(ProtocolError::PayloadTooLarge);
-    }
-    let mut payload = Vec::new();
-    payload
-        .try_reserve_exact(length)
-        .map_err(ProtocolError::Allocation)?;
-    payload.resize(length, 0);
-    match reader.read_exact(&mut payload) {
-        Ok(()) => Ok(Some(payload)),
-        Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => {
-            Err(ProtocolError::TruncatedPayload)
-        }
-        Err(error) => Err(error.into()),
+    match FrameReader::default().poll(reader)? {
+        Poll::Ready(frame) => Ok(frame),
+        Poll::Pending => Err(io::Error::from(io::ErrorKind::WouldBlock).into()),
     }
 }
 
-fn read_header<R: BufRead>(reader: &mut R) -> Result<Option<Vec<u8>>, ProtocolError> {
-    let mut header = Vec::with_capacity(256);
-    loop {
-        let available = match reader.fill_buf() {
-            Ok(bytes) => bytes,
-            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
-            Err(error) => return Err(error.into()),
-        };
-        if available.is_empty() {
-            return if header.is_empty() {
-                Ok(None)
-            } else {
-                Err(ProtocolError::TruncatedHeader)
-            };
+/// One bounded, resumable frame. This owns only the current header/payload,
+/// never a queue, and leaves all following frames in the caller's buffer.
+/// Framing errors are terminal: discard this decoder and its input stream.
+#[derive(Debug)]
+pub struct FrameReader {
+    header: Vec<u8>,
+    payload: Vec<u8>,
+    length: Option<usize>,
+}
+impl Default for FrameReader {
+    fn default() -> Self {
+        Self {
+            header: Vec::with_capacity(256),
+            payload: Vec::new(),
+            length: None,
         }
-        let mut consumed = 0;
-        let mut complete = false;
-        for &byte in available.iter().take(MAX_HEADER_BYTES - header.len()) {
-            header.push(byte);
-            consumed += 1;
-            if header.ends_with(b"\r\n\r\n") {
-                complete = true;
-                break;
+    }
+}
+impl FrameReader {
+    /// Continue until one complete frame, EOF, or a reader WouldBlock. Partial
+    /// headers and payloads survive Pending; all grammar validation is shared
+    /// with the blocking `read_frame` adapter.
+    pub fn poll<R: BufRead>(
+        &mut self,
+        reader: &mut R,
+    ) -> Result<Poll<Option<Vec<u8>>>, ProtocolError> {
+        loop {
+            if self
+                .length
+                .is_some_and(|length| self.payload.len() == length)
+            {
+                self.length = None;
+                self.header.clear();
+                return Ok(Poll::Ready(Some(std::mem::take(&mut self.payload))));
             }
-        }
-        reader.consume(consumed);
-        if complete {
-            return Ok(Some(header));
-        }
-        if header.len() == MAX_HEADER_BYTES {
-            return Err(ProtocolError::HeaderTooLarge);
+            let available = match reader.fill_buf() {
+                Ok(bytes) => bytes,
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    return Ok(Poll::Pending);
+                }
+                Err(error) => return Err(error.into()),
+            };
+            if available.is_empty() {
+                return if self.length.is_some() {
+                    Err(ProtocolError::TruncatedPayload)
+                } else if self.header.is_empty() {
+                    Ok(Poll::Ready(None))
+                } else {
+                    Err(ProtocolError::TruncatedHeader)
+                };
+            }
+            if let Some(length) = self.length {
+                let consumed = available.len().min(length - self.payload.len());
+                self.payload.extend_from_slice(&available[..consumed]);
+                reader.consume(consumed);
+                continue;
+            }
+            let mut consumed = 0;
+            let mut complete = false;
+            for &byte in available.iter().take(MAX_HEADER_BYTES - self.header.len()) {
+                self.header.push(byte);
+                consumed += 1;
+                if self.header.ends_with(b"\r\n\r\n") {
+                    complete = true;
+                    break;
+                }
+            }
+            reader.consume(consumed);
+            if complete {
+                let length = payload_length(&self.header)?;
+                if length > MAX_PAYLOAD_BYTES {
+                    return Err(ProtocolError::PayloadTooLarge);
+                }
+                self.payload
+                    .try_reserve_exact(length)
+                    .map_err(ProtocolError::Allocation)?;
+                self.length = Some(length);
+            } else if self.header.len() == MAX_HEADER_BYTES {
+                return Err(ProtocolError::HeaderTooLarge);
+            }
         }
     }
 }

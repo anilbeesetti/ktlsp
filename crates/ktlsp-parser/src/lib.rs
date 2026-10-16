@@ -2481,6 +2481,22 @@ mod unix_io {
 #[cfg(all(test, unix))]
 mod native_io_observation;
 
+// Temporary #377 proof: output follows selected timeout, child cleanup and scoped I/O.
+#[cfg(windows)]
+fn windows_timeout_phase(deadline: Instant, at: (u32, u32)) {
+    if std::env::var_os("KTLSP_WINDOWS_TIMEOUT_PHASE_PROOF").as_deref()
+        == Some(std::ffi::OsStr::new("1"))
+    {
+        let _ = writeln!(
+            std::io::stderr(),
+            "KTLSP_WINDOWS_TIMEOUT_PHASE_V1 line={} column={} after_cleanup_late_ns={}",
+            at.0,
+            at.1,
+            Instant::now().saturating_duration_since(deadline).as_nanos()
+        );
+    }
+}
+
 #[cfg(not(unix))]
 fn supervise_piped(
     mut command: Command,
@@ -2497,7 +2513,8 @@ fn supervise_piped(
         .spawn()
         .map_err(|_| ParserError::Io)?;
     drop(command);
-    thread::scope(|scope| {
+    let mut timeout_at = None;
+    let result = thread::scope(|scope| {
         let mut guard = ChildGuard {
             child,
             reaped: false,
@@ -2533,6 +2550,7 @@ fn supervise_piped(
                     return Err(ParserError::Cancelled);
                 }
                 if Instant::now() >= deadline {
+                    timeout_at = Some((line!(), column!()));
                     return Err(ParserError::Timeout);
                 }
                 if output.is_none() {
@@ -2554,25 +2572,34 @@ fn supervise_piped(
             if !status.success() {
                 return Err(ParserError::WorkerFailed);
             }
-            finish_io(writer, reader, receiver, output, deadline, cancelled)
+            finish_io(writer, reader, receiver, output, deadline, cancelled, &mut timeout_at)
         })();
         // Check cleanup before the scope joins potentially blocked I/O threads.
         guard.finish()?;
         *cleanup_status = true;
         result
-    })
+    });
+    #[cfg(windows)]
+    if matches!(&result, Err(ParserError::Timeout)) && let Some(at) = timeout_at {
+        windows_timeout_phase(deadline, at);
+    }
+    result
 }
 #[cfg(any(not(unix), test))]
+#[track_caller]
 fn join_io<T>(
     handle: thread::ScopedJoinHandle<'_, T>,
     deadline: Instant,
     cancelled: &AtomicBool,
+    timeout_at: &mut Option<(u32, u32)>,
 ) -> Result<T, ParserError> {
     loop {
         if cancelled.load(Ordering::Relaxed) {
             return Err(ParserError::Cancelled);
         }
         if Instant::now() >= deadline {
+            let caller = std::panic::Location::caller();
+            *timeout_at = Some((caller.line(), caller.column()));
             return Err(ParserError::Timeout);
         }
         if handle.is_finished() {
@@ -2589,9 +2616,10 @@ fn finish_io(
     output: Option<Vec<u8>>,
     deadline: Instant,
     cancelled: &AtomicBool,
+    timeout_at: &mut Option<(u32, u32)>,
 ) -> Result<Vec<u8>, ParserError> {
-    join_io(writer, deadline, cancelled)?.map_err(|_| ParserError::Io)?;
-    join_io(reader, deadline, cancelled)?;
+    join_io(writer, deadline, cancelled, timeout_at)?.map_err(|_| ParserError::Io)?;
+    join_io(reader, deadline, cancelled, timeout_at)?;
     output
         .map(Ok)
         .unwrap_or_else(|| receiver.try_recv().map_err(|_| ParserError::Io)?)
@@ -2804,7 +2832,7 @@ mod tests {
                     });
                     ready.recv().unwrap();
                     cancelled.store(cancel, Ordering::Relaxed);
-                    let outcome = join_io(handle, Instant::now() + deadline_after, &cancelled);
+                    let outcome = join_io(handle, Instant::now() + deadline_after, &cancelled, &mut None);
                     let _ = selected.send(outcome.map(|_| ()));
                 });
             });
@@ -3009,6 +3037,7 @@ mod tests {
                             TIMEOUT
                         },
                     &AtomicBool::new(case == "cancel-ready"),
+                    &mut None,
                 )
             });
             assert_eq!(actual, expected, "{case}");

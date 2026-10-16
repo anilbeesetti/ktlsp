@@ -784,16 +784,22 @@ mod platform {
             match confinement::spawn(&mut child_command, directory) {
                 Ok((child, receipt)) => (child, Some(receipt)),
                 Err(failure) => {
-                    report["childConfinement"] = serde_json::to_value(failure.receipt)
-                        .map_err(|e| e.to_string())?;
+                    report["childConfinement"] =
+                        serde_json::to_value(failure.receipt).map_err(|e| e.to_string())?;
                     if let Err(storage) = save_confinement(directory, &report["childConfinement"]) {
-                        return Err(format!("{}; confinement receipt storage: {storage}", failure.error));
+                        return Err(format!(
+                            "{}; confinement receipt storage: {storage}",
+                            failure.error
+                        ));
                     }
                     return Err(failure.error);
                 }
             }
         } else {
-            (child_command.spawn().map_err(|e| format!("spawn: {e}"))?, None)
+            (
+                child_command.spawn().map_err(|e| format!("spawn: {e}"))?,
+                None,
+            )
         };
         let pgid = i32::try_from(child.id()).map_err(|e| e.to_string())?;
         let mut group = Group {
@@ -802,7 +808,8 @@ mod platform {
             killed: false,
         };
         if let Some(receipt) = confinement_receipt {
-            report["childConfinement"] = serde_json::to_value(receipt).map_err(|e| e.to_string())?;
+            report["childConfinement"] =
+                serde_json::to_value(receipt).map_err(|e| e.to_string())?;
             save_confinement(directory, &report["childConfinement"]).map_err(|e| e.to_string())?;
         }
         let mut input = group.child.stdin.take();
@@ -1006,7 +1013,13 @@ mod platform {
         };
         let transport_complete = failure.is_none() && cleanup_error.is_none() && script_done;
         let exported = if transport_complete {
-            export(directory, &transcript, context, status.as_ref(), report.get("childConfinement"))
+            export(
+                directory,
+                &transcript,
+                context,
+                status.as_ref(),
+                report.get("childConfinement"),
+            )
         } else {
             Err(format!(
                 "consumer export withheld: {}",
@@ -1074,7 +1087,8 @@ mod platform {
             .ok_or("export requires observed child returncode")?;
         let mut evidence_metadata = context.metadata(returncode);
         if context.is_official() {
-            let receipt = confinement_receipt.ok_or("official export requires child confinement")?;
+            let receipt =
+                confinement_receipt.ok_or("official export requires child confinement")?;
             let typed = confinement::Receipt::deserialize(receipt).map_err(|e| e.to_string())?;
             typed.validate_enforced(std::process::id())?;
             evidence_metadata["childConfinement"] = receipt.clone();
@@ -1103,15 +1117,23 @@ mod platform {
     #[test]
     fn official_export_refuses_missing_unenforced_or_mismatched_custody() {
         // Fabricated receipts are refusal inputs only, never runtime evidence.
-        let root = std::env::temp_dir().join(format!("ktlsp-custody-export-{}", std::process::id()));
+        let root =
+            std::env::temp_dir().join(format!("ktlsp-custody-export-{}", std::process::id()));
         fs::create_dir(&root).unwrap();
         let context = CaptureContext::Official {
             identity: json!({"test":"not official evidence"}),
             authorization: json!({"test":"not authorization"}),
         };
         let script = [json!({"jsonrpc":"2.0","method":"exit"})];
-        let chronology = [RawReference { direction:"client", frame_index:0 }];
-        let transcript = Transcript { chronology:&chronology, script:&script, decoded:&[] };
+        let chronology = [RawReference {
+            direction: "client",
+            frame_index: 0,
+        }];
+        let transcript = Transcript {
+            chronology: &chronology,
+            script: &script,
+            decoded: &[],
+        };
         let baseline = json!({
             "schemaVersion":1,"profile":confinement::profile(),
             "landlockAbi":6,"parentPid":std::process::id(),"parentDumpable":0,
@@ -1135,8 +1157,16 @@ mod platform {
         for (index, receipt) in receipts.iter().enumerate() {
             let directory = root.join(index.to_string());
             fs::create_dir(&directory).unwrap();
-            assert!(export(&directory, &transcript, &context,
-                Some(&std::process::ExitStatus::from_raw(0)), receipt.as_ref()).is_err());
+            assert!(
+                export(
+                    &directory,
+                    &transcript,
+                    &context,
+                    Some(&std::process::ExitStatus::from_raw(0)),
+                    receipt.as_ref()
+                )
+                .is_err()
+            );
             assert!(!directory.join("transcript.json").exists());
             assert!(!directory.join("transcript.next").exists());
             assert!(!directory.join("metadata.json").exists());
@@ -1395,7 +1425,8 @@ mod tests {
         let report = context.initial_manifest(CaptureLimits::default());
         assert_eq!(report["identity"], json!({"identity":"frozen"}));
         assert_eq!(report["authorization"], json!({"authorization":"bound"}));
-        let initial: confinement::Receipt = serde_json::from_value(report["childConfinement"].clone()).unwrap();
+        let initial: confinement::Receipt =
+            serde_json::from_value(report["childConfinement"].clone()).unwrap();
         assert_eq!(initial.profile, confinement::profile());
         assert_eq!(initial.parent_pid, std::process::id());
         assert_eq!(initial.landlock_abi, None);

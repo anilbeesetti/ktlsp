@@ -44,8 +44,13 @@ const HANDLED_ACCESS_FS: u64 = WRITE_FILE
     | IOCTL_DEV;
 const ALLOWED_ACCESS_FS: u64 = HANDLED_ACCESS_FS & !(MAKE_CHAR | MAKE_BLOCK | IOCTL_DEV);
 const SCOPED: u64 = (1 << 0) | (1 << 1);
-#[cfg(not(all(target_os = "linux", target_arch = "x86_64", target_pointer_width = "64")))]
-const UNSUPPORTED: &str = "confinement requires Linux x86_64 (64-bit) with Landlock ABI >= 6; no process launched";
+#[cfg(not(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+)))]
+const UNSUPPORTED: &str =
+    "confinement requires Linux x86_64 (64-bit) with Landlock ABI >= 6; no process launched";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -133,11 +138,19 @@ pub struct SpawnFailure {
 
 /// Query the native kernel independently; this does not change process policy.
 pub fn abi() -> Result<u32, String> {
-    #[cfg(all(target_os = "linux", target_arch = "x86_64", target_pointer_width = "64"))]
+    #[cfg(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
     {
         linux::abi()
     }
-    #[cfg(not(all(target_os = "linux", target_arch = "x86_64", target_pointer_width = "64")))]
+    #[cfg(not(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    )))]
     {
         Err(UNSUPPORTED.into())
     }
@@ -146,7 +159,7 @@ pub fn abi() -> Result<u32, String> {
 /// Protect the recorder before publishing a readiness gate. No child is started,
 /// no Landlock policy is applied to the parent, and success is only NOT_RUN.
 /// Parent dumpability is intentionally never restored.
-pub fn prepare_parent() -> Result<Receipt, SpawnFailure> {
+pub fn prepare_parent() -> Result<Receipt, Box<SpawnFailure>> {
     let mut receipt = Receipt {
         schema_version: SCHEMA_VERSION,
         profile: profile(),
@@ -155,13 +168,21 @@ pub fn prepare_parent() -> Result<Receipt, SpawnFailure> {
         parent_dumpable: None,
         hook_outcome: "NOT_RUN".into(),
     };
-    #[cfg(all(target_os = "linux", target_arch = "x86_64", target_pointer_width = "64"))]
+    #[cfg(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
     let result = linux::prepare_parent(&mut receipt);
-    #[cfg(not(all(target_os = "linux", target_arch = "x86_64", target_pointer_width = "64")))]
+    #[cfg(not(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    )))]
     let result: Result<(), String> = Err(UNSUPPORTED.into());
     if let Err(error) = result {
         receipt.hook_outcome = "REFUSED_NO_OFFICIAL_EXEC".into();
-        return Err(SpawnFailure { receipt, error });
+        return Err(Box::new(SpawnFailure { receipt, error }));
     }
     Ok(receipt)
 }
@@ -169,12 +190,23 @@ pub fn prepare_parent() -> Result<Receipt, SpawnFailure> {
 /// The only production launcher. The caller supplies an existing private capture
 /// directory with the six existing private leaves. Fresh pipe stdio is forced;
 /// all nonstdio descriptors are close-on-exec, and only the child is landlocked.
-pub fn spawn(command: &mut Command, capture: &Path) -> Result<(Child, Receipt), SpawnFailure> {
+pub fn spawn(command: &mut Command, capture: &Path) -> Result<(Child, Receipt), Box<SpawnFailure>> {
     let mut receipt = prepare_parent()?;
-    command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
-    #[cfg(all(target_os = "linux", target_arch = "x86_64", target_pointer_width = "64"))]
+    command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
     let result = linux::spawn(command, capture);
-    #[cfg(not(all(target_os = "linux", target_arch = "x86_64", target_pointer_width = "64")))]
+    #[cfg(not(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    )))]
     let result: Result<Child, String> = {
         let _ = (command, capture);
         Err(UNSUPPORTED.into())
@@ -187,12 +219,16 @@ pub fn spawn(command: &mut Command, capture: &Path) -> Result<(Child, Receipt), 
         }
         Err(error) => {
             receipt.hook_outcome = "REFUSED_NO_OFFICIAL_EXEC".into();
-            Err(SpawnFailure { receipt, error })
+            Err(Box::new(SpawnFailure { receipt, error }))
         }
     }
 }
 
-#[cfg(all(target_os = "linux", target_arch = "x86_64", target_pointer_width = "64"))]
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
 mod linux {
     use super::*;
     use std::{
@@ -277,14 +313,35 @@ mod linux {
         let version = abi()?;
         receipt.landlock_abi = Some(version);
         if version < MINIMUM_ABI {
-            return Err(format!("confinement requires Landlock ABI >= {MINIMUM_ABI}; found {version}"));
+            return Err(format!(
+                "confinement requires Landlock ABI >= {MINIMUM_ABI}; found {version}"
+            ));
         }
         // SAFETY: PR_SET_DUMPABLE takes the scalar value 0; no pointer arguments.
-        if unsafe { syscall(SYS_PRCTL, PR_SET_DUMPABLE, 0 as c_long, 0 as c_long, 0 as c_long, 0 as c_long) } != 0 {
+        if unsafe {
+            syscall(
+                SYS_PRCTL,
+                PR_SET_DUMPABLE,
+                0 as c_long,
+                0 as c_long,
+                0 as c_long,
+                0 as c_long,
+            )
+        } != 0
+        {
             return Err(syscall_error("PR_SET_DUMPABLE"));
         }
         // SAFETY: PR_GET_DUMPABLE has no pointer arguments.
-        let dumpable = unsafe { syscall(SYS_PRCTL, PR_GET_DUMPABLE, 0 as c_long, 0 as c_long, 0 as c_long, 0 as c_long) };
+        let dumpable = unsafe {
+            syscall(
+                SYS_PRCTL,
+                PR_GET_DUMPABLE,
+                0 as c_long,
+                0 as c_long,
+                0 as c_long,
+                0 as c_long,
+            )
+        };
         if dumpable < 0 {
             return Err(syscall_error("PR_GET_DUMPABLE"));
         }
@@ -306,9 +363,14 @@ mod linux {
     }
 
     fn private_directory(file: &File, uid: u32) -> Result<(), String> {
-        let metadata = file.metadata().map_err(|e| format!("confinement directory metadata: {e}"))?;
+        let metadata = file
+            .metadata()
+            .map_err(|e| format!("confinement directory metadata: {e}"))?;
         if !metadata.is_dir() || metadata.uid() != uid || metadata.mode() & 0o7777 != 0o700 {
-            return Err("confinement requires owned 0700 nonsymlink capture and write-leaf directories".into());
+            return Err(
+                "confinement requires owned 0700 nonsymlink capture and write-leaf directories"
+                    .into(),
+            );
         }
         Ok(())
     }
@@ -331,7 +393,8 @@ mod linux {
             if uid < 0 {
                 return Err(syscall_error("effective UID query"));
             }
-            let uid = u32::try_from(uid).map_err(|_| "confinement invalid effective UID".to_string())?;
+            let uid =
+                u32::try_from(uid).map_err(|_| "confinement invalid effective UID".to_string())?;
             private_directory(&root, uid)?;
             let attr = RulesetAttr {
                 handled_access_fs: HANDLED_ACCESS_FS,
@@ -340,16 +403,32 @@ mod linux {
             };
             // SAFETY: attr is a live repr(C) UAPI buffer with its exact ABI size.
             // The kernel returns this ruleset descriptor with O_CLOEXEC.
-            let ruleset = owned_file(unsafe {
-                syscall(SYS_LANDLOCK_CREATE_RULESET, &attr as *const RulesetAttr, size_of::<RulesetAttr>(), 0 as c_long)
-            }, "ruleset creation")?;
+            let ruleset = owned_file(
+                unsafe {
+                    syscall(
+                        SYS_LANDLOCK_CREATE_RULESET,
+                        &attr as *const RulesetAttr,
+                        size_of::<RulesetAttr>(),
+                        0 as c_long,
+                    )
+                },
+                "ruleset creation",
+            )?;
             // Command's stdio dup2 must never overwrite the ruleset descriptor
             // when this process happened to start with a closed standard fd.
             let ruleset = if ruleset.as_raw_fd() < 3 {
                 // SAFETY: duplicate our live fd above stdio, atomically CLOEXEC.
-                owned_file(unsafe {
-                    syscall(SYS_FCNTL, ruleset.as_raw_fd() as c_long, F_DUPFD_CLOEXEC, 3 as c_long)
-                }, "ruleset descriptor duplication")?
+                owned_file(
+                    unsafe {
+                        syscall(
+                            SYS_FCNTL,
+                            ruleset.as_raw_fd() as c_long,
+                            F_DUPFD_CLOEXEC,
+                            3 as c_long,
+                        )
+                    },
+                    "ruleset descriptor duplication",
+                )?
             } else {
                 ruleset
             };
@@ -357,9 +436,18 @@ mod linux {
             for (slot, name) in leaves.iter_mut().zip(LEAF_NAMES) {
                 // SAFETY: root is held, name is a single NUL-terminated literal,
                 // and O_DIRECTORY|O_NOFOLLOW rejects a symlink instead of following it.
-                let leaf = owned_file(unsafe {
-                    syscall(SYS_OPENAT, root.as_raw_fd() as c_long, name.as_ptr(), DIRECTORY_FLAGS as c_long, 0 as c_long)
-                }, "write-leaf open")?;
+                let leaf = owned_file(
+                    unsafe {
+                        syscall(
+                            SYS_OPENAT,
+                            root.as_raw_fd() as c_long,
+                            name.as_ptr(),
+                            DIRECTORY_FLAGS as c_long,
+                            0 as c_long,
+                        )
+                    },
+                    "write-leaf open",
+                )?;
                 private_directory(&leaf, uid)?;
                 let rule = PathBeneathAttr {
                     allowed_access: ALLOWED_ACCESS_FS,
@@ -368,29 +456,65 @@ mod linux {
                 // SAFETY: descriptors are live; the packed UAPI buffer is exactly
                 // 12 bytes and is accessed by the kernel through a raw pointer.
                 if unsafe {
-                    syscall(SYS_LANDLOCK_ADD_RULE, ruleset.as_raw_fd() as c_long, LANDLOCK_RULE_PATH_BENEATH, &rule as *const PathBeneathAttr, 0 as c_long)
-                } != 0 {
+                    syscall(
+                        SYS_LANDLOCK_ADD_RULE,
+                        ruleset.as_raw_fd() as c_long,
+                        LANDLOCK_RULE_PATH_BENEATH,
+                        &rule as *const PathBeneathAttr,
+                        0 as c_long,
+                    )
+                } != 0
+                {
                     return Err(syscall_error("write-leaf rule addition"));
                 }
                 *slot = Some(leaf);
             }
-            Ok(Self { ruleset, _capture: root, _leaves: leaves })
+            Ok(Self {
+                ruleset,
+                _capture: root,
+                _leaves: leaves,
+            })
         }
 
         // Called only after fork: scalar syscalls and allocation-free errno
         // errors, with no formatting, locks, directory operations or destructors.
         fn enforce(&self) -> io::Result<()> {
             // SAFETY: documented scalar prctl arguments; no_new_privs cannot be undone.
-            if unsafe { syscall(SYS_PRCTL, PR_SET_NO_NEW_PRIVS, 1 as c_long, 0 as c_long, 0 as c_long, 0 as c_long) } != 0 {
+            if unsafe {
+                syscall(
+                    SYS_PRCTL,
+                    PR_SET_NO_NEW_PRIVS,
+                    1 as c_long,
+                    0 as c_long,
+                    0 as c_long,
+                    0 as c_long,
+                )
+            } != 0
+            {
                 return Err(io::Error::last_os_error());
             }
             // SAFETY: the closure owns the live ruleset through the exec handshake.
-            if unsafe { syscall(SYS_LANDLOCK_RESTRICT_SELF, self.ruleset.as_raw_fd() as c_long, 0 as c_long) } != 0 {
+            if unsafe {
+                syscall(
+                    SYS_LANDLOCK_RESTRICT_SELF,
+                    self.ruleset.as_raw_fd() as c_long,
+                    0 as c_long,
+                )
+            } != 0
+            {
                 return Err(io::Error::last_os_error());
             }
             // SAFETY: CLOEXEC marks rather than closes all nonstdio fds, including
             // Rust's exec-error pipe; that pipe must still report any exec failure.
-            if unsafe { syscall(SYS_CLOSE_RANGE, 3 as c_long, u32::MAX as c_long, CLOSE_RANGE_CLOEXEC) } != 0 {
+            if unsafe {
+                syscall(
+                    SYS_CLOSE_RANGE,
+                    3 as c_long,
+                    u32::MAX as c_long,
+                    CLOSE_RANGE_CLOEXEC,
+                )
+            } != 0
+            {
                 return Err(io::Error::last_os_error());
             }
             Ok(())
@@ -402,7 +526,9 @@ mod linux {
         // SAFETY: enforce uses only async-signal-safe syscalls and raw errno;
         // owned capture/leaf/ruleset fds remain held by this closure in Command.
         unsafe { command.pre_exec(move || prepared.enforce()) };
-        command.spawn().map_err(|e| format!("confinement pre-exec or exec refused: {e}"))
+        command
+            .spawn()
+            .map_err(|e| format!("confinement pre-exec or exec refused: {e}"))
     }
 
     #[cfg(test)]
@@ -433,21 +559,27 @@ mod tests {
     #[test]
     fn profile_is_exact_and_strict() {
         let value = serde_json::to_value(profile()).unwrap();
-        assert_eq!(value, serde_json::json!({
-            "schemaVersion": 1,
-            "id": "pr174-evidence-custody-landlock-v1",
-            "minimumAbi": 6,
-            "handledAccessFs": 0xfff2u64,
-            "allowedAccessFs": 0x77b2u64,
-            "handledAccessNet": 0,
-            "scoped": 3,
-            "writeLeaves": ["home", "config", "system", "log", "tmp", "workspace"],
-            "parentDumpable": 0,
-            "noNewPrivs": true,
-            "closeRangeCloexec": true,
-            "childOnly": true
-        }));
-        assert_eq!(serde_json::from_value::<Profile>(value.clone()).unwrap(), profile());
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "schemaVersion": 1,
+                "id": "pr174-evidence-custody-landlock-v1",
+                "minimumAbi": 6,
+                "handledAccessFs": 0xfff2u64,
+                "allowedAccessFs": 0x77b2u64,
+                "handledAccessNet": 0,
+                "scoped": 3,
+                "writeLeaves": ["home", "config", "system", "log", "tmp", "workspace"],
+                "parentDumpable": 0,
+                "noNewPrivs": true,
+                "closeRangeCloexec": true,
+                "childOnly": true
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<Profile>(value.clone()).unwrap(),
+            profile()
+        );
         let mut extra = value;
         extra["unexpected"] = serde_json::json!(true);
         assert!(serde_json::from_value::<Profile>(extra).is_err());
@@ -482,7 +614,11 @@ mod tests {
         assert!(serde_json::from_value::<Receipt>(value).is_err());
     }
 
-    #[cfg(not(all(target_os = "linux", target_arch = "x86_64", target_pointer_width = "64")))]
+    #[cfg(not(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    )))]
     #[test]
     fn unsupported_platform_refuses_before_exec() {
         assert!(abi().is_err());
@@ -493,6 +629,11 @@ mod tests {
         let mut command = Command::new("must-not-be-executed-confinement-test");
         let failure = spawn(&mut command, Path::new("/unused-capture")).unwrap_err();
         assert_eq!(failure.receipt.hook_outcome, "REFUSED_NO_OFFICIAL_EXEC");
-        assert!(failure.receipt.validate_enforced(std::process::id()).is_err());
+        assert!(
+            failure
+                .receipt
+                .validate_enforced(std::process::id())
+                .is_err()
+        );
     }
 }

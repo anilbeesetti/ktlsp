@@ -9,7 +9,10 @@ use std::{
     os::unix::{fs::DirBuilderExt, process::CommandExt},
     path::PathBuf,
     process::{Command, Stdio},
-    sync::{atomic::{AtomicUsize, Ordering}, mpsc},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        mpsc,
+    },
     time::{Duration, Instant},
 };
 
@@ -20,24 +23,33 @@ struct Directory(PathBuf);
 impl Directory {
     fn new() -> Self {
         let path = std::env::temp_dir().join(format!(
-            "ktlsp-confinement-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)
+            "ktlsp-confinement-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
         ));
         fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
         Self(path)
     }
 }
 impl Drop for Directory {
-    fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); }
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
 }
 
-unsafe extern "C" { fn kill(pid: i32, signal: i32) -> i32; }
+unsafe extern "C" {
+    fn kill(pid: i32, signal: i32) -> i32;
+}
 
 fn driver(mode: &str) -> Value {
     fn reader(stream: impl Read + Send + 'static) -> mpsc::Receiver<std::io::Result<Vec<u8>>> {
         let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || {
             let mut bytes = Vec::new();
-            let result = stream.take(OUTPUT_LIMIT + 1).read_to_end(&mut bytes).map(|_| bytes);
+            let result = stream
+                .take(OUTPUT_LIMIT + 1)
+                .read_to_end(&mut bytes)
+                .map(|_| bytes);
             let _ = tx.send(result);
         });
         rx
@@ -45,26 +57,45 @@ fn driver(mode: &str) -> Value {
     let root = Directory::new();
     // The driver, not cargo's shared test process, becomes nondumpable.
     let mut child = Command::new(env!("CARGO_BIN_EXE_confinement-test-peer"))
-        .arg(mode).arg(&root.0).process_group(0)
-        .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped())
-        .spawn().unwrap();
+        .arg(mode)
+        .arg(&root.0)
+        .process_group(0)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
     drop(child.stdin.take());
     let stdout = reader(child.stdout.take().unwrap());
     let stderr = reader(child.stderr.take().unwrap());
     let deadline = Instant::now() + Duration::from_secs(15);
     let status = loop {
-        if let Some(status) = child.try_wait().unwrap() { break status; }
+        if let Some(status) = child.try_wait().unwrap() {
+            break status;
+        }
         if Instant::now() >= deadline {
-            unsafe { kill(-(child.id() as i32), 9); }
+            unsafe {
+                kill(-(child.id() as i32), 9);
+            }
             let _ = child.kill();
             panic!("NONOFFICIAL mechanics driver deadline");
         }
         std::thread::sleep(Duration::from_millis(5));
     };
-    let out = stdout.recv_timeout(deadline.saturating_duration_since(Instant::now())).unwrap().unwrap();
-    let err = stderr.recv_timeout(deadline.saturating_duration_since(Instant::now())).unwrap().unwrap();
+    let out = stdout
+        .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+        .unwrap()
+        .unwrap();
+    let err = stderr
+        .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+        .unwrap()
+        .unwrap();
     assert!(out.len() as u64 <= OUTPUT_LIMIT && err.len() as u64 <= OUTPUT_LIMIT);
-    assert!(status.success(), "driver exit {status}: {}", String::from_utf8_lossy(&err));
+    assert!(
+        status.success(),
+        "driver exit {status}: {}",
+        String::from_utf8_lossy(&err)
+    );
     serde_json::from_slice(&out).unwrap()
 }
 
@@ -85,7 +116,10 @@ fn receipt(report: &Value) -> Receipt {
     assert!(receipt.profile.no_new_privs);
     assert!(receipt.profile.close_range_cloexec);
     assert!(receipt.profile.child_only);
-    assert_eq!(receipt.profile.write_leaves, ["home", "config", "system", "log", "tmp", "workspace"]);
+    assert_eq!(
+        receipt.profile.write_leaves,
+        ["home", "config", "system", "log", "tmp", "workspace"]
+    );
     assert!(receipt.parent_pid > 0);
     receipt
 }
@@ -93,20 +127,40 @@ fn receipt(report: &Value) -> Receipt {
 fn denials(probes: &Value) {
     assert!(probes["sameUid"].is_u64());
     assert_eq!(probes["leakedFds"], serde_json::json!([]));
-    assert_eq!(probes["allowedWriteLeaves"], serde_json::json!(["home", "config", "system", "log", "tmp", "workspace"]));
+    assert_eq!(
+        probes["allowedWriteLeaves"],
+        serde_json::json!(["home", "config", "system", "log", "tmp", "workspace"])
+    );
     assert_eq!(probes["noNewPrivs"], true);
     assert_eq!(probes["denials"]["inheritedEvidenceFd"]["return"], -1);
     assert_eq!(probes["denials"]["inheritedEvidenceFd"]["errno"], 9);
     for name in [
-        "evidenceWrite", "evidenceTruncate", "evidenceUnlink", "evidenceRename",
-        "evidenceHardlink", "captureRootCreate", "outsideWrite", "symlinkEvidenceWrite",
-        "captureRootSymlink", "procParentFd", "procParentMem", "pidfdGetfd",
-        "ptraceSeize", "processVmWritev", "signalZero", "signalBenign", "pidfdSignalZero",
-        "pidfdSignalBenign", "abstractUnixConnect",
+        "evidenceWrite",
+        "evidenceTruncate",
+        "evidenceUnlink",
+        "evidenceRename",
+        "evidenceHardlink",
+        "captureRootCreate",
+        "outsideWrite",
+        "symlinkEvidenceWrite",
+        "captureRootSymlink",
+        "procParentFd",
+        "procParentMem",
+        "pidfdGetfd",
+        "ptraceSeize",
+        "processVmWritev",
+        "signalZero",
+        "signalBenign",
+        "pidfdSignalZero",
+        "pidfdSignalBenign",
+        "abstractUnixConnect",
     ] {
         let observation = &probes["denials"][name];
         assert_eq!(observation["return"], -1, "{name}: {probes}");
-        assert!(matches!(observation["errno"].as_i64(), Some(1 | 13 | 18)), "{name}: {observation}");
+        assert!(
+            matches!(observation["errno"].as_i64(), Some(1 | 13 | 18)),
+            "{name}: {observation}"
+        );
     }
 }
 
@@ -115,11 +169,16 @@ fn actual_production_hook_confines_same_uid_child_and_detached_exec_descendant()
     let observed = abi().ok();
     let report = driver("driver");
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    assert!(observed.is_some_and(|value| value >= 6), "actual Linux denial mechanics require enabled ABI>=6: {report}");
+    assert!(
+        observed.is_some_and(|value| value >= 6),
+        "actual Linux denial mechanics require enabled ABI>=6: {report}"
+    );
     let receipt = receipt(&report);
     if report["outcome"] == "REFUSED_NO_CHILD_ENTRY" {
-        assert!(!cfg!(all(target_os = "linux", target_arch = "x86_64")),
-            "Linux mechanics must exercise actual denials, not accept setup refusal: {report}");
+        assert!(
+            !cfg!(all(target_os = "linux", target_arch = "x86_64")),
+            "Linux mechanics must exercise actual denials, not accept setup refusal: {report}"
+        );
         assert_eq!(report["actualDenials"], false);
         assert_eq!(report["childEntered"], false);
         assert_eq!(receipt.hook_outcome, "REFUSED_NO_OFFICIAL_EXEC");
@@ -143,9 +202,15 @@ fn actual_production_hook_confines_same_uid_child_and_detached_exec_descendant()
     denials(&report["probes"]);
     denials(&report["probes"]["descendant"]);
     assert_eq!(report["probes"]["sameUid"], report["parentUid"]);
-    assert_eq!(report["probes"]["descendant"]["sameUid"], report["parentUid"]);
+    assert_eq!(
+        report["probes"]["descendant"]["sameUid"],
+        report["parentUid"]
+    );
     assert_eq!(report["probes"]["descendant"]["detachedSession"], true);
-    assert_eq!(report["probes"]["descendant"]["sessionId"], report["probes"]["descendant"]["pid"]);
+    assert_eq!(
+        report["probes"]["descendant"]["sessionId"],
+        report["probes"]["descendant"]["pid"]
+    );
 }
 
 #[test]

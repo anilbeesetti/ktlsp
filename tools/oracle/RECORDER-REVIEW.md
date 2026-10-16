@@ -43,6 +43,23 @@ runtime/closure proof and authenticated receiver checks still precede official
 acceptance. Source review and small native mechanics do not admit privileged,
 container or JVM execution.
 
+The two retained independent reviewers cleared the security implementation and
+fresh-stdio FD-smuggling regression. ROOT's additional security specialist
+cleared frozen source `e3f5ecfc306f01a4e5d72405ebea162afd67212c`, tree
+`ba0a1cc237b3099224c77b9c6ea1333097b8bc65`, for source semantics under the
+stated unprivileged private-container assumptions. No enforcement/runtime claim
+or independent clean-working-tree attestation follows from those source reads.
+The verified incoming main `bb6a75f61fd467c9b090210a369c7e1d225713d5` was
+composed once before this freeze.
+
+After source reviews, formatting completed; strict Clippy found that the
+288-byte `SpawnFailure` made both public result error variants too large.
+Only those failure variants are now boxed, preserving the receipt, original
+error and success-path layout without lint suppression or post-fork allocation.
+Both retained reviewers rechecked ownership/error preservation clear. This
+representation correction requires ROOT's narrow source recheck before further
+checks; no security-delta tests had started at that failure.
+
 ## #331 prior finite protected adapter source
 
 This source adds the fixed PR174 entrypoint and private official configuration

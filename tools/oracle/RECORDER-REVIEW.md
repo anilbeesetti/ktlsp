@@ -56,9 +56,14 @@ After source reviews, formatting completed; strict Clippy found that the
 288-byte `SpawnFailure` made both public result error variants too large.
 Only those failure variants are now boxed, preserving the receipt, original
 error and success-path layout without lint suppression or post-fork allocation.
-Both retained reviewers rechecked ownership/error preservation clear. This
-representation correction requires ROOT's narrow source recheck before further
-checks; no security-delta tests had started at that failure.
+Both retained reviewers and ROOT's security specialist rechecked ownership/error
+preservation clear; ROOT independently matched the clean `438f4fa` candidate.
+The next strict Clippy attempt reached two constant platform assertions in the
+mechanics integration test; ordinary tests still had not started. Replacing them
+with explicit unsupported-platform branching preserves mandatory actual ABI>=6,
+enforcement and every denial probe on Linux, and refusal-only assertions on
+macOS. All three reviewers rechecked that source correction clear, without
+executing checks. Neither diagnostic was suppressed.
 
 ## #331 prior finite protected adapter source
 

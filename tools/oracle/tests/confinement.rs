@@ -168,17 +168,9 @@ fn denials(probes: &Value) {
 fn actual_production_hook_confines_same_uid_child_and_detached_exec_descendant() {
     let observed = abi().ok();
     let report = driver("driver");
-    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    assert!(
-        observed.is_some_and(|value| value >= 6),
-        "actual Linux denial mechanics require enabled ABI>=6: {report}"
-    );
     let receipt = receipt(&report);
-    if report["outcome"] == "REFUSED_NO_CHILD_ENTRY" {
-        assert!(
-            !cfg!(all(target_os = "linux", target_arch = "x86_64")),
-            "Linux mechanics must exercise actual denials, not accept setup refusal: {report}"
-        );
+    if !cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        assert_eq!(report["outcome"], "REFUSED_NO_CHILD_ENTRY");
         assert_eq!(report["actualDenials"], false);
         assert_eq!(report["childEntered"], false);
         assert_eq!(receipt.hook_outcome, "REFUSED_NO_OFFICIAL_EXEC");
@@ -188,7 +180,6 @@ fn actual_production_hook_confines_same_uid_child_and_detached_exec_descendant()
         eprintln!("NONOFFICIAL mechanics NOT EXERCISED: production hook refused, ABI={observed:?}");
         return;
     }
-    assert!(cfg!(all(target_os = "linux", target_arch = "x86_64")));
     assert!(observed.is_some_and(|value| value >= 6));
     assert_eq!(report["actualDenials"], true);
     assert_eq!(report["outcome"], "ENFORCED");

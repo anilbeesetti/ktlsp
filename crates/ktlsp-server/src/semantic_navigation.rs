@@ -155,10 +155,9 @@ pub(crate) fn render(
             && element.start <= offset
             && (offset < element.end
                 || matches!(query, Query::Completion { .. }) && offset == element.end)
+            && reference.replace((index, element)).is_some()
         {
-            if reference.replace((index, element)).is_some() {
-                return Err(UNSUPPORTED);
-            }
+            return Err(UNSUPPORTED);
         }
         if element.token
             && element.kind == "IDENTIFIER"

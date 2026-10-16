@@ -126,7 +126,22 @@ pub(crate) fn render(
     let rename_query = matches!(query, Query::PrepareRename { .. } | Query::Rename { .. });
     let occurrence_query =
         rename_query || matches!(query, Query::References { .. } | Query::Highlights { .. });
+    let declaration_hover = matches!(query, Query::Hover { .. })
+        && reference.is_none()
+        && tree.elements().iter().any(|element| {
+            element.token
+                && element.kind == "IDENTIFIER"
+                && element.start <= offset
+                && offset < element.end
+                && element.parent.is_some_and(|parent| {
+                    matches!(
+                        tree.elements()[parent].kind.as_str(),
+                        "CLASS" | "FUN" | "PROPERTY" | "VALUE_PARAMETER"
+                    )
+                })
+        });
     if reference.is_none()
+        && !declaration_hover
         && (!occurrence_query
             || !tree.elements().iter().any(|element| {
                 element.token
@@ -141,6 +156,17 @@ pub(crate) fn render(
         return Ok(Value::Null);
     }
     let lowered = lower_declarations(result, snapshot).map_err(|_| UNSUPPORTED)?;
+    if declaration_hover {
+        let mut declarations = lowered.declarations().iter().filter(|declaration| {
+            let range = declaration.name_range();
+            range.start <= offset && offset < range.end
+        });
+        let target = declarations.next().ok_or(UNSUPPORTED)?;
+        if declarations.next().is_some() || target.incomplete() {
+            return Err(UNSUPPORTED);
+        }
+        return render_target(tree.source(), snapshot, query, target, target.name_range());
+    }
     let directory = build_regions(&lowered, result, snapshot).map_err(|_| UNSUPPORTED)?;
     if occurrence_query {
         let anchor = if let Some((index, _)) = reference {
@@ -189,8 +215,18 @@ pub(crate) fn render(
         | Query::PrepareRename { .. }
         | Query::Rename { .. } => unreachable!("rendered above"),
     };
+    render_target(tree.source(), snapshot, query, target, bytes)
+}
+
+fn render_target(
+    source: &str,
+    snapshot: &SourceSnapshot,
+    query: Query,
+    target: &ktlsp_parser::lowering::Declaration<'_>,
+    bytes: std::ops::Range<usize>,
+) -> Result<Value, &'static str> {
     // Two authenticated original endpoints, using the existing UTF-16 sweep.
-    let positions = crate::structure::positions(tree.source(), &[bytes.start, bytes.end]);
+    let positions = crate::structure::positions(source, &[bytes.start, bytes.end]);
     let range = Range {
         start: positions[0],
         end: positions[1],
@@ -198,7 +234,7 @@ pub(crate) fn render(
     match query {
         Query::Definition { .. } => Ok(json!({"uri":snapshot.document(), "range":range})),
         Query::Hover { format, .. } => {
-            let declaration = &tree.source()[target.range()];
+            let declaration = &source[target.range()];
             let (kind, value) = match format {
                 HoverFormat::Plaintext => ("plaintext", declaration.to_owned()),
                 HoverFormat::Markdown => {

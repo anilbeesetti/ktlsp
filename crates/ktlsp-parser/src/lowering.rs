@@ -2498,6 +2498,70 @@ mod tests {
         }
     }
 
+    #[test]
+    fn visible_query_shares_exact_budget_from_site_selection_through_emission() {
+        use crate::{
+            local_value_binding::{LocalBindingError, visible_with_budget},
+            structural_regions::build_regions,
+        };
+        // Synthetic CSTs isolate accounting; acceptance uses the real producer.
+        for annotated in [false, true] {
+            let result = binding_fixture_with_annotations(
+                &[&[("x", None), ("a", None), ("last", Some("unknown"))]],
+                annotated,
+            );
+            let lower = lower(&result).unwrap();
+            let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
+            let index = result
+                .parsed
+                .elements
+                .iter()
+                .position(|node| {
+                    node.kind == "REFERENCE_EXPRESSION"
+                        && node
+                            .parent
+                            .is_some_and(|parent| result.parsed.elements[parent].kind == "PROPERTY")
+                })
+                .unwrap();
+            let mut selection = ReferenceBudget::default();
+            reference_site_with_budget(&lower, &result, result.snapshot(), index, &mut selection)
+                .unwrap();
+            let mut measured = ReferenceBudget::default();
+            let found =
+                visible_with_budget(&directory, &result, index, result.snapshot(), &mut measured)
+                    .unwrap();
+            assert_eq!(found.values().len(), 2);
+            assert!(std::ptr::eq(found.values()[0], &lower.declarations()[1]));
+            assert!(std::ptr::eq(found.values()[1], &lower.declarations()[2]));
+            assert!(measured.work > selection.work + 2);
+            let mut exact = ReferenceBudget {
+                work: WORK - measured.work,
+            };
+            visible_with_budget(&directory, &result, index, result.snapshot(), &mut exact).unwrap();
+            assert_eq!(exact.work, WORK);
+            // A one-unit short budget returns no result; omitting initial
+            // selection from the accounting must not fit either.
+            for work in [
+                WORK - measured.work + 1,
+                WORK - (measured.work - selection.work),
+                usize::MAX,
+            ] {
+                let mut exhausted = ReferenceBudget { work };
+                assert_eq!(
+                    visible_with_budget(
+                        &directory,
+                        &result,
+                        index,
+                        result.snapshot(),
+                        &mut exhausted
+                    )
+                    .unwrap_err(),
+                    LocalBindingError::Resource
+                );
+            }
+        }
+    }
+
     fn structure(result: &SnapshotResult) -> Result<Counts> {
         let mut out = LoweredDeclarations {
             snapshot: result.snapshot(),

@@ -648,6 +648,16 @@ impl Session {
         let worker_snapshot = snapshot.clone();
         let provider = Arc::clone(provider);
         let client = self.symbol_client.clone();
+        // Bound the complete response envelope without copying or serializing
+        // the arbitrary client id. A JSON string byte needs at most six bytes.
+        let response_id_bound = id
+            .as_str()
+            .map_or(Some(20), |id| {
+                id.len()
+                    .checked_mul(6)
+                    .and_then(|bytes| bytes.checked_add(2))
+            })
+            .ok_or((-32803, "hover response id limit exceeded"))?;
         let cancelled = Arc::new(AtomicBool::new(false));
         let worker_cancelled = Arc::clone(&cancelled);
         let (sender, result) = mpsc::sync_channel(1);
@@ -680,8 +690,14 @@ impl Session {
                         return Err((-32800, "Request cancelled"));
                     }
                     if let Some(query) = query {
-                        semantic_navigation::render(&parsed, &worker_snapshot, query)
-                            .map_err(|error| (-32803, error))
+                        semantic_navigation::render(
+                            &parsed,
+                            &worker_snapshot,
+                            query,
+                            &worker_cancelled,
+                            response_id_bound,
+                        )
+                        .map_err(|error| (-32803, error))
                     } else {
                         let tree = parsed
                             .tree_for(&worker_snapshot)
@@ -757,7 +773,15 @@ impl Session {
                 result
             };
             responses.push(match result {
-                Ok(result) => json!({"jsonrpc":"2.0","id":id,"result":result}),
+                Ok(result) => {
+                    // Move source-sized hover strings into the inherited fixed
+                    // response envelope; json!({ "result": result }) serializes
+                    // through a borrowed Value and needlessly copies them.
+                    let mut response = json!({"jsonrpc":"2.0","id":null,"result":null});
+                    response["id"] = id;
+                    response["result"] = result;
+                    response
+                }
                 Err((code, message)) => response_error(id, code, message),
             });
         }

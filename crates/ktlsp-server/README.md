@@ -365,6 +365,65 @@ Non-reference positions can return null. Unsupported contexts/names, queried-nam
 
 `textDocument.hover.contentFormat` selects the first recognized client preference (`plaintext` or `markdown`); absent lists default to plaintext. Empty, malformed or wholly incompatible lists disable hover without breaking initialize or other providers. Markdown uses a Kotlin code fence longer than every backtick run in the source declaration, so untrusted source cannot close it; plaintext is emitted only when negotiated/defaulted. Source and response remain bounded by the existing parser input ceiling.
 
+**Source-owned prose KDoc (#397).** The declaration-name lane additionally accepts
+one producer-attached, directly owned leading `DOC_COMMENT` on a complete supported
+declaration. It uses the original parse and caller-owned declaration lowering;
+neither nearby comments nor enclosing/body/annotation/modifier names establish
+ownership. The finite prefix admits plain modifier keywords only with an attached
+supported comment; annotations and unsupported prefixes remain refused. Blank
+lines and intervening ordinary comments do not replace producer ownership.
+
+The accepted default section contains only plain text, whitespace and producer
+parenthesis leaves, with original comment delimiters/leading asterisk decoration
+removed. All other content whitespace, paragraphs, tabs, Unicode and LF/CRLF/lone-CR
+line endings remain literal. Tags, bracketed links/images/reference destinations,
+backtick/code forms, tilde fences, malformed or ambiguous structures refuse the
+whole hover, never fall back to raw KDoc or an enclosing declaration. This is not
+resolved KDoc links, inherited/tag-derived documentation or official hover parity.
+
+Actual prose appears before the declaration's exact original
+`documentation.end..declaration.end` suffix, separated by two newlines, so the
+comment is not duplicated. Plaintext is literal; Markdown backslash-escapes every
+ASCII punctuation character in prose, including HTML/entity/URI syntax. The source
+suffix retains the existing dynamically sized Kotlin fence. No source-authored
+destination is activated or manufactured. The hover range remains the exact
+original name token converted to UTF-16, not a decoded-prose coordinate.
+
+Only positive original-name/direct-comment eligibility enters this operation.
+Docless names still use the exact old whole-tree lowerer and renderer, including
+its acceptance, prefix refusals and long-backtick fences. Consequently a docless
+name in a file containing a different documented declaration can retain the old
+whole-tree `-32803` refusal; this feature does not widen that old grammar.
+Documented value/type/callee references also remain refused by the old binding
+proofs; this is not use-site documentation lookup.
+
+One opaque parser documentation budget spans original authentication/selection,
+the real lowerer's count-and-emit work, prefix/comment validation and prose decode,
+then escaping, fence sizing, the shared UTF-16 sweep and output. Managed
+source-proportional strings reserve fallibly once, charging requested storage and
+actual retained capacity; failures refuse atomically without truncation. The
+existing 2,097,152 work and 131,072 requested/retained-byte ceilings are not reset
+between stages. Complete successful documentation response/wire size has a
+conservative 1 MiB ceiling, including JSON string escaping, fixed keys/range digits,
+framing and the real request-id upper bound; no serialization copy is made merely
+to count. Owned strings move into the inherited fixed-shape JSON response.
+Fixed-count serde_json map/key/envelope allocations and the existing final wire
+serializer retain their ordinary infallible-allocation/OOM behavior; managed
+String-capacity accounting is not full transport fallibility or an RSS guarantee.
+The same borrowed cancellation observer is checked throughout substantial work,
+without an executor, new timer or renewed parser deadline. Publication still
+rechecks URI, version, exact bytes, incarnation and cancellation.
+
+Permanent cases include exact literal/escaped output and dynamic fences, complete
+JSON/id and retained-growth boundaries, mid-operation cancellation, paired
+packaged CLI negotiation/refusals and actual UTF-16 doc/name/prefix edits,
+move/removal and close/reopen ownership transitions. TEMP397 packet writers retain
+full original requests/responses pending ROOT/OWNER hosted inspection. These are
+source-authored checks, not an execution receipt: no local parser/server/Session,
+build, test, lint or formatter was run for this change. ROOT-hosted composed-source
+verification remains required; #96/#377/#395 and full-parity limits remain open.
+
+
 All eight parser-backed methods share **one** bounded job pipeline, parser instance, admission limits, cancellation/tombstones, cleanup ownership and incarnation/version/content publication guard. There is no second validator/pool, parse cache or extra source copy. #350 tests exercise actual paired stdio replies and controlled-peer cancellation separately; source/review/hosted receipts are not full navigation, oracle or platform proof. #96 remains open: no local parser/server runtime is authorized.
 
 The [first original #351 Native run38866505501/job116860467519](https://github.com/anilbeesetti/ktlsp/actions/runs/38866505501/job/116860467519), attempt 1 at source `96b54047ee242e34a66f68020c79a47e620793eb`, checked merge `accd703dd2224301d1c8c44d1b2834a56a8b557f` into `bb6a75f61fd467c9b090210a369c7e1d225713d5`. Format and strict locked Clippy passed; workspace tests **failed** a new fixture's reply-count authoring error (six requests but expected seven). Actual failure wire retained the original definition `2:14–2:19`, plaintext declaration ``val `x😀` = 1`` and reference `2:33–2:38`, plus Combined/item outline and full empty pull without pushes. The other new real-worker semantic/refusal/hostile-fence/no-chasing cases and shared-wire cancellation/edit/reopen regression passed. The count was corrected from the six explicit source requests and independently source-rechecked by both reviewers; no unchanged retry or passing-full-run claim follows from this failure. Full negotiation and the direct-Write observation were not reached. Optional synthetic-tools [run38866505445](https://github.com/anilbeesetti/ktlsp/actions/runs/38866505445), attempt 1, passed both hosts; that is not official-oracle or platform proof.

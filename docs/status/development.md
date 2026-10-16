@@ -1439,3 +1439,163 @@ The capture-free final source needs its OWN exact reviews and ORIGINAL full
 CI before a fresh guarded merge; this first candidate is not merge authority.
 395/377's historical failure attribution,96 and full-parity limits remain.
 
+#### Delivered400: independently verified native product union
+
+[PR400](https://github.com/anilbeesetti/ktlsp/pull/400) delivered392/394/396/
+398/399; all five issues are closed/completed. Final capture-free reviewed
+head48d0ba30a6e67b75a94bec19612cf9a010b4712c/tree2bf0c6c2b4207b4ab02ff2a19db399479fd50c53
+received two exact independent full91-file reviews and both affected392
+cleanup rechecks. Its own strict locked all-target Clippy passed.
+
+Its OWN original attempt1 Native38962522944 and platform38962523114 passed.
+Actual tested mergeb8802a526728909051684b1a8671952ec7af6f7c has exact reviewed
+tree2bf0c6c2b4207b4ab02ff2a19db399479fd50c53 and ordered parents[6a621285,48d0ba30].
+ROOT and independent OWNER read every complete original job log and both
+complete evidence ZIPs, reauthenticated fresh APIs and source/clean-worktree/
+parent/byte-policy/exit records, and independently recounted results.
+
+| Original final CI | Job | Ordinary passed | Doctests passed | Total | Result rows | Failed | Ignored | Filtered |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+|Native38962522944|117180875356|1119|32|1151|137|0|3|0|
+|Platform38962523114 macOS|117180876508|1117|32|1149|137|0|3|0|
+|Platform38962523114 Windows|117180876770|1066|32|1098|137|0|3|0|
+|Original exact-main38963953331|117185661349|1119|32|1151|137|0|3|0|
+
+The separate actual22-case worker-protocol success is NOT another22 doctests.
+Final macOS artifact12073596578:46841 bytes/SHA-256
+1d02b7e8c96a73b198b567907a03d2c2d610a1508d887ea42656818c45a26d3a;
+Windows12072944345:41817 bytes/SHA-256
+4ca9c14344acdec5ce46cf87fa824d94a4492e0042f80295e27483e2a0ddb5f7.
+Both actual original ZIP digests match API metadata. No TEMP_392 output
+remains in final logs; meaningful original product assertions passed again.
+
+Fresh integration guards ran in a separate STRICTLY READ-ONLY call:
+process0 AND valid parsed0, exact main/head/base/tree, complete91 scope/
+config4/checks3/statuses0, original workflows and mandatory jobs, and clean
+local reviewed identity. ROOT explicitly inspected all matching facts before
+a SEPARATE ordinary expected-head squash. Actual mainbc5c6760b596721d4f627cc1d89c579be20c406c
+has exact reviewed tree2bf0c6c2b4207b4ab02ff2a19db399479fd50c53 and SOLEPARENT
+6a62128542955a6c0c75154716de238bf589041d. ROOT and independent OWNER both
+verified actual source APIs, not only the requested head.
+
+The exclusive base lease remained ACTIVE through original push/main
+attempt1 run38963953331/job117185661349, actual fullbc5 checkout and all
+mandatory pinned format/Clippy/unfiltered workspace steps. ROOT and OWNER
+independently read the SAME complete289159-byte original raw log, SHA-256
+f7fae15441fb6853a4f931305d4f3a7fdfd70c29d4f70ebffbe8aa9635bf3b4b,
+fresh run/jobs/main/tree/sole-parent APIs and complete137-row census above.
+Only then ROOT CLEARED lease400. This is the new verified incoming main.
+Monitor TCP resets only resumed the SAME original runs; CI never reran.
+
+All old/user/component/delivered worktrees remain preserved. No Cargo/lock/
+dependency/workflow/vendor/JVM/C-analysis/parser-runtime boundary changed.
+395/377 remain historically unattributed;96, official-custody, effective
+tooling, formatting, SDK/release and full Kotlin LSP parity limits remain.
+
+### Source-owned prose KDoc hover397: next independent native lanes
+
+ROOT created isolated parser-source, server-consumer and root-integration
+branches from the SAME independently verifiedbc5c6760 incoming main.
+SourceKernel owns original prefix/KDoc admission and explicit single-budget
+authentication/decoding; HoverConsumer owns negotiated literal/escaped
+rendering, existing publication/cancellation preservation and actual edited
+CLI regression source. Common docs/config/publication/CI remain ROOT-owned.
+The saved397 contract and completed primary/native source research are
+reused, not restarted. Actual producer ownership—not comment proximity—
+and untouched body/type/value/callee proofs remain required. Two independent
+static review slots per component are granted. Implementation is INPROGRESS;
+no397 format/build/test/runtime/hosted acceptance or parity is claimed.
+
+#### First complete397 composition and static compatibility correction
+
+Parser componente960a1fbaaf92bc6a5f7a58f6d963ebb5cec7708/tree8350ffbe33ca1900fc5e4d74d843a1129a41495b
+and consumerce2af77375d981ecf326b9546df81bb7ef335c16/tree22aea023b74b0d98d21200d52373bc3af3b16f4e
+each completed both independent static reviews and exact changed-source
+rechecks. ROOT directly read all four review histories and composed them
+without conflicts at e63b1db8c98ee9833256af86061501a6dfc5549f/tree52b3d944e0af14f4c9da39eec6d5e9d292ff6dc4.
+No397 formatter/compiler/test/runtime/hosted execution had occurred.
+
+The independent full11-file functionality review cleared that source; its
+separate full-union adversarial review identified a source-proven P2:
+3000 original leading `//x` comments plus `fun named() {}` were supported by
+the old docless lowerer, but the new eligibility-only scan charged the full
+sixteen-comparison/256-fixed-check documentation visit per trivia leaf and
+exhausted before reaching the old path. This was static source evidence,
+not a locally executed parser/server reproduction.
+
+ROOT traced all shared candidate/access callers and separated eligibility's
+actual closed six-comparison/literal-byte/fixed-check precharge from complete
+documentation validation. The same monotonic counter/cancellation and original
+parent/subtree checks remain; positive candidates STILL require unchanged full
+lowerer/selection/documentation validation. No error is swallowed, no lowered
+limit is raised and no failed-binding/docless fallback was introduced.
+New original-worker and real packaged-CLI regression source checks the
+many-comment declaration's exact original range/name and complete legacy
+Markdown response. They remain UNEXECUTED pending the required static gates.
+
+The temporary producer writer now uses the existing structured JSON capture
+convention for complete actual source/snapshot/CST/diagnostics, not a second
+Rust-debug evidence parser. This changes only observation format, not any
+producer or assertion. All TEMP397 writers remain until ROOT+OWNER read
+actual hosted payloads. Exact corrected-union rechecks are required before
+oncefmt/strict compile and original full hosted verification.
+
+Both independent full-union and affected-component post-format static
+rechecks cleared5a9e3a25006e68757e3d79692941d61d0874efac/tree6af864969468348a4bb7f6297bcb7a22d527585e.
+ROOT's first strict locked workspace/all-target Clippy with --keep-going
+then exited101: Rust1.99 deprecated AtomicUsize::fetch_update and reported
+one collapsible test conditional. ROOT preserved declared Rust1.90 support
+and reused the existing worker-allocator checked relaxed-CAS retry pattern
+for nonwrapping stamp allocation, rather than suppressing warnings or adopting
+an unverified newer renamed API. Checked exhaustion/nonreuse and local-counter
+regressions remain intact; the test conditional is equivalent. Exact changed
+source rechecks and strict compilation remain required; no397 runtime ran.
+
+
+#### Original397 hosted source and complete actual-payload acceptance
+
+Reviewed first head12eb80b205770182909f7ce02bc8043ba4a56158/tree79e4eec96dfd3951e8c41538bff736c91a1c7ff5
+passed its OWN original attempt1 Native38969812481/job117205143580 and
+platform38969812508/macOS117205143483/Windows117205143768. Actual
+test mergec3c633cfd5fd3fa8aed1d5b40fbed6a588d46658 has the same tree and
+ordered parents[verifiedbc5c6760,12eb80b2]. Complete raw logs, original
+artifact digests, source preflight, clean checkout, mandatory steps and zero
+command exits were authenticated. Linux passed1174=1142ordinary+32doc,
+Mac1172=1140+32, Windows1121=1089+32; each138 result rows,0failed,
+3ignored,0measured,0filtered. Parser doctests have separate2+7 result rows;
+both count. These totals already include docs, not the separate22 fault cases.
+
+ROOT and independent source/consumer owners read ALL actual payloads from
+both original platform logs:38 complete producer CSTs,325 requests and251
+responses PER HOST, not merely expected values/counts/green checks. Original
+UTF8 leaf partitions, parent/subtree ownership, diagnostics, direct attached
+comments and refusal syntax were inspected. Pointer/stamp identity is not
+serialized; its refusal is evidenced separately by successful hosted assertions.
+
+Both readers independently actually applied36 ranged UTF16 edits per host.
+Prose/name/prefix edits, movement to second's original owner, removal,
+close/reopenversion1 under a fresh incarnation and exact returned name ranges
+follow those sources. Old docless owners retain the legacy whole-tree refusal
+while another declaration owns documentation; removing the final comment
+restores exact legacy source, never stale prose. ROOT checked all184 actual
+hover replies and all25 distinct successful prose/source-suffix/fence values.
+LF/CRLF/loneCR, astral/combining text, paragraph whitespace, distinct
+class/property/parameter/local/nested names and last-attached docs survive.
+Literal HTML/entities/schemes/backslashes are safe plaintext or punctuation-
+escaped Markdown; a four-backtick body gets a five-backtick fence.
+All14 semantic/link/code/tag/prefix refusal fixtures per host return-32803,
+never raw fallback; disabled/missing-worker requests return-32601.
+Actual100000-character ID success and175000-quote ID refusal retain exact
+IDs once; the unchanged45000-backtick docless source retains its full45001
+fence. The3000-comment docless regression returns its complete original source.
+
+Only AFTER those independent complete reads did ROOT remove temporary CST/
+wire writers and their capture-only activation/ID bookkeeping. Production,
+source/identity/resource/cancellation/publication guards, waits, full actual
+edit application and all meaningful assertions remain. Common README now
+states finite prose-only behavior and refusals. This cleanup/documentation
+source still requires its OWN exact union reviews, strict compile and original
+full hosted CI; first-head acceptance is NOT final-head or main acceptance.
+No local parser/server/Session/worker/peer runtime, JVM, oracle, dependency,
+Cargo/lock/workflow/vendor change, unchanged CI retry or relaxed bound occurred.
+397 is not yet delivered;395/377 causes remain unknown,96 and full parity open.

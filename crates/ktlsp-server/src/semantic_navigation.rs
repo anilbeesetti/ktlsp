@@ -1,6 +1,7 @@
 //! Deliberately finite local binding, never a global unresolved-name answer.
 use ktlsp_parser::{
     SnapshotResult, SourceSnapshot,
+    documentation::{self, Budget as DocumentationBudget},
     local_value_binding::{
         LocalValueAnchor, TypeParameterAnchor, bind_lexical_type_parameter,
         bind_local_function_callee, bind_local_value, guarded_local_value_rename,
@@ -12,6 +13,7 @@ use ktlsp_parser::{
 };
 use ktlsp_text::Range;
 use serde_json::{Value, json};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 const UNSUPPORTED: &str = "navigation requires a supported unambiguous function parameter or preceding local val binding; global resolution is unavailable";
 
@@ -111,7 +113,23 @@ pub(crate) fn render(
     result: &SnapshotResult,
     snapshot: &SourceSnapshot,
     query: Query,
+    cancelled: &AtomicBool,
+    response_id_bound: usize,
 ) -> Result<Value, &'static str> {
+    let observe_cancelled = || cancelled.load(Ordering::Relaxed);
+    let mut budget = DocumentationBudget::new(&observe_cancelled);
+    let hover = matches!(query, Query::Hover { .. });
+    if hover {
+        for bytes in [
+            result.snapshot().document().len(),
+            snapshot.document().len(),
+            result.snapshot().source().len(),
+            snapshot.source().len(),
+            4,
+        ] {
+            budget.work(bytes).map_err(|_| UNSUPPORTED)?;
+        }
+    }
     let tree = result.tree_for(snapshot).map_err(|_| UNSUPPORTED)?;
     let offset = match &query {
         Query::Definition { offset }
@@ -122,16 +140,44 @@ pub(crate) fn render(
         | Query::Rename { offset, .. }
         | Query::Completion { offset } => *offset,
     };
-    let mut references = tree.elements().iter().enumerate().filter(|(_, e)| {
-        !e.token
-            && e.kind == "REFERENCE_EXPRESSION"
-            && e.start <= offset
-            && (offset < e.end || matches!(query, Query::Completion { .. }) && offset == e.end)
-    });
-    let reference = references.next();
-    if references.next().is_some() {
-        return Err(UNSUPPORTED);
+    let mut reference = None;
+    let mut declaration_hover = false;
+    let mut declaration_token = None;
+    let mut identifier = false;
+    for (index, element) in tree.elements().iter().enumerate() {
+        if hover {
+            budget
+                .work(element.kind.len() + 1)
+                .map_err(|_| UNSUPPORTED)?;
+        }
+        if !element.token
+            && element.kind == "REFERENCE_EXPRESSION"
+            && element.start <= offset
+            && (offset < element.end
+                || matches!(query, Query::Completion { .. }) && offset == element.end)
+            && reference.replace((index, element)).is_some()
+        {
+            return Err(UNSUPPORTED);
+        }
+        if element.token
+            && element.kind == "IDENTIFIER"
+            && element.start <= offset
+            && offset < element.end
+        {
+            identifier = true;
+            declaration_hover |= hover
+                && element.parent.is_some_and(|parent| {
+                    matches!(
+                        tree.elements()[parent].kind.as_str(),
+                        "CLASS" | "FUN" | "PROPERTY" | "VALUE_PARAMETER"
+                    )
+                });
+            if declaration_hover {
+                declaration_token = Some(index);
+            }
+        }
     }
+    declaration_hover &= reference.is_none();
     if matches!(query, Query::Completion { .. }) {
         let (index, _) =
             reference.ok_or("completion requires an existing whole-initializer identifier")?;
@@ -146,37 +192,38 @@ pub(crate) fn render(
     let rename_query = matches!(query, Query::PrepareRename { .. } | Query::Rename { .. });
     let occurrence_query =
         rename_query || matches!(query, Query::References { .. } | Query::Highlights { .. });
-    let declaration_hover = matches!(query, Query::Hover { .. })
-        && reference.is_none()
-        && tree.elements().iter().any(|element| {
-            element.token
-                && element.kind == "IDENTIFIER"
-                && element.start <= offset
-                && offset < element.end
-                && element.parent.is_some_and(|parent| {
-                    matches!(
-                        tree.elements()[parent].kind.as_str(),
-                        "CLASS" | "FUN" | "PROPERTY" | "VALUE_PARAMETER"
-                    )
-                })
-        });
-    if reference.is_none()
-        && !declaration_hover
-        && (!occurrence_query
-            || !tree.elements().iter().any(|element| {
-                element.token
-                    && element.kind == "IDENTIFIER"
-                    && element.start <= offset
-                    && offset < element.end
-            }))
-    {
+    if reference.is_none() && !declaration_hover && (!occurrence_query || !identifier) {
         if rename_query {
             return Err(UNSUPPORTED);
         }
         return Ok(Value::Null);
     }
+    if declaration_hover
+        && documentation::candidate(tree, declaration_token.ok_or(UNSUPPORTED)?, &mut budget)
+            .map_err(|_| UNSUPPORTED)?
+    {
+        let lowered =
+            documentation::lower(result, snapshot, &mut budget).map_err(|_| UNSUPPORTED)?;
+        let attached = documentation::select(&lowered, result, snapshot, offset, &mut budget)
+            .map_err(|_| UNSUPPORTED)?;
+        let prose = attached.prose().ok_or(UNSUPPORTED)?;
+        let Query::Hover { format, .. } = query else {
+            unreachable!("positive hover dispatch")
+        };
+        return render_documentation(
+            snapshot.source(),
+            Some(prose),
+            attached.source_range(),
+            attached.declaration().name_range(),
+            format,
+            response_id_bound,
+            &mut budget,
+        );
+    }
     let lowered = lower_declarations(result, snapshot).map_err(|_| UNSUPPORTED)?;
     if declaration_hover {
+        // No directly owned leading KDoc: retain the exact old lowerer and
+        // renderer, including docless prefix refusals and fence acceptance.
         let mut declarations = lowered.declarations().iter().filter(|declaration| {
             let range = declaration.name_range();
             range.start <= offset && offset < range.end
@@ -318,6 +365,150 @@ pub(crate) fn render(
         | Query::Completion { .. } => unreachable!("rendered above"),
     };
     render_target(tree.source(), snapshot, query, target, bytes)
+}
+
+// This is literal source prose, not a Markdown renderer. Escaping every ASCII
+// punctuation character prevents links, entities, HTML and extension autolinks
+// from acquiring source-authored destinations on Markdown clients.
+fn render_documentation(
+    source: &str,
+    prose: Option<&str>,
+    source_range: std::ops::Range<usize>,
+    name_range: std::ops::Range<usize>,
+    format: HoverFormat,
+    response_id_bound: usize,
+    budget: &mut DocumentationBudget<'_>,
+) -> Result<Value, &'static str> {
+    let declaration = source.get(source_range).ok_or(UNSUPPORTED)?;
+    let markdown = matches!(format, HoverFormat::Markdown);
+    let mut size = declaration.len();
+    // Preflight exact escaped value bytes during the required size/fence pass,
+    // not by serializing a second source-sized buffer.
+    let mut json_value = 0usize;
+    let mut longest = 0usize;
+    let mut run = 0usize;
+    for byte in declaration.bytes() {
+        budget.work(1).map_err(|_| UNSUPPORTED)?;
+        if markdown {
+            run = if byte == b'`' {
+                run.checked_add(1).ok_or(UNSUPPORTED)?
+            } else {
+                0
+            };
+            longest = longest.max(run);
+        }
+        json_value = json_value
+            .checked_add(json_byte_width(byte))
+            .ok_or(UNSUPPORTED)?;
+    }
+    let fence = 3.max(longest.checked_add(1).ok_or(UNSUPPORTED)?);
+    if markdown {
+        size = size
+            .checked_add(fence.checked_mul(2).ok_or(UNSUPPORTED)?)
+            .and_then(|n| n.checked_add(8))
+            .ok_or(UNSUPPORTED)?;
+        json_value = json_value
+            .checked_add(fence.checked_mul(2).ok_or(UNSUPPORTED)?)
+            .and_then(|n| n.checked_add(10))
+            .ok_or(UNSUPPORTED)?;
+    }
+    if let Some(prose) = prose {
+        size = size
+            .checked_add(prose.len())
+            .and_then(|n| n.checked_add(2))
+            .ok_or(UNSUPPORTED)?;
+        json_value = json_value.checked_add(4).ok_or(UNSUPPORTED)?;
+        for byte in prose.bytes() {
+            budget.work(1).map_err(|_| UNSUPPORTED)?;
+            json_value = json_value
+                .checked_add(json_byte_width(byte))
+                .ok_or(UNSUPPORTED)?;
+            if markdown && byte.is_ascii_punctuation() {
+                size = size.checked_add(1).ok_or(UNSUPPORTED)?;
+                json_value = json_value.checked_add(2).ok_or(UNSUPPORTED)?;
+            }
+        }
+    }
+    // Fixed JSON punctuation/keys/kind/jsonrpc need <160 bytes, four u32
+    // coordinates need <=40 digits, framing <=32 bytes: all fit in 256.
+    // The arbitrary request id has its own real-caller checked upper bound.
+    let json_bytes = response_id_bound
+        .checked_add(256)
+        .and_then(|n| n.checked_add(json_value))
+        .ok_or(UNSUPPORTED)?;
+    budget.output(json_bytes).map_err(|_| UNSUPPORTED)?;
+    let mut value = String::new();
+    budget
+        .reserve_string(&mut value, size)
+        .map_err(|_| UNSUPPORTED)?;
+    if let Some(prose) = prose {
+        append_documentation(&mut value, prose, markdown, budget)?;
+        append_documentation(&mut value, "\n\n", false, budget)?;
+    }
+    if markdown {
+        for _ in 0..fence {
+            append_documentation(&mut value, "`", false, budget)?;
+        }
+        append_documentation(&mut value, "kotlin\n", false, budget)?;
+    }
+    append_documentation(&mut value, declaration, false, budget)?;
+    if markdown {
+        append_documentation(&mut value, "\n", false, budget)?;
+        for _ in 0..fence {
+            append_documentation(&mut value, "`", false, budget)?;
+        }
+    }
+    let mut positions = [ktlsp_text::Position {
+        line: 0,
+        character: 0,
+    }; 2];
+    let mut index = 0;
+    crate::structure::visit_positions(
+        source,
+        &[name_range.start, name_range.end],
+        |units| budget.work(units),
+        |position| {
+            positions[index] = position;
+            index += 1;
+        },
+    )
+    .map_err(|_| UNSUPPORTED)?;
+    let range = Range {
+        start: positions[0],
+        end: positions[1],
+    };
+    // Moving the owned String avoids serde_json::to_value's extra source copy.
+    let mut result = json!({
+        "contents":{"kind":if markdown { "markdown" } else { "plaintext" },"value":null},
+        "range":range
+    });
+    result["contents"]["value"] = Value::String(value);
+    budget.work(1).map_err(|_| UNSUPPORTED)?;
+    Ok(result)
+}
+
+fn json_byte_width(byte: u8) -> usize {
+    match byte {
+        b'"' | b'\\' | b'\x08' | b'\x0c' | b'\n' | b'\r' | b'\t' => 2,
+        0..=0x1f => 6,
+        _ => 1,
+    }
+}
+
+fn append_documentation(
+    output: &mut String,
+    text: &str,
+    escape: bool,
+    budget: &mut DocumentationBudget<'_>,
+) -> Result<(), &'static str> {
+    for character in text.chars() {
+        budget.work(character.len_utf8()).map_err(|_| UNSUPPORTED)?;
+        if escape && character.is_ascii_punctuation() {
+            output.push('\\');
+        }
+        output.push(character);
+    }
+    Ok(())
 }
 
 fn render_target(
@@ -584,5 +775,117 @@ mod rename_limits {
         assert!(rename_output_size(65536, 1, 1, 2, 1).is_err());
         assert!(rename_output_size(0, 0, 1025, 1, 200000).is_err());
         assert!(rename_output_size(0, 0, usize::MAX, usize::MAX, usize::MAX).is_err());
+    }
+}
+
+#[cfg(test)]
+mod documentation_rendering {
+    use super::*;
+
+    fn render(
+        source: &str,
+        prose: Option<&str>,
+        format: HoverFormat,
+        id_bound: usize,
+    ) -> Result<Value, &'static str> {
+        let cancelled = || false;
+        let mut budget = DocumentationBudget::new(&cancelled);
+        render_documentation(
+            source,
+            prose,
+            0..source.len(),
+            0..1,
+            format,
+            id_bound,
+            &mut budget,
+        )
+    }
+
+    #[test]
+    fn literal_prose_escapes_all_markdown_destinations_and_preserves_unicode() {
+        let prose = "<b>&amp; ![x](command:run) [r]: file:../x\n1. *a* `b` \\ https://x\n\t😀e\u{301}\r\n\rparagraph";
+        let escaped = "\\<b\\>\\&amp\\; \\!\\[x\\]\\(command\\:run\\) \\[r\\]\\: file\\:\\.\\.\\/x\n1\\. \\*a\\* \\`b\\` \\\\ https\\:\\/\\/x\n\t😀e\u{301}\r\n\rparagraph";
+        let source = "val /* ```` */ x=1";
+        assert_eq!(
+            render(source, Some(prose), HoverFormat::Markdown, 20).unwrap()["contents"]["value"],
+            format!("{escaped}\n\n`````kotlin\n{source}\n`````")
+        );
+        assert_eq!(
+            render(source, Some(prose), HoverFormat::Plaintext, 20).unwrap()["contents"]["value"],
+            format!("{prose}\n\n{source}")
+        );
+        assert_eq!(
+            render(source, None, HoverFormat::Markdown, 20).unwrap()["contents"]["value"],
+            format!("`````kotlin\n{source}\n`````")
+        );
+        assert_eq!(
+            render(source, None, HoverFormat::Plaintext, 20).unwrap()["contents"]["value"],
+            source
+        );
+    }
+
+    #[test]
+    fn complete_json_id_envelope_exact_and_plus_one_refuse_without_truncation() {
+        // The value contains JSON quotes, backslash, newline, NUL, Unicode;
+        // its encoded payload is 2+2+2+6+4 bytes, not its UTF-8 source length.
+        let source = "\"\\\n\0😀";
+        let payload = 16;
+        let exact = 1024 * 1024 - 256 - payload;
+        assert_eq!(
+            render(source, None, HoverFormat::Plaintext, exact).unwrap()["contents"]["value"],
+            source
+        );
+        assert!(render(source, None, HoverFormat::Plaintext, exact + 1).is_err());
+        assert!(render("x", None, HoverFormat::Plaintext, usize::MAX).is_err());
+    }
+
+    #[test]
+    fn retained_growth_and_late_cancellation_refuse_atomically() {
+        let prose = "!".repeat(65536);
+        assert!(render("x", Some(&prose), HoverFormat::Markdown, 20).is_err());
+        let calls = std::cell::Cell::new(0);
+        let cancelled = || {
+            calls.set(calls.get() + 1);
+            calls.get() > 128
+        };
+        let mut budget = DocumentationBudget::new(&cancelled);
+        let source = format!("val x=\"{}\"", "a".repeat(4096));
+        assert!(
+            render_documentation(
+                &source,
+                Some("safe"),
+                0..source.len(),
+                4..5,
+                HoverFormat::Markdown,
+                20,
+                &mut budget
+            )
+            .is_err()
+        );
+        assert!(calls.get() > 128);
+    }
+
+    #[test]
+    fn original_name_utf16_uses_shared_lf_crlf_and_lone_cr_sweep() {
+        let source = "// 😀\r\n// e\u{301}\rval `x😀`=1\n";
+        let start = source.find("`x").unwrap();
+        let cancelled = || false;
+        let mut budget = DocumentationBudget::new(&cancelled);
+        let result = render_documentation(
+            source,
+            Some("paragraph"),
+            start - 4..source.len(),
+            start..start + "`x😀`".len(),
+            HoverFormat::Plaintext,
+            20,
+            &mut budget,
+        )
+        .unwrap();
+        assert_eq!(
+            result["range"],
+            json!({
+                "start":{"line":2,"character":4},"end":{"line":2,"character":9}
+            })
+        );
     }
 }

@@ -3,6 +3,7 @@
 //! does not preserve content-root boundaries, source types or classpath order.
 
 pub mod dependency_class;
+pub mod jps;
 mod json;
 pub mod maven;
 

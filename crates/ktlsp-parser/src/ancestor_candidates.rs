@@ -315,6 +315,7 @@ mod tests {
                     .unwrap(),
                 parsed: Parsed {
                     source,
+                    positions: std::sync::OnceLock::new(),
                     elements: self.elements,
                     diagnostics: self.diagnostics,
                 },

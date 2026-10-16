@@ -107,6 +107,30 @@ termination. Callers must install the matching trusted worker; this is not a san
 Editor consumers use `SourceSnapshot` and `Parser::parse_snapshot`; accepted
 `SnapshotResult::tree_for` rejects a changed document/revision/source/file kind.
 See [the exact declaration corpus and unresolved recovery gates](CORPUS.md).
+
+`Parsed::position` lazily retains an immutable original-byte UTF-16 table, built
+in one forward source sweep for arbitrary-order constant-time lookups. Trees
+whose positions are never queried allocate no table. At the unchanged 64 KiB
+source ceiling, at most 65,537 two-u32 entries occupy 524,296 payload bytes per
+queried tree. Fallible reservation checks actual Vec capacity with checked byte
+arithmetic against that bound; excess capacity is dropped, not retained. Vec
+storage is retained without a boxed-slice shrink/reallocation. Allocation refusal
+is remembered once per tree and preserves the exact scalar conversion instead
+of adding a valid-offset error or repeatedly trying allocation. This trades
+parent-side retained storage for eliminating repeated source rescans; it changes
+neither worker/query allowances nor source limits and is not an allocator/RSS
+guarantee. Larger future source ceilings would require reconsidering this table.
+Strict UTF-8/CRLF interiors remain invalid; source, snapshot and old-tree identity
+are unchanged. No measured speedup is claimed before changed-source hosted CI.
+
+For #404, ROOT's admitted original full Native debug workspace/platform run must
+retain all frozen position totals (231,567 / 262,756 / 206,112 / 142,131). Compare
+the unchanged 65,536-byte cap-case completion intervals, in longer-simple /
+qualified / nullable-two / two-argument order, against 63.4100483 / 61.7083814 /
+63.0678637 / 55.1976965 seconds from original Native job 117212394570. These
+intervals include case assertions and healthy followups, not isolated CPU time;
+release/platform timings are separate compatibility evidence, not debug parity.
+
 Linux native checks do not establish Darwin/Windows reliability, resolve #96 or
 close B3/B4; historical MissingACK observations stay inconclusive. No comparative
 speed/RAM claim follows from the transport change. The parent capacity checks do not
@@ -279,7 +303,9 @@ error. Error recovery is ktrs behavior, not a compiler diagnostic claim.
 
 CRLF and lone CR normalize to LF only inside parsing. A boundary map converts all
 returned spans to original source; a normalized LF covers the entire original
-CRLF. `Parsed::position` delegates UTF-16/invalid-boundary handling to ktlsp-text.
+CRLF. `Parsed::position` preserves ktlsp-text's strict UTF-16/invalid-boundary
+behavior through the bounded lazy original-source table described above, with
+scalar ktlsp-text conversion when table storage is unavailable.
 Worker checks original normalized tree spelling and missed-token reports; parent
 checks rooted preorder/containment/depth, UTF-8 spans, exact token partition,
 diagnostic/count limits, and bounded JSON. The token-loss regression is rejected

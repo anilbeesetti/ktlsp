@@ -630,6 +630,7 @@ mod tests {
                     .unwrap(),
                 parsed: Parsed {
                     source,
+                    positions: std::sync::OnceLock::new(),
                     elements: self.elements,
                     diagnostics: self.diagnostics,
                 },
@@ -657,6 +658,7 @@ mod tests {
             snapshot: r.snapshot.clone(),
             parsed: Parsed {
                 source: r.parsed.source.clone(),
+                positions: std::sync::OnceLock::new(),
                 elements: r.parsed.elements.clone(),
                 diagnostics: r.parsed.diagnostics.clone(),
             },

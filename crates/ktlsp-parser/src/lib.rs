@@ -194,6 +194,10 @@ pub struct Parsed {
     source: Arc<str>,
     elements: Vec<Element>,
     diagnostics: Vec<Diagnostic>,
+    // ponytail: up to 524,296 retained payload bytes per queried tree; revisit
+    // checkpoint indexing if the 64 KiB source ceiling grows. None remembers
+    // unavailable bounded storage so later queries do not retry allocation.
+    positions: OnceLock<Option<Vec<ktlsp_text::Position>>>,
 }
 impl Parsed {
     pub fn source(&self) -> &str {
@@ -209,7 +213,46 @@ impl Parsed {
         &self,
         original_offset: usize,
     ) -> Result<ktlsp_text::Position, ktlsp_text::TextError> {
-        ktlsp_text::offset_to_position(&self.source, original_offset)
+        use ktlsp_text::{Position, TextError};
+        const INVALID: u32 = u32::MAX;
+        let Some(positions) = self.positions.get_or_init(|| {
+            let entries = self.source.len().checked_add(1)?;
+            let max_entries = MAX_SOURCE_BYTES.checked_add(1)?;
+            let max_bytes = max_entries.checked_mul(std::mem::size_of::<Position>())?;
+            if entries > max_entries {
+                return None;
+            }
+            let mut positions = Vec::new();
+            positions.try_reserve_exact(entries).ok()?;
+            if positions.capacity().checked_mul(std::mem::size_of::<Position>())? > max_bytes {
+                return None;
+            }
+            positions.resize(entries, Position { line: INVALID, character: INVALID });
+            let mut position = Position { line: 0, character: 0 };
+            let mut characters = self.source.char_indices().peekable();
+            while let Some((offset, character)) = characters.next() {
+                positions[offset] = position;
+                match character {
+                    '\r' | '\n' => {
+                        if character == '\r' && characters.peek().is_some_and(|(_, c)| *c == '\n') {
+                            characters.next();
+                        }
+                        position.line += 1;
+                        position.character = 0;
+                    }
+                    _ => position.character += character.len_utf16() as u32,
+                }
+            }
+            positions[self.source.len()] = position;
+            Some(positions)
+        }) else {
+            return ktlsp_text::offset_to_position(&self.source, original_offset);
+        };
+        positions
+            .get(original_offset)
+            .copied()
+            .filter(|position| position.line != INVALID)
+            .ok_or(TextError::InvalidOffset(original_offset))
     }
 }
 
@@ -2780,12 +2823,51 @@ fn validate(
         source: Arc::from(source),
         elements,
         diagnostics,
+        positions: OnceLock::new(),
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn positions_preserve_strict_original_coordinates_in_arbitrary_order() {
+        use ktlsp_text::{Position, TextError};
+        fn reference(source: &str, offset: usize) -> Result<Position, TextError> {
+            let prefix = source.get(..offset).ok_or(TextError::InvalidOffset(offset))?;
+            if prefix.ends_with('\r') && source[offset..].starts_with('\n') {
+                return Err(TextError::InvalidOffset(offset));
+            }
+            let normalized = prefix.replace("\r\n", "\n").replace('\r', "\n");
+            let mut lines = normalized.split('\n');
+            let mut last = lines.next().unwrap();
+            let mut line = 0;
+            for next in lines {
+                line += 1;
+                last = next;
+            }
+            Ok(Position { line, character: last.encode_utf16().count() as u32 })
+        }
+        for source in ["", "\r\n", "\r", "\n", "a😀e\u{301}\r\nβ\r中\n\0\u{2028}z\r\n", "😀"] {
+            let parsed = Parsed {
+                source: Arc::from(source),
+                elements: vec![],
+                diagnostics: vec![],
+                positions: OnceLock::new(),
+            };
+            let mut order = Vec::new();
+            for low in 0..=(source.len() + 2) / 2 {
+                order.push(source.len() + 2 - low);
+                order.push(low);
+            }
+            order.extend((0..=source.len() + 2).rev());
+            order.extend(0..=source.len() + 2);
+            order.extend([usize::MAX, 0, source.len(), 0, usize::MAX]);
+            for offset in order {
+                assert_eq!(parsed.position(offset), reference(source, offset), "{source:?} at {offset}");
+            }
+        }
+    }
     fn pending_io<T: Send>(
         work: impl FnOnce() -> T + Send,
         deadline_after: Duration,

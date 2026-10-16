@@ -1992,6 +1992,7 @@ mod tests {
                 },
                 parsed: Parsed {
                     source,
+                    positions: std::sync::OnceLock::new(),
                     elements: self.elements,
                     diagnostics: self.diagnostics,
                 },

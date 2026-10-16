@@ -242,8 +242,9 @@ input and decoded-attribute bytes, 8,192 XML events, depth32, 16 attributes/tag,
 Fallible geometric buffer reservations charge actual retained capacities, even
 for temporary documents; quick-xml scratch and existing model-loader allocations
 are conservatively reserved before delegation. The model envelope is eight times
-serialized bytes plus512 bytes per module/root; this is an operation allocation
-allowance, not an allocator hook/RSS guarantee. Serialized projection remains
+serialized-plus-manifest-path bytes, plus2048 bytes per module/operation and512
+per root; this is an operation allocation allowance, not an allocator hook/RSS
+guarantee. Serialized projection remains
 bounded by the existing 2 MiB native limit; no per-document allowance resets.
 
 Original unmodified release-pinned JpsJavaModule XML and Apache2 license/notices

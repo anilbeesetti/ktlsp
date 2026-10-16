@@ -192,3 +192,48 @@ fn exact_snapshot_reference_count_and_next_document_are_bounded() {
     docs.push(Document { path: "extra.iml", bytes: a.as_bytes() });
     assert!(matches!(jps::source_projection(base(), &docs), Err(Error::Budget("documents"))));
 }
+
+#[test]
+fn lexical_parent_macros_absolute_urls_and_same_kind_nested_roots_roundtrip() {
+    let project = base();
+    let absolute = project.join("src").to_str().unwrap().replace('\\', "/");
+    let absolute_url = if cfg!(windows) { format!("file:///{absolute}") } else { format!("file://{absolute}") };
+    let body = format!(
+        r#"<content url="file://$MODULE_DIR$/../"><sourceFolder url="{absolute_url}"/><sourceFolder url="file://$MODULE_DIR$/../src/nested"/></content>"#,
+    );
+    let m = manifest(&["nested/a.iml"]);
+    let a = module(&body);
+    let result = jps::source_projection(&project, &[
+        Document { path: ".idea/./modules.xml", bytes: m.as_bytes() },
+        Document { path: "nested/a.iml", bytes: a.as_bytes() },
+    ]).unwrap();
+    assert_eq!(result.modules[0].source_roots[0].path, project.join("src"));
+    assert_eq!(result.modules[0].source_roots[1].path, project.join("src/nested"));
+    let bytes = serde_json::to_vec(result.declared_source_projection()).unwrap();
+    assert_eq!(*result.declared_source_projection(), ktlsp_project::from_json(project.join("model.json"), &bytes).unwrap());
+}
+
+#[test]
+fn oversized_invalid_snapshot_keys_refuse_before_diagnostic_retention() {
+    let key = format!("${}", "x".repeat(jps::MAX_PATH_BYTES));
+    assert!(matches!(jps::source_projection(base(), &[Document { path: &key, bytes: b"" }]), Err(Error::Budget("path bytes"))));
+}
+
+#[test]
+fn trailing_separator_on_supported_macro_is_the_same_declared_path() {
+    let body = r#"<content url="file://$MODULE_DIR$/"><sourceFolder url="file://$MODULE_DIR$/"/></content>"#;
+    let result = import(&manifest(&["a.iml"]), &module(body)).unwrap();
+    assert_eq!(result.modules[0].source_roots[0].path, base());
+    assert_eq!(result.declared_source_projection().modules[0].source_roots[0].path, base());
+}
+
+#[cfg(windows)]
+#[test]
+fn macro_suffix_cannot_replace_project_with_an_absolute_drive() {
+    let m = manifest(&["D:/a.iml"]);
+    let a = module("");
+    assert!(matches!(jps::source_projection(base(), &[
+        Document { path: ".idea/modules.xml", bytes: m.as_bytes() },
+        Document { path: "D:/a.iml", bytes: a.as_bytes() },
+    ]), Err(Error::Unsupported { reason: "macro suffix must remain relative", .. })));
+}

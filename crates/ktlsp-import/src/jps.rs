@@ -208,9 +208,10 @@ fn attributes<'a>(raw: &'a str, name_len: usize, doc: &str, offset: usize, b: &m
 fn parse<'a>(doc: &str, bytes: &'a [u8], b: &mut Budget) -> Result<Vec<Element<'a>>, Error> {
     let text = std::str::from_utf8(bytes).map_err(|_| invalid(doc, 0, "document is not UTF-8"))?;
     if !text.chars().all(xml_char) { return Err(invalid(doc, 0, "illegal XML scalar")); }
-    // quick-xml retains opening names/end-check scratch internally. Its contents are
-    // bounded by document bytes; charge a doubled capacity envelope before parsing.
-    b.storage(bytes.len().checked_mul(2).ok_or(Error::Budget("allocated storage"))?)?;
+    // quick-xml's opening-name bytes grow geometrically. Include minimum capacity
+    // and its index stack (the reader sees depth33 before our depth32 refusal).
+    let scratch = bytes.len().checked_mul(2).and_then(|n| n.checked_add(2 * MAX_DEPTH * size_of::<usize>() + 8)).ok_or(Error::Budget("allocated storage"))?;
+    b.storage(scratch)?;
     let bom = usize::from(text.starts_with('\u{feff}')) * 3;
     let mut reader = Reader::from_str(text); reader.config_mut().check_comments = true;
     let mut nodes: Vec<Element<'a>> = Vec::new();
@@ -271,6 +272,8 @@ fn parse<'a>(doc: &str, bytes: &'a [u8], b: &mut Budget) -> Result<Vec<Element<'
 }
 
 fn lexical(value: &str, relative: Option<&Path>, doc: &str, offset: usize, b: &mut Budget) -> Result<PathBuf, Error> {
+    // Bound caller snapshot keys before any diagnostic can retain their spelling.
+    if value.len() > MAX_PATH_BYTES { return Err(Error::Budget("path bytes")); }
     if value.is_empty() || value.chars().any(|c| c.is_control() || matches!(c, '$' | '<' | '>' | '*' | '?' | '|' | '"') || (c == '\\' && !cfg!(windows)))
         || value.starts_with("//") || value.starts_with("\\\\") || value.contains("://") {
         return Err(unsupported(doc, offset, "unsupported path or unresolved macro"));
@@ -309,13 +312,13 @@ fn lexical(value: &str, relative: Option<&Path>, doc: &str, offset: usize, b: &m
 fn resolve(value: &str, url: bool, project: &Path, module: Option<&Path>, doc: &str, offset: usize, b: &mut Budget) -> Result<PathBuf, Error> {
     if value.len() > MAX_PATH_BYTES { return Err(Error::Budget("path bytes")); }
     let value = if url { value.strip_prefix("file://").ok_or_else(|| unsupported(doc, offset, "only file URLs are supported"))? } else { value };
+    if url && value.contains(['?', '#']) { return Err(unsupported(doc, offset, "URL query or fragment")); }
     let mut decoded = Vec::new();
-    let value = if url {
+    let value = if url && value.contains('%') {
         b.reserve(&mut decoded, value.len())?;
         let mut index = 0;
         while index < value.len() {
             let c = value.as_bytes()[index];
-            if matches!(c, b'?' | b'#') { return Err(unsupported(doc, offset, "URL query or fragment")); }
             if c == b'%' {
                 let digits = value.get(index + 1..index + 3).ok_or_else(|| invalid(doc, offset, "invalid URL escape"))?;
                 let c = u8::from_str_radix(digits, 16).map_err(|_| invalid(doc, offset, "invalid URL escape"))?;
@@ -331,7 +334,11 @@ fn resolve(value: &str, url: bool, project: &Path, module: Option<&Path>, doc: &
     if let Some(base) = base {
         if !suffix.is_empty() && !suffix.starts_with('/') { return Err(invalid(doc, offset, "macro requires path boundary")); }
         if suffix.starts_with("//") { return Err(invalid(doc, offset, "double separator after macro")); }
-        if suffix.is_empty() { return b.path_copy(base); }
+        if suffix.is_empty() || suffix == "/" { return b.path_copy(base); }
+        let relative = Path::new(&suffix[1..]);
+        if relative.has_root() || matches!(relative.components().next(), Some(Component::Prefix(_))) {
+            return Err(unsupported(doc, offset, "macro suffix must remain relative"));
+        }
         return lexical(&suffix[1..], Some(base), doc, offset, b);
     }
     #[cfg(windows)]
@@ -354,6 +361,8 @@ struct Reference { path: PathBuf, range: Range<usize> }
 pub fn source_projection(project_directory: impl AsRef<Path>, documents: &[Document<'_>]) -> Result<ImportedSources, Error> {
     if documents.len() > MAX_DOCUMENTS { return Err(Error::Budget("documents")); }
     let mut b = Budget::default();
+    // One bounded diagnostic document string can outlive a failed operation.
+    b.storage(MAX_PATH_BYTES)?;
     let base = project_directory.as_ref().to_str().ok_or_else(|| invalid("", 0, "base is not UTF-8"))?;
     let project = lexical(base, None, "", 0, &mut b)?;
     let manifest = lexical(".idea/modules.xml", Some(&project), "", 0, &mut b)?;
@@ -485,7 +494,11 @@ pub fn source_projection(project_directory: impl AsRef<Path>, documents: &[Docum
     // and per-record space covers vector/hash capacities and overlap sorting scratch.
     let roots: usize = modules.iter().map(|m| m.source_roots.len()).sum();
     output.budget.work((roots + modules.len()).checked_mul(32).ok_or(Error::Budget("work"))?)?;
-    let envelope = output.bytes.len().checked_mul(8).and_then(|n| n.checked_add((modules.len() + roots) * 512)).ok_or(Error::Budget("allocated storage"))?;
+    let envelope = output.bytes.len().checked_add(manifest.as_os_str().len())
+        .and_then(|n| n.checked_mul(8))
+        .and_then(|n| n.checked_add((modules.len() + 1) * 2048))
+        .and_then(|n| n.checked_add(roots * 512))
+        .ok_or(Error::Budget("allocated storage"))?;
     output.budget.storage(envelope)?;
     let project = ktlsp_project::from_json(&manifest, &output.bytes).map_err(Error::Project)?;
     Ok(ImportedSources { project, modules })
@@ -578,5 +591,13 @@ mod boundaries {
         assert!(writer.write_all(b" ").is_err());
         assert!(matches!(writer.failure, Some(Error::Budget("projection bytes"))));
         assert_eq!(writer.bytes.len(), ktlsp_project::MAX_MANIFEST_BYTES);
+    }
+
+    #[test]
+    fn xml_reader_minimum_stack_storage_is_reserved_before_reading() {
+        let mut budget = Budget { storage: MAX_STORAGE_BYTES - 6, ..Budget::default() };
+        // The input-byte-only allowance cannot cover even the reader's minimum
+        // opening-name and index capacities; refuse before the unclosed tag.
+        assert!(matches!(parse("tiny", b"<x>", &mut budget), Err(Error::Budget("allocated storage"))));
     }
 }

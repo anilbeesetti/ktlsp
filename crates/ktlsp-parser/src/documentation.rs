@@ -2,8 +2,15 @@
 //!
 //! No semantic tags, links, code, annotations, inheritance or reference lookup.
 //! The caller owns the original lowering and shares one budget through output.
-use crate::{lowering::{self, Declaration, LoweredDeclarations, LoweringError}, Element, Parsed, SnapshotResult, SourceSnapshot};
-use std::{borrow::Cow, ops::Range, sync::atomic::{AtomicUsize, Ordering}};
+use crate::{
+    Element, Parsed, SnapshotResult, SourceSnapshot,
+    lowering::{self, Declaration, LoweredDeclarations, LoweringError},
+};
+use std::{
+    borrow::Cow,
+    ops::Range,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
@@ -16,7 +23,11 @@ pub enum Error {
 }
 impl From<LoweringError> for Error {
     fn from(error: LoweringError) -> Self {
-        if error == LoweringError::Cancelled { Self::Cancelled } else { Self::Lowering(error) }
+        if error == LoweringError::Cancelled {
+            Self::Cancelled
+        } else {
+            Self::Lowering(error)
+        }
     }
 }
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -26,7 +37,10 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 // declaration identity. No allocation, registry or counter reset is involved.
 static NEXT_OPERATION: AtomicUsize = AtomicUsize::new(1);
 fn next_operation(counter: &AtomicUsize) -> Result<usize> {
-    counter.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |next| next.checked_add(1))
+    counter
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |next| {
+            next.checked_add(1)
+        })
         .map_err(|_| Error::InvalidOrigin)
 }
 
@@ -41,17 +55,28 @@ pub struct Budget<'c> {
 }
 impl<'c> Budget<'c> {
     pub fn new(cancelled: &'c dyn Fn() -> bool) -> Self {
-        Self { inner: lowering::Budget::documentation(cancelled), used: false, selected: false, origin: None }
+        Self {
+            inner: lowering::Budget::documentation(cancelled),
+            used: false,
+            selected: false,
+            origin: None,
+        }
     }
     /// Charge before scans, comparisons, coordinate conversion or emission.
-    pub fn work(&mut self, units: usize) -> Result<()> { self.inner.work(units).map_err(Into::into) }
+    pub fn work(&mut self, units: usize) -> Result<()> {
+        self.inner.work(units).map_err(Into::into)
+    }
     /// Reserve once into a fresh empty string. All retained capacity is charged,
     /// including allocator over-allocation; callers must never grow it implicitly.
     pub fn reserve_string(&mut self, output: &mut String, additional: usize) -> Result<()> {
         self.work(1)?;
-        if !output.is_empty() || output.capacity() != 0 { return Err(Error::InvalidOrigin); }
+        if !output.is_empty() || output.capacity() != 0 {
+            return Err(Error::InvalidOrigin);
+        }
         self.inner.storage(additional, 0)?;
-        output.try_reserve_exact(additional).map_err(|_| Error::Allocation)?;
+        output
+            .try_reserve_exact(additional)
+            .map_err(|_| Error::Allocation)?;
         if let Err(error) = self.inner.storage(0, output.capacity()) {
             *output = String::new();
             return Err(error.into());
@@ -67,7 +92,9 @@ impl<'c> Budget<'c> {
     /// Check the complete escaped JSON response bound, not just prose bytes.
     pub fn output(&mut self, complete_json_bytes: usize) -> Result<()> {
         self.work(complete_json_bytes)?;
-        if complete_json_bytes > 1_048_576 { return Err(Error::Output); }
+        if complete_json_bytes > 1_048_576 {
+            return Err(Error::Output);
+        }
         Ok(())
     }
 }
@@ -75,26 +102,49 @@ impl<'c> Budget<'c> {
 /// Eligibility only: inspect the original direct name's declaration prefix.
 /// False keeps the old docless operation unchanged; true still requires
 /// `lower` and `select` under this same budget, never a raw-source fallback.
-pub fn candidate(parsed: &Parsed, name_token_index: usize, budget: &mut Budget<'_>) -> Result<bool> {
+pub fn candidate(
+    parsed: &Parsed,
+    name_token_index: usize,
+    budget: &mut Budget<'_>,
+) -> Result<bool> {
     let name = candidate_element(parsed, name_token_index, &mut budget.inner)?;
     budget.work(name.kind.len())?;
-    if !name.token || name.kind != "IDENTIFIER" { return Err(Error::Unsupported); }
+    if !name.token || name.kind != "IDENTIFIER" {
+        return Err(Error::Unsupported);
+    }
     let index = name.parent.ok_or(Error::Unsupported)?;
     let declaration = candidate_element(parsed, index, &mut budget.inner)?;
     budget.work(declaration.kind.len())?;
-    if declaration.token || !matches!(declaration.kind.as_str(), "CLASS" | "FUN" | "PROPERTY" | "VALUE_PARAMETER" | "TYPE_PARAMETER") {
+    if declaration.token
+        || !matches!(
+            declaration.kind.as_str(),
+            "CLASS" | "FUN" | "PROPERTY" | "VALUE_PARAMETER" | "TYPE_PARAMETER"
+        )
+    {
         return Err(Error::Unsupported);
     }
     let mut cursor = index.checked_add(1).ok_or(Error::InvalidOrigin)?;
     while cursor < name_token_index {
         let child = candidate_element(parsed, cursor, &mut budget.inner)?;
         budget.work(child.kind.len())?;
-        if child.parent != Some(index) || child.subtree_end <= cursor || child.subtree_end > declaration.subtree_end {
+        if child.parent != Some(index)
+            || child.subtree_end <= cursor
+            || child.subtree_end > declaration.subtree_end
+        {
             return Err(Error::InvalidOrigin);
         }
-        if !child.token && child.kind == "DOC_COMMENT" { return Ok(true); }
-        if !child.token && child.kind == "MODIFIER_LIST" { return Ok(false); }
-        if !child.token || !matches!(child.kind.as_str(), "WHITE_SPACE" | "EOL_COMMENT" | "BLOCK_COMMENT") {
+        if !child.token && child.kind == "DOC_COMMENT" {
+            return Ok(true);
+        }
+        if !child.token && child.kind == "MODIFIER_LIST" {
+            return Ok(false);
+        }
+        if !child.token
+            || !matches!(
+                child.kind.as_str(),
+                "WHITE_SPACE" | "EOL_COMMENT" | "BLOCK_COMMENT"
+            )
+        {
             return Ok(false);
         }
         cursor = child.subtree_end;
@@ -102,9 +152,15 @@ pub fn candidate(parsed: &Parsed, name_token_index: usize, budget: &mut Budget<'
     Ok(false)
 }
 
-pub fn lower<'a>(result: &'a SnapshotResult, current: &SourceSnapshot, budget: &mut Budget<'_>) -> Result<LoweredDeclarations<'a>> {
+pub fn lower<'a>(
+    result: &'a SnapshotResult,
+    current: &SourceSnapshot,
+    budget: &mut Budget<'_>,
+) -> Result<LoweredDeclarations<'a>> {
     budget.work(4)?;
-    if budget.used { return Err(Error::InvalidOrigin); }
+    if budget.used {
+        return Err(Error::InvalidOrigin);
+    }
     budget.used = true;
     let mut lowered = lowering::lower_with_budget(result, current, &mut budget.inner)?;
     let operation = next_operation(&NEXT_OPERATION)?;
@@ -122,33 +178,65 @@ pub struct Attached<'a> {
     prose: Option<Cow<'a, str>>,
 }
 impl<'a> Attached<'a> {
-    pub fn declaration(&self) -> &'a Declaration<'a> { self.declaration }
-    pub fn prose(&self) -> Option<&str> { self.prose.as_deref() }
-    pub fn documentation_range(&self) -> Option<Range<usize>> { self.documentation.clone() }
+    pub fn declaration(&self) -> &'a Declaration<'a> {
+        self.declaration
+    }
+    pub fn prose(&self) -> Option<&str> {
+        self.prose.as_deref()
+    }
+    pub fn documentation_range(&self) -> Option<Range<usize>> {
+        self.documentation.clone()
+    }
     pub fn source_range(&self) -> Range<usize> {
-        self.documentation.as_ref().map_or_else(|| self.declaration.range(), |doc| doc.end..self.declaration.range().end)
+        self.documentation.as_ref().map_or_else(
+            || self.declaration.range(),
+            |doc| doc.end..self.declaration.range().end,
+        )
     }
 }
 
-pub fn select<'a>(lowered: &'a LoweredDeclarations<'a>, result: &'a SnapshotResult, current: &SourceSnapshot, original_offset: usize, budget: &mut Budget<'_>) -> Result<Attached<'a>> {
+pub fn select<'a>(
+    lowered: &'a LoweredDeclarations<'a>,
+    result: &'a SnapshotResult,
+    current: &SourceSnapshot,
+    original_offset: usize,
+    budget: &mut Budget<'_>,
+) -> Result<Attached<'a>> {
     budget.work(1)?;
-    if budget.selected || !budget.origin.is_some_and(|(parsed, operation)| std::ptr::eq(parsed, lowered.parsed()) && lowered.documentation_operation == Some(operation)) {
+    if budget.selected
+        || !budget.origin.is_some_and(|(parsed, operation)| {
+            std::ptr::eq(parsed, lowered.parsed())
+                && lowered.documentation_operation == Some(operation)
+        })
+    {
         return Err(Error::InvalidOrigin);
     }
     budget.selected = true;
-    for source in [current.source(), result.snapshot().source()] { budget.work(source.len())?; }
-    for document in [current.document(), result.snapshot().document()] { budget.work(document.len())?; }
+    for source in [current.source(), result.snapshot().source()] {
+        budget.work(source.len())?;
+    }
+    for document in [current.document(), result.snapshot().document()] {
+        budget.work(document.len())?;
+    }
     budget.work(4)?;
     let parsed = result.tree_for(current).map_err(|_| Error::InvalidOrigin)?;
-    if !std::ptr::eq(parsed, lowered.parsed()) || !std::ptr::eq(result.snapshot(), lowered.snapshot()) { return Err(Error::InvalidOrigin); }
+    if !std::ptr::eq(parsed, lowered.parsed())
+        || !std::ptr::eq(result.snapshot(), lowered.snapshot())
+    {
+        return Err(Error::InvalidOrigin);
+    }
     budget.work(1)?;
-    if !parsed.source().is_char_boundary(original_offset) { return Err(Error::Unsupported); }
+    if !parsed.source().is_char_boundary(original_offset) {
+        return Err(Error::Unsupported);
+    }
     let mut target = None;
     for declaration in lowered.declarations() {
         budget.work(4)?;
         let name = declaration.name_range();
         if name.contains(&original_offset) {
-            if target.is_some() || declaration.incomplete() { return Err(Error::Unsupported); }
+            if target.is_some() || declaration.incomplete() {
+                return Err(Error::Unsupported);
+            }
             target = Some(declaration);
         }
     }
@@ -160,14 +248,23 @@ pub fn select<'a>(lowered: &'a LoweredDeclarations<'a>, result: &'a SnapshotResu
     let mut cursor = index.checked_add(1).ok_or(Error::InvalidOrigin)?;
     while cursor < node.subtree_end {
         let child = get(parsed, cursor, &mut budget.inner)?;
-        if child.parent != Some(index) { return Err(Error::InvalidOrigin); }
+        if child.parent != Some(index) {
+            return Err(Error::InvalidOrigin);
+        }
         budget.work(child.kind.len())?;
-        if child.token && matches!(child.kind.as_str(), "WHITE_SPACE" | "EOL_COMMENT" | "BLOCK_COMMENT") {
+        if child.token
+            && matches!(
+                child.kind.as_str(),
+                "WHITE_SPACE" | "EOL_COMMENT" | "BLOCK_COMMENT"
+            )
+        {
             cursor = child.subtree_end;
             continue;
         }
         if !child.token && child.kind == "DOC_COMMENT" {
-            if doc.replace(cursor).is_some() { return Err(Error::Unsupported); }
+            if doc.replace(cursor).is_some() {
+                return Err(Error::Unsupported);
+            }
             cursor = child.subtree_end;
             continue;
         }
@@ -175,7 +272,13 @@ pub fn select<'a>(lowered: &'a LoweredDeclarations<'a>, result: &'a SnapshotResu
         // it cannot acquire ownership. The complete lowerer already proved it.
         break;
     }
-    let Some(doc_index) = doc else { return Ok(Attached { declaration, documentation: None, prose: None }); };
+    let Some(doc_index) = doc else {
+        return Ok(Attached {
+            declaration,
+            documentation: None,
+            prose: None,
+        });
+    };
     let doc_node = get(parsed, doc_index, &mut budget.inner)?;
     let range = doc_node.start..doc_node.end;
     validate_doc(parsed, doc_index, &mut budget.inner)?;
@@ -185,7 +288,9 @@ pub fn select<'a>(lowered: &'a LoweredDeclarations<'a>, result: &'a SnapshotResu
     for i in doc_index + 1..doc_node.subtree_end {
         let leaf = get(parsed, i, &mut budget.inner)?;
         if retained_leaf(leaf, &mut budget.inner)? {
-            length = length.checked_add(leaf.end - leaf.start).ok_or(Error::Output)?;
+            length = length
+                .checked_add(leaf.end - leaf.start)
+                .ok_or(Error::Output)?;
             retained_start.get_or_insert(leaf.start);
             retained_end = leaf.end;
         }
@@ -193,10 +298,19 @@ pub fn select<'a>(lowered: &'a LoweredDeclarations<'a>, result: &'a SnapshotResu
     let retained_start = retained_start.ok_or(Error::Unsupported)?;
     if retained_end.checked_sub(retained_start) == Some(length) {
         budget.work(2)?;
-        let prose = parsed.source().get(retained_start..retained_end).ok_or(Error::InvalidOrigin)?;
+        let prose = parsed
+            .source()
+            .get(retained_start..retained_end)
+            .ok_or(Error::InvalidOrigin)?;
         budget.work(prose.len())?;
-        if !prose.chars().any(|ch| !ch.is_whitespace()) { return Err(Error::Unsupported); }
-        return Ok(Attached { declaration, documentation: Some(range), prose: Some(Cow::Borrowed(prose)) });
+        if !prose.chars().any(|ch| !ch.is_whitespace()) {
+            return Err(Error::Unsupported);
+        }
+        return Ok(Attached {
+            declaration,
+            documentation: Some(range),
+            prose: Some(Cow::Borrowed(prose)),
+        });
     }
     let mut prose = String::new();
     budget.reserve_string(&mut prose, length)?;
@@ -208,51 +322,108 @@ pub fn select<'a>(lowered: &'a LoweredDeclarations<'a>, result: &'a SnapshotResu
             budget.work(text.len())?;
             content |= text.chars().any(|ch| !ch.is_whitespace());
             budget.work(text.len())?;
-            if prose.capacity() - prose.len() < text.len() { return Err(Error::Allocation); }
+            if prose.capacity() - prose.len() < text.len() {
+                return Err(Error::Allocation);
+            }
             prose.push_str(text);
         }
     }
-    if !content || prose.len() != length { return Err(Error::Unsupported); }
-    Ok(Attached { declaration, documentation: Some(range), prose: Some(Cow::Owned(prose)) })
+    if !content || prose.len() != length {
+        return Err(Error::Unsupported);
+    }
+    Ok(Attached {
+        declaration,
+        documentation: Some(range),
+        prose: Some(Cow::Owned(prose)),
+    })
 }
 // Eligibility performs at most six kind comparisons (literal bytes <=64) and
 // twelve fixed checks, not the full sixteen-comparison documentation visit.
 // In particular, ordinary leading trivia must reach the legacy docless path.
-fn candidate_element<'a>(parsed: &'a Parsed, index: usize, budget: &mut lowering::Budget<'_>) -> std::result::Result<&'a Element, LoweringError> {
+fn candidate_element<'a>(
+    parsed: &'a Parsed,
+    index: usize,
+    budget: &mut lowering::Budget<'_>,
+) -> std::result::Result<&'a Element, LoweringError> {
     budget.work(1)?;
-    let element = parsed.elements().get(index).ok_or(LoweringError::InvalidCst { element: Some(index) })?;
-    let work = element.kind.len().checked_mul(6).and_then(|n| n.checked_add(76))
+    let element = parsed
+        .elements()
+        .get(index)
+        .ok_or(LoweringError::InvalidCst {
+            element: Some(index),
+        })?;
+    let work = element
+        .kind
+        .len()
+        .checked_mul(6)
+        .and_then(|n| n.checked_add(76))
         .ok_or(LoweringError::Limit(lowering::LoweringLimit::Work))?;
     budget.work(work)?;
     Ok(element)
 }
 
-
-fn get<'a>(parsed: &'a Parsed, index: usize, budget: &mut lowering::Budget<'_>) -> std::result::Result<&'a Element, LoweringError> {
+fn get<'a>(
+    parsed: &'a Parsed,
+    index: usize,
+    budget: &mut lowering::Budget<'_>,
+) -> std::result::Result<&'a Element, LoweringError> {
     budget.work(1)?;
-    let element = parsed.elements().get(index).ok_or(LoweringError::InvalidCst { element: Some(index) })?;
+    let element = parsed
+        .elements()
+        .get(index)
+        .ok_or(LoweringError::InvalidCst {
+            element: Some(index),
+        })?;
     // Each visit has a closed set of at most sixteen kind comparisons plus
     // fixed index/range/parent checks. Pay their byte bound before inspecting.
-    let work = element.kind.len().checked_mul(16).and_then(|n| n.checked_add(256))
+    let work = element
+        .kind
+        .len()
+        .checked_mul(16)
+        .and_then(|n| n.checked_add(256))
         .ok_or(LoweringError::Limit(lowering::LoweringLimit::Work))?;
     budget.work(work)?;
     Ok(element)
 }
-fn text<'a>(parsed: &'a Parsed, leaf: &Element, budget: &mut lowering::Budget<'_>) -> std::result::Result<&'a str, LoweringError> {
+fn text<'a>(
+    parsed: &'a Parsed,
+    leaf: &Element,
+    budget: &mut lowering::Budget<'_>,
+) -> std::result::Result<&'a str, LoweringError> {
     budget.work(2)?;
-    parsed.source().get(leaf.start..leaf.end).ok_or(LoweringError::InvalidCst { element: None })
+    parsed
+        .source()
+        .get(leaf.start..leaf.end)
+        .ok_or(LoweringError::InvalidCst { element: None })
 }
-fn retained_leaf(leaf: &Element, budget: &mut lowering::Budget<'_>) -> std::result::Result<bool, LoweringError> {
+fn retained_leaf(
+    leaf: &Element,
+    budget: &mut lowering::Budget<'_>,
+) -> std::result::Result<bool, LoweringError> {
     budget.work(leaf.kind.len())?;
-    Ok(leaf.token && matches!(leaf.kind.as_str(), "KDOC_TEXT" | "WHITE_SPACE" | "KDOC_LPAR" | "KDOC_RPAR"))
+    Ok(leaf.token
+        && matches!(
+            leaf.kind.as_str(),
+            "KDOC_TEXT" | "WHITE_SPACE" | "KDOC_LPAR" | "KDOC_RPAR"
+        ))
 }
-fn refuse(index: usize) -> LoweringError { LoweringError::Unsupported { element: index } }
+fn refuse(index: usize) -> LoweringError {
+    LoweringError::Unsupported { element: index }
+}
 
-pub(crate) fn validate_prefix(parsed: &Parsed, index: usize, budget: &mut lowering::Budget<'_>) -> std::result::Result<(), LoweringError> {
+pub(crate) fn validate_prefix(
+    parsed: &Parsed,
+    index: usize,
+    budget: &mut lowering::Budget<'_>,
+) -> std::result::Result<(), LoweringError> {
     let node = get(parsed, index, budget)?;
     budget.work(node.kind.len())?;
-    if node.kind == "DOC_COMMENT" { return validate_doc(parsed, index, budget); }
-    if node.kind != "MODIFIER_LIST" || node.token { return Err(refuse(index)); }
+    if node.kind == "DOC_COMMENT" {
+        return validate_doc(parsed, index, budget);
+    }
+    if node.kind != "MODIFIER_LIST" || node.token {
+        return Err(refuse(index));
+    }
     // ponytail: plain visibility/finality modifiers only; annotation arguments
     // require an independent finite header proof before admission.
     let mut modifiers = 0usize;
@@ -261,29 +432,50 @@ pub(crate) fn validate_prefix(parsed: &Parsed, index: usize, budget: &mut loweri
     for i in index + 1..node.subtree_end {
         let leaf = get(parsed, i, budget)?;
         budget.work(leaf.kind.len())?;
-        if !leaf.token || leaf.parent != Some(index) { return Err(refuse(i)); }
+        if !leaf.token || leaf.parent != Some(index) {
+            return Err(refuse(i));
+        }
         let expected = match leaf.kind.as_str() {
-            "PUBLIC_KEYWORD" => "public", "PRIVATE_KEYWORD" => "private",
-            "PROTECTED_KEYWORD" => "protected", "INTERNAL_KEYWORD" => "internal",
-            "FINAL_KEYWORD" => "final", "OPEN_KEYWORD" => "open",
+            "PUBLIC_KEYWORD" => "public",
+            "PRIVATE_KEYWORD" => "private",
+            "PROTECTED_KEYWORD" => "protected",
+            "INTERNAL_KEYWORD" => "internal",
+            "FINAL_KEYWORD" => "final",
+            "OPEN_KEYWORD" => "open",
             "WHITE_SPACE" | "EOL_COMMENT" | "BLOCK_COMMENT" => continue,
             _ => return Err(refuse(i)),
         };
-        let group = if matches!(leaf.kind.as_str(), "FINAL_KEYWORD" | "OPEN_KEYWORD") { &mut finality } else { &mut visibility };
-        if *group { return Err(refuse(i)); }
+        let group = if matches!(leaf.kind.as_str(), "FINAL_KEYWORD" | "OPEN_KEYWORD") {
+            &mut finality
+        } else {
+            &mut visibility
+        };
+        if *group {
+            return Err(refuse(i));
+        }
         *group = true;
         let raw = text(parsed, leaf, budget)?;
         budget.work(raw.len() + expected.len())?;
-        if raw != expected { return Err(refuse(i)); }
+        if raw != expected {
+            return Err(refuse(i));
+        }
         modifiers += 1;
     }
-    if modifiers == 0 { return Err(refuse(index)); }
+    if modifiers == 0 {
+        return Err(refuse(index));
+    }
     Ok(())
 }
 
-fn validate_doc(parsed: &Parsed, index: usize, budget: &mut lowering::Budget<'_>) -> std::result::Result<(), LoweringError> {
+fn validate_doc(
+    parsed: &Parsed,
+    index: usize,
+    budget: &mut lowering::Budget<'_>,
+) -> std::result::Result<(), LoweringError> {
     let node = get(parsed, index, budget)?;
-    if node.token { return Err(refuse(index)); }
+    if node.token {
+        return Err(refuse(index));
+    }
     let mut section = None;
     let mut start = false;
     let mut end = false;
@@ -291,41 +483,79 @@ fn validate_doc(parsed: &Parsed, index: usize, budget: &mut lowering::Budget<'_>
         let leaf = get(parsed, i, budget)?;
         budget.work(leaf.kind.len())?;
         if !leaf.token {
-            if leaf.kind != "KDOC_SECTION" || leaf.parent != Some(index) || section.is_some() || !start || end { return Err(refuse(i)); }
+            if leaf.kind != "KDOC_SECTION"
+                || leaf.parent != Some(index)
+                || section.is_some()
+                || !start
+                || end
+            {
+                return Err(refuse(i));
+            }
             section = Some(i);
             continue;
         }
-        if leaf.parent != Some(index) && leaf.parent != section { return Err(refuse(i)); }
+        if leaf.parent != Some(index) && leaf.parent != section {
+            return Err(refuse(i));
+        }
         let raw = text(parsed, leaf, budget)?;
         budget.work(raw.len())?;
         match leaf.kind.as_str() {
-            "KDOC_START" if !start && !end && section.is_none() && leaf.parent == Some(index) && leaf.start == node.start && raw == "/**" => start = true,
-            "KDOC_END" if start && !end && section.is_some() && leaf.parent == Some(index) && leaf.end == node.end => {
+            "KDOC_START"
+                if !start
+                    && !end
+                    && section.is_none()
+                    && leaf.parent == Some(index)
+                    && leaf.start == node.start
+                    && raw == "/**" =>
+            {
+                start = true
+            }
+            "KDOC_END"
+                if start
+                    && !end
+                    && section.is_some()
+                    && leaf.parent == Some(index)
+                    && leaf.end == node.end =>
+            {
                 let stars = raw.strip_suffix('/').ok_or_else(|| refuse(i))?;
-                if stars.is_empty() || !stars.bytes().all(|byte| byte == b'*') { return Err(refuse(i)); }
+                if stars.is_empty() || !stars.bytes().all(|byte| byte == b'*') {
+                    return Err(refuse(i));
+                }
                 end = true;
             }
             "KDOC_LEADING_ASTERISK" if start && !end => {
-                if raw.is_empty() || !raw.bytes().all(|byte| byte == b'*') { return Err(refuse(i)); }
+                if raw.is_empty() || !raw.bytes().all(|byte| byte == b'*') {
+                    return Err(refuse(i));
+                }
             }
             "WHITE_SPACE" if start && !end => {
-                if !raw.chars().all(char::is_whitespace) { return Err(refuse(i)); }
+                if !raw.chars().all(char::is_whitespace) {
+                    return Err(refuse(i));
+                }
             }
             "KDOC_TEXT" | "KDOC_LPAR" | "KDOC_RPAR" if start && !end && leaf.parent == section => {
                 // Empty code fences can be emitted as TEXT by the producer.
                 // Refuse code fences, lexical/external/reference/image links
                 // and nested comment delimiters, including TEXT-only forms.
                 budget.work(raw.len().checked_mul(6).ok_or_else(|| refuse(i))?)?;
-                if raw.contains('`') || raw.contains("~~~") || raw.contains('[')
-                    || raw.contains(']') || raw.contains("/*") || raw.contains("*/")
+                if raw.contains('`')
+                    || raw.contains("~~~")
+                    || raw.contains('[')
+                    || raw.contains(']')
+                    || raw.contains("/*")
+                    || raw.contains("*/")
                     || (leaf.kind == "KDOC_LPAR" && raw != "(")
                     || (leaf.kind == "KDOC_RPAR" && raw != ")")
-                { return Err(refuse(i)); }
+                {
+                    return Err(refuse(i));
+                }
             }
             _ => return Err(refuse(i)),
         }
     }
-    if !start || !end || section.is_none() { return Err(refuse(index)); }
+    if !start || !end || section.is_none() {
+        return Err(refuse(index));
+    }
     Ok(())
 }
 
@@ -337,41 +567,67 @@ mod tests {
 
     // Synthetic defensive/accounting fixture, never producer acceptance.
     fn snapshot() -> SnapshotResult {
-        fn e(kind: &str, start: usize, end: usize, parent: Option<usize>, subtree_end: usize, token: bool) -> Element {
-            Element { kind: kind.into(), start, end, parent, subtree_end, token }
+        fn e(
+            kind: &str,
+            start: usize,
+            end: usize,
+            parent: Option<usize>,
+            subtree_end: usize,
+            token: bool,
+        ) -> Element {
+            Element {
+                kind: kind.into(),
+                start,
+                end,
+                parent,
+                subtree_end,
+                token,
+            }
         }
         let source: Arc<str> = Arc::from("/** prose */fun named(){}");
         SnapshotResult {
-            snapshot: SourceSnapshot::new("synthetic", 1, FileKind::Source, source.clone()).unwrap(),
-            parsed: Parsed { source, diagnostics: vec![], elements: vec![
-                e("KT_FILE", 0, 25, None, 16, false),
-                e("FUN", 0, 25, Some(0), 16, false),
-                e("DOC_COMMENT", 0, 12, Some(1), 7, false),
-                e("KDOC_START", 0, 3, Some(2), 4, true),
-                e("KDOC_SECTION", 3, 10, Some(2), 6, false),
-                e("KDOC_TEXT", 3, 10, Some(4), 6, true),
-                e("KDOC_END", 10, 12, Some(2), 7, true),
-                e("FUN_KEYWORD", 12, 15, Some(1), 8, true),
-                e("WHITE_SPACE", 15, 16, Some(1), 9, true),
-                e("IDENTIFIER", 16, 21, Some(1), 10, true),
-                e("VALUE_PARAMETER_LIST", 21, 23, Some(1), 13, false),
-                e("LPAR", 21, 22, Some(10), 12, true),
-                e("RPAR", 22, 23, Some(10), 13, true),
-                e("BLOCK", 23, 25, Some(1), 16, false),
-                e("LBRACE", 23, 24, Some(13), 15, true),
-                e("RBRACE", 24, 25, Some(13), 16, true),
-            ]},
+            snapshot: SourceSnapshot::new("synthetic", 1, FileKind::Source, source.clone())
+                .unwrap(),
+            parsed: Parsed {
+                source,
+                diagnostics: vec![],
+                elements: vec![
+                    e("KT_FILE", 0, 25, None, 16, false),
+                    e("FUN", 0, 25, Some(0), 16, false),
+                    e("DOC_COMMENT", 0, 12, Some(1), 7, false),
+                    e("KDOC_START", 0, 3, Some(2), 4, true),
+                    e("KDOC_SECTION", 3, 10, Some(2), 6, false),
+                    e("KDOC_TEXT", 3, 10, Some(4), 6, true),
+                    e("KDOC_END", 10, 12, Some(2), 7, true),
+                    e("FUN_KEYWORD", 12, 15, Some(1), 8, true),
+                    e("WHITE_SPACE", 15, 16, Some(1), 9, true),
+                    e("IDENTIFIER", 16, 21, Some(1), 10, true),
+                    e("VALUE_PARAMETER_LIST", 21, 23, Some(1), 13, false),
+                    e("LPAR", 21, 22, Some(10), 12, true),
+                    e("RPAR", 22, 23, Some(10), 13, true),
+                    e("BLOCK", 23, 25, Some(1), 16, false),
+                    e("LBRACE", 23, 24, Some(13), 15, true),
+                    e("RBRACE", 24, 25, Some(13), 16, true),
+                ],
+            },
         }
     }
     fn operation(result: &SnapshotResult, budget: &mut Budget<'_>) -> Result<()> {
-        assert!(candidate(result.tree_for(result.snapshot()).unwrap(), 9, budget)?);
+        assert!(candidate(
+            result.tree_for(result.snapshot()).unwrap(),
+            9,
+            budget
+        )?);
         let lowered = lower(result, result.snapshot(), budget)?;
         let attached = select(&lowered, result, result.snapshot(), 16, budget)?;
         assert_eq!(attached.prose(), Some(" prose "));
         assert!(matches!(attached.prose.as_ref(), Some(Cow::Borrowed(_))));
         assert_eq!(attached.documentation_range(), Some(0..12));
         assert_eq!(attached.source_range(), 12..25);
-        assert!(std::ptr::eq(attached.declaration(), &lowered.declarations()[0]));
+        assert!(std::ptr::eq(
+            attached.declaration(),
+            &lowered.declarations()[0]
+        ));
         Ok(())
     }
     #[test]
@@ -385,13 +641,25 @@ mod tests {
         let mut exact = Budget::new(&|| false);
         exact.work(2_097_152 - work).unwrap();
         operation(&result, &mut exact).unwrap();
-        assert!(exact.work(1).is_err(), "render cannot renew the lowering allowance");
+        assert!(
+            exact.work(1).is_err(),
+            "render cannot renew the lowering allowance"
+        );
         let mut short = Budget::new(&|| false);
         short.work(2_097_152 - work + 1).unwrap();
         assert!(operation(&result, &mut short).is_err());
         assert!(measured.work(usize::MAX).is_err());
         assert!(lower(&result, result.snapshot(), &mut measured).is_err());
-        assert!(select(&lower(&result, result.snapshot(), &mut Budget::new(&|| false)).unwrap(), &result, result.snapshot(), 16, &mut measured).is_err());
+        assert!(
+            select(
+                &lower(&result, result.snapshot(), &mut Budget::new(&|| false)).unwrap(),
+                &result,
+                result.snapshot(),
+                16,
+                &mut measured
+            )
+            .is_err()
+        );
     }
     #[test]
     fn actual_capacity_and_late_growth_cannot_hide_in_existing_buffers() {
@@ -406,8 +674,17 @@ mod tests {
         assert!(budget.reserve_string(&mut foreign, 0).is_err());
         budget.storage(0, 131_072 - retained).unwrap();
         let mut late = String::new();
-        assert!(matches!(budget.reserve_string(&mut late, 1), Err(Error::Lowering(LoweringError::Limit(lowering::LoweringLimit::RetainedCapacity)))));
-        assert_eq!(late.capacity(), 0, "refused capacity must not remain retained");
+        assert!(matches!(
+            budget.reserve_string(&mut late, 1),
+            Err(Error::Lowering(LoweringError::Limit(
+                lowering::LoweringLimit::RetainedCapacity
+            )))
+        ));
+        assert_eq!(
+            late.capacity(),
+            0,
+            "refused capacity must not remain retained"
+        );
         let mut requested = Budget::new(&|| false);
         requested.storage(131_072, 0).unwrap();
         assert!(requested.reserve_string(&mut String::new(), 1).is_err());
@@ -424,8 +701,14 @@ mod tests {
         let result = snapshot();
         let lower = lower(&result, result.snapshot(), &mut budget).unwrap();
         cancelled.set(true);
-        assert_eq!(select(&lower, &result, result.snapshot(), 16, &mut budget).unwrap_err(), Error::Cancelled);
-        assert!(matches!(budget.reserve_string(&mut String::new(), 1), Err(Error::Cancelled)));
+        assert_eq!(
+            select(&lower, &result, result.snapshot(), 16, &mut budget).unwrap_err(),
+            Error::Cancelled
+        );
+        assert!(matches!(
+            budget.reserve_string(&mut String::new(), 1),
+            Err(Error::Cancelled)
+        ));
         assert!(matches!(budget.output(1), Err(Error::Cancelled)));
         let mut exact = Budget::new(&|| false);
         exact.output(1_048_576).unwrap();
@@ -447,8 +730,22 @@ mod tests {
         let mut foreign_budget = Budget::new(&|| false);
         let foreign = lower(&result, result.snapshot(), &mut foreign_budget).unwrap();
         assert_ne!(foreign.documentation_operation, stamp);
-        assert_eq!(select(&foreign, &result, result.snapshot(), 16, &mut original).unwrap_err(), Error::InvalidOrigin);
-        assert_eq!(select(&foreign, &result, result.snapshot(), 16, &mut foreign_budget).unwrap().prose(), Some(" prose "));
+        assert_eq!(
+            select(&foreign, &result, result.snapshot(), 16, &mut original).unwrap_err(),
+            Error::InvalidOrigin
+        );
+        assert_eq!(
+            select(
+                &foreign,
+                &result,
+                result.snapshot(),
+                16,
+                &mut foreign_budget
+            )
+            .unwrap()
+            .prose(),
+            Some(" prose ")
+        );
     }
     #[test]
     fn decoration_decode_owns_only_discontiguous_prose_under_the_same_budget() {
@@ -458,15 +755,39 @@ mod tests {
         result.parsed.source = source;
         // Synthetic producer-kind boundary, not an actual lexer/ownership claim.
         for leaf in &mut result.parsed.elements {
-            if leaf.subtree_end >= 6 { leaf.subtree_end += 2; }
+            if leaf.subtree_end >= 6 {
+                leaf.subtree_end += 2;
+            }
             if let Some(parent) = &mut leaf.parent {
-                if *parent >= 6 { *parent += 2; }
+                if *parent >= 6 {
+                    *parent += 2;
+                }
             }
         }
         result.parsed.elements[5].end = 4;
         result.parsed.elements[5].subtree_end = 6;
-        result.parsed.elements.insert(6, Element { kind: "KDOC_LEADING_ASTERISK".into(), start: 4, end: 5, parent: Some(4), subtree_end: 7, token: true });
-        result.parsed.elements.insert(7, Element { kind: "KDOC_TEXT".into(), start: 5, end: 10, parent: Some(4), subtree_end: 8, token: true });
+        result.parsed.elements.insert(
+            6,
+            Element {
+                kind: "KDOC_LEADING_ASTERISK".into(),
+                start: 4,
+                end: 5,
+                parent: Some(4),
+                subtree_end: 7,
+                token: true,
+            },
+        );
+        result.parsed.elements.insert(
+            7,
+            Element {
+                kind: "KDOC_TEXT".into(),
+                start: 5,
+                end: 10,
+                parent: Some(4),
+                subtree_end: 8,
+                token: true,
+            },
+        );
         let operation = |budget: &mut Budget<'_>| -> Result<()> {
             let lower = lower(&result, result.snapshot(), budget)?;
             let attached = select(&lower, &result, result.snapshot(), 16, budget)?;
@@ -482,7 +803,9 @@ mod tests {
         operation(&mut exact).unwrap();
         assert!(exact.work(1).is_err());
         let mut short = Budget::new(&|| false);
-        short.work(2_097_152 - measured.inner.usage().0 + 1).unwrap();
+        short
+            .work(2_097_152 - measured.inner.usage().0 + 1)
+            .unwrap();
         assert!(operation(&mut short).is_err());
     }
 }

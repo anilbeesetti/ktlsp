@@ -396,13 +396,18 @@ fn exchange_directory(directory: &Path, messages: &[Value]) -> Vec<Value> {
     // TEMP397: retain complete original hosted packets until ROOT and OWNER
     // directly inspect the producer/CLI evidence; never print expected echoes.
     let capture397 = messages.iter().any(|message| {
-        message["id"].as_str().is_some_and(|id| id.starts_with("TEMP397-"))
+        message["id"]
+            .as_str()
+            .is_some_and(|id| id.starts_with("TEMP397-"))
     });
     let mut responses: Vec<Value> = Vec::new();
     for message in messages {
         let payload = serde_json::to_vec(message).unwrap();
         if capture397 {
-            eprintln!("TEMP397 ACTUAL CLI REQUEST {}", String::from_utf8_lossy(&payload));
+            eprintln!(
+                "TEMP397 ACTUAL CLI REQUEST {}",
+                String::from_utf8_lossy(&payload)
+            );
         }
         ktlsp_protocol::write_frame(&mut input, &payload).unwrap();
         input.flush().unwrap();
@@ -412,7 +417,10 @@ fn exchange_directory(directory: &Path, messages: &[Value]) -> Vec<Value> {
             loop {
                 let frame = ktlsp_protocol::read_frame(&mut reader).unwrap().unwrap();
                 if capture397 {
-                    eprintln!("TEMP397 ACTUAL CLI RESPONSE {}", String::from_utf8_lossy(&frame));
+                    eprintln!(
+                        "TEMP397 ACTUAL CLI RESPONSE {}",
+                        String::from_utf8_lossy(&frame)
+                    );
                 }
                 let response: Value = serde_json::from_slice(&frame).unwrap();
                 let matched = response.get("id") == Some(id);
@@ -426,7 +434,10 @@ fn exchange_directory(directory: &Path, messages: &[Value]) -> Vec<Value> {
     drop(input);
     while let Some(frame) = ktlsp_protocol::read_frame(&mut reader).unwrap() {
         if capture397 {
-            eprintln!("TEMP397 ACTUAL CLI RESPONSE {}", String::from_utf8_lossy(&frame));
+            eprintln!(
+                "TEMP397 ACTUAL CLI RESPONSE {}",
+                String::from_utf8_lossy(&frame)
+            );
         }
         responses.push(serde_json::from_slice(&frame).unwrap());
     }
@@ -3383,7 +3394,11 @@ fn documentation_expected(
 ) -> Value {
     let name_start = source.find(name).unwrap();
     let declaration = if markdown {
-        let longest = suffix.split(|character| character != '`').map(str::len).max().unwrap_or(0);
+        let longest = suffix
+            .split(|character| character != '`')
+            .map(str::len)
+            .max()
+            .unwrap_or(0);
         let fence = "`".repeat(3.max(longest + 1));
         format!("{fence}kotlin\n{suffix}\n{fence}")
     } else {
@@ -3391,10 +3406,13 @@ fn documentation_expected(
     };
     let value = if let Some(prose) = prose {
         let escaped = if markdown {
-            prose.chars().flat_map(|character| {
-                let prefix = (character.is_ascii_punctuation()).then_some('\\');
-                prefix.into_iter().chain(std::iter::once(character))
-            }).collect::<String>()
+            prose
+                .chars()
+                .flat_map(|character| {
+                    let prefix = (character.is_ascii_punctuation()).then_some('\\');
+                    prefix.into_iter().chain(std::iter::once(character))
+                })
+                .collect::<String>()
         } else {
             prose.to_owned()
         };
@@ -3424,57 +3442,155 @@ fn documentation_paired_cli_applies_utf16_doc_name_prefix_move_remove_and_reopen
             json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":initial}}}),
         ];
         let mut expected = Vec::new();
-        let mut query = |messages: &mut Vec<Value>, source: &str, id: &str, name: &str, suffix: &str, prose: Option<&str>| {
+        let mut query = |messages: &mut Vec<Value>,
+                         source: &str,
+                         id: &str,
+                         name: &str,
+                         suffix: &str,
+                         prose: Option<&str>| {
             messages.push(json!({"jsonrpc":"2.0","id":id,"method":"textDocument/hover","params":navigation_params(source,source.find(name).unwrap())}));
-            expected.push((id.to_owned(), documentation_expected(source,name,suffix,prose,markdown)));
+            expected.push((
+                id.to_owned(),
+                documentation_expected(source, name, suffix, prose, markdown),
+            ));
         };
-        query(&mut messages,initial,"initial","`old😀`","\r\npublic fun `old😀`() {}",Some(" old 😀e\u{301} "));
+        query(
+            &mut messages,
+            initial,
+            "initial",
+            "`old😀`",
+            "\r\npublic fun `old😀`() {}",
+            Some(" old 😀e\u{301} "),
+        );
         let mut document = ktlsp_text::Document::new(1, initial.to_owned()).unwrap();
         let start = document.text().find("old 😀").unwrap();
-        documentation_ranged_change(&mut messages,&mut document,2,start..start+"old 😀e\u{301}".len(),"new 😀e\u{301}");
-        query(&mut messages,document.text(),"doc-edited","`old😀`","\r\npublic fun `old😀`() {}",Some(" new 😀e\u{301} "));
+        documentation_ranged_change(
+            &mut messages,
+            &mut document,
+            2,
+            start..start + "old 😀e\u{301}".len(),
+            "new 😀e\u{301}",
+        );
+        query(
+            &mut messages,
+            document.text(),
+            "doc-edited",
+            "`old😀`",
+            "\r\npublic fun `old😀`() {}",
+            Some(" new 😀e\u{301} "),
+        );
         let start = document.text().find("`old😀`").unwrap();
-        documentation_ranged_change(&mut messages,&mut document,3,start..start+"`old😀`".len(),"`renamed🦀`");
+        documentation_ranged_change(
+            &mut messages,
+            &mut document,
+            3,
+            start..start + "`old😀`".len(),
+            "`renamed🦀`",
+        );
         let start = document.text().find("public ").unwrap();
-        documentation_ranged_change(&mut messages,&mut document,4,start..start+7,"");
-        query(&mut messages,document.text(),"name-prefix-edited","`renamed🦀`","\r\nfun `renamed🦀`() {}",Some(" new 😀e\u{301} "));
+        documentation_ranged_change(&mut messages, &mut document, 4, start..start + 7, "");
+        query(
+            &mut messages,
+            document.text(),
+            "name-prefix-edited",
+            "`renamed🦀`",
+            "\r\nfun `renamed🦀`() {}",
+            Some(" new 😀e\u{301} "),
+        );
         let start = document.text().find("/** new").unwrap();
         let end = start + "/** new 😀e\u{301} */\r\n".len();
         let moved = document.text()[start..end].to_owned();
-        documentation_ranged_change(&mut messages,&mut document,5,start..end,"");
+        documentation_ranged_change(&mut messages, &mut document, 5, start..end, "");
         let start = document.text().find("/** second */\r\n").unwrap();
-        documentation_ranged_change(&mut messages,&mut document,6,start..start+"/** second */\r\n".len(),&moved);
+        documentation_ranged_change(
+            &mut messages,
+            &mut document,
+            6,
+            start..start + "/** second */\r\n".len(),
+            &moved,
+        );
         // The old owner has no direct doc and retains the legacy whole-tree
         // refusal while another declaration still owns documentation.
         messages.push(json!({"jsonrpc":"2.0","id":"old-owner-docless","method":"textDocument/hover","params":navigation_params(document.text(),document.text().find("`renamed🦀`").unwrap())}));
-        query(&mut messages,document.text(),"new-owner","second","\r\nfun second() {}",Some(" new 😀e\u{301} "));
+        query(
+            &mut messages,
+            document.text(),
+            "new-owner",
+            "second",
+            "\r\nfun second() {}",
+            Some(" new 😀e\u{301} "),
+        );
         let start = document.text().find("/** new").unwrap();
-        documentation_ranged_change(&mut messages,&mut document,7,start..start+moved.len(),"");
-        query(&mut messages,document.text(),"removed","second","fun second() {}",None);
-        query(&mut messages,document.text(),"removed-old-owner","`renamed🦀`","// 😀\r\nfun `renamed🦀`() {}",None);
+        documentation_ranged_change(
+            &mut messages,
+            &mut document,
+            7,
+            start..start + moved.len(),
+            "",
+        );
+        query(
+            &mut messages,
+            document.text(),
+            "removed",
+            "second",
+            "fun second() {}",
+            None,
+        );
+        query(
+            &mut messages,
+            document.text(),
+            "removed-old-owner",
+            "`renamed🦀`",
+            "// 😀\r\nfun `renamed🦀`() {}",
+            None,
+        );
         messages.push(json!({"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":URI}}}));
-        let reopened = format!("{}\r\n/** reopened */\r\nfun third() {{}}",document.text());
+        let reopened = format!("{}\r\n/** reopened */\r\nfun third() {{}}", document.text());
         messages.push(json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":reopened}}}));
-        query(&mut messages,&reopened,"reopened","third","\r\nfun third() {}",Some(" reopened "));
+        query(
+            &mut messages,
+            &reopened,
+            "reopened",
+            "third",
+            "\r\nfun third() {}",
+            Some(" reopened "),
+        );
         messages.push(json!({"jsonrpc":"2.0","id":"reopened-old-owner","method":"textDocument/hover","params":navigation_params(&reopened,reopened.find("second").unwrap())}));
         messages.extend([
             json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
         let replies = package.exchange(&messages);
-        assert_eq!(replies[0]["result"]["capabilities"]["hoverProvider"],true);
+        assert_eq!(replies[0]["result"]["capabilities"]["hoverProvider"], true);
         for (id, result) in expected {
-            let response = replies.iter().find(|response| response["id"] == id).unwrap();
-            assert_eq!(response["result"],result,"{id}: {response}");
+            let response = replies
+                .iter()
+                .find(|response| response["id"] == id)
+                .unwrap();
+            assert_eq!(response["result"], result, "{id}: {response}");
         }
         for id in ["old-owner-docless", "reopened-old-owner"] {
-            let response = replies.iter().find(|response| response["id"] == id).unwrap();
-            assert_eq!(response["error"]["code"],-32803,"{id}: {response}");
+            let response = replies
+                .iter()
+                .find(|response| response["id"] == id)
+                .unwrap();
+            assert_eq!(response["error"]["code"], -32803, "{id}: {response}");
             assert!(response.get("result").is_none());
         }
         let missing = Package::new(false).exchange(&messages);
-        assert!(missing[0]["result"]["capabilities"].get("hoverProvider").is_none());
-        assert!(missing.iter().filter(|response| response.get("id").is_some() && response["id"] != "TEMP397-init" && response["id"] != "stop").all(|response| response["error"]["code"] == -32601));
+        assert!(
+            missing[0]["result"]["capabilities"]
+                .get("hoverProvider")
+                .is_none()
+        );
+        assert!(
+            missing
+                .iter()
+                .filter(|response| response.get("id").is_some()
+                    && response["id"] != "TEMP397-init"
+                    && response["id"] != "stop")
+                .all(|response| response["error"]["code"] == -32601)
+        );
     }
 }
 
@@ -3498,15 +3614,34 @@ fn documentation_paired_cli_literal_security_dynamic_fences_and_semantic_refusal
             json!({"jsonrpc":"2.0","method":"exit"}),
         ];
         let replies = package.exchange(&messages);
-        let response = replies.iter().find(|response| response["id"] == u64::MAX).unwrap();
-        assert_eq!(response["result"]["contents"]["kind"],if markdown {"markdown"} else {"plaintext"});
-        assert_eq!(response["result"]["contents"]["value"],if markdown {expected.to_owned()} else {format!("{prose}\n\n\nfun safe(){{ val /* ```` */ x=1 }}")});
-        assert_eq!(response["result"]["range"],references_range(source,source.find("safe").unwrap(),4));
+        let response = replies
+            .iter()
+            .find(|response| response["id"] == u64::MAX)
+            .unwrap();
+        assert_eq!(
+            response["result"]["contents"]["kind"],
+            if markdown { "markdown" } else { "plaintext" }
+        );
+        assert_eq!(
+            response["result"]["contents"]["value"],
+            if markdown {
+                expected.to_owned()
+            } else {
+                format!("{prose}\n\n\nfun safe(){{ val /* ```` */ x=1 }}")
+            }
+        );
+        assert_eq!(
+            response["result"]["range"],
+            references_range(source, source.find("safe").unwrap(), 4)
+        );
     }
     let cases = [
         ("/** [Other] */\nfun target(){}", "target"),
         ("/** [label](command:run) */\nfun target(){}", "target"),
-        ("/** ![image](data:text/html,evil) */\nfun target(){}", "target"),
+        (
+            "/** ![image](data:text/html,evil) */\nfun target(){}",
+            "target",
+        ),
         ("/** [r]: ../relative */\nfun target(){}", "target"),
         ("/** `code` */\nfun target(){}", "target"),
         ("/** ```\ncode\n``` */\nfun target(){}", "target"),
@@ -3516,8 +3651,14 @@ fn documentation_paired_cli_literal_security_dynamic_fences_and_semantic_refusal
         ("/** text */\npublic fun target(x: List<Long>){}", "target"),
         ("fun outer(){ /** text */ val x=1; val y=x }", "x }"),
         ("/** text */\nfun <T> target(p:T){}", "T)"),
-        ("fun outer(){ /** text */ fun target(){}; target() }", "target() }"),
-        ("/** text */\nval target=1\nfun f(){val x=target}", "target}"),
+        (
+            "fun outer(){ /** text */ fun target(){}; target() }",
+            "target() }",
+        ),
+        (
+            "/** text */\nval target=1\nfun f(){val x=target}",
+            "target}",
+        ),
     ];
     for (source, needle) in cases {
         let messages = [
@@ -3529,8 +3670,11 @@ fn documentation_paired_cli_literal_security_dynamic_fences_and_semantic_refusal
             json!({"jsonrpc":"2.0","method":"exit"}),
         ];
         let replies = package.exchange(&messages);
-        let response = replies.iter().find(|response| response["id"] == "refuse").unwrap();
-        assert_eq!(response["error"]["code"],-32803,"{source}: {response}");
+        let response = replies
+            .iter()
+            .find(|response| response["id"] == "refuse")
+            .unwrap();
+        assert_eq!(response["error"]["code"], -32803, "{source}: {response}");
         assert!(response.get("result").is_none());
     }
 }
@@ -3540,7 +3684,12 @@ fn documentation_profiles_keep_disabled_clients_and_legacy_docless_fence_accepta
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let package = Package::new(true);
     let source = "/** attached */\nfun target(){}";
-    for profile in [json!({"contentFormat":[]}),json!({"contentFormat":false}),json!({"contentFormat":[7]}),json!({"contentFormat":["unknown"]})] {
+    for profile in [
+        json!({"contentFormat":[]}),
+        json!({"contentFormat":false}),
+        json!({"contentFormat":[7]}),
+        json!({"contentFormat":["unknown"]}),
+    ] {
         let messages = [
             json!({"jsonrpc":"2.0","id":"TEMP397-disabled","method":"initialize","params":{"capabilities":{"textDocument":{"hover":profile}}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
@@ -3550,10 +3699,20 @@ fn documentation_profiles_keep_disabled_clients_and_legacy_docless_fence_accepta
             json!({"jsonrpc":"2.0","method":"exit"}),
         ];
         let replies = package.exchange(&messages);
-        assert!(replies[0]["result"]["capabilities"].get("hoverProvider").is_none());
-        assert_eq!(replies.iter().find(|response| response["id"] == "disabled").unwrap()["error"]["code"],-32601);
+        assert!(
+            replies[0]["result"]["capabilities"]
+                .get("hoverProvider")
+                .is_none()
+        );
+        assert_eq!(
+            replies
+                .iter()
+                .find(|response| response["id"] == "disabled")
+                .unwrap()["error"]["code"],
+            -32601
+        );
     }
-    let source = format!("val /*{}*/ target=1","`".repeat(45000));
+    let source = format!("val /*{}*/ target=1", "`".repeat(45000));
     let messages = [
         json!({"jsonrpc":"2.0","id":"TEMP397-docless","method":"initialize","params":{"capabilities":{"textDocument":{"hover":{"contentFormat":["markdown"]}}}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
@@ -3563,12 +3722,24 @@ fn documentation_profiles_keep_disabled_clients_and_legacy_docless_fence_accepta
         json!({"jsonrpc":"2.0","method":"exit"}),
     ];
     let replies = package.exchange(&messages);
-    let response = replies.iter().find(|response| response["id"] == "docless").unwrap();
+    let response = replies
+        .iter()
+        .find(|response| response["id"] == "docless")
+        .unwrap();
     let fence = "`".repeat(45001);
-    assert_eq!(response["result"]["contents"]["value"],format!("{fence}kotlin\n{source}\n{fence}"));
+    assert_eq!(
+        response["result"]["contents"]["value"],
+        format!("{fence}kotlin\n{source}\n{fence}")
+    );
     // This previously supported docless output is larger than the managed
     // documentation String ceiling and must not be sent through that new cap.
-    assert!(response["result"]["contents"]["value"].as_str().unwrap().len() > 131072);
+    assert!(
+        response["result"]["contents"]["value"]
+            .as_str()
+            .unwrap()
+            .len()
+            > 131072
+    );
 }
 
 #[test]
@@ -3588,18 +3759,24 @@ fn documentation_eligibility_preserves_many_comment_docless_hover() {
     let replies = package.exchange(&messages);
     let response = replies.iter().find(|r| r["id"] == "comments").unwrap();
     assert_eq!(response["result"]["contents"]["kind"], "markdown");
-    assert_eq!(response["result"]["contents"]["value"], format!("```kotlin\n{source}\n```"));
-    assert_eq!(response["result"]["range"], references_range(&source,name,5));
+    assert_eq!(
+        response["result"]["contents"]["value"],
+        format!("```kotlin\n{source}\n```")
+    );
+    assert_eq!(
+        response["result"]["range"],
+        references_range(&source, name, 5)
+    );
 }
 
 #[test]
 fn documentation_hover_keeps_cancel_edit_reopen_and_rejected_edit_publication_guards() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let source = "/** original 😀 */\r\nfun `target😀`() {}";
-    for action in ["cancel","change","reopen","rejected-change"] {
+    for action in ["cancel", "change", "reopen", "rejected-change"] {
         let mut session = running(json!({}));
-        open(&mut session,source);
-        let params = navigation_params(source,source.find("`target").unwrap());
+        open(&mut session, source);
+        let params = navigation_params(source, source.find("`target").unwrap());
         assert!(session.handle(json!({"jsonrpc":"2.0","id":"doc-pending","method":"textDocument/hover","params":params})).is_empty());
         let replies = match action {
             "cancel" => session.handle(json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":"doc-pending"}})),
@@ -3612,26 +3789,55 @@ fn documentation_hover_keeps_cancel_edit_reopen_and_rejected_edit_publication_gu
             _ => session.handle(json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":URI,"version":2},"contentChanges":[{"range":{"start":{"line":0,"character":14},"end":{"line":0,"character":15}},"text":"split surrogate"}]}})),
         };
         if action == "rejected-change" {
-            assert!(replies.iter().all(|response| response["id"] != "doc-pending"));
+            assert!(
+                replies
+                    .iter()
+                    .all(|response| response["id"] != "doc-pending")
+            );
             let deadline = Instant::now() + Duration::from_secs(15);
             let response = loop {
                 let responses = session.poll();
-                if let Some(response) = responses.into_iter().find(|response| response["id"] == "doc-pending") {
+                if let Some(response) = responses
+                    .into_iter()
+                    .find(|response| response["id"] == "doc-pending")
+                {
                     break response;
                 }
-                assert!(Instant::now() < deadline,"real documentation worker did not finish");
+                assert!(
+                    Instant::now() < deadline,
+                    "real documentation worker did not finish"
+                );
                 std::thread::sleep(Duration::from_millis(2));
             };
-            assert_eq!(response["result"],documentation_expected(source,"`target😀`","\r\nfun `target😀`() {}",Some(" original 😀 "),false));
+            assert_eq!(
+                response["result"],
+                documentation_expected(
+                    source,
+                    "`target😀`",
+                    "\r\nfun `target😀`() {}",
+                    Some(" original 😀 "),
+                    false
+                )
+            );
         } else {
-            let pending: Vec<_> = replies.iter().filter(|response| response["id"] == "doc-pending").collect();
-            assert_eq!(pending.len(),1,"{action}: {replies:?}");
-            assert_eq!(pending[0]["error"]["code"],if action == "cancel" {-32800} else {-32801});
+            let pending: Vec<_> = replies
+                .iter()
+                .filter(|response| response["id"] == "doc-pending")
+                .collect();
+            assert_eq!(pending.len(), 1, "{action}: {replies:?}");
+            assert_eq!(
+                pending[0]["error"]["code"],
+                if action == "cancel" { -32800 } else { -32801 }
+            );
             assert!(pending[0].get("result").is_none());
         }
         let (remaining, clean) = session.close();
-        assert!(clean,"{action}");
-        assert!(remaining.iter().all(|response| response["id"] != "doc-pending"));
+        assert!(clean, "{action}");
+        assert!(
+            remaining
+                .iter()
+                .all(|response| response["id"] != "doc-pending")
+        );
     }
 }
 
@@ -3639,8 +3845,9 @@ fn documentation_hover_keeps_cancel_edit_reopen_and_rejected_edit_publication_gu
 fn documentation_paired_cli_preserves_paragraphs_original_line_endings_and_name_boundaries() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let package = Package::new(true);
-    for newline in ["\n","\r\n","\r"] {
-        let doc = format!("/**{newline} * first 😀e\u{301}\t{newline} *{newline} * para{newline} */");
+    for newline in ["\n", "\r\n", "\r"] {
+        let doc =
+            format!("/**{newline} * first 😀e\u{301}\t{newline} *{newline} * para{newline} */");
         let prose = format!("{newline}  first 😀e\u{301}\t{newline} {newline}  para{newline} ");
         let suffix = format!("{newline}{newline}// between{newline}public fun `same😀`() {{}}");
         let source = format!("/** earlier */{newline}{doc}{suffix}{newline}");
@@ -3658,12 +3865,29 @@ fn documentation_paired_cli_preserves_paragraphs_original_line_endings_and_name_
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
         let replies = package.exchange(&messages);
-        let response = replies.iter().find(|response| response["id"] == "name").unwrap();
-        assert_eq!(response["result"],documentation_expected(&source,"`same😀`",&suffix,Some(&prose),true));
-        for id in ["name-end","body"] {
-            assert_eq!(replies.iter().find(|response| response["id"] == id).unwrap()["result"],Value::Null);
+        let response = replies
+            .iter()
+            .find(|response| response["id"] == "name")
+            .unwrap();
+        assert_eq!(
+            response["result"],
+            documentation_expected(&source, "`same😀`", &suffix, Some(&prose), true)
+        );
+        for id in ["name-end", "body"] {
+            assert_eq!(
+                replies
+                    .iter()
+                    .find(|response| response["id"] == id)
+                    .unwrap()["result"],
+                Value::Null
+            );
         }
-        assert!(!response["result"]["contents"]["value"].as_str().unwrap().contains("earlier"));
+        assert!(
+            !response["result"]["contents"]["value"]
+                .as_str()
+                .unwrap()
+                .contains("earlier")
+        );
     }
 }
 
@@ -3683,13 +3907,34 @@ fn documentation_paired_cli_complete_output_accounts_real_large_ids_without_losi
         json!({"jsonrpc":"2.0","method":"exit"}),
     ];
     let replies = Package::new(true).exchange(&messages);
-    let accepted = replies.iter().find(|response| response["id"] == accepted_id).unwrap();
-    assert_eq!(accepted["result"],documentation_expected(source,"target","\nfun target(){}",Some(" literal "),false));
+    let accepted = replies
+        .iter()
+        .find(|response| response["id"] == accepted_id)
+        .unwrap();
+    assert_eq!(
+        accepted["result"],
+        documentation_expected(
+            source,
+            "target",
+            "\nfun target(){}",
+            Some(" literal "),
+            false
+        )
+    );
     assert!(serde_json::to_vec(accepted).unwrap().len() + 32 <= 1024 * 1024);
-    let refused = replies.iter().find(|response| response["id"] == refused_id).unwrap();
-    assert_eq!(refused["error"]["code"],-32803);
+    let refused = replies
+        .iter()
+        .find(|response| response["id"] == refused_id)
+        .unwrap();
+    assert_eq!(refused["error"]["code"], -32803);
     assert!(refused.get("result").is_none());
-    assert_eq!(replies.iter().filter(|response| response["id"] == refused_id).count(),1);
+    assert_eq!(
+        replies
+            .iter()
+            .filter(|response| response["id"] == refused_id)
+            .count(),
+        1
+    );
 }
 
 #[test]
@@ -3697,14 +3942,45 @@ fn documentation_paired_cli_selects_original_class_property_parameter_and_nested
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let package = Package::new(true);
     for (source, name, suffix, prose) in [
-        ("/** class prose */\nclass Same {}", "Same", "\nclass Same {}", " class prose "),
-        ("/** property prose */\nval `same😀`=1", "`same😀`", "\nval `same😀`=1", " property prose "),
-        ("fun f(/** parameter prose */ p:Long){}", "p:Long", " p:Long", " parameter prose "),
-        ("fun same(){/** inner prose */ fun same(){}}", "same(){}", " fun same(){}", " inner prose "),
-        ("fun f(){/** local prose */ val x=1;val y=x}", "x=1", " val x=1", " local prose "),
+        (
+            "/** class prose */\nclass Same {}",
+            "Same",
+            "\nclass Same {}",
+            " class prose ",
+        ),
+        (
+            "/** property prose */\nval `same😀`=1",
+            "`same😀`",
+            "\nval `same😀`=1",
+            " property prose ",
+        ),
+        (
+            "fun f(/** parameter prose */ p:Long){}",
+            "p:Long",
+            " p:Long",
+            " parameter prose ",
+        ),
+        (
+            "fun same(){/** inner prose */ fun same(){}}",
+            "same(){}",
+            " fun same(){}",
+            " inner prose ",
+        ),
+        (
+            "fun f(){/** local prose */ val x=1;val y=x}",
+            "x=1",
+            " val x=1",
+            " local prose ",
+        ),
     ] {
         let start = source.rfind(name).unwrap();
-        let name_len = if name == "p:Long" || name == "x=1" {1} else if name == "same(){}" {4} else {name.len()};
+        let name_len = if name == "p:Long" || name == "x=1" {
+            1
+        } else if name == "same(){}" {
+            4
+        } else {
+            name.len()
+        };
         let messages = [
             json!({"jsonrpc":"2.0","id":"TEMP397-kinds","method":"initialize","params":{"capabilities":{"textDocument":{"hover":{"contentFormat":["plaintext"]}}}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
@@ -3714,10 +3990,17 @@ fn documentation_paired_cli_selects_original_class_property_parameter_and_nested
             json!({"jsonrpc":"2.0","method":"exit"}),
         ];
         let replies = package.exchange(&messages);
-        let response = replies.iter().find(|response| response["id"] == "name").unwrap();
-        assert_eq!(response["result"],json!({
-            "contents":{"kind":"plaintext","value":format!("{prose}\n\n{suffix}")},
-            "range":references_range(source,start,name_len)
-        }),"{source}: {response}");
+        let response = replies
+            .iter()
+            .find(|response| response["id"] == "name")
+            .unwrap();
+        assert_eq!(
+            response["result"],
+            json!({
+                "contents":{"kind":"plaintext","value":format!("{prose}\n\n{suffix}")},
+                "range":references_range(source,start,name_len)
+            }),
+            "{source}: {response}"
+        );
     }
 }

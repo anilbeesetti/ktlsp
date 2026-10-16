@@ -146,7 +146,9 @@ pub(crate) fn render(
     let mut identifier = false;
     for (index, element) in tree.elements().iter().enumerate() {
         if hover {
-            budget.work(element.kind.len() + 1).map_err(|_| UNSUPPORTED)?;
+            budget
+                .work(element.kind.len() + 1)
+                .map_err(|_| UNSUPPORTED)?;
         }
         if !element.token
             && element.kind == "REFERENCE_EXPRESSION"
@@ -198,12 +200,11 @@ pub(crate) fn render(
         return Ok(Value::Null);
     }
     if declaration_hover
-        && documentation::candidate(
-            tree, declaration_token.ok_or(UNSUPPORTED)?, &mut budget,
-        ).map_err(|_| UNSUPPORTED)?
+        && documentation::candidate(tree, declaration_token.ok_or(UNSUPPORTED)?, &mut budget)
+            .map_err(|_| UNSUPPORTED)?
     {
-        let lowered = documentation::lower(result, snapshot, &mut budget)
-            .map_err(|_| UNSUPPORTED)?;
+        let lowered =
+            documentation::lower(result, snapshot, &mut budget).map_err(|_| UNSUPPORTED)?;
         let attached = documentation::select(&lowered, result, snapshot, offset, &mut budget)
             .map_err(|_| UNSUPPORTED)?;
         let prose = attached.prose().ok_or(UNSUPPORTED)?;
@@ -390,25 +391,39 @@ fn render_documentation(
     for byte in declaration.bytes() {
         budget.work(1).map_err(|_| UNSUPPORTED)?;
         if markdown {
-            run = if byte == b'`' { run.checked_add(1).ok_or(UNSUPPORTED)? } else { 0 };
+            run = if byte == b'`' {
+                run.checked_add(1).ok_or(UNSUPPORTED)?
+            } else {
+                0
+            };
             longest = longest.max(run);
         }
-        json_value = json_value.checked_add(json_byte_width(byte)).ok_or(UNSUPPORTED)?;
+        json_value = json_value
+            .checked_add(json_byte_width(byte))
+            .ok_or(UNSUPPORTED)?;
     }
     let fence = 3.max(longest.checked_add(1).ok_or(UNSUPPORTED)?);
     if markdown {
-        size = size.checked_add(fence.checked_mul(2).ok_or(UNSUPPORTED)?)
-            .and_then(|n| n.checked_add(8)).ok_or(UNSUPPORTED)?;
-        json_value = json_value.checked_add(fence.checked_mul(2).ok_or(UNSUPPORTED)?)
-            .and_then(|n| n.checked_add(10)).ok_or(UNSUPPORTED)?;
+        size = size
+            .checked_add(fence.checked_mul(2).ok_or(UNSUPPORTED)?)
+            .and_then(|n| n.checked_add(8))
+            .ok_or(UNSUPPORTED)?;
+        json_value = json_value
+            .checked_add(fence.checked_mul(2).ok_or(UNSUPPORTED)?)
+            .and_then(|n| n.checked_add(10))
+            .ok_or(UNSUPPORTED)?;
     }
     if let Some(prose) = prose {
-        size = size.checked_add(prose.len()).and_then(|n| n.checked_add(2))
+        size = size
+            .checked_add(prose.len())
+            .and_then(|n| n.checked_add(2))
             .ok_or(UNSUPPORTED)?;
         json_value = json_value.checked_add(4).ok_or(UNSUPPORTED)?;
         for byte in prose.bytes() {
             budget.work(1).map_err(|_| UNSUPPORTED)?;
-            json_value = json_value.checked_add(json_byte_width(byte)).ok_or(UNSUPPORTED)?;
+            json_value = json_value
+                .checked_add(json_byte_width(byte))
+                .ok_or(UNSUPPORTED)?;
             if markdown && byte.is_ascii_punctuation() {
                 size = size.checked_add(1).ok_or(UNSUPPORTED)?;
                 json_value = json_value.checked_add(2).ok_or(UNSUPPORTED)?;
@@ -418,11 +433,15 @@ fn render_documentation(
     // Fixed JSON punctuation/keys/kind/jsonrpc need <160 bytes, four u32
     // coordinates need <=40 digits, framing <=32 bytes: all fit in 256.
     // The arbitrary request id has its own real-caller checked upper bound.
-    let json_bytes = response_id_bound.checked_add(256)
-        .and_then(|n| n.checked_add(json_value)).ok_or(UNSUPPORTED)?;
+    let json_bytes = response_id_bound
+        .checked_add(256)
+        .and_then(|n| n.checked_add(json_value))
+        .ok_or(UNSUPPORTED)?;
     budget.output(json_bytes).map_err(|_| UNSUPPORTED)?;
     let mut value = String::new();
-    budget.reserve_string(&mut value, size).map_err(|_| UNSUPPORTED)?;
+    budget
+        .reserve_string(&mut value, size)
+        .map_err(|_| UNSUPPORTED)?;
     if let Some(prose) = prose {
         append_documentation(&mut value, prose, markdown, budget)?;
         append_documentation(&mut value, "\n\n", false, budget)?;
@@ -440,15 +459,25 @@ fn render_documentation(
             append_documentation(&mut value, "`", false, budget)?;
         }
     }
-    let mut positions = [ktlsp_text::Position { line: 0, character: 0 }; 2];
+    let mut positions = [ktlsp_text::Position {
+        line: 0,
+        character: 0,
+    }; 2];
     let mut index = 0;
     crate::structure::visit_positions(
         source,
         &[name_range.start, name_range.end],
         |units| budget.work(units),
-        |position| { positions[index] = position; index += 1; },
-    ).map_err(|_| UNSUPPORTED)?;
-    let range = Range { start: positions[0], end: positions[1] };
+        |position| {
+            positions[index] = position;
+            index += 1;
+        },
+    )
+    .map_err(|_| UNSUPPORTED)?;
+    let range = Range {
+        start: positions[0],
+        end: positions[1],
+    };
     // Moving the owned String avoids serde_json::to_value's extra source copy.
     let mut result = json!({
         "contents":{"kind":if markdown { "markdown" } else { "plaintext" },"value":null},
@@ -762,7 +791,15 @@ mod documentation_rendering {
     ) -> Result<Value, &'static str> {
         let cancelled = || false;
         let mut budget = DocumentationBudget::new(&cancelled);
-        render_documentation(source, prose, 0..source.len(), 0..1, format, id_bound, &mut budget)
+        render_documentation(
+            source,
+            prose,
+            0..source.len(),
+            0..1,
+            format,
+            id_bound,
+            &mut budget,
+        )
     }
 
     #[test]
@@ -814,10 +851,18 @@ mod documentation_rendering {
         };
         let mut budget = DocumentationBudget::new(&cancelled);
         let source = format!("val x=\"{}\"", "a".repeat(4096));
-        assert!(render_documentation(
-            &source, Some("safe"), 0..source.len(), 4..5,
-            HoverFormat::Markdown, 20, &mut budget
-        ).is_err());
+        assert!(
+            render_documentation(
+                &source,
+                Some("safe"),
+                0..source.len(),
+                4..5,
+                HoverFormat::Markdown,
+                20,
+                &mut budget
+            )
+            .is_err()
+        );
         assert!(calls.get() > 128);
     }
 
@@ -828,11 +873,20 @@ mod documentation_rendering {
         let cancelled = || false;
         let mut budget = DocumentationBudget::new(&cancelled);
         let result = render_documentation(
-            source, Some("paragraph"), start - 4..source.len(), start..start + "`x😀`".len(),
-            HoverFormat::Plaintext, 20, &mut budget
-        ).unwrap();
-        assert_eq!(result["range"], json!({
-            "start":{"line":2,"character":4},"end":{"line":2,"character":9}
-        }));
+            source,
+            Some("paragraph"),
+            start - 4..source.len(),
+            start..start + "`x😀`".len(),
+            HoverFormat::Plaintext,
+            20,
+            &mut budget,
+        )
+        .unwrap();
+        assert_eq!(
+            result["range"],
+            json!({
+                "start":{"line":2,"character":4},"end":{"line":2,"character":9}
+            })
+        );
     }
 }

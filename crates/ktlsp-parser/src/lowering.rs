@@ -98,7 +98,11 @@ pub(crate) struct Budget<'c> {
 }
 impl Budget<'_> {
     pub(crate) fn documentation(cancelled: &dyn Fn() -> bool) -> Budget<'_> {
-        Budget { documentation: true, cancelled: Some(cancelled), ..Default::default() }
+        Budget {
+            documentation: true,
+            cancelled: Some(cancelled),
+            ..Default::default()
+        }
     }
     pub(crate) fn work(&mut self, n: usize) -> Result<()> {
         if self.cancelled.is_some_and(|cancelled| cancelled()) {
@@ -119,8 +123,18 @@ impl Budget<'_> {
         Ok(choices.contains(&text))
     }
     pub(crate) fn storage(&mut self, requested: usize, retained: usize) -> Result<()> {
-        add(&mut self.requested, requested, REQUESTED, LoweringLimit::RequestedHeap)?;
-        add(&mut self.retained, retained, RETAINED, LoweringLimit::RetainedCapacity)
+        add(
+            &mut self.requested,
+            requested,
+            REQUESTED,
+            LoweringLimit::RequestedHeap,
+        )?;
+        add(
+            &mut self.retained,
+            retained,
+            RETAINED,
+            LoweringLimit::RetainedCapacity,
+        )
     }
     #[cfg(test)]
     pub(crate) fn usage(&self) -> (usize, usize, usize) {

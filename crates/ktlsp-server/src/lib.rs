@@ -650,9 +650,14 @@ impl Session {
         let client = self.symbol_client.clone();
         // Bound the complete response envelope without copying or serializing
         // the arbitrary client id. A JSON string byte needs at most six bytes.
-        let response_id_bound = id.as_str().map_or(Some(20), |id| {
-            id.len().checked_mul(6).and_then(|bytes| bytes.checked_add(2))
-        }).ok_or((-32803, "hover response id limit exceeded"))?;
+        let response_id_bound = id
+            .as_str()
+            .map_or(Some(20), |id| {
+                id.len()
+                    .checked_mul(6)
+                    .and_then(|bytes| bytes.checked_add(2))
+            })
+            .ok_or((-32803, "hover response id limit exceeded"))?;
         let cancelled = Arc::new(AtomicBool::new(false));
         let worker_cancelled = Arc::clone(&cancelled);
         let (sender, result) = mpsc::sync_channel(1);

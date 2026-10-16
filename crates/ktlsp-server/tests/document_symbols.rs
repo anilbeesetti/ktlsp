@@ -2640,7 +2640,6 @@ fn lexical_generic_definition_preserves_all_eight_paired_cli_consumers_and_edits
     );
     // Both real edits are applied and fed to the paired CLI. Type annotations,
     // the generic list and the unrelated function retain their original bytes.
-    let mut rebound_wire = Vec::new();
     for (text, use_start, target, len) in [
         (&completed, completed_use, parameter, 1),
         (&renamed, renamed.find("= T").unwrap() + 2, local, 1),
@@ -2666,16 +2665,7 @@ fn lexical_generic_definition_preserves_all_eight_paired_cli_consumers_and_edits
             rebound[2]["result"],
             json!({"uri":URI,"range":references_range(text,type_t,1)})
         );
-        rebound_wire.push(json!({"requests":rebound_messages,"responses":rebound}));
     }
-    // TEMP #386: bounded actual wire/edit observation, no instrumentation parse.
-    let capture = json!({
-        "source":source,"requests":messages,"responses":replies,
-        "completed":completed,"renamed":renamed,"rebound_wire":rebound_wire,
-    });
-    let capture = serde_json::to_string(&capture).unwrap();
-    assert!(capture.len() < 65536);
-    eprintln!("TEMP_386_PAIRED_CLI {capture}");
 }
 
 #[test]

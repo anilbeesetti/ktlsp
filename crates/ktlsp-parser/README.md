@@ -420,11 +420,13 @@ types, stable cross-revision symbols or a new server capability.
   context/spelling and exhaustion refuse atomically. No values, other functions,
   outer classes, package names or imports are fallback candidates. This query
   allocates nothing; value completion/occurrences/rename remain value-only.
-  Production and paired-CLI regressions are authored but unexercised until
-  separately admitted original hosted CI; temporary bounded capture uses only
-  the results already parsed by those fixtures. No official equivalence,
-  typeDefinition, type-parameter hover/references/rename or generic inference is
-  established; #96 and full parity remain open.
+  Original platform38930044300 at source1f118a4 directly retained four complete
+  producer packets per host; ROOT and the owner independently authenticated
+  and read original CST/name/owner associations and paired-CLI edit rebinding.
+  Temporary observation writers/bookkeeping were removed afterward; all
+  original semantic assertions remain. Cleanup-source CI/main are separate
+  gates. No official equivalence, typeDefinition, type-parameter hover/
+  references/rename or generic inference is established; #96/full parity stay open.
 - `local_value_binding::visible_local_values(directory, result, initializer_index,
   current_snapshot)` authenticates an existing whole-identifier initializer
   reference without requiring its spelling to bind. The owned result retains

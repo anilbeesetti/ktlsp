@@ -660,8 +660,8 @@ fn rename_guard_preserves_original_partitions_and_refuses_capture() {
 fn lexical_type_parameters_borrow_original_annotations_targets_and_owners() {
     use ktlsp_parser::local_value_binding::bind_lexical_type_parameter;
     let _serial = functional::serial();
-    // Expectations are source-derived, not frozen producer indices/trivia
-    // ancestry. First production execution is reserved to admitted hosted CI.
+    // Bind real annotations to original lexical declarations, without freezing
+    // producer indices or confusing inherited regions with type visibility.
     for source in [
         "import elsewhere.T\nimport elsewhere.Other as T\nclass T {}\nfun <T> f(p: T) { val x: T = p; val use = x }",
         "fun <T, U> f(p: U) { val x: T = p; val use = x }\nfun <T> g(p: T) { val x: T = p }",
@@ -674,7 +674,6 @@ fn lexical_type_parameters_borrow_original_annotations_targets_and_owners() {
         assert!(tree.diagnostics().is_empty(), "{:?}", tree.diagnostics());
         let lower = lower_declarations(&result, current).unwrap();
         let directory = build_regions(&lower, &result, current).unwrap();
-        let mut associations = Vec::new();
         for (index, reference) in tree.elements().iter().enumerate().filter(|(_, node)| {
             node.kind == "REFERENCE_EXPRESSION"
                 && node
@@ -746,14 +745,6 @@ fn lexical_type_parameters_borrow_original_annotations_targets_and_owners() {
                 bind_lexical_type_parameter(&directory, &result, index, &stale).unwrap_err(),
                 LocalBindingError::StaleSnapshot,
             );
-            associations.push(serde_json::json!({
-                "reference_index":index,"token_index":index+1,
-                "annotated_index":annotated.cst_index(),
-                "function_index":function.cst_index(),"body_index":binding.body().cst_index(),
-                "target_index":target.cst_index(),"target_parent":target.cst_parent_index(),
-                "target_owner":target.owner(),"target_name":target.raw_name(),
-                "target_name_range":target.name_range(),
-            }));
         }
         for (index, _) in tree.elements().iter().enumerate().filter(|(_, node)| {
             node.kind == "REFERENCE_EXPRESSION"
@@ -772,16 +763,6 @@ fn lexical_type_parameters_borrow_original_annotations_targets_and_owners() {
                 ktlsp_parser::integer_initializer_types::IntegerInitializerError::UnsupportedContext,
             );
         }
-        assert!(!associations.is_empty());
-        // TEMP #386: bounded original producer observation; no second parse.
-        assert!(source.len() < 1024 && tree.elements().len() < 512);
-        eprintln!(
-            "TEMP_386_PRODUCER {}",
-            serde_json::json!({
-                "document":current.document(),"revision":current.revision(),"source":source,
-                "elements":tree.elements(),"diagnostics":tree.diagnostics(),"associations":associations,
-            })
-        );
     }
 }
 

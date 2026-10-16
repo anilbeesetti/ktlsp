@@ -295,3 +295,11 @@ class→annotations→Metadata→consumer tests are pure data processing, not Ko
 execution. This is not general generics, type-table lookup, merging, bounds
 interpretation, substitution/inference, source/Java linkage, server integration
 or official Kotlin LSP parity.
+
+The complete native binary suite passed481 cases across52 suites on the composed
+source; original platform38930044300 independently passed those481 on macOS and
+Windows, including all10 property-consumer and6 alias-signature cases. ROOT's
+throwaway actual public-API executable observed Pair.first→original A(id0,ordinal0,
+d1 declaration54..60/Type238..240) and second→B(id1,ordinal1,62..68/263..265),
+with original borrowed pointers and absent nullable marking. The example source
+was removed. These are native data observations, not official generics or linkage.

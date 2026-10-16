@@ -210,10 +210,32 @@ All eight existing parser-backed consumers retain their original value/body
 contracts on this generic body. Type parameters stay out of value completion,
 occurrences and rename edits; annotation references stay outside value partitions.
 No typeDefinition method/capability, type-parameter hover/references/rename,
-generic inference or full Kotlin type resolution is added. New production/paired
-CLI tests and bounded temporary first-observation capture are authored, not
-runtime evidence until separately admitted hosted execution. #96/full parity and
-unknown official runtime behavior remain unchanged.
+generic inference or full Kotlin type resolution is added. First original hosted
+producer/paired-CLI behavior is recorded below; cleanup-source CI and guarded
+main acceptance remain separate. #96/full parity and unknown official runtime
+behavior remain unchanged.
+
+At first source `1f118a4efe990f044759e1162bcd2b0361df4991`, original attempt1
+Native38930044366/job117071397551 passed1052+22; platform38930044300
+Windows117071396385 passed997+22 and macOS117071396733 passed1050+22.
+Each full census has131 rows/0failed/3ignored/0filtered. Actual checkout
+4b34cec4a99bdc4de9963b8413a680e3ec86feb8 has tree
+2591f559118236a038ab158a59c51b07644a95b6 and ordered parents
+`[040dbba580d908c649c7256405687e2044e4cec2,1f118a4efe990f044759e1162bcd2b0361df4991]`.
+
+ROOT and the source owner independently read every original four-packet producer
+set and the complete actual CLI payload on both platform hosts. Actual annotation
+targets are T3:5–6, quoted-U3:8–13 and isolated g-T7:5–6; ordinary p/x still target
+their original values. The main23-message/20-reply exchange exercises all eight
+consumers. Returned completion and version7 local-x→T rename edits independently
+reconstruct the actual version8 reopened sources; both real followups retain the
+original generic-T annotation target. Type parameters do not enter value edits.
+Original raw CLI payload13563bytes SHA256
+c36709b823583840c882e02639a18c5fd6c44329ed16b11d489d18ebd0a1ce34
+is identical across hosts. Linux's eprintln captures are not observed.
+Only temporary writers/bookkeeping were removed; all semantic, edit/rebinding
+and refusal assertions remain. This is finite native behavior, not official
+generic semantics, an extracted current-source archive or a #377 repair.
 
 Hover also accepts the unique original half-open **name-token** range of a complete lowered `CLASS`, `FUN`, `PROPERTY` or ordinary `VALUE_PARAMETER`, returning that declaration's exact original source and its name range through the same negotiated renderer. Same-spelled declarations at different positions remain distinct, including parameter/local shadows; no binder or inferred type identity is needed for a declaration's own name. Definition on those names remains null. Keywords, whitespace, braces, name ends and EOF remain null; incomplete selected declarations and unsupported whole-tree lowering fail explicitly, without syntactic-symbol fallback. Unsupported reference lookup never falls back to an enclosing declaration. This is declaration-source hover, not KDoc, type resolution or full official hover parity.
 
@@ -243,7 +265,7 @@ Both providers are independent of hover content-format negotiation and require t
 
 Output is bounded by the kernel's 1,024-site/storage ceiling and a conservative 1 MiB rendered-size ceiling (including repeated escaped URIs), failing the whole query rather than truncating. Only the admitted same function body is searched; identical names in other functions and unrelated duplicate names do not change the target. This is **not workspace/cross-file/full Kotlin references or highlight completeness**, general type resolution, or official parity.
 
-The composed typed-local lowerer admits an optional single simple type-name annotation on these same plain local vals, including supported backtick names. This is retained declaration syntax only: hover preserves it exactly, type-name tokens are not value occurrences, and no builtin-name whitelist or resolved type identity is inferred. Explicitly typed targets refuse integer-default inference; an annotated containing val does not invalidate a different untyped target. Qualified/nullable/generic/annotated/parenthesized/function/intersection/dynamic types remain outside this bounded subset. The paired-stdio composition regression also uses a type-name token spelled exactly like the value target, checking that it never enters references or highlights.
+The composed typed-local lowerer admits an optional single simple type-name annotation on these same plain local vals, including supported backtick names. Outside the lexical type-parameter lane above, this is retained declaration syntax only: hover preserves it exactly, type-name tokens are not value occurrences, and no builtin-name whitelist or global type identity is inferred. Explicitly typed targets refuse integer-default inference; an annotated containing val does not invalidate a different untyped target. Qualified/nullable/generic/annotated/parenthesized/function/intersection/dynamic types remain outside this bounded subset. The paired-stdio composition regression also uses a type-name token spelled exactly like the value target, checking that it never enters references or highlights.
 
 The #364 permanent regressions assert real same-build packaged CLI payloads/IDs, declaration/use/unused anchors, includeDeclaration, highlight kinds/order, Unicode/CRLF and missing-worker behavior without duplicate pull-mode pushes. Additional real-worker cases assert semantic-equivalent quoted names, function isolation, no chasing, strict invalid input and atomic refusal. Shared controlled-peer tests cover each provider's exact cancellation and stale/lifecycle guards; those deliberately failing peers do not fabricate successful CST.
 

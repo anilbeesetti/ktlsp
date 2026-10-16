@@ -896,3 +896,58 @@ Source386 FIRST genuine producer/paired-CLI capture and all new-source hosted
 platform/full-workspace acceptance remain unobserved; TEMP writers await ROOT's
 direct first-outcome read. Final docs/source reviews, CI, guarded integration and
 independent original-main acceptance remain required. Full parity is not achieved.
+
+### PR388 first original generic producer/provider execution
+
+Two exact full18-file source/docs rechecks cleared first-hosted
+1f118a4efe990f044759e1162bcd2b0361df4991/tree2591f559118236a038ab158a59c51b07644a95b6.
+Original attempt1 Native38930044366/job117071397551 passed1052+22; platform
+38930044300 Windows117071396385 passed997+22, macOS117071396733 passed1050+22.
+Complete131-row censuses have0failed/3ignored/0filtered; mandatory pinned format,
+strict locked workspace-all-target Clippy and full workspace commands succeeded.
+Actual tested merge4b34cec4a99bdc4de9963b8413a680e3ec86feb8 has the reviewed tree
+and ordered parents `[040dbba580d908c649c7256405687e2044e4cec2,1f118a4efe990f044759e1162bcd2b0361df4991]`.
+Retained Windows12058975780 ZIP digest
+c9f8ce0918f81917552ec2d320e53a27f3389217db640a4c123fb54c02fc5043;
+macOS12058437493 digest
+34ba3dfc9efe8fcf9132d49c247ddb68dec3e36f54619643ef9a45b472e0c5ab.
+Original APIs/checkout/ordered parents/clean complete preflight/zero exits agree.
+
+ROOT and source owner independently authenticated and directly read all four
+complete producer packets on EACH platform. Sources retain103/81/49/126 UTF8
+bytes,90/103/56/74 original elements and2/4/2/2 annotation bindings, all parser
+diagnostics empty. Actual REF→USER_TYPE→TYPE_REFERENCE→parameter/local ancestry,
+original type-parameter/list/function/body/owner/name associations and full token
+partition are preserved. The leading comment is actually inside the final
+fixture's FUN extent; no invented trivia or frozen numeric-index expectation.
+Actual imported/aliased/outer classT is not a lexical candidate; multiple-function
+T contexts remain distinct; bare/backtick T and quoted-crab/trailing comma work.
+Exact original producer payload SHA256 values:
+- 66fbc3a61d69477b640efcbf8d700dacd8f2090ce8edb2c5c46a26151a62af4e
+- 7b0e13b1d7e44f12f92b85b558eed4106e5914259a3826471a179dae1668ce28
+- 96613204bfe0f4945949b476348ee3c8418e3ff0c9b015f91fc9a965f34c60ad
+- 5b58cf738da55685965de6cce182366e18e5e78ca981fce532e2616495571ff2
+
+The complete paired CLI payload is identical across platform hosts:13563 bytes,
+SHA256c36709b823583840c882e02639a18c5fd6c44329ed16b11d489d18ebd0a1ce34.
+Actual main23 messages/20 exact string-ID replies exercise all8 consumers;
+two reopened-source exchanges each contain7 messages/4 exact replies.
+Annotation T→3:5–6, quoted-U→3:8–13, other-functionT→7:5–6;
+ordinary p→3:18–19 and x→4:5–6. Original plaintext declaration, value-only
+references/highlights/symbols/completion and local-val preparation/rename agree.
+ROOT and owner independently applied actual returned UTF16 edits: completion
+x→p and version7 local-x→T exactly reconstruct captured143-byte CRLF/astral sources.
+Both actual version8 followups retain generic T's annotation identity while
+rebinding the value correctly. Type hover/references/prepare/rename fail-32803;
+typeDefinition fails-32601 and is not advertised. No duplicate pushes.
+Linux executed the tests but neither captured eprintln payload is observed there.
+
+Independent binary owner additionally authenticated both platform481-case/52-block
+binary censuses:10 actual property-consumer and6 alias-signature tests pass.
+Only two temporary writers and their serialization/bookkeeping vectors,
+capture-size/nonempty guards were removed after actual readback; semantic
+ownership/body/origin/budget/application/rebinding/refusal assertions remain.
+Cleanup-source exact reviews/compile/full original CI, guarded merge and
+independent original exact-main acceptance remain mandatory. Current main is
+still040; no new archive/#377 repair, local parser/server/worker runtime, JVM,
+effective non-nullness, full generic inference or official parity claim follows.

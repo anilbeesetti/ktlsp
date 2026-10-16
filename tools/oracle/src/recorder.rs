@@ -1,9 +1,218 @@
-//! Synthetic raw stdio capture and PR174 input consistency validation.
+//! Bounded raw stdio capture and PR174 input consistency validation.
 use crate::{MAX_BYTES, MAX_MESSAGES, MAX_STDERR, envelope, id};
 use ktlsp_protocol::{MAX_HEADER_BYTES, ProtocolError, read_frame, write_frame};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{collections::BTreeSet, path::Path};
+
+#[path = "recorder/official.rs"]
+mod official;
+pub use official::record_pr174;
+
+enum CaptureContext {
+    Synthetic,
+    #[cfg(any(all(target_os = "linux", target_arch = "x86_64"), test))]
+    Official {
+        identity: Value,
+        authorization: Value,
+    },
+}
+
+impl CaptureContext {
+    fn scope(&self) -> &'static str {
+        match self {
+            Self::Synthetic => "synthetic-only; official live execution blocked",
+            #[cfg(any(all(target_os = "linux", target_arch = "x86_64"), test))]
+            Self::Official { .. } => {
+                "official-pr174-capture; runtime/containment/receiver unverified"
+            }
+        }
+    }
+
+    fn requires_export(&self) -> bool {
+        match self {
+            Self::Synthetic => false,
+            #[cfg(any(all(target_os = "linux", target_arch = "x86_64"), test))]
+            Self::Official { .. } => true,
+        }
+    }
+
+    fn provenance(&self) -> Value {
+        match self {
+            Self::Synthetic => json!({"archive":"none"}),
+            #[cfg(any(all(target_os = "linux", target_arch = "x86_64"), test))]
+            Self::Official { .. } => json!({
+                "release":"kotlin-lsp/v263.6379.0",
+                "archiveSha256":"ab8ca4455dc2fc5fe1a24db2bccc46c104254d2c465155c4251ee65df8f3f7cc"
+            }),
+        }
+    }
+
+    fn configure_command(&self, command: &mut std::process::Command) {
+        let environment: &[(&str, &str)] = match self {
+            Self::Synthetic => &[],
+            #[cfg(any(all(target_os = "linux", target_arch = "x86_64"), test))]
+            Self::Official { .. } => &[
+                ("PATH", "/usr/bin:/bin"),
+                ("LANG", "C.UTF-8"),
+                ("LC_ALL", "C.UTF-8"),
+            ],
+        };
+        command.envs(environment.iter().copied());
+    }
+
+    fn initial_manifest(&self, limits: CaptureLimits) -> Value {
+        let report = json!({
+            "schemaVersion":1,
+            "scope":self.scope(),
+            "complete":false,
+            "failureReason":"capture interrupted before final manifest",
+            "limits":limits,
+            "officialAcceptance":false,
+            "runtime":"unverified",
+            "containment":"unverified",
+            "receiver":"unverified",
+            "provenance":self.provenance(),
+            "export":{"complete":false,"records":0,"bytes":0,"failureReason":"export not completed"},
+            "cleanup":{"containment":"isolated process group; escaped sessions/groups unsupported"}
+        });
+        match self {
+            Self::Synthetic => report,
+            #[cfg(any(all(target_os = "linux", target_arch = "x86_64"), test))]
+            Self::Official {
+                identity,
+                authorization,
+            } => {
+                let mut report = report;
+                report["identity"] = identity.clone();
+                report["authorization"] = authorization.clone();
+                report["environment"] = json!({
+                    "PATH":"/usr/bin:/bin","LANG":"C.UTF-8","LC_ALL":"C.UTF-8"
+                });
+                report
+            }
+        }
+    }
+
+    fn metadata(&self, returncode: i32) -> Value {
+        let (release, sha256) = match self {
+            Self::Synthetic => (
+                "synthetic-only",
+                "0000000000000000000000000000000000000000000000000000000000000000",
+            ),
+            #[cfg(any(all(target_os = "linux", target_arch = "x86_64"), test))]
+            Self::Official { .. } => (
+                "kotlin-lsp/v263.6379.0",
+                "ab8ca4455dc2fc5fe1a24db2bccc46c104254d2c465155c4251ee65df8f3f7cc",
+            ),
+        };
+        let metadata = json!({
+            "release":release,"sha256":sha256,"returncode":returncode,
+            "scope":self.scope(),"officialAcceptance":false,
+            "provenance":self.provenance(),"runtime":"unverified",
+            "containment":"unverified","receiver":"unverified"
+        });
+        match self {
+            Self::Synthetic => metadata,
+            #[cfg(any(all(target_os = "linux", target_arch = "x86_64"), test))]
+            Self::Official {
+                identity,
+                authorization,
+            } => {
+                let mut metadata = metadata;
+                metadata["identity"] = identity.clone();
+                metadata["authorization"] = authorization.clone();
+                metadata
+            }
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RawReference {
+    direction: &'static str,
+    frame_index: usize,
+}
+
+#[derive(Serialize)]
+struct DecodedFrame {
+    start: usize,
+    end: usize,
+    message: Value,
+}
+
+struct Transcript<'a> {
+    chronology: &'a [RawReference],
+    script: &'a [Value],
+    decoded: &'a [DecodedFrame],
+}
+
+impl Serialize for Transcript<'_> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeSeq;
+        #[derive(Serialize)]
+        struct Record<'a> {
+            direction: &'static str,
+            message: &'a Value,
+        }
+        let mut sequence = serializer.serialize_seq(Some(self.chronology.len()))?;
+        for reference in self.chronology {
+            let message = match reference.direction {
+                "client" => &self.script[reference.frame_index],
+                _ => &self.decoded[reference.frame_index].message,
+            };
+            sequence.serialize_element(&Record {
+                direction: reference.direction,
+                message,
+            })?;
+        }
+        sequence.end()
+    }
+}
+
+struct ExportWriter<W> {
+    inner: W,
+    bytes: usize,
+    overflow: bool,
+}
+
+impl<W: std::io::Write> std::io::Write for ExportWriter<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        if bytes.len() > MAX_BYTES - self.bytes {
+            self.overflow = true;
+            return Err(std::io::Error::other("transcript byte limit"));
+        }
+        let written = self.inner.write(bytes)?;
+        self.bytes += written;
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+fn write_transcript(
+    output: &mut impl std::io::Write,
+    transcript: &Transcript<'_>,
+) -> Result<usize, String> {
+    if transcript.chronology.len() > MAX_MESSAGES {
+        return Err("transcript record limit".into());
+    }
+    let mut output = ExportWriter {
+        inner: output,
+        bytes: 0,
+        overflow: false,
+    };
+    let result = serde_json::to_writer(&mut output, transcript);
+    if output.overflow {
+        return Err("transcript byte limit".into());
+    }
+    result.map_err(|e| format!("transcript export: {e}"))?;
+    std::io::Write::flush(&mut output).map_err(|e| format!("transcript export: {e}"))?;
+    Ok(output.bytes)
+}
 
 #[derive(Clone, Copy, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -216,6 +425,22 @@ pub fn record(
     directory: &Path,
     limits: CaptureLimits,
 ) -> Result<Value, String> {
+    record_with_context(
+        script,
+        command,
+        directory,
+        limits,
+        &CaptureContext::Synthetic,
+    )
+}
+
+fn record_with_context(
+    script: &[Value],
+    command: &[String],
+    directory: &Path,
+    limits: CaptureLimits,
+    context: &CaptureContext,
+) -> Result<Value, String> {
     if command.is_empty() || !Path::new(&command[0]).is_absolute() {
         return Err("absolute executable path required".into());
     }
@@ -268,7 +493,7 @@ pub fn record(
     if script.last().unwrap()["method"] != "exit" || id(script.last().unwrap())?.is_some() {
         return Err("script must end with exit notification".into());
     }
-    platform::run(script, &frames, command, directory, limits)
+    platform::run(script, &frames, command, directory, limits, context)
 }
 
 // Completeness scheduling only; read_frame remains the authoritative grammar validator.
@@ -311,6 +536,7 @@ mod platform {
         _: &[String],
         _: &Path,
         _: CaptureLimits,
+        _: &CaptureContext,
     ) -> Result<Value, String> {
         Err("recorder supervision supports Linux/macOS only; no process launched".into())
     }
@@ -464,14 +690,23 @@ mod platform {
         command: &[String],
         directory: &Path,
         limits: CaptureLimits,
+        context: &CaptureContext,
     ) -> Result<Value, String> {
         fs::create_dir(directory).map_err(|e| format!("fresh evidence directory: {e}"))?;
         fs::set_permissions(directory, fs::Permissions::from_mode(0o700))
             .map_err(|e| e.to_string())?;
         let directory = fs::canonicalize(directory).map_err(|e| e.to_string())?;
-        let mut report = json!({"schemaVersion":1,"scope":"synthetic-only; official live execution blocked", "complete":false,"failureReason":"capture interrupted before final manifest", "limits":limits, "cleanup":{"containment":"isolated process group; escaped sessions/groups unsupported"}});
+        let mut report = context.initial_manifest(limits);
         save(&directory, &report).map_err(|e| e.to_string())?;
-        let result = capture(script, frames, command, &directory, limits, &mut report);
+        let result = capture(
+            script,
+            frames,
+            command,
+            &directory,
+            limits,
+            context,
+            &mut report,
+        );
         if let Err(error) = result {
             report["complete"] = json!(false);
             report["failureReason"] = json!(error);
@@ -487,6 +722,7 @@ mod platform {
         command: &[String],
         directory: &Path,
         limits: CaptureLimits,
+        context: &CaptureContext,
         report: &mut Value,
     ) -> Result<(), String> {
         let mut intended =
@@ -512,7 +748,8 @@ mod platform {
         for name in ["home", "config", "system", "log", "tmp", "workspace"] {
             fs::create_dir(directory.join(name)).map_err(|e| e.to_string())?;
         }
-        let child = Command::new(&command[0])
+        let mut child_command = Command::new(&command[0]);
+        child_command
             .args(&command[1..])
             .env_clear()
             .env("HOME", directory.join("home"))
@@ -526,9 +763,9 @@ mod platform {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .process_group(0)
-            .spawn()
-            .map_err(|e| format!("spawn: {e}"))?;
+            .process_group(0);
+        context.configure_command(&mut child_command);
+        let child = child_command.spawn().map_err(|e| format!("spawn: {e}"))?;
         let pgid = i32::try_from(child.id()).map_err(|e| e.to_string())?;
         let mut group = Group {
             child,
@@ -554,7 +791,8 @@ mod platform {
         let mut index = 0;
         let mut written = 0;
         let mut outgoing = Vec::<Value>::new();
-        let mut decoded = Vec::<Value>::new();
+        let mut decoded = Vec::<DecodedFrame>::new();
+        let mut chronology = Vec::<RawReference>::new();
         let mut consumed = 0;
         let mut next_size = None;
         let mut pending = None;
@@ -613,15 +851,26 @@ mod platform {
                         .map_err(|e| format!("stdout JSON: {e}"))?;
                     consumed += size;
                     decoded_this_tick += 1;
-                    decoded.push(json!({"start":start,"end":consumed,"message":message}));
-                    envelope(&message)?;
-                    let key = id(&message)?;
+                    decoded.push(DecodedFrame {
+                        start,
+                        end: consumed,
+                        message,
+                    });
+                    chronology.push(RawReference {
+                        direction: "server",
+                        frame_index: decoded.len() - 1,
+                    });
+                    let message = &decoded.last().unwrap().message;
+                    envelope(message)?;
+                    let key = id(message)?;
                     if message.get("method").is_some() {
                         if key.is_some() {
                             return Err("unexpected server request".into());
                         }
                     } else if key.is_none() || key != pending {
                         return Err("unexpected/duplicate response ID".into());
+                    } else if index >= frames.len() || written != frames[index].len() {
+                        return Err("response before client frame fully accepted".into());
                     } else {
                         pending = None;
                     }
@@ -655,6 +904,12 @@ mod platform {
                         Ok(n) => {
                             written += n;
                             outgoing[index]["acceptedBytes"] = json!(written);
+                            if written == frames[index].len() {
+                                chronology.push(RawReference {
+                                    direction: "client",
+                                    frame_index: index,
+                                });
+                            }
                         }
                         Err(e)
                             if matches!(
@@ -711,12 +966,54 @@ mod platform {
             }
             thread::sleep(Duration::from_millis(2));
         }
+        let transcript = Transcript {
+            chronology: &chronology,
+            script,
+            decoded: &decoded,
+        };
+        let transport_complete = failure.is_none() && cleanup_error.is_none() && script_done;
+        let exported = if transport_complete {
+            export(directory, &transcript, context, status.as_ref())
+        } else {
+            Err(format!(
+                "consumer export withheld: {}",
+                failure
+                    .as_ref()
+                    .or(cleanup_error.as_ref())
+                    .map_or("script incomplete", String::as_str)
+            ))
+        };
+        report["export"] = match &exported {
+            Ok(bytes) => json!({
+                "complete":true,"records":chronology.len(),"bytes":bytes,"failureReason":null
+            }),
+            Err(error) => json!({
+                "complete":false,"records":chronology.len(),"bytes":0,"failureReason":error
+            }),
+        };
+        if context.requires_export()
+            && let Err(error) = exported
+        {
+            failure.get_or_insert(error);
+        }
         let complete = failure.is_none() && cleanup_error.is_none() && script_done;
         report["complete"] = json!(complete);
         report["failureReason"] = json!(failure.as_ref().or(cleanup_error.as_ref()));
         report["scriptCompleted"] = json!(script_done);
-        report["clientFrames"] = json!(outgoing);
-        report["stdoutFrames"] = json!(decoded);
+        report["clientFrames"] = Value::Array(outgoing);
+        report["stdoutFrames"] = Value::Array(
+            decoded
+                .into_iter()
+                .map(|frame| {
+                    Value::Object(serde_json::Map::from_iter([
+                        ("start".into(), Value::from(frame.start)),
+                        ("end".into(), Value::from(frame.end)),
+                        ("message".into(), frame.message),
+                    ]))
+                })
+                .collect(),
+        );
+        report["chronology"] = serde_json::to_value(chronology).map_err(|e| e.to_string())?;
         report["stdout"] = json!({"bytes":stdout.bytes.len(),"observedBytes":stdout.observed_bytes,"unpersistedBytes":stdout.unpersisted_bytes,"storageFailed":stdout.storage_failed,"eof":stdout.eof,"truncated":stdout.truncated,"undecodedStart":consumed,"undecodedEnd":stdout.bytes.len()});
         report["stderr"] = json!({"bytes":stderr.bytes.len(),"observedBytes":stderr.observed_bytes,"unpersistedBytes":stderr.unpersisted_bytes,"storageFailed":stderr.storage_failed,"eof":stderr.eof,"truncated":stderr.truncated});
         report["exit"] = json!({"observed":status.is_some(),"code":status.and_then(|s| s.code()),"signal":status.and_then(|s| s.signal())});
@@ -726,5 +1023,255 @@ mod platform {
         report["cleanup"]["error"] = json!(cleanup_error);
         report["elapsedMs"] = json!(started.elapsed().as_millis() as u64);
         Ok(())
+    }
+
+    fn export(
+        directory: &Path,
+        transcript: &Transcript<'_>,
+        context: &CaptureContext,
+        status: Option<&std::process::ExitStatus>,
+    ) -> Result<usize, String> {
+        let returncode = status
+            .and_then(|status| {
+                status
+                    .code()
+                    .or_else(|| status.signal().map(|signal| -signal))
+            })
+            .ok_or("export requires observed child returncode")?;
+        let temporary = directory.join("transcript.next");
+        let result = (|| {
+            let mut output = file(&temporary).map_err(|e| format!("transcript export: {e}"))?;
+            let bytes = write_transcript(&mut output, transcript)?;
+            let mut metadata = file(&directory.join("metadata.json"))
+                .map_err(|e| format!("metadata export: {e}"))?;
+            serde_json::to_writer(&mut metadata, &context.metadata(returncode))
+                .map_err(|e| format!("metadata export: {e}"))?;
+            metadata
+                .flush()
+                .map_err(|e| format!("metadata export: {e}"))?;
+            fs::rename(&temporary, directory.join("transcript.json"))
+                .map_err(|e| format!("transcript export: {e}"))?;
+            Ok(bytes)
+        })();
+        if result.is_err() {
+            let _ = fs::remove_file(&temporary);
+        }
+        result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{self, Write};
+
+    #[test]
+    fn export_preserves_chronological_references() {
+        let script = [
+            json!({"jsonrpc":"2.0","id":1,"method":"shutdown"}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ];
+        let decoded = [DecodedFrame {
+            start: 0,
+            end: 42,
+            message: json!({"jsonrpc":"2.0","id":1,"result":null}),
+        }];
+        let chronology = [
+            RawReference {
+                direction: "client",
+                frame_index: 0,
+            },
+            RawReference {
+                direction: "server",
+                frame_index: 0,
+            },
+            RawReference {
+                direction: "client",
+                frame_index: 1,
+            },
+        ];
+        let mut output = Vec::new();
+        let bytes = write_transcript(
+            &mut output,
+            &Transcript {
+                chronology: &chronology,
+                script: &script,
+                decoded: &decoded,
+            },
+        )
+        .unwrap();
+        assert_eq!(bytes, output.len());
+        assert_eq!(
+            serde_json::from_slice::<Value>(&output).unwrap(),
+            json!([
+                {"direction":"client","message":script[0]},
+                {"direction":"server","message":decoded[0].message},
+                {"direction":"client","message":script[1]}
+            ])
+        );
+        let metadata = serde_json::to_vec(&CaptureContext::Synthetic.metadata(0)).unwrap();
+        assert!(crate::Evidence::parse(&output, &metadata).is_ok());
+    }
+
+    #[test]
+    fn export_combines_directional_record_limits() {
+        let script = [json!({"jsonrpc":"2.0","method":"exit"})];
+        let decoded = [DecodedFrame {
+            start: 0,
+            end: 1,
+            message: json!({"jsonrpc":"2.0","method":"notice"}),
+        }];
+        let mut chronology: Vec<_> = (0..MAX_MESSAGES)
+            .map(|index| RawReference {
+                direction: if index % 2 == 0 { "client" } else { "server" },
+                frame_index: 0,
+            })
+            .collect();
+        assert!(
+            write_transcript(
+                &mut io::sink(),
+                &Transcript {
+                    chronology: &chronology,
+                    script: &script,
+                    decoded: &decoded
+                },
+            )
+            .is_ok()
+        );
+        chronology.push(RawReference {
+            direction: "client",
+            frame_index: 0,
+        });
+        assert_eq!(
+            write_transcript(
+                &mut io::sink(),
+                &Transcript {
+                    chronology: &chronology,
+                    script: &script,
+                    decoded: &decoded
+                },
+            )
+            .unwrap_err(),
+            "transcript record limit"
+        );
+    }
+
+    #[test]
+    fn export_byte_boundary_and_storage_errors_are_not_success() {
+        let mut script = [json!({"jsonrpc":"2.0","method":"exit","params":{"text":""}})];
+        let chronology = [RawReference {
+            direction: "client",
+            frame_index: 0,
+        }];
+        let base = write_transcript(
+            &mut io::sink(),
+            &Transcript {
+                chronology: &chronology,
+                script: &script,
+                decoded: &[],
+            },
+        )
+        .unwrap();
+        script[0]["params"]["text"] = json!("x".repeat(MAX_BYTES - base));
+        assert_eq!(
+            write_transcript(
+                &mut io::sink(),
+                &Transcript {
+                    chronology: &chronology,
+                    script: &script,
+                    decoded: &[]
+                },
+            )
+            .unwrap(),
+            MAX_BYTES
+        );
+        script[0]["params"]["text"] = json!("x".repeat(MAX_BYTES - base + 1));
+        assert_eq!(
+            write_transcript(
+                &mut io::sink(),
+                &Transcript {
+                    chronology: &chronology,
+                    script: &script,
+                    decoded: &[]
+                },
+            )
+            .unwrap_err(),
+            "transcript byte limit"
+        );
+
+        struct FailedStorage;
+        impl Write for FailedStorage {
+            fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+                Err(io::Error::other("storage unavailable"))
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        assert!(
+            write_transcript(
+                &mut FailedStorage,
+                &Transcript {
+                    chronology: &chronology,
+                    script: &script,
+                    decoded: &[]
+                },
+            )
+            .unwrap_err()
+            .contains("storage unavailable")
+        );
+    }
+
+    #[test]
+    fn initial_official_manifest_is_configured_and_unverified() {
+        let context = CaptureContext::Official {
+            identity: json!({"identity":"frozen"}),
+            authorization: json!({"authorization":"bound"}),
+        };
+        let report = context.initial_manifest(CaptureLimits::default());
+        assert_eq!(report["identity"], json!({"identity":"frozen"}));
+        assert_eq!(report["authorization"], json!({"authorization":"bound"}));
+        assert_eq!(
+            report["environment"],
+            json!({
+                "PATH":"/usr/bin:/bin","LANG":"C.UTF-8","LC_ALL":"C.UTF-8"
+            })
+        );
+        let mut command = std::process::Command::new("/nonexistent/not-spawned");
+        command.env_clear();
+        context.configure_command(&mut command);
+        let environment: std::collections::BTreeMap<_, _> = command
+            .get_envs()
+            .map(|(key, value)| (key.to_str().unwrap(), value.unwrap().to_str().unwrap()))
+            .collect();
+        assert_eq!(
+            environment,
+            std::collections::BTreeMap::from([
+                ("LANG", "C.UTF-8"),
+                ("LC_ALL", "C.UTF-8"),
+                ("PATH", "/usr/bin:/bin"),
+            ])
+        );
+        let mut synthetic_command = std::process::Command::new("/nonexistent/not-spawned");
+        synthetic_command.env_clear();
+        CaptureContext::Synthetic.configure_command(&mut synthetic_command);
+        assert_eq!(synthetic_command.get_envs().count(), 0);
+        assert_eq!(report["officialAcceptance"], false);
+        assert_eq!(report["complete"], false);
+        for key in ["runtime", "containment", "receiver"] {
+            assert_eq!(report[key], "unverified");
+        }
+        let synthetic = CaptureContext::Synthetic.initial_manifest(CaptureLimits::default());
+        assert!(synthetic.get("environment").is_none());
+        assert_eq!(
+            synthetic["scope"],
+            "synthetic-only; official live execution blocked"
+        );
+        assert_eq!(synthetic["provenance"]["archive"], "none");
+        assert_eq!(
+            CaptureContext::Synthetic.metadata(0)["release"],
+            "synthetic-only"
+        );
+        assert_eq!(context.metadata(0)["officialAcceptance"], false);
     }
 }

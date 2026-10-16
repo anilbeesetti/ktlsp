@@ -1,5 +1,56 @@
 # T045c / #91 recorder review evidence
 
+## #331 protected adapter source
+
+This source adds the fixed PR174 entrypoint and private official configuration
+inside the existing recorder; it does not authorize an official launch.
+Authorization consumes the host producer's flattened `originalRun` projection
+and actual preflight-byte SHA-256, while PR300 validation still supplies strict
+pins/schemas and exact embedded fixture bytes. The optional package reuses the
+existing audited exact SHA2 graph and retained artifacts-crate notices.
+
+ROOT's producer-compatible custody interpretation permits only the exact
+UID/GID65532 mode0755 INNER tmpfs ancestor, with distinct root-owned read-only
+private mounts at the four input roots and read-only image-root coverage above
+it. Held-descriptor openat traversal and fdinfo/mountinfo identity checks reject
+symlink, hidden/nested mount, type, link-count, ownership and digest substitution.
+This is not independent run authentication: original host START and an
+authenticated receiver remain mandatory. Separate hosted calibration must
+prove the child cannot rename/remove/unmount/bind-over those roots or enter an
+effective alternate mount namespace; no such runtime proof is claimed here.
+
+Chronology is recorded at complete client OS-byte acceptance and server decode,
+with references to retained raw frame tables. Borrowed directional export has
+the existing Evidence consumer's 8 MiB/1,024-record ceilings. Incomplete/error/
+budget/storage observations never become official acceptance. Synthetic peer
+mechanics regressions use the real executable recorder→Evidence→replay path and
+explicit nonofficial metadata. Linux custody tests require no official child,
+Docker, systemd or mount mutation. Source-review and exercised-check receipts
+are recorded separately on the source PR, not inferred from historical results.
+
+Independent source review found three correctness edges: a matching response
+could be decoded before the request was fully accepted; a malformed raw tail
+could leave a replayable valid prefix; and applying the combined consumer count
+inside transport changed synthetic limits. The recorder now fails premature
+responses without changing actual chronology, withholds consumer files after
+failed transport, and checks combined budgets at export only. Synthetic
+`complete` remains transport-only, with separate `export.complete`; official
+capture additionally requires export. Permanent Rust-peer regressions retain
+each case's raw/acceptance/error facts. Independent functionality and adversarial
+source rechecks cleared all three fixes with no remaining findings.
+
+After those reviews, optional formatting and locked strict all-target Clippy
+passed locally on macOS. The first full test attempt found a new assertion typo:
+`bad-frame-tail` emits `malformed-tail`, not another peer mode's `raw-tail`.
+Both reviewers source-rechecked the exact-byte correction, with no production
+or limit change. The corrected full optional suite passed: **55 ordinary cases**
+(7 library, 20 host, 1 host-peer consumer, 12 PR174, 9 recorder, 6 replay), plus
+two ignored helpers actually exercised by their parents. Executable synthetic
+Rust peer → recorder export → Evidence load → replay passed, including notification
+placement, errors/nonzero exits, record/byte ceilings and premature responses.
+No parser, JVM, Docker or systemd launch occurred. The two Linux-only custody
+regressions and Linux compilation are hosted-check requirements, not local facts.
+
 ## Historical PR300 source-review checkpoint
 
 PR174 source preparation adds a working input-consistency validator.

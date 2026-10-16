@@ -2678,14 +2678,11 @@ mod host {
         // The unique outside-step cleanup owner also preserves the protected export after runner-step loss.
         // Export failure never rewrites the original teardown result.
         let export = protected_export_until(dir, service_end.saturating_sub(2_000));
-        match export {
-            Err(error) => {
-                let bytes = serde_json::to_vec(&json!({"scope":"PR174_EXPORT_FAILURE","error":error,"officialCaptureSuccess":false})).map_err(|e|e.to_string())?;
-                if bytes.len() <= 2048 {
-                    let _ = make_file(&dir.join("export-failure.json"), &bytes, 0o400);
-                }
+        if let Err(error) = export {
+            let bytes = serde_json::to_vec(&json!({"scope":"PR174_EXPORT_FAILURE","error":error,"officialCaptureSuccess":false})).map_err(|e|e.to_string())?;
+            if bytes.len() <= 2048 {
+                let _ = make_file(&dir.join("export-failure.json"), &bytes, 0o400);
             }
-            Ok(_) => {}
         }
         Ok(result)
     }

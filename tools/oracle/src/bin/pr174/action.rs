@@ -5,7 +5,7 @@ fn unhex(value:&Value)->Result<Vec<u8>> {
     let text=value.as_str().ok_or("raw command hex missing")?;
     if text.len()>CLEANUP_BYTES*2||text.len()%2!=0||!text.bytes().all(|b|b.is_ascii_digit()||(b'a'..=b'f').contains(&b)){return Err("raw command hex invalid/bounded".into());}
     let nibble=|b:u8|if b.is_ascii_digit(){b-b'0'}else{b-b'a'+10};
-    Ok(text.as_bytes().chunks_exact(2).map(|pair|(nibble(pair[0])<<4)|nibble(pair[1])).collect())
+    Ok(text.as_bytes().as_chunks::<2>().0.iter().map(|pair|(nibble(pair[0])<<4)|nibble(pair[1])).collect())
 }
 fn forced_cleanup_proof(raw:&[u8],tool:&Path,cid:&str)->Result<()> {
     let mut killed=false;let mut waited=false;let mut inspected=false;

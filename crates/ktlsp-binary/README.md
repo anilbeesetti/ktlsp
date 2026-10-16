@@ -213,3 +213,38 @@ semantic classpath resolution or full official Kotlin LSP parity.
 `method_type_annotations::decode` composes declaration/extension/field data with all six legal method targets (0x01, 0x12, 0x14, 0x15, 0x16, 0x17), sharing one annotation budget. `target_type` retains the raw tag and `target_info: MethodTargetInfo` retains fixed-width indices. **Breaking API change:** `formal_parameter_index` was removed; formal-parameter data is now `MethodTargetInfo::FormalParameter(index)`. External field reads/literals/patterns and derived Debug/layout/size can change.
 
 Indices and paths are encoded data, without descriptor, Signature, bound, receiver or Exceptions validation. Class/Code/Record contexts remain outside this method decoder; no semantic server feature or full annotation-context parity follows. See [the finite contract](METHOD_TYPE_ANNOTATIONS_SPEC.md).
+
+## Resolved nominal Package aliases (#383)
+
+`metadata::resolved_alias_signature::decode` consumes supported decoded kind 2/5,
+mv 2.3.0 Package data and returns declaration names plus underlying/expanded
+nominal ClassIds, effective nullable values and nullable presence. ClassIds expose
+lossless UTF-16 package/relative-class parts and resolver local membership.
+Encoded declaration ordinals and decoded-d1 spans are provenance, not symbol IDs.
+The genuine checked-in `KTypeParameterBaseKt.class.bin` supplies
+`TypeParameterContainer` → `kotlin/Any` for both roles through predefined index 0,
+despite empty raw d2 text. Its existing notices/provenance remain unchanged;
+compiler provenance is still unverified.
+
+This finite consumer requires one inline Type per role. Inline takes precedence
+over a simultaneous table ID; duplicate singular inline messages explicitly
+refuse instead of pretending to implement protobuf merging. Missing/table-only
+roles, alias parameters, arguments, parameter/alias classifiers, flexible/outer/
+abbreviated Types and nonzero Type flags refuse. Flat leaf Types use the existing
+hard depth-2 schema budget; no recursive traversal or cap increase is introduced.
+Unknown fields retain the existing opaque bounded-wire policy. Complete Package
+framing is scanned on success; any error returns no partial signatures.
+
+One existing shared schema/wire/resolver budget covers framing, complete Package
+selection, leaf validation, all string/local queries, ClassId conversion and
+owned output. Caller limits only tighten hard ceilings. Header/annotations/d1
+decoding remain earlier independently bounded stages; already-decoded d1 plus d2
+input bytes are admitted together. ClassId conversion follows pinned Kotlin
+[`NameResolverUtil`](https://github.com/JetBrains/kotlin/blob/d57eb4a26ed01ab03cf195da686c8047032ff16f/core/deserialization.common/src/org/jetbrains/kotlin/serialization/deserialization/NameResolverUtil.kt#L12-L17)
+and [`ClassId.fromString`](https://github.com/JetBrains/kotlin/blob/d57eb4a26ed01ab03cf195da686c8047032ff16f/core/compiler.common/src/org/jetbrains/kotlin/name/ClassId.kt#L126-L138):
+split at the last slash before the first backtick, map package slashes to dots,
+remove relative-class backticks, retain nested dots and local membership.
+No lossy Unicode conversion, alias lookup/expansion, generics/substitution,
+subtyping, module linkage, parser/server integration or official LSP parity is
+claimed. The existing raw TypeAlias/Types APIs still preserve opaque occurrences;
+this separate consumer does not broaden their contracts.

@@ -615,7 +615,60 @@ First-source original Native38898391304/platform38898391737 passed at
 were directly read before removing only temporary writers. See the
 [parser identity/CI receipt](../../crates/ktlsp-parser/README.md#ordinary-parameter-source-observation-369--pr370)
 and [provider behavior](../../crates/ktlsp-server/README.md#ordinary-parameters-and-local-shadowing-369).
-Cleanup/documentation reviews, final-source original full hosted CI and guarded
-integration remain separate required gates. No local parser/server/peer runtime,
-unchanged retry, compiler/type-resolution or full official parity claim follows.
+Final reviewed source `0bdd352001b6d5d0afa094fe65034f61dacbf67a` passed
+original Native38900620123 and platform38900620232. Guarded PR370 then
+delivered main `594cc51cb4f1994b5e4e896e3a3c171b0ff3bcf4`, tree
+`dcc34ee7f53abd5e27db94e3c02c18cbaa772140`, sole parent3047b69.
+Original attempt-1 push/main Native38902197940/job116976906974 passed
+983 standard/doctest cases plus22 separate worker fault cases. Independent
+OWNER and ROOT authenticated the exact checkout/tree/sole parent, complete
+127 result rows and mandatory steps before clearing the exclusive lease.
+No local parser/server/peer runtime, compiler/type-resolution or full official
+parity claim follows.
 
+
+## Visible values, declaration hover and extracted-archive source #378
+
+ROOT composes #371/PR375, #372/PR374 and #373/PR376 on that ONE verified
+594cc51 incoming main. The bounded visible-value API preserves producer,
+declaration and scope identity; declaration-name hover reuses the negotiated
+source renderer. Neither establishes completion, resolved types or full scopes.
+The optional archive path verifies all bytes and identities before executing
+the actual extracted matching binaries; its ignored test is NOT exercised by
+ordinary workspace CI and still requires separately admitted manual execution.
+
+The original #373 sourceb64a242 attempt-1 platform38905671701/Windows116988495909
+FAILED two existing tests. Cancellation received generic -32803 versus -32800;
+the definition assertion retained only an indexed Null, not its full reply or
+profile. Underlying parser category/callsite and actual null versus absent-result
+remain unknown. Native38905671387 and the original Mac job passed; the original
+failed Windows run remains failed. No CPU/CRLF/timeout/resource cause is inferred.
+
+#377 preserves exact static parser failure categories with unchanged codes,
+cleanup and precedence, tracks assertion callsites and adds failure-only full
+definition/profile context. This is provenance, NOT a reliability repair.
+Two independent full-union reviews cleared changed source
+`2c940228bb4af10f76020503ce007dbd1cfa8b44`, tree
+`9ac8b5af275e357ba81153bb633651cc4b078823`; pinned format, strict compile-only
+locked workspace/all-target Clippy and both affected workflow actionlint passed.
+ROOT corrected the temporary hover capture's job-level runner context to the
+test-step environment before publication; no hosted invalid-workflow run occurred.
+
+First original changed-union platform38907884039, attempt1, passed Mac116995986538
+and Windows116995986522 at actual checkout
+`0d1c4c35e5351a738e95d39ea209d4359acb2dc1`, ordered parents[594cc51,2c940228],
+the exact reviewed tree. Complete128-row censuses passed992/Mac and939/Windows,
+zero failures and3 ignored, with22 separately exercised worker fault cases each.
+This finite success does NOT reproduce, explain or fix #377's earlier failures.
+
+ROOT authenticated original artifact digests and directly read all three actual
+hover profiles: seven exact-ID replies each, class/function/property/parameter/
+local original name ranges, CRLF/non-BMP source and hostile-backtick Markdown.
+The six profile files were byte-identical across hosts. Only temporary capture
+writers may be removed after this readback; all behavioral assertions remain.
+Original Linux Native38907883688/job116995977677 also passed all mandatory
+pinned steps,994 standard/doctest cases plus22 separate worker fault cases,
+with the same actual checkout and128 result rows. ROOT authenticated complete
+APIs/logs and retained the first-source proof independently. Final cleanup-source
+reviews/CI and guarded integration remain separate gates. #96/#377, B3,
+#46/license and full official parity remain open.

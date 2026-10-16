@@ -503,9 +503,4 @@ fn real_cli_semantic_tokens_decode_full_range_and_committed_edit() {
         ]
     );
     assert_eq!(replies[4]["result"], json!({"kind":"full","items":[]}));
-    // Temporary first-hosted actual-wire capture: ROOT must read before removal.
-    let capture = serde_json::to_vec(&json!({"semanticTokens380":{"wire":replies,"decodedFull":full,"decodedRange":clipped,"decodedEdited":edited}})).unwrap();
-    assert!(capture.len() <= 16 * 1024);
-    std::io::stderr().write_all(&capture).unwrap();
-    std::io::stderr().write_all(b"\n").unwrap();
 }

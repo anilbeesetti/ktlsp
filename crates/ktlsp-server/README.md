@@ -13,7 +13,7 @@ cargo build --locked --release -p ktlsp-server -p ktlsp-parser --bins
 
 Install **both** `ktlsp` and `ktlsp-parser-worker` from that same build into the same trusted directory (with `.exe` suffixes on Windows). The default CLI discovers the worker only beside its own executable, checking that the sibling is a regular executable file on Unix. There is no PATH, current-directory or environment-selected worker fallback. Installation trust and matching build identity are the distributor's responsibility; this is not a sandbox, signature check or version-authentication protocol.
 
-Without that sibling, synchronization/folding/lexical diagnostics and compatible lexical semantic tokens remain available, `documentSymbolProvider`/`definitionProvider`/`hoverProvider`/`referencesProvider`/`documentHighlightProvider` are omitted and their requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. A configured worker that subsequently fails is a request failure, not a fabricated outline or binding. No JVM/JDK, Kotlin compiler or C parser is required.
+Without that sibling, synchronization/folding/lexical diagnostics and compatible lexical semantic tokens remain available, `documentSymbolProvider`/`definitionProvider`/`hoverProvider`/`referencesProvider`/`documentHighlightProvider`/`completionProvider`/`renameProvider` are omitted and their requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. A configured worker that subsequently fails is a request failure, not a fabricated outline or binding. No JVM/JDK, Kotlin compiler or C parser is required.
 
 ## Optional extracted-archive smoke (#373)
 
@@ -105,9 +105,9 @@ Permanent provider regressions decode real lexer output, negotiate independent
 request/type profiles, cover strict UTF-16/mixed terminators/opaque templates,
 edit rollback and exact resource boundaries. The real CLI regression decodes
 full/range results and an applied edit with exact string/u64 IDs and pull-mode
-diagnostics. These are authored checks, not a claim of execution: no local
-server/parser runtime is authorized under #96. Original hosted proof and final
-composition remain separately ROOT-admitted; full official parity remains open.
+diagnostics. Original hosted execution is recorded below; no local server/parser
+runtime is authorized under #96. Final cleanup-source CI and guarded integration
+remain separate gates; full official parity remains open.
 
 ## Eager finite local completion (#382)
 
@@ -152,13 +152,42 @@ resulting source's definition, including suffix/quote replacement, CRLF,
 astral names, empty prefixes, parameter/local shadowing and atomic refusals.
 Paired CLI coverage also retains exact string/u64 IDs, missing-worker and
 hover-independent behavior; controlled failing peers cover cancellation and
-edit/close/reopen guards, never fabricated successful CST. A temporary bounded
-direct wire/applied-source/rebinding capture is retained for ROOT's first
-hosted readback; no local runtime or hosted execution is claimed here.
+edit/close/reopen guards, never fabricated successful CST. ROOT and the owner
+independently read the original hosted wire, applied source and actual rebinding
+described below. No local server/parser runtime was run.
 
 No completion resolve, imports, snippets, commands, item data, dot triggers,
 type inference, damaged-syntax recovery or full/official completion parity is
 implemented or advertised. Type annotations remain retained syntax only.
+
+## Original hosted completion, rename and token proof
+
+At source `95bebd7762be59a6420a9942069d7113996bdf55`, original attempt1
+[Native38920539902](https://github.com/anilbeesetti/ktlsp/actions/runs/38920539902)
+and [platform38920540091](https://github.com/anilbeesetti/ktlsp/actions/runs/38920540091)
+passed pinned format, strict locked workspace/all-target Clippy and full workspace
+tests. Actual checkout `5b8e59624be2853dece9d9015d2d385a73a01857` has tree
+`a3140441914bbd998e0ab98af1f7de805f3a6bae` and ordered parents
+`[f5f8a409dea209d44f9a9abe11c0becdf20f658e,95bebd7762be59a6420a9942069d7113996bdf55]`.
+
+ROOT directly read all three actual payloads; macOS/Windows payloads agree exactly.
+Returned version7 rename edits replace only the original local name and bound use,
+preserving annotation/comment/sibling text; the actually reopened version8 source
+returns only the renamed declaration/use and its original definition. Completion
+replaces the complete original `` `couSuffix` `` token with `` `count😀` `` despite
+an inside caret, and the resulting real CLI definition returns parameter1:6–1:15.
+The exact u64 ID, CRLF/astral ranges, hover-independent capability and missing-worker
+refusals remain intact. ROOT independently applied both captured edit sets.
+
+ROOT independently decoded every actual relative full/range/edited token tuple:
+mixed CRLF/CR comment fragments clip correctly, and the committed edit changes the
+number into a four-UTF-16-unit astral string. Pull diagnostics return full `[]`
+without duplicate pushes. Linux additionally emitted matching rename/token payloads;
+completion's captured libtest output is available from the two platform jobs.
+Temporary writers were removed only after readback; behavioral assertions remain.
+This is finite source-specific native execution, not official equivalence, Windows
+packaging acceptance or an explanation/repair of #377. Final cleanup-source CI,
+guarded integration and independent original exact-main proof remain mandatory.
 
 ## Finite local definition and declaration hover
 
@@ -174,7 +203,7 @@ Non-reference positions can return null. Unsupported contexts/names, queried-nam
 
 `textDocument.hover.contentFormat` selects the first recognized client preference (`plaintext` or `markdown`); absent lists default to plaintext. Empty, malformed or wholly incompatible lists disable hover without breaking initialize or other providers. Markdown uses a Kotlin code fence longer than every backtick run in the source declaration, so untrusted source cannot close it; plaintext is emitted only when negotiated/defaulted. Source and response remain bounded by the existing parser input ceiling.
 
-All five parser consumers share **one** bounded job pipeline, parser instance, admission limits, cancellation/tombstones, cleanup ownership and incarnation/version/content publication guard. There is no second validator/pool, parse cache or extra source copy. #350 tests exercise actual paired stdio replies and controlled-peer cancellation separately; source/review/hosted receipts are not full navigation, oracle or platform proof. #96 remains open: no local parser/server runtime is authorized.
+All eight parser-backed methods share **one** bounded job pipeline, parser instance, admission limits, cancellation/tombstones, cleanup ownership and incarnation/version/content publication guard. There is no second validator/pool, parse cache or extra source copy. #350 tests exercise actual paired stdio replies and controlled-peer cancellation separately; source/review/hosted receipts are not full navigation, oracle or platform proof. #96 remains open: no local parser/server runtime is authorized.
 
 The [first original #351 Native run38866505501/job116860467519](https://github.com/anilbeesetti/ktlsp/actions/runs/38866505501/job/116860467519), attempt 1 at source `96b54047ee242e34a66f68020c79a47e620793eb`, checked merge `accd703dd2224301d1c8c44d1b2834a56a8b557f` into `bb6a75f61fd467c9b090210a369c7e1d225713d5`. Format and strict locked Clippy passed; workspace tests **failed** a new fixture's reply-count authoring error (six requests but expected seven). Actual failure wire retained the original definition `2:14–2:19`, plaintext declaration ``val `x😀` = 1`` and reference `2:33–2:38`, plus Combined/item outline and full empty pull without pushes. The other new real-worker semantic/refusal/hostile-fence/no-chasing cases and shared-wire cancellation/edit/reopen regression passed. The count was corrected from the six explicit source requests and independently source-rechecked by both reviewers; no unchanged retry or passing-full-run claim follows from this failure. Full negotiation and the direct-Write observation were not reached. Optional synthetic-tools [run38866505445](https://github.com/anilbeesetti/ktlsp/actions/runs/38866505445), attempt 1, passed both hosts; that is not official-oracle or platform proof.
 
@@ -272,7 +301,7 @@ Incomplete/error trees, unsupported declaration shapes (including destructuring 
 
 ### Cancellation and library lifetime
 
-`Session::handle` returns immediate responses; accepted parser-backed symbol/definition/hover/references/highlight requests return no immediate response. Call the nonblocking `Session::poll()` while continuing to service incoming messages to collect deferred responses. `Session::pending_requests()` includes cancelled work until its thread actually terminates. Existing parser-free requests remain immediate. The real-worker test request helper polls, and the packaged stdio client waits for each request before sending dependent edits or shutdown; bulk input does not imply synchronous completion order.
+`Session::handle` returns immediate responses; accepted parser-backed symbol/definition/hover/references/highlight/completion/prepareRename/rename requests return no immediate response. Call the nonblocking `Session::poll()` while continuing to service incoming messages to collect deferred responses. `Session::pending_requests()` includes cancelled work until its thread actually terminates. Existing parser-free requests remain immediate. The real-worker test request helper polls, and the packaged stdio client waits for each request before sending dependent edits or shutdown; bulk input does not imply synchronous completion order.
 
 A valid `$/cancelRequest` signals the exact active string/integer ID's `AtomicBool` passed to the existing Parser and returns that request's single RequestCancelled (`-32800`) response, never a notification response. Unknown IDs do nothing; invalid cancellation notifications produce bounded error records, not wire errors. IDs are reusable after their response, while old cancelled generations remain retained solely for cleanup. A duplicate still-active ID is rejected with InvalidRequest and null ID, without terminating the original request. Committed didChange/didClose invalidate matching work with ContentModified (`-32801`); rejected edits leave it alive. Stale/cancelled results never become empty success.
 
@@ -282,7 +311,7 @@ Shutdown and exit cancel owned jobs. `Session::close() -> (Vec<Value>, bool)` is
 
 EOF, fatal framing or broken output cancel jobs and attempt bounded cleanup. EOF is success only after shutdown; exit is success only after shutdown; any incomplete cleanup or output failure returns status 1 and controlled stderr. No writes are retried after broken output. Responses cannot be delivered after a broken transport, but work is still cancelled. Output write/flush, filesystem/handle operations and thread creation are synchronous OS calls: backpressure, OS scheduling or stuck OS calls have no hard real-time guarantee. The server does not hide a blocked join as successful cleanup.
 
-- At most **8 retained parser jobs per Session**, no waiting-job queue, and **8 owned parser thread handles process-wide**, shared across all five parser providers, with unfinished handles retained globally until joined. Capacity exhaustion returns RequestFailed (`-32803`) before copying source or spawning more work. These limits do not replace or weaken the parser's existing eight global Unix supervision reservations.
+- At most **8 retained parser jobs per Session**, no waiting-job queue, and **8 owned parser thread handles process-wide**, shared across all eight parser-backed methods, with unfinished handles retained globally until joined. Capacity exhaustion returns RequestFailed (`-32803`) before copying source or spawning more work. These limits do not replace or weaken the parser's existing eight global Unix supervision reservations.
 - Snapshot text is copied once into immutable shared storage; worker and owner share that snapshot. Each job has one bounded single-result channel, at most one rendered response, and one cancellation flag. A cancelled job releases its ID immediately but not its storage/admission slot before completion.
 - The incremental decoder retains at most one 8 KiB header and one 16 MiB payload plus the CLI's bounded read buffer. There is no accumulated input-frame queue or reader-thread lifetime to join.
 - Idle pending-input polls back off for 1 ms, so an immediately nonblocking
@@ -380,4 +409,4 @@ after applying an edit; standard versions cannot encode post-publication reopen
 incarnations. No workspace/member/parameter/full Kotlin rename, compiler conflict
 analysis or official rename equivalence is claimed. Permanent paired-worker tests
 apply the actual returned original-coordinate edits in memory and reparse/rebind;
-their runtime is hosted-only under #96 and awaits independently admitted evidence.
+their actual hosted wire/application/rebinding observation is recorded above. No local runtime or full rename/parity claim follows.

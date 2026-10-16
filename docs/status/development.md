@@ -745,3 +745,58 @@ These are combined native data observations, not Windows execution or CLI
 provider proof. First original hosted completion/rename/token payload readback,
 capture-only cleanup, final-source reviews/CI and guarded integration remain
 separate gates. Native-only/T004/#96 and full official parity limits remain.
+
+### PR385 first original combined execution and capture cleanup
+
+Two independent full27-file union source/docs rechecks cleared first-hosted head
+`95bebd7762be59a6420a9942069d7113996bdf55`, tree
+`a3140441914bbd998e0ab98af1f7de805f3a6bae`. ROOT published only the integration
+branch and draft [PR385](https://github.com/anilbeesetti/ktlsp/pull/385), preserving
+all component worktrees. Original attempt1 Native38920539902/job117039015622
+passed1035 cases; platform38920540091 macOS117039016182 passed1033 and
+Windows117039015825 passed980. Each complete census has130 result rows, zero
+failed/filtered and3 explicitly ignored fixtures, plus22 separate worker-protocol
+fault cases. Pinned format and strict locked workspace/all-target Clippy passed;
+Linux full workspace is debug, platform full workspace is release. No retries.
+
+Original APIs and authenticated retained artifacts independently establish actual
+checkout `5b8e59624be2853dece9d9015d2d385a73a01857`, that same tree, and ordered
+parents `[f5f8a409dea209d44f9a9abe11c0becdf20f658e,95bebd7762be59a6420a9942069d7113996bdf55]`.
+Both platform artifacts retain complete exit-zero original HEAD/tree/status,
+clean source, pinned compiler and successful format/Clippy/workspace receipts.
+Artifact12055145195 macOS SHA256
+dcf5dbf79319ef42da8d84f299d1b7d20bbbb7007d6646427f2f41dcd3676178;
+artifact12054219770 Windows SHA256
+91d970018f7612643a99cbd7b44f9d224c1475bdbaa5444d2d55ac6c2c6a2c70.
+ROOT and owner independently observed the Windows canonical-verbatim binding
+regression actually PASS; the consumer suite passed10 on each platform.
+
+ROOT directly read the complete actual completion, rename and lexical-token
+payloads. Each macOS/Windows pair is identical, with compact JSON SHA256:
+rename07cb0e79e1566b7acc6065bd6fde33ff6af4e692fc9dc4cde18595d531a3271d
+(5286 bytes); completione594513f704dd2bb690668c17e405418be093f6f299943f771eba5f01267b74a
+(4142 bytes); tokensa405e3958c7f98f87a8ba807abf4812c588bffab6559a9d4bc93c8f42fe428bf
+(1335 bytes). Independent implementation owners additionally authenticated and
+read both full rename/completion exchanges. Linux directly emitted equivalent
+rename/token payloads; completion eprintln is libtest-captured there, not observed.
+
+Actual rename carries original URI/version7, exact string/u64 IDs and two UTF-16
+edits; ROOT independently applied them to the captured CRLF/astral source and
+obtained exactly the actually reopened version8 text. Original annotation,
+comment and sibling stay unchanged; real followup references/definition select
+only the renamed local. Actual completion replaces the full backtick suffix token
+with the original parameter spelling, independently applies exactly, and the real
+followup definition returns parameter1:6–1:15. Hover-format refusal does not disable
+completion; resolve and missing-worker requests return-32601, never fake success.
+ROOT independently decoded every actual full/range/edited relative token tuple,
+including mixed CRLF/CR comment clipping, exact u64 ID and committed number→astral
+string change. Full pull reports remain empty without push duplicates.
+
+Only the three bounded temporary writers were removed after this readback;
+behavioral application/rebinding/decoding/ID/capability/cancellation assertions
+remain. Existing provider docs now enumerate all eight shared parser-backed
+methods rather than the historical five. Final cleanup-source reviews and
+original full hosted CI, separate fresh read-only guard/expected-head merge and
+independent OWNER+ROOT original exact-main acceptance are still required.
+No local parser/server/worker/peer runtime, official oracle, Windows archive,
+#377 root-cause/repair, first-party-license or full-parity acceptance is claimed.

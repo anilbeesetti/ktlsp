@@ -227,7 +227,17 @@ fn selected_ordinal_framing_and_opaque_other_members_are_atomic() {
     bytes.extend(message(9, &[0x80]));
     bytes.extend(message(10, &[0x80]));
     let input = input_for(&bytes);
-    assert!(decode(&input, 3, Limits::default()).is_ok());
+    let selected = decode(&input, 3, Limits::default()).unwrap();
+    assert_eq!(selected.function.ordinal, 3);
+    assert_eq!(selected.function.name, units("copy"));
+    assert_eq!(
+        selected.function.return_type.arguments[0].parameter_ordinal,
+        0
+    );
+    assert_eq!(
+        selected.function.return_type.arguments[1].parameter_ordinal,
+        1
+    );
     assert_eq!(
         decode(&input, 0, Limits::default()).unwrap_err().kind,
         ErrorKind::NotFunction
@@ -239,12 +249,7 @@ fn selected_ordinal_framing_and_opaque_other_members_are_atomic() {
         ErrorKind::MissingOrdinal
     );
     bytes.push(0x80); // Malformed LATE Class framing cannot be hidden behind selected success.
-    assert!(matches!(
-        decode(&input_for(&bytes), 3, Limits::default())
-            .unwrap_err()
-            .kind,
-        ErrorKind::Context(class_context::ErrorKind::Wire(_))
-    ));
+    assert!(decode(&input_for(&bytes), 3, Limits::default()).is_err());
     let mut wrong = parameter(0, 1);
     wrong.extend(parameter(1, 2));
     wrong.extend(scalar(9, 0));

@@ -89,6 +89,9 @@ fn infer_with_budget<'a>(
     let tree = binding.site().tree(current, budget)?;
     let target_index = binding.target().cst_index();
     let target = budget.element(tree, target_index)?;
+    if !budget.equal(&target.kind, "PROPERTY")? {
+        return Err(IntegerInitializerError::UnsupportedContext);
+    }
     let mut cursor = target_index
         .checked_add(1)
         .ok_or(IntegerInitializerError::Resource)?;

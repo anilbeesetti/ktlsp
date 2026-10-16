@@ -23,9 +23,9 @@ Missing/closed-document folding requests return invalid params (`-32602`), witho
 
 ## Finite local definition and declaration hover
 
-Over open Kotlin documents, a strict UTF-16 position selects an actual original value `REFERENCE_EXPRESSION` containing that position (end-exclusive). The existing declaration lowerer, structural-region directory, authenticated `ReferenceSite` and `bind_local_value` prove a unique preceding direct immutable local `val`, with an optional single simple type-name annotation. Only ordinary top-level zero-parameter functions with complete plain integer/whole-identifier local initializers are eligible. Definition returns the original target **name** range and same URI. Hover returns the original target **declaration text** and original reference range: no invented types, initializer chasing or inferred global unresolvedness.
+Over open Kotlin documents, a strict UTF-16 position selects an actual original value `REFERENCE_EXPRESSION` containing that position (end-exclusive). The existing declaration lowerer, structural-region directory, authenticated `ReferenceSite` and `bind_local_value` prove a unique eligible preceding direct immutable local `val` or same-function ordinary parameter. Only ordinary named top-level block functions with complete plain integer/whole-identifier local initializers and simple syntax-only parameter/local annotations are eligible. Definition returns the original target **name** range and same URI. Hover returns the original target **declaration text** (`p: T` for a parameter) and original reference range: no invented types, initializer chasing or inferred global unresolvedness.
 
-Non-reference positions can return null. Unsupported contexts/names, duplicates, self/forward references and no eligible local target return RequestFailed (`-32803`), not a claim that a symbol is globally unresolved. Malformed/out-of-range/surrogate-interior positions or unopened documents return InvalidParams (`-32602`). No imports, cross-file/project/member/full Kotlin resolution, type inference, full navigation or official parity is claimed.
+Non-reference positions can return null. Unsupported contexts/names, queried-name duplicates, self/forward references without an eligible parameter fallback, and no eligible target return RequestFailed (`-32803`), not a claim that a symbol is globally unresolved. Malformed/out-of-range/surrogate-interior positions or unopened documents return InvalidParams (`-32602`). No imports, cross-file/project/member/full Kotlin resolution, type inference, full navigation or official parity is claimed.
 
 `textDocument.hover.contentFormat` selects the first recognized client preference (`plaintext` or `markdown`); absent lists default to plaintext. Empty, malformed or wholly incompatible lists disable hover without breaking initialize or other providers. Markdown uses a Kotlin code fence longer than every backtick run in the source declaration, so untrusted source cannot close it; plaintext is emitted only when negotiated/defaulted. Source and response remain bounded by the existing parser input ceiling.
 
@@ -39,17 +39,18 @@ The same-build packaged stdio consumer, with empty PATH and Java variables remov
 
 ### Finite same-body references and highlights
 
-References/highlights select either an original lowered declaration-name token (including an unused local) or an authenticated whole-reference initializer. Use anchors resolve through the existing `reference_site`/`bind_local_value`; declaration anchors retain their original lowered declaration. Exactly one `local_value_occurrences` call then authenticates the target and collects its original bound sites under the kernel's single work/storage budget. No textual name search, global lookup, initializer chasing, per-occurrence budget reset or second parser pipeline is used.
+References/highlights select an original lowered declaration-name token (including unused locals/ordinary parameters) or a whole-reference initializer CST-index anchor. Exactly one `local_value_occurrences` call authenticates the `LocalValueAnchor`, resolves reference selection and collects original bound sites under ONE shared semantic work/storage budget; no fresh preliminary `reference_site`/`bind_local_value` query escapes that budget. Parameter ownership identifies the same introduced body while retaining original header file membership. No textual name search, global lookup, initializer chasing, per-occurrence budget reset or second parser pipeline is used.
 
 `textDocument/references` requires `context.includeDeclaration` to be a boolean. The result is same-document `Location[]`, in source order, optionally beginning with the original declaration-name range. An authenticated unused target returns `[]` when declaration inclusion is false. `textDocument/documentHighlight` returns the declaration as Write (`kind: 3`) and each bound occurrence as Read (`kind: 2`), once each, in source order. One existing UTF-16 sweep converts retained original endpoints, preserving CRLF and astral/backtick spelling.
 
-Both providers are independent of hover content-format negotiation and require the same canonical worker availability. Nontoken positions may return null; unsupported declaration/use contexts, ambiguous names, member/global/parameter lookup and self/forward use selection fail explicitly with `-32803`, never a claim of complete global no-references. Invalid context/URI/position shapes, unopened documents and invalid or split UTF-16 return `-32602`. Source/job limits, stale edit/close/reopen rejection, exact string/u64 cancellation, EOF/shutdown/exit and cleanup acknowledgement are shared unchanged.
+Both providers are independent of hover content-format negotiation and require the same canonical worker availability. Nontoken positions may return null; unsupported declaration/use/parameter forms, ambiguous names, member/global lookup and self/forward use selection without an eligible parameter fallback fail explicitly with `-32803`, never a claim of complete global no-references. Invalid context/URI/position shapes, unopened documents and invalid or split UTF-16 return `-32602`. Source/job limits, stale edit/close/reopen rejection, exact string/u64 cancellation, EOF/shutdown/exit and cleanup acknowledgement are shared unchanged.
 
 Output is bounded by the kernel's 1,024-site/storage ceiling and a conservative 1 MiB rendered-size ceiling (including repeated escaped URIs), failing the whole query rather than truncating. Only the admitted same function body is searched; identical names in other functions and unrelated duplicate names do not change the target. This is **not workspace/cross-file/full Kotlin references or highlight completeness**, general type resolution, or official parity.
 
 The composed typed-local lowerer admits an optional single simple type-name annotation on these same plain local vals, including supported backtick names. This is retained declaration syntax only: hover preserves it exactly, type-name tokens are not value occurrences, and no builtin-name whitelist or resolved type identity is inferred. Explicitly typed targets refuse integer-default inference; an annotated containing val does not invalidate a different untyped target. Qualified/nullable/generic/annotated/parenthesized/function/intersection/dynamic types remain outside this bounded subset. The paired-stdio composition regression also uses a type-name token spelled exactly like the value target, checking that it never enters references or highlights.
 
 The #364 permanent regressions assert real same-build packaged CLI payloads/IDs, declaration/use/unused anchors, includeDeclaration, highlight kinds/order, Unicode/CRLF and missing-worker behavior without duplicate pull-mode pushes. Additional real-worker cases assert semantic-equivalent quoted names, function isolation, no chasing, strict invalid input and atomic refusal. Shared controlled-peer tests cover each provider's exact cancellation and stale/lifecycle guards; those deliberately failing peers do not fabricate successful CST.
+
 
 At source `84a2baffed1ee75f43627c7d74a5475fe5abcd4e`, [first original #366 Linux Native run38884683910/job116919452694](https://github.com/anilbeesetti/ktlsp/actions/runs/38884683910/job/116919452694), attempt 1, passed pinned format, strict locked workspace/all-target Clippy and **963 workspace tests plus 22 separate protocol fault cases**. Actual checkout `77978b9df59dd167c70b29b96715309aa4552a0c` has ordered parents `[abe98694226c86fced3aed31691b8f0945a565e0,84a2baffed1ee75f43627c7d74a5475fe5abcd4e]` and tree `f85a217bcc13bef5c27c37ba663f68c64b6cedd1`. All 16 matching-worker provider tests and three controlled-peer cancellation tests passed. The initial local compile-only Clippy caught `chunks_exact_to_as_chunks`; its zero-allocation correction received both affected source rechecks and the admitted changed-source format/Clippy gates passed before this first push. No local parser/worker/server runtime was run under #96.
 
@@ -86,6 +87,33 @@ runtime observation is not attributed to an unexecuted cleanup head.
 
 
 
+
+### Ordinary parameters and local shadowing (#369)
+
+Ordinary parameters require positive name/colon/simple-type shape, comma separation
+and at most one trailing comma after a real parameter. Missing/richer types,
+defaults, vararg/modifiers/annotations, receivers/context/generics/explicit returns,
+expression bodies, members/constructors/lambdas/nesting/destructuring and relevant
+recovery remain refused. Type names are retained syntax, never resolved builtin
+identities. Queried-name duplicates are checked separately in parameter/local
+scopes; a unique preceding local wins, otherwise its same-function parameter.
+Before-shadow and `val p=p` initializer reads bind the parameter; later reads bind
+the local. References/highlights exclude valid same-body sites bound to the other
+target instead of failing or merging the two sets. Header types are not values.
+
+The [first-source producer/CI receipt](../ktlsp-parser/README.md#ordinary-parameter-source-observation-369--pr370)
+records exact source `9e96b16bcee0e10cf9228a7e467860c52576e9ec` and original
+Native38898391304/platform38898391737. ROOT directly read identical actual paired
+release-CLI wire on macOS/Windows: parameter name `2:6..2:11`, reads
+`3:16..3:21` and self-initializer `4:13..4:18`; local name `4:5..4:10` and read
+`5:9..5:14` formed a distinct set. Hover retained original `` `p🦀`: Long `` at the
+read with exact integer ID18446744073709551615. Unused `2:19..2:25` produced empty
+references without declaration inclusion and a single Write highlight; sibling
+function anchors stayed isolated. Annotation lookup failed explicitly, full pull
+was empty, all16 original request IDs appeared exactly once and no push appeared.
+Copied matching binaries ran with empty PATH and Java homes removed. Only the
+observed temporary writer was removed afterward; permanent assertions remain.
+This is first-source native evidence, not final-cleanup/main/official parity proof.
 
 ## Bounded syntactic document symbols
 

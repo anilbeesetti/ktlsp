@@ -175,6 +175,27 @@ impl<'a> BodyCheck<'a, '_> {
             function.subtree_end,
         )?;
         self.expect("LPAR", true, parameters_index, parameters.subtree_end)?;
+        loop {
+            self.trivia(parameters_index, parameters.subtree_end)?;
+            let next = self.peek()?;
+            if next.token && self.b.equal(&next.kind, "RPAR")? {
+                break;
+            }
+            let (_, parameter) = self.expect(
+                "VALUE_PARAMETER",
+                false,
+                parameters_index,
+                parameters.subtree_end,
+            )?;
+            // The authenticated lowerer owns the exact name/colon/type grammar.
+            self.cursor = parameter.subtree_end;
+            self.trivia(parameters_index, parameters.subtree_end)?;
+            let next = self.peek()?;
+            if next.token && self.b.equal(&next.kind, "RPAR")? {
+                break;
+            }
+            self.expect("COMMA", true, parameters_index, parameters.subtree_end)?;
+        }
         self.expect("RPAR", true, parameters_index, parameters.subtree_end)?;
         self.finish(parameters_index, parameters.subtree_end)?;
         let (checked_body_index, body) =
@@ -220,7 +241,7 @@ fn annotation_reference(
     Ok(!parent.token && b.equal(&parent.kind, "USER_TYPE")?)
 }
 
-/// Return the unique earlier complete direct local val, preserving original identity.
+/// Return the unique eligible preceding local val or same-function parameter.
 /// A refusal is not a claim that a reference is globally unresolved. Recheck the
 /// authoritative open-document incarnation under its synchronization before use.
 pub fn bind_local_value<'a>(
@@ -236,6 +257,16 @@ pub(super) fn bind_with_budget<'a>(
     current: &SourceSnapshot,
     b: &mut ReferenceBudget,
 ) -> Result<LocalValueBinding<'a>> {
+    let (body, target) = binding_target_with_budget(directory, site, current, b)?;
+    Ok(LocalValueBinding { site, body, target })
+}
+
+fn binding_target_with_budget<'a>(
+    directory: &'a RegionDirectory<'a>,
+    site: &ReferenceSite<'a>,
+    current: &SourceSnapshot,
+    b: &mut ReferenceBudget,
+) -> Result<(&'a Region<'a>, &'a Declaration<'a>)> {
     if !std::ptr::eq(directory.lowered(), site.origin())
         || !std::ptr::eq(directory.snapshot(), site.origin().snapshot())
     {
@@ -252,14 +283,24 @@ pub(super) fn bind_with_budget<'a>(
     }
     .function(site.function(), site.body_index())?;
     let (body_ordinal, body) = find_body(directory, site.body_index(), b)?;
-    let target = unique_local(directory, body_ordinal, site.body_index(), spelling, b)?;
-    if std::ptr::eq(target, site.containing_property())
-        || target.cst_index() >= site.containing_property().cst_index()
-        || target.range().end > site.range().start
-    {
-        return Err(LocalBindingError::NoEligibleLocal);
-    }
-    Ok(LocalValueBinding { site, body, target })
+    let (local, parameter) = value_candidates(
+        directory,
+        body_ordinal,
+        site.body_index(),
+        site.function(),
+        spelling,
+        b,
+    )?;
+    b.charge(3)?;
+    let target = local
+        .filter(|target| {
+            !std::ptr::eq(*target, site.containing_property())
+                && target.cst_index() < site.containing_property().cst_index()
+                && target.range().end <= site.range().start
+        })
+        .or(parameter)
+        .ok_or(LocalBindingError::NoEligibleLocal)?;
+    Ok((body, target))
 }
 
 fn find_body<'a>(
@@ -277,42 +318,76 @@ fn find_body<'a>(
     body.ok_or(LocalBindingError::UnsupportedContext)
 }
 
-fn unique_local<'a>(
+fn value_candidates<'a>(
     directory: &'a RegionDirectory<'a>,
     body_ordinal: usize,
     body_index: usize,
+    function: &Declaration<'a>,
     spelling: &str,
     b: &mut ReferenceBudget,
-) -> Result<&'a Declaration<'a>> {
-    let mut target = None;
-    let mut matches = 0usize;
+) -> Result<(Option<&'a Declaration<'a>>, Option<&'a Declaration<'a>>)> {
+    let (mut local, mut parameter) = (None, None);
+    let (mut local_matches, mut parameter_matches) = (0usize, 0usize);
     for (ordinal, declaration) in directory.lowered().declarations().iter().enumerate() {
-        b.charge(2)?;
+        b.charge(3)?;
         let membership = directory
             .memberships()
             .get(ordinal)
             .ok_or(LocalBindingError::InvalidOrigin)?;
-        if membership.region() != body_ordinal {
-            continue;
+        let is_parameter = b.equal(declaration.kind(), "VALUE_PARAMETER")?;
+        if is_parameter {
+            let owner = declaration
+                .owner()
+                .and_then(|owner| directory.lowered().declarations().get(owner))
+                .ok_or(LocalBindingError::InvalidOrigin)?;
+            if !std::ptr::eq(owner, function) {
+                continue;
+            }
+            if !b.equal(declaration.cst_parent_kind(), "VALUE_PARAMETER_LIST")? {
+                return Err(LocalBindingError::UnsupportedContext);
+            }
+        } else {
+            if membership.region() != body_ordinal {
+                continue;
+            }
+            if declaration.cst_parent_index() != Some(body_index)
+                || !b.equal(declaration.kind(), "PROPERTY")?
+            {
+                return Err(LocalBindingError::UnsupportedContext);
+            }
         }
-        if declaration.cst_parent_index() != Some(body_index)
-            || !b.equal(declaration.kind(), "PROPERTY")?
-            || declaration.incomplete()
-        {
+        if declaration.incomplete() {
             return Err(LocalBindingError::UnsupportedContext);
         }
         let name = b
             .spelling(declaration.raw_name())?
             .ok_or(LocalBindingError::UnsupportedSpelling)?;
         if b.equal(name, spelling)? {
-            matches = matches.checked_add(1).ok_or(LocalBindingError::Resource)?;
-            target = Some(declaration);
+            let matches = if is_parameter {
+                &mut parameter_matches
+            } else {
+                &mut local_matches
+            };
+            *matches = matches.checked_add(1).ok_or(LocalBindingError::Resource)?;
+            if is_parameter {
+                parameter = Some(declaration);
+            } else {
+                local = Some(declaration);
+            }
         }
     }
-    if matches > 1 {
+    if local_matches > 1 || parameter_matches > 1 {
         return Err(LocalBindingError::AmbiguousLocal);
     }
-    target.ok_or(LocalBindingError::NoEligibleLocal)
+    Ok((local, parameter))
+}
+
+/// Select one original declaration or authenticate an initializer-reference CST node.
+/// Reference selection and occurrence collection share the same semantic budget.
+#[derive(Debug, Clone, Copy)]
+pub enum LocalValueAnchor<'a> {
+    Declaration(&'a Declaration<'a>),
+    ReferenceExpression(usize),
 }
 
 /// Complete occurrences for one original declaration in the admitted same body.
@@ -341,20 +416,20 @@ impl<'a> LocalValueOccurrences<'a> {
     }
 }
 
-/// Authenticate a target and collect its complete admitted same-body occurrences.
-/// All errors discard the result. Self/forward references do not bind to this
-/// target, nor does a nonmatching name imply global unresolvedness.
+/// Authenticate an anchor and collect its complete admitted same-body occurrences.
+/// All errors discard the result. Local shadowing partitions parameter/local sites;
+/// a nonmatching or ineligible name never implies global unresolvedness.
 /// Recheck the authoritative open-document incarnation before publication.
 pub fn local_value_occurrences<'a>(
     directory: &'a RegionDirectory<'a>,
     result: &'a SnapshotResult,
-    target: &'a Declaration<'a>,
+    anchor: LocalValueAnchor<'a>,
     current: &SourceSnapshot,
 ) -> Result<LocalValueOccurrences<'a>> {
     occurrences_with_budget(
         directory,
         result,
-        target,
+        anchor,
         current,
         &mut ReferenceBudget::default(),
     )
@@ -378,7 +453,7 @@ fn occurrence_storage(count: usize) -> Result<()> {
 pub(super) fn occurrences_with_budget<'a>(
     directory: &'a RegionDirectory<'a>,
     result: &'a SnapshotResult,
-    target: &'a Declaration<'a>,
+    anchor: LocalValueAnchor<'a>,
     current: &SourceSnapshot,
     b: &mut ReferenceBudget,
 ) -> Result<LocalValueOccurrences<'a>> {
@@ -386,6 +461,13 @@ pub(super) fn occurrences_with_budget<'a>(
         return Err(LocalBindingError::InvalidOrigin);
     }
     let parsed = authenticated_tree(directory.lowered(), result, current, b)?;
+    let target = match anchor {
+        LocalValueAnchor::Declaration(target) => target,
+        LocalValueAnchor::ReferenceExpression(index) => {
+            let site = reference_site_with_budget(directory.lowered(), result, current, index, b)?;
+            binding_target_with_budget(directory, &site, current, b)?.1
+        }
+    };
     let mut target_ordinal = None;
     for (ordinal, declaration) in directory.lowered().declarations().iter().enumerate() {
         b.charge(1)?;
@@ -394,24 +476,55 @@ pub(super) fn occurrences_with_budget<'a>(
         }
     }
     let target_ordinal = target_ordinal.ok_or(LocalBindingError::InvalidOrigin)?;
-    let body_index = target
-        .cst_parent_index()
+    let function_ordinal = target
+        .owner()
         .ok_or(LocalBindingError::UnsupportedContext)?;
-    let (body_ordinal, body) = find_body(directory, body_index, b)?;
+    let function = directory
+        .lowered()
+        .declarations()
+        .get(function_ordinal)
+        .ok_or(LocalBindingError::InvalidOrigin)?;
+    let parameter = b.equal(target.kind(), "VALUE_PARAMETER")?;
+    let (body_ordinal, body) = if parameter {
+        let mut body = None;
+        for (ordinal, region) in directory.regions().iter().enumerate() {
+            b.charge(1)?;
+            if region.introducer() == Some(function_ordinal)
+                && b.equal(region.kind(), "BLOCK")?
+                && body.replace((ordinal, region)).is_some()
+            {
+                return Err(LocalBindingError::InvalidOrigin);
+            }
+        }
+        body.ok_or(LocalBindingError::UnsupportedContext)?
+    } else if b.equal(target.kind(), "PROPERTY")? {
+        let index = target
+            .cst_parent_index()
+            .ok_or(LocalBindingError::UnsupportedContext)?;
+        find_body(directory, index, b)?
+    } else {
+        return Err(LocalBindingError::UnsupportedContext);
+    };
+    let body_index = body.cst_index();
     b.charge(2)?;
+    let expected_membership = if parameter {
+        directory
+            .memberships()
+            .get(function_ordinal)
+            .ok_or(LocalBindingError::InvalidOrigin)?
+            .region()
+    } else {
+        body_ordinal
+    };
     if directory
         .memberships()
         .get(target_ordinal)
         .ok_or(LocalBindingError::InvalidOrigin)?
         .region()
-        != body_ordinal
+        != expected_membership
     {
         return Err(LocalBindingError::UnsupportedContext);
     }
-    let function = target
-        .owner()
-        .and_then(|ordinal| directory.lowered().declarations().get(ordinal))
-        .ok_or(LocalBindingError::UnsupportedContext)?;
     BodyCheck {
         parsed,
         cursor: 0,
@@ -421,7 +534,10 @@ pub(super) fn occurrences_with_budget<'a>(
     let spelling = b
         .spelling(target.raw_name())?
         .ok_or(LocalBindingError::UnsupportedSpelling)?;
-    let unique = unique_local(directory, body_ordinal, body_index, spelling, b)?;
+    let (local, parameter_target) =
+        value_candidates(directory, body_ordinal, body_index, function, spelling, b)?;
+    let unique =
+        if parameter { parameter_target } else { local }.ok_or(LocalBindingError::InvalidOrigin)?;
     if !std::ptr::eq(unique, target) {
         return Err(LocalBindingError::InvalidOrigin);
     }
@@ -463,10 +579,13 @@ pub(super) fn occurrences_with_budget<'a>(
         if !b.equal(name, spelling)? {
             continue;
         }
-        match bind_with_budget(directory, &site, current, b) {
-            Ok(binding) => {
-                if !std::ptr::eq(binding.target(), target) || !std::ptr::eq(binding.body(), body) {
+        match binding_target_with_budget(directory, &site, current, b) {
+            Ok((bound_body, bound_target)) => {
+                if !std::ptr::eq(bound_body, body) {
                     return Err(LocalBindingError::InvalidOrigin);
+                }
+                if !std::ptr::eq(bound_target, target) {
+                    continue;
                 }
             }
             Err(LocalBindingError::NoEligibleLocal) => continue,

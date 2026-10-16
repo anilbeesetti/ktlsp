@@ -560,7 +560,7 @@ fn actual_local_binding_definition_hover_ranges_and_refusals() {
         (3, "fun f() { val y = x; val x = 1 }"),
         (4, "fun f() { val x = 1; val x = 2; val y = x }"),
         (5, "fun f() { var x = 1; val y = x }"),
-        (6, "fun f(arg: Int) { val x = 1; val y = x }"),
+        (6, "fun f(vararg arg: Int) { val x = 1; val y = x }"),
         (7, "fun f() { val x: Int? = 1; val y = x }"),
         (8, "fun f() { val x = 1; val y = x + 1 }"),
         (9, "val x = 1; val y = x"),
@@ -946,6 +946,116 @@ fn typed_local_navigation_and_references_compose_over_paired_stdio() {
 }
 
 #[test]
+fn parameter_shadowing_and_native_providers_compose_over_paired_stdio() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let source = "// 😀\r\nclass Int {}\r\nfun f(`p🦀`: Long, unused: Int,) {\r\n val a: `p🦀` = `p🦀`\r\n val `p🦀` = `p🦀`\r\n val b = `p🦀`\r\n}\r\nfun g(`p🦀`: Int) {\r\n val c = `p🦀`\r\n}\r\n";
+    let at = |line, character| json!({"textDocument":{"uri":URI},"position":{"line":line,"character":character}});
+    let refs = |line, character, include| json!({"textDocument":{"uri":URI},"position":{"line":line,"character":character},"context":{"includeDeclaration":include}});
+    let range = |line, start, end| json!({"start":{"line":line,"character":start},"end":{"line":line,"character":end}});
+    let parameter = range(2, 6, 11);
+    let before = range(3, 16, 21);
+    let self_initializer = range(4, 13, 18);
+    let local = range(4, 5, 10);
+    let after = range(5, 9, 14);
+    let unused = range(2, 19, 25);
+    let other = range(7, 6, 11);
+    let other_use = range(8, 9, 14);
+    let messages = [
+        json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{"capabilities":{"textDocument":{"hover":{"contentFormat":["plaintext"]},"diagnostic":{}}}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":"parameter-definition","method":"textDocument/definition","params":at(4,14)}),
+        json!({"jsonrpc":"2.0","id":u64::MAX,"method":"textDocument/hover","params":at(3,17)}),
+        json!({"jsonrpc":"2.0","id":"parameter-declaration-references","method":"textDocument/references","params":refs(2,7,true)}),
+        json!({"jsonrpc":"2.0","id":"parameter-use-references","method":"textDocument/references","params":refs(3,17,false)}),
+        json!({"jsonrpc":"2.0","id":"parameter-highlights","method":"textDocument/documentHighlight","params":at(4,14)}),
+        json!({"jsonrpc":"2.0","id":"local-definition","method":"textDocument/definition","params":at(5,10)}),
+        json!({"jsonrpc":"2.0","id":"local-references","method":"textDocument/references","params":refs(4,6,true)}),
+        json!({"jsonrpc":"2.0","id":"local-highlights","method":"textDocument/documentHighlight","params":at(5,10)}),
+        json!({"jsonrpc":"2.0","id":"unused-references","method":"textDocument/references","params":refs(2,20,false)}),
+        json!({"jsonrpc":"2.0","id":"unused-declaration","method":"textDocument/references","params":refs(2,20,true)}),
+        json!({"jsonrpc":"2.0","id":"unused-highlights","method":"textDocument/documentHighlight","params":at(2,20)}),
+        json!({"jsonrpc":"2.0","id":"other-function","method":"textDocument/references","params":refs(8,10,true)}),
+        json!({"jsonrpc":"2.0","id":"annotation-is-not-value","method":"textDocument/definition","params":at(3,9)}),
+        json!({"jsonrpc":"2.0","id":"pull","method":"textDocument/diagnostic","params":{"textDocument":{"uri":URI}}}),
+        json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ];
+    let replies = Package::new(true).exchange(&messages);
+    assert!(replies.iter().all(|reply| reply.get("id").is_some()));
+    assert!(
+        replies
+            .iter()
+            .map(|reply| &reply["id"])
+            .eq(messages.iter().filter_map(|message| message.get("id"))),
+        "original IDs exactly once; no duplicate or push output: {replies:?}"
+    );
+    let expected = [
+        (
+            json!("parameter-definition"),
+            json!({"uri":URI,"range":parameter}),
+        ),
+        (
+            json!(u64::MAX),
+            json!({"contents":{"kind":"plaintext","value":"`p🦀`: Long"},"range":before}),
+        ),
+        (
+            json!("parameter-declaration-references"),
+            json!([
+                {"uri":URI,"range":parameter},{"uri":URI,"range":before},{"uri":URI,"range":self_initializer}
+            ]),
+        ),
+        (
+            json!("parameter-use-references"),
+            json!([
+                {"uri":URI,"range":before},{"uri":URI,"range":self_initializer}
+            ]),
+        ),
+        (
+            json!("parameter-highlights"),
+            json!([
+                {"range":parameter,"kind":3},{"range":before,"kind":2},{"range":self_initializer,"kind":2}
+            ]),
+        ),
+        (json!("local-definition"), json!({"uri":URI,"range":local})),
+        (
+            json!("local-references"),
+            json!([{"uri":URI,"range":local},{"uri":URI,"range":after}]),
+        ),
+        (
+            json!("local-highlights"),
+            json!([{"range":local,"kind":3},{"range":after,"kind":2}]),
+        ),
+        (json!("unused-references"), json!([])),
+        (
+            json!("unused-declaration"),
+            json!([{"uri":URI,"range":unused}]),
+        ),
+        (
+            json!("unused-highlights"),
+            json!([{"range":unused,"kind":3}]),
+        ),
+        (
+            json!("other-function"),
+            json!([{"uri":URI,"range":other},{"uri":URI,"range":other_use}]),
+        ),
+        (json!("pull"), json!({"kind":"full","items":[]})),
+        (json!("stop"), Value::Null),
+    ];
+    for (id, payload) in expected {
+        let reply = replies.iter().find(|reply| reply["id"] == id).unwrap();
+        assert!(reply.get("error").is_none(), "{reply}");
+        assert_eq!(reply["result"], payload, "{reply}");
+    }
+    let annotation = replies
+        .iter()
+        .find(|reply| reply["id"] == "annotation-is-not-value")
+        .unwrap();
+    assert_eq!(annotation["error"]["code"], -32803);
+    assert!(annotation.get("result").is_none());
+}
+
+#[test]
 fn references_authenticated_targets_semantic_spelling_isolation_and_no_chasing() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let source = "fun f() { val `x` = 1; val other = 2; val other = 3; val a = x; val b = `x`; val c = a }\nfun g() { val x = 4; val y = x }";
@@ -1082,7 +1192,7 @@ fn references_invalid_params_unsupported_contexts_and_resource_fail_atomically()
         ("fun f() { val y = x; val x = 1 }", "x;"),
         ("fun f() { val x = x }", "x }"),
         ("fun f() { val y = unknown }", "unknown"),
-        ("fun f(arg: Int) { val x = 1; val y = x }", "x"),
+        ("fun f(vararg arg: Int) { val x = 1; val y = x }", "x"),
         ("fun f() { var x = 1; val y = x }", "x"),
         ("val x = 1; val y = x", "x"),
         ("fun f() { val x = 1; val y = x.member }", "x.member"),
@@ -1127,7 +1237,7 @@ fn references_invalid_params_unsupported_contexts_and_resource_fail_atomically()
     }
     for (i, (source, spelling)) in [
         ("fun f() { val x = 1; val `x` = 2 }", "x"),
-        ("fun f(arg: Int) { val x = 1 }", "arg"),
+        ("fun f(arg: Int = 1) { val x = 1 }", "arg"),
         ("class C { val member = 1 }", "member"),
     ]
     .into_iter()

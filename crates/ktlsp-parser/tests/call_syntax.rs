@@ -14,7 +14,7 @@ use ktlsp_parser::{
     lowering::{ReferenceSiteError, lower_declarations, reference_site},
     structural_regions::build_regions,
 };
-use std::{fmt::Write as _, sync::atomic::AtomicBool};
+use std::sync::atomic::AtomicBool;
 
 fn parse(source: &str, revision: i64) -> SnapshotResult {
     let snapshot = SourceSnapshot::new("original-call-syntax", revision, FileKind::Source, source).unwrap();
@@ -52,35 +52,47 @@ fn assert_tree(tree: &Parsed) {
 // Retain this actual public-output/full-CST writer until OWNER + ROOT read the
 // complete hosted payload. All source bytes come from the actual returned tree.
 fn capture(tree: &Parsed, call: &CallSite<'_>, parameters: Option<&CallableParameters<'_>>) {
-    let mut output = String::new();
-    writeln!(output, "CALL_SYNTAX_ACTUAL_BEGIN\nsource={:?}", tree.source()).unwrap();
-    for (index, e) in tree.elements().iter().enumerate() {
-        writeln!(output, "cst[{index}]={e:?} raw={:?}", text(tree, e)).unwrap();
-    }
-    writeln!(output, "call={} callee={} name={} list={} open={} close={} body={} function={} owner={:?}",
-        original(tree, call.call()), original(tree, call.callee()), original(tree, call.callee_name()),
-        original(tree, call.argument_list()), original(tree, call.open_paren()), original(tree, call.close_paren()),
-        original(tree, call.body()), call.function().cst_index(), call.function().owner()).unwrap();
-    for argument in call.arguments() {
-        writeln!(output, "argument[{}] node={} value={} token={} comma={:?} label={:?}", argument.ordinal(),
-            original(tree, argument.node()), original(tree, argument.expression()), original(tree, argument.value_token()),
-            argument.comma().map(|e| original(tree, e)), argument.label().map(|label| (
-                original(tree, label.node()), original(tree, label.reference()), original(tree, label.name()), original(tree, label.equals())
-            ))).unwrap();
-    }
-    if let Some(parameters) = parameters {
-        writeln!(output, "selected-function={} owner={:?} list={} open={} close={} body={}",
-            parameters.function().cst_index(), parameters.function().owner(), original(tree, parameters.parameter_list()),
-            original(tree, parameters.open_paren()), original(tree, parameters.close_paren()), original(tree, parameters.body())).unwrap();
-        for parameter in parameters.parameters() {
+    let declarations: Vec<_> = call.origin().declarations().iter().enumerate().map(|(ordinal, d)| {
+        serde_json::json!({
+            "ordinal":ordinal,"cst_index":d.cst_index(),"kind":d.kind(),
+            "range":d.range(),"name_range":d.name_range(),"raw_name":d.raw_name(),
+            "owner":d.owner(),"incomplete":d.incomplete()
+        })
+    }).collect();
+    let arguments: Vec<_> = call.arguments().iter().map(|argument| {
+        serde_json::json!({
+            "ordinal":argument.ordinal(),"node":original(tree,argument.node()),
+            "expression":original(tree,argument.expression()),"value_token":original(tree,argument.value_token()),
+            "comma":argument.comma().map(|e|original(tree,e)),
+            "label":argument.label().map(|label|serde_json::json!({
+                "node":original(tree,label.node()),"reference":original(tree,label.reference()),
+                "name":original(tree,label.name()),"equals":original(tree,label.equals())
+            }))
+        })
+    }).collect();
+    let parameters = parameters.map(|view| {
+        let values: Vec<_> = view.parameters().iter().map(|parameter| {
             let d = parameter.declaration();
-            writeln!(output, "parameter[{}] declaration={} owner={:?} range={:?} name={:?} raw={:?} annotation={} comma={:?}",
-                parameter.ordinal(), d.cst_index(), d.owner(), d.range(), d.name_range(), d.raw_name(),
-                original(tree, parameter.annotation()), parameter.comma().map(|e| original(tree, e))).unwrap();
-        }
-    }
-    writeln!(output, "CALL_SYNTAX_ACTUAL_END").unwrap();
-    println!("{output}");
+            serde_json::json!({
+                "ordinal":parameter.ordinal(),"declaration":d.cst_index(),"owner":d.owner(),
+                "range":d.range(),"name_range":d.name_range(),"raw_name":d.raw_name(),
+                "annotation":original(tree,parameter.annotation()),"comma":parameter.comma().map(|e|original(tree,e))
+            })
+        }).collect();
+        serde_json::json!({
+            "function":view.function().cst_index(),"owner":view.function().owner(),
+            "list":original(tree,view.parameter_list()),"open":original(tree,view.open_paren()),
+            "close":original(tree,view.close_paren()),"body":original(tree,view.body()),"values":values
+        })
+    });
+    eprintln!("CALL_SYNTAX_ACTUAL {}",serde_json::json!({
+        "document":call.origin().snapshot().document(),"revision":call.origin().snapshot().revision(),
+        "source":tree.source(),"elements":tree.elements(),"diagnostics":tree.diagnostics(),"declarations":declarations,
+        "call":{"index":call.cst_index(),"callee":original(tree,call.callee()),"name":original(tree,call.callee_name()),
+            "list":original(tree,call.argument_list()),"open":original(tree,call.open_paren()),"close":original(tree,call.close_paren()),
+            "body":original(tree,call.body()),"function":call.function().cst_index(),"owner":call.function().owner()},
+        "arguments":arguments,"parameters":parameters
+    }));
 }
 
 #[test]
@@ -208,6 +220,7 @@ fn actual_edits_reparse_original_syntax_and_rebind_existing_empty_proof() {
     let tree = result.tree_for(result.snapshot()).unwrap();
     let old_call = call_site(&lower, &result, result.snapshot(), selected_call(tree)).unwrap();
     let old_parameters = callable_parameters(&lower, &result, result.snapshot(), &lower.declarations()[1]).unwrap();
+    capture(tree, &old_call, Some(&old_parameters));
     let mut edited = source.to_owned();
     // Actual original ranges, applied backwards: remove arguments/parameters to
     // enter the existing closed empty-call proof, then rename its callee+target.
@@ -217,6 +230,13 @@ fn actual_edits_reparse_original_syntax_and_rebind_existing_empty_proof() {
         (old_parameters.parameter_list().start + 1..old_parameters.parameter_list().end - 1, ""),
         (old_parameters.function().name_range(), "fresh"),
     ];
+    let observed_edits: Vec<_> = edits.iter().map(|(range,text)| {
+        serde_json::json!({"range":range,"text":text})
+    }).collect();
+    eprintln!("CALL_SYNTAX_ACTUAL_EDITS {}",serde_json::json!({
+        "document":result.snapshot().document(),"from_revision":result.snapshot().revision(),
+        "to_revision":2,"edits":observed_edits
+    }));
     for (range, replacement) in edits { edited.replace_range(range, replacement); }
     let updated = parse(&edited, 2);
     assert_eq!(call_site(&lower, &updated, updated.snapshot(), old_call.cst_index()).unwrap_err(), ReferenceSiteError::InvalidOrigin);

@@ -1599,3 +1599,70 @@ full hosted CI; first-head acceptance is NOT final-head or main acceptance.
 No local parser/server/Session/worker/peer runtime, JVM, oracle, dependency,
 Cargo/lock/workflow/vendor change, unchanged CI retry or relaxed bound occurred.
 397 is not yet delivered;395/377 causes remain unknown,96 and full parity open.
+
+#### Delivered401: source-owned prose KDoc with independent exact-main proof
+
+Reviewed capture-free5388880d038920dbefefcadaa5ddd7d9156900d1/tree03c1c5504a6b8210cefe0dd8f754cf43bfc9ca6e
+received six independent exact component/full12-file functionality/adversarial
+clears, pinned format check and strict locked workspace/alltarget Clippy.
+OWN original final Native38972014385/job117212394570 and platform38972014234/
+Mac117212393986/Win117212394318 passed1174/1172/1121 respectively, each
+138rows0failed3ignored0filtered0measured including32doc. Separate22faultcases
+are not docs. Actual testmerge2101df9beb648503a8ac76d036f98f68855c1b90 has that
+exact tree and orderedparents[bc5c6760,5388880d]; complete original bytes,
+ZIPdigests/sourcepreflight/bytepolicy/cleancheckout/exits/mandatory steps and
+unfiltered counts independently accepted by OWNER+ROOT.
+
+Separate fresh strictly-readonly guard exitedprocess0/parsed0 with exact
+exclusivebase/head/tree/scope12/config4/check3/status0/original2workflows+
+allmandatoryjobs/cleanreviewedidentity. Ordinary expected-head PR401 squash
+produced3920ab7d22ce4d89023291f2801500e598e24bb0, identical03c1c tree and
+SOLE parentbc5c6760b596721d4f627cc1d89c579be20c406c. Independent OWNER+ROOT
+fresh original exact-main38973388351/job117216883736 attempt1 push/main
+verified full392 checkout and all mandatory pinned checks:1174=1142ordinary+
+32doc,138rows0failed3ignored0filtered0measured plus22 separate faultcases.
+Complete raw292841bytes SHA256e44a23abfd88a9dc8ddf4b351ab742add4171f14c376cc1c5329c1cf1eb2a34a.
+Lease401 CLEARED;397 closed/completed. No local parser/server/Session/worker/
+peer runtime, unchanged retry or relaxed bounds. All WTs preserved.
+
+### Original call syntax403 and selected metadata parameter402 composition
+
+Two genuine source-only lanes worked in parallel DURING401 original CI,
+both from SAME verifiedbc5 incomingmain, without checks/publication.
+402 component40b9d34eed42b16ad7f37ad7d4a605aed2e31b8e/tree36124565311452d70e62189cc2232d72eebac1b8
+and403a4cc0901f11af3ec47ba9e4a1177502dda7b717c/treea3d75c8ba8989bd474efd6033aa856902f3641ea
+each completed independent functionality/adversarial static reviews and
+exact revised-source rechecks. ROOT directly read all four receipts.
+ONLY after independently verified392 main did ROOT create the new root
+integration WT and compose both sources, without conflicts; old/component/
+delivered/user WTs remain frozen/preserved. No Cargo/dependency/lock/vendor/
+workflow or provider-capability changes.
+
+403 projects original call/list/argument/label/value identities and parameters
+OF an explicitly selected original local FUN, not parameters OF a resolved
+call. Existing initializer ReferenceSite and strict semantic BodyCheck retain
+their roles; richer bodies still refuse. Same query budget spans original
+authentication/validation/count/reserve/emit and cumulative actual storage.
+No name/arity-only binding, inferred builtin, applicability or signature help.
+402 internally selects ONE Function by ALL-Class-field ordinal from the same
+Metadata Outcome and authentic owner/names, preserves every original value
+declaration, binds exact Class parameter IDs or genuine nominal ClassIds and
+retains original bytes/ranges/nullability/rawflags. Function-local scope,
+table-only/vararg/richer forms refuse; no default/JVM mapping is fabricated.
+
+ROOT completed403's observation-only evidence before any hosted admission:
+reuse the existing structured JSON actual-source/full-CST/projection capture,
+including original lowered declaration ordinals/owners, instead of introducing
+a Rust-debug evidence parser. The actual-edit regression now captures its
+original selected call/parameters plus actual four byte-range/text edits BEFORE
+applying them, then retains actual version2 reparse/rebinding output. Production
+and every permanent assertion/application remain unchanged. Both affected
+reviewers and two separate complete-union reviewers must recheck exact source.
+All new402/403 formatting/build/tests/runtime/smoke/hosted proof remain
+UNEXECUTED; the prepared external genuine Pair API smoke is not execution.
+397's prior pass is not acceptance for this composition.
+
+Native-only/T004/96 and existing source/work/storage/depth/timeout/cleanup
+ceilings remain.395/377 historical causes are still unknown. Full scopes,
+types/inference/applicability, formatting, tooling, SDK/library semantics,
+general platform/release/oracle-custody and official Kotlin LSP parity remain.

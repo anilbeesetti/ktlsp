@@ -49,10 +49,12 @@ fn lifecycle_states_and_honest_capabilities() {
         -32002
     );
     let result = initialize(&mut session);
-    assert_eq!(
-        result["result"]["capabilities"],
-        json!({"positionEncoding":"utf-16","foldingRangeProvider":true,"textDocumentSync":{"openClose":true,"change":2,"save":false}})
-    );
+    let capabilities = &result["result"]["capabilities"];
+    assert_eq!(capabilities["positionEncoding"], "utf-16");
+    assert_eq!(capabilities["foldingRangeProvider"], true);
+    assert_eq!(capabilities["textDocumentSync"]["openClose"], true);
+    assert_eq!(capabilities["textDocumentSync"]["change"], 2);
+    assert_eq!(capabilities["textDocumentSync"]["save"], false);
     assert_eq!(
         result["result"]["serverInfo"],
         json!({"name":"ktlsp","version":"0.1.0"})
@@ -172,8 +174,6 @@ fn initialization_validation_is_atomic_and_retryable() {
         json!({}),
         json!({"capabilities":null}),
         json!({"capabilities":{"general":false}}),
-        json!({"capabilities":{"general":{"positionEncodings":["utf-8"]}}}),
-        json!({"capabilities":{"general":{"positionEncodings":[]}}}),
         json!({"capabilities":{"general":{"positionEncodings":["utf-16",8]}}}),
         json!({"capabilities":{},"processId":1.5}),
         json!({"capabilities":{},"rootUri":"relative/file.kt"}),
@@ -204,6 +204,79 @@ fn initialization_validation_is_atomic_and_retryable() {
         session.configuration().workspace_folders[0].uri,
         "untitled:workspace"
     );
+}
+
+#[test]
+fn position_encoding_preferences_always_allow_utf16_fallback() {
+    for capabilities in [
+        json!({}),
+        json!({"general":{}}),
+        json!({"general":{"positionEncodings":[]}}),
+        json!({"general":{"positionEncodings":["utf-8"]}}),
+        json!({"general":{"positionEncodings":["utf-32"]}}),
+        json!({"general":{"positionEncodings":["future-encoding"]}}),
+        json!({"general":{"positionEncodings":["utf-8","utf-32","future-encoding"]}}),
+        json!({"general":{"positionEncodings":["utf-8","utf-16"]}}),
+    ] {
+        let mut session = Session::new();
+        let result = request(
+            &mut session,
+            json!("init"),
+            "initialize",
+            json!({"capabilities":capabilities}),
+        );
+        let capabilities = &result["result"]["capabilities"];
+        assert_eq!(capabilities["positionEncoding"], "utf-16");
+        assert_eq!(capabilities["foldingRangeProvider"], true);
+        assert_eq!(capabilities["textDocumentSync"]["openClose"], true);
+        assert_eq!(capabilities["textDocumentSync"]["change"], 2);
+        assert_eq!(capabilities["textDocumentSync"]["save"], false);
+        notify(&mut session, "initialized", json!({}));
+        open(&mut session, "untitled:fallback", 1, "a😀b");
+        change(
+            &mut session,
+            "untitled:fallback",
+            2,
+            json!([{"range":{"start":{"line":0,"character":1},"end":{"line":0,"character":3}},"rangeLength":2,"text":"水"}]),
+        );
+        assert_eq!(
+            session.document("untitled:fallback").unwrap().text(),
+            "a水b"
+        );
+        assert!(session.drain_errors().is_empty());
+    }
+}
+
+#[test]
+fn malformed_position_encoding_lists_are_rejected_without_initializing() {
+    for (encodings, message) in [
+        (Value::Null, "positionEncodings must be an array"),
+        (json!(false), "positionEncodings must be an array"),
+        (json!(8), "positionEncodings must be an array"),
+        (json!("utf-16"), "positionEncodings must be an array"),
+        (json!({}), "positionEncodings must be an array"),
+        (
+            json!(["utf-16", 8]),
+            "positionEncodings entries must be strings",
+        ),
+        (json!([null]), "positionEncodings entries must be strings"),
+        (json!([false]), "positionEncodings entries must be strings"),
+        (json!([{}]), "positionEncodings entries must be strings"),
+        (json!([[]]), "positionEncodings entries must be strings"),
+    ] {
+        let mut session = Session::new();
+        let response = request(
+            &mut session,
+            json!("malformed"),
+            "initialize",
+            json!({"capabilities":{"general":{"positionEncodings":encodings}}}),
+        );
+        assert_eq!(response["id"], "malformed");
+        assert_eq!(code(&response), -32602);
+        assert_eq!(response["error"]["message"], message);
+        assert_eq!(session.state(), State::Uninitialized);
+        assert!(initialize(&mut session).get("result").is_some());
+    }
 }
 
 #[test]

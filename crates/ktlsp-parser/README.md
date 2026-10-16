@@ -141,6 +141,26 @@ types, stable cross-revision symbols or a new server capability.
   returns every half-open containing region in directory order; brace bytes
   count, EOF matches nothing. It neither authenticates a reference occurrence
   nor converts UTF-16 positions; callers convert against the identical source.
+- `lowering::reference_site` authenticates an original whole-initializer
+  `REFERENCE_EXPRESSION` and its sole identifier token against the exact lowerer,
+  parsed tree, result and current snapshot. Private fields retain borrowed origin,
+  original range/spelling, containing property, body CST index and function.
+  `ReferenceSite::semantic_spelling` reuses the declaration spelling helper.
+- `local_value_binding::bind_local_value` validates the complete ordinary top-level
+  zero-parameter function body once, then returns the original borrowed site,
+  identical body region and unique preceding complete direct local `val`.
+  Only plain immutable untyped vals with integer or whole-identifier initializers
+  are admitted. Semantic-equivalent duplicates of the queried name anywhere in
+  that body, including later duplicates, refuse the query; unsupported candidate
+  spellings never disappear from the search. Containing and later declarations
+  never bind the occurrence. Initializers are not chased transitively.
+  Origin, stale, unsupported context/spelling, ambiguity, no eligible local and
+  resource errors expose no target; no eligible local is not global unresolvedness.
+  One checked 2,097,152-unit work budget charges snapshot comparisons, traversal,
+  validation and compared bytes. The query allocates nothing and is nonrecursive.
+  This is library-only and is not complete references, nested/outer lookup,
+  parameter/receiver/import/overload resolution, types, stable cross-revision
+  identity, official navigation evidence or a new server capability.
 
 These consumers retain immutable producer association and require a synchronized
 current-document recheck before publication. Document/revision/kind/source
@@ -149,6 +169,19 @@ revision. Their checked work/capacity limits and allocation refusals are
 incremental bounds, not whole-process allocation, RSS, stack or time guarantees.
 The raw-name index may scan quadratically within its charged work limit;
 ancestor queries use fixed storage and position queries allocate nothing.
+
+At #333 source head `a22b54619f6996e03cceee56362453a9b846d574`,
+[original attempt-1 Linux CI38857165917/job116831130221](https://github.com/anilbeesetti/ktlsp/actions/runs/38857165917/job/116831130221)
+passed pinned format, locked workspace Clippy and all 890 workspace tests.
+Its synthetic checkout `78dc92de87802132f3451d51c44c7e4b4a58ec47` has
+ordered parents `[a52f9518ff1532c25aff8fc1bdb1c566a05526b4,a22b54619f6996e03cceee56362453a9b846d574]`
+and tree `6b32ab3c8b3a04052cdf8e7ba01ee03a3b8a7fd3`.
+ROOT independently authenticated the original API/log and observed occurrence
+`29..30` binding to declaration `10..19`, name `14..15`, with original target,
+body and site pointer associations all true. The temporary direct-`Write` marker
+was then removed; its production assertions remain. This is bounded library
+consumer proof, not official navigation or Mac/Windows reliability acceptance.
+Final reviewed integration-head CI and guarded merge are separate gates.
 
 At source head `b94e6ded912d72c700be9f3e8d09ab923c4fb5a3`,
 [original attempt-1 Linux CI38850851404/job116811504205](https://github.com/anilbeesetti/ktlsp/actions/runs/38850851404/job/116811504205)

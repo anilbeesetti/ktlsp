@@ -1922,3 +1922,58 @@ Full original observation stays `/private/tmp/ktlsp-next-function-local-data/`.
 No implementation smoke for407/408 has run; unchanged96 quarantine,
 original full producer/CLI/edit readback and final-source/main gates apply.
 
+#### Composed407/408 source: component reviews complete, runtime NOT admitted
+
+407 head01df409f28ab6e19e07efdc1c79c767f56af5eea/treebf52be5b3faaf6307c8a04fe00ceec4c8354a0ea
+and408 head746c996705c6c5dbcd659288fcf8b300d7959593/tree02eabd1392269c5539f7c4da70cc3d411a609cdf
+were composed from SAME verified608 main without conflicts.
+407 adds the mandatory closed TYPE-only proof shared by definition/complete
+occurrences/capture-safe rename, exactly one authenticated direct-local
+owner link and allocation-free shared local-parameter/call syntax checks.
+Every existing non-type BodyCheck route and server production remain strict.
+ROOT authorized ONLY the existing lowering cfg(test) accounting-fixture
+extension; all prior cases/assertions and production lowering remain.
+Meaningful new parser/paired-CLI assertions and observation-only writers
+LOCAL_TYPE_PRODUCER_JSON=/LOCAL_TYPE_CLI_JSON= remain UNEXECUTED.
+
+Both independent407 reviewers explicitly cleared the exact final SEVEN-file
+union, including the ENTIRE original accounting test plus rich fixture.
+Their final receipts are history://LocalAnnotationTypeScope.LocalTypeFunction
+lines183..203 and .LocalTypeAdversary lines161..183; published agent outputs
+were stale older624640 receipts, NOT silently accepted as final reviews.
+The earlier static indexed-str comparison P1 was fixed and rechecked before
+any compiler/test; no compiler diagnostic or runtime reproduction is claimed.
+
+408 extends the EXISTING selected operation with original own declarations,
+scoped ID/unique immediate-own NAME bindings and a shared private original
+declaration helper. Original Class/property/return consumer behavior remains.
+It retains authentic Result$Companion bytes/provenance/notices and meaningful
+genuine NAME plus clearly authored ID/ambiguity/signed/UTF16/resource tests.
+Both exact final independent seven-file functionality/adversarial reviews
+are CLEAR. No new composed binding success is yet an observed fact.
+
+ROOT updated common source/status claims and preserved current handoff plus
+historical checkpoint. Two independent COMPLETE union reviews are still
+required before once-only format/strict compile/native data admission and
+OWN ORIGINAL full hosted producer/paired-CLI/edit proof. The prepared public
+native408 standalone source has NOT compiled or run. Previous406 CI never
+accepts this composition. Keep all actual writers until independent OWNER
+and ROOT full payload/actual edit application reads, then only writer cleanup,
+final exact reviews/OWN CI/fresh separate read-only guard/ordinary expected
+merge/tree+sole-parent/independent original exact-main proof.
+
+Additional READ-ONLY prerequisite research, not new implementation:
+WorkspaceSymbolPrerequisites traced the original outline/parser pipeline,
+validated imported-workspace/sidecar/library APIs and pinned release
+contributors. Session owns open buffers, not a retained imported source/
+closed-file/library inventory or navigable library documents. Open-buffer-only
+search would silently narrow workspace/library symbols; capability stays absent.
+MainLensRunDebugPrereqs pinned eager main Run/Debug command arguments,
+initialization gating, launch/build command schemas and client DAP flow.
+Even Run/noDebug requires a real DAP path. Native authoritative runtime
+project/source-set/SDK/classpath/build resolution and configured debugger
+backend are missing; no dead clickable lens, fake endpoint or descriptor-only
+success was admitted. User-existing optional tools remain permitted, never
+bundled or used for JVM semantic offload. Release/master and actual wire
+unknowns remain distinct; no repeated oracle probe/dispatch was performed.
+

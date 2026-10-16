@@ -87,7 +87,8 @@ pub(crate) fn render(
         return Err(UNSUPPORTED);
     }
     if matches!(query, Query::Completion { .. }) {
-        let (index, _) = reference.ok_or("completion requires an existing whole-initializer identifier")?;
+        let (index, _) =
+            reference.ok_or("completion requires an existing whole-initializer identifier")?;
         let lowered = lower_declarations(result, snapshot).map_err(|_| UNSUPPORTED)?;
         let directory = build_regions(&lowered, result, snapshot).map_err(|_| UNSUPPORTED)?;
         // One semantic query authenticates the original site and every candidate,

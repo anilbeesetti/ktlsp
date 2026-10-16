@@ -512,11 +512,15 @@ fn exact_composite_boundaries_cover_provenance_and_late_table_scans() {
     let mut larger = function();
     add_method(&mut larger, "other", "()V", 1);
     assert!(minimum(&larger, |l| &mut l.work, 64 * 1024 * 1024) > work);
-    let mut limits = Limits::default();
-    limits.work = work;
+    let limits = Limits {
+        work,
+        ..Limits::default()
+    };
     assert!(linked_class_method::decode(&larger, 1, limits).is_err());
-    let mut limits = Limits::default();
-    limits.depth = 1;
+    let limits = Limits {
+        depth: 1,
+        ..Limits::default()
+    };
     assert!(linked_class_method::decode(&class, 1, limits).is_err());
 }
 

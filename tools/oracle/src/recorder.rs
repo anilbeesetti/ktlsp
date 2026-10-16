@@ -1058,6 +1058,83 @@ mod platform {
         }
         result
     }
+
+    #[test]
+    fn combined_export_byte_budget_refuses_consumer_files_without_transport_timing() {
+        let root = std::env::temp_dir().join(format!("ktlsp-export-budget-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        let mut script = [
+            json!({"jsonrpc":"2.0","id":1,"method":"shutdown","params":{"text":""}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ];
+        let mut decoded = [DecodedFrame {
+            start: 0,
+            end: 0,
+            message: json!({"jsonrpc":"2.0","id":1,"result":""}),
+        }];
+        let chronology = [
+            RawReference {
+                direction: "client",
+                frame_index: 0,
+            },
+            RawReference {
+                direction: "server",
+                frame_index: 0,
+            },
+            RawReference {
+                direction: "client",
+                frame_index: 1,
+            },
+        ];
+        let overhead = write_transcript(
+            &mut io::sink(),
+            &Transcript {
+                chronology: &chronology,
+                script: &script,
+                decoded: &decoded,
+            },
+        )
+        .unwrap();
+        let client_length = (MAX_BYTES - overhead) / 2;
+        script[0]["params"]["text"] = Value::String("x".repeat(client_length));
+        for extra in [0, 1] {
+            let directory = root.join(extra.to_string());
+            fs::create_dir(&directory).unwrap();
+            decoded[0].message["result"] =
+                Value::String("x".repeat(MAX_BYTES - overhead - client_length + extra));
+            assert!(serde_json::to_vec(&script).unwrap().len() < MAX_BYTES);
+            assert!(serde_json::to_vec(&decoded[0].message).unwrap().len() < MAX_BYTES);
+            let result = export(
+                &directory,
+                &Transcript {
+                    chronology: &chronology,
+                    script: &script,
+                    decoded: &decoded,
+                },
+                &CaptureContext::Synthetic,
+                Some(&std::process::ExitStatus::from_raw(0)),
+            );
+            if extra == 0 {
+                // Same filesystem, valid sequential evidence, exactly at the
+                // consumer cap; the second case adds only one ASCII byte.
+                assert_eq!(result.unwrap(), MAX_BYTES);
+                assert_eq!(
+                    fs::metadata(directory.join("transcript.json"))
+                        .unwrap()
+                        .len(),
+                    MAX_BYTES as u64
+                );
+                assert!(crate::Evidence::load(&directory).is_ok());
+            } else {
+                assert!(result.is_err());
+                assert!(!directory.join("transcript.json").exists());
+                assert!(!directory.join("transcript.next").exists());
+                assert!(!directory.join("metadata.json").exists());
+                assert!(crate::Evidence::load(&directory).is_err());
+            }
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
 }
 
 #[cfg(test)]

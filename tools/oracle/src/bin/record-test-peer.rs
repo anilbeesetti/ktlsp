@@ -55,7 +55,7 @@ fn descendant() {
 }
 fn main() {
     let mode = env::args().nth(1).unwrap();
-    if mode == "echo" || mode == "error" {
+    if mode == "error" {
         eprintln!("SYNTHETIC / NONOFFICIAL Rust peer: adapter mechanics only");
     }
     if mode == "premature-response" {
@@ -182,8 +182,6 @@ fn main() {
         if let Some(id) = message.get("id") {
             let reply = if mode == "server-request" {
                 json!({"jsonrpc":"2.0","id":9,"method":"workspace/configuration"})
-            } else if mode == "echo" {
-                json!({"jsonrpc":"2.0","id":id,"result":message["params"]["text"]})
             } else if mode == "error" {
                 json!({"jsonrpc":"2.0","id":id,"error":{"code":-32603,"message":"synthetic peer error"}})
             } else {

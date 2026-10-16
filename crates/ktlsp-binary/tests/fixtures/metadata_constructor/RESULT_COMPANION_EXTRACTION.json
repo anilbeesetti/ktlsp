@@ -1,0 +1,63 @@
+{
+  "artifact": "org.jetbrains.kotlin:kotlin-stdlib:2.3.20",
+  "origin": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.3.20/kotlin-stdlib-2.3.20.jar",
+  "archive_bytes": 1804720,
+  "archive_sha256": "0ae12504a5040ebaf37703908483420d1a5624dd1d93f357665f8c77c848a01e",
+  "digest_authority": "Caller-provided expected digest equality, NOT vendor signature authentication",
+  "entry": "kotlin/Result$Companion.class",
+  "zip_ordinal": 74,
+  "method": 8,
+  "class_bytes": 1682,
+  "class_sha256": "f12235d29decd00f18cdd1b1ef75b5c0d0bfdc6b3c27259224784c293f4cf9ad",
+  "decoded_d1_bytes": 126,
+  "decoded_d1_sha256": "6dac5cb910f12fe28d24a866718466fa9bc05f723b4473dc460711b657e58fba",
+  "compiler_provenance": "UNVERIFIED; distribution version is not compiler provenance",
+  "license": "Apache-2.0; existing LICENSE.txt/NOTICE.txt and t017c2 provenance unchanged",
+  "observation": {
+    "retained_original_receipts": "/private/tmp/ktlsp-next-function-local-data/{proof.json,observe.rs,run.stdout,conclusion.json}",
+    "original_source_sha256": "793003e731f469931126968dc727b621f54186d9ab4e08b9ebe296c4327f6f5d",
+    "authority": "ROOT-admitted existing-public-native data-only observation, independent raw-query budgets",
+    "engine_head": "347463e0cada6e33b1acaed25660bfc6d18fd89f",
+    "engine_tree": "cab6dff1184de764dd991ff5c22d97e279232c4a",
+    "compile_exit": 0,
+    "run_exit": 0,
+    "stderr": "",
+    "boundary": "NOT new composed-API binding success or aggregate budget evidence; no JVM execution"
+  },
+  "expected": {
+    "metadata": { "kind": 1, "mv": [2, 3, 0] },
+    "owner": "kotlin/Result.Companion",
+    "class_body": [29, 126],
+    "class_declarations": 0,
+    "success": {
+      "all_class_ordinal": 4,
+      "outer": [49, 86],
+      "body": [51, 86],
+      "local_body": [65, 69],
+      "local_raw_hex": "08011006",
+      "local_id": 1,
+      "local_name_index": 6,
+      "local_name_utf16": [84],
+      "value_body": [71, 77],
+      "type_body": [75, 77],
+      "type_raw_hex": "4806",
+      "classifier_field": 9,
+      "parameter_name_index": 6,
+      "parameter_id": null,
+      "intended_classifier": "FunctionParameter(0)"
+    },
+    "failure": {
+      "all_class_ordinal": 5,
+      "outer": [86, 123],
+      "body": [88, 123],
+      "local_body": [102, 106],
+      "local_id": 1,
+      "value_body": [108, 114],
+      "type_body": [112, 114],
+      "type_raw_hex": "300b",
+      "intended_classifier": "nominal kotlin/Throwable"
+    },
+    "child_outer_spans": "Unexposed in original raw observation; never reconstructed as observed facts",
+    "genuine_function_local_id_leaf": "GAP; ID tests are explicitly authored"
+  }
+}

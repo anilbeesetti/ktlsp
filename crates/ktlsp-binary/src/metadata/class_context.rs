@@ -129,6 +129,51 @@ pub(super) fn resolver<'a, 'b>(
     .map_err(|e| name_error(framed.string_table_span.start, e))
 }
 
+/// Append one original declaration to ONE scope, sharing the caller's allowance.
+pub(super) fn push_parameter<'a>(
+    body: &'a [u8],
+    body_span: Range<usize>,
+    offset: usize,
+    parameters: &mut Vec<Parameter<'a>>,
+    resolver: &mut name_resolver::Resolver<'_, '_>,
+    budget: &mut string_table::Budget,
+) -> Result<(), Error> {
+    budget.node(2, body_span.start)?;
+    let parameter = type_parameter::decode_with_budget(body, budget).map_err(|e| {
+        failure(body_span.start + e.offset, ErrorKind::TypeParameter(e.kind))
+    })?;
+    let mut pos = 0;
+    while pos < body.len() {
+        let child = wire::field(body, &mut pos, body.len(), &mut budget.wire)
+            .map_err(|e| failure(body_span.start + e.offset, ErrorKind::Wire(e.kind)))?;
+        let child_offset = body_span.start + child.span.start;
+        budget.wire.work(1, child_offset)?;
+        if matches!(child.number, 1 | 2) && !matches!(child.value, wire::Value::Varint(_)) {
+            return Err(failure(child_offset, ErrorKind::UnsupportedParameter));
+        }
+    }
+    // ponytail: bounded quadratic duplicate detection; no secondary owning index.
+    for previous in parameters.iter() {
+        budget.wire.work(1, body_span.start)?;
+        if previous.parameter.id == parameter.id {
+            return Err(failure(body_span.start, ErrorKind::DuplicateParameterId));
+        }
+    }
+    let name = resolver
+        .get_string_with_budget(parameter.name, budget)
+        .map_err(|e| name_error(body_span.start, e))?;
+    budget.push(
+        parameters,
+        Parameter {
+            body_span,
+            parameter,
+            name,
+        },
+        offset,
+    )?;
+    Ok(())
+}
+
 pub(super) fn decode_with_budget<'a>(
     bytes: &'a [u8],
     span: Range<usize>,
@@ -155,43 +200,7 @@ pub(super) fn decode_with_budget<'a>(
             (1 | 3, wire::Value::Varint(_)) | (10, wire::Value::Bytes(_)) => {}
             (5, wire::Value::Bytes(body)) => {
                 let body_span = field.span.end - body.len()..field.span.end;
-                budget.node(2, body_span.start)?;
-                let parameter = type_parameter::decode_with_budget(body, budget).map_err(|e| {
-                    failure(body_span.start + e.offset, ErrorKind::TypeParameter(e.kind))
-                })?;
-                let mut child_pos = 0;
-                while child_pos < body.len() {
-                    let child = wire::field(body, &mut child_pos, body.len(), &mut budget.wire)
-                        .map_err(|e| {
-                            failure(body_span.start + e.offset, ErrorKind::Wire(e.kind))
-                        })?;
-                    let child_offset = body_span.start + child.span.start;
-                    budget.wire.work(1, child_offset)?;
-                    if matches!(child.number, 1 | 2)
-                        && !matches!(child.value, wire::Value::Varint(_))
-                    {
-                        return Err(failure(child_offset, ErrorKind::UnsupportedParameter));
-                    }
-                }
-                // ponytail: bounded quadratic duplicate detection; no secondary owning index.
-                for previous in &parameters {
-                    budget.wire.work(1, body_span.start)?;
-                    if previous.parameter.id == parameter.id {
-                        return Err(failure(body_span.start, ErrorKind::DuplicateParameterId));
-                    }
-                }
-                let name = resolver
-                    .get_string_with_budget(parameter.name, budget)
-                    .map_err(|e| name_error(body_span.start, e))?;
-                budget.push(
-                    &mut parameters,
-                    Parameter {
-                        body_span,
-                        parameter,
-                        name,
-                    },
-                    offset,
-                )?;
+                push_parameter(body, body_span, offset, &mut parameters, resolver, budget)?;
             }
             (1 | 3 | 5 | 10, _) => return Err(failure(offset, ErrorKind::UnsupportedClass)),
             _ => {}

@@ -3,11 +3,28 @@ use ktlsp_protocol::{read_frame, write_frame};
 use serde_json::{Value, json};
 use std::{
     env, fs,
-    io::{self, Write},
+    io::{self, Read, Write},
     process::{Command, Stdio},
     thread,
     time::{Duration, Instant},
 };
+fn malformed_stdout(bytes: &[u8]) {
+    #[cfg(unix)]
+    {
+        unsafe extern "C" {
+            fn write(fd: i32, bytes: *const std::ffi::c_void, length: usize) -> isize;
+        }
+        // SAFETY: stdout is our live blocking pipe; these fixed fixtures fit
+        // PIPE_BUF. One write exposes the malformed frame and tail atomically.
+        assert!(bytes.len() < 512);
+        assert_eq!(
+            unsafe { write(1, bytes.as_ptr().cast(), bytes.len()) },
+            bytes.len() as isize
+        );
+    }
+    #[cfg(not(unix))]
+    io::stdout().write_all(bytes).unwrap();
+}
 fn stall() -> ! {
     loop {
         thread::sleep(Duration::from_secs(1));
@@ -38,6 +55,20 @@ fn descendant() {
 }
 fn main() {
     let mode = env::args().nth(1).unwrap();
+    if mode == "error" {
+        eprintln!("SYNTHETIC / NONOFFICIAL Rust peer: adapter mechanics only");
+    }
+    if mode == "premature-response" {
+        eprintln!("SYNTHETIC / NONOFFICIAL premature response peer");
+        io::stdin().read_exact(&mut [0]).unwrap();
+        write_frame(
+            &mut io::stdout(),
+            br#"{"jsonrpc":"2.0","id":1,"result":null}"#,
+        )
+        .unwrap();
+        io::stdout().flush().unwrap();
+        stall();
+    }
     if mode == "heartbeat" || mode == "heartbeat-silent" {
         if mode == "heartbeat-silent" {
             #[cfg(unix)]
@@ -80,12 +111,14 @@ fn main() {
         return;
     }
     if mode == "bad-frame-tail" {
-        print!("Content-Length: -1\r\n\r\nmalformed-tail");
+        malformed_stdout(b"Content-Length: -1\r\n\r\nmalformed-tail");
         return;
     }
     if mode == "bad-json-tail" {
-        write_frame(&mut io::stdout(), b"{").unwrap();
-        print!("raw-tail");
+        let mut bytes = Vec::new();
+        write_frame(&mut bytes, b"{").unwrap();
+        bytes.extend_from_slice(b"raw-tail");
+        malformed_stdout(&bytes);
         return;
     }
     if mode == "stderr-flood" || mode == "both-flood" {
@@ -149,6 +182,8 @@ fn main() {
         if let Some(id) = message.get("id") {
             let reply = if mode == "server-request" {
                 json!({"jsonrpc":"2.0","id":9,"method":"workspace/configuration"})
+            } else if mode == "error" {
+                json!({"jsonrpc":"2.0","id":id,"error":{"code":-32603,"message":"synthetic peer error"}})
             } else {
                 json!({"jsonrpc":"2.0","id":id,"result":"😀"})
             };

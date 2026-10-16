@@ -79,8 +79,20 @@ mod host {
         ),
     ];
     type Result<T> = std::result::Result<T, String>;
+    include!("pr174/bootstrap.rs");
+    include!("pr174/calibration.rs");
+    include!("pr174/original.rs");
+    include!("pr174/export.rs");
+    include!("pr174/collect.rs");
+    include!("pr174/storage.rs");
+    include!("pr174/action.rs");
+    include!("pr174/confinement.rs");
+    include!("pr174/workflow.rs");
+    mod materializer {
+        include!("pr174/materializer.rs");
+    }
 
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Serialize)]
     #[serde(deny_unknown_fields, rename_all = "camelCase")]
     struct Admission {
         schema_version: u8,
@@ -101,19 +113,7 @@ mod host {
         workflow_sha256: String,
         tools: Tools,
     }
-    #[derive(Deserialize, Serialize, Clone)]
-    #[serde(deny_unknown_fields, rename_all = "camelCase")]
-    struct OriginalRun {
-        repository: String,
-        event: String,
-        attempt: u8,
-        run_id: u64,
-        job_id: u64,
-        suite_id: u64,
-        source_head: String,
-        source_tree: String,
-    }
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Serialize)]
     #[serde(deny_unknown_fields, rename_all = "camelCase")]
     struct Tools {
         docker: PathBuf,
@@ -613,8 +613,42 @@ mod host {
             .mode(mode)
             .open(p)
             .map_err(|e| e.to_string())?;
+        f.set_permissions(fs::Permissions::from_mode(mode))
+            .map_err(|e| e.to_string())?;
         // Failed writes remain tombstones: removing a cancellation latch could permit START.
         write(&mut f, b).map_err(|e| e.to_string())
+    }
+    fn publish_complete_no_replace(staged: &Path, final_path: &Path) -> Result<()> {
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        {
+            let staged = std::ffi::CString::new(staged.as_os_str().as_encoded_bytes())
+                .map_err(|_| "staged publication path contains NUL")?;
+            let final_path = std::ffi::CString::new(final_path.as_os_str().as_encoded_bytes())
+                .map_err(|_| "final publication path contains NUL")?;
+            #[cfg(target_os = "linux")]
+            let status = unsafe {
+                libc::renameat2(
+                    libc::AT_FDCWD,
+                    staged.as_ptr(),
+                    libc::AT_FDCWD,
+                    final_path.as_ptr(),
+                    libc::RENAME_NOREPLACE,
+                )
+            };
+            #[cfg(target_os = "macos")]
+            let status = unsafe {
+                libc::renamex_np(staged.as_ptr(), final_path.as_ptr(), libc::RENAME_EXCL)
+            };
+            if status != 0 {
+                return Err(std::io::Error::last_os_error().to_string());
+            }
+            Ok(())
+        }
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+        {
+            let _ = (staged, final_path);
+            Err("atomic no-replace publication unsupported on this OS".into())
+        }
     }
     fn unit(nonce: &str, role: &str) -> String {
         format!("ktlsp-pr174-{nonce}-{role}")
@@ -624,7 +658,10 @@ mod host {
         protected(&std::env::current_exe().map_err(|e| e.to_string())?, false)?;
         let r = &a.run;
         if a.schema_version != 1
-            || a.scope != "PR174_HOST_EXECUTION_ADMITTED"
+            || !matches!(
+                a.scope.as_str(),
+                "PR174_HOST_EXECUTION_ADMITTED" | "PR174_RUST_CALIBRATION_ADMITTED"
+            )
             || a.contract_sha256 != CONTRACT
             || a.nonce != dir.file_name().and_then(|s| s.to_str()).unwrap_or("")
             || r.repository != "anilbeesetti/ktlsp"
@@ -701,14 +738,8 @@ mod host {
         }
         Ok(a)
     }
-    fn hash_file(e: &mut Evidence, a: &Admission, p: &Path, expected: &str) -> Result<()> {
-        let b = e.checked(
-            &a.tools.sha256sum,
-            &["--".into(), p.to_str().ok_or("hash path encoding")?.into()],
-            a.preparation_deadline_ms,
-        )?;
-        let s = std::str::from_utf8(&b).map_err(|_| "SHA256 output encoding")?;
-        if s.split_whitespace().next() != Some(expected) || !digest(expected) {
+    fn hash_file(_e: &mut Evidence, a: &Admission, p: &Path, expected: &str) -> Result<()> {
+        if !digest(expected) || sha_path(p, a.preparation_deadline_ms)? != expected {
             return Err("materialized SHA256 mismatch".into());
         }
         Ok(())
@@ -737,12 +768,16 @@ mod host {
     fn api_identity(run: &Value, job: &Value, commit: &Value, r: &OriginalRun) -> Result<()> {
         if run["id"] != r.run_id
             || run["run_attempt"] != 1
+            || run["status"] != "in_progress"
+            || !run.get("conclusion").is_some_and(Value::is_null)
             || run["event"] != "workflow_dispatch"
             || run["head_sha"] != r.source_head
             || run["check_suite_id"] != r.suite_id
             || run["repository"]["full_name"] != "anilbeesetti/ktlsp"
             || run["path"] != ".github/workflows/t045-pr174-official-symbols.yml"
             || job["id"] != r.job_id
+            || job["status"] != "in_progress"
+            || !job.get("conclusion").is_some_and(Value::is_null)
             || job["run_id"] != r.run_id
             || job["head_sha"] != r.source_head
             || commit["sha"] != r.source_head
@@ -810,7 +845,8 @@ mod host {
         let mp = dir.join("inputs/extraction-manifest.json");
         protected(&mp, false)?;
         hash_file(e, a, &mp, &a.extraction_manifest_sha256)?;
-        let manifest: Materialization = parse(&read_file(&mp, e.available() / 4)?)?;
+        // Streamed preparation inventory is bounded separately; it is not persisted host observation evidence.
+        let manifest: Materialization = parse(&read_file(&mp, 262_144)?)?;
         if manifest.entries.len() > 1120 {
             return Err("extraction inventory limit".into());
         }
@@ -931,57 +967,19 @@ mod host {
             .strip_prefix("0::")
             .ok_or("unified host cgroup required")?;
         let wanted = format!("/system.slice/{}.service", unit(&a.nonce, "supervisor"));
+        let self_stat = read_file(Path::new("/proc/self/stat"), 4096)?;
         if cg != wanted
             || !String::from_utf8_lossy(&read_file(Path::new("/proc/1/comm"), 128)?)
                 .starts_with("systemd")
+            || parent_pid(&self_stat)? != 1
         {
             return Err("supervisor is not the dedicated outside-step system service".into());
         }
+        e.append(&json!({"kind":"outside-step-supervisor","statHex":raw_hex(&self_stat),"cgroup":cg,"pid1CommHex":raw_hex(&read_file(Path::new("/proc/1/comm"),128)?)}),false)?;
         core_policy(e)?;
         attest_mounts(dir, None, e)?;
         input_pins(dir, a, e)?;
-        let token = String::from_utf8(read_file(&dir.join("github.token"), 4096)?)
-            .map_err(|_| "credential encoding")?;
-        let token = token.trim();
-        if token.is_empty() || token.bytes().any(|b| b.is_ascii_control()) {
-            return Err("credential input unavailable".into());
-        }
-        let prefix = "repos/anilbeesetti/ktlsp";
-        let run: Value = parse(&gh(
-            e,
-            a,
-            token,
-            format!("{prefix}/actions/runs/{}", a.run.run_id),
-            false,
-        )?)?;
-        let job: Value = parse(&gh(
-            e,
-            a,
-            token,
-            format!("{prefix}/actions/jobs/{}", a.run.job_id),
-            false,
-        )?)?;
-        let commit: Value = parse(&gh(
-            e,
-            a,
-            token,
-            format!("{prefix}/git/commits/{}", a.run.source_head),
-            false,
-        )?)?;
-        api_identity(&run, &job, &commit, &a.run)?;
-        let workflow = gh(
-            e,
-            a,
-            token,
-            format!(
-                "{prefix}/contents/.github/workflows/t045-pr174-official-symbols.yml?ref={}",
-                a.run.source_head
-            ),
-            true,
-        )?;
-        if workflow != read_file(&dir.join("workflow.yml"), INPUT_BYTES)? {
-            return Err("original API workflow bytes differ".into());
-        }
+        authenticate_original(dir, a, e)?;
         daemon(e, &a.tools.docker, a.preparation_deadline_ms, &a.daemon_id)?;
         let image: Value = parse(&e.checked(
             &a.tools.docker,
@@ -1003,7 +1001,8 @@ mod host {
         {
             return Err("pinned image identity/volumes".into());
         }
-        e.append(&json!({"kind":"original-host","bootId":a.boot_id,"supervisorCgroup":cg,"osReleaseHex":raw_hex(&read_file(Path::new("/etc/os-release"),INPUT_BYTES)?),"kernelHex":raw_hex(&read_file(Path::new("/proc/sys/kernel/osrelease"),1024)?),"apiAuthenticated":true,"authority":"reviewed ROOT/bootstrap custody; receiver independently verifies original artifacts"}),false)?;
+        e.append(&json!({"kind":"original-host","bootId":a.boot_id,"supervisorCgroup":cg,"osReleaseHex":raw_hex(&os_release()?),"kernelHex":raw_hex(&read_file(Path::new("/proc/sys/kernel/osrelease"),1024)?),"apiAuthenticated":true,"authority":"reviewed ROOT/bootstrap custody; receiver independently verifies original artifacts"}),false)?;
+        measure_child_confinement(dir, a, e)?;
         Ok(cg.into())
     }
     fn empty(v: &Value) -> bool {
@@ -1082,6 +1081,11 @@ mod host {
         for p in ["fixture", "distribution", "tool", "preflight"] {
             mkdir(&state.join(p), 0o755)?;
         }
+        side_json(
+            e,
+            &dir.join("state-mount.json"),
+            &state_mount_identity(dir)?,
+        )?;
         Ok(())
     }
 
@@ -1141,6 +1145,10 @@ mod host {
             return Err("original init ancestry changed".into());
         }
         let cmdline = read_file(&path.join("cmdline"), INPUT_BYTES)?;
+        let parent_proc = fs::metadata(&path).map_err(|e| e.to_string())?;
+        if !recorder && (parent_proc.uid() != 0 || parent_proc.gid() != 0) {
+            return Err("launcher parent lacks original nondumpable recorder proc custody".into());
+        }
         if recorder {
             if stamp != (identity.init_pid, identity.init_start) {
                 return Err("recorder is not original init child".into());
@@ -1242,12 +1250,8 @@ mod host {
                 ),
             ]);
         }
-        v.extend([
-            "--entrypoint".into(),
-            format!("{INNER}/tool/ktlsp-oracle-official-pr174"),
-            a.image.clone(),
-        ]);
-        v.extend(adapter_argv());
+        v.extend(["--entrypoint".into(), entrypoint(a), a.image.clone()]);
+        v.extend(entry_arguments(dir, a)?);
         Ok(v)
     }
     fn one_inspect(b: &[u8]) -> Result<Value> {
@@ -1267,9 +1271,9 @@ mod host {
         if v["Id"] != cid
             || v["Image"] != a.image_id
             || c["User"] != "65532:65532"
-            || v["Path"] != format!("{INNER}/tool/ktlsp-oracle-official-pr174")
-            || v["Args"] != json!(adapter_argv())
-            || c["Entrypoint"] != json!([format!("{INNER}/tool/ktlsp-oracle-official-pr174")])
+            || v["Path"] != entrypoint(a)
+            || v["Args"] != json!(entry_arguments(dir, a)?)
+            || c["Entrypoint"] != json!([entrypoint(a)])
             || c["Env"] != json!(environment())
             || !empty(&c["Volumes"])
             || c["Healthcheck"]["Test"] != json!(["NONE"])
@@ -1585,61 +1589,6 @@ mod host {
         }
         Ok(m)
     }
-    fn systemctl_usec(s: &str) -> Result<u64> {
-        if s.is_empty() || s.len() > 128 {
-            return Err("systemctl timespan length".into());
-        }
-        let mut total = 0_u64;
-        let mut previous = u64::MAX;
-        for (index, part) in s.split(' ').enumerate() {
-            if index >= 6 {
-                return Err("systemctl timespan unit count".into());
-            }
-            let (number, factor) = [
-                ("us", 1_u64),
-                ("µs", 1),
-                ("ms", 1000),
-                ("s", 1_000_000),
-                ("min", 60_000_000),
-                ("h", 3_600_000_000),
-                ("d", 86_400_000_000),
-            ]
-            .into_iter()
-            .find_map(|(unit, factor)| part.strip_suffix(unit).map(|n| (n, factor)))
-            .ok_or("unsupported systemctl timespan unit")?;
-            if factor >= previous {
-                return Err("repeated/unordered systemctl timespan unit".into());
-            }
-            previous = factor;
-            let (whole, fraction) = number.split_once('.').unwrap_or((number, ""));
-            if whole.is_empty()
-                || !whole.bytes().all(|b| b.is_ascii_digit())
-                || fraction.len() > 6
-                || !fraction.bytes().all(|b| b.is_ascii_digit())
-                || (number.contains('.') && fraction.is_empty())
-            {
-                return Err("malformed systemctl timespan number".into());
-            }
-            let whole = whole.parse::<u64>().map_err(|_| "timespan overflow")?;
-            let mut value = whole.checked_mul(factor).ok_or("timespan overflow")?;
-            if !fraction.is_empty() {
-                let digits = fraction.parse::<u64>().map_err(|_| "timespan fraction")?;
-                let divisor = 10_u64.pow(fraction.len() as u32);
-                let scaled = digits.checked_mul(factor).ok_or("timespan overflow")?;
-                if scaled % divisor != 0 {
-                    return Err("submicrosecond systemctl timespan".into());
-                }
-                value = value
-                    .checked_add(scaled / divisor)
-                    .ok_or("timespan overflow")?;
-            }
-            total = total.checked_add(value).ok_or("timespan overflow")?;
-        }
-        if total == 0 {
-            return Err("zero systemctl timespan".into());
-        }
-        Ok(total)
-    }
     fn watchdog_within_bound(trigger_us: u64, armed_ms: u64, now_ms: u64) -> bool {
         let upper = armed_ms
             .checked_add(540_000)
@@ -1675,13 +1624,15 @@ mod host {
         format!("{}:{}:{}\n", b.nonce, b.container_id, b.boot_id)
     }
     fn publish_cleanup_service(dir: &Path, b: &Binding, e: &mut Evidence) -> Result<()> {
+        let next = dir.join("cleanup-service-ready.next");
         side(
             e,
-            &dir.join("cleanup-service-ready"),
+            &next,
             cleanup_service_identity(b).as_bytes(),
             0o600,
             false,
-        )
+        )?;
+        publish_complete_no_replace(&next, &dir.join("cleanup-service-ready"))
     }
     fn cancellation_latched(dir: &Path) -> Result<bool> {
         match fs::symlink_metadata(dir.join("cleanup-requested")) {
@@ -2023,6 +1974,12 @@ mod host {
             if !recorder && !official {
                 continue;
             }
+            let proc_custody = fs::metadata(&p).map_err(|e| e.to_string())?;
+            // Setup can precede the production hook. Only policy-ready recorder observations qualify;
+            // missing such an original observation at normal exit still fails runtime attestation.
+            if recorder && (proc_custody.uid() != 0 || proc_custody.gid() != 0) {
+                continue;
+            }
             let stat = read_file(&p.join("stat"), 4096)?;
             let stamp = process_start(&stat)?;
             if stamp.0 != pid {
@@ -2118,7 +2075,7 @@ mod host {
                 return Err("process exec/ancestry changed during observation".into());
             }
             if previous.is_none() || mapped {
-                e.append(&json!({"kind":"original-process","hostPid":pid,"starttime":stamp.1,"namespace":ns,"statHex":raw_hex(&stat),"cmdlineHex":raw_hex(&cmdline),"ancestry":parents,"statusHex":raw_hex(&status),"limitsHex":raw_hex(&limits),"cgroupHex":raw_hex(&cg),"mapsHex":raw_hex(&maps),"pinnedLibjvmMapped":mapped}),false)?;
+                e.append(&json!({"kind":"original-process","role":if recorder {"recorder"}else{"launcher"},"hostPid":pid,"starttime":stamp.1,"namespace":ns,"statHex":raw_hex(&stat),"cmdlineHex":raw_hex(&cmdline),"ancestry":parents,"statusHex":raw_hex(&status),"limitsHex":raw_hex(&limits),"cgroupHex":raw_hex(&cg),"mapsHex":raw_hex(&maps),"pinnedLibjvmMapped":mapped,"exeDevice":exe.0,"exeInode":exe.1,"procDirectoryUid":proc_custody.uid(),"procDirectoryGid":proc_custody.gid(),"sealedExecutableDevice":if recorder {adapter.dev()}else{launcher.dev()},"sealedExecutableInode":if recorder {adapter.ino()}else{launcher.ino()},"sealedJvmDevice":jvm.dev(),"sealedJvmInode":jvm.ino(),"namespaceJvmDevice":if mapped {Some(jvm.dev())}else{None},"namespaceJvmInode":if mapped {Some(jvm.ino())}else{None}}),false)?;
             }
             if recorder {
                 seen.recorder = Some(stamp);
@@ -2518,8 +2475,49 @@ mod host {
             e.failed = true;
             e
         });
-        let (end, clock_valid) = cleanup_clock(dir, b, &mut e, mono_ms()?, resuming);
+        let (mut service_end, mut clock_valid) =
+            cleanup_clock(dir, b, &mut e, mono_ms()?, resuming);
+        if !direct_prearm {
+            let measured = e
+                .checked(
+                    &b.systemctl,
+                    &args(&[
+                        "show",
+                        "--property=ExecMainStartTimestampMonotonic",
+                        &format!("{}.service", unit(&b.nonce, "cleanup")),
+                    ]),
+                    service_end,
+                )
+                .and_then(|raw| properties(&raw))
+                .and_then(|values| {
+                    values
+                        .get("ExecMainStartTimestampMonotonic")
+                        .ok_or_else(|| "cleanup systemd start timestamp unavailable".into())
+                        .and_then(|value| {
+                            value
+                                .parse::<u64>()
+                                .map_err(|_| "numeric timestamp".to_string())
+                                .or_else(|_| systemctl_usec(value))
+                        })
+                })
+                .and_then(|start| {
+                    let start = start / 1000;
+                    if start == 0 || start > mono_ms()? {
+                        return Err("actual cleanup systemd start timestamp invalid".into());
+                    }
+                    start
+                        .checked_add(60000)
+                        .ok_or("cleanup service deadline overflow".into())
+                });
+            match measured {
+                Ok(actual_end) => service_end = service_end.min(actual_end),
+                Err(_) => clock_valid = false,
+            }
+        }
+        // Preserve 10s for immutable export and 2s for its final outcome inside the SAME 60s unit.
+        let end = service_end.saturating_sub(12_000);
         let budget = CleanupBudget { end };
+        let _ = e.append(&json!({"kind":"cleanup-export-budget","teardownEndMs":end,"exportEndMs":service_end.saturating_sub(2_000),"serviceEndMs":service_end}),false);
         let mut facts = ClosureFacts {
             proofs: !b.uncertain,
             deadline_valid: clock_valid,
@@ -2659,7 +2657,7 @@ mod host {
         facts.deadline_valid &= mono_ms()? <= end;
         facts.evidence_complete = !e.failed;
         let confirmed = facts.confirmed();
-        let result = json!({"schemaVersion":1,"containerId":b.container_id,"nonce":b.nonce,"bootId":b.boot_id,"teardown":if confirmed{"CONTAINER_TEARDOWN_CONFIRMED"}else{"UNKNOWN"},"officialCaptureSuccess":false,"reason":"receiver review required; host/daemon/partial closure is never clean","directPrearm":direct_prearm,"endMs":end});
+        let result = json!({"schemaVersion":1,"containerId":b.container_id,"nonce":b.nonce,"bootId":b.boot_id,"teardown":if confirmed{"CONTAINER_TEARDOWN_CONFIRMED"}else{"UNKNOWN"},"officialCaptureSuccess":false,"reason":"receiver review required; host/daemon/partial closure is never clean","directPrearm":direct_prearm,"endMs":service_end});
         side(
             &mut e,
             &dir.join("teardown-receipt.json"),
@@ -2675,6 +2673,16 @@ mod host {
                 end,
                 None,
             );
+        }
+        drop(e);
+        // The unique outside-step cleanup owner also preserves the protected export after runner-step loss.
+        // Export failure never rewrites the original teardown result.
+        let export = protected_export_until(dir, service_end.saturating_sub(2_000));
+        if let Err(error) = export {
+            let bytes = serde_json::to_vec(&json!({"scope":"PR174_EXPORT_FAILURE","error":error,"officialCaptureSuccess":false})).map_err(|e|e.to_string())?;
+            if bytes.len() <= 2048 {
+                let _ = make_file(&dir.join("export-failure.json"), &bytes, 0o400);
+            }
         }
         Ok(result)
     }
@@ -2979,7 +2987,19 @@ mod host {
     }
     fn supervise(dir: &Path) -> Result<Value> {
         let a = admission(dir)?;
+        root_authority(dir, &a)?;
+        bootstrap_receipt_gate(dir, &a)?;
         let mut e = Evidence::preflight();
+        e.limit = OBSERVER_BYTES
+            - 131_072
+            - 16_384
+            - 16_384
+            - 8_192
+            - if calibration_case(dir, &a)? == Some(CalibrationCase::WorkflowStepCancel) {
+                131_072
+            } else {
+                0
+            };
         let mut cg = String::new();
         let mut stamp = None;
         let mut known: Option<Binding> = None;
@@ -3082,7 +3102,13 @@ mod host {
                     &cid,
                     true,
                 ),
-                CaptureStep::Seal => seal_handoff(dir, &a, &cid, &mut e),
+                CaptureStep::Seal => {
+                    if calibration_case(dir, &a)?.is_some() {
+                        seal_calibration(dir, &a, &cid, &mut e)
+                    } else {
+                        seal_handoff(dir, &a, &cid, &mut e)
+                    }
+                }
                 CaptureStep::Arm => {
                     if a.preparation_deadline_ms
                         < mono_ms()?
@@ -3140,21 +3166,44 @@ mod host {
                     }
                     Ok(())
                 }
-                CaptureStep::Observe => observe(dir, &a, b, &mut e),
+                CaptureStep::Observe => {
+                    if let Some(case) = calibration_case(dir, &a)? {
+                        observe_calibration(dir, &a, b, &mut e, case)
+                    } else {
+                        observe(dir, &a, b, &mut e)
+                    }
+                }
                 _ => Err("invalid lifecycle phase".into()),
             }
         });
         let _=e.append(&json!({"kind":"supervisor-final","captureError":run.as_ref().err(),"containerId":known.as_ref().map(|b|&b.container_id),"officialCaptureSuccess":false,"closure":"UNKNOWN until independent cleanup receipt"}),true);
+        if e.file.is_none()
+            && !e.pending.is_empty()
+            && fs::symlink_metadata(dir.join("receipts/observer.evidence"))
+                .is_err_and(|error| error.kind() == ErrorKind::NotFound)
+        {
+            // Preserve pre-CREATE raw failure prefixes without duplicating an already charged partial observer file.
+            let _ = make_file(&dir.join("preflight-failure.evidence"), &e.pending, 0o600);
+        }
         finish_supervision(run, dir, known.as_ref(), cleanup_ready, &mut e)?;
         Ok(
             json!({"status":"CLEANUP_REQUESTED","officialCaptureSuccess":false,"receiverReviewRequired":true}),
         )
     }
     pub fn entry() -> Result<Value> {
+        let argv: Vec<_> = std::env::args().skip(1).collect();
+        if argv.as_slice() == ["describe-template"] {
+            return Ok(
+                json!({"schemaVersion":1,"scope":"PR174_CONTAINMENT_TEMPLATE_SOURCE","containmentTemplateSha256":containment_template_sha256()?,"profile":child_confinement::profile(),"runtimeAuthority":"NONE; exact source policy only, no kernel/launch/calibration fact"}),
+            );
+        }
         if !cfg!(target_os = "linux") {
             return Err(
                 "host execution is Linux-only; optional macOS compilation remains supported".into(),
             );
+        }
+        if argv.first().is_some_and(|mode| mode == "workflow-source") {
+            return workflow_source(&argv);
         }
         unsafe extern "C" {
             fn geteuid() -> u32;
@@ -3162,9 +3211,20 @@ mod host {
         if unsafe { geteuid() } != 0 {
             return Err("protected host execution requires OS root".into());
         }
-        let argv: Vec<_> = std::env::args().skip(1).collect();
+        if argv
+            .first()
+            .is_some_and(|mode| mode.starts_with("workflow-"))
+        {
+            return workflow_entry(&argv);
+        }
+        if argv.as_slice() == ["bootstrap", STAGING] {
+            return bootstrap();
+        }
+        if argv.as_slice() == ["collect-calibration", STAGING] {
+            return collect_calibration();
+        }
         if argv.len() != 2 {
-            return Err("usage: ktlsp-oracle-pr174-host supervise|cleanup|request-cleanup /run/ktlsp-pr174/NONCE".into());
+            return Err("usage: ktlsp-oracle-pr174-host bootstrap /etc/ktlsp-pr174/staging | supervise|calibrate|export|cleanup|request-cleanup /run/ktlsp-pr174/NONCE".into());
         }
         let dir = directory(&argv[1])?;
         entry_mode(&argv[0], &dir)
@@ -3172,7 +3232,16 @@ mod host {
     // The caller has already validated OS root and the protected nonce directory.
     fn entry_mode(mode: &str, dir: &Path) -> Result<Value> {
         match mode {
-            "supervise" => supervise(dir),
+            "supervise" | "calibrate" => {
+                let a = admission(dir)?;
+                if (mode == "calibrate") != (a.scope == "PR174_RUST_CALIBRATION_ADMITTED") {
+                    return Err("official and Rust-only calibration entry scopes differ".into());
+                }
+                supervise(dir)
+            }
+            "export" => protected_export(dir),
+            "await-calibration" => await_calibration(dir),
+            "release-calibration" => release_calibration(dir),
             "cleanup" => {
                 let b = binding(dir)?;
                 let expected = format!("0::/system.slice/{}.service", unit(&b.nonce, "cleanup"));
@@ -4087,9 +4156,8 @@ mod host {
                 source_head: "a".repeat(40),
                 source_tree: "b".repeat(40),
             };
-            let value = json!({"id":1,"run_attempt":1,"event":"workflow_dispatch","head_sha":run.source_head,"check_suite_id":3,"repository":{"full_name":"anilbeesetti/ktlsp"},"path":".github/workflows/t045-pr174-official-symbols.yml"});
-            let job =
-                json!({"id":2,"run_id":1,"head_sha":run.source_head,"labels":["ubuntu-24.04"]});
+            let value = json!({"id":1,"run_attempt":1,"status":"in_progress","conclusion":null,"event":"workflow_dispatch","head_sha":run.source_head,"check_suite_id":3,"repository":{"full_name":"anilbeesetti/ktlsp"},"path":".github/workflows/t045-pr174-official-symbols.yml"});
+            let job = json!({"id":2,"run_id":1,"status":"in_progress","conclusion":null,"head_sha":run.source_head,"labels":["ubuntu-24.04"]});
             let commit = json!({"sha":run.source_head,"tree":{"sha":run.source_tree}});
             assert!(api_identity(&value, &job, &commit, &run).is_ok());
             let mut bad = value.clone();
@@ -4098,6 +4166,14 @@ mod host {
             let mut bad = job.clone();
             bad["run_id"] = json!(9);
             assert!(api_identity(&value, &bad, &commit, &run).is_err());
+            let mut completed = value.clone();
+            completed["status"] = json!("completed");
+            completed["conclusion"] = json!("success");
+            assert!(api_identity(&completed, &job, &commit, &run).is_err());
+            let mut completed_job = job;
+            completed_job["status"] = json!("completed");
+            completed_job["conclusion"] = json!("success");
+            assert!(api_identity(&value, &completed_job, &commit, &run).is_err());
         }
     }
 }

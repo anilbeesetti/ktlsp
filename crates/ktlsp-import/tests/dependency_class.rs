@@ -86,7 +86,10 @@ fn import_path(path: &Path) -> String {
     )
 }
 fn library(name: &str, binaries: &[PathBuf]) -> Value {
-    let mut roots: Vec<_> = binaries.iter().map(|path| json!({"path": import_path(path)})).collect();
+    let mut roots: Vec<_> = binaries
+        .iter()
+        .map(|path| json!({"path": import_path(path)}))
+        .collect();
     roots.push(json!({"path": import_path(&fixture(true)), "type":"SOURCES"}));
     json!({"name":name,"type":null,"roots":roots})
 }
@@ -136,7 +139,14 @@ fn genuine_class_owner_identity_and_owning_library_source_composition() {
     #[cfg(windows)]
     {
         assert!(source().to_str().unwrap().contains('\\'));
-        assert!(binary.provenance().artifact_path.to_str().unwrap().contains('\\'));
+        assert!(
+            binary
+                .provenance()
+                .artifact_path
+                .to_str()
+                .unwrap()
+                .contains('\\')
+        );
     }
     // Public mutable sidecars are not authority for ownership, order, or paths.
     workspace.modules.clear();

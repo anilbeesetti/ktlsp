@@ -1680,15 +1680,14 @@ mod peer {
                 }
                 observer_gate()?;
                 report.observer_gate_observed = true;
-                if let Some(child) = &mut child {
-                    if let Some(status) = child
+                if let Some(child) = &mut child
+                    && let Some(status) = child
                         .try_wait()
                         .map_err(|e| error("recheck observed descendant", e))?
-                    {
-                        return Err(format!(
-                            "descendant exited before host observer gate: {status}"
-                        ));
-                    }
+                {
+                    return Err(format!(
+                        "descendant exited before host observer gate: {status}"
+                    ));
                 }
                 match case {
                     Case::BoundaryDenials => boundary_denials(&mut report)?,
@@ -1737,6 +1736,14 @@ mod peer {
                 });
             }
             Ok(())
+        }
+        pub(super) fn run(mode: Mode) -> Result<(), String> {
+            require_identity()?;
+            match mode {
+                Mode::Peer(case) => peer(case),
+                Mode::Descendant(case) => descendant(case),
+                Mode::CustodyChild => custody_child(),
+            }
         }
         #[cfg(test)]
         mod pipe_state_tests {
@@ -1858,14 +1865,6 @@ mod peer {
             }
         }
 
-        pub(super) fn run(mode: Mode) -> Result<(), String> {
-            require_identity()?;
-            match mode {
-                Mode::Peer(case) => peer(case),
-                Mode::Descendant(case) => descendant(case),
-                Mode::CustodyChild => custody_child(),
-            }
-        }
     }
 
     #[cfg(target_os = "linux")]

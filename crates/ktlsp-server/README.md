@@ -1,6 +1,8 @@
 # Native server providers
 
-`ktlsp` supports bounded stdio lifecycle, open-document synchronization, `textDocument/foldingRange`, negotiated lexical `textDocument/semanticTokens/full` and `/range`, parser-backed syntactic `textDocument/documentSymbol`, finite local `textDocument/definition`, negotiated `textDocument/hover`, `textDocument/references` and `textDocument/documentHighlight`. Initialization advertises UTF-16, incremental sync and folding; lexical tokens require compatible client capabilities, parser-backed capabilities require the trusted matching worker, and hover also requires a compatible content format. Clients advertising `textDocument.diagnostic` negotiate lexical/structural pull reports instead of legacy push diagnostics. Neither diagnostic path provides Kotlin compiler diagnostics.
+`ktlsp` supports bounded stdio lifecycle, document synchronization, folding, negotiated lexical semantic-token full/range transport, parser-backed syntactic symbols, finite local definition/hover/references/highlights, eager local-value completion, and guarded local-val prepare/rename. Initialization advertises only the implemented negotiated providers.
+
+Parser-backed capabilities require the trusted matching worker. Hover also requires a compatible content format; rename requires versioned `documentChanges`, with preparation advertised only when supported by the client. Lexical tokens need compatible token capabilities but no worker. Clients advertising `textDocument.diagnostic` negotiate lexical/structural pull reports instead of legacy push diagnostics. Neither diagnostics nor lexical token categories provide Kotlin compiler analysis or full semantic coloring.
 
 ## Build and distribute both executables
 
@@ -44,10 +46,9 @@ The permanent bounded decoded wire/CLI/provenance receipt is
 facts, complete inner checksums and the captured optional-test log. It is not
 inserted into its own TAR. Failure evidence remains always-uploaded; the package
 is uploaded only after the extracted smoke succeeds. Source and compile checks
-are not runtime proof: this optional test has not yet been exercised by #373.
-Its manual dispatch requires a new separate ROOT admission after reviewed source
-is merged and exact-main verified. #96, #46, the first-party-license hold and
-official/full-parity release gates remain open.
+are not runtime proof. The first separately admitted [original experiment38911945117](https://github.com/anilbeesetti/ktlsp/issues/373#issuecomment-6218039840), attempt1 at verified main `f5f8a409dea209d44f9a9abe11c0becdf20f658e`, actually exercised the extracted Linux/macOS pairs after full unfiltered release workspace tests. Independent platform owners and ROOT authenticated all archive bytes and directly read the 16-reply receipts with successful CLI/stdio, empty PATH/no Java-home variables and retained directories. These are finite observations at that source, not the current source's archive acceptance.
+
+Windows failed its full workspace before staging: an actual definition reply was `-32803`, `parser deadline exceeded`, not `result:null`; no Windows package or extracted receipt exists for that run. #373/#377 remain open, with phase/root cause unestablished. No unchanged retry or general platform/parity claim follows. Every later manual dispatch requires a separate ROOT admission after reviewed source and exact-main verification. #96, #46, the first-party-license hold and official/full-parity release gates remain open.
 
 ## Folding and diagnostics
 

@@ -854,16 +854,6 @@ fn references_actual_paired_cli_declaration_use_utf16_and_existing_providers() {
     assert_eq!(caps["definitionProvider"], true);
     assert_eq!(caps["documentSymbolProvider"], true);
     assert!(caps.get("hoverProvider").is_none());
-    // Temporary original hosted observation; assertions above remain permanent.
-    std::io::stdout()
-        .write_all(
-            format!(
-                "\nREFERENCES_PROVIDER_DIRECT_WIRE {}\n",
-                json!({"source":source,"requests":messages,"responses":replies})
-            )
-            .as_bytes(),
-        )
-        .unwrap();
     let missing = Package::new(false).exchange(&messages);
     assert_eq!(missing.len(), expected.len());
     assert!(

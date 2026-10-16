@@ -424,6 +424,12 @@ fn real_stdio_packaged_sibling_and_missing_worker_capabilities() {
     let symbols = packaged.iter().find(|m| m["id"] == 2).unwrap();
     assert_eq!(symbols["result"][0]["name"], "Outer", "{symbols}");
     assert_eq!(symbols["result"][0]["children"][0]["name"], "inner");
+    writeln!(
+        std::io::stdout().lock(),
+        "DOCUMENT_SYMBOL_STDIO_SMOKE {}",
+        json!({"initialize": &packaged[0], "documentSymbol": symbols})
+    )
+    .unwrap();
     let missing = Package::new(false).exchange(&messages);
     assert!(
         missing[0]["result"]["capabilities"]

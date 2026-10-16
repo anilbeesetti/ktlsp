@@ -1081,7 +1081,10 @@ fn extracted_archive_smoke() {
         std::env::var_os("KTLSP_EXTRACTED_PACKAGE_DIR")
             .expect("KTLSP_EXTRACTED_PACKAGE_DIR must name the verified extracted package"),
     );
-    assert!(directory.is_absolute() && directory.is_dir(), "{directory:?}");
+    assert!(
+        directory.is_absolute() && directory.is_dir(),
+        "{directory:?}"
+    );
     let directory = directory.canonicalize().unwrap();
     let executable = directory.join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX));
     let worker = directory.join(format!(
@@ -1105,7 +1108,10 @@ fn extracted_archive_smoke() {
         assert!(output.stderr.is_empty(), "{:?}", output.stderr);
         let stdout = String::from_utf8(output.stdout).unwrap();
         if argument == "--version" {
-            assert_eq!(stdout.trim_end(), concat!("ktlsp ", env!("CARGO_PKG_VERSION")));
+            assert_eq!(
+                stdout.trim_end(),
+                concat!("ktlsp ", env!("CARGO_PKG_VERSION"))
+            );
         } else {
             assert!(stdout.contains("Usage: ktlsp [--stdio | --help | --version]"));
         }
@@ -1124,7 +1130,10 @@ fn extracted_archive_smoke() {
         "borrowed_directory_retained":true
     }))
     .unwrap();
-    assert!(receipt.len() <= 65536, "artifact smoke receipt exceeds 64 KiB");
+    assert!(
+        receipt.len() <= 65536,
+        "artifact smoke receipt exceeds 64 KiB"
+    );
     // Captured permanently in the separate evidence ZIP, never inserted into its own TAR.
     println!("EXTRACTED_ARCHIVE_SMOKE_RECEIPT={receipt}");
 }

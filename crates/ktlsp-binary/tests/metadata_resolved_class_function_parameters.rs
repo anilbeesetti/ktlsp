@@ -893,12 +893,12 @@ fn authored_own_options_opaque_bounds_and_nullable_presence_are_retained() {
 
 #[test]
 fn authored_late_own_failures_are_atomic_rebased_once_and_name_shapes_stay_bare() {
-    for body in [
-        vec![8, 7], // Missing required name.
-        vec![16, 1], // Missing required ID.
-        vec![8, 7, 16, 1, 50, 1, 0x80], // Truncated packed bound ID.
-        vec![8, 7, 16, 1, 10, 0], // Significant ID wrong wire, despite earlier valid ID.
-        vec![8, 7, 16, 1, 18, 0], // Significant name wrong wire.
+    for (body, relative_error) in [
+        (vec![8, 7], 2), // Missing required name.
+        (vec![16, 1], 2), // Missing required ID.
+        (vec![8, 7, 16, 1, 50, 1, 0x80], 7), // Truncated packed bound ID.
+        (vec![8, 7, 16, 1, 10, 0], 4), // Significant ID wrong wire.
+        (vec![8, 7, 16, 1, 18, 0], 4), // Significant name wrong wire.
     ] {
         let mut roles = value(4, &leaf(0));
         roles.extend(message(4, &body));
@@ -906,7 +906,7 @@ fn authored_late_own_failures_are_atomic_rebased_once_and_name_shapes_stay_bare(
         let error = decode(&input, 3, Limits::default()).unwrap_err();
         let metadata::Outcome::Decoded { bytes, .. } = &input else { unreachable!() };
         let start = bytes.len() - body.len();
-        assert!(error.offset >= start && error.offset <= bytes.len());
+        assert_eq!(error.offset, start + relative_error);
         assert!(matches!(error.kind, ErrorKind::Context(_)));
     }
     for extra in [
@@ -1043,4 +1043,26 @@ fn authored_long_equal_prefix_name_comparisons_consume_work_per_inspected_unit()
         decode(&late_input, 1, Limits::default()).unwrap().function.parameters[0].classifier,
         Classifier::FunctionParameter(1)
     );
+}
+
+#[test]
+fn authored_names_are_not_normalized_and_signed_id_varints_are_not_positions() {
+    let composed = units("\u{e9}");
+    let decomposed = units("e\u{301}");
+    let mut names = NAMES.to_vec();
+    names[1] = &composed;
+    names[6] = &decomposed;
+    let mut roles = own(-1, 1);
+    roles.extend(value(4, &scalar(9, 6)));
+    let original = input(class(&function(&roles)), &names);
+    assert_eq!(
+        decode(&original, 1, Limits::default()).unwrap_err().kind,
+        ErrorKind::UnknownParameterName
+    );
+    let mut roles = own(-1, 1);
+    roles.extend(value(4, &scalar(7, u64::MAX))); // Ten-byte signed -1, not ordinal.
+    let original = input(class(&function(&roles)), &names);
+    let result = decode(&original, 1, Limits::default()).unwrap();
+    assert_eq!(result.function.parameters[0].header.type_parameter, Some(-1));
+    assert_eq!(result.function.parameters[0].classifier, Classifier::FunctionParameter(0));
 }

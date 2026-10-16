@@ -67,7 +67,7 @@ fn hash(b: &[u8], seed: u32) -> u32 {
 pub fn image(records: &[Record]) -> Image {
     let count = records.len();
     let mut t = count * 4 + 3;
-    while (2..t).any(|n| t % n == 0) {
+    while (2..t).any(|n| t.is_multiple_of(n)) {
         t += 1;
     }
     let mut names = Vec::new();

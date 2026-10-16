@@ -3180,13 +3180,14 @@ fn local_annotation_type_namespace_actual_cli_all_anchors_edits_and_rebinding() 
         "textDocument":{"rename":{"prepareSupport":true}}
     }}});
     for source in [
+        "fun <T> outer(){ fun target(p:T){} }",
         "fun <T, Spare> outer(){ fun target(p:T){} }",
         "// 😀\r\nfun <T, Spare> outer(T:T){ fun before(p:T,q:Int){}; val x:T=T; unknown(noSuch=x,noSuch=2L); fun after(p:`T`){}; before(); val y=x }\r\n",
         "fun <Int, Spare> outer(){ fun before(p:Int){}; unknown(label=1); fun after(p:`Int`){} }",
         "// 😀\r\nfun <`🦀`, Spare> outer(){ fun before(p:`🦀`){}; fun after(p:`🦀`){} }\r\n",
     ] {
         let start = source.find('<').unwrap()+1;
-        let raw = &source[start..source.find(',').unwrap()];
+        let raw = &source[start..source.find([',','>']).unwrap()];
         let declaration = start..start+raw.len();
         let annotations:Vec<_> = source.match_indices(&format!(":{raw}"))
             .map(|(i,_)|i+1..i+1+raw.len())
@@ -3197,9 +3198,9 @@ fn local_annotation_type_namespace_actual_cli_all_anchors_edits_and_rebinding() 
             } else {vec![]}).collect();
         let mut annotations=annotations;
         annotations.sort_by_key(|r|r.start);
-        let spare=source.find("Spare").unwrap()..source.find("Spare").unwrap()+5;
+        let spare=source.find("Spare").map(|i|i..i+5);
         let anchors:Vec<_>=std::iter::once(declaration.clone()).chain(annotations.clone())
-            .chain(std::iter::once(spare.clone())).collect();
+            .chain(spare.clone()).collect();
         for name in ["Fresh","out","reified"] {
             let mut messages=vec![init.clone(),
                 json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
@@ -3217,9 +3218,10 @@ fn local_annotation_type_namespace_actual_cli_all_anchors_edits_and_rebinding() 
                 }
             }
             for (id,offset,new_name) in [
-                ("capture",declaration.start,"Int"),("unused-capture",spare.start,"Int"),
-                ("context",annotations[0].start,"where"),
-            ] {
+                ("capture",Some(declaration.start),"Int"),
+                ("unused-capture",spare.as_ref().map(|r|r.start),"Int"),
+                ("context",Some(annotations[0].start),"where"),
+            ].into_iter().filter_map(|(id,offset,name)|offset.map(|offset|(id,offset,name))) {
                 messages.push(json!({"jsonrpc":"2.0","id":id,"method":"textDocument/rename","params":rename_params(source,offset,new_name)}));
             }
             if source.contains("unknown(") {
@@ -3237,8 +3239,8 @@ fn local_annotation_type_namespace_actual_cli_all_anchors_edits_and_rebinding() 
             assert_eq!(reply("init")["result"]["capabilities"]["positionEncoding"],"utf-16");
             let full:Vec<_>=std::iter::once(declaration.clone()).chain(annotations.clone()).collect();
             for (i,anchor) in anchors.iter().enumerate() {
-                let unused=*anchor==spare;
-                let partition=if unused {vec![spare.clone()]} else {full.clone()};
+                let unused=spare.as_ref()==Some(anchor);
+                let partition=if unused {vec![anchor.clone()]} else {full.clone()};
                 let range=|r:&std::ops::Range<usize>|references_range(source,r.start,r.len());
                 assert_eq!(reply(&format!("refs-{i}"))["result"],json!(partition.iter()
                     .map(|r|json!({"uri":URI,"range":range(r)})).collect::<Vec<_>>()));
@@ -3278,6 +3280,10 @@ fn local_annotation_type_namespace_actual_cli_all_anchors_edits_and_rebinding() 
                 for (j,r) in edited_annotation_ranges.iter().enumerate() {
                     replay.push(json!({"jsonrpc":"2.0","id":format!("type-{j}"),"method":"textDocument/definition","params":navigation_params(&edited,r.start)}));
                 }
+                if unused {
+                    replay.push(json!({"jsonrpc":"2.0","id":"unused-rebound","method":"textDocument/references",
+                        "params":references_params(&edited,edited.find(name).unwrap(),true)}));
+                }
                 replay.extend([
                     json!({"jsonrpc":"2.0","id":"refs","method":"textDocument/references","params":references_params(&edited,edited_target,true)}),
                     json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
@@ -3287,6 +3293,16 @@ fn local_annotation_type_namespace_actual_cli_all_anchors_edits_and_rebinding() 
                 for j in 0..annotations.len() {
                     let actual=rebound.iter().find(|r|r["id"]==format!("type-{j}")).unwrap();
                     assert_eq!(actual["result"],json!({"uri":URI,"range":references_range(&edited,edited_target,if unused {raw.len()}else{name.len()})}));
+                }
+                let edited_target_len=if unused {raw.len()}else{name.len()};
+                let expected_rebound:Vec<_>=std::iter::once(edited_target..edited_target+edited_target_len)
+                    .chain(edited_annotation_ranges.clone()).map(|r|json!({
+                        "uri":URI,"range":references_range(&edited,r.start,r.len())
+                    })).collect();
+                assert_eq!(rebound.iter().find(|r|r["id"]=="refs").unwrap()["result"],json!(expected_rebound));
+                if unused {
+                    assert_eq!(rebound.iter().find(|r|r["id"]=="unused-rebound").unwrap()["result"],
+                        json!([{"uri":URI,"range":references_range(&edited,edited.find(name).unwrap(),name.len())}]));
                 }
                 let packet=json!({"source":source,"name":name,"anchor":anchor,"requests":messages,
                     "responses":replies,"appliedResponse":rename,"appliedSource":edited,
@@ -3356,6 +3372,14 @@ fn type_parameter_wire_quote_context_capture_growth_negotiation_and_reopen() {
             json!({"textDocument":{"uri":URI}}),
         );
     }
+    let rich = "fun <T> f(){ fun before(p:T){}; unknown(label=1); fun after(q:T){} }";
+    open(&mut session, rich);
+    let response = request(&mut session, "textDocument/rename",
+        rename_params(rich, rich.find("p:T").unwrap()+2, &"A".repeat(33000)));
+    assert_eq!(response["error"]["code"], -32803);
+    assert!(response.get("result").is_none());
+    assert_eq!(session.document(URI).unwrap().text(), rich);
+    notify(&mut session, "textDocument/didClose", json!({"textDocument":{"uri":URI}}));
     let source = "fun <T> f(p:T){}";
     open(&mut session, source);
     let response = request(

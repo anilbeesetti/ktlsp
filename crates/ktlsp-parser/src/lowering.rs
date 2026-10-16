@@ -2172,6 +2172,121 @@ mod tests {
                 }
             }
         }
+        // Authored synthetic accounting boundary ONLY, not producer acceptance.
+        // Preserve the original fixture above and additionally exercise the
+        // complete rich local type envelope with uncalled before/after uses.
+        let mut tree = Tree::new();
+        tree.open("FUN");
+        tree.token("FUN_KEYWORD", "fun");
+        tree.token("WHITE_SPACE", " ");
+        tree.open("TYPE_PARAMETER_LIST");
+        tree.token("LT", "<");
+        for (i, name) in ["T", "Spare"].into_iter().enumerate() {
+            if i != 0 { tree.token("COMMA", ","); }
+            tree.open("TYPE_PARAMETER");
+            tree.token("IDENTIFIER", name);
+            tree.close();
+        }
+        tree.token("GT", ">");
+        tree.close();
+        tree.token("WHITE_SPACE", " ");
+        tree.token("IDENTIFIER", "outer");
+        tree.open("VALUE_PARAMETER_LIST");
+        tree.token("LPAR", "(");
+        tree.token("RPAR", ")");
+        tree.close();
+        tree.open("BLOCK");
+        tree.token("LBRACE", "{");
+        let mut references = Vec::new();
+        for (name, annotation) in [("before", "T"), ("unused", "Captured"), ("after", "T")] {
+            tree.header(name);
+            tree.open("VALUE_PARAMETER_LIST");
+            tree.token("LPAR", "(");
+            tree.open("VALUE_PARAMETER");
+            tree.token("IDENTIFIER", "p");
+            tree.token("COLON", ":");
+            tree.open("TYPE_REFERENCE");
+            tree.open("USER_TYPE");
+            references.push(tree.elements.len());
+            tree.open("REFERENCE_EXPRESSION");
+            tree.token("IDENTIFIER", annotation);
+            tree.close();
+            tree.close();
+            tree.close();
+            tree.close();
+            tree.token("RPAR", ")");
+            tree.close();
+            tree.open("BLOCK");
+            tree.token("LBRACE", "{");
+            tree.token("RBRACE", "}");
+            tree.close();
+            tree.close();
+            tree.token("SEMICOLON", ";");
+        }
+        tree.open("CALL_EXPRESSION");
+        tree.open("REFERENCE_EXPRESSION");
+        tree.token("IDENTIFIER", "unknown");
+        tree.close();
+        tree.open("VALUE_ARGUMENT_LIST");
+        tree.token("LPAR", "(");
+        tree.open("VALUE_ARGUMENT");
+        tree.open("VALUE_ARGUMENT_NAME");
+        tree.open("REFERENCE_EXPRESSION");
+        tree.token("IDENTIFIER", "label");
+        tree.close();
+        tree.close();
+        tree.token("EQ", "=");
+        tree.open("INTEGER_CONSTANT");
+        tree.token("INTEGER_LITERAL", "1");
+        tree.close();
+        tree.close();
+        tree.token("RPAR", ")");
+        tree.close();
+        tree.close();
+        let result = finish_body(tree);
+        let lower = lower_declarations(&result, result.snapshot()).unwrap();
+        let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
+        let target = lower.declarations().iter().find(|d| d.raw_name() == "T").unwrap();
+        let spare = lower.declarations().iter().find(|d| d.raw_name() == "Spare").unwrap();
+        for anchor in [
+            TypeParameterAnchor::Declaration(target),
+            TypeParameterAnchor::AnnotationReference(references[0]),
+            TypeParameterAnchor::AnnotationReference(references[2]),
+            TypeParameterAnchor::Declaration(spare),
+        ] {
+            for name in [None, Some("Fresh")] {
+                let mut measured = ReferenceBudget::default();
+                let found = type_rename_with_budget(
+                    &directory, &result, anchor, result.snapshot(), name, &mut measured,
+                ).unwrap();
+                let expected = if std::ptr::eq(found.target(), spare) {
+                    vec![]
+                } else {
+                    vec![references[0], references[2]]
+                };
+                assert_eq!(found.occurrences().iter().map(|a| a.reference_index()).collect::<Vec<_>>(), expected);
+                for (extra, accepted) in [(0, true), (1, false)] {
+                    let outcome = type_rename_with_budget(
+                        &directory, &result, anchor, result.snapshot(), name,
+                        &mut ReferenceBudget {
+                            work: WORK - measured.work + extra,
+                            ..ReferenceBudget::default()
+                        },
+                    );
+                    if accepted {
+                        let exact = outcome.unwrap();
+                        assert!(std::ptr::eq(exact.target(), found.target()));
+                        assert_eq!(exact.occurrences().iter().map(|a| a.reference_index()).collect::<Vec<_>>(), expected);
+                    } else {
+                        assert_eq!(outcome.unwrap_err(), LocalBindingError::Resource);
+                    }
+                }
+            }
+            assert_eq!(type_rename_with_budget(
+                &directory, &result, anchor, result.snapshot(), Some("Captured"),
+                &mut ReferenceBudget::default(),
+            ).unwrap_err(), LocalBindingError::AmbiguousTypeParameter);
+        }
     }
 
     #[test]

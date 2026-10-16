@@ -1836,6 +1836,7 @@ fn local_parameter_annotations_share_one_complete_original_outer_type_partition(
     use serde_json::json;
     let _serial = functional::serial();
     for original in [
+        "fun <T> outer(){ fun target(p:T){} }",
         "fun <T, Spare> outer(){ fun target(p:T){} }",
         "// 😀\r\nfun <T, Spare> outer(T:T){ fun before(p:T,q:Int){}; val x:T=T; unknown(noSuch=x,noSuch=2L); fun after(p:`T`){}; before(); val y=x }\r\n",
         "fun <Int, Spare> outer(){ fun before(p:Int){}; unknown(label=1); fun after(p:`Int`){} }",
@@ -1888,12 +1889,13 @@ fn local_parameter_annotations_share_one_complete_original_outer_type_partition(
                 observed.push(json!({
                     "referenceIndex":annotation.reference_index(), "range":annotation.range(),
                     "annotatedOrdinal":lower.declarations().iter().position(|d| std::ptr::eq(d, annotation.annotated())),
-                    "targetOrdinal":1, "functionOrdinal":target.owner(),
+                    "targetOrdinal":lower.declarations().iter().position(|d| std::ptr::eq(d, bound.target())),
+                    "functionOrdinal":lower.declarations().iter().position(|d| std::ptr::eq(d, bound.function())),
                     "referencePointerAuthenticated":std::ptr::eq(bound.reference(), &tree.elements()[annotation.reference_index()]),
                     "namePointerAuthenticated":std::ptr::eq(bound.name_token(), &tree.elements()[annotation.reference_index()+1])
                 }));
             }
-            let spare = lower.declarations().iter().find(|d| d.raw_name()=="Spare").unwrap();
+            let spare = lower.declarations().iter().find(|d| d.raw_name()=="Spare");
             let mut anchors = vec![TypeParameterAnchor::Declaration(target)];
             anchors.extend(expected.iter().copied().map(TypeParameterAnchor::AnnotationReference));
             for anchor in anchors {
@@ -1906,10 +1908,12 @@ fn local_parameter_annotations_share_one_complete_original_outer_type_partition(
                     assert_eq!(partition.occurrences().iter().map(|a| a.reference_index()).collect::<Vec<_>>(), expected);
                 }
             }
-            assert!(type_parameter_occurrences(&directory, &result,
-                TypeParameterAnchor::Declaration(spare), snapshot).unwrap().occurrences().is_empty());
+            if let Some(spare) = spare {
+                assert!(type_parameter_occurrences(&directory, &result,
+                    TypeParameterAnchor::Declaration(spare), snapshot).unwrap().occurrences().is_empty());
+            }
             if original.contains("q:Int") {
-                for selected in [target, spare] {
+                for selected in std::iter::once(target).chain(spare) {
                     assert_eq!(guarded_type_parameter_rename(&directory, &result,
                         TypeParameterAnchor::Declaration(selected), snapshot, Some("Int")).unwrap_err(),
                         LocalBindingError::AmbiguousTypeParameter);
@@ -1918,7 +1922,7 @@ fn local_parameter_annotations_share_one_complete_original_outer_type_partition(
             for (i, element) in tree.elements().iter().enumerate()
                 .filter(|(_, e)| e.kind=="REFERENCE_EXPRESSION") {
                 let parent = &tree.elements()[element.parent.unwrap()];
-                if parent.kind=="USER_TYPE" && original[element.start..element.end]=="Int"
+                if parent.kind=="USER_TYPE" && &original[element.start..element.end]=="Int"
                     && target.raw_name()!="Int" {
                     assert_eq!(bind_lexical_type_parameter(&directory, &result, i, snapshot).unwrap_err(),
                         LocalBindingError::NoEligibleTypeParameter);

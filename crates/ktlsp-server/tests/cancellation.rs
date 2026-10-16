@@ -483,12 +483,14 @@ fn navigation_uses_shared_wire_ids_cancellation_and_snapshot_guards() {
     for (method, token) in [
         ("textDocument/definition", "definition"),
         ("textDocument/hover", "hover"),
+        ("textDocument/references", "references"),
+        ("textDocument/documentHighlight", "highlight"),
     ] {
         let navigation = |id: Value| {
             request(
                 id,
                 method,
-                json!({"textDocument":{"uri":URI},"position":{"line":1,"character":0}}),
+                json!({"textDocument":{"uri":URI},"position":{"line":1,"character":0},"context":{"includeDeclaration":true}}),
             )
         };
         let mut client = Client::new(&package);
@@ -532,6 +534,21 @@ fn navigation_uses_shared_wire_ids_cancellation_and_snapshot_guards() {
             }
             assert!(collect(&mut session).is_empty());
             assert!(session.close().1);
+        }
+
+        for (suffix, terminal) in [("exit", "exit"), ("eof", "eof")] {
+            let token = format!("{token}{suffix}");
+            let mut client = Client::new(&package);
+            client.send(open(&token));
+            client.send(navigation(json!(u64::MAX)));
+            package.started(&token);
+            if terminal == "exit" {
+                client.send(notify("exit", Value::Null));
+            } else {
+                client.input.take();
+            }
+            error(&client.reply(), json!(u64::MAX), -32800);
+            client.finish(1);
         }
     }
 }

@@ -992,3 +992,44 @@ analysis, unchanged retry or new archive dispatch occurred. Typeparameter
 inference/rename/reference/hover and full official parity remain unimplemented;
 Windows377cause and96/B3/46/license/official release gates remain open.
 
+### Local calls, selected generic returns and structural quickfix source
+
+All three isolated owners started from independently verifiedc4. Final formatted
+component heads389/5e1e02dcdb85abb9a1af987da3d3dc107276641d,
+390/cbd978456df48b295ee81b9993db42a72914341a and
+391/7cce198c7d2e32250e0e7ab4ef129900e3a0f9ac each obtained two separate
+functionality/adversarial static reviews and exact formatting rechecks.
+ROOT composed without conflicts, documented finite limits, removed the temporary
+quickfix coordinate vector and reused constant action titles instead of runtime
+formatting. Two full20-file union reviews cleared447ff0c420a4449ee4fcec180fb19c23415366ab/treed2239090.
+
+The first strict compile exposed two new Clippy errors; ROOT used a borrowed
+one-Range slice and collapsed the diagnostic-tags guard without suppressions or
+semantic changes. Both exact ae5de3c rechecks cleared; strict compile then passed.
+The first full binary data suite rejected a new test's incidental internal
+Context(Wire) wrapper expectation AFTER the API had correctly returnedErr.
+The authoritative Class-header pass wraps that failure asContext(Class(Wire));
+ROOT did not repin the wrapper or alter production error policy. The unchanged
+late malformed bytes must still fail, and their valid prefix now asserts selected
+ordinal/name/original owning-parameter bindings instead of bare success.
+Both exact3c13abab406c043c0a82bde14633fcc3475afc66/tree67df5803 rechecks
+confirmed the consumer-visible assertion was preserved, not weakened.
+
+At3c13, pinned format/strict locked workspace-all-target Clippy passed; the
+COMPLETE native binary data suite passed491 cases across53 suites. ROOT's actual
+external native executable read genuine2983-bytePair.class through class reader
+→annotations→Metadata→selected-return publicAPI. It observed original owner
+kotlin.Pair47..285, copy/allClassfieldordinal9/function151..198/return155..169;
+argument0→originalA(ID0,ordinal0,decl54..60,arg157..161,leaf159..161),
+argument1→B(ID1,ordinal1,decl62..68,arg163..167,leaf165..167).
+All original borrowed-pointer checks passed. Projection/nullable marking isNone,
+declaration varianceSome(Out); method-listordinal3 is correctly refused.
+Throwaway source was removed; no parser/server/worker or JVM runtime ran locally.
+
+FIRST actual389producer/CLI and391interactive quickfix outcomes remain unobserved.
+Temporary already-executed-path writers retain full structured source/CST/target
+and request/reply/returned-edit evidence for ROOT's original hosted readback.
+No extra parse is added. Source reviews/native data are not actual provider or
+official equivalence; first hosted readback, writer-only cleanup, final original
+native/platformCI and guarded integration/OWNER+ROOTmain remain required.
+

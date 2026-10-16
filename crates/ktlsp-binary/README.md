@@ -322,7 +322,13 @@ Arguments reference original A(ID0, declaration54..60, ordinal0) and B(ID1,
 62..68, ordinal1); leaf Types are159..161 and165..167. Declaration variance OUT
 does not change argument projection: absent projection means invariant while
 remaining absent in the result. Nullable Options preserve marking only.
-These are retained fixture/test-source expectations, not fresh execution evidence.
+ROOT actually executed an external native public-API consumer over this genuine
+class: owner47..285, selected copy/function151..198, return155..169, both exact
+original Argument/leaf/declaration pointers and ordinal bindings above passed.
+The function-list ordinal3 was correctly refused; nullable/projection marking
+remained absent while declarations retained OUT. Complete native binary tests
+passed491 cases across53 suites on the composed source; no JVM/compiler or
+parser/server/worker runtime was involved. The throwaway source was removed.
 
 The return must resolve to the owning ClassId, with argument/declaration counts
 equal. The common identical-resolver-index case reuses the authenticated owner

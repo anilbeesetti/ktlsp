@@ -2729,7 +2729,10 @@ fn local_empty_call_definition_and_mixed_values_use_actual_paired_cli_edits() {
     ];
     let replies = package.exchange(&messages);
     // TEMP_389: retain first actual wire, including any refusal, before assertions.
-    eprintln!("TEMP_389_CLI_MINIMAL source={minimal:?} replies={replies:?}");
+    eprintln!(
+        "TEMP_389_CLI_MINIMAL {}",
+        json!({"source":minimal,"sent":messages,"replies":replies})
+    );
     assert_eq!(replies[1]["id"], "callee");
     assert_eq!(
         replies[1]["result"],
@@ -2768,7 +2771,10 @@ fn local_empty_call_definition_and_mixed_values_use_actual_paired_cli_edits() {
         json!({"jsonrpc":"2.0","method":"exit"}),
     ];
     let replies = package.exchange(&messages);
-    eprintln!("TEMP_389_CLI_MIXED source={source:?} replies={replies:?}");
+    eprintln!(
+        "TEMP_389_CLI_MIXED {}",
+        json!({"source":source,"sent":messages,"replies":replies})
+    );
     assert!(
         replies
             .iter()
@@ -2883,7 +2889,10 @@ fn local_empty_call_definition_and_mixed_values_use_actual_paired_cli_edits() {
             json!({"jsonrpc":"2.0","method":"exit"}),
         ];
         let rebound = package.exchange(&messages);
-        eprintln!("TEMP_389_CLI_EDIT source={text:?} replies={rebound:?}");
+        eprintln!(
+            "TEMP_389_CLI_EDIT {}",
+            json!({"source":text,"sent":messages,"replies":rebound})
+        );
         assert_eq!(
             rebound[1]["result"],
             json!({"uri":URI,"range":references_range(&text,value_target,len)})

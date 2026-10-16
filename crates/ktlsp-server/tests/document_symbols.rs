@@ -481,10 +481,4 @@ fn packaged_stdio_combines_symbols_pull_and_mandatory_utf16_fallback() {
     );
     let rejected_symbols = replies.iter().find(|reply| reply["id"] == 5).unwrap();
     assert_eq!(rejected_symbols["error"]["code"], -32803);
-    writeln!(
-        std::io::stdout().lock(),
-        "PRODUCT_STDIO_SMOKE {}",
-        json!({"initialize":&replies[0],"symbols":symbols,"diagnostics":diagnostics,"invalidSymbols":rejected_symbols})
-    )
-    .unwrap();
 }

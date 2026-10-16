@@ -119,13 +119,32 @@ impl Analysis {
 // Sorted byte boundaries come only from lossless tokens and lexical diagnostics.
 pub(crate) fn positions(text: &str, offsets: &[usize]) -> Vec<Position> {
     let mut result = Vec::with_capacity(offsets.len());
+    let Ok(()) = visit_positions(
+        text,
+        offsets,
+        |_| Ok::<_, std::convert::Infallible>(()),
+        |position| result.push(position),
+    );
+    result
+}
+
+// The documentation consumer uses stack endpoints and observes its existing
+// cancellation/work budget in this same UTF-16 sweep, without a second index.
+pub(crate) fn visit_positions<E>(
+    text: &str,
+    offsets: &[usize],
+    mut work: impl FnMut(usize) -> Result<(), E>,
+    mut emit: impl FnMut(Position),
+) -> Result<(), E> {
     let mut byte = 0;
     let mut position = Position {
         line: 0,
         character: 0,
     };
     for &offset in offsets {
+        work(1)?;
         while byte < offset {
+            work(1)?;
             let c = text[byte..]
                 .chars()
                 .next()
@@ -141,9 +160,9 @@ pub(crate) fn positions(text: &str, offsets: &[usize]) -> Vec<Position> {
                 position.character += c.len_utf16() as u32;
             }
         }
-        result.push(position);
+        emit(position);
     }
-    result
+    Ok(())
 }
 
 pub fn analyze(text: &str, fold_limit: usize) -> Result<Analysis, &'static str> {

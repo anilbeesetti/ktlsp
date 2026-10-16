@@ -1252,11 +1252,14 @@ capture cleanup and final exact-head review/checks. Fresh guarded integration
 and independent OWNER+ROOT original exact-main proof are still required.
 395/377/96/B3, official-custody, release/license and full parity remain open.
 
-Separate independent398/JImage and399/Java24-25 data owners also use verified
-6a621285; their unverified source is NOT part of this composition. 397/KDoc
-is researched/queued after392, not implemented. Full formatting is not ready
-for a parity claim: native rules, effective settings/read authority and actual
-official option/EditorConfig precedence remain missing rather than guessed.
+The initial28-file review excluded independent398/JImage and399/Java24-25
+components. Both finished before any compilation/check/runtime admission;
+ROOT then composed them from the SAME verified6a621285 base to avoid a
+duplicate integration/CI epoch. The expanded source requires fresh affected
+full-union reviews; earlier28-file clearances alone do not approve it.
+397/KDoc is researched/queued after392, not implemented. Full formatting
+still lacks native rules, effective settings/read authority and actual official
+option/EditorConfig precedence; those requirements are not replaced by guesses.
 
 #### First full-union Windows path finding
 
@@ -1272,4 +1275,47 @@ macro-drive replacement refusal. No other path policy, bounds or assertions
 were relaxed. The before-fix counterexample is source-backed, not an executed
 Windows observation; exact rechecks and original hosted Windows execution
 remain required before acceptance. No local Kotlin runtime was admitted.
+
+#### Expanded native JDK data composition
+
+399 selected exact62ce2179e2a3fa60981e136d853b011c19aeff47/tree676968786f6f77e84c27113f833acd0dd19a4ff1.
+One crate-private predicate replaces all six direct version policies at their
+existing gate positions; inherited readers retain their error/resource order.
+Only ordinary68.0/69.0 are added, with historical supported minors unchanged
+and all preview/major70 still unsupported. No descriptor/tag/opaque-attribute
+policy, classpath winner/release semantics or resource ceiling is loosened.
+Both exact component reviews cleared fixes for Windows fixture paths and
+complete source-attachment version coverage. Genuine pinned Eclipse minimal
+JCL24/25 archives/classes, source/build/about and EPL2 notices are retained;
+they are compiled TEST libraries, not stock SDK/compiler/LSP-JDK proof.
+
+398 selected exact472da0c8700a17e7fe21af30d70940cd28bcf540/treed94182c267bcec10ef86d9e2c2798fe48a995433.
+Private origin-bound JImage views retain the original verified carrier and
+complete bounded endian/table/hash/location/string/count/identity/span proof
+before selection or absence. Stored bytes borrow; selected nested zlib output
+uses exact checksums/consumption/length and global layer/work/live-buffer bounds.
+The real selected-class bridge checks declared names and clears scratch on
+failure. Its small private unsafe cleanup guard was specifically reviewed
+for raw-pointer provenance, borrow/drop order and successful disarming; that
+static assessment is not executed Miri/runtime proof. Unknown/compact-cp
+codecs refuse rather than emit transformed class bytes or fall back.
+Both exact component reviews cleared moduleless aliasing, short final
+magic-prefixed payload handling and cleanup-pointer provenance corrections.
+
+Four genuine MIT upstream small images in both byte orders retain12 structural
+records each:5 ordinary resources and7 internal records. Original Object160
+bytes/67.0 is an authored image-generator fixture, not a stock JDK class.
+Immutable Git blobs, actual raw hashes, complete inventories, MIT/BSD notices
+and generator-as-data provenance are retained. No Java tools were invoked.
+The64MiB carrier limit, unsupported compact-cp and absent SDK/root association
+remain explicit; no claim that full real runtime images fit is made.
+
+All five component implementations came from the one verified6a621285 base.
+ROOT merged the new data branches without conflicts; automatic annotation and
+binary-export/README combinations still require renewed affected review.
+No Cargo, dependency, lock, workflow, vendor, JVM or parser-runtime change
+was introduced. Builds/lints/tests/format/smokes/platform execution remain
+UNEXERCISED for this source. ROOT will verify one expanded final source,
+including genuine native PUBLIC-API data smokes and actual hosted392 edits,
+before any ordinary guarded integration. Full parity is still not achieved.
 

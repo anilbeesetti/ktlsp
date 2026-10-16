@@ -56,7 +56,7 @@ fn root_authority(dir: &Path, a: &Admission) -> Result<RootGrant> {
         protected(&dir.join(name),false)?;
         if sha_path(&dir.join(name),a.preparation_deadline_ms)? != *seal { return Err("ROOT lock/toolchain source seal".into()); }
     }
-    if containment_template_sha256() != grant.containment_template_sha256 { return Err("ROOT containment template source mismatch".into()); }
+    if containment_template_sha256()? != grant.containment_template_sha256 { return Err("ROOT containment template source mismatch".into()); }
     match grant.scope {
         GrantScope::RustCalibration => {
             let plan: CalibrationPlan=load(&dir.join("calibration.json"))?; plan.validate(&grant)?;
@@ -84,9 +84,13 @@ fn entrypoint(a: &Admission) -> String {
 fn entry_arguments(dir: &Path,a: &Admission) -> Result<Vec<String>> {
     Ok(match calibration_case(dir,a)? {Some(case)=>args(&["--case",case.as_str()]),None=>adapter_argv()})
 }
-fn containment_template_sha256() -> String {
-    // A finite source projection: all shared security/resources/mount constants. Run identity and paths are separately bound.
-    sha_bytes(b"PR174-CONTAINMENT-v1\0linux/amd64;init;pid=private;ipc=private;cgroupns=private;uid=65532:65532;cap-drop=ALL;nnp;readonly;network=none;memory=4294967296;swap=0;pids=256;cpus=2;restart=no;pull=never;health=none;log=none;core=0:0;shm=67108864;state=536870912:16384;bind=state:rw,fixture:ro,distribution:ro,tool:ro,preflight:ro;rprivate;watchdog=530000:540000:600000;cleanup=60000;command=10000")
+fn containment_template_sha256() -> Result<String> {
+    // Source authority seals the complete shared containment AND the exact canonical child policy.
+    // Neither this hash nor a source profile is a substitute for actual ABI/enforcement/denial evidence.
+    let mut hash=Sha256::new();
+    hash.update(b"PR174-CONTAINMENT-v2\0linux/amd64;init;pid=private;ipc=private;cgroupns=private;uid=65532:65532;cap-drop=ALL;nnp;readonly;network=none;memory=4294967296;swap=0;pids=256;cpus=2;restart=no;pull=never;health=none;log=none;core=0:0;shm=67108864;state=536870912:16384;bind=state:rw,fixture:ro,distribution:ro,tool:ro,preflight:ro;rprivate;watchdog=530000:540000:600000;cleanup=60000;command=10000\0child-confinement\0");
+    hash.update(serde_json::to_vec(&child_confinement::profile()).map_err(|e|e.to_string())?);
+    Ok(format!("{:x}",hash.finalize()))
 }
 fn copy_sealed(source:&Path,target:&Path,cap:u64,mode:u32,end:u64)->Result<()> {
     protected(source,false)?;
@@ -150,6 +154,9 @@ fn bootstrap() -> Result<Value> {
         root_authority(&dir,&admission)?;
         hash_file(&mut evidence,&admission,&std::env::current_exe().map_err(|e|e.to_string())?,&expected.host_binary_sha256)?;
         core_policy(&mut evidence)?;
+        let profile=child_confinement::profile();
+        let abi=confinement_abi(&profile)?;
+        evidence.append(&json!({"kind":"bootstrap-child-confinement-kernel","landlockAbi":abi,"profile":profile,"childEnforcement":"requires actual original shared spawn receipt and same-template denial calibration"}),false)?;
         // Authentication is repeated by the outside-step supervisor immediately before CREATE.
         authenticate_original(&dir,&admission,&mut evidence)?;
         materializer::materialize(&dir,&admission,&mut evidence)?;

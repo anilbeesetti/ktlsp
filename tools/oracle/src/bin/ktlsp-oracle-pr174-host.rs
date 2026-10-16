@@ -86,6 +86,7 @@ mod host {
     include!("pr174/collect.rs");
     include!("pr174/storage.rs");
     include!("pr174/action.rs");
+    include!("pr174/confinement.rs");
     mod materializer { include!("pr174/materializer.rs"); }
 
     #[derive(Deserialize, Serialize)]
@@ -958,6 +959,7 @@ mod host {
             return Err("pinned image identity/volumes".into());
         }
         e.append(&json!({"kind":"original-host","bootId":a.boot_id,"supervisorCgroup":cg,"osReleaseHex":raw_hex(&os_release()?),"kernelHex":raw_hex(&read_file(Path::new("/proc/sys/kernel/osrelease"),1024)?),"apiAuthenticated":true,"authority":"reviewed ROOT/bootstrap custody; receiver independently verifies original artifacts"}),false)?;
+        measure_child_confinement(dir,a,e)?;
         Ok(cg.into())
     }
     fn empty(v: &Value) -> bool {
@@ -1096,6 +1098,10 @@ mod host {
             return Err("original init ancestry changed".into());
         }
         let cmdline = read_file(&path.join("cmdline"), INPUT_BYTES)?;
+        let parent_proc = fs::metadata(&path).map_err(|e|e.to_string())?;
+        if !recorder && (parent_proc.uid()!=0 || parent_proc.gid()!=0) {
+            return Err("launcher parent lacks original nondumpable recorder proc custody".into());
+        }
         if recorder {
             if stamp != (identity.init_pid, identity.init_start) {
                 return Err("recorder is not original init child".into());
@@ -1923,6 +1929,10 @@ mod host {
             if !recorder && !official {
                 continue;
             }
+            let proc_custody = fs::metadata(&p).map_err(|e|e.to_string())?;
+            // Setup can precede the production hook. Only policy-ready recorder observations qualify;
+            // missing such an original observation at normal exit still fails runtime attestation.
+            if recorder && (proc_custody.uid()!=0 || proc_custody.gid()!=0) { continue; }
             let stat = read_file(&p.join("stat"), 4096)?;
             let stamp = process_start(&stat)?;
             if stamp.0 != pid {
@@ -2018,7 +2028,7 @@ mod host {
                 return Err("process exec/ancestry changed during observation".into());
             }
             if previous.is_none() || mapped {
-                e.append(&json!({"kind":"original-process","role":if recorder {"recorder"}else{"launcher"},"hostPid":pid,"starttime":stamp.1,"namespace":ns,"statHex":raw_hex(&stat),"cmdlineHex":raw_hex(&cmdline),"ancestry":parents,"statusHex":raw_hex(&status),"limitsHex":raw_hex(&limits),"cgroupHex":raw_hex(&cg),"mapsHex":raw_hex(&maps),"pinnedLibjvmMapped":mapped,"exeDevice":exe.0,"exeInode":exe.1,"sealedExecutableDevice":if recorder {adapter.dev()}else{launcher.dev()},"sealedExecutableInode":if recorder {adapter.ino()}else{launcher.ino()},"sealedJvmDevice":jvm.dev(),"sealedJvmInode":jvm.ino(),"namespaceJvmDevice":if mapped {Some(jvm.dev())}else{None},"namespaceJvmInode":if mapped {Some(jvm.ino())}else{None}}),false)?;
+                e.append(&json!({"kind":"original-process","role":if recorder {"recorder"}else{"launcher"},"hostPid":pid,"starttime":stamp.1,"namespace":ns,"statHex":raw_hex(&stat),"cmdlineHex":raw_hex(&cmdline),"ancestry":parents,"statusHex":raw_hex(&status),"limitsHex":raw_hex(&limits),"cgroupHex":raw_hex(&cg),"mapsHex":raw_hex(&maps),"pinnedLibjvmMapped":mapped,"exeDevice":exe.0,"exeInode":exe.1,"procDirectoryUid":proc_custody.uid(),"procDirectoryGid":proc_custody.gid(),"sealedExecutableDevice":if recorder {adapter.dev()}else{launcher.dev()},"sealedExecutableInode":if recorder {adapter.ino()}else{launcher.ino()},"sealedJvmDevice":jvm.dev(),"sealedJvmInode":jvm.ino(),"namespaceJvmDevice":if mapped {Some(jvm.dev())}else{None},"namespaceJvmInode":if mapped {Some(jvm.ino())}else{None}}),false)?;
             }
             if recorder {
                 seen.recorder = Some(stamp);
@@ -3076,12 +3086,21 @@ mod host {
             }
         });
         let _=e.append(&json!({"kind":"supervisor-final","captureError":run.as_ref().err(),"containerId":known.as_ref().map(|b|&b.container_id),"officialCaptureSuccess":false,"closure":"UNKNOWN until independent cleanup receipt"}),true);
+        if e.file.is_none() && !e.pending.is_empty()
+            && fs::symlink_metadata(dir.join("receipts/observer.evidence")).is_err_and(|error|error.kind()==ErrorKind::NotFound) {
+            // Preserve pre-CREATE raw failure prefixes without duplicating an already charged partial observer file.
+            let _ = make_file(&dir.join("preflight-failure.evidence"), &e.pending, 0o600);
+        }
         finish_supervision(run, dir, known.as_ref(), cleanup_ready, &mut e)?;
         Ok(
             json!({"status":"CLEANUP_REQUESTED","officialCaptureSuccess":false,"receiverReviewRequired":true}),
         )
     }
     pub fn entry() -> Result<Value> {
+        let argv: Vec<_> = std::env::args().skip(1).collect();
+        if argv.as_slice()==["describe-template"] {
+            return Ok(json!({"schemaVersion":1,"scope":"PR174_CONTAINMENT_TEMPLATE_SOURCE","containmentTemplateSha256":containment_template_sha256()?,"profile":child_confinement::profile(),"runtimeAuthority":"NONE; exact source policy only, no kernel/launch/calibration fact"}));
+        }
         if !cfg!(target_os = "linux") {
             return Err(
                 "host execution is Linux-only; optional macOS compilation remains supported".into(),
@@ -3093,7 +3112,6 @@ mod host {
         if unsafe { geteuid() } != 0 {
             return Err("protected host execution requires OS root".into());
         }
-        let argv: Vec<_> = std::env::args().skip(1).collect();
         if argv.as_slice() == ["bootstrap", STAGING] {
             return bootstrap();
         }

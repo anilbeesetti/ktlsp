@@ -207,6 +207,27 @@ facts; names, hashes and report booleans alone are insufficient. Real Linux
 root/image/core policy, effective tools/config/custody, cancellation survival,
 all ten closures/exports and later official JVM observations remain unmeasured.
 
+Same-UID filesystem ownership is **not** recorder-versus-JVM evidence
+authorship. The separately admitted corrected adapter uses one production
+`recorder::confinement::spawn` hook before the direct ELF exec: Landlock ABI6
+or newer, the exact six private write leaves, scoped signals/abstract Unix,
+parent nondumpability and close-on-exec nonstdio descriptors. Unsupported or
+failed enforcement refuses the launch; no old-adapter or unsandboxed fallback
+is admitted. The real boundary peer reuses that same hook and tests content
+and descriptor/process-authority bypasses, inherited fork/setsid restrictions,
+unchanged original parent files/memory and permitted private writes.
+
+The exact serialized production `profile()` is included in containment
+template v2. `describe-template` prints only that source policy and its seal,
+without requiring or granting host runtime authority. Protected
+`child-confinement-profile.json` and the identical
+`child-confinement-preflight` observer record bind actual host kernel ABI to
+the admitted source/profile/run nonce/boot/daemon. They do not assert child
+enforcement: the original parent's measured `capture/child-confinement.json`,
+manifest/metadata receipt equality and the authenticated real denial cohort
+remain mandatory independent receiver joins. Synthetic mechanics or matching
+hashes cannot replace them.
+
 Gzip uses only the optional `flate2 = 1.1.8`, defaults disabled,
 `rust_backend` selection: `miniz_oxide 0.8.9`, `crc32fast 1.5.0`,
 `adler2 2.0.1`, `simd-adler32 0.3.7` and the existing `cfg-if` closure.

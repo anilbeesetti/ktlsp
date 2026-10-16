@@ -3,7 +3,7 @@ use std::os::fd::{AsRawFd, FromRawFd};
 
 fn seal_calibration(dir:&Path,a:&Admission,cid:&str,e:&mut Evidence)->Result<()> {
     let case=calibration_case(dir,a)?.ok_or("Rust calibration plan absent")?;
-    side(e,&dir.join("preflight/identity.json"),&serde_json::to_vec(&json!({"schemaVersion":1,"scope":"PR174_RUST_CALIBRATION","case":case,"run":a.run,"containerId":cid,"nonce":a.nonce,"bootId":a.boot_id,"daemonId":a.daemon_id,"containmentTemplateSha256":containment_template_sha256()})).map_err(|e|e.to_string())?,0o444,false)?;
+    side(e,&dir.join("preflight/identity.json"),&serde_json::to_vec(&json!({"schemaVersion":1,"scope":"PR174_RUST_CALIBRATION","case":case,"run":a.run,"containerId":cid,"nonce":a.nonce,"bootId":a.boot_id,"daemonId":a.daemon_id,"containmentTemplateSha256":containment_template_sha256()?})).map_err(|e|e.to_string())?,0o444,false)?;
     fs::set_permissions(dir.join("preflight"),fs::Permissions::from_mode(0o555)).map_err(|e|e.to_string())
 }
 fn capture_file(dir:&Path,name:&str)->Result<File> {
@@ -58,8 +58,10 @@ fn attest_peer_process(dir:&Path,identity:&ProcessIdentity,reported:&ktlsp_oracl
         let limits=read_file(&p.join("limits"),INPUT_BYTES)?;
         let ns=fs::read_link(p.join("ns/pid")).map_err(|e|e.to_string())?;
         let cg=read_file(&p.join("cgroup"),INPUT_BYTES)?;
+        let proc_custody=fs::metadata(&p).map_err(|e|e.to_string())?;
+        if case==CalibrationCase::BoundaryDenials&&!child&&(proc_custody.uid()!=0||proc_custody.gid()!=0){return Err("boundary parent lacks measured nondumpable recorder proc custody".into());}
         if nspid.len()!=2 || nspid[0]!=pid || stamp.1!=reported.start_time_ticks || exe!=(sealed.dev(),sealed.ino()) || exe!=(reported.executable_device,reported.executable_inode) || !actual_argv(&cmdline,&expected) || ns.to_string_lossy()!=identity.pid_namespace || std::str::from_utf8(&cg).map_err(|_|"peer cgroup UTF8")?.trim()!=format!("0::{}",identity.cgroup) || !core_zero(text,std::str::from_utf8(&limits).map_err(|_|"peer limits UTF8")?) || process_start(&read_file(&p.join("stat"),4096)?)?!=stamp || exe_stamp(pid)?!=exe{return Err("original real Rust peer proc identity/security mismatch".into());}
-        e.append(&json!({"kind":"calibration-original-process","case":case,"child":child,"hostPid":pid,"starttime":stamp.1,"statHex":raw_hex(&before),"statusHex":raw_hex(&status),"limitsHex":raw_hex(&limits),"cmdlineHex":raw_hex(&cmdline),"cgroupHex":raw_hex(&cg),"namespace":ns,"exeDevice":exe.0,"exeInode":exe.1,"sealedExecutableDevice":sealed.dev(),"sealedExecutableInode":sealed.ino()}),false)?;
+        e.append(&json!({"kind":"calibration-original-process","case":case,"child":child,"hostPid":pid,"starttime":stamp.1,"statHex":raw_hex(&before),"statusHex":raw_hex(&status),"limitsHex":raw_hex(&limits),"cmdlineHex":raw_hex(&cmdline),"cgroupHex":raw_hex(&cg),"namespace":ns,"exeDevice":exe.0,"exeInode":exe.1,"procDirectoryUid":proc_custody.uid(),"procDirectoryGid":proc_custody.gid(),"sealedExecutableDevice":sealed.dev(),"sealedExecutableInode":sealed.ino()}),false)?;
         if matched.is_some(){return Err("original peer process identity ambiguous".into());}
         matched=Some(AttestedPeer{pid,parent,group:group.0,session:session.0});
     }
@@ -130,7 +132,7 @@ fn observe_calibration(dir:&Path,a:&Admission,b:&Binding,e:&mut Evidence,case:Ca
     } else {
         record_calibration_action(dir,a,b,&identity,case,session_end,e)?;
     }
-    e.append(&json!({"kind":"calibration-host-observation","scope":"PR174_RUST_CALIBRATION","case":case,"containerId":b.container_id,"nonce":b.nonce,"run":a.run,"bootId":a.boot_id,"daemonId":a.daemon_id,"containmentTemplateSha256":containment_template_sha256(),"peerReportSha256":sha_bytes(&serde_json::to_vec(&report).map_err(|e|e.to_string())?),"normalExit":!forced,"hostAction":if case==CalibrationCase::Kill{"exact-CID cleanup kill requested"}else if case==CalibrationCase::Timeout{"original300000ms deadline"}else if case==CalibrationCase::WorkflowStepCancel{"requires authenticated original job cancellation; watchdog/cleanup independently exports"}else{"normal original exit"},"workflowCancellationAuthenticated":false,"officialCaptureSuccess":false}),false)
+    e.append(&json!({"kind":"calibration-host-observation","scope":"PR174_RUST_CALIBRATION","case":case,"containerId":b.container_id,"nonce":b.nonce,"run":a.run,"bootId":a.boot_id,"daemonId":a.daemon_id,"containmentTemplateSha256":containment_template_sha256()?,"peerReportSha256":sha_bytes(&serde_json::to_vec(&report).map_err(|e|e.to_string())?),"normalExit":!forced,"hostAction":if case==CalibrationCase::Kill{"exact-CID cleanup kill requested"}else if case==CalibrationCase::Timeout{"original300000ms deadline"}else if case==CalibrationCase::WorkflowStepCancel{"requires authenticated original job cancellation; watchdog/cleanup independently exports"}else{"normal original exit"},"workflowCancellationAuthenticated":false,"officialCaptureSuccess":false}),false)
 }
 fn validate_peer_case(report:&PeerReport)->Result<()> {
     report.validate_case(report.case)
@@ -160,7 +162,7 @@ mod calibration_source_tests {
     use super::*;
     #[test]
     fn synthetic_scope_template_is_deterministic_not_runtime_calibration() {
-        assert!(digest(&containment_template_sha256()));
+        assert!(digest(&containment_template_sha256().unwrap()));
         assert_eq!(containment_template_sha256(),containment_template_sha256());
         assert_eq!(CalibrationCase::ALL.iter().filter(|case|case.forced()).count(),3);
         assert!(sha_bytes(b"one")!=sha_bytes(b"two"));

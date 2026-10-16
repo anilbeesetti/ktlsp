@@ -210,7 +210,39 @@ mod tests {
         cancel.calibration_step=Some(CalibrationStep{name:"actual runner timeout step".into(),number:7});
         assert!(cancel.validate_shape().is_ok());
     }
+    #[test]
+    fn synthetic_host_profile_requires_exact_source_policy_and_independent_bindings() {
+        let grant=synthetic_grant();let nonce="6".repeat(64);
+        let measurement=ConfinementMeasurement{schema_version:1,scope:"PR174_HOST_CHILD_CONFINEMENT_PROFILE".into(),kind:"child-confinement-preflight".into(),nonce:nonce.clone(),boot_id:"synthetic-boot".into(),daemon_id:"synthetic-daemon".into(),profile:crate::recorder::confinement::profile(),landlock_abi:6,containment_template_sha256:grant.containment_template_sha256.clone(),source_head:grant.source_head.clone(),source_tree:grant.source_tree.clone(),host_binary_sha256:grant.host_binary_sha256.clone(),adapter_sha256:grant.adapter_sha256.clone(),peer_sha256:grant.peer_sha256.clone()};
+        assert!(measurement.validate(&grant,&nonce,"synthetic-boot","synthetic-daemon").is_ok()); // Data consistency only.
+        assert!(measurement.validate(&grant,&nonce,"different-boot","synthetic-daemon").is_err());
+        let mut invalid=measurement.clone();invalid.landlock_abi=5;
+        assert!(invalid.validate(&grant,&nonce,"synthetic-boot","synthetic-daemon").is_err());
+        let mut invalid=measurement.clone();invalid.profile.scoped=0;
+        assert!(invalid.validate(&grant,&nonce,"synthetic-boot","synthetic-daemon").is_err());
+        let mut invalid=measurement;invalid.source_tree="7".repeat(40);
+        assert!(invalid.validate(&grant,&nonce,"synthetic-boot","synthetic-daemon").is_err());
+    }
 }
+#[derive(Clone,Debug,PartialEq,Eq,Serialize,Deserialize)]
+#[serde(deny_unknown_fields,rename_all="camelCase")]
+pub struct ConfinementMeasurement {
+    pub schema_version:u8,pub scope:String,pub kind:String,pub nonce:String,pub boot_id:String,pub daemon_id:String,
+    pub profile:crate::recorder::confinement::Profile,pub landlock_abi:u32,pub containment_template_sha256:String,
+    pub source_head:String,pub source_tree:String,pub host_binary_sha256:String,pub adapter_sha256:String,pub peer_sha256:String,
+}
+impl ConfinementMeasurement {
+    /// Source policy + actual host ABI only. Child enforcement still requires the original
+    /// protected recorder receipt and the real same-template Rust denial calibration.
+    pub fn validate(&self,grant:&RootGrant,nonce:&str,boot:&str,daemon:&str)->Result<(),String> {
+        grant.validate_shape()?;
+        if self.schema_version!=1||self.scope!="PR174_HOST_CHILD_CONFINEMENT_PROFILE"||self.kind!="child-confinement-preflight"||self.nonce!=nonce||self.boot_id!=boot||self.daemon_id!=daemon||self.profile!=crate::recorder::confinement::profile()||self.landlock_abi<self.profile.minimum_abi||self.containment_template_sha256!=grant.containment_template_sha256||self.source_head!=grant.source_head||self.source_tree!=grant.source_tree||self.host_binary_sha256!=grant.host_binary_sha256||self.adapter_sha256!=grant.adapter_sha256||self.peer_sha256!=grant.peer_sha256 {
+            return Err("original host ABI/source/profile measurement mismatch; not child enforcement proof".into());
+        }
+        Ok(())
+    }
+}
+
 pub fn systemctl_usec(s: &str) -> Result<u64, String> {
         if s.is_empty() || s.len() > 128 {
             return Err("systemctl timespan length".into());

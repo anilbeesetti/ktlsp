@@ -161,6 +161,13 @@ impl Declaration<'_> {
     pub fn raw_name(&self) -> &str {
         self.raw_name
     }
+    /// Borrowed spelling for supported bare and backtick names, without resolution.
+    /// `None` means unsupported or malformed: compare only two successful spellings.
+    /// Raw spelling/ranges, declaration identity and incompleteness remain unchanged.
+    // shortcut: non-ASCII bare names are unsupported; upgrade when Unicode-category validation is admitted.
+    pub fn semantic_spelling(&self) -> Option<&str> {
+        semantic_spelling(self.raw_name)
+    }
     pub fn name_range(&self) -> Range<usize> {
         self.name.start..self.name.end
     }
@@ -177,6 +184,64 @@ impl Declaration<'_> {
         self.incomplete
     }
 }
+fn semantic_spelling(raw: &str) -> Option<&str> {
+    if raw.len() > SOURCE {
+        return None;
+    }
+    if let Some(body) = raw.strip_prefix('`') {
+        let body = body.strip_suffix('`')?;
+        return (!body.is_empty() && !body.bytes().any(|b| matches!(b, b'`' | b'\r' | b'\n' | 0)))
+            .then_some(body);
+    }
+    let first = raw.as_bytes().first()?;
+    if !first.is_ascii_alphabetic() && *first != b'_' {
+        return None;
+    }
+    let mut named = false;
+    for b in raw.bytes() {
+        if !b.is_ascii_alphanumeric() && b != b'_' {
+            return None;
+        }
+        named |= b != b'_';
+    }
+    if !named
+        || matches!(
+            raw,
+            "as" | "break"
+                | "class"
+                | "continue"
+                | "do"
+                | "else"
+                | "false"
+                | "for"
+                | "fun"
+                | "if"
+                | "in"
+                | "interface"
+                | "is"
+                | "null"
+                | "object"
+                | "package"
+                | "return"
+                | "super"
+                | "this"
+                | "throw"
+                | "true"
+                | "try"
+                | "typealias"
+                | "typeof"
+                | "val"
+                | "var"
+                | "when"
+                | "while"
+        )
+    {
+        None
+    } else {
+        Some(raw)
+    }
+}
+
 #[derive(Debug)]
 pub struct LoweredSyntaxError<'a> {
     cst_index: usize,
@@ -210,6 +275,7 @@ enum Tag {
     Block,
     Parameters,
     Integer,
+    Reference,
     Error,
 }
 impl Tag {
@@ -226,7 +292,7 @@ impl Tag {
     }
 }
 fn tag(text: &str, i: usize, b: &mut Budget) -> Result<Tag> {
-    const TAGS: [(&str, Tag); 11] = [
+    const TAGS: [(&str, Tag); 12] = [
         ("KT_FILE", Tag::Root),
         ("PACKAGE_DIRECTIVE", Tag::Package),
         ("IMPORT_LIST", Tag::Imports),
@@ -237,6 +303,7 @@ fn tag(text: &str, i: usize, b: &mut Budget) -> Result<Tag> {
         ("BLOCK", Tag::Block),
         ("VALUE_PARAMETER_LIST", Tag::Parameters),
         ("INTEGER_CONSTANT", Tag::Integer),
+        ("REFERENCE_EXPRESSION", Tag::Reference),
         ("ERROR_ELEMENT", Tag::Error),
     ];
     for (word, _) in TAGS {
@@ -264,6 +331,8 @@ struct Frame<'a> {
     integer: bool,
     owned_error: bool,
     emitted: bool,
+    plain: u8,
+    reference: bool,
 }
 impl Frame<'_> {
     const EMPTY: Self = Self {
@@ -279,6 +348,8 @@ impl Frame<'_> {
         integer: false,
         owned_error: false,
         emitted: false,
+        plain: 0,
+        reference: false,
     };
 }
 const _: () = assert!(size_of::<Frame<'static>>() <= 128);
@@ -439,6 +510,27 @@ fn lower_with_budget<'a>(
     Ok(out)
 }
 
+// Strict ordered states are enforced only for reference-bearing functions.
+fn plain_step(f: &mut Frame<'_>, from: u8, to: u8, b: &mut Budget) -> Result<()> {
+    b.work(1)?;
+    f.plain = if f.plain == from { to } else { u8::MAX };
+    Ok(())
+}
+
+fn plain_child(f: &mut Frame<'_>, child: Tag, b: &mut Budget) -> Result<()> {
+    b.work(1)?;
+    match (f.tag, child) {
+        (Tag::Fun, Tag::Parameters) => plain_step(f, 2, 3, b),
+        (Tag::Fun, Tag::Block) => plain_step(f, 3, 4, b),
+        (Tag::Block, Tag::Property) => plain_step(f, 1, 1, b),
+        (Tag::Property, Tag::Integer | Tag::Reference) => plain_step(f, 3, 4, b),
+        _ => {
+            f.plain = u8::MAX;
+            Ok(())
+        }
+    }
+}
+
 fn close_frames<'a>(
     s: &mut [Frame<'a>; DEPTH],
     depth: &mut usize,
@@ -464,6 +556,28 @@ fn close_frames<'a>(
         {
             return Err(unsupported(f.index));
         }
+        if pass != Pass::Structure {
+            b.work(1)?;
+            let complete = f.plain
+                == match f.tag {
+                    Tag::Fun | Tag::Property => 4,
+                    Tag::Block | Tag::Parameters => 2,
+                    Tag::Integer | Tag::Reference => 1,
+                    _ => u8::MAX,
+                }
+                && f.plain != u8::MAX;
+            if f.tag == Tag::Fun && f.reference && !complete {
+                return Err(unsupported(f.index));
+            }
+            if *depth > 1 {
+                let mut parent = frame(s, *depth - 2, b)?;
+                if !complete {
+                    parent.plain = u8::MAX;
+                }
+                parent.reference |= f.reference;
+                put_frame(s, *depth - 2, parent, b)?;
+            }
+        }
         b.work(1)?;
         *depth -= 1;
     }
@@ -483,6 +597,7 @@ fn context(t: Tag, parent: Option<Frame<'_>>, e: &Element, i: usize) -> Result<(
         Tag::ClassBody => p == Some(Tag::Class),
         Tag::Block | Tag::Parameters => p == Some(Tag::Fun),
         Tag::Integer => matches!(p, Some(Tag::Fun | Tag::Property)),
+        Tag::Reference => p == Some(Tag::Property),
         Tag::Error => p.is_some() && !matches!(p, Some(Tag::Package | Tag::Imports)),
     };
     if !allowed {
@@ -532,6 +647,17 @@ fn token<'a>(
     b: &mut Budget,
     out: &mut LoweredDeclarations<'a>,
 ) -> Result<Frame<'a>> {
+    if f.tag == Tag::Reference {
+        let node = f.node.ok_or(invalid(i))?;
+        if !b.equal(&e.kind, "IDENTIFIER")? || e.start != node.start || e.end != node.end {
+            return Err(unsupported(i));
+        }
+        plain_step(&mut f, 0, 1, b)?;
+        if f.plain != 1 {
+            return Err(unsupported(i));
+        }
+        return Ok(f);
+    }
     if b.one_of(&e.kind, &["WHITE_SPACE", "EOL_COMMENT", "BLOCK_COMMENT"])? {
         return Ok(f);
     }
@@ -541,11 +667,13 @@ fn token<'a>(
                 return Err(unsupported(i));
             }
             f.core = true;
+            plain_step(&mut f, 0, 1, b)?;
         } else if b.equal(&e.kind, "IDENTIFIER")? {
             if !f.core || f.name {
                 return Err(unsupported(i));
             }
             f.name = true;
+            plain_step(&mut f, 1, 2, b)?;
             if pass == Pass::Emit {
                 let ordinal = f.ordinal.ok_or(invalid(i))?;
                 let node = f.node.ok_or(invalid(i))?;
@@ -578,17 +706,38 @@ fn token<'a>(
             || !b.one_of(&e.kind, &["EQ", "SEMICOLON"])?
         {
             return Err(unsupported(i));
+        } else if f.tag == Tag::Property && b.equal(&e.kind, "EQ")? {
+            plain_step(&mut f, 2, 3, b)?;
+        } else {
+            f.plain = u8::MAX;
         }
     } else {
         let allowed = match f.tag {
             Tag::Root => b.equal(&e.kind, "SEMICOLON")?,
-            Tag::ClassBody | Tag::Block => b.one_of(&e.kind, &["LBRACE", "RBRACE", "SEMICOLON"])?,
-            Tag::Parameters => b.one_of(&e.kind, &["LPAR", "RPAR"])?,
+            Tag::ClassBody | Tag::Block => {
+                let allowed = b.one_of(&e.kind, &["LBRACE", "RBRACE", "SEMICOLON"])?;
+                match e.kind.as_str() {
+                    "LBRACE" => plain_step(&mut f, 0, 1, b)?,
+                    "RBRACE" => plain_step(&mut f, 1, 2, b)?,
+                    _ => plain_step(&mut f, 1, 1, b)?,
+                }
+                allowed
+            }
+            Tag::Parameters => {
+                let allowed = b.one_of(&e.kind, &["LPAR", "RPAR"])?;
+                if e.kind == "LPAR" {
+                    plain_step(&mut f, 0, 1, b)?;
+                } else {
+                    plain_step(&mut f, 1, 2, b)?;
+                }
+                allowed
+            }
             Tag::Integer => {
                 if !b.equal(&e.kind, "INTEGER_LITERAL")? || f.integer {
                     return Err(unsupported(i));
                 }
                 f.integer = true;
+                plain_step(&mut f, 0, 1, b)?;
                 true
             }
             Tag::Error => true, // retain existing validated error tokens opaquely
@@ -691,6 +840,20 @@ fn walk<'a>(
         };
         if pass != Pass::Structure {
             context(t, parent, e, i)?;
+            if t == Tag::Reference
+                && (depth != 4
+                    || frame(s, 0, b)?.tag != Tag::Root
+                    || frame(s, 1, b)?.tag != Tag::Fun
+                    || frame(s, 2, b)?.tag != Tag::Block
+                    || frame(s, 3, b)?.tag != Tag::Property
+                    || e.subtree_end != i + 2)
+            {
+                return Err(unsupported(i));
+            }
+            if let Some(mut f) = parent {
+                plain_child(&mut f, t, b)?;
+                put_frame(s, depth - 1, f, b)?;
+            }
         }
         let inherited_owner = parent.and_then(|f| f.owner_frame);
         let outer_owner = if let Some(slot) = inherited_owner {
@@ -765,6 +928,7 @@ fn walk<'a>(
                 owner_frame,
                 ordinal,
                 outer_owner,
+                reference: t == Tag::Reference,
                 ..Frame::EMPTY
             },
             b,
@@ -877,6 +1041,44 @@ mod tests {
         tree.close();
         tree.finish()
     }
+    fn reference_body() -> Tree {
+        let mut tree = Tree::new();
+        tree.header("f");
+        tree.open("VALUE_PARAMETER_LIST");
+        tree.token("LPAR", "(");
+        tree.token("RPAR", ")");
+        tree.close();
+        tree.open("BLOCK");
+        tree.token("LBRACE", "{");
+        tree
+    }
+    fn local_val(tree: &mut Tree, initializer: &str) {
+        tree.open("PROPERTY");
+        tree.token("VAL_KEYWORD", "val");
+        tree.token("WHITE_SPACE", " ");
+        tree.token("IDENTIFIER", "y");
+        tree.token("EQ", "=");
+        tree.open(initializer);
+        if initializer == "REFERENCE_EXPRESSION" {
+            tree.token("IDENTIFIER", "x");
+        } else {
+            tree.token("INTEGER_LITERAL", "1");
+        }
+        tree.close();
+        tree.close();
+    }
+    fn finish_body(mut tree: Tree) -> SnapshotResult {
+        tree.token("RBRACE", "}");
+        tree.close();
+        tree.close();
+        tree.finish()
+    }
+    fn reference_result() -> SnapshotResult {
+        let mut tree = reference_body();
+        local_val(&mut tree, "REFERENCE_EXPRESSION");
+        finish_body(tree)
+    }
+
     fn structure(result: &SnapshotResult) -> Result<Counts> {
         let mut out = LoweredDeclarations {
             snapshot: result.snapshot(),
@@ -894,6 +1096,138 @@ mod tests {
     }
     fn limit<T: std::fmt::Debug>(result: Result<T>, expected: LoweringLimit) {
         assert_eq!(result.unwrap_err(), LoweringError::Limit(expected));
+    }
+
+    #[test]
+    fn semantic_spelling_literals_keep_source_borrows_and_declaration_data() {
+        let cases = [
+            ("x", Some("x")),
+            ("`x`", Some("x")),
+            ("X", Some("X")),
+            ("`é`", Some("é")),
+            ("`e\u{301}`", Some("e\u{301}")),
+            ("é", None),
+            ("`local 🦀e\u{301}`", Some("local 🦀e\u{301}")),
+            ("`if`", Some("if")),
+            ("if", None),
+            ("field", Some("field")),
+            ("`field`", Some("field")),
+            ("_x1", Some("_x1")),
+            ("`_x1`", Some("_x1")),
+            ("___", None),
+            ("`___`", Some("___")),
+            ("`a\\u0061`", Some("a\\u0061")),
+            ("aa", Some("aa")),
+            ("`a.b`", Some("a.b")),
+            ("``", None),
+            ("`x", None),
+            ("x`", None),
+            ("`x`y`", None),
+            ("`a\nb`", None),
+            ("`a\rb`", None),
+            ("`a\0b`", None),
+            ("9x", None),
+            ("x y", None),
+            ("x.y", None),
+            ("$x", None),
+            ("e\u{301}", None),
+            ("broken", Some("broken")),
+            ("`broken`", Some("broken")),
+            ("`a\tb`", Some("a\tb")),
+            ("x", Some("x")),
+        ];
+        let mut tree = Tree::new();
+        for (raw, _) in cases {
+            tree.header(raw);
+            if raw == "broken" {
+                tree.error("missing");
+            }
+            tree.close();
+        }
+        let result = tree.finish();
+        let out = lower(&result).unwrap();
+        assert_eq!(out.declarations().len(), cases.len());
+        for (record, (raw, expected)) in out.declarations().iter().zip(cases) {
+            assert_eq!(record.raw_name(), raw);
+            assert_eq!(&result.parsed.source()[record.name_range()], raw);
+            assert_eq!(record.semantic_spelling(), expected);
+            if let Some(spelling) = record.semantic_spelling() {
+                let start = record.name_range().start + usize::from(raw.starts_with('`'));
+                assert_eq!(spelling.as_ptr(), result.parsed.source()[start..].as_ptr());
+            }
+            assert_eq!(record.owner(), None);
+            assert_eq!(record.incomplete(), raw == "broken");
+        }
+        let spelling = |i: usize| out.declarations()[i].semantic_spelling().unwrap();
+        assert_eq!(spelling(0), spelling(1));
+        assert_ne!(spelling(0), spelling(2));
+        assert_ne!(spelling(3), spelling(4));
+        assert_ne!(spelling(15), spelling(16));
+        assert_eq!(spelling(30), spelling(31));
+        assert_eq!(spelling(0), spelling(33));
+        assert_ne!(
+            out.declarations()[0].name_range(),
+            out.declarations()[33].name_range()
+        );
+        assert_eq!(out.errors().len(), 1);
+        assert_eq!(out.errors()[0].owner(), Some(30));
+        assert_eq!(out.errors()[0].message(), "missing");
+        assert!(semantic_spelling("").is_none());
+    }
+
+    #[test]
+    fn semantic_spelling_refuses_hard_keywords_but_keeps_contextual_names() {
+        for raw in [
+            "as",
+            "break",
+            "class",
+            "continue",
+            "do",
+            "else",
+            "false",
+            "for",
+            "fun",
+            "if",
+            "in",
+            "interface",
+            "is",
+            "null",
+            "object",
+            "package",
+            "return",
+            "super",
+            "this",
+            "throw",
+            "true",
+            "try",
+            "typealias",
+            "typeof",
+            "val",
+            "var",
+            "when",
+            "while",
+        ] {
+            assert!(semantic_spelling(raw).is_none(), "{raw}");
+        }
+        for raw in ["field", "import", "const", "suspend", "_1"] {
+            assert_eq!(semantic_spelling(raw), Some(raw));
+        }
+        for raw in ["_", "`", "a\0b", "a\rb", "a\nb", "🦀"] {
+            assert!(semantic_spelling(raw).is_none(), "{raw:?}");
+        }
+    }
+
+    #[test]
+    fn semantic_spelling_byte_cap_is_inclusive_for_bare_and_multibyte_quoted_names() {
+        let bare = "x".repeat(SOURCE);
+        assert_eq!(semantic_spelling(&bare), Some(bare.as_str()));
+        assert!(semantic_spelling(&(bare + "x")).is_none());
+        let quoted = format!("`{}`", "é".repeat((SOURCE - 2) / 2));
+        assert_eq!(quoted.len(), SOURCE);
+        assert_eq!(semantic_spelling(&quoted), Some(&quoted[1..SOURCE - 1]));
+        let over = format!("`{}x`", &quoted[1..SOURCE - 1]);
+        assert_eq!(over.len(), SOURCE + 1);
+        assert!(semantic_spelling(&over).is_none());
     }
 
     #[test]
@@ -1244,6 +1578,303 @@ mod tests {
         let mut result = tree.finish();
         result.parsed.elements[2].parent = None;
         assert_eq!(lower(&result).unwrap_err(), invalid(2));
+    }
+
+    #[test]
+    fn reference_shapes_require_the_complete_ordered_function_and_property() {
+        let baseline = reference_result();
+        assert_eq!(lower(&baseline).unwrap().declarations().len(), 2);
+        for change in 0..16 {
+            let mut result = reference_result();
+            let elements = &mut result.parsed.elements;
+            let find = |kind: &str| elements.iter().position(|e| e.kind == kind).unwrap();
+            let (parameters, block, property, reference) = (
+                find("VALUE_PARAMETER_LIST"),
+                find("BLOCK"),
+                find("PROPERTY"),
+                find("REFERENCE_EXPRESSION"),
+            );
+            let (lpar, rpar, lbrace, rbrace, eq) = (
+                find("LPAR"),
+                find("RPAR"),
+                find("LBRACE"),
+                find("RBRACE"),
+                find("EQ"),
+            );
+            match change {
+                0 => elements[eq].kind = "WHITE_SPACE".into(),
+                1 => elements[property + 2].kind = "EQ".into(),
+                2 => elements[property + 1].kind = "VAR_KEYWORD".into(),
+                3 => elements[property + 3].kind = "WHITE_SPACE".into(),
+                4 => elements[lpar].kind = "RPAR".into(),
+                5 => elements[rpar].kind = "LPAR".into(),
+                6 => elements[lbrace].kind = "RBRACE".into(),
+                7 => elements[rbrace].kind = "LBRACE".into(),
+                8 => elements[reference + 1].kind = "INTEGER_LITERAL".into(),
+                9 => elements[reference + 1].kind = "WHITE_SPACE".into(),
+                10 => elements[reference].end -= 1,
+                11 => elements[reference + 1].parent = Some(property),
+                12 => elements[reference].subtree_end = reference + 1,
+                13 => elements[parameters].kind = "INTEGER_CONSTANT".into(),
+                14 => elements[block].kind = "CLASS_BODY".into(),
+                15 => elements[eq].kind = "SEMICOLON".into(),
+                _ => unreachable!(),
+            }
+            assert!(lower(&result).is_err(), "change {change}");
+        }
+        for child in [
+            None,
+            Some("WHITE_SPACE"),
+            Some("IDENTIFIER"),
+            Some("INTEGER_CONSTANT"),
+        ] {
+            let mut tree = reference_body();
+            tree.open("PROPERTY");
+            tree.token("VAL_KEYWORD", "val");
+            tree.token("IDENTIFIER", "y");
+            tree.token("EQ", "=");
+            tree.open("REFERENCE_EXPRESSION");
+            if child.is_some() {
+                tree.token("IDENTIFIER", "x");
+            }
+            match child {
+                Some("INTEGER_CONSTANT") => {
+                    tree.open("INTEGER_CONSTANT");
+                    tree.token("INTEGER_LITERAL", "1");
+                    tree.close();
+                }
+                Some(kind) => tree.token(kind, "x"),
+                None => {}
+            }
+            tree.close();
+            tree.close();
+            assert!(lower(&finish_body(tree)).is_err(), "child {child:?}");
+        }
+    }
+
+    #[test]
+    fn reference_admission_refuses_wrong_ancestry_and_invalid_siblings_in_either_order() {
+        for owner in ["KT_FILE", "FUN", "CLASS_BODY", "BLOCK"] {
+            let mut tree = Tree::new();
+            if owner == "FUN" {
+                tree.header("f");
+            } else if owner != "KT_FILE" {
+                tree.open("CLASS");
+                tree.token("CLASS_KEYWORD", "class");
+                tree.token("IDENTIFIER", "C");
+                tree.open("CLASS_BODY");
+                if owner == "BLOCK" {
+                    tree.header("f");
+                    tree.open("BLOCK");
+                }
+            }
+            local_val(&mut tree, "REFERENCE_EXPRESSION");
+            while tree.stack.len() > 1 {
+                tree.close();
+            }
+            assert!(lower(&tree.finish()).is_err(), "owner {owner}");
+        }
+        for before in [true, false] {
+            for bad in 0..7 {
+                let mut tree = reference_body();
+                if !before {
+                    local_val(&mut tree, "REFERENCE_EXPRESSION");
+                }
+                match bad {
+                    0 => tree.error("incomplete"),
+                    1 => {
+                        tree.header("local");
+                        tree.close();
+                    }
+                    2 => {
+                        tree.open("CLASS");
+                        tree.token("CLASS_KEYWORD", "class");
+                        tree.token("IDENTIFIER", "Local");
+                        tree.close();
+                    }
+                    _ => {
+                        tree.open("PROPERTY");
+                        tree.token("VAL_KEYWORD", "val");
+                        tree.token("IDENTIFIER", "z");
+                        if bad != 3 {
+                            tree.token("EQ", "=");
+                        }
+                        if bad == 4 {
+                            tree.token("EQ", "=");
+                        }
+                        for _ in 0..if bad == 5 { 2 } else { 1 } {
+                            tree.open("INTEGER_CONSTANT");
+                            tree.token("INTEGER_LITERAL", "1");
+                            tree.close();
+                        }
+                        if bad == 6 {
+                            tree.error("incomplete property");
+                        }
+                        tree.close();
+                    }
+                }
+                if before {
+                    local_val(&mut tree, "REFERENCE_EXPRESSION");
+                }
+                let result = finish_body(tree);
+                let mut b = Budget::default();
+                assert!(
+                    lower_with_budget(&result, result.snapshot(), &mut b).is_err(),
+                    "before {before} bad {bad}"
+                );
+                assert_eq!(b.reservations, 0);
+            }
+        }
+        let mut tree = reference_body();
+        local_val(&mut tree, "REFERENCE_EXPRESSION");
+        tree.token("RBRACE", "}");
+        tree.close();
+        tree.close();
+        tree.header("legacy");
+        tree.error("old error");
+        tree.close();
+        let result = tree.finish();
+        let out = lower(&result).unwrap();
+        assert_eq!(out.declarations().len(), 3);
+        assert!(out.declarations()[2].incomplete());
+        assert_eq!(out.errors().len(), 1);
+    }
+
+    #[test]
+    fn reference_ordering_and_repeated_bodies_refuse_without_rescans() {
+        for change in 0..8 {
+            let mut tree = Tree::new();
+            tree.header("f");
+            if change == 7 {
+                tree.token("EQ", "="); // cannot stand in for the function's parameter list
+            }
+            for _ in 0..if change == 0 || change == 7 {
+                0
+            } else if change == 1 {
+                2
+            } else {
+                1
+            } {
+                tree.open("VALUE_PARAMETER_LIST");
+                tree.token("LPAR", "(");
+                tree.token("RPAR", ")");
+                tree.close();
+            }
+            tree.open("BLOCK");
+            tree.token("LBRACE", "{");
+            tree.open("PROPERTY");
+            tree.token("VAL_KEYWORD", "val");
+            tree.token("IDENTIFIER", "y");
+            if change != 2 {
+                tree.token("EQ", "=");
+            }
+            if change == 3 {
+                tree.open("INTEGER_CONSTANT");
+                tree.token("INTEGER_LITERAL", "1");
+                tree.close();
+            }
+            tree.open("REFERENCE_EXPRESSION");
+            tree.token("IDENTIFIER", "x");
+            tree.close();
+            if change == 2 {
+                tree.token("EQ", "=");
+            }
+            if change == 4 {
+                tree.open("INTEGER_CONSTANT");
+                tree.token("INTEGER_LITERAL", "1");
+                tree.close();
+            }
+            if change == 5 {
+                tree.open("REFERENCE_EXPRESSION");
+                tree.token("IDENTIFIER", "x");
+                tree.close();
+            }
+            tree.close();
+            if change == 6 {
+                tree.token("RBRACE", "}");
+                tree.close();
+                tree.open("BLOCK");
+                tree.token("LBRACE", "{");
+            }
+            assert!(lower(&finish_body(tree)).is_err(), "change {change}");
+        }
+        let mut work = Vec::new();
+        for count in [16, 32, 64] {
+            let mut tree = reference_body();
+            for _ in 0..count {
+                local_val(&mut tree, "REFERENCE_EXPRESSION");
+                tree.token("SEMICOLON", ";");
+            }
+            let result = finish_body(tree);
+            let mut b = Budget::default();
+            assert_eq!(
+                lower_with_budget(&result, result.snapshot(), &mut b)
+                    .unwrap()
+                    .declarations()
+                    .len(),
+                count + 1
+            );
+            work.push(b.work);
+        }
+        assert_eq!(work[2] - work[1], 2 * (work[1] - work[0]));
+    }
+
+    #[test]
+    fn reference_budget_stale_and_origin_failures_remain_atomic() {
+        let result = reference_result();
+        let mut measured = Budget::default();
+        let lower = lower_with_budget(&result, result.snapshot(), &mut measured).unwrap();
+        let other = reference_result();
+        assert_eq!(
+            crate::structural_regions::build_regions(&lower, &other, other.snapshot()).unwrap_err(),
+            crate::structural_regions::RegionError::InvalidOrigin
+        );
+        let stale =
+            SourceSnapshot::new("synthetic", 2, FileKind::Source, result.snapshot().source())
+                .unwrap();
+        assert_eq!(
+            lower_declarations(&result, &stale).unwrap_err(),
+            LoweringError::StaleSnapshot
+        );
+        let mut exact = Budget {
+            work: WORK - measured.work,
+            ..Budget::default()
+        };
+        assert!(lower_with_budget(&result, result.snapshot(), &mut exact).is_ok());
+        assert_eq!(exact.work, WORK);
+        let mut over = Budget {
+            work: WORK - measured.work + 1,
+            ..Budget::default()
+        };
+        limit(
+            lower_with_budget(&result, result.snapshot(), &mut over),
+            LoweringLimit::Work,
+        );
+        let mut fail = Budget {
+            fail_reservation: Some(0),
+            ..Budget::default()
+        };
+        assert_eq!(
+            lower_with_budget(&result, result.snapshot(), &mut fail).unwrap_err(),
+            LoweringError::Allocation
+        );
+        assert_eq!(fail.emitted, 0);
+        let mut requested = Budget {
+            requested: REQUESTED - measured.requested + 1,
+            ..Budget::default()
+        };
+        limit(
+            lower_with_budget(&result, result.snapshot(), &mut requested),
+            LoweringLimit::RequestedHeap,
+        );
+        assert_eq!(requested.emitted, 0);
+        let mut capacity = Budget::default();
+        capacity.extra_capacity[0] = RETAINED;
+        limit(
+            lower_with_budget(&result, result.snapshot(), &mut capacity),
+            LoweringLimit::RetainedCapacity,
+        );
+        assert_eq!(capacity.emitted, 0);
     }
 
     #[test]

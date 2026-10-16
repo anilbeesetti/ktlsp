@@ -50,3 +50,57 @@ The initial incomplete manifest exists before launch. Final manifest records scr
 Supervision is explicitly Linux/macOS-only (other platforms fail before creating output or launching). Each child starts its own process group. All return paths attempt SIGKILL on that group, including after direct-child exit; normal completion also kills any same-group descendant that closed its pipes. Cleanup drains within its own deadline and observes/reaps the direct child without blocking. Descendants that escape into another group/session are outside containment, and grandchildren are reaped by their OS parent/init. Tests independently observe a descendant heartbeat stopping and pipe EOF after group termination. No claim of a general process sandbox or Windows support is made.
 
 **Official live execution remains blocked.** This child ran synthetic Rust peers only. A later separately admitted gate must authenticate publisher archive checksum/provenance, validate launcher-specific containment (including escaped groups), review isolation/arguments and admit actual official capture. An existing local official installation does not authorize this recorder to launch it. T045 remains open; no new official diagnostic or feature-parity evidence is produced here.
+
+## Optional PR174 host cleanup ownership (#321)
+
+`ktlsp-oracle-pr174-host` is a Linux-only, root-custody controller; its presence does not authorize provisioning, dispatch or official execution. The official adapter and separately admitted original-job/containment prerequisites remain required. macOS runs synthetic tests only.
+
+Cleanup service ownership transfers only after exclusive unit creation, daemon reload and policy readback succeed. A failed installation retains direct prearm cleanup of the exact known container, even when a partial or preexisting unit file remains; unrelated files are never overwritten or removed. Direct cleanup remains forbidden after watchdog/START ownership. Failed file writes retain cancellation tombstones so persistence failure cannot reopen START.
+
+The supervisor records a protected `cleanup-service-ready` marker bound to nonce, full container ID and boot identity. External `request-cleanup` always latches cancellation, but starts the service only after validating that marker; before transfer it returns `CLEANUP_LATCHED` without starting any unit. If marker publication fails after verified installation, the supervisor retains service ownership in memory and requests its usable service before returning the capture error.
+
+After OS-root and protected nonce-directory admission, `request-cleanup` writes its cancellation tombstone **before** requiring `binding.json`. A missing binding returns `CLEANUP_LATCHED`; an existing invalid/untrusted binding returns an error after latching, never an invented cleanup identity. Existing cancellation objects, including dangling symlinks, are preserved and exclude START. Later binding publication cannot clear early cancellation.
+
+Run the complete optional workspace to build the standalone Rust command peer and expose the deterministic smoke output:
+
+```sh
+cargo fmt --manifest-path tools/oracle/Cargo.toml -- --check
+cargo clippy --locked --manifest-path tools/oracle/Cargo.toml --all-targets -- -D warnings
+cargo test --locked --manifest-path tools/oracle/Cargo.toml -- --nocapture
+```
+
+The executable regression uses real production installation, final routing and direct cleanup against file-backed Rust command peers, not Docker/systemd or echo scripts. Write, sync, reload, readback-command, readback-policy, preexisting-file and symlink failures each return failure and remove the synthetic exact-CID container, reporting `owner=DirectPrearm containerPresent=false`. Successful installation and marker-publication failure select `owner=Service`, with dispatch recorded but no claimed service execution. A test-only custody callback permits valid/malformed marker paths without OS root; production always enforces protected custody. Receipts remain `UNKNOWN` and `officialCaptureSuccess=false`; this is not containment, fresh official capture, abrupt-death recovery or protection against privileged concurrent mutation.
+
+### Change record
+
+- #321: fixed PR306's file-existence ownership gap and migrated external cancellation routing. Local macOS format and strict all-target Clippy passed; optional tests passed with 19 host, 1 peer-consumer, 9 recorder and 6 replay tests, plus two ignored subprocess helpers exercised by their parents. The first actual-path run exposed `clock_gettime(1)` failing on macOS; selecting Darwin's `CLOCK_MONOTONIC=6` fixed it while Linux retains `1`. Hosted checks and root integration are separate evidence, not implied by these local results.
+- #324 optional-tooling union: integrated the single verified main `2e408cfd8d65c68a9eede863e3f983a2db720d95` and PR300 `9318ffbe1ab97a386cf599ae49310e8c036616a6` with corrected PR306/323. At code head `04ccc2e78ad1a35ac42da873e75358d0da8ba44d`, independent functionality/adversarial integration reviews cleared, then local optional format, locked strict all-target Clippy and full synthetic tests passed once: 19 host, 1 peer-consumer, 6 PR174 validation, 9 recorder and 6 replay cases, with two ignored helpers exercised by parents. The existing executable smoke again removed the file-backed container for all seven installation failures; service cases proved dispatch only. This is reviewed/passing optional preparation, not aggregate hosted/exact-main proof or live execution admission.
+- #324 early-cancellation correction: ROOT's union review found that the real CLI previously loaded the binding before reaching the latch helper. Code head `eec10ebbd486858bf9d5bc17370158c948e10b60` corrects that boundary. After three independent changed-path source rechecks, optional format, locked strict all-target Clippy and the full synthetic suite passed once: 20 host, 1 peer-consumer, 6 PR174 validation, 9 recorder and 6 replay cases. A real Rust subprocess invokes the shared post-admission CLI dispatcher for missing binding during preflight/preparation/CREATE, existing invalid binding, preexisting cancellation bytes and a dangling cancellation symlink; all six `EARLY_CANCEL_SMOKE` observations report `startAllowed=false`, `serviceDispatched=false` and `officialCaptureSuccess=false`. The subprocess bypasses OS-root/nonce-directory admission only; production admission is unchanged. The existing installation-failure smoke also passed. No pre-fix runtime execution, actual service launch or containment proof is claimed.
+
+## PR174 input validation (source only)
+
+`recorder::validate_pr174_inputs(identity_path, preflight_path, fixture_directory)`
+checks bounded proposed-run and preflight data for the two unchanged
+[PR174 fixtures](fixtures/official-pr174-symbols/README.md). Consistent inputs
+return `Ok(())`; invalid inputs return an error. It creates no evidence and
+spawns no process. This success is data validation, never launch authorization.
+No official CLI or recording path is delivered.
+
+Both JSON inputs are regular, nonsymlink files limited to 16 KiB; source/script
+files must exactly match embedded bytes, including UTF-8/newlines. The proposed
+identity schema pins the preparation contract and source baseline, repository,
+workflow-dispatch attempt 1 and finite original-run identifiers. Preflight must
+repeat that identity and fixed release/hash claims, command, limits and output
+path. Test source provides deliberately fabricated schema examples, never run
+evidence. Unknown or duplicate top-level, identity, pin and limit fields are refused.
+
+This checks data consistency only. Matching supplied hashes do not authenticate
+the publisher, actual executable bytes, run, permissions or authorization. The
+validator supplies no trusted host handoff, effective isolation, runtime attestation
+or actual teardown evidence. The separate optional controller source above does
+not establish those live facts. A live recording entrypoint still requires a
+separately admitted official adapter/bootstrap, execution admission, containment
+calibration and independent review. Existing `record()` and `--synthetic-only`
+retain their scope, environment, limits and raw/error/cleanup behavior. No
+dependency, workflow, product or native default-test graph changes accompany
+this source preparation.

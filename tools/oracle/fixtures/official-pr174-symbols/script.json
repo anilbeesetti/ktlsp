@@ -1,0 +1,101 @@
+[
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "processId": null,
+      "clientInfo": {
+        "name": "ktlsp-pr174-official-capture",
+        "version": "1"
+      },
+      "rootUri": "file:///tmp/ktlsp-t045-pr174-host/fixture",
+      "workspaceFolders": [
+        {
+          "uri": "file:///tmp/ktlsp-t045-pr174-host/fixture",
+          "name": "pr174"
+        }
+      ],
+      "capabilities": {
+        "general": {
+          "positionEncodings": [
+            "utf-16"
+          ]
+        },
+        "textDocument": {
+          "documentSymbol": {
+            "dynamicRegistration": false,
+            "hierarchicalDocumentSymbolSupport": true
+          }
+        },
+        "workspace": {
+          "configuration": false,
+          "workspaceFolders": true
+        }
+      },
+      "initializationOptions": {
+        "projects": [],
+        "runMainCodeLens": false,
+        "intellijExtensions": false
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "initialized",
+    "params": {}
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "textDocument/didOpen",
+    "params": {
+      "textDocument": {
+        "uri": "file:///tmp/ktlsp-t045-pr174-host/fixture/declarations.kt",
+        "languageId": "kotlin",
+        "version": 1,
+        "text": "class Host {\n    val same = 1\n    fun same() {\n        class Local\n        fun inner() {}\n        val `local 🦀é` = 3\n    }\n}\n\nfun same() = 2\n"
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "textDocument/documentSymbol",
+    "params": {
+      "textDocument": {
+        "uri": "file:///tmp/ktlsp-t045-pr174-host/fixture/declarations.kt"
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "textDocument/didOpen",
+    "params": {
+      "textDocument": {
+        "uri": "file:///tmp/ktlsp-t045-pr174-host/fixture/error-node.kt",
+        "languageId": "kotlin",
+        "version": 1,
+        "text": "fun broken(\nval later = 1\nfun healthy() = 2\n"
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 3,
+    "method": "textDocument/documentSymbol",
+    "params": {
+      "textDocument": {
+        "uri": "file:///tmp/ktlsp-t045-pr174-host/fixture/error-node.kt"
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 4,
+    "method": "shutdown"
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "exit"
+  }
+]

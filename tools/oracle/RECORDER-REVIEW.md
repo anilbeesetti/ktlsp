@@ -1,5 +1,26 @@
 # T045c / #91 recorder review evidence
 
+## Historical PR300 source-review checkpoint
+
+PR174 source preparation adds a working input-consistency validator.
+It checks bounded proposed identity/preflight data and exact embedded source/
+script bytes, returning success or an error without output or process creation. Hash
+claims remain unauthenticated until a separately reviewed supervisor handoff;
+matching caller-provided values never grant execution. No official CLI is added.
+Synthetic recording is unchanged. New focused test source covers consistent proposed claims,
+missing/mismatched/unknown identity fields, fixed preflight/fixture mismatches,
+input bounds/types, contradictory raw-JSON duplicate pin/limit fields and
+explicitly synthetic Rust-peer recording. Correctness review found that nested
+`Value` objects accepted last-wins duplicate keys; strict typed pins and existing
+`CaptureLimits` now reject them before comparison.
+Those new tests have not been executed locally under #96; historical execution
+evidence below does not apply to this new slice. Source review and compile-only
+validation receipts are recorded separately in its delivery handoff. No actual
+official, Docker, host-controller, workflow or genuine-observation implementation
+is delivered here.
+
+## Historical synthetic-recorder delivery evidence
+
 Scope: optional standalone synthetic-only raw recorder. No JVM/official launch/download, semantic observation, dependency/lock change, shipped provider or native-workspace graph change. Parent #45 remains open. Official live execution remains blocked by a separate admission/provenance/launcher containment gate.
 
 Architect reviewed the plan, repeated test failures and finished design. Corrections included acknowledged stdin prefixes, fair bounded ticks, header completeness caching, independent exit/EOF, descendant readiness, EOF decoding backlog, direct stdout-byte-cap and actual CLI coverage. Early 350 ms fixture deadlines were sensitive to parallel startup; ordinary test phases are 1200 ms with separate deterministic short no-read deadlines. Production defaults remain 5/30/1 seconds (phase/session/cleanup).

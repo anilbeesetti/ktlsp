@@ -47,6 +47,10 @@ cargo test --locked -p ktlsp-server
 
 **Known build-child failure:** `rust-objcopy` aborted with SIGABRT because dyld could not load `@rpath/libLLVM.dylib`; debug-info stripping failed even though Cargo exited 0. The release executable reported its version, and 38 server-only tests passed (12 provider, 16 session, 10 stdio). This is bounded package evidence at `50bef1c6`, not current-source/workspace/parser/dependency-crate tests, editor/performance validation or full Mac support. At that historical freeze the server had no parser dependency; the current optional symbol provider does. [#96](https://github.com/anilbeesetti/ktlsp/issues/96) remains OPEN/UNKNOWN; do not run the current unqualified server suite locally because it now includes real parser consumers. See the durable [Mac observation receipt](docs/status/development.md#bounded-mac-server-observation) for provenance and limits.
 
+## Experimental paired packages
+
+The manually admitted [native packaging workflow](.github/workflows/native-packaging-experiment.yml) builds matching server/worker binaries from its immutable default-branch dispatch SHA. Each Linux/macOS/Windows leg must independently pass pinned native checks, full release workspace tests, notice/provenance/checksum staging and evidence upload before publishing its experimental archive. A successful leg does not certify the whole matrix, general platform support or full parity. Build-child/stripping failures are not accepted merely because Cargo returns zero. See [source and execution gates](docs/status/development.md#saved-continuation-integration-324); the historical macOS failure and #96 remain separate.
+
 ## Development
 
 ```sh

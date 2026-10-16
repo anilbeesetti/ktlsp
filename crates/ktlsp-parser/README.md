@@ -4,9 +4,11 @@ This library invokes the separately built `ktlsp-parser-worker` through an expli
 trusted absolute path. Build both with `cargo build --locked -p ktlsp-parser`.
 `Parser::parse` accepts source, source/script kind, and a cancellation flag; it
 returns a checked flat CST with original byte spans and syntax diagnostics, or a
-named rejection. Source is never replaced with parser-generated text. This crate
-has no server caller and advertises no provider. It is not full grammar, recovery,
-HIR, formatter or official Kotlin LSP parity.
+named rejection. Source is never replaced with parser-generated text. The server
+consumes the validated CST for its bounded syntactic document-symbol provider
+(see [server limits](../ktlsp-server/README.md)); the finite declaration consumers
+below are library-only. This is not full grammar, recovery, HIR, formatter or
+official Kotlin LSP parity.
 
 Each call starts one Rust worker. On Unix, the parent transfers input and drains
 stdout through one nonblocking `UnixStream` endpoint; the child's duplicated
@@ -102,6 +104,67 @@ Worker checks original normalized tree spelling and missed-token reports; parent
 checks rooted preorder/containment/depth, UTF-8 spans, exact token partition,
 diagnostic/count limits, and bounded JSON. The token-loss regression is rejected
 explicitly, never presented as a lossless tree.
+
+## Bounded semantic prerequisites (#320)
+
+This branch composes PR307 → PR304 → PR299 → PR302 → PR305 and the two adopted
+#308 lowering/regression files, including the reviewed function-EQ refusal.
+It incorporates verified incoming main `2e408cfd8d65c68a9eede863e3f983a2db720d95`
+without changing its product providers, native dependencies or workflow isolation.
+This is finite syntax/structure admission, not full scopes, binding, navigation,
+types, stable cross-revision symbols or a new server capability.
+
+- `lowering::lower_declarations` borrows declarations and existing syntax errors
+  from a validated source snapshot, preserving original byte/name spans, CST
+  parents, result-local owners and incompleteness. Unsupported syntax rejects
+  the whole operation; package/import nodes are admitted only when empty.
+- Reference-bearing functions require an ordinary top-level zero-parameter
+  function with an ordered brace body of plain immutable untyped local `val`s,
+  whose initializers are integer constants or whole bare-identifier reference
+  subtrees. Parameters, receivers, nested/reference-bearing member contexts,
+  calls, qualified accesses, assignments and relevant error-bearing contexts
+  are not admitted. Accepting a reference initializer does not resolve its name,
+  enforce declaration-order visibility or diagnose self/forward references.
+- `Declaration::semantic_spelling` separately supports ASCII bare names and
+  nonempty backtick bodies without backticks, CR/LF or NUL, borrowing unchanged
+  bytes without normalization; unsupported names return `None`, not an identity.
+- `structural_regions::build_regions` authenticates the exact original lowerer
+  and snapshot result, then supplies file/class-body/function-body regions and
+  ordered declaration memberships. Equal bytes from an independent parse do
+  not establish origin. Regions and declaration owners are not Kotlin scopes.
+- `declaration_name_index` groups exact **raw** spellings within an identical
+  borrowed region, retaining duplicates and result-local declaration ordinals.
+  `ancestor_candidates` returns all such groups along structural ancestors,
+  nearest first, without picking a semantic winner or applying visibility,
+  shadowing, declaration-order or backtick-equivalence rules.
+- `position_regions::containing_regions` accepts original UTF-8 boundaries and
+  returns every half-open containing region in directory order; brace bytes
+  count, EOF matches nothing. It neither authenticates a reference occurrence
+  nor converts UTF-16 positions; callers convert against the identical source.
+
+These consumers retain immutable producer association and require a synchronized
+current-document recheck before publication. Document/revision/kind/source
+changes invalidate results; reopening must use a new document identity or
+revision. Their checked work/capacity limits and allocation refusals are
+incremental bounds, not whole-process allocation, RSS, stack or time guarantees.
+The raw-name index may scan quadratically within its charged work limit;
+ancestor queries use fixed storage and position queries allocate nothing.
+
+At source head `b94e6ded912d72c700be9f3e8d09ab923c4fb5a3`,
+[original attempt-1 Linux CI38850851404/job116811504205](https://github.com/anilbeesetti/ktlsp/actions/runs/38850851404/job/116811504205)
+checked synthetic merge `fad71a4c94b9e154ce90503f24cae5d39d27b7db`,
+ordered parents `[2e408cfd8d65c68a9eede863e3f983a2db720d95,b94e6ded912d72c700be9f3e8d09ab923c4fb5a3]`,
+tree `1436973f46d32175ec16398be571dc44c4e16a2d`. Unchanged pinned
+format, locked all-target workspace Clippy and locked full workspace tests passed.
+The actual supervised parser → lowerer → structural-directory observation
+returned 37 CST rows/27 tokens, zero diagnostics/errors, complete `f`/`x`/`y`
+declarations, two regions, memberships `[0, 1, 1]` and all three original-producer
+association checks true. The temporary direct-`Write` marker was removed after
+inspection; the substantive production and synthetic regressions remain.
+Final aggregate reviewed-head CI and guarded integration are separate gates.
+No local parser runtime/tests ran under #96.
+T008/T008a, full T009 and broader recovery/binding acceptance remain pending;
+#96 remains OPEN/UNKNOWN. No official oracle or platform-parity proof is claimed.
 
 ## Adoption audit
 

@@ -1,4 +1,4 @@
-//! Synthetic-only raw stdio capture. Official execution requires a separate live gate.
+//! Synthetic raw stdio capture and PR174 input consistency validation.
 use crate::{MAX_BYTES, MAX_MESSAGES, MAX_STDERR, envelope, id};
 use ktlsp_protocol::{MAX_HEADER_BYTES, ProtocolError, read_frame, write_frame};
 use serde::{Deserialize, Serialize};
@@ -26,6 +26,186 @@ impl Default for CaptureLimits {
             messages: MAX_MESSAGES,
         }
     }
+}
+
+/// Validate proposed PR174 inputs only; success grants no launch authority.
+/// No output is created and no process is spawned.
+pub fn validate_pr174_inputs(
+    identity_path: &Path,
+    preflight_path: &Path,
+    fixture_directory: &Path,
+) -> Result<(), String> {
+    let identity: Pr174Identity =
+        serde_json::from_slice(&preparation_input(identity_path, 16_384)?)
+            .map_err(|e| format!("frozen identity: {e}"))?;
+    identity.validate()?;
+    let preflight: Pr174Preflight =
+        serde_json::from_slice(&preparation_input(preflight_path, 16_384)?)
+            .map_err(|e| format!("preflight: {e}"))?;
+    if preflight.schema_version != 1 || preflight.identity != identity {
+        return Err("preflight frozen identity mismatch".into());
+    }
+    let expected_pins = json!({
+        "release": "kotlin-lsp/v263.6379.0",
+        "platform": "linux-amd64",
+        "archiveSha256": "ab8ca4455dc2fc5fe1a24db2bccc46c104254d2c465155c4251ee65df8f3f7cc",
+        "launcherSha256": "adf02baec622b4fcd1e7db3ec96f7c7b3309d5ab59e170e60260d7511222878e",
+        "scriptSha256": "930a87ea1fa9c3f6e6a6b6008d010dd9435082329ea8b897a42084d7369ab008",
+        "declarationsSha256": "fa935b144a49838fd9e603bfc95462bcf3701eeb19877501d451ca069ce9e233",
+        "errorNodeSha256": "c052b78e7603a88f3531f5b06f3a533f8df5394ce8ce9eeab3eb2b3ce3f4bd2c"
+    });
+    let expected_command = json!([
+        "/tmp/ktlsp-t045-pr174-host/distribution/kotlin-server-263.6379.0/bin/intellij-server",
+        "--stdio",
+        "--data-sharing=none",
+        "--region=apac",
+        "--system-path=/tmp/ktlsp-t045-pr174-host/capture/system"
+    ]);
+    let limits = CaptureLimits {
+        phase_ms: 60_000,
+        session_ms: 300_000,
+        cleanup_ms: 5_000,
+        ..CaptureLimits::default()
+    };
+    if serde_json::to_value(preflight.pins).map_err(|e| e.to_string())? != expected_pins
+        || preflight.command != expected_command
+        || serde_json::to_value(preflight.limits).map_err(|e| e.to_string())?
+            != serde_json::to_value(limits).map_err(|e| e.to_string())?
+        || preflight.output_directory != "/tmp/ktlsp-t045-pr174-host/capture"
+    {
+        return Err("preflight PR174 pins, command, limits or output mismatch".into());
+    }
+    for (name, expected) in [
+        (
+            "declarations.kt",
+            include_bytes!("../fixtures/official-pr174-symbols/declarations.kt").as_slice(),
+        ),
+        (
+            "error-node.kt",
+            include_bytes!("../fixtures/official-pr174-symbols/error-node.kt").as_slice(),
+        ),
+        (
+            "script.json",
+            include_bytes!("../fixtures/official-pr174-symbols/script.json").as_slice(),
+        ),
+    ] {
+        if preparation_input(&fixture_directory.join(name), expected.len())? != expected {
+            return Err(format!("PR174 fixture bytes mismatch: {name}"));
+        }
+    }
+    // Hash claims are not authenticated until the separately admitted supervisor handoff exists.
+    Ok(())
+}
+
+#[derive(Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct Pr174Identity {
+    schema_version: u8,
+    contract_sha256: String,
+    source_baseline: String,
+    original_run: Pr174Run,
+}
+#[derive(Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct Pr174Run {
+    repository: String,
+    event: String,
+    attempt: u8,
+    run_id: u64,
+    job_id: u64,
+    suite_id: u64,
+    source_head: String,
+    source_tree: String,
+    workflow_sha256: String,
+    container_id: String,
+    image_sha256: String,
+    nonce: String,
+}
+impl Pr174Identity {
+    fn validate(&self) -> Result<(), String> {
+        let run = &self.original_run;
+        let hex = |s: &str, length| {
+            s.len() == length
+                && s.bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        };
+        if self.schema_version != 1
+            || self.contract_sha256
+                != "65eb16c5bd73c99fe7fc000fddf0242bf6abab09283676612edf5ce9f285b61d"
+            || self.source_baseline != "b4fa25286a5fa0d7600b0b0420a7bcae6d520edc"
+            || run.repository != "anilbeesetti/ktlsp"
+            || run.event != "workflow_dispatch"
+            || run.attempt != 1
+            || run.run_id == 0
+            || run.job_id == 0
+            || run.suite_id == 0
+            || !hex(&run.source_head, 40)
+            || !hex(&run.source_tree, 40)
+            || !hex(&run.workflow_sha256, 64)
+            || !hex(&run.container_id, 64)
+            || !hex(&run.image_sha256, 64)
+            || !hex(&run.nonce, 64)
+        {
+            return Err("frozen PR174 identity mismatch".into());
+        }
+        Ok(())
+    }
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct Pr174Preflight {
+    schema_version: u8,
+    identity: Pr174Identity,
+    pins: Pr174Pins,
+    command: Value,
+    limits: CaptureLimits,
+    output_directory: String,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct Pr174Pins {
+    release: String,
+    platform: String,
+    archive_sha256: String,
+    launcher_sha256: String,
+    script_sha256: String,
+    declarations_sha256: String,
+    error_node_sha256: String,
+}
+
+fn preparation_input(path: &Path, limit: usize) -> Result<Vec<u8>, String> {
+    use std::{fs, io::Read};
+    if !fs::symlink_metadata(path)
+        .map_err(|e| e.to_string())?
+        .is_file()
+    {
+        return Err("preparation input must be a regular file".into());
+    }
+    let mut options = fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        #[cfg(target_os = "linux")]
+        const FLAGS: i32 = 0x800 | 0x20000; // O_NONBLOCK | O_NOFOLLOW
+        #[cfg(not(target_os = "linux"))]
+        const FLAGS: i32 = 4 | 0x100;
+        options.custom_flags(FLAGS);
+    }
+    let input = options.open(path).map_err(|e| e.to_string())?;
+    if !input.metadata().map_err(|e| e.to_string())?.is_file() {
+        return Err("preparation input must be a regular file".into());
+    }
+    let mut bytes = Vec::new();
+    input
+        .take(limit as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() > limit {
+        return Err("preparation input byte limit".into());
+    }
+    Ok(bytes)
 }
 
 /// Fresh local evidence directory; command must be an absolute executable path.

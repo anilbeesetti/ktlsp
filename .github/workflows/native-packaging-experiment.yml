@@ -1,3 +1,5 @@
+# Source-only child #325; source PR remains on root aggregate #324 HOLD.
+# No dispatch/execution proof is implied by source review or ordinary native CI.
 # Manual, experimental evidence only; dispatch requires a separate root admission
 # after the reviewed paired worker/symbol product is verified on default-branch main.
 # This does not close #96 or the #46/specs/parity.md release gate.
@@ -19,8 +21,6 @@ jobs:
         shell: pwsh
     env:
       CARGO_TERM_COLOR: never
-      CARGO_HOME: ${{ runner.temp }}/native-package-cargo
-      CARGO_TARGET_DIR: ${{ runner.temp }}/native-package-target
       RUSTFLAGS: ''
       CARGO_ENCODED_RUSTFLAGS: ''
       RUSTC_WRAPPER: ''
@@ -44,6 +44,10 @@ jobs:
             throw 'Only the immutable dispatch SHA and its default-branch workflow are admitted'
           }
           New-Item -ItemType Directory "$env:RUNNER_TEMP/native-package-evidence" | Out-Null
+          @(
+            "CARGO_HOME=$env:RUNNER_TEMP/native-package-cargo"
+            "CARGO_TARGET_DIR=$env:RUNNER_TEMP/native-package-target"
+          ) | Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
@@ -74,7 +78,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Format
         run: |
-          cargo +1.99.0 fmt --all -- --check
+          cargo +1.99.0 fmt --all -- --check 2>&1 | Tee-Object "$env:RUNNER_TEMP/native-package-evidence/format.txt"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Locked workspace Clippy
         run: |
@@ -188,6 +192,14 @@ jobs:
           tar -czf "$env:RUNNER_TEMP/$name.tar.gz" -C $stage .
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           "$((Get-FileHash -LiteralPath "$env:RUNNER_TEMP/$name.tar.gz" -Algorithm SHA256).Hash.ToLowerInvariant())  $name.tar.gz" | Set-Content "$env:RUNNER_TEMP/$name.tar.gz.sha256" -Encoding utf8NoBOM
+      - name: Preserve original native evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-package-evidence-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/native-package-evidence/
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload experimental package only after all proofs pass
         uses: actions/upload-artifact@v4
         with:
@@ -195,13 +207,5 @@ jobs:
           path: |
             ${{ runner.temp }}/ktlsp-experimental-*.tar.gz
             ${{ runner.temp }}/ktlsp-experimental-*.tar.gz.sha256
-          if-no-files-found: error
-          retention-days: 14
-      - name: Preserve original native evidence, including failures
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: native-package-evidence-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/native-package-evidence/
           if-no-files-found: error
           retention-days: 14

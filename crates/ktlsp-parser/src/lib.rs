@@ -230,9 +230,39 @@ pub struct DeadlineEvidence {
     pub receipt: DeadlineReceipt,
 }
 
+/// Request-owned datagram pair. The inert peer alias keeps the receive queue
+/// connected through post-cleanup validation, even after the child closes fd2.
+/// Only the child writes receipts; the retained peer is never used for I/O.
+#[cfg(unix)]
+struct ObservationChannel {
+    receiver: std::os::unix::net::UnixDatagram,
+    peer: std::os::unix::net::UnixDatagram,
+}
+#[cfg(unix)]
+impl ObservationChannel {
+    fn pair() -> std::io::Result<Self> {
+        let (receiver, peer) = std::os::unix::net::UnixDatagram::pair()?;
+        receiver.set_nonblocking(true)?;
+        peer.set_nonblocking(true)?;
+        Ok(Self { receiver, peer })
+    }
+    fn new(command: &mut Command) -> std::io::Result<Self> {
+        use std::os::fd::OwnedFd;
+        let channel = Self::pair()?;
+        command.stderr(Stdio::from(OwnedFd::from(channel.peer.try_clone()?)));
+        Ok(channel)
+    }
+    fn recv(&self, bytes: &mut [u8]) -> std::io::Result<usize> {
+        self.receiver.recv(bytes)
+    }
+    fn send(&self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.receiver.send(bytes)
+    }
+}
+
 #[cfg(unix)]
 struct DeadlineObserver {
-    socket: std::os::unix::net::UnixDatagram,
+    socket: ObservationChannel,
     evidence: DeadlineEvidence,
 }
 
@@ -243,13 +273,8 @@ fn is_deadline_ack(bytes: &[u8]) -> bool {
 #[cfg(unix)]
 impl DeadlineObserver {
     fn new(command: &mut Command) -> std::io::Result<Self> {
-        use std::os::{fd::OwnedFd, unix::net::UnixDatagram};
-        let (socket, worker) = UnixDatagram::pair()?;
-        socket.set_nonblocking(true)?;
-        worker.set_nonblocking(true)?;
-        command
-            .arg("--observe-deadline-eof-v1")
-            .stderr(Stdio::from(OwnedFd::from(worker)));
+        let socket = ObservationChannel::new(command)?;
+        command.arg("--observe-deadline-eof-v1");
         Ok(Self {
             socket,
             evidence: DeadlineEvidence::default(),
@@ -425,17 +450,12 @@ pub enum GenericCopyEvidence {
     Complete(GenericCopyRecord),
 }
 #[cfg(unix)]
-struct GenericCopyObserver(std::os::unix::net::UnixDatagram);
+struct GenericCopyObserver(ObservationChannel);
 #[cfg(unix)]
 impl GenericCopyObserver {
     fn new(command: &mut Command) -> std::io::Result<Self> {
-        use std::os::{fd::OwnedFd, unix::net::UnixDatagram};
-        let (socket, worker) = UnixDatagram::pair()?;
-        socket.set_nonblocking(true)?;
-        worker.set_nonblocking(true)?;
-        command
-            .arg("--observe-generic-copy-v1")
-            .stderr(Stdio::from(OwnedFd::from(worker)));
+        let socket = ObservationChannel::new(command)?;
+        command.arg("--observe-generic-copy-v1");
         Ok(Self(socket))
     }
     fn finish(self, source: &str) -> GenericCopyEvidence {
@@ -2158,9 +2178,8 @@ mod unix_io {
         fn controls_precede_readiness_and_only_running_deadline_sends() {
             for exited in [false, true] {
                 for cancel in [false, true] {
-                    let (socket, peer) = std::os::unix::net::UnixDatagram::pair().unwrap();
-                    socket.set_nonblocking(true).unwrap();
-                    peer.set_nonblocking(true).unwrap();
+                    let socket = ObservationChannel::pair().unwrap();
+                    let peer = socket.peer.try_clone().unwrap();
                     let mut observer = DeadlineObserver {
                         socket,
                         evidence: DeadlineEvidence::default(),
@@ -2260,9 +2279,8 @@ mod unix_io {
                             .writes
                             .push_back(Err(io::ErrorKind::BrokenPipe.into()));
                     }
-                    let (socket, peer) = std::os::unix::net::UnixDatagram::pair().unwrap();
-                    socket.set_nonblocking(true).unwrap();
-                    peer.set_nonblocking(true).unwrap();
+                    let socket = ObservationChannel::pair().unwrap();
+                    let peer = socket.peer.try_clone().unwrap();
                     let mut observer = DeadlineObserver {
                         socket,
                         evidence: DeadlineEvidence::default(),
@@ -2668,7 +2686,6 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn generic_copy_wire_is_bounded_and_rejects_invalid_or_duplicate_records() {
-        use std::os::unix::net::UnixDatagram;
         let source = "class C<T fun f() = 1";
         let record = GenericCopyRecord {
             status: 1,
@@ -2729,13 +2746,13 @@ mod tests {
             assert_eq!(GenericCopyRecord::from_bytes(packet, source), None);
         }
         for duplicate in [false, true] {
-            let (parent, worker) = UnixDatagram::pair().unwrap();
-            parent.set_nonblocking(true).unwrap();
-            worker.set_nonblocking(true).unwrap();
+            let parent = ObservationChannel::pair().unwrap();
+            let worker = parent.peer.try_clone().unwrap();
             worker.send(&bytes).unwrap();
             if duplicate {
                 worker.send(b"").unwrap();
             }
+            drop(worker); // Model child exit before record and sentinel reads.
             let evidence = GenericCopyObserver(parent).finish(source);
             assert_eq!(
                 evidence,
@@ -2746,16 +2763,16 @@ mod tests {
                 }
             );
         }
-        let (parent, _worker) = UnixDatagram::pair().unwrap();
-        parent.set_nonblocking(true).unwrap();
+        let parent = ObservationChannel::pair().unwrap();
         assert_eq!(
             GenericCopyObserver(parent).finish(source),
             GenericCopyEvidence::Missing
         );
         for packet in [b"".as_slice(), &bytes[..63], &[0; 65]] {
-            let (parent, worker) = UnixDatagram::pair().unwrap();
-            parent.set_nonblocking(true).unwrap();
+            let parent = ObservationChannel::pair().unwrap();
+            let worker = parent.peer.try_clone().unwrap();
             worker.send(packet).unwrap();
+            drop(worker);
             assert_eq!(
                 GenericCopyObserver(parent).finish(source),
                 GenericCopyEvidence::Invalid
@@ -3207,12 +3224,42 @@ mod tests {
 #[cfg(all(test, unix))]
 mod deadline_tests {
     use super::*;
-    use std::os::unix::net::UnixDatagram;
+
+    #[test]
+    fn observation_channel_remains_live_after_external_worker_aliases_close() {
+        let mut command = Command::new("unused-test-fixture");
+        let channel = ObservationChannel::new(&mut command).unwrap();
+        let worker = channel.peer.try_clone().unwrap();
+        worker.send(b"receipt").unwrap();
+        drop(worker);
+        drop(command);
+        let mut bytes = [0; 17];
+        assert_eq!(channel.recv(&mut bytes).unwrap(), 7);
+        assert_eq!(&bytes[..7], b"receipt");
+        assert_eq!(
+            channel.recv(&mut bytes).unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock
+        );
+    }
+
+    #[test]
+    fn observation_channel_and_child_alias_are_close_on_exec() {
+        use std::os::fd::AsRawFd;
+        let channel = ObservationChannel::pair().unwrap();
+        let child_alias = channel.peer.try_clone().unwrap();
+        for descriptor in [&channel.receiver, &channel.peer, &child_alias] {
+            // SAFETY: F_GETFD only reads flags for this live, borrowed descriptor.
+            let flags = unsafe { libc::fcntl(descriptor.as_raw_fd(), libc::F_GETFD) };
+            assert!(flags >= 0);
+            assert_ne!(flags & libc::FD_CLOEXEC, 0);
+        }
+    }
 
     #[test]
     fn deadline_receipts_require_exact_challenge_ack_and_empty_sentinel() {
         for (packets, selected, sent, expected) in [
             (vec![], true, Some(Ok(16)), DeadlineReceipt::Missing),
+            (vec![], false, None, DeadlineReceipt::Missing),
             (
                 vec![b"KTLSP-EOF-v1!!!!".to_vec()],
                 true,
@@ -3266,12 +3313,12 @@ mod deadline_tests {
                 DeadlineReceipt::Invalid,
             ),
         ] {
-            let (socket, worker) = UnixDatagram::pair().unwrap();
-            socket.set_nonblocking(true).unwrap();
-            worker.set_nonblocking(true).unwrap();
+            let socket = ObservationChannel::pair().unwrap();
+            let worker = socket.peer.try_clone().unwrap();
             for packet in packets {
                 worker.send(&packet).unwrap();
             }
+            drop(worker); // Model child exit before both strict receive checks.
             let observer = DeadlineObserver {
                 socket,
                 evidence: DeadlineEvidence {
@@ -3295,9 +3342,8 @@ mod deadline_tests {
 
     #[test]
     fn failed_decision_send_is_not_a_witness() {
-        let (socket, worker) = UnixDatagram::pair().unwrap();
-        socket.set_nonblocking(true).unwrap();
-        drop(worker);
+        let socket = ObservationChannel::pair().unwrap();
+        socket.receiver.shutdown(std::net::Shutdown::Write).unwrap();
         let mut observer = DeadlineObserver {
             socket,
             evidence: DeadlineEvidence::default(),

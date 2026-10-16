@@ -1,6 +1,5 @@
 //! Opt-in fault-fixture evidence only; never compiled into the product.
 use super::*;
-use std::os::unix::net::UnixDatagram;
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Sample {
@@ -22,7 +21,7 @@ pub(super) enum Decision {
 pub(super) struct Observation {
     start: Instant,
     spawned: Option<(Duration, Result<(), ParserError>)>,
-    socket: Option<UnixDatagram>,
+    socket: Option<ObservationChannel>,
     setup_error: Option<std::io::ErrorKind>,
     samples: [Option<(Duration, Sample)>; 32],
     ticks: u64,
@@ -35,6 +34,13 @@ pub(super) struct Observation {
     stages: [Option<(Duration, u8)>; 8],
     stage_count: usize,
     invalid_stages: u64,
+}
+
+fn eligible(command: &Command) -> bool {
+    command.get_args().any(|arg| arg == "tests::fault_worker")
+        && !command
+            .get_args()
+            .any(|arg| arg == "--observe-deadline-eof-v1" || arg == "--observe-generic-copy-v1")
 }
 impl Observation {
     fn new(start: Instant) -> Self {
@@ -59,22 +65,14 @@ impl Observation {
     pub(super) fn requested(command: &mut Command, deadline: Instant) -> Option<Self> {
         // Scope the opt-in to this known fault fixture, not real parser/source traffic.
         if std::env::var_os("KTLSP_NATIVE_IO_OBSERVE").as_deref() != Some(std::ffi::OsStr::new("1"))
-            || !command.get_args().any(|arg| arg == "tests::fault_worker")
+            || !eligible(command)
         {
             return None;
         }
         let mut observation = Self::new(deadline - TIMEOUT);
-        let setup = (|| {
-            let (socket, worker) = UnixDatagram::pair()?;
-            socket.set_nonblocking(true)?;
-            worker.set_nonblocking(true)?;
-            Ok::<_, std::io::Error>((socket, worker))
-        })();
-        match setup {
-            Ok((socket, worker)) => {
-                command
-                    .stderr(Stdio::from(std::os::fd::OwnedFd::from(worker)))
-                    .env("KTLSP_FAULT_IO_OBSERVE", "1");
+        match ObservationChannel::new(command) {
+            Ok(socket) => {
+                command.env("KTLSP_FAULT_IO_OBSERVE", "1");
                 observation.socket = Some(socket);
             }
             Err(error) => observation.setup_error = Some(error.kind()),
@@ -220,8 +218,8 @@ fn fixed_history_retains_terminal_decision_and_counts_idle_ticks() {
 
 #[test]
 fn child_stage_storage_and_receive_budget_are_bounded() {
-    let (socket, worker) = UnixDatagram::pair().unwrap();
-    socket.set_nonblocking(true).unwrap();
+    let socket = ObservationChannel::pair().unwrap();
+    let worker = socket.peer.try_clone().unwrap();
     let mut observation = Observation::new(Instant::now());
     observation.socket = Some(socket);
     for packet in [&[1][..], &[1, 2], &[6], &[]] {
@@ -238,6 +236,9 @@ fn child_stage_storage_and_receive_budget_are_bounded() {
     assert_eq!(observation.stage_count, 8);
     assert_eq!(observation.invalid_stages, 4);
     assert!(observation.stages.iter().all(Option::is_some));
+    drop(worker); // Child endpoint closure must not become invalid stage data.
+    observation.drain_stages();
+    assert_eq!(observation.invalid_stages, 4);
 }
 
 #[test]
@@ -267,4 +268,24 @@ fn logging_errors_do_not_replace_the_selected_result_with_a_panic() {
     observation.finish(&selected, admission::Cleanup::Confirmed, &mut log);
     assert_eq!(selected, Err(ParserError::Timeout));
     assert_eq!(log.0, 2); // One failed summary and one failed snapshot, no retry.
+}
+
+#[test]
+fn explicit_observer_modes_are_never_replaced_by_fault_tracing() {
+    for (args, expected) in [
+        (&["tests::fault_worker"][..], true),
+        (&["--source"][..], false),
+        (
+            &["tests::fault_worker", "--observe-deadline-eof-v1"][..],
+            false,
+        ),
+        (
+            &["--observe-generic-copy-v1", "tests::fault_worker"][..],
+            false,
+        ),
+    ] {
+        let mut command = Command::new("unused-test-fixture");
+        command.args(args);
+        assert_eq!(eligible(&command), expected);
+    }
 }

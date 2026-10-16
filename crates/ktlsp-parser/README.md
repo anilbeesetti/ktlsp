@@ -178,6 +178,50 @@ sampling, exact challenge validation, one ACK attempt and no-retry semantics are
 unchanged. This fixture source repair still requires an original changed-source
 hosted run; it establishes no full-workspace pass or #96 resolution.
 
+The next original changed-source run,
+[38879411025/job116902229288](https://github.com/anilbeesetti/ktlsp/actions/runs/38879411025/job/116902229288),
+at `74135c0a7dcdbb16f75b457a625569c11518488c`, passed the parser library
+(101 passed, one ignored) and worker fixtures (eight passed, one ignored).
+The frozen real generic-copy observation then returned `Invalid` instead of
+its unchanged exact `Complete(GenericCopyRecord)` requirement. An earlier
+unselected deadline observation also reported `Invalid`, without claiming a
+deadline witness. The logs did not expose which generic-copy receive failed.
+
+Both parent receipt validators run only after confirmed same-child cleanup.
+Previously, every worker-side datagram alias had closed by then, so a Darwin
+peer-close error could not satisfy the strict `WouldBlock` empty-queue sentinel.
+Deadline, generic-copy and native-I/O observation now share a request-owned
+datagram channel retaining an inert worker-side alias until validation finishes.
+That alias performs no I/O and cannot fabricate a child receipt. Validation
+still requires the exact packet, all scalar checks and a clean `WouldBlock`
+sentinel; `ConnectionReset`, malformed, truncated and extra packets remain
+nonaccepting. Unconfirmed cleanup still drops channels without receipt reads.
+Error/unwind/cancellation paths own and drop the same channel inside their
+existing reservation. Ordinary unobserved parsing creates no observation channel.
+
+Descriptor accounting is explicit, not a hard process-FD ceiling: the observed
+path has at most six known caller-owned FDs before Command disposal (three
+stream endpoints, channel receiver/keeper, and Command's child-stderr alias),
+up from five without the keeper. The unchanged eight-reservation admission cap
+therefore bounds those known observed-path FDs at 48, excluding ambient FDs,
+child stdio and Rust/OS spawn internals. The keeper uses the safe standard-library
+close-on-exec socket/clone operations; only the intended child stderr mapping
+survives exec. After Command disposal, only the parent stream plus two channel
+FDs remain; the stream closes before cleanup, and both channel FDs drop after
+receipt validation or earlier error/unwind disposal. Public observation APIs
+select one channel per request; ordinary parsing retains its three known stream
+FDs and allocates no channel. No kernel limits, reservation cap or resource-error
+handling are raised or bypassed; failed setup remains failure-visible.
+
+The native-I/O trace already required the subprocess fault-test name, excluding
+the real parser command in the failing run. It now also explicitly excludes
+both private observation-mode flags, so diagnostic setup cannot replace those
+stderr channels even if a future fixture combines arguments. Regressions close
+external worker/Command aliases before strict receipt validation, check channel
+descriptor `FD_CLOEXEC` flags, preserve malformed/duplicate rejection, and ensure
+child closure does not increment invalid native-stage counts. No local runtime
+has exercised this repair; full changed-source hosted proof remains required.
+
 Limits are enforced independently in parent and worker where applicable:
 
 | Resource | Limit |

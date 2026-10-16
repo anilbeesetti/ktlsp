@@ -13,3 +13,7 @@ prejoin model path bytes to 8 MiB each. Oversized expansions reject even when
 normalization would shrink them. See the [v1 path budget contract](reviews/t111-v1-path-budget.md)
 for accounting, new `Budget` variants/error precedence and unchanged
 serialization/reload limits.
+
+The separate [v2 contract](V2.md) adds ordered scoped/exported edges and a pinned
+SDK catalog with explicit `(name, kind)` and unresolved inherited-SDK edges.
+SDK homes/URLs remain validated data; no discovery, SDK selection or Java execution.

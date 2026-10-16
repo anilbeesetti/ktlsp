@@ -52,10 +52,10 @@ module `isTestJar: true` remains unsupported. All other original subset rules
 above still apply, and unsupported semantics reject the whole call atomically.
 
 The separate v2 sidecar dependency enum contains `Module(ModuleDependency)`,
-`Library { library, scope, exported }` and `ModuleSource`. It preserves every
-entry, including repeated moduleSource positions. The v2 project projection
-omits only moduleSource and retains relative module/library edge order. Content
-boundaries, source membership/exact root types and interleaved library-root order
+`Library { library, scope, exported }`, `Sdk { name, kind }`, `InheritedSdk` and
+`ModuleSource`. It preserves every entry, including repeated moduleSource
+positions. The v2 projection omits only moduleSource and retains all other edge order.
+Content boundaries, source membership/exact root types and interleaved library-root order
 remain in the sidecar. The projection alone is incomplete import semantics.
 
 Delivered project v2 validates tuple identity `(tag, target, scope, exported)`:
@@ -89,10 +89,47 @@ same-name module/library identities, Unicode paths and ordered roots. Tests
 cover compatibility, tuple/graph/reference errors, malformed/unknown fields,
 atomic mixed blockers, truncation and byte/node/depth/path/projection boundaries.
 Verification evidence is in [the review note](reviews/t021-import-v2.md).
-No official runtime/oracle/build tool was run. SDK/resources/exclusions/facets/
+No official runtime/oracle/build tool was run. Resources/exclusions/facets/
 plugins/compiler/build metadata, path/symlink/platform parity, server wiring and
 semantic visibility remain pending. This finite child does not complete T021/#21.
 
+## SDK data import (#342 / #330 / #21)
+
+Only importer-v2 accepts the pinned `sdks` catalog and explicit
+`{"type":"sdk","name":"JDK","kind":"JavaSDK"}` / `{"type":"inheritedSdk"}`
+dependencies. The catalog uses the single canonical
+[`ktlsp_project::v2::Sdk`](../ktlsp-project/V2.md) representation exposed by
+`ImportedWorkspace::sdks()` as a borrowed view of the native projection:
+there is no second mirrored catalog. Catalog/edge/root order, two SDKs sharing a
+name with different kinds, required nullable version/homePath, roots null versus
+empty, and required opaque additionalData survive the complete result and native
+serialization/reload. Omitted roots become null, per the pinned default.
+
+SDK names/types and root types are nonempty; SDK strings reject NUL. Unknown
+SDK/root/edge fields refuse atomically, as do malformed nullable/string fields,
+unresolved `(name,kind)` references, duplicate identities/SDK edges, and inherited
+markers repeated within one module. Module, library and SDK namespaces are
+independent. No SDK is flattened into an ordinary library edge.
+Catalog count (8,192), total SDK roots (32,768), decoded SDK bytes (2 MiB), existing
+input node/depth/byte limits, projection and native output limits apply together.
+The existing path expansion budget still covers ordinary content/source/library
+paths; SDK homes are retained spelling, not base-expanded paths.
+
+Homes admit only null, absolute host-native strings or `<WORKSPACE>/` spellings;
+unsupported foreign paths/placeholders/URL homes refuse. SDK root URLs are
+validated URL envelopes, retained as URL strings, never host PathBuf values.
+No home expansion/normalization, root derivation, file/archive lookup, legacy
+jrt URL rewrite, first-SDK selection, effective/default/inherited SDK resolution,
+additionalData XML parsing, JDK execution or SDK-symbol consumer is implemented.
+Explicit and inherited edges can coexist; neither overrides the other here.
+Null/omitted roots mean unresolved roots, **not** a verified empty classpath.
+The pinned conversion performs filesystem/JDK-based root derivation and path
+handling that this native data-only contract intentionally does not claim.
+
 ## Next child
 
-Extend the native/import contract for module SDK identity/default inheritance, resource/excluded roots, facets/plugins, compiler/language/output settings, special library metadata, and build-system provenance. Then add original-schema fixtures for those translations and oracle comparisons. This subset does not implement full T021, Gradle/Maven/JPS import, dependency resolution or compiler semantics.
+Resolve SDK inheritance/path policy, resource/excluded roots, facets/plugins,
+compiler/language/output settings, special library metadata and build provenance
+in separately bounded contracts with original-schema fixtures and comparisons.
+This subset does not implement full T021, Gradle/Maven/JPS import, dependency
+resolution or compiler semantics.

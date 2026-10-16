@@ -8,8 +8,8 @@ pub use integrity::{ExpectedDigestOrigin, IntegrityError, VerifiedArtifact, veri
 
 mod zip_index;
 pub use zip_index::{
-    ZipDeflateError, ZipDirectoryEntry, ZipDirectoryIndex, ZipIndexError, ZipStoredError,
-    index_zip_directory,
+    JmodDirectoryIndex, JmodIndexError, ZipDeflateError, ZipDirectoryEntry, ZipDirectoryIndex,
+    ZipIndexError, ZipStoredError, index_jmod_directory, index_zip_directory,
 };
 
 use std::collections::HashSet;

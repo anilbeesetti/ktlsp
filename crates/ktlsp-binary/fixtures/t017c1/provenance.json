@@ -5,6 +5,17 @@
   "archive_fixture": "commons-lang3-3.17.0.jar.bin",
   "archive_retained": "2026-10-16; downloaded unchanged from origin above; SHA-256 matched archive_sha256; no Java or extraction required by archive consumer tests",
   "license": "Apache-2.0; bundled LICENSE.txt and NOTICE.txt unchanged",
+  "source_archive": {
+    "origin": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-lang3/3.17.0/commons-lang3-3.17.0-sources.jar",
+    "sha256": "5fdcac21ad329766054a95367d7583dfcdca737d221d5e01a5f2a198c04c6b18",
+    "fixture": "commons-lang3-3.17.0-sources.jar.bin",
+    "obtained": "2026-10-16; downloaded unchanged from canonical Maven primary origin as data only; no JVM/compiler executed",
+    "license": "Apache-2.0; META-INF/LICENSE.txt and META-INF/NOTICE.txt byte-identical to retained LICENSE.txt and NOTICE.txt",
+    "source_entry": "org/apache/commons/lang3/AppendableJoiner.java",
+    "source_entry_ordinal": 27,
+    "source_entry_bytes": 11798,
+    "source_entry_sha256": "bb5a9762fa8614c2a49e5ccb770f1378c60d5fdb7b8679039c85bdabe7f57315"
+  },
   "compiler": "Manifest Build-Jdk-Spec: 17; precise compiler version unknown; class major 52",
   "obtained": "2026-10-12; downloaded/extracted as data only; no JVM/compiler executed",
   "files": {

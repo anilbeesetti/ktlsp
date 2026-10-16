@@ -2,7 +2,7 @@ use ktlsp_artifacts::{
     ChecksumStatus, Coordinate, LookupError, MAX_ARTIFACT_BYTES, MAX_ROOTS, lookup,
 };
 use std::fs::{self, File};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 struct Cache(PathBuf);
@@ -178,16 +178,31 @@ fn missing_is_explicit_and_never_scans_neighbors() {
 fn duplicates_and_invalid_roots_are_rejected() {
     let cache = Cache::new();
     cache.put(&binary(), b"data");
+    // Windows canonicalization yields a verbatim prefix; PathBuf::join would
+    // normalize away `..` before lookup could validate this hostile input.
+    let mut traversal = cache.0.clone().into_os_string();
+    traversal.push(std::path::MAIN_SEPARATOR_STR);
+    traversal.push("..");
+    traversal.push(std::path::MAIN_SEPARATOR_STR);
+    traversal.push("escape");
+    let traversal = PathBuf::from(traversal);
+    assert!(
+        traversal
+            .components()
+            .any(|component| matches!(component, Component::ParentDir)),
+        "parent-traversal fixture was normalized before lookup: {traversal:?}"
+    );
     for roots in [
         vec![cache.0.clone(), cache.0.join(".")],
         vec![PathBuf::from("relative")],
-        vec![cache.0.join("../escape")],
+        vec![traversal],
         vec![cache.0.join("a".repeat(4096))],
     ] {
-        assert!(matches!(
-            lookup(&binary(), &roots),
-            Err(LookupError::InvalidRoot { .. })
-        ));
+        let result = lookup(&binary(), &roots);
+        assert!(
+            matches!(&result, Err(LookupError::InvalidRoot { .. })),
+            "roots={roots:?}: actual lookup result={result:?}"
+        );
     }
     assert!(matches!(
         lookup(&binary(), &vec![cache.0.clone(); MAX_ROOTS + 1]),

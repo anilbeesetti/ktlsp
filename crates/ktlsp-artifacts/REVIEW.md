@@ -91,3 +91,39 @@ Verification proves equality of retained bytes to a caller-provided digest only;
 digest authentication, coordinate binding, archive validity, filesystem sandboxing
 and future path contents remain unverified. No project/import/server integration
 or broad T020/full parity claim; parent #20 remains open.
+
+# Native Windows #329: hostile-root fixture preservation
+
+The original reviewed-source platform
+[run 38879411025 / Windows job 116902229633](https://github.com/anilbeesetti/ktlsp/actions/runs/38879411025/job/116902229633),
+attempt 1, reached release test execution after source admission, format and
+strict Clippy passed. Its `lookup` target reported seven passes and one failure:
+`duplicates_and_invalid_roots_are_rejected` at `tests/lookup.rs:187` did not
+receive `LookupError::InvalidRoot`. The old assertion printed neither the input
+case nor the actual result, so that original returned variant is unknown.
+The retained log `ktlsp-platform-116902229633.log` has SHA-256
+`2f03f9935557f68e3938a5c4402de6379cecf5b51eac8f4a5e6e11ba479ed956`.
+No unchanged retry was used to determine it.
+
+Source review identifies a hostile-input construction defect:
+`Cache::new` canonicalizes its temporary root, while the traversal case used
+`cache.0.join("../escape")`. Windows
+[`canonicalize`](https://doc.rust-lang.org/std/fs/fn.canonicalize.html#platform-specific-behavior)
+returns an extended-length path; Rust documents that
+[`PathBuf::push`](https://doc.rust-lang.org/std/path/struct.PathBuf.html#method.push)
+normalizes `.` and `..` when appending to a verbatim prefix. Thus a join can
+remove the very `ParentDir` this case intends to supply before lookup receives
+it. This source-level diagnosis does not invent the missing original result.
+
+The correction appends native separators and `..` through the raw `OsString`,
+then asserts that the supplied path still contains `Component::ParentDir`.
+Every invalid case still requires exactly `InvalidRoot`; failure diagnostics now
+retain the roots and actual result. Duplicate, relative and oversized cases,
+the root count/byte/component limits, canonical/symlink checks and the production
+lookup implementation are unchanged. The lockfile lookup wrappers already
+delegate to that same production validation and require no API/library change.
+
+Changed-source Windows execution remains pending ROOT's separately admitted
+original platform run. Local parser execution, an unchanged retry, push,
+dispatch, merge, warning suppression or acceptance of a different error variant
+is not supplied by this correction. Historical platform failures are preserved.

@@ -108,18 +108,6 @@ mod host {
         workflow_sha256: String,
         tools: Tools,
     }
-    #[derive(Deserialize, Serialize, Clone)]
-    #[serde(deny_unknown_fields, rename_all = "camelCase")]
-    struct OriginalRun {
-        repository: String,
-        event: String,
-        attempt: u8,
-        run_id: u64,
-        job_id: u64,
-        suite_id: u64,
-        source_head: String,
-        source_tree: String,
-    }
     #[derive(Deserialize, Serialize)]
     #[serde(deny_unknown_fields, rename_all = "camelCase")]
     struct Tools {
@@ -2959,8 +2947,9 @@ mod host {
     fn supervise(dir: &Path) -> Result<Value> {
         let a = admission(dir)?;
         root_authority(dir, &a)?;
+        bootstrap_receipt_gate(dir, &a)?;
         let mut e = Evidence::preflight();
-        e.limit = OBSERVER_BYTES - 131_072 - 16_384 - 8_192
+        e.limit = OBSERVER_BYTES - 131_072 - 16_384 - 16_384 - 8_192
             - if calibration_case(dir, &a)? == Some(CalibrationCase::WorkflowStepCancel) {131_072}else{0};
         let mut cg = String::new();
         let mut stamp = None;

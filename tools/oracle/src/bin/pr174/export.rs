@@ -1,13 +1,4 @@
-#[derive(Serialize)]
-#[serde(rename_all="camelCase")]
-struct ProtectedExportFile {path:String,bytes:u64,sha256:String}
-#[derive(Serialize)]
-#[serde(rename_all="camelCase")]
-struct ProtectedExportBinding {
-    schema_version:u8,scope:&'static str,run:OriginalRun,nonce:String,container_id:String,
-    boot_id:String,daemon_id:String,image:String,image_id:String,root_authorization_sha256:String,
-    calibration_sha256:String,workflow_sha256:String,files:Vec<ProtectedExportFile>,
-}
+use ktlsp_oracle_replay::authority::{ExportBinding as ProtectedExportBinding,ExportFile as ProtectedExportFile};
 fn export_copy(mut input:File,target:&Path,cap:u64,end:u64)->Result<(u64,String)> {
     let before=input.metadata().map_err(|e|e.to_string())?;
     if !before.is_file()||before.nlink()!=1||before.len()>cap{return Err("export input type/single-link/bounds".into());}
@@ -49,7 +40,7 @@ fn protected_export(dir:&Path)->Result<Value> {
         inventory.push(ProtectedExportFile{path,bytes,sha256});
     }
     inventory.sort_by(|a,b|a.path.cmp(&b.path));
-    let binding=ProtectedExportBinding{schema_version:1,scope:"PR174_PROTECTED_EXPORT",run:a.run,nonce:a.nonce,container_id:b.container_id,boot_id:a.boot_id,daemon_id:a.daemon_id,image:a.image,image_id:a.image_id,root_authorization_sha256:a.root_authorization_sha256,calibration_sha256:a.calibration_sha256,workflow_sha256:a.workflow_sha256,files:inventory};
+    let binding=ProtectedExportBinding{schema_version:1,scope:"PR174_PROTECTED_EXPORT".into(),run:a.run,nonce:a.nonce,container_id:b.container_id,boot_id:a.boot_id,daemon_id:a.daemon_id,image:a.image,image_id:a.image_id,root_authorization_sha256:a.root_authorization_sha256,calibration_sha256:a.calibration_sha256,workflow_sha256:a.workflow_sha256,files:inventory};
     let bytes=serde_json::to_vec(&binding).map_err(|e|e.to_string())?;
     if bytes.len()>INPUT_BYTES{return Err("protected export binding cap".into());}
     make_file(&output.join("export-binding.json"),&bytes,0o400)?;

@@ -182,7 +182,7 @@ pub fn from_json(manifest_path: impl AsRef<Path>, bytes: &[u8]) -> Result<Projec
         }
         .into());
     }
-    super::preflight(bytes)?;
+    super::preflight(bytes, true)?;
     let mut manifest: Manifest =
         serde_json::from_slice(bytes).map_err(super::ProjectError::Json)?;
     if manifest.schema_version != 2 {

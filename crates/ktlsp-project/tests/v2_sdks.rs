@@ -228,3 +228,19 @@ fn exact_sdk_and_shared_root_count_boundaries_admit_real_records() {
         }))
     ));
 }
+
+#[test]
+fn sdk_accounting_is_v2_only_and_v1_keeps_strict_unknown_schema_errors() {
+    for sdks in [
+        json!(vec![Value::Null; v2::MAX_SDKS + 1]),
+        json!([{"roots": vec![Value::Null; v2::MAX_SDK_ROOTS + 1]}]),
+    ] {
+        let bytes =
+            serde_json::to_vec(&json!({"schemaVersion":1,"modules":[],"sdks":sdks})).unwrap();
+        assert!(matches!(
+            ktlsp_project::from_json("v1.json", &bytes),
+            Err(ProjectError::Json(_))
+        ));
+    }
+    assert!(ktlsp_project::from_json("v1.json", br#"{"schemaVersion":1,"modules":[]}"#).is_ok());
+}

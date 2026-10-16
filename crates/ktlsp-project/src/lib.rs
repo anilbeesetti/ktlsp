@@ -251,7 +251,7 @@ pub fn from_json(
             limit: MAX_MANIFEST_BYTES,
         });
     }
-    preflight(bytes)?;
+    preflight(bytes, false)?;
     let mut manifest: Manifest = serde_json::from_slice(bytes).map_err(ProjectError::Json)?;
     if manifest.schema_version != 1 {
         return Err(ProjectError::UnsupportedSchemaVersion(
@@ -599,6 +599,7 @@ enum Context {
 
 #[derive(Default)]
 struct Counts {
+    sdk_model: bool,
     modules: usize,
     libraries: usize,
     dependencies: usize,
@@ -689,8 +690,8 @@ impl<'de> Visitor<'de> for Scan<'_> {
             let context = match (self.context, key.as_str()) {
                 (Context::Manifest, "modules") => Context::Modules,
                 (Context::Manifest, "libraries") => Context::Libraries,
-                (Context::Manifest, "sdks") => Context::Sdks,
-                (Context::Sdk, "roots") => Context::SdkRoots,
+                (Context::Manifest, "sdks") if self.counts.sdk_model => Context::Sdks,
+                (Context::Sdk, "roots") if self.counts.sdk_model => Context::SdkRoots,
                 (Context::Manifest, "sdkArchives") | (Context::Library, "binaries" | "sources") => {
                     Context::Archives
                 }
@@ -726,8 +727,11 @@ impl<'de> DeserializeSeed<'de> for CountedScan<'_> {
         .deserialize(deserializer)
     }
 }
-fn preflight(bytes: &[u8]) -> Result<(), ProjectError> {
-    let mut counts = Counts::default();
+fn preflight(bytes: &[u8], sdk_model: bool) -> Result<(), ProjectError> {
+    let mut counts = Counts {
+        sdk_model,
+        ..Counts::default()
+    };
     let mut deserializer = serde_json::Deserializer::from_slice(bytes);
     let result = Scan {
         counts: &mut counts,

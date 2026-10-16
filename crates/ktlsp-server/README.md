@@ -13,6 +13,42 @@ Install **both** `ktlsp` and `ktlsp-parser-worker` from that same build into the
 
 Without that sibling, synchronization/folding/lexical diagnostics and compatible lexical semantic tokens remain available, `documentSymbolProvider`/`definitionProvider`/`hoverProvider`/`referencesProvider`/`documentHighlightProvider` are omitted and their requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. A configured worker that subsequently fails is a request failure, not a fabricated outline or binding. No JVM/JDK, Kotlin compiler or C parser is required.
 
+## Optional extracted-archive smoke (#373)
+
+The existing manual experimental packaging workflow keeps the full unfiltered
+locked **release workspace tests first**, then checks the just-created TAR's outer
+SHA-256 before creating a fresh extraction directory. After extraction it verifies
+every inner checksum, exact file inventory, provenance, admitted source/tree,
+workflow bytes, lockfile and original run/attempt identities **before execution**.
+Only then does the separately identified ignored Rust integration test run:
+
+```sh
+KTLSP_EXTRACTED_PACKAGE_DIR=/absolute/verified/extracted/package \
+  cargo +1.99.0 test --locked --release -p ktlsp-server --test document_symbols \
+  extracted_archive_smoke -- --ignored --exact --nocapture
+```
+
+An absent/invalid directory fails this explicit invocation; it is never a
+success-shaped skip. Default native tests do not require an archive or JDK and
+do **not** exercise this ignored test. The smoke runs the actual extracted server
+`--help`, `--version` and matching sibling-worker stdio with empty PATH and
+JAVA_HOME/JDK_HOME removed. It reuses the ordinary-parameter/local-shadow fixture,
+original string/u64 request IDs, CRLF/non-BMP UTF-16 ranges, definition/hover,
+references/highlights and full empty pull diagnostics without duplicate pushes.
+All processes must exit successfully with empty stderr. The borrowing exchange
+helper never deletes the extraction directory; only exclusively created `Package`
+test directories have deletion ownership, and retained extraction is asserted.
+
+The permanent bounded decoded wire/CLI/provenance receipt is
+`extracted-smoke.json` in the **separate evidence ZIP**, alongside verification
+facts, complete inner checksums and the captured optional-test log. It is not
+inserted into its own TAR. Failure evidence remains always-uploaded; the package
+is uploaded only after the extracted smoke succeeds. Source and compile checks
+are not runtime proof: this optional test has not yet been exercised by #373.
+Its manual dispatch requires a new separate ROOT admission after reviewed source
+is merged and exact-main verified. #96, #46, the first-party-license hold and
+official/full-parity release gates remain open.
+
 ## Folding and diagnostics
 
 Folding recognizes matched multiline `{}`, `()`, `[]`, block-comment tokens, raw-string tokens and groups of consecutive whole-line `//` comments. Comment groups need at least two adjacent physical lines with only space/tab/form-feed indentation before `//`; blank lines, code, inline comments and opaque tokens separate groups. Their ranges start at the first slash and end after the last comment's content, including trailing spaces but excluding its terminator. LF, CRLF, lone CR and EOF are supported. Strings/templates, characters, backtick identifiers and comments remain opaque to delimiter matching. The complete opaque raw-string/comment token may fold; nested template expressions/comment interiors do not create outer-file folds. Single-line ranges are omitted. Unterminated multiline comments/raw strings can fold to their token end while their lexical diagnostic remains visible. Imports, declarations and semantic structure are outside this declared subset.
@@ -75,6 +111,12 @@ composition remain separately ROOT-admitted; full official parity remains open.
 ## Finite local definition and declaration hover
 
 Over open Kotlin documents, a strict UTF-16 position selects an actual original value `REFERENCE_EXPRESSION` containing that position (end-exclusive). The existing declaration lowerer, structural-region directory, authenticated `ReferenceSite` and `bind_local_value` prove a unique eligible preceding direct immutable local `val` or same-function ordinary parameter. Only ordinary named top-level block functions with complete plain integer/whole-identifier local initializers and simple syntax-only parameter/local annotations are eligible. Definition returns the original target **name** range and same URI. Hover returns the original target **declaration text** (`p: T` for a parameter) and original reference range: no invented types, initializer chasing or inferred global unresolvedness.
+
+Hover also accepts the unique original half-open **name-token** range of a complete lowered `CLASS`, `FUN`, `PROPERTY` or ordinary `VALUE_PARAMETER`, returning that declaration's exact original source and its name range through the same negotiated renderer. Same-spelled declarations at different positions remain distinct, including parameter/local shadows; no binder or inferred type identity is needed for a declaration's own name. Definition on those names remains null. Keywords, whitespace, braces, name ends and EOF remain null; incomplete selected declarations and unsupported whole-tree lowering fail explicitly, without syntactic-symbol fallback. Unsupported reference lookup never falls back to an enclosing declaration. This is declaration-source hover, not KDoc, type resolution or full official hover parity.
+
+At first changed-diagnostic union source `2c940228bb4af10f76020503ce007dbd1cfa8b44`, [original platform run38907884039](https://github.com/anilbeesetti/ktlsp/actions/runs/38907884039), attempt 1, passed pinned format, strict locked Clippy and full release workspace tests on macOS/job116995986538 (**992 standard/doctest passes**) and Windows/job116995986522 (**939 passes**), each with zero failures, three ignored tests and 22 separately reported worker protocol fault cases. Actual checkout `0d1c4c35e5351a738e95d39ea209d4359acb2dc1` has ordered parents `[594cc51cb4f1994b5e4e896e3a3c171b0ff3bcf4,2c940228bb4af10f76020503ce007dbd1cfa8b44]` and tree `9ac8b5af275e357ba81153bb633651cc4b078823`. ROOT and the hover owner independently authenticated original API/checkout identities and directly read all six captured default/Markdown/plaintext paired-CLI payloads. Both hosts returned seven exact original IDs once each, including integer `18446744073709551615`, with no unsolicited pushes. Declaration-name ranges were class `1:6..1:10`, property `4:3..4:11`, function `5:4..5:8`, parameter `5:9..5:17` and local shadow `6:5..6:13`; contents preserved original CRLF/non-BMP source and the class's bound leading comment. Markdown preference skipped the unknown format and fenced the hostile four-backtick property comment with five backticks; plaintext-first and absent-format profiles returned plaintext.
+
+Only the observed temporary capture writer was removed afterward; all behavioral assertions and production logic remain. This receipt describes that first union source, not execution of the cleanup head or main, an extracted release archive, official parity or a fix for #377. The earlier #377 failures were not reproduced or explained by the changed diagnostic. No local parser/server runtime was run under #96; final cleanup/integration reviews and CI remain separate.
 
 Non-reference positions can return null. Unsupported contexts/names, queried-name duplicates, self/forward references without an eligible parameter fallback, and no eligible target return RequestFailed (`-32803`), not a claim that a symbol is globally unresolved. Malformed/out-of-range/surrogate-interior positions or unopened documents return InvalidParams (`-32602`). No imports, cross-file/project/member/full Kotlin resolution, type inference, full navigation or official parity is claimed.
 

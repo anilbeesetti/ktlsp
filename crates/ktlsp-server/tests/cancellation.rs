@@ -45,6 +45,7 @@ fn change(version: i32, token: &str) -> Value {
         json!({"textDocument":{"uri":URI,"version":version},"contentChanges":[{"text":format!("// hold:{token}\nclass C")}]}),
     )
 }
+#[track_caller]
 fn error(response: &Value, id: Value, code: i32) {
     assert_eq!(response["id"], id, "{response}");
     assert_eq!(response["error"]["code"], code, "{response}");

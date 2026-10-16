@@ -382,6 +382,170 @@ fn value_candidates<'a>(
     Ok((local, parameter))
 }
 
+/// Original visible declarations at one authenticated whole-initializer reference.
+/// This is a snapshot-local value subset, not a completion or general scope API.
+#[derive(Debug)]
+pub struct VisibleLocalValues<'a> {
+    directory: &'a RegionDirectory<'a>,
+    site: ReferenceSite<'a>,
+    body: &'a Region<'a>,
+    values: Vec<&'a Declaration<'a>>,
+}
+impl<'a> VisibleLocalValues<'a> {
+    pub fn directory(&self) -> &'a RegionDirectory<'a> {
+        self.directory
+    }
+    pub fn site(&self) -> &ReferenceSite<'a> {
+        &self.site
+    }
+    pub fn body(&self) -> &'a Region<'a> {
+        self.body
+    }
+    /// Surviving original declarations in declaration preorder.
+    pub fn values(&self) -> &[&'a Declaration<'a>] {
+        &self.values
+    }
+}
+
+/// Enumerate values without requiring the query spelling to bind successfully.
+/// Any ambiguity, unsupported context, stale snapshot or exhausted budget refuses
+/// the entire result. Recheck the authoritative open document before publication.
+pub fn visible_local_values<'a>(
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    reference_expression_cst_index: usize,
+    current: &SourceSnapshot,
+) -> Result<VisibleLocalValues<'a>> {
+    visible_with_budget(
+        directory,
+        result,
+        reference_expression_cst_index,
+        current,
+        &mut ReferenceBudget::default(),
+    )
+}
+
+const MAX_VISIBLE_VALUES: usize = 1_024;
+const VISIBLE_VALUE_BYTES: usize = 131_072;
+
+fn visible_storage(count: usize) -> Result<()> {
+    if count > MAX_VISIBLE_VALUES
+        || count
+            .checked_mul(std::mem::size_of::<&Declaration<'_>>())
+            .ok_or(LocalBindingError::Resource)?
+            > VISIBLE_VALUE_BYTES
+    {
+        return Err(LocalBindingError::Resource);
+    }
+    Ok(())
+}
+
+fn visible_winner(
+    directory: &RegionDirectory<'_>,
+    site: &ReferenceSite<'_>,
+    body_ordinal: usize,
+    ordinal: usize,
+    b: &mut ReferenceBudget,
+) -> Result<bool> {
+    b.charge(3)?;
+    let declaration = &directory.lowered().declarations()[ordinal];
+    let parameter = b.equal(declaration.kind(), "VALUE_PARAMETER")?;
+    if parameter {
+        let owner = declaration
+            .owner()
+            .and_then(|owner| directory.lowered().declarations().get(owner))
+            .ok_or(LocalBindingError::InvalidOrigin)?;
+        if !std::ptr::eq(owner, site.function()) {
+            return Ok(false);
+        }
+    } else {
+        let membership = directory
+            .memberships()
+            .get(ordinal)
+            .ok_or(LocalBindingError::InvalidOrigin)?;
+        if membership.region() != body_ordinal
+            || declaration.cst_index() >= site.containing_property().cst_index()
+            || declaration.range().end > site.range().start
+        {
+            return Ok(false);
+        }
+    }
+    let spelling = b
+        .spelling(declaration.raw_name())?
+        .ok_or(LocalBindingError::UnsupportedSpelling)?;
+    let (local, parameter) = value_candidates(
+        directory,
+        body_ordinal,
+        site.body_index(),
+        site.function(),
+        spelling,
+        b,
+    )?;
+    b.charge(3)?;
+    let winner = local
+        .filter(|local| {
+            local.cst_index() < site.containing_property().cst_index()
+                && local.range().end <= site.range().start
+        })
+        .or(parameter);
+    Ok(winner.is_some_and(|winner| std::ptr::eq(winner, declaration)))
+}
+
+pub(super) fn visible_with_budget<'a>(
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    index: usize,
+    current: &SourceSnapshot,
+    b: &mut ReferenceBudget,
+) -> Result<VisibleLocalValues<'a>> {
+    if !std::ptr::eq(directory.snapshot(), directory.lowered().snapshot()) {
+        return Err(LocalBindingError::InvalidOrigin);
+    }
+    let site = reference_site_with_budget(directory.lowered(), result, current, index, b)?;
+    // Authenticate query spelling independently of any declaration-name match.
+    b.spelling(site.raw_spelling())?
+        .ok_or(LocalBindingError::UnsupportedSpelling)?;
+    let parsed = site.tree(current, b)?;
+    BodyCheck {
+        parsed,
+        cursor: 0,
+        b,
+    }
+    .function(site.function(), site.body_index())?;
+    let (body_ordinal, body) = find_body(directory, site.body_index(), b)?;
+
+    // ponytail: borrowed quadratic candidate scans share the 2,097,152-work
+    // ceiling; add a validated-body index only if larger bodies are needed.
+    let mut count = 0usize;
+    for ordinal in 0..directory.lowered().declarations().len() {
+        if visible_winner(directory, &site, body_ordinal, ordinal, b)? {
+            count = count.checked_add(1).ok_or(LocalBindingError::Resource)?;
+        }
+    }
+    visible_storage(count)?;
+    b.charge(count)?;
+    let mut values = Vec::new();
+    values
+        .try_reserve_exact(count)
+        .map_err(|_| LocalBindingError::Resource)?;
+    visible_storage(values.capacity())?;
+    for ordinal in 0..directory.lowered().declarations().len() {
+        if visible_winner(directory, &site, body_ordinal, ordinal, b)? {
+            b.charge(1)?;
+            if values.len() >= count {
+                return Err(LocalBindingError::Resource);
+            }
+            values.push(&directory.lowered().declarations()[ordinal]);
+        }
+    }
+    Ok(VisibleLocalValues {
+        directory,
+        site,
+        body,
+        values,
+    })
+}
+
 /// Select one original declaration or authenticate an initializer-reference CST node.
 /// Reference selection and occurrence collection share the same semantic budget.
 #[derive(Debug, Clone, Copy)]
@@ -622,5 +786,23 @@ mod occurrence_storage_tests {
             occurrence_storage(usize::MAX),
             Err(LocalBindingError::Resource)
         );
+    }
+}
+
+#[cfg(test)]
+mod visible_storage_tests {
+    use super::*;
+
+    #[test]
+    fn visible_storage_checks_count_capacity_and_arithmetic_before_allocation() {
+        visible_storage(0).unwrap();
+        visible_storage(MAX_VISIBLE_VALUES).unwrap();
+        for count in [
+            MAX_VISIBLE_VALUES + 1,
+            VISIBLE_VALUE_BYTES / std::mem::size_of::<&Declaration<'_>>() + 1,
+            usize::MAX,
+        ] {
+            assert_eq!(visible_storage(count), Err(LocalBindingError::Resource));
+        }
     }
 }

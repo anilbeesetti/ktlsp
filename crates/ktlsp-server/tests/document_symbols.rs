@@ -1538,6 +1538,26 @@ fn local_val_rename_prepares_applies_and_rebinds_over_real_paired_stdio() {
         rebound[2]["result"],
         json!({"uri":URI,"range":references_range(&edited,declaration,5)})
     );
+    // Temporary #379 hosted observation; remove after ROOT authenticates the run.
+    // Fixed storage bounds serialization/output and bypasses libtest capture.
+    let mut observation = std::io::Cursor::new([0u8; 64 * 1024]);
+    serde_json::to_writer(
+        &mut observation,
+        &json!({
+            "observation": "issue379-local-rename-actual-wire",
+            "originalSource": source,
+            "requests": &messages,
+            "replies": &replies,
+            "appliedSource": &edited,
+            "followupRequests": &replay,
+            "followupReplies": &rebound
+        }),
+    )
+    .unwrap();
+    observation.write_all(b"\n").unwrap();
+    std::io::stderr()
+        .write_all(&observation.get_ref()[..observation.position() as usize])
+        .unwrap();
 }
 
 #[test]

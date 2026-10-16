@@ -231,6 +231,23 @@ overflow spellings all the way to the integer query: an upstream refusal fails
 the test rather than substituting decoder-only evidence. Hosted execution
 evidence must be recorded separately from source.
 
+ROOT composed #346/PR348 source `e9f8aeec5396c6f76a4c76ab8b5f74ea78dfd337`
+and #347/PR349 source `749ed9854f7b16ab8b2975234d1c58bff378743b` on verified
+incoming main `bb6a75f61fd467c9b090210a369c7e1d225713d5`.
+[Original package/import CI38866350684/job116859972463](https://github.com/anilbeesetti/ktlsp/actions/runs/38866350684/job/116859972463)
+passed 896 workspace tests; its actual LF/CRLF production consumer retained
+authenticated reference/binding origin. The earlier malformed-header assertion
+failure was fixed in the shared lowerer, not relaxed: recovered error-bearing
+header tails now refuse the whole projection.
+[Original integer CI38865103037/job116855978067](https://github.com/anilbeesetti/ktlsp/actions/runs/38865103037/job/116855978067)
+passed 895 workspace tests. ROOT authenticated thirteen direct production
+observations across Int/Long/UInt/ULong boundaries and spelling variants,
+retaining original binding/literal/source associations; strict negative cases
+also reached the actual producer. Only the temporary stderr proof writers were
+removed after those observations; permanent behavioral assertions remain.
+Those are source-component receipts, not final aggregate CI or merge evidence.
+No local parser runtime ran; #96 and full semantic parity remain open.
+
 At #333 source head `a22b54619f6996e03cceee56362453a9b846d574`,
 [original attempt-1 Linux CI38857165917/job116831130221](https://github.com/anilbeesetti/ktlsp/actions/runs/38857165917/job/116831130221)
 passed pinned format, locked workspace Clippy and all 890 workspace tests.

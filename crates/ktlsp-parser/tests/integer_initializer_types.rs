@@ -110,18 +110,6 @@ fn native_integer_targets_preserve_literal_identity_and_default_types() {
             bind_local_value(&independent_regions, &site, &snapshot).unwrap_err(),
             ktlsp_parser::local_value_binding::LocalBindingError::InvalidOrigin
         );
-        // Temporary direct-Write observation for ROOT's original hosted proof.
-        std::io::Write::write_all(
-            &mut std::io::stderr().lock(),
-            format!(
-                "INTEGER_INITIALIZER_PROOF raw={raw:?} value={} type={:?} target={}..{} literal={}..{} site={}..{} original_binding=true original_literal=true original_source=true\n",
-                inferred.value(), inferred.default_type(), binding.target().range().start,
-                binding.target().range().end, inferred.range().start, inferred.range().end,
-                site.range().start, site.range().end
-            )
-            .as_bytes(),
-        )
-        .unwrap();
     }
 }
 

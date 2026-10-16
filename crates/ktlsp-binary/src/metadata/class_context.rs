@@ -41,7 +41,10 @@ pub struct Error {
 }
 impl From<wire::Error> for Error {
     fn from(error: wire::Error) -> Self {
-        Self { offset: error.offset, kind: ErrorKind::Wire(error.kind) }
+        Self {
+            offset: error.offset,
+            kind: ErrorKind::Wire(error.kind),
+        }
     }
 }
 impl std::fmt::Display for Error {
@@ -70,9 +73,14 @@ pub(super) fn admit(metadata: &Outcome<'_>, limits: Limits) -> Result<string_tab
         return Err(failure(0, ErrorKind::UnsupportedContainer));
     }
     if header.d2.len() > limits.entries.min(MAX_RECORDS) {
-        return Err(name_error(0, name_resolver::Error {
-            kind: name_resolver::ErrorKind::Limit("entries"), index: None, record: None,
-        }));
+        return Err(name_error(
+            0,
+            name_resolver::Error {
+                kind: name_resolver::ErrorKind::Limit("entries"),
+                index: None,
+                record: None,
+            },
+        ));
     }
     let byte_error = failure(0, ErrorKind::Wire(wire::ErrorKind::Limit("bytes")));
     let mut input_bytes = bytes.len();
@@ -80,15 +88,22 @@ pub(super) fn admit(metadata: &Outcome<'_>, limits: Limits) -> Result<string_tab
         return Err(byte_error);
     }
     for text in &header.d2 {
-        input_bytes = text.len().checked_mul(2)
-            .and_then(|n| input_bytes.checked_add(n)).ok_or(byte_error)?;
+        input_bytes = text
+            .len()
+            .checked_mul(2)
+            .and_then(|n| input_bytes.checked_add(n))
+            .ok_or(byte_error)?;
         if input_bytes > limits.bytes.min(MAX_BYTES) {
             return Err(byte_error);
         }
     }
     Ok(string_table::Budget::new(string_table::Limits {
-        bytes: limits.bytes, records: limits.records, nodes: limits.nodes,
-        depth: limits.depth, work: limits.work, owned_bytes: limits.owned_bytes,
+        bytes: limits.bytes,
+        records: limits.records,
+        nodes: limits.nodes,
+        depth: limits.depth,
+        work: limits.work,
+        owned_bytes: limits.owned_bytes,
     }))
 }
 
@@ -99,12 +114,19 @@ pub(super) fn resolver<'a, 'b>(
     budget: &mut string_table::Budget,
 ) -> Result<name_resolver::Resolver<'a, 'b>, Error> {
     name_resolver::Resolver::new_with_budget(
-        &framed.string_table, d2,
+        &framed.string_table,
+        d2,
         name_resolver::Limits {
-            entries: limits.entries, input_bytes: limits.bytes, range_slots: limits.range_slots,
-            queries: limits.queries, work: limits.work, output_units: limits.output_units,
-        }, budget,
-    ).map_err(|e| name_error(framed.string_table_span.start, e))
+            entries: limits.entries,
+            input_bytes: limits.bytes,
+            range_slots: limits.range_slots,
+            queries: limits.queries,
+            work: limits.work,
+            output_units: limits.output_units,
+        },
+        budget,
+    )
+    .map_err(|e| name_error(framed.string_table_span.start, e))
 }
 
 pub(super) fn decode_with_budget<'a>(
@@ -117,10 +139,11 @@ pub(super) fn decode_with_budget<'a>(
     budget.node(1, start)?;
     let class = class_header::decode_with_budget(&bytes[span.clone()], &mut budget.wire)
         .map_err(|e| failure(start + e.offset, ErrorKind::Class(e.kind)))?;
-    let class_id = class_id::resolve(class.fq_name, start, resolver, budget).map_err(|e| match e {
-        class_id::Error::Wire(e) => Error::from(e),
-        class_id::Error::Name(e) => name_error(start, e),
-    })?;
+    let class_id =
+        class_id::resolve(class.fq_name, start, resolver, budget).map_err(|e| match e {
+            class_id::Error::Wire(e) => Error::from(e),
+            class_id::Error::Name(e) => name_error(start, e),
+        })?;
     let mut parameters: Vec<Parameter<'a>> = Vec::new();
     let mut pos = start;
     // Read ALL declarations and finish Class framing before selecting any consumer.
@@ -133,15 +156,20 @@ pub(super) fn decode_with_budget<'a>(
             (5, wire::Value::Bytes(body)) => {
                 let body_span = field.span.end - body.len()..field.span.end;
                 budget.node(2, body_span.start)?;
-                let parameter = type_parameter::decode_with_budget(body, budget)
-                    .map_err(|e| failure(body_span.start + e.offset, ErrorKind::TypeParameter(e.kind)))?;
+                let parameter = type_parameter::decode_with_budget(body, budget).map_err(|e| {
+                    failure(body_span.start + e.offset, ErrorKind::TypeParameter(e.kind))
+                })?;
                 let mut child_pos = 0;
                 while child_pos < body.len() {
                     let child = wire::field(body, &mut child_pos, body.len(), &mut budget.wire)
-                        .map_err(|e| failure(body_span.start + e.offset, ErrorKind::Wire(e.kind)))?;
+                        .map_err(|e| {
+                            failure(body_span.start + e.offset, ErrorKind::Wire(e.kind))
+                        })?;
                     let child_offset = body_span.start + child.span.start;
                     budget.wire.work(1, child_offset)?;
-                    if matches!(child.number, 1 | 2) && !matches!(child.value, wire::Value::Varint(_)) {
+                    if matches!(child.number, 1 | 2)
+                        && !matches!(child.value, wire::Value::Varint(_))
+                    {
                         return Err(failure(child_offset, ErrorKind::UnsupportedParameter));
                     }
                 }
@@ -152,13 +180,29 @@ pub(super) fn decode_with_budget<'a>(
                         return Err(failure(body_span.start, ErrorKind::DuplicateParameterId));
                     }
                 }
-                let name = resolver.get_string_with_budget(parameter.name, budget)
+                let name = resolver
+                    .get_string_with_budget(parameter.name, budget)
                     .map_err(|e| name_error(body_span.start, e))?;
-                budget.push(&mut parameters, Parameter { body_span, parameter, name }, offset)?;
+                budget.push(
+                    &mut parameters,
+                    Parameter {
+                        body_span,
+                        parameter,
+                        name,
+                    },
+                    offset,
+                )?;
             }
             (1 | 3 | 5 | 10, _) => return Err(failure(offset, ErrorKind::UnsupportedClass)),
             _ => {}
         }
     }
-    Ok(Context { owner: Owner { header: class, body_span: span, class_id }, parameters })
+    Ok(Context {
+        owner: Owner {
+            header: class,
+            body_span: span,
+            class_id,
+        },
+        parameters,
+    })
 }

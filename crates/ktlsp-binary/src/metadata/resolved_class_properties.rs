@@ -1,7 +1,9 @@
 //! Finite Class-owned parameter-ID property returns, not substitution or inference.
 use super::{
-    Outcome, class_context::{self, Owner, Parameter}, class_header, name_resolver, payload,
-    property_header, string_table, type_header, type_parameter, wire,
+    Outcome,
+    class_context::{self, Owner, Parameter},
+    class_header, name_resolver, payload, property_header, string_table, type_header,
+    type_parameter, wire,
 };
 use std::ops::Range;
 
@@ -211,12 +213,17 @@ fn property<'a>(
 /// One monotonic schema/wire/resolver/output budget covers this entire operation.
 pub fn decode<'a>(metadata: &'a Outcome<'_>, limits: Limits) -> Result<ClassProperties<'a>, Error> {
     let mut budget = class_context::admit(metadata, limits)?;
-    let Outcome::Decoded { header, bytes } = metadata else { unreachable!() };
+    let Outcome::Decoded { header, bytes } = metadata else {
+        unreachable!()
+    };
     let framed = payload::decode_with_budget(bytes, &mut budget)?;
     let start = framed.payload_span.start;
     let mut resolver = class_context::resolver(&framed, &header.d2, limits, &mut budget)?;
     let class_context::Context { owner, parameters } = class_context::decode_with_budget(
-        bytes, framed.payload_span.clone(), &mut resolver, &mut budget,
+        bytes,
+        framed.payload_span.clone(),
+        &mut resolver,
+        &mut budget,
     )?;
     let mut properties = Vec::new();
     let mut pos = start;

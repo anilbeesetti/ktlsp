@@ -1,7 +1,9 @@
 //! One original Class Function's self-applied, parameter-ID-only return.
 use super::{
-    Outcome, class_context::{self, Owner, Parameter}, class_id, function_header, name_resolver,
-    payload, string_table, type_argument, type_arguments, type_header, wire,
+    Outcome,
+    class_context::{self, Owner, Parameter},
+    class_id, function_header, name_resolver, payload, string_table, type_argument, type_arguments,
+    type_header, wire,
 };
 use std::ops::Range;
 
@@ -72,17 +74,28 @@ impl std::fmt::Display for Error {
 }
 impl std::error::Error for Error {}
 impl From<wire::Error> for Error {
-    fn from(e: wire::Error) -> Self { failure(e.offset, ErrorKind::Wire(e.kind)) }
+    fn from(e: wire::Error) -> Self {
+        failure(e.offset, ErrorKind::Wire(e.kind))
+    }
 }
 impl From<class_context::Error> for Error {
-    fn from(e: class_context::Error) -> Self { failure(e.offset, ErrorKind::Context(e.kind)) }
+    fn from(e: class_context::Error) -> Self {
+        failure(e.offset, ErrorKind::Context(e.kind))
+    }
 }
-fn failure(offset: usize, kind: ErrorKind) -> Error { Error { offset, kind } }
+fn failure(offset: usize, kind: ErrorKind) -> Error {
+    Error { offset, kind }
+}
 fn wire_error(start: usize, e: wire::Error) -> Error {
     failure(start + e.offset, ErrorKind::Wire(e.kind))
 }
 
-fn type_shape(bytes: &[u8], start: usize, nominal: bool, budget: &mut string_table::Budget) -> Result<(), Error> {
+fn type_shape(
+    bytes: &[u8],
+    start: usize,
+    nominal: bool,
+    budget: &mut string_table::Budget,
+) -> Result<(), Error> {
     let mut pos = 0;
     while pos < bytes.len() {
         let field = wire::field(bytes, &mut pos, bytes.len(), &mut budget.wire)
@@ -102,17 +115,23 @@ fn type_shape(bytes: &[u8], start: usize, nominal: bool, budget: &mut string_tab
 }
 
 fn applied_return<'a>(
-    bytes: &'a [u8], start: usize, context: &class_context::Context<'_>,
-    resolver: &mut name_resolver::Resolver<'_, '_>, budget: &mut string_table::Budget,
+    bytes: &'a [u8],
+    start: usize,
+    context: &class_context::Context<'_>,
+    resolver: &mut name_resolver::Resolver<'_, '_>,
+    budget: &mut string_table::Budget,
 ) -> Result<ReturnType<'a>, Error> {
     // Fixed flat selected slices retain depth <=2, NOT a recursive Class->Function->Type tree.
-    let staged = type_arguments::decode_with_budget(bytes, budget)
-        .map_err(|e| wire_error(start, e))?;
+    let staged =
+        type_arguments::decode_with_budget(bytes, budget).map_err(|e| wire_error(start, e))?;
     type_shape(bytes, start, true, budget)?;
     if staged.header.flags.unwrap_or(0) != 0 {
         return Err(failure(start, ErrorKind::UnsupportedType));
     }
-    let index = staged.header.class_name.ok_or(failure(start, ErrorKind::UnsupportedType))?;
+    let index = staged
+        .header
+        .class_name
+        .ok_or(failure(start, ErrorKind::UnsupportedType))?;
     budget.wire.work(1, start)?;
     if index != context.owner.header.fq_name {
         let target = class_id::resolve(index, start, resolver, budget).map_err(|e| match e {
@@ -120,7 +139,10 @@ fn applied_return<'a>(
             class_id::Error::Name(e) => failure(start, ErrorKind::Name(e)),
         })?;
         let owner = &context.owner.class_id;
-        budget.wire.work(owner.package_name().len() + owner.relative_class_name().len() + 1, start)?;
+        budget.wire.work(
+            owner.package_name().len() + owner.relative_class_name().len() + 1,
+            start,
+        )?;
         if target != *owner {
             return Err(failure(start, ErrorKind::WrongReturnClass));
         }
@@ -147,14 +169,23 @@ fn applied_return<'a>(
                 _ => {}
             }
         }
-        if !matches!(argument.projection, None | Some(type_argument::Projection::Inv)) {
+        if !matches!(
+            argument.projection,
+            None | Some(type_argument::Projection::Inv)
+        ) {
             return Err(failure(argument_start, ErrorKind::UnsupportedProjection));
         }
         if argument.inline_types.len() > 1 {
             return Err(failure(argument_start, ErrorKind::DuplicateInlineRole));
         }
-        let inline = argument.inline_types.first().ok_or(failure(argument_start,
-            if argument.type_id.is_some() { ErrorKind::UnsupportedTableRole } else { ErrorKind::MissingRole }))?;
+        let inline = argument.inline_types.first().ok_or(failure(
+            argument_start,
+            if argument.type_id.is_some() {
+                ErrorKind::UnsupportedTableRole
+            } else {
+                ErrorKind::MissingRole
+            },
+        ))?;
         let leaf_start = argument_start + inline.span.start;
         budget.node(2, leaf_start)?;
         let header = type_header::decode_with_budget(inline.raw, &mut budget.wire)
@@ -163,21 +194,38 @@ fn applied_return<'a>(
         if header.flags.unwrap_or(0) != 0 {
             return Err(failure(leaf_start, ErrorKind::UnsupportedType));
         }
-        let id = header.type_parameter.ok_or(failure(leaf_start, ErrorKind::UnsupportedType))?;
+        let id = header
+            .type_parameter
+            .ok_or(failure(leaf_start, ErrorKind::UnsupportedType))?;
         let mut ordinal = None;
         // ponytail: bounded linear ID lookup; no secondary owning index.
         for (index, parameter) in context.parameters.iter().enumerate() {
             budget.wire.work(1, leaf_start)?;
-            if parameter.parameter.id == id { ordinal = Some(index); break; }
+            if parameter.parameter.id == id {
+                ordinal = Some(index);
+                break;
+            }
         }
-        let parameter_ordinal = ordinal.ok_or(failure(leaf_start, ErrorKind::UnknownParameterId))?;
+        let parameter_ordinal =
+            ordinal.ok_or(failure(leaf_start, ErrorKind::UnknownParameterId))?;
         let type_span = leaf_start..leaf_start + inline.raw.len();
-        budget.push(&mut arguments, Argument {
-            body_span: argument_start..argument_start + argument.raw.len(),
-            raw: argument, header, type_span, parameter_ordinal,
-        }, argument_start)?;
+        budget.push(
+            &mut arguments,
+            Argument {
+                body_span: argument_start..argument_start + argument.raw.len(),
+                raw: argument,
+                header,
+                type_span,
+                parameter_ordinal,
+            },
+            argument_start,
+        )?;
     }
-    Ok(ReturnType { header: staged.header, body_span: start..start + bytes.len(), arguments })
+    Ok(ReturnType {
+        header: staged.header,
+        body_span: start..start + bytes.len(),
+        arguments,
+    })
 }
 
 /// Select an original field9/wire2 by ALL-Class-field ordinal from the SAME Outcome.
@@ -187,12 +235,23 @@ fn applied_return<'a>(
 /// encoded MARKING, never effective bound-derived nullability. Other Functions and
 /// receiver/value/context/contract/JVM bodies stay bounded opaque signature data.
 /// One monotonic combined d1+d2/schema/wire/name/output budget covers the operation.
-pub fn decode<'a>(metadata: &'a Outcome<'_>, ordinal: usize, limits: Limits) -> Result<SelectedReturn<'a>, Error> {
+pub fn decode<'a>(
+    metadata: &'a Outcome<'_>,
+    ordinal: usize,
+    limits: Limits,
+) -> Result<SelectedReturn<'a>, Error> {
     let mut budget = class_context::admit(metadata, limits)?;
-    let Outcome::Decoded { header, bytes } = metadata else { unreachable!() };
+    let Outcome::Decoded { header, bytes } = metadata else {
+        unreachable!()
+    };
     let framed = payload::decode_with_budget(bytes, &mut budget)?;
     let mut resolver = class_context::resolver(&framed, &header.d2, limits, &mut budget)?;
-    let context = class_context::decode_with_budget(bytes, framed.payload_span.clone(), &mut resolver, &mut budget)?;
+    let context = class_context::decode_with_budget(
+        bytes,
+        framed.payload_span.clone(),
+        &mut resolver,
+        &mut budget,
+    )?;
     let mut selected = None;
     let mut pos = framed.payload_span.start;
     let mut current = 0;
@@ -216,13 +275,16 @@ pub fn decode<'a>(metadata: &'a Outcome<'_>, ordinal: usize, limits: Limits) -> 
     let mut inline = None;
     let mut table = false;
     while pos < body.len() {
-        let field = wire::field(body, &mut pos, body.len(), &mut budget.wire).map_err(|e| wire_error(start, e))?;
+        let field = wire::field(body, &mut pos, body.len(), &mut budget.wire)
+            .map_err(|e| wire_error(start, e))?;
         let offset = start + field.span.start;
         budget.wire.work(1, offset)?;
         match (field.number, field.value) {
             (1 | 2 | 9, wire::Value::Varint(_)) => {}
             (3, wire::Value::Bytes(raw)) => {
-                if inline.is_some() { return Err(failure(offset, ErrorKind::DuplicateInlineRole)); }
+                if inline.is_some() {
+                    return Err(failure(offset, ErrorKind::DuplicateInlineRole));
+                }
                 inline = Some((raw, start + field.span.end - raw.len()));
             }
             (7, wire::Value::Varint(_)) => table = true,
@@ -231,13 +293,28 @@ pub fn decode<'a>(metadata: &'a Outcome<'_>, ordinal: usize, limits: Limits) -> 
             _ => {}
         }
     }
-    let (raw, return_start) = inline.ok_or(failure(start,
-        if table { ErrorKind::UnsupportedTableRole } else { ErrorKind::MissingRole }))?;
-    let name = resolver.get_string_with_budget(function_header.name, &mut budget)
+    let (raw, return_start) = inline.ok_or(failure(
+        start,
+        if table {
+            ErrorKind::UnsupportedTableRole
+        } else {
+            ErrorKind::MissingRole
+        },
+    ))?;
+    let name = resolver
+        .get_string_with_budget(function_header.name, &mut budget)
         .map_err(|e| failure(start, ErrorKind::Name(e)))?;
     let return_type = applied_return(raw, return_start, &context, &mut resolver, &mut budget)?;
     Ok(SelectedReturn {
-        owner: context.owner, parameters: context.parameters,
-        function: Function { ordinal, span, body_span: start..start + body.len(), header: function_header, name, return_type },
+        owner: context.owner,
+        parameters: context.parameters,
+        function: Function {
+            ordinal,
+            span,
+            body_span: start..start + body.len(),
+            header: function_header,
+            name,
+            return_type,
+        },
     })
 }

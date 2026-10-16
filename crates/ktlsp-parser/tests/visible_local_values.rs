@@ -85,47 +85,6 @@ fn accepted(source: &str, queries: &[(usize, &[usize])]) {
                 assert!(value.cst_index() < found.site().containing_property().cst_index());
             }
         }
-        // Bounded actual producer/public consumer packet for the first admitted
-        // hosted run. No source rewriting, fake worker or local execution.
-        println!(
-            "KTLSP_VISIBLE_VALUES_V1 query={:?} site={} token={} body={} function={} containing={} winners={:?}",
-            found.site().range(),
-            index,
-            found.site().token_index(),
-            found.body().cst_index(),
-            found.site().function().cst_index(),
-            found.site().containing_property().cst_index(),
-            found
-                .values()
-                .iter()
-                .map(|value| (
-                    value.raw_name(),
-                    value.name_range(),
-                    value.range(),
-                    value.owner(),
-                    value.cst_index()
-                ))
-                .collect::<Vec<_>>()
-        );
-        println!(
-            "KTLSP_VISIBLE_PRODUCER_V1 reference={:?} token={:?} body={:?} declarations={:?}",
-            tree.elements()[index],
-            tree.elements()[found.site().token_index()],
-            tree.elements()[found.body().cst_index()],
-            ordinals
-                .iter()
-                .map(|&ordinal| {
-                    let declaration = &lower.declarations()[ordinal];
-                    (
-                        ordinal,
-                        &tree.elements()[declaration.cst_index()],
-                        declaration.cst_parent_index(),
-                        declaration.cst_parent_kind(),
-                        directory.memberships()[ordinal].region(),
-                    )
-                })
-                .collect::<Vec<_>>()
-        );
     }
 }
 

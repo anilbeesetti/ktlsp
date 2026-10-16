@@ -416,12 +416,27 @@ types, stable cross-revision symbols or a new server capability.
   2,097,152-work budget, starting before index selection. Output is capped at
   1,024 borrowed declarations and 131,072 requested/retained capacity bytes.
   Quadratic borrowed scans deliberately trade larger-body admission for no
-  additional index. `tests/visible_local_values.rs` provides real-producer,
-  original-pointer/order/shadow/snapshot/refusal assertions and bounded hosted
-  producer/public-consumer captures; private tests cover exact shared work and
-  storage boundaries. These assertions await ROOT-admitted hosted execution;
-  source alone is not acceptance evidence. No caret/hole, completion capability,
-  initializer chasing, global scope/type resolution or parity is claimed.
+  additional index. `tests/visible_local_values.rs` retains real-producer
+  original-pointer/order/shadow/snapshot/refusal assertions; private tests cover
+  exact shared work and storage boundaries. At component source
+  `cbd4f5f01885f24283abb30b9381d1eac9dc3a20`, original attempt-1
+  [Linux Native38905509897/job116987948413](https://github.com/anilbeesetti/ktlsp/actions/runs/38905509897/job/116987948413)
+  passed 991 standard/doctests plus 22 separate worker fault cases. Original
+  [platform38905510309](https://github.com/anilbeesetti/ktlsp/actions/runs/38905510309)
+  passed macOS job116987949539 (989+22) and Windows job116987949723 (936+22).
+  Both platform jobs authenticated actual PR merge
+  `e656c43ce980b5c8af760eb6745cc28c811ecf5f`, ordered parents verified main
+  `594cc51cb4f1994b5e4e896e3a3c171b0ff3bcf4` and that component source,
+  and identical source tree `9dfcb9ad8a16a0a8fa177c1223068df335e96b26`.
+  OWNER and ROOT directly read all 26 actual producer/public-consumer records
+  per platform, preserving original parameter-list/function versus local/block
+  membership, before/self/after-shadow winners, unknown-query empty visibility,
+  sibling isolation and CRLF/nonBMP/backtick identity. Only the two temporary
+  capture writers were removed after ROOT's readback; all behavioral assertions
+  remain. This is original component PR proof, not final-source, union or
+  exact-main acceptance; #96 remains OPEN/UNKNOWN. No caret/hole, completion
+  capability, initializer chasing, global scope/type resolution or parity is
+  claimed.
 - `local_value_binding::local_value_occurrences` accepts precisely an original
   `LocalValueAnchor::Declaration` or a `ReferenceExpression` CST-index anchor.
   The identical directory/lowerer/result authenticates selection, including

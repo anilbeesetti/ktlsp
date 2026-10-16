@@ -18,3 +18,7 @@ harness = false
 [[test]]
 name = "lowering_fixture_acceptance"
 harness = false
+
+[[test]]
+name = "reference_binding_cst_acceptance"
+harness = false

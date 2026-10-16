@@ -206,7 +206,7 @@ fn controlled_worker_cancellation_ids_invalidations_shutdown_and_capacity() {
     for (token, terminal) in [
         (
             "shutdown",
-            request(json!("shutdown"), "shutdown", Value::Null),
+            request(json!("shutdown-request"), "shutdown", Value::Null),
         ),
         ("exit", notify("exit", Value::Null)),
     ] {
@@ -217,6 +217,7 @@ fn controlled_worker_cancellation_ids_invalidations_shutdown_and_capacity() {
         error(&responses[0], json!(token), -32800);
         if token == "shutdown" {
             assert_eq!(responses.len(), 2);
+            assert_eq!(responses[1]["id"], "shutdown-request");
             assert_eq!(responses[1]["result"], Value::Null);
         }
         assert!(collect(&mut session).is_empty());

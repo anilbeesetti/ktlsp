@@ -170,6 +170,45 @@ incremental bounds, not whole-process allocation, RSS, stack or time guarantees.
 The raw-name index may scan quadratically within its charged work limit;
 ancestor queries use fixed storage and position queries allocate nothing.
 
+### Bounded positive integer initializer types (#330 / T012 child)
+
+`integer_initializer_types::infer_integer_initializer` accepts only a private-field
+`LocalValueBinding` and current snapshot. It authenticates that binding's original
+tree using `ReferenceSite::tree`, then inspects only its already-validated direct
+target initializer, without validating the complete body again. Success borrows
+the original binding, integer token and original source spelling/span, with an
+exact nonnegative `u64` value and default `Int`, `Long`, `UInt` or `ULong`.
+An unsuffixed signed value defaults to `Int` through 2,147,483,647 and `Long`
+through 9,223,372,036,854,775,807. `u`/`U` defaults to `UInt` through
+4,294,967,295, otherwise `ULong` through 18,446,744,073,709,551,615.
+`L` forces `Long`; `uL`/`UL` forces `ULong`. Lowercase `l` is refused.
+Decimal, `0x`/`0X` hexadecimal and `0b`/`0B` binary spellings permit repeated
+underscores only between digits; decimal leading zeroes are invalid.
+Invalid spelling and overflow return errors, never a fallback type.
+
+Rules were read before implementation from the pinned
+[Kotlin specification, integer literals](https://github.com/Kotlin/kotlin-spec/blob/7fccf8d6ee8210612ee8d55fa2a24fbb7c3ceea9/docs/src/md/kotlin.core/expressions.md#integer-literals)
+and Kotlin v2.2.20 source commit `693c44ee79f62895a9b92bdd60fdd7a9bc29a975`:
+[numeric suffix/range decoding](https://github.com/JetBrains/kotlin/blob/693c44ee79f62895a9b92bdd60fdd7a9bc29a975/compiler/psi/psi-api/src/org/jetbrains/kotlin/psi/utils/ConstantExpressionUtils.kt),
+[literal lexer](https://github.com/JetBrains/kotlin/blob/693c44ee79f62895a9b92bdd60fdd7a9bc29a975/compiler/psi/parser/src/org/jetbrains/kotlin/lexer/Kotlin.flex),
+[lowercase-long rejection](https://github.com/JetBrains/kotlin/blob/693c44ee79f62895a9b92bdd60fdd7a9bc29a975/compiler/frontend/src/org/jetbrains/kotlin/resolve/constants/CompileTimeConstantChecker.java)
+and [default signed/unsigned selection](https://github.com/JetBrains/kotlin/blob/693c44ee79f62895a9b92bdd60fdd7a9bc29a975/compiler/frontend/src/org/jetbrains/kotlin/resolve/constants/evaluate/ConstantExpressionEvaluator.kt).
+The Rust implementation is independent; these source rules are not an execution
+of the official LSP, a language-version configuration or full T012 acceptance.
+
+Reference initializers refuse without chasing. Expected types, integer-literal
+constraint types, unary minus (including minimum signed values), folding,
+smart casts, overloads, generics and external lookup are excluded.
+Origin/stale/resource errors remain distinct. One checked 2,097,152-unit query
+budget charges snapshot/source comparisons, target visits/kind comparisons and
+raw literal bytes; the query allocates nothing and is nonrecursive. This is a
+library-only subset with no server capability, stable revision identity or
+whole-process memory/time bound. Native consumer tests require actual parser
+production of signed and unsigned cases and admission of the frozen invalid/
+overflow spellings all the way to the integer query: an upstream refusal fails
+the test rather than substituting decoder-only evidence. Hosted execution
+evidence must be recorded separately from source.
+
 At #333 source head `a22b54619f6996e03cceee56362453a9b846d574`,
 [original attempt-1 Linux CI38857165917/job116831130221](https://github.com/anilbeesetti/ktlsp/actions/runs/38857165917/job/116831130221)
 passed pinned format, locked workspace Clippy and all 890 workspace tests.

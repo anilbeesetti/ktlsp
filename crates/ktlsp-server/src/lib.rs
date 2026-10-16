@@ -346,8 +346,12 @@ impl Session {
             )
             .map_err(|e| (-32602, e))?;
             let code_actions = parse_code_action_capability(
-                params.and_then(|p| p.get("capabilities")).expect("validated capabilities"),
-            ).map_err(|e| (-32602, e))? && rename_client.document_changes;
+                params
+                    .and_then(|p| p.get("capabilities"))
+                    .expect("validated capabilities"),
+            )
+            .map_err(|e| (-32602, e))?
+                && rename_client.document_changes;
             self.code_actions = code_actions;
             self.rename_client = rename_client;
             self.symbol_client = symbol_client;
@@ -432,28 +436,36 @@ impl Session {
                     .and_then(|d| required(d, "uri"))
                     .and_then(uri_value)
                     .map_err(|e| (-32602, e))?;
-                let range = required(map, "range").and_then(range_value)
+                let range = required(map, "range")
+                    .and_then(range_value)
                     .map_err(|e| (-32602, e))?;
-                let permits = required(map, "context").and_then(code_action_context)
+                let permits = required(map, "context")
+                    .and_then(code_action_context)
                     .map_err(|e| (-32602, e))?;
-                let document = self.documents.get(uri)
+                let document = self
+                    .documents
+                    .get(uri)
                     .ok_or((-32602, "code action refers to unopened document"))?;
                 let start = ktlsp_text::position_to_offset(document.text(), range.start)
                     .map_err(|_| (-32602, "invalid UTF-16 code action range"))?;
                 let end = ktlsp_text::position_to_offset(document.text(), range.end)
                     .map_err(|_| (-32602, "invalid UTF-16 code action range"))?;
-                let analysis = self.analysis_cache
+                let analysis = self
+                    .analysis_cache
                     .get(uri, document, self.configuration.folding_range_limit)
                     .map_err(|e| (-32803, e))?;
-                if permits && document.version() != i32::MAX
-                    && let Some((token_start, token_end, closer)) = analysis.trailing_closer(document.text())
+                if permits
+                    && document.version() != i32::MAX
+                    && let Some((token_start, token_end, closer)) =
+                        analysis.trailing_closer(document.text())
                     && (if start == end {
                         token_start <= start && start <= token_end
                     } else {
                         start < token_end && token_start < end
                     })
                 {
-                    let positions = structure::positions(document.text(), &[token_start, token_end]);
+                    let positions =
+                        structure::positions(document.text(), &[token_start, token_end]);
                     return Ok(json!([{
                         "title":format!("Remove unmatched trailing '{closer}'"),
                         "kind":"quickfix",
@@ -1019,10 +1031,20 @@ impl Drop for Session {
 }
 
 fn parse_code_action_capability(capabilities: &Value) -> Result<bool, &'static str> {
-    let Some(text) = capabilities.get("textDocument") else { return Ok(false) };
-    let Some(action) = object(text)?.get("codeAction") else { return Ok(false) };
+    let Some(text) = capabilities.get("textDocument") else {
+        return Ok(false);
+    };
+    let Some(action) = object(text)?.get("codeAction") else {
+        return Ok(false);
+    };
     let action = object(action)?;
-    for key in ["dynamicRegistration", "isPreferredSupport", "disabledSupport", "dataSupport", "honorsChangeAnnotations"] {
+    for key in [
+        "dynamicRegistration",
+        "isPreferredSupport",
+        "disabledSupport",
+        "dataSupport",
+        "honorsChangeAnnotations",
+    ] {
         if action.get(key).is_some_and(|value| !value.is_boolean()) {
             return Err("code action capability flags must be boolean");
         }
@@ -1030,7 +1052,9 @@ fn parse_code_action_capability(capabilities: &Value) -> Result<bool, &'static s
     if let Some(resolve) = action.get("resolveSupport") {
         string_array(required(object(resolve)?, "properties")?)?;
     }
-    let Some(literal) = action.get("codeActionLiteralSupport") else { return Ok(false) };
+    let Some(literal) = action.get("codeActionLiteralSupport") else {
+        return Ok(false);
+    };
     let kind = object(required(object(literal)?, "codeActionKind")?)?;
     string_array(required(kind, "valueSet")?)?;
     // LSP clients must gracefully handle kinds outside this advisory value set.
@@ -1038,71 +1062,108 @@ fn parse_code_action_capability(capabilities: &Value) -> Result<bool, &'static s
 }
 
 fn string_array(value: &Value) -> Result<&[Value], &'static str> {
-    value.as_array().filter(|values| values.iter().all(Value::is_string))
-        .map(Vec::as_slice).ok_or("expected an array of strings")
+    value
+        .as_array()
+        .filter(|values| values.iter().all(Value::is_string))
+        .map(Vec::as_slice)
+        .ok_or("expected an array of strings")
 }
 
 fn range_value(value: &Value) -> Result<ktlsp_text::Range, &'static str> {
     fn position(value: &Value) -> Result<ktlsp_text::Position, &'static str> {
         let map = object(value)?;
-        let coordinate = |key| required(map, key)?.as_u64()
-            .filter(|n| *n <= i32::MAX as u64).map(|n| n as u32)
-            .ok_or("range coordinates must be LSP uintegers");
-        Ok(ktlsp_text::Position { line:coordinate("line")?, character:coordinate("character")? })
+        let coordinate = |key| {
+            required(map, key)?
+                .as_u64()
+                .filter(|n| *n <= i32::MAX as u64)
+                .map(|n| n as u32)
+                .ok_or("range coordinates must be LSP uintegers")
+        };
+        Ok(ktlsp_text::Position {
+            line: coordinate("line")?,
+            character: coordinate("character")?,
+        })
     }
     let map = object(value)?;
     let range = ktlsp_text::Range {
-        start:position(required(map, "start")?)?,
-        end:position(required(map, "end")?)?,
+        start: position(required(map, "start")?)?,
+        end: position(required(map, "end")?)?,
     };
-    if range.start > range.end { return Err("reversed range") }
+    if range.start > range.end {
+        return Err("reversed range");
+    }
     Ok(range)
 }
 
 fn code_action_context(value: &Value) -> Result<bool, &'static str> {
     let map = object(value)?;
-    let diagnostics = required(map, "diagnostics")?.as_array()
+    let diagnostics = required(map, "diagnostics")?
+        .as_array()
         .ok_or("code action diagnostics must be an array")?;
     for diagnostic in diagnostics {
         let diagnostic = object(diagnostic)?;
         range_value(required(diagnostic, "range")?)?;
-        required(diagnostic, "message")?.as_str().ok_or("diagnostic message must be a string")?;
-        if diagnostic.get("source").is_some_and(|value| !value.is_string()) {
+        required(diagnostic, "message")?
+            .as_str()
+            .ok_or("diagnostic message must be a string")?;
+        if diagnostic
+            .get("source")
+            .is_some_and(|value| !value.is_string())
+        {
             return Err("diagnostic source must be a string");
         }
-        if diagnostic.get("severity").is_some_and(|value| !matches!(value.as_u64(), Some(1..=4))) {
+        if diagnostic
+            .get("severity")
+            .is_some_and(|value| !matches!(value.as_u64(), Some(1..=4)))
+        {
             return Err("invalid diagnostic severity");
         }
-        if diagnostic.get("code").is_some_and(|value|
-            !value.is_string() && value.as_i64().and_then(|n| i32::try_from(n).ok()).is_none())
-        {
+        if diagnostic.get("code").is_some_and(|value| {
+            !value.is_string() && value.as_i64().and_then(|n| i32::try_from(n).ok()).is_none()
+        }) {
             return Err("diagnostic code must be an integer or string");
         }
         if let Some(description) = diagnostic.get("codeDescription") {
             uri_value(required(object(description)?, "href")?)?;
         }
         if let Some(tags) = diagnostic.get("tags") {
-            if !tags.as_array().is_some_and(|values| values.iter()
-                .all(|value| matches!(value.as_u64(), Some(1 | 2))))
-            {
+            if !tags.as_array().is_some_and(|values| {
+                values
+                    .iter()
+                    .all(|value| matches!(value.as_u64(), Some(1 | 2)))
+            }) {
                 return Err("invalid diagnostic tags");
             }
         }
         if let Some(related) = diagnostic.get("relatedInformation") {
-            for info in related.as_array().ok_or("related information must be an array")? {
+            for info in related
+                .as_array()
+                .ok_or("related information must be an array")?
+            {
                 let info = object(info)?;
-                required(info, "message")?.as_str().ok_or("related message must be a string")?;
+                required(info, "message")?
+                    .as_str()
+                    .ok_or("related message must be a string")?;
                 let location = object(required(info, "location")?)?;
                 uri_value(required(location, "uri")?)?;
                 range_value(required(location, "range")?)?;
             }
         }
     }
-    if map.get("triggerKind").is_some_and(|value| !matches!(value.as_u64(), Some(1 | 2))) {
+    if map
+        .get("triggerKind")
+        .is_some_and(|value| !matches!(value.as_u64(), Some(1 | 2)))
+    {
         return Err("invalid code action trigger kind");
     }
-    map.get("only").map(|value| string_array(value)
-        .map(|kinds| kinds.iter().any(|kind| matches!(kind.as_str(), Some("" | "quickfix")))))
+    map.get("only")
+        .map(|value| {
+            string_array(value).map(|kinds| {
+                kinds
+                    .iter()
+                    .any(|kind| matches!(kind.as_str(), Some("" | "quickfix")))
+            })
+        })
         .unwrap_or(Ok(true))
 }
 

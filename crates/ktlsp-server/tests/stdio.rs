@@ -511,7 +511,11 @@ fn real_cli_semantic_tokens_decode_full_range_and_committed_edit() {
 
 #[test]
 fn real_stdio_structural_action_applies_received_edit_and_observes_fresh_diagnostics() {
-    use std::{io::BufReader, sync::mpsc, time::{Duration, Instant}};
+    use std::{
+        io::BufReader,
+        sync::mpsc,
+        time::{Duration, Instant},
+    };
     struct Child(std::process::Child);
     impl Drop for Child {
         fn drop(&mut self) {
@@ -525,100 +529,143 @@ fn real_stdio_structural_action_applies_received_edit_and_observes_fresh_diagnos
     let (sender, receiver) = mpsc::sync_channel(8);
     let reader = thread::spawn(move || {
         for _ in 0..8 {
-            let Some(payload) = read_frame(&mut output).unwrap() else { break };
+            let Some(payload) = read_frame(&mut output).unwrap() else {
+                break;
+            };
             let reply: Value = serde_json::from_slice(&payload).unwrap();
-            if sender.send(reply).is_err() { break }
+            if sender.send(reply).is_err() {
+                break;
+            }
         }
     });
     let mut sent = Vec::new();
     let mut replies = Vec::new();
     let mut send = |message: Value| {
-        input.write_all(&encode(std::slice::from_ref(&message))).unwrap();
+        input
+            .write_all(&encode(std::slice::from_ref(&message)))
+            .unwrap();
         input.flush().unwrap();
         sent.push(message);
     };
     let mut receive = || {
-        let reply = receiver.recv_timeout(Duration::from_secs(2))
+        let reply = receiver
+            .recv_timeout(Duration::from_secs(2))
             .expect("structural action stdio reply timeout");
         replies.push(reply.clone());
         reply
     };
     let uri = "untitled:fix";
     let source = "val s = \"😀\"\r\n)";
-    send(request(json!("init"),"initialize",json!({"capabilities":{
-        "workspace":{"workspaceEdit":{"documentChanges":true}},
-        "textDocument":{"codeAction":{"codeActionLiteralSupport":{"codeActionKind":{"valueSet":["quickfix"]}}},
-            "publishDiagnostics":{"versionSupport":true}}
-    }})));
-    assert_eq!(receive()["result"]["capabilities"]["codeActionProvider"],
-        json!({"codeActionKinds":["quickfix"],"resolveProvider":false}));
-    send(notification("initialized",json!({})));
-    send(notification("textDocument/didOpen",
-        json!({"textDocument":{"uri":uri,"languageId":"kotlin","version":7,"text":source}})));
+    send(request(
+        json!("init"),
+        "initialize",
+        json!({"capabilities":{
+            "workspace":{"workspaceEdit":{"documentChanges":true}},
+            "textDocument":{"codeAction":{"codeActionLiteralSupport":{"codeActionKind":{"valueSet":["quickfix"]}}},
+                "publishDiagnostics":{"versionSupport":true}}
+        }}),
+    ));
+    assert_eq!(
+        receive()["result"]["capabilities"]["codeActionProvider"],
+        json!({"codeActionKinds":["quickfix"],"resolveProvider":false})
+    );
+    send(notification("initialized", json!({})));
+    send(notification(
+        "textDocument/didOpen",
+        json!({"textDocument":{"uri":uri,"languageId":"kotlin","version":7,"text":source}}),
+    ));
     let before = receive();
-    assert_eq!(before["method"],"textDocument/publishDiagnostics");
-    assert_eq!(before["params"]["version"],7);
+    assert_eq!(before["method"], "textDocument/publishDiagnostics");
+    assert_eq!(before["params"]["version"], 7);
     let range = json!({"start":{"line":1,"character":0},"end":{"line":1,"character":1}});
-    assert_eq!(before["params"]["diagnostics"],json!([{
-        "range":range,"severity":1,"source":"ktlsp-lexical-structural",
-        "code":"structural","message":"unexpected or mismatched closing delimiter"
-    }]));
-    let action_params = json!({"textDocument":{"uri":uri},"range":range,"context":{"diagnostics":[]}});
-    send(request(json!("action"),"textDocument/codeAction",action_params.clone()));
+    assert_eq!(
+        before["params"]["diagnostics"],
+        json!([{
+            "range":range,"severity":1,"source":"ktlsp-lexical-structural",
+            "code":"structural","message":"unexpected or mismatched closing delimiter"
+        }])
+    );
+    let action_params =
+        json!({"textDocument":{"uri":uri},"range":range,"context":{"diagnostics":[]}});
+    send(request(
+        json!("action"),
+        "textDocument/codeAction",
+        action_params.clone(),
+    ));
     let action = receive();
-    assert_eq!(action["id"],"action");
-    assert_eq!(action["result"],json!([{
-        "title":"Remove unmatched trailing ')'","kind":"quickfix",
-        "edit":{"documentChanges":[{
-            "textDocument":{"uri":uri,"version":7},"edits":[{"range":range,"newText":""}]
-        }]}
-    }]));
+    assert_eq!(action["id"], "action");
+    assert_eq!(
+        action["result"],
+        json!([{
+            "title":"Remove unmatched trailing ')'","kind":"quickfix",
+            "edit":{"documentChanges":[{
+                "textDocument":{"uri":uri,"version":7},"edits":[{"range":range,"newText":""}]
+            }]}
+        }])
+    );
     let document_edit = &action["result"][0]["edit"]["documentChanges"][0];
     let edit = &document_edit["edits"][0];
     let change = ktlsp_text::TextChange {
-        range:Some(serde_json::from_value(edit["range"].clone()).unwrap()),
-        range_length:None,
-        text:edit["newText"].as_str().unwrap().into(),
+        range: Some(serde_json::from_value(edit["range"].clone()).unwrap()),
+        range_length: None,
+        text: edit["newText"].as_str().unwrap().into(),
     };
     let mut applied = ktlsp_text::Document::new(
-        document_edit["textDocument"]["version"].as_i64().unwrap() as i32,source.into()).unwrap();
-    applied.apply_changes(8,std::slice::from_ref(&change)).unwrap();
-    assert_eq!(applied.text(),"val s = \"😀\"\r\n");
-    assert_eq!(applied.version(),8);
-    send(notification("textDocument/didChange",json!({
-        "textDocument":{"uri":document_edit["textDocument"]["uri"],"version":applied.version()},
-        "contentChanges":[change]
-    })));
+        document_edit["textDocument"]["version"].as_i64().unwrap() as i32,
+        source.into(),
+    )
+    .unwrap();
+    applied
+        .apply_changes(8, std::slice::from_ref(&change))
+        .unwrap();
+    assert_eq!(applied.text(), "val s = \"😀\"\r\n");
+    assert_eq!(applied.version(), 8);
+    send(notification(
+        "textDocument/didChange",
+        json!({
+            "textDocument":{"uri":document_edit["textDocument"]["uri"],"version":applied.version()},
+            "contentChanges":[change]
+        }),
+    ));
     let fresh = receive();
-    assert_eq!(fresh["method"],"textDocument/publishDiagnostics");
-    assert_eq!(fresh["params"],json!({"uri":uri,"version":8,"diagnostics":[]}));
+    assert_eq!(fresh["method"], "textDocument/publishDiagnostics");
+    assert_eq!(
+        fresh["params"],
+        json!({"uri":uri,"version":8,"diagnostics":[]})
+    );
     // The old selection is now outside current text: use the actual remaining caret.
     let mut next = action_params;
     next["range"] = json!({"start":{"line":1,"character":0},"end":{"line":1,"character":0}});
-    send(request(json!("next"),"textDocument/codeAction",next));
+    send(request(json!("next"), "textDocument/codeAction", next));
     let next = receive();
-    assert_eq!(next["id"],"next");
-    assert_eq!(next["result"],json!([]));
-    send(request(json!("shutdown"),"shutdown",Value::Null));
+    assert_eq!(next["id"], "next");
+    assert_eq!(next["result"], json!([]));
+    send(request(json!("shutdown"), "shutdown", Value::Null));
     let shutdown = receive();
-    assert_eq!(shutdown["id"],"shutdown");
-    assert_eq!(shutdown["result"],Value::Null);
-    send(notification("exit",Value::Null));
+    assert_eq!(shutdown["id"], "shutdown");
+    assert_eq!(shutdown["result"], Value::Null);
+    send(notification("exit", Value::Null));
     let deadline = Instant::now() + Duration::from_secs(2);
     loop {
         if let Some(status) = child.0.try_wait().unwrap() {
             assert!(status.success());
             break;
         }
-        assert!(Instant::now() < deadline,"structural action stdio exit timeout");
+        assert!(
+            Instant::now() < deadline,
+            "structural action stdio exit timeout"
+        );
         thread::sleep(Duration::from_millis(2));
     }
     reader.join().unwrap();
     assert!(receiver.try_recv().is_err());
     let mut errors = String::new();
     std::io::Read::read_to_string(child.0.stderr.as_mut().unwrap(), &mut errors).unwrap();
-    assert!(errors.is_empty(),"{errors}");
+    assert!(errors.is_empty(), "{errors}");
     // TEMP_391: ROOT reads the first original hosted payload before removing this writer.
-    eprintln!("TEMP_391 {}",json!({"source":source,"sent":sent,"replies":replies,
-        "appliedSource":applied.text(),"appliedVersion":applied.version()}));
+    eprintln!(
+        "TEMP_391 {}",
+        json!({"source":source,"sent":sent,"replies":replies,
+        "appliedSource":applied.text(),"appliedVersion":applied.version()})
+    );
 }

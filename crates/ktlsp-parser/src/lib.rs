@@ -2492,7 +2492,9 @@ fn windows_timeout_phase(deadline: Instant, at: (u32, u32)) {
             "KTLSP_WINDOWS_TIMEOUT_PHASE_V1 line={} column={} after_cleanup_late_ns={}",
             at.0,
             at.1,
-            Instant::now().saturating_duration_since(deadline).as_nanos()
+            Instant::now()
+                .saturating_duration_since(deadline)
+                .as_nanos()
         );
     }
 }
@@ -2572,7 +2574,15 @@ fn supervise_piped(
             if !status.success() {
                 return Err(ParserError::WorkerFailed);
             }
-            finish_io(writer, reader, receiver, output, deadline, cancelled, &mut timeout_at)
+            finish_io(
+                writer,
+                reader,
+                receiver,
+                output,
+                deadline,
+                cancelled,
+                &mut timeout_at,
+            )
         })();
         // Check cleanup before the scope joins potentially blocked I/O threads.
         guard.finish()?;
@@ -2580,7 +2590,9 @@ fn supervise_piped(
         result
     });
     #[cfg(windows)]
-    if matches!(&result, Err(ParserError::Timeout)) && let Some(at) = timeout_at {
+    if matches!(&result, Err(ParserError::Timeout))
+        && let Some(at) = timeout_at
+    {
         windows_timeout_phase(deadline, at);
     }
     result
@@ -2832,7 +2844,12 @@ mod tests {
                     });
                     ready.recv().unwrap();
                     cancelled.store(cancel, Ordering::Relaxed);
-                    let outcome = join_io(handle, Instant::now() + deadline_after, &cancelled, &mut None);
+                    let outcome = join_io(
+                        handle,
+                        Instant::now() + deadline_after,
+                        &cancelled,
+                        &mut None,
+                    );
                     let _ = selected.send(outcome.map(|_| ()));
                 });
             });

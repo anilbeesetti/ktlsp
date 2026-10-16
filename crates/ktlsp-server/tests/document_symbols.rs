@@ -378,14 +378,21 @@ impl Package {
     }
 }
 // This directory is borrowed: only Package owns cleanup of its exclusive creation.
-fn exchange_directory(directory: &Path, messages: &[Value], windows_timeout_proof: bool) -> Vec<Value> {
+fn exchange_directory(
+    directory: &Path,
+    messages: &[Value],
+    windows_timeout_proof: bool,
+) -> Vec<Value> {
     let mut child = Command::new(directory.join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX)))
         .arg("--stdio")
         .env("PATH", "")
         .env_remove("JAVA_HOME")
         .env_remove("JDK_HOME")
         // Temporary #377 proof is enabled only by the negotiation fixture.
-        .env("KTLSP_WINDOWS_TIMEOUT_PHASE_PROOF", if windows_timeout_proof { "1" } else { "" })
+        .env(
+            "KTLSP_WINDOWS_TIMEOUT_PHASE_PROOF",
+            if windows_timeout_proof { "1" } else { "" },
+        )
         .current_dir(directory)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

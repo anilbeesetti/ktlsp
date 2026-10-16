@@ -219,6 +219,16 @@ fn unsupported_container_versions_wrong_fields_and_late_framing_refuse_atomicall
 
 #[test]
 fn hostile_public_model_cp_counts_and_late_method_table_entries_are_revalidated() {
+    // A usable forged slot0 must not legalize a consumed zero CP reference.
+    for reference in 0..3 {
+        let mut class = function();
+        match reference {
+            0 => { class.constants[0] = utf("pkg/Owner$Nested"); class.constants[15] = Constant::Class(0); }
+            1 => { class.constants[0] = utf("call"); class.methods[0].name = 0; }
+            _ => { class.constants[0] = utf("()V"); class.methods[0].descriptor = 0; }
+        }
+        assert_eq!(result(&class), Err(Error::Model(ktlsp_binary::Error::Malformed("constant index zero"))));
+    }
     let mut class = function();
     class.constants[18] = Constant::Integer(0);
     assert!(matches!(result(&class),Err(Error::Model(_))));
@@ -269,4 +279,17 @@ fn exact_composite_boundaries_cover_provenance_and_late_table_scans() {
     assert!(linked_class_method::decode(&larger,1,limits).is_err());
     let mut limits = Limits::default(); limits.depth = 1;
     assert!(linked_class_method::decode(&class,1,limits).is_err());
+}
+
+#[test]
+fn annotation_cp_grammar_passes_debit_the_same_work_allowance() {
+    let mut class = function();
+    class.methods.clear();
+    class.constants.push(utf(&format!("L{};", "a".repeat(4094))));
+    class.attributes[0].bytes = &[0,1,0,19,0,0];
+    let limits = Limits { work: 8192, ..Limits::default() };
+    // The six attribute bytes cannot pay for repeated scans of 4096 CP units.
+    assert_eq!(linked_class_method::decode(&class,1,limits),
+        Err(Error::Model(ktlsp_binary::Error::Limit("work"))));
+    assert_eq!(result(&class), Err(Error::UnsupportedContainer));
 }

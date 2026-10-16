@@ -88,6 +88,9 @@ impl From<wire::Error> for Error {
 
 fn text<'c>(class: &'c ClassFile<'_>, index: u16, budget: &mut string_table::Budget) -> Result<&'c [u16], Error> {
     budget.wire.work(1, 0)?;
+    if index == 0 {
+        return Err(Error::Model(crate::Error::Malformed("constant index zero")));
+    }
     let text = class.utf16(index).map_err(Error::Model)?;
     if text.len() > crate::descriptors::MAX_UNITS {
         return Err(Error::Model(crate::Error::Limit("constant UTF16 units")));

@@ -124,6 +124,10 @@ impl<'b> Budget<'b> {
             return Err(Error::Limit("constant UTF16 units"));
         }
         self.work(text.len())?;
+        if let Some(budget) = &mut self.composite {
+            // Prepay the downstream name/descriptor validation scans of CP text.
+            budget.wire.work(text.len() * 2, 0).map_err(composite_error)?;
+        }
         Ok(text)
     }
 }

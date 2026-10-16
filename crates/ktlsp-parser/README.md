@@ -303,7 +303,9 @@ error. Error recovery is ktrs behavior, not a compiler diagnostic claim.
 
 CRLF and lone CR normalize to LF only inside parsing. A boundary map converts all
 returned spans to original source; a normalized LF covers the entire original
-CRLF. `Parsed::position` delegates UTF-16/invalid-boundary handling to ktlsp-text.
+CRLF. `Parsed::position` preserves ktlsp-text's strict UTF-16/invalid-boundary
+behavior through the bounded lazy original-source table described above, with
+scalar ktlsp-text conversion when table storage is unavailable.
 Worker checks original normalized tree spelling and missed-token reports; parent
 checks rooted preorder/containment/depth, UTF-8 spans, exact token partition,
 diagnostic/count limits, and bounded JSON. The token-loss regression is rejected

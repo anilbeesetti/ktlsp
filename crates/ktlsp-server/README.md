@@ -31,6 +31,9 @@ Non-reference positions can return null. Unsupported contexts/names, duplicates,
 
 All three parser consumers share **one** bounded job pipeline, parser instance, admission limits, cancellation/tombstones, cleanup ownership and incarnation/version/content publication guard. There is no second validator/pool, parse cache or extra source copy. #350 tests exercise actual paired stdio replies and controlled-peer cancellation separately; source/review/hosted receipts are not full navigation, oracle or platform proof. #96 remains open: no local parser/server runtime is authorized.
 
+The [first original #351 Native run38866505501/job116860467519](https://github.com/anilbeesetti/ktlsp/actions/runs/38866505501/job/116860467519), attempt 1 at source `96b54047ee242e34a66f68020c79a47e620793eb`, checked merge `accd703dd2224301d1c8c44d1b2834a56a8b557f` into `bb6a75f61fd467c9b090210a369c7e1d225713d5`. Format and strict locked Clippy passed; workspace tests **failed** a new fixture's reply-count authoring error (six requests but expected seven). Actual failure wire retained the original definition `2:14–2:19`, plaintext declaration ``val `x😀` = 1`` and reference `2:33–2:38`, plus Combined/item outline and full empty pull without pushes. The other new real-worker semantic/refusal/hostile-fence/no-chasing cases and shared-wire cancellation/edit/reopen regression passed. The count was corrected from the six explicit source requests and independently source-rechecked by both reviewers; no unchanged retry or passing-full-run claim follows from this failure. Full negotiation and the direct-Write observation were not reached. Optional synthetic-tools [run38866505445](https://github.com/anilbeesetti/ktlsp/actions/runs/38866505445), attempt 1, passed both hosts; that is not official-oracle or platform proof.
+
+
 
 ## Bounded syntactic document symbols
 

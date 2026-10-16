@@ -598,6 +598,14 @@ fn actual_packaged_stdio_navigation_negotiation_and_existing_providers() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let source =
         "// 😀\r\nclass Combined { val item = 1 }\r\nfun f() { val `x😀` = 1; val y = `x😀` }";
+    let assert_ids = |replies: &[Value]| {
+        let expected = [json!(1), json!("definition"), json!(u64::MAX), json!(4), json!(5), json!(6)];
+        assert_eq!(replies.len(), expected.len(), "no unsolicited/push output: {replies:?}");
+        for id in expected {
+            assert_eq!(replies.iter().filter(|reply| reply.get("id") == Some(&id)).count(), 1,
+                "each original request ID exactly once: {id}: {replies:?}");
+        }
+    };
     for (profile, expected_kind) in [
         (json!({}), Some("plaintext")),
         (
@@ -629,11 +637,7 @@ fn actual_packaged_stdio_navigation_negotiation_and_existing_providers() {
             json!({"jsonrpc":"2.0","method":"exit"}),
         ];
         let replies = Package::new(true).exchange(&messages);
-        assert_eq!(replies.len(), 7, "{replies:?}");
-        assert!(
-            replies.iter().all(|reply| reply.get("id").is_some()),
-            "no duplicate push"
-        );
+        assert_ids(&replies);
         let caps = &replies[0]["result"]["capabilities"];
         assert_eq!(caps["positionEncoding"], "utf-16");
         assert_eq!(caps["definitionProvider"], true);
@@ -673,6 +677,7 @@ fn actual_packaged_stdio_navigation_negotiation_and_existing_providers() {
             json!({"kind":"full","items":[]})
         );
         let missing = Package::new(false).exchange(&messages);
+        assert_ids(&missing);
         let caps = &missing[0]["result"]["capabilities"];
         assert!(caps.get("definitionProvider").is_none() && caps.get("hoverProvider").is_none());
         for id in [json!("definition"), json!(u64::MAX)] {

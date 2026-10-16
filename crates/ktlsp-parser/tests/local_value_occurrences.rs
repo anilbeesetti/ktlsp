@@ -144,6 +144,7 @@ fn production_complete_original_occurrences_and_unused_targets() {
     );
     accepted("fun f() { val x = x }\n", 1, 14..15, &[]);
     accepted("fun f() { val y = x; val x = 1 }\n", 2, 25..26, &[]);
+    accepted("fun f() { val x = 1; fun nested() {} }\n", 1, 14..15, &[]);
 }
 
 #[test]
@@ -253,7 +254,7 @@ fn production_ambiguity_unsupported_context_and_resource_are_atomic() {
             LocalBindingError::AmbiguousLocal,
         ),
         (
-            "fun f() { val x = 1; fun nested() {} }\n",
+            "fun f() { val x = 1; fun nested() { val hidden = 1 } }\n",
             1,
             LocalBindingError::UnsupportedContext,
         ),

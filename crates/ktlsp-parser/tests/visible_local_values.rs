@@ -118,6 +118,8 @@ fn original_order_shadow_points_unknown_query_unused_parameters_and_siblings() {
     // of a visible candidate; do not accidentally bind the query first.
     let source = "fun f() { val x = 1; val y = later; val later = 1; val `later` = 2 }\n";
     accepted(source, &[(source.find("= later").unwrap() + 2, &[1])]);
+    let source = "fun f() { val y = unknown; fun nested() {} }\n";
+    accepted(source, &[(source.find("unknown").unwrap(), &[])]);
 }
 
 #[test]
@@ -209,11 +211,6 @@ fn visible_ambiguity_and_unsupported_whole_bodies_are_atomic() {
 fn unsupported_whole_bodies_refuse_before_a_directory_can_be_created() {
     let _serial = functional::serial();
     for (source, rejected_kind, rejected_token) in [
-        (
-            "fun f() { val y = unknown; fun nested() {} }\n",
-            "FUN",
-            false,
-        ),
         (
             "fun f() { val y = unknown; var z = 1 }\n",
             "VAR_KEYWORD",

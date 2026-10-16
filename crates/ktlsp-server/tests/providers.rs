@@ -1010,7 +1010,7 @@ fn structural_actions_apply_the_actual_versioned_edit_and_refresh_both_diagnosti
                 &mut session,
                 "textDocument/didChange",
                 json!({"textDocument":{"uri":document_edit["textDocument"]["uri"],"version":8},
-                    "contentChanges":[change]}),
+                    "contentChanges":[{"range":change.range,"text":change.text}]}),
             );
             assert_eq!(session.document(URI).unwrap(), &applied);
             assert_eq!(session.document(URI).unwrap().version(), 8);

@@ -2939,11 +2939,11 @@ fn local_call_definitions_refuse_unproved_whole_bodies_on_actual_cli() {
             json!({"jsonrpc":"2.0","method":"exit"}),
         ];
         let replies = package.exchange(&messages);
-        assert_eq!(
-            replies[1]["error"]["code"], -32803,
-            "{source}: {:?}",
-            replies[1]
-        );
-        assert!(replies[1].get("result").is_none());
+        let reply = replies
+            .iter()
+            .find(|reply| reply.get("id").and_then(Value::as_str) == Some("callee"))
+            .expect("callee response");
+        assert_eq!(reply["error"]["code"], -32803, "{source}: {reply:?}");
+        assert!(reply.get("result").is_none());
     }
 }

@@ -593,6 +593,10 @@ fn real_stdio_structural_action_applies_received_edit_and_observes_fresh_diagnos
         action_params.clone(),
     ));
     let action = receive();
+    eprintln!(
+        "TEMP_391_ACTION {}",
+        json!({"source":source,"reply":action})
+    );
     assert_eq!(action["id"], "action");
     assert_eq!(
         action["result"],
@@ -624,7 +628,7 @@ fn real_stdio_structural_action_applies_received_edit_and_observes_fresh_diagnos
         "textDocument/didChange",
         json!({
             "textDocument":{"uri":document_edit["textDocument"]["uri"],"version":applied.version()},
-            "contentChanges":[change]
+            "contentChanges":[{"range":change.range,"text":change.text}]
         }),
     ));
     let fresh = receive();

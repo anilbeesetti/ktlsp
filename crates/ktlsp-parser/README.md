@@ -105,6 +105,16 @@ exact input/output bounds, and failure-visible `OutputLimit` assertions unchange
 Local parser runtime remains prohibited under #96. Hosted macOS release full
 workspace and supervision proof is still required; #96 remains OPEN/UNKNOWN.
 
+The first changed-source diagnostic workflow,
+[38859356634](https://github.com/anilbeesetti/ktlsp/actions/runs/38859356634),
+refused both platforms before checkout: the event payload's optional
+`merge_commit_sha` was empty, although the immutable source/workflow SHA and
+merge ref agreed. Original identity artifacts were retained and independently
+rehash-verified. Source admission now records that absence, checks any supplied
+event merge SHA, and requires the actual ordered Git parents to match the original
+event base/head before native execution. This workflow correction is not a
+Windows source-guard diagnosis or a macOS parser observation; neither ran there.
+
 Limits are enforced independently in parent and worker where applicable:
 
 | Resource | Limit |

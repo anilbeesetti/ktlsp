@@ -24,8 +24,6 @@ jobs:
       RUSTC_WRAPPER: ''
       RUSTC_WORKSPACE_WRAPPER: ''
       RUSTC_BOOTSTRAP: ''
-      # Temporary ROOT-admitted original declaration-hover wire capture.
-      KTLSP_DECLARATION_HOVER_PROOF_DIR: ${{ runner.temp }}/native-platform-evidence/declaration-hover
     steps:
       - name: Record and admit immutable actual PR merge source
         env:
@@ -148,6 +146,8 @@ jobs:
       - name: Full locked release workspace tests
         env:
           KTLSP_NATIVE_IO_OBSERVE: '1'
+          # Temporary ROOT-admitted original declaration-hover wire capture.
+          KTLSP_DECLARATION_HOVER_PROOF_DIR: ${{ runner.temp }}/native-platform-evidence/declaration-hover
         run: |
           cargo +1.99.0 test --locked --release --workspace --no-fail-fast -- --nocapture 2>&1 | Tee-Object "$env:RUNNER_TEMP/native-platform-evidence/workspace-tests.txt"
           $code = $LASTEXITCODE

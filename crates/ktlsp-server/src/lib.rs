@@ -508,9 +508,15 @@ impl Session {
                         ParserError::InputLimit => (-32803, "parser input limit exceeded"),
                         ParserError::NestingLimit => (-32803, "parser nesting limit exceeded"),
                         ParserError::OutputLimit => (-32803, "parser output limit exceeded"),
-                        ParserError::AllocationLimit => (-32803, "parser worker allocation limit exceeded"),
-                        ParserError::Coverage => (-32803, "parser output coverage validation failed"),
-                        ParserError::InvalidTree => (-32803, "parser output tree validation failed"),
+                        ParserError::AllocationLimit => {
+                            (-32803, "parser worker allocation limit exceeded")
+                        }
+                        ParserError::Coverage => {
+                            (-32803, "parser output coverage validation failed")
+                        }
+                        ParserError::InvalidTree => {
+                            (-32803, "parser output tree validation failed")
+                        }
                         ParserError::Timeout => (-32803, "parser deadline exceeded"),
                         ParserError::WorkerFailed => (-32803, "parser worker failed"),
                         ParserError::Io => (-32803, "parser I/O or cleanup failed"),

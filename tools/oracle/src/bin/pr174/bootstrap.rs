@@ -1,4 +1,4 @@
-use ktlsp_oracle_replay::authority::{CalibrationCase, CalibrationPlan, CalibrationReport, GrantScope, HostSeal, RootGrant};
+use ktlsp_oracle_replay::authority::{CalibrationCase, CalibrationPlan, CalibrationReport, GrantScope, HostSeal, RootGrant, OriginalRun};
 use sha2::{Digest, Sha256};
 
 const EXPECTED_GRANT: &str = "/etc/ktlsp-pr174/expected-grant.json";
@@ -109,6 +109,9 @@ fn no_disposal_failure()->Result<()> {
         _=>Err("prior preparation disposal failed; no later launch admission".into()),
     }
 }
+#[derive(Serialize,Deserialize)]
+#[serde(deny_unknown_fields,rename_all="camelCase")]
+struct BootstrapReceipt {schema_version:u8,scope:String,nonce:String,error:Option<String>,official_capture_success:bool,evidence_hex:String}
 fn bootstrap() -> Result<Value> {
     protected(Path::new(STAGING),true)?;
     let expected:RootGrant=load(Path::new(EXPECTED_GRANT))?; expected.validate_shape()?;
@@ -148,15 +151,17 @@ fn bootstrap() -> Result<Value> {
         materializer::materialize(&dir,&admission,&mut evidence)?;
         admission.extraction_manifest_sha256=sha_path(&dir.join("inputs/extraction-manifest.json"),end)?;
         input_pins(&dir,&admission,&mut evidence)?;
+        if evidence.failed{return Err("bootstrap original measurement evidence incomplete; no service start".into());}
         let bytes=serde_json::to_vec(&admission).map_err(|e|e.to_string())?;if bytes.len()>INPUT_BYTES{return Err("Admission size".into());}make_file(&dir.join("admission.json"),&bytes,0o400)?;
         install_supervisor(&dir,&admission,&mut evidence)?;
+        if evidence.failed{return Err("bootstrap service start evidence incomplete; supervisor must refuse CREATE".into());}
         Ok(json!({"status":"SUPERVISOR_STARTED","admissionDirectory":dir,"scope":admission.scope,"authority":"independent ROOT grant plus protected original workflow/OS-root custody; runtime receipts required"}))
     })();
-    let receipt=json!({"schemaVersion":1,"scope":"PR174_BOOTSTRAP","nonce":nonce,"error":result.as_ref().err(),"officialCaptureSuccess":false,"evidenceHex":raw_hex(&evidence.pending)});
+    let receipt=BootstrapReceipt{schema_version:1,scope:"PR174_BOOTSTRAP".into(),nonce,error:result.as_ref().err().cloned(),official_capture_success:false,evidence_hex:raw_hex(&evidence.pending)};
     // Bootstrap preparation evidence has its own reserved part of the ONE observer allowance.
     let bytes=serde_json::to_vec(&receipt).map_err(|e|e.to_string())?;
     if bytes.len()>131072{return Err("bootstrap original evidence cap".into());}
-    let saved=make_file(&dir.join("bootstrap-receipt.json"),&bytes,0o400);
+    let saved=make_file(&dir.join("bootstrap-receipt.next"),&bytes,0o400).and_then(|()|fs::rename(dir.join("bootstrap-receipt.next"),dir.join("bootstrap-receipt.json")).map_err(|e|e.to_string()));
     result.and_then(|v|{saved?;Ok(v)})
 }
 fn install_supervisor(dir:&Path,a:&Admission,e:&mut Evidence)->Result<()> {
@@ -174,6 +179,7 @@ fn install_supervisor(dir:&Path,a:&Admission,e:&mut Evidence)->Result<()> {
     if p.get("FragmentPath")!=Some(&path.to_string_lossy().into_owned()) || p.get("DropInPaths").map(String::as_str)!=Some("") || p.get("User").map(String::as_str)!=Some("root") || p.get("Group").map(String::as_str)!=Some("root") || p.get("KillMode").map(String::as_str)!=Some("control-group") || p.get("StartLimitBurst").map(String::as_str)!=Some("1") || !p.get("ExecStart").is_some_and(|value| supervisor_exec_start(value,exe,mode,dir)) || p.get("Environment").map(String::as_str)!=Some("PATH=/usr/bin:/bin LANG=C.UTF-8 LC_ALL=C.UTF-8") {return Err("effective outside-step supervisor unit mismatch".into());}
     // Exact on-disk bytes plus no drop-ins bind ExecStart; effective argv/env are retained for receiver.
     if read_file(&path,INPUT_BYTES)?!=text.as_bytes(){return Err("supervisor unit changed".into());}
+    if e.failed{return Err("supervisor installation evidence incomplete; no service START".into());}
     e.checked(&a.tools.systemctl,&args(&["start","--no-block",&service]),a.preparation_deadline_ms)?;
     Ok(())
 }
@@ -187,6 +193,25 @@ fn supervisor_exec_start(value:&str,exe:&str,mode:&str,dir:&Path)->bool {
         && values.iter().filter(|value|value.starts_with("path=")).count()==1
         && values.iter().filter(|value|value.starts_with("argv[]=")).count()==1
         && values.contains(&"ignore_errors=no")
+}
+
+fn bootstrap_receipt_gate(dir:&Path,a:&Admission)->Result<()> {
+    let end=mono_ms()?.checked_add(10000).ok_or("bootstrap gate deadline overflow")?.min(a.preparation_deadline_ms);
+    loop {
+        match fs::symlink_metadata(dir.join("bootstrap-receipt.json")) {
+            Ok(_)=>{
+                let path=dir.join("bootstrap-receipt.json");protected(&path,false)?;
+                let value:BootstrapReceipt=parse(&read_file(&path,131072)?)?;
+                if value.schema_version!=1||value.scope!="PR174_BOOTSTRAP"||value.nonce!=a.nonce||value.error.is_some()||value.official_capture_success{return Err("original bootstrap did not complete; no CREATE permission".into());}
+                return Ok(());
+            },
+            Err(error)if error.kind()==ErrorKind::NotFound=>{
+                if mono_ms()?>=end{return Err("original bootstrap completion receipt unavailable; no CREATE".into());}
+                std::thread::yield_now();
+            },
+            Err(error)=>return Err(error.to_string()),
+        }
+    }
 }
 
 #[cfg(test)]

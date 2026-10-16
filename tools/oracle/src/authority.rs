@@ -7,6 +7,24 @@ pub const CONTRACT_SHA256: &str = "65eb16c5bd73c99fe7fc000fddf0242bf6abab0928367
 pub const WORKFLOW_PATH: &str = ".github/workflows/t045-pr174-official-symbols.yml";
 pub const AUTHORITY_BYTES: usize = 16_384;
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all="camelCase")]
+pub struct OriginalRun {
+    pub repository:String,pub event:String,pub attempt:u8,pub run_id:u64,pub job_id:u64,
+    pub suite_id:u64,pub source_head:String,pub source_tree:String,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all="camelCase")]
+pub struct ExportFile {pub path:String,pub bytes:u64,pub sha256:String}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all="camelCase")]
+pub struct ExportBinding {
+    pub schema_version:u8,pub scope:String,pub run:OriginalRun,pub nonce:String,pub container_id:String,
+    pub boot_id:String,pub daemon_id:String,pub image:String,pub image_id:String,
+    pub root_authorization_sha256:String,pub calibration_sha256:String,pub workflow_sha256:String,
+    pub files:Vec<ExportFile>,
+}
+
 pub fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, String> {
     if bytes.len() > AUTHORITY_BYTES { return Err("authority byte limit".into()); }
     serde_json::from_slice(bytes).map_err(|e| format!("strict authority JSON: {e}"))

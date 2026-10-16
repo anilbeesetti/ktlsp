@@ -87,6 +87,7 @@ mod host {
     include!("pr174/storage.rs");
     include!("pr174/action.rs");
     include!("pr174/confinement.rs");
+    include!("pr174/workflow.rs");
     mod materializer { include!("pr174/materializer.rs"); }
 
     #[derive(Deserialize, Serialize)]
@@ -3110,11 +3111,17 @@ mod host {
                 "host execution is Linux-only; optional macOS compilation remains supported".into(),
             );
         }
+        if argv.first().is_some_and(|mode| mode == "workflow-source") {
+            return workflow_source(&argv);
+        }
         unsafe extern "C" {
             fn geteuid() -> u32;
         }
         if unsafe { geteuid() } != 0 {
             return Err("protected host execution requires OS root".into());
+        }
+        if argv.first().is_some_and(|mode| mode.starts_with("workflow-")) {
+            return workflow_entry(&argv);
         }
         if argv.as_slice() == ["bootstrap", STAGING] {
             return bootstrap();

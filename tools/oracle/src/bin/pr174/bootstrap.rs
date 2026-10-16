@@ -41,6 +41,7 @@ fn root_authority(dir: &Path, a: &Admission) -> Result<RootGrant> {
     let expected: RootGrant = load(Path::new(EXPECTED_GRANT))?;
     let grant: RootGrant = load(&dir.join("root-authorization.json"))?;
     grant.validate(&expected)?;
+    workflow_validate_measured_host(a,&grant)?;
     let claim=grant_claim(&expected)?;
     protected(&claim,false)?;
     if read_file(&claim,128)? != format!("{}\n",a.nonce).as_bytes(){return Err("ROOT finite launch grant already claimed by another nonce".into());}
@@ -170,6 +171,7 @@ fn bootstrap() -> Result<Value> {
         input_pins(&dir,&admission,&mut evidence)?;
         if evidence.failed{return Err("bootstrap original measurement evidence incomplete; no service start".into());}
         let bytes=serde_json::to_vec(&admission).map_err(|e|e.to_string())?;if bytes.len()>INPUT_BYTES{return Err("Admission size".into());}make_file(&dir.join("admission.json"),&bytes,0o400)?;
+        workflow_record_bootstrap_nonce(&dir,&admission)?;
         install_supervisor(&dir,&admission,&mut evidence)?;
         if evidence.failed{return Err("bootstrap service start evidence incomplete; supervisor must refuse CREATE".into());}
         Ok(json!({"status":"SUPERVISOR_STARTED","admissionDirectory":dir,"scope":admission.scope,"authority":"independent ROOT grant plus protected original workflow/OS-root custody; runtime receipts required"}))

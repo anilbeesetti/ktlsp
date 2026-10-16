@@ -1456,6 +1456,9 @@ fn type_parameter_occurrences_preserve_original_type_value_and_callee_partitions
             let mut callees = Vec::new();
             for (index, node) in tree.elements().iter().enumerate().filter(|(_, e)| e.kind == "REFERENCE_EXPRESSION") {
                 let parent = &tree.elements()[node.parent.unwrap()];
+                if !matches!(parent.kind.as_str(), "USER_TYPE" | "CALL_EXPRESSION" | "PROPERTY") {
+                    continue; // Imports are not same-function lexical occurrences.
+                }
                 if parent.kind == "USER_TYPE" {
                     let bound = bind_lexical_type_parameter(&directory, rebound, index, snapshot);
                     // TEMP_392: actual original associations before assertions.

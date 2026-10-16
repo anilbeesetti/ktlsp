@@ -24,6 +24,7 @@ struct Diagnostic {
 pub struct Analysis {
     folds: Vec<Fold>,
     diagnostics: Vec<Diagnostic>,
+    last_non_whitespace_end: usize,
 }
 impl Analysis {
     fn diagnostic(&mut self, start: usize, end: usize, code: &'static str, message: &'static str) {
@@ -50,6 +51,24 @@ impl Analysis {
     }
     pub fn diagnostics(&self, text: &str) -> Vec<Value> {
         self.render_outputs(text, false, &[]).1
+    }
+    pub fn trailing_closer(&self, text: &str) -> Option<(usize, usize, &'static str)> {
+        let [diagnostic] = self.diagnostics.as_slice() else {
+            return None;
+        };
+        if diagnostic.code != "structural"
+            || diagnostic.message != "unexpected or mismatched closing delimiter"
+            || diagnostic.end != self.last_non_whitespace_end
+        {
+            return None;
+        }
+        let title = match text.get(diagnostic.start..diagnostic.end)? {
+            ")" => "Remove unmatched trailing ')'",
+            "]" => "Remove unmatched trailing ']'",
+            "}" => "Remove unmatched trailing '}'",
+            _ => return None,
+        };
+        Some((diagnostic.start, diagnostic.end, title))
     }
     fn render_outputs(
         &self,
@@ -161,6 +180,7 @@ pub fn analyze(text: &str, fold_limit: usize) -> Result<Analysis, &'static str> 
             byte += 1;
         }
         if token.kind != TokenKind::Whitespace {
+            analysis.last_non_whitespace_end = token.end;
             // Complete a separated group before this token can complete another fold.
             match comments.take() {
                 Some((start, _, first_line, last_line))

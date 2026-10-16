@@ -124,6 +124,7 @@ pub struct Session {
     hover_format: Option<semantic_navigation::HoverFormat>,
     rename_client: semantic_navigation::RenameClient,
     semantic_tokens: Option<semantic_tokens::Client>,
+    code_actions: bool,
     exit_code: Option<i32>,
     incarnations: HashMap<String, u64>,
     next_incarnation: u64,
@@ -178,6 +179,7 @@ impl Session {
             hover_format: Some(semantic_navigation::HoverFormat::Plaintext),
             rename_client: semantic_navigation::RenameClient::default(),
             semantic_tokens: None,
+            code_actions: false,
             exit_code: None,
             incarnations: HashMap::new(),
             next_incarnation: 0,
@@ -343,6 +345,14 @@ impl Session {
                     .expect("validated capabilities"),
             )
             .map_err(|e| (-32602, e))?;
+            let code_actions = parse_code_action_capability(
+                params
+                    .and_then(|p| p.get("capabilities"))
+                    .expect("validated capabilities"),
+            )
+            .map_err(|e| (-32602, e))?
+                && rename_client.document_changes;
+            self.code_actions = code_actions;
             self.rename_client = rename_client;
             self.symbol_client = symbol_client;
             self.hover_format = semantic_navigation::HoverFormat::negotiate(
@@ -359,6 +369,10 @@ impl Session {
             self.pull_diagnostics = pull_diagnostics;
             self.state = State::Initializing;
             let mut result = json!({"capabilities":{"positionEncoding":"utf-16", "foldingRangeProvider":true, "textDocumentSync":{"openClose":true,"change":2,"save":false}}, "serverInfo":{"name":"ktlsp","version":env!("CARGO_PKG_VERSION")}});
+            if self.code_actions {
+                result["capabilities"]["codeActionProvider"] =
+                    json!({"codeActionKinds":["quickfix"],"resolveProvider":false});
+            }
             if let Some(client) = &self.semantic_tokens {
                 result["capabilities"]["semanticTokensProvider"] = client.options();
             }
@@ -412,6 +426,61 @@ impl Session {
                     .document_diagnostics(uri)
                     .ok_or((-32602, "diagnostic refers to unopened document"))?;
                 Ok(json!({"kind":"full","items":diagnostics}))
+            }
+            "textDocument/codeAction" if self.code_actions => {
+                let map = params
+                    .ok_or((-32602, "code action params missing"))
+                    .and_then(|p| object(p).map_err(|e| (-32602, e)))?;
+                let uri = required(map, "textDocument")
+                    .and_then(object)
+                    .and_then(|d| required(d, "uri"))
+                    .and_then(uri_value)
+                    .map_err(|e| (-32602, e))?;
+                let range = required(map, "range")
+                    .and_then(range_value)
+                    .map_err(|e| (-32602, e))?;
+                let permits = required(map, "context")
+                    .and_then(code_action_context)
+                    .map_err(|e| (-32602, e))?;
+                let document = self
+                    .documents
+                    .get(uri)
+                    .ok_or((-32602, "code action refers to unopened document"))?;
+                let start = ktlsp_text::position_to_offset(document.text(), range.start)
+                    .map_err(|_| (-32602, "invalid UTF-16 code action range"))?;
+                let end = ktlsp_text::position_to_offset(document.text(), range.end)
+                    .map_err(|_| (-32602, "invalid UTF-16 code action range"))?;
+                let analysis = self
+                    .analysis_cache
+                    .get(uri, document, self.configuration.folding_range_limit)
+                    .map_err(|e| (-32803, e))?;
+                if permits
+                    && document.version() != i32::MAX
+                    && let Some((token_start, token_end, title)) =
+                        analysis.trailing_closer(document.text())
+                    && (if start == end {
+                        token_start <= start && start <= token_end
+                    } else {
+                        start < token_end && token_start < end
+                    })
+                {
+                    let edit_start = ktlsp_text::offset_to_position(document.text(), token_start)
+                        .map_err(|_| (-32803, "invalid structural closer range"))?;
+                    // The authenticated closer is one ASCII code unit, not a newline.
+                    let edit_end = ktlsp_text::Position {
+                        line: edit_start.line,
+                        character: edit_start.character + 1,
+                    };
+                    return Ok(json!([{
+                        "title":title,
+                        "kind":"quickfix",
+                        "edit":{"documentChanges":[{
+                            "textDocument":{"uri":uri,"version":document.version()},
+                            "edits":[{"range":ktlsp_text::Range {start:edit_start,end:edit_end},"newText":""}]
+                        }]}
+                    }]));
+                }
+                Ok(json!([]))
             }
             "textDocument/semanticTokens/full" | "textDocument/semanticTokens/range" => {
                 let range_request = method == "textDocument/semanticTokens/range";
@@ -964,6 +1033,143 @@ impl Drop for Session {
         // Global bounded ownership retains unfinished handles. Admission/poll
         // reap them only after is_finished(); close() reports cleanup outcome.
     }
+}
+
+fn parse_code_action_capability(capabilities: &Value) -> Result<bool, &'static str> {
+    let Some(text) = capabilities.get("textDocument") else {
+        return Ok(false);
+    };
+    let Some(action) = object(text)?.get("codeAction") else {
+        return Ok(false);
+    };
+    let action = object(action)?;
+    for key in [
+        "dynamicRegistration",
+        "isPreferredSupport",
+        "disabledSupport",
+        "dataSupport",
+        "honorsChangeAnnotations",
+    ] {
+        if action.get(key).is_some_and(|value| !value.is_boolean()) {
+            return Err("code action capability flags must be boolean");
+        }
+    }
+    if let Some(resolve) = action.get("resolveSupport") {
+        string_array(required(object(resolve)?, "properties")?)?;
+    }
+    let Some(literal) = action.get("codeActionLiteralSupport") else {
+        return Ok(false);
+    };
+    let kind = object(required(object(literal)?, "codeActionKind")?)?;
+    string_array(required(kind, "valueSet")?)?;
+    // LSP clients must gracefully handle kinds outside this advisory value set.
+    Ok(true)
+}
+
+fn string_array(value: &Value) -> Result<&[Value], &'static str> {
+    value
+        .as_array()
+        .filter(|values| values.iter().all(Value::is_string))
+        .map(Vec::as_slice)
+        .ok_or("expected an array of strings")
+}
+
+fn range_value(value: &Value) -> Result<ktlsp_text::Range, &'static str> {
+    fn position(value: &Value) -> Result<ktlsp_text::Position, &'static str> {
+        let map = object(value)?;
+        let coordinate = |key| {
+            required(map, key)?
+                .as_u64()
+                .filter(|n| *n <= i32::MAX as u64)
+                .map(|n| n as u32)
+                .ok_or("range coordinates must be LSP uintegers")
+        };
+        Ok(ktlsp_text::Position {
+            line: coordinate("line")?,
+            character: coordinate("character")?,
+        })
+    }
+    let map = object(value)?;
+    let range = ktlsp_text::Range {
+        start: position(required(map, "start")?)?,
+        end: position(required(map, "end")?)?,
+    };
+    if range.start > range.end {
+        return Err("reversed range");
+    }
+    Ok(range)
+}
+
+fn code_action_context(value: &Value) -> Result<bool, &'static str> {
+    let map = object(value)?;
+    let diagnostics = required(map, "diagnostics")?
+        .as_array()
+        .ok_or("code action diagnostics must be an array")?;
+    for diagnostic in diagnostics {
+        let diagnostic = object(diagnostic)?;
+        range_value(required(diagnostic, "range")?)?;
+        required(diagnostic, "message")?
+            .as_str()
+            .ok_or("diagnostic message must be a string")?;
+        if diagnostic
+            .get("source")
+            .is_some_and(|value| !value.is_string())
+        {
+            return Err("diagnostic source must be a string");
+        }
+        if diagnostic
+            .get("severity")
+            .is_some_and(|value| !matches!(value.as_u64(), Some(1..=4)))
+        {
+            return Err("invalid diagnostic severity");
+        }
+        if diagnostic.get("code").is_some_and(|value| {
+            !value.is_string() && value.as_i64().and_then(|n| i32::try_from(n).ok()).is_none()
+        }) {
+            return Err("diagnostic code must be an integer or string");
+        }
+        if let Some(description) = diagnostic.get("codeDescription") {
+            uri_value(required(object(description)?, "href")?)?;
+        }
+        if let Some(tags) = diagnostic.get("tags")
+            && !tags.as_array().is_some_and(|values| {
+                values
+                    .iter()
+                    .all(|value| matches!(value.as_u64(), Some(1 | 2)))
+            })
+        {
+            return Err("invalid diagnostic tags");
+        }
+        if let Some(related) = diagnostic.get("relatedInformation") {
+            for info in related
+                .as_array()
+                .ok_or("related information must be an array")?
+            {
+                let info = object(info)?;
+                required(info, "message")?
+                    .as_str()
+                    .ok_or("related message must be a string")?;
+                let location = object(required(info, "location")?)?;
+                uri_value(required(location, "uri")?)?;
+                range_value(required(location, "range")?)?;
+            }
+        }
+    }
+    if map
+        .get("triggerKind")
+        .is_some_and(|value| !matches!(value.as_u64(), Some(1 | 2)))
+    {
+        return Err("invalid code action trigger kind");
+    }
+    map.get("only")
+        .map(|value| {
+            string_array(value).map(|kinds| {
+                kinds
+                    .iter()
+                    .any(|kind| matches!(kind.as_str(), Some("" | "quickfix")))
+            })
+        })
+        .unwrap_or(Ok(true))
 }
 
 fn parse_initialize(params: Option<&Value>) -> Result<(Configuration, bool), &'static str> {

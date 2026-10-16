@@ -303,3 +303,54 @@ throwaway actual public-API executable observed Pair.first→original A(id0,ordi
 d1 declaration54..60/Type238..240) and second→B(id1,ordinal1,62..68/263..265),
 with original borrowed pointers and absent nullable marking. The example source
 was removed. These are native data observations, not official generics or linkage.
+
+## Selected self-applied Class Function return (#390)
+
+`metadata::resolved_class_function_return::decode(&outcome, class_field_ordinal,
+limits)` selects one original field9/wire2 by its ordinal among **all** Class
+fields, from the same decoded kind1/mv2.3.0 Outcome that authenticates the owner.
+It returns the original owner, ordered declarations, selected Function header/name
+and outer/body spans, nominal return header/span, and ordered raw Arguments with
+projection presence, leaf headers/spans and checked owning declaration ordinals.
+The shared owner/declaration types live in `metadata::class_context`; the context
+extraction itself is internal and shared with the property consumer. No caller-
+authored owner vector, raw Function body or method-name fallback is accepted.
+
+The unchanged genuine Pair fixture's `copy` is Class field ordinal9 (not Function
+list ordinal3), outer149..198/body151..198, return155..169. Its two invariant
+Arguments reference original A(ID0, declaration54..60, ordinal0) and B(ID1,
+62..68, ordinal1); leaf Types are159..161 and165..167. Declaration variance OUT
+does not change argument projection: absent projection means invariant while
+remaining absent in the result. Nullable Options preserve marking only.
+ROOT actually executed an external native public-API consumer over this genuine
+class: owner47..285, selected copy/function151..198, return155..169, both exact
+original Argument/leaf/declaration pointers and ordinal bindings above passed.
+The function-list ordinal3 was correctly refused; nullable/projection marking
+remained absent while declarations retained OUT. Complete native binary tests
+passed491 cases across53 suites on the composed source; no JVM/compiler or
+parser/server/worker runtime was involved. The throwaway source was removed.
+
+The return must resolve to the owning ClassId, with argument/declaration counts
+equal. The common identical-resolver-index case reuses the authenticated owner
+without allocating a second ClassId; different indices compare resolved semantic
+ClassId parts, including local membership. Identity remains this context plus
+declaration ordinal, not a raw ID/name, global method ID or JVM linkage.
+Signed/noncontiguous/reordered IDs bind exactly; duplicate/unknown/enclosing IDs,
+Function-own parameters and leaf parameter-NAME classifiers refuse.
+
+Inline return/argument Type beats its accompanying table ID. Missing/table-only
+roles, duplicate inline messages, classifier conflicts, nested leaf arguments,
+aliases/flexible/outer/abbreviated Types, nonzero effective int32 Type flags and
+non-invariant/unknown projections refuse atomically. Recognized scalar narrowing
+and last-value semantics remain unchanged. Other Functions remain opaque; the
+selected Function's receiver/value/context/contract/JVM-extension bodies are
+bounded opaque data, not full signatures.
+
+One monotonic existing schema/wire/name/output budget covers combined d1+d2
+admission, complete Class framing/context, Function/return/Argument/leaf scans,
+binding/comparisons, names/ClassIds and staging/final vector capacity. No public
+per-argument decoder resets, repeated leaf decoding, raw-body copies or raised
+depth ceilings are used: selected fixed leaves follow the existing depth2 rule.
+Property/alias contracts remain unchanged. No general generic reconstruction,
+substitution, bounds/type-table interpretation, source/module linkage, server
+integration or official Kotlin LSP parity is claimed; #96 remains open.

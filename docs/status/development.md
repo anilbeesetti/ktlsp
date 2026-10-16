@@ -951,3 +951,208 @@ Cleanup-source exact reviews/compile/full original CI, guarded merge and
 independent original exact-main acceptance remain mandatory. Current main is
 still040; no new archive/#377 repair, local parser/server/worker runtime, JVM,
 effective non-nullness, full generic inference or official parity claim follows.
+
+### PR388 final generic identity integration
+
+After the actual producer/provider readback above, both independent full18-file
+functionality/adversarial reviews cleared capture-free
+`b5f612873fec17a0d4810f1ef00f75fc858ff869`, tree
+`ba361cbf6bc63e62e187ecc0fc607390d4dcc587`. Pinned format/strict locked
+workspace-all-target Clippy passed locally, without parser/server/worker runtime.
+Original attempt1 final Native38932181178/job117078656982 passed1052+22;
+platform38932181320 Mac117078657456 passed1050+22 and Windows117078657732
+passed997+22. Each complete131-row census has0failed/3ignored/0filtered.
+Exact synthetic823497b94615640f95b543730da4794139730a59 has the reviewed tree
+and ordered parents `[040dbba580d908c649c7256405687e2044e4cec2,b5f612873fec17a0d4810f1ef00f75fc858ff869]`.
+Both original platform ZIPs retain complete clean source/parent preflight and
+zero format/Clippy/full-workspace exit receipts; temporary writers are gone.
+
+A separate fresh strictly read-only guard returned process0 and parsed0:
+exact main/head/base/tree, complete18-file scope, frozen4configurationblobs,
+clean local reviewed identity,3successful checks/0statuses/2originalworkflows.
+Only then did a separate ordinary expected-head squash produce
+`c4c7c6dfe72aa28fbb327e9581916eddc375d4ad`, exact reviewed treeba361 and
+soleparent040. The exclusive base lease remained held through actual squash
+identity and independent OWNER+ROOT original attempt1 push/main
+[38933481416/job117083027573](https://github.com/anilbeesetti/ktlsp/actions/runs/38933481416/job/117083027573).
+Each independently authenticated actualc4 checkout, pinnedRust1.99 format,
+strict locked workspace-all-target Clippy/full workspace:1052passed plus22
+separate protocol faultcases,131rows/0failed/3ignored/0filtered. ROOT complete
+log276851bytes SHA256
+5d37495d9b5c9156135586c7a3650a4e1a9264e6439271c2ed46de6680620763.
+Lease388 cleared only after both proofs; #386/#387 closed. Public full delivery:
+[PR388comment6220411515](https://github.com/anilbeesetti/ktlsp/pull/388#issuecomment-6220411515),
+[330comment6220412069](https://github.com/anilbeesetti/ktlsp/issues/330#issuecomment-6220412069).
+
+This supersedes the pending integration state at the prior source checkpoint,
+not its historical first-outcome evidence. All next isolated389/390/391 owners
+received ONE verifiedc4 incoming main, separate worktrees and two reserved
+independent review slots each. No local parser/server/worker runtime, JVM/C
+analysis, unchanged retry or new archive dispatch occurred. Typeparameter
+inference/rename/reference/hover and full official parity remain unimplemented;
+Windows377cause and96/B3/46/license/official release gates remain open.
+
+### Local calls, selected generic returns and structural quickfix source
+
+All three isolated owners started from independently verifiedc4. Final formatted
+component heads389/5e1e02dcdb85abb9a1af987da3d3dc107276641d,
+390/cbd978456df48b295ee81b9993db42a72914341a and
+391/7cce198c7d2e32250e0e7ab4ef129900e3a0f9ac each obtained two separate
+functionality/adversarial static reviews and exact formatting rechecks.
+ROOT composed without conflicts, documented finite limits, removed the temporary
+quickfix coordinate vector and reused constant action titles instead of runtime
+formatting. Two full20-file union reviews cleared447ff0c420a4449ee4fcec180fb19c23415366ab/treed2239090.
+
+The first strict compile exposed two new Clippy errors; ROOT used a borrowed
+one-Range slice and collapsed the diagnostic-tags guard without suppressions or
+semantic changes. Both exact ae5de3c rechecks cleared; strict compile then passed.
+The first full binary data suite rejected a new test's incidental internal
+Context(Wire) wrapper expectation AFTER the API had correctly returnedErr.
+The authoritative Class-header pass wraps that failure asContext(Class(Wire));
+ROOT did not repin the wrapper or alter production error policy. The unchanged
+late malformed bytes must still fail, and their valid prefix now asserts selected
+ordinal/name/original owning-parameter bindings instead of bare success.
+Both exact3c13abab406c043c0a82bde14633fcc3475afc66/tree67df5803 rechecks
+confirmed the consumer-visible assertion was preserved, not weakened.
+
+At3c13, pinned format/strict locked workspace-all-target Clippy passed; the
+COMPLETE native binary data suite passed491 cases across53 suites. ROOT's actual
+external native executable read genuine2983-bytePair.class through class reader
+→annotations→Metadata→selected-return publicAPI. It observed original owner
+kotlin.Pair47..285, copy/allClassfieldordinal9/function151..198/return155..169;
+argument0→originalA(ID0,ordinal0,decl54..60,arg157..161,leaf159..161),
+argument1→B(ID1,ordinal1,decl62..68,arg163..167,leaf165..167).
+All original borrowed-pointer checks passed. Projection/nullable marking isNone,
+declaration varianceSome(Out); method-listordinal3 is correctly refused.
+Throwaway source was removed; no parser/server/worker or JVM runtime ran locally.
+
+FIRST actual389producer/CLI and391interactive quickfix outcomes remain unobserved.
+Temporary already-executed-path writers retain full structured source/CST/target
+and request/reply/returned-edit evidence for ROOT's original hosted readback.
+No extra parse is added. Source reviews/native data are not actual provider or
+official equivalence; first hosted readback, writer-only cleanup, final original
+native/platformCI and guarded integration/OWNER+ROOTmain remain required.
+
+### First original local-call and quickfix outcomes
+
+First reviewedbad67b5931abfd6e671719aee0510c9131dda265/treeee9060a3
+ran original Native38939434901/job117103045641 and platform38939435059:
+Windows117103045825/Mac117103046326. Native stopped at one obsolete empty-local
+function refusal; platform full132-row censuses each retained5failures,
+3ignored/0filtered (1015Windows/1068Mac passes). Original source
+fd53323201105d36ab2f3d34605d663d18549682 has treeee90/parents[c4,bad67].
+Both failure ZIPs12063405406/12062641957 were authenticated; no retry occurred.
+
+All five failures were test/contract issues: two formerly unsupported empty
+functions are now intentionally admitted; a CLI negative indexed a diagnostic
+notification instead of matching its callee reply; both edit-application tests
+serialized native `TextChange` as `rangeLength:null`, which the unchanged strict
+wire validator correctly rejected. ROOT migrated exact empty cases to original-
+identity positives, retained nonempty-body refusal and all11 callee negatives,
+selected the exact response ID, and sent actual edit-derived range/text with
+absent rangeLength omitted. No production, input guard, serializer, bound or
+two-second timeout changed. Both reviewers cleared expanded21-file
+e24c0114d05250ade17ff1fb9aa49cdc9954bf9d/treeb3f32d5239b16e3eb62e1dede2c014fbc8932658;
+pinned format/strict workspace-all-target Clippy passed.
+
+That changed source's OWN original attempt1 checks passed, without filters:
+
+|Original run/job|Workspace passes|Separate faultcases|
+|---|---:|---:|
+|Native38941146516/117108802041|1075|22|
+|Platform38941146673/Windows117108802992|1020|22|
+|Platform38941146673/macOS117108803352|1073|22|
+
+All132 resultrows have0failed/3ignored/0filtered. Actual checkout
+8e43cccc0d6f3b0285beb3617e8e0bc9f14cb9fb has exact treeb3f32d and
+ordered parents[c4,e24]; the older event merge SHAfd533 was not substituted for
+actual source. Complete clean preflight/zero mandatory exits and original API
+ZIPs agree: macOS12063582424 SHA256
+612ff25f4ca2a9b27f657ee5bad1726d3e577b7a2842827f8857cf789c5bbec1;
+Windows12063397200 SHA256
+7a6fc53a176f025d79a6cfa7de9caee4ff5095189c8f02589afbd96af6ed0c98.
+
+ROOT and independent owners directly read corresponding actual packets.
+All13 records agree byte-for-byte across hosts; the11 local-call records also
+match the earlier failed-source positives. Three complete CSTs retain39/141/39
+UTF8bytes,33/107/33 elements,21/74/21 tokens and0diagnostics. Original minimal
+target name17..23 precedes its call; mixed local quotedtarget76..84 belongs to
+the original outer function/body, not same-name import/top-level declarations.
+Complete token/child partitions, UTF8 boundaries and original associations passed.
+Actual minimal6/3 and mixed20/17 messages/replies exercise all8 consumers.
+ROOT and owner independently applied actual returned UTF16 completion/rename
+edits; all three captured8/5 version8 followups preserve callee/typeparameter
+targets and bind values correctly. No-op self-completion's redundant reopen was
+removed during cleanup; both completion candidates and the meaningful changed
+completion/rename application/rebinding assertions remain.
+
+The first complete actual quickfix packet has8sent/6received messages:
+source `val s = "😀"\r\n)` at URIuntitled:fix/version7; actual versioned one-edit
+deletion1:0–1:1; actualdidChange8 with returned range/emptytext and absent
+rangeLength; actualfresh version8 empty diagnostics, nextaction[] and shutdownnull.
+ROOT and owner independently applied the received edit to exactly
+`val s = "😀"\r\n`. Full2707-byte observationpacket SHA256
+564b94d9bfe250206a4ef4e45bbbe756cd60e0c53d640dc254059e105ec18790;
+325-byte actual-actionpacket SHA256
+a5dd1aa0e73d6ec20d61fa44f65750114deef1c9d8108a0853471987128254f7.
+Source assertions exercise empty PATH/no Java homes/exit0/empty stderr;
+these are not additional raw receipt fields. Available worker absence is not
+proved, but no parser-backed request occurs. Linux executed these tests;
+successful eprintln packets were not observed in its captured libtest output.
+
+Only temporary writers/bookkeeping and the duplicate no-op replay were removed
+after readback. All original identity, actual changed-edit/version8/rebinding,
+strict validation, budgets and refusal assertions remain. Final cleanup-source
+exact reviews/full original native/platformCI, fresh separate read-only guard/
+expected-head merge/actual tree+soleparent/OWNER+ROOToriginalmain remain required.
+Full parity,96/B3/46/license/official and377cause gates are not closed.
+
+### Original macOS cancellation failure and bounded observation (#395)
+
+The capture-free8be92e7fb45833ca53fdc58345f49c1d99be3d6c/tree90d978a8
+did not pass all gates. Original Native38943194925/job117115694417
+passed1075+22 and platform38943194927/Windows117115694759 passed1020+22,
+but macOS117115694418 failed with1072passed/1failed. Each complete census
+has132rows/3ignored/0filtered. Actual checkoutca733b5ece7f7777fdb29a87cc588f2340949a6a
+has reviewed tree90d978a8 and ordered parents[c4,8be]. ROOT and an independent
+owner authenticated original APIs, raw logs and both source-preflight ZIPs.
+The existing interactive cancellation test observed exit1 versus required0.
+Its shared helper asserted before reading stderr, losing the exact expected-zero
+subcase and child error. ParserTimeout, cleanup failure and root cause are not
+established. #395 remains OPEN/UNKNOWN; earlier e24 green checks do not erase it.
+
+Two independent source investigations found no incident-specific repair.
+Strict20ms cleanup observation can conservatively refuse under an allowed
+interleaving; that is not observed cause. Accepting late confirmation, raising
+grace or weakening zero-exit/error assertions is not a repair.
+
+Diagnostic-only d50972f72a265c641f041c4ac81570e140b45a21/treef10d4dfb
+received two expanded22-file static observation clearances and passed pinned
+format/strict locked workspace-all-target Clippy. Its own original attempt1
+Native38945638770/job117123930855 passed1075+22;
+platform38945638717/macOS117123930208 passed1073+22 and
+Windows117123930809 passed1020+22, each132rows/0failed/3ignored/0filtered.
+Actual checkouta8b3b6d566785f65dcce92f17d606eb183f22b2c has exact treef10d4dfb
+and ordered parents[c4,d509]; the older event merge SHA was not substituted.
+Authenticated artifacts12065517503/macOS and12066775087/Windows retain complete
+clean preflight and zero mandatory exits.
+
+ROOT and the independent owner directly read102 actual records per host:
+76 received replies and26 completed-process exits. Both formerly ambiguous
+zero-expected paths observed exit0/empty stderr; the released reissued request
+observed-32803/parser worker failed, not Timeout. Exact u64MAX/string IDs,
+cancellation reasons, shutdown-null, nonzero exit/EOF and actual broken-output
+errors were retained. Corresponding records agree except OS-specific pipe-error
+wording. Linux passed the complete suite but exposed no successful capture
+records. None of this diagnoses the old failure or proves a lifecycle repair.
+
+Temporary reply/exit writers were removed only after both readers completed.
+Caller propagation and draining completed-child stderr BEFORE the unchanged
+status assertion remain, with stdin still held open and every original wait,
+exit/error/duplicate-output and cleanup assertion unchanged. No production
+supervisor, resource bound, deadline, parser guard or feature acceptance changed.
+The final capture-free product still requires its own exact expanded-union
+reviews, full original checks and all guarded integration/main-evidence gates.
+Unresolved395/377/96/B3 and official/release/full-parity limits remain separate.
+
+

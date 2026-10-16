@@ -408,6 +408,36 @@ types, stable cross-revision symbols or a new server capability.
   validation and compared bytes. Binding allocates nothing and is nonrecursive.
   This is not complete nested/outer/member/receiver/import/overload resolution,
   types, stable cross-revision identity or official navigation equivalence.
+- `local_value_binding::bind_local_function_callee(directory, result, callee_index,
+  current)` adds definition-only lookup for a direct standalone plain empty call
+  to an original preceding same-block local `FUN`. Local targets have ordinary
+  non-generic zero-parameter headers and empty bodies. The complete ordinary
+  top-level outer function (including retained #386 generic headers/annotations)
+  is validated; **every** call must prove this same local-function identity.
+  Callees are a distinct authenticated role, never initializer `ReferenceSite`s.
+  All original value binding, integer-default, visibility, occurrences and
+  guarded rename remain available in admitted mixed bodies. Local function
+  declarations, type parameters and callees never enter value completions or occurrences.
+  Lookup inspects every relevant semantic-equivalent local declaration and
+  parameter before eligibility; unsupported competition, overloads (including
+  different arities), values/classifiers, unsupported spellings and richer call
+  shapes refuse atomically. Later locals are not forward candidates; conflicts
+  with future declarations are conservative refusals, not visibility claims.
+  A proved local positive needs no guessed package/import universe. Rename
+  conflicts with any relevant local-function name refuse, preserving proved
+  callees after fresh value edits. One checked 2,097,152-unit reference budget
+  covers origin, complete body, every callee and all competitor/rename work.
+  Private lookup never recursively invokes public body validation, allocates no
+  names/candidates, and selected-call resolution is not repeated. Permanent real
+  producer and paired-CLI tests apply actual edits and rebind updated source.
+  ROOT and the source owner read all three complete original CST/target packets
+  and real mixed-body/returned-edit/rebind wire on both original platform hosts;
+  corrected-source38941146673 passed all full workspace checks. Writers were
+  removed only after readback; meaningful identity/edit/refusal assertions remain.
+  This is hosted native behavior, not local runtime or official equivalence.
+  General overload/invoke, nonempty/nested local bodies, package/global fallback,
+  callee references/hover and function rename remain unsupported;
+  #96 quarantine and the full-parity gap are unchanged.
 - `local_value_binding::bind_lexical_type_parameter(directory, result,
   annotation_reference_index, current)` authenticates original snapshot/tree
   association, exact reference/token/USER_TYPE/TYPE_REFERENCE/parameter-or-local

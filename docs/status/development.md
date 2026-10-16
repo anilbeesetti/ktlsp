@@ -951,3 +951,44 @@ Cleanup-source exact reviews/compile/full original CI, guarded merge and
 independent original exact-main acceptance remain mandatory. Current main is
 still040; no new archive/#377 repair, local parser/server/worker runtime, JVM,
 effective non-nullness, full generic inference or official parity claim follows.
+
+### PR388 final generic identity integration
+
+After the actual producer/provider readback above, both independent full18-file
+functionality/adversarial reviews cleared capture-free
+`b5f612873fec17a0d4810f1ef00f75fc858ff869`, tree
+`ba361cbf6bc63e62e187ecc0fc607390d4dcc587`. Pinned format/strict locked
+workspace-all-target Clippy passed locally, without parser/server/worker runtime.
+Original attempt1 final Native38932181178/job117078656982 passed1052+22;
+platform38932181320 Mac117078657456 passed1050+22 and Windows117078657732
+passed997+22. Each complete131-row census has0failed/3ignored/0filtered.
+Exact synthetic823497b94615640f95b543730da4794139730a59 has the reviewed tree
+and ordered parents `[040dbba580d908c649c7256405687e2044e4cec2,b5f612873fec17a0d4810f1ef00f75fc858ff869]`.
+Both original platform ZIPs retain complete clean source/parent preflight and
+zero format/Clippy/full-workspace exit receipts; temporary writers are gone.
+
+A separate fresh strictly read-only guard returned process0 and parsed0:
+exact main/head/base/tree, complete18-file scope, frozen4configurationblobs,
+clean local reviewed identity,3successful checks/0statuses/2originalworkflows.
+Only then did a separate ordinary expected-head squash produce
+`c4c7c6dfe72aa28fbb327e9581916eddc375d4ad`, exact reviewed treeba361 and
+soleparent040. The exclusive base lease remained held through actual squash
+identity and independent OWNER+ROOT original attempt1 push/main
+[38933481416/job117083027573](https://github.com/anilbeesetti/ktlsp/actions/runs/38933481416/job/117083027573).
+Each independently authenticated actualc4 checkout, pinnedRust1.99 format,
+strict locked workspace-all-target Clippy/full workspace:1052passed plus22
+separate protocol faultcases,131rows/0failed/3ignored/0filtered. ROOT complete
+log276851bytes SHA256
+5d37495d9b5c9156135586c7a3650a4e1a9264e6439271c2ed46de6680620763.
+Lease388 cleared only after both proofs; #386/#387 closed. Public full delivery:
+[PR388comment6220411515](https://github.com/anilbeesetti/ktlsp/pull/388#issuecomment-6220411515),
+[330comment6220412069](https://github.com/anilbeesetti/ktlsp/issues/330#issuecomment-6220412069).
+
+This supersedes the pending integration state at the prior source checkpoint,
+not its historical first-outcome evidence. All next isolated389/390/391 owners
+received ONE verifiedc4 incoming main, separate worktrees and two reserved
+independent review slots each. No local parser/server/worker runtime, JVM/C
+analysis, unchanged retry or new archive dispatch occurred. Typeparameter
+inference/rename/reference/hover and full official parity remain unimplemented;
+Windows377cause and96/B3/46/license/official release gates remain open.
+

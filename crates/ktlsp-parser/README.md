@@ -105,7 +105,7 @@ checks rooted preorder/containment/depth, UTF-8 spans, exact token partition,
 diagnostic/count limits, and bounded JSON. The token-loss regression is rejected
 explicitly, never presented as a lossless tree.
 
-## Source-only semantic prerequisites (#320)
+## Bounded semantic prerequisites (#320)
 
 This branch composes PR307 → PR304 → PR299 → PR302 → PR305 and the two adopted
 #308 lowering/regression files, including the reviewed function-EQ refusal.
@@ -150,18 +150,19 @@ incremental bounds, not whole-process allocation, RSS, stack or time guarantees.
 The raw-name index may scan quadratically within its charged work limit;
 ancestor queries use fixed storage and position queries allocate nothing.
 
-Runtime status: the permanent
-`production_reference_initializer_preserves_declarations_and_regions` regression
-asserts the frozen same-block 37-row/27-token/zero-diagnostic CST, three
-declarations, two regions and memberships `[0, 1, 1]`, with same-origin checks.
-Those are expectations, **not a newly observed run of this composed branch**.
-Synthetic regressions retain context/order/error, origin/stale, resource and
-allocation refusals. No local parser runtime/tests are authorized under #96.
-Initial unchanged hosted Linux workspace CI must supply actual smoke proof;
-temporary direct-`Write` marker `SEMANTIC_PREREQ_SMOKE` in
-`tests/lowering.rs` prints only the actual authenticated regression results,
-without weakening assertions. Root removes only that observation block after
-proof, retains the regression, and obtains final reviewed-head CI.
+At source head `b94e6ded912d72c700be9f3e8d09ab923c4fb5a3`,
+[original attempt-1 Linux CI38850851404/job116811504205](https://github.com/anilbeesetti/ktlsp/actions/runs/38850851404/job/116811504205)
+checked synthetic merge `fad71a4c94b9e154ce90503f24cae5d39d27b7db`,
+ordered parents `[2e408cfd8d65c68a9eede863e3f983a2db720d95,b94e6ded912d72c700be9f3e8d09ab923c4fb5a3]`,
+tree `1436973f46d32175ec16398be571dc44c4e16a2d`. Unchanged pinned
+format, locked all-target workspace Clippy and locked full workspace tests passed.
+The actual supervised parser → lowerer → structural-directory observation
+returned 37 CST rows/27 tokens, zero diagnostics/errors, complete `f`/`x`/`y`
+declarations, two regions, memberships `[0, 1, 1]` and all three original-producer
+association checks true. The temporary direct-`Write` marker was removed after
+inspection; the substantive production and synthetic regressions remain.
+Final aggregate reviewed-head CI and guarded integration are separate gates.
+No local parser runtime/tests ran under #96.
 T008/T008a, full T009 and broader recovery/binding acceptance remain pending;
 #96 remains OPEN/UNKNOWN. No official oracle or platform-parity proof is claimed.
 

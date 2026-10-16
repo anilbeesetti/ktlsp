@@ -38,6 +38,13 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<TypeWithArguments<'_>, Err
         });
     }
     let mut budget = string_table::Budget::new(limits);
+    decode_with_budget(bytes, &mut budget)
+}
+
+pub(super) fn decode_with_budget<'a>(
+    bytes: &'a [u8],
+    budget: &mut string_table::Budget,
+) -> Result<TypeWithArguments<'a>, Error> {
     budget.node(1, 0)?;
     let header = type_header::decode_with_budget(bytes, &mut budget.wire)?;
     let mut arguments = Vec::new();
@@ -51,7 +58,7 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<TypeWithArguments<'_>, Err
             let span = field.span.end - raw.len()..field.span.end;
             budget.node(2, span.start)?;
             let argument =
-                type_argument::decode_with_budget(raw, &mut budget).map_err(|error| Error {
+                type_argument::decode_with_budget(raw, budget).map_err(|error| Error {
                     offset: span.start + error.offset,
                     ..error
                 })?;

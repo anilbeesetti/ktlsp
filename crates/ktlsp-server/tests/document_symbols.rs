@@ -370,6 +370,7 @@ impl Package {
             self.0
                 .join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX)),
         )
+        .arg("--stdio")
         .env("PATH", "")
         .env_remove("JAVA_HOME")
         .env_remove("JDK_HOME")
@@ -434,4 +435,50 @@ fn real_stdio_packaged_sibling_and_missing_worker_capabilities() {
         missing.iter().find(|m| m["id"] == 2).unwrap()["error"]["code"],
         -32601
     );
+}
+
+#[test]
+fn packaged_stdio_combines_symbols_pull_and_mandatory_utf16_fallback() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{"general":{"positionEncodings":["utf-8"]},"textDocument":{"documentSymbol":{"hierarchicalDocumentSymbolSupport":true},"diagnostic":{}}}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":"class Combined { val item = 1 }"}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":URI}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/diagnostic","params":{"textDocument":{"uri":URI}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":URI,"version":2},"contentChanges":[{"text":"\"😀\" ]"}]}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"textDocument/diagnostic","params":{"textDocument":{"uri":URI}}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":URI}}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"shutdown"}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ];
+    let replies = Package::new(true).exchange(&messages);
+    assert_eq!(replies.len(), 6, "{replies:?}");
+    assert!(replies.iter().all(|reply| reply.get("id").is_some()));
+    let capabilities = &replies[0]["result"]["capabilities"];
+    assert_eq!(capabilities["positionEncoding"], "utf-16");
+    assert_eq!(capabilities["documentSymbolProvider"], true);
+    assert_eq!(capabilities["diagnosticProvider"]["interFileDependencies"], false);
+    assert_eq!(capabilities["diagnosticProvider"]["workspaceDiagnostics"], false);
+    let symbols = replies.iter().find(|reply| reply["id"] == 2).unwrap();
+    assert_eq!(symbols["result"][0]["name"], "Combined");
+    assert_eq!(symbols["result"][0]["children"][0]["name"], "item");
+    assert_eq!(
+        replies.iter().find(|reply| reply["id"] == 3).unwrap()["result"],
+        json!({"kind":"full","items":[]})
+    );
+    let diagnostics = replies.iter().find(|reply| reply["id"] == 4).unwrap();
+    assert_eq!(diagnostics["result"]["kind"], "full");
+    assert_eq!(
+        diagnostics["result"]["items"][0]["range"],
+        json!({"start":{"line":0,"character":5},"end":{"line":0,"character":6}})
+    );
+    let rejected_symbols = replies.iter().find(|reply| reply["id"] == 5).unwrap();
+    assert_eq!(rejected_symbols["error"]["code"], -32803);
+    writeln!(
+        std::io::stdout().lock(),
+        "PRODUCT_STDIO_SMOKE {}",
+        json!({"initialize":&replies[0],"symbols":symbols,"diagnostics":diagnostics,"invalidSymbols":rejected_symbols})
+    )
+    .unwrap();
 }

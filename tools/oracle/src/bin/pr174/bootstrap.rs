@@ -1,4 +1,4 @@
-use ktlsp_oracle_replay::authority::{CalibrationCase, CalibrationPlan, CalibrationReport, GrantScope, HostSeal, RootGrant, OriginalRun};
+use ktlsp_oracle_replay::authority::{CalibrationCase, CalibrationPlan, CalibrationReport, GrantScope, HostSeal, RootGrant, OriginalRun, systemctl_usec};
 use sha2::{Digest, Sha256};
 
 const EXPECTED_GRANT: &str = "/etc/ktlsp-pr174/expected-grant.json";

@@ -1600,20 +1600,6 @@ fn declaration_name_hover_actual_worker_and_paired_cli() {
             let reply = replies.iter().find(|reply| reply["id"] == id).unwrap();
             assert_eq!(reply["result"], result, "{reply}");
         }
-        // Temporary bounded actual wire capture for ROOT's first hosted read.
-        if let Some(directory) = std::env::var_os("KTLSP_DECLARATION_HOVER_PROOF_DIR") {
-            let bytes = serde_json::to_vec(&json!({"source":source,"markdown":markdown,"profile":profile,"messages":messages,"replies":replies})).unwrap();
-            assert!(bytes.len() <= 65536);
-            std::fs::create_dir_all(&directory).unwrap();
-            let name = if markdown {
-                "markdown.json"
-            } else if profile.get("contentFormat").is_some() {
-                "plaintext.json"
-            } else {
-                "default.json"
-            };
-            std::fs::write(PathBuf::from(directory).join(name), bytes).unwrap();
-        }
     }
 }
 

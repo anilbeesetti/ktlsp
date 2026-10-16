@@ -1,4 +1,6 @@
 //! Optional native replay tooling; never part of the server/default workspace.
+pub mod authority;
+pub mod calibration_peer;
 use ktlsp_protocol::{read_frame, write_frame};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};

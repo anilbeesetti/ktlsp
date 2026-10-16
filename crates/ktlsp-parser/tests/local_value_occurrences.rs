@@ -2127,3 +2127,72 @@ fn local_type_namespace_refuses_the_entire_unsupported_envelope_and_annotation_c
         }
     }
 }
+
+#[test]
+fn documentation_operation_cannot_authorize_lexical_type_consumers() {
+    use ktlsp_parser::{
+        documentation,
+        local_value_binding::{
+            TypeParameterAnchor, bind_lexical_type_parameter, guarded_type_parameter_rename,
+            type_parameter_occurrences,
+        },
+    };
+    let _serial = functional::serial();
+    for (source, prose) in [
+        ("fun <T> f(){ /** doc */ val x:T=1 }", Some("doc")),
+        ("fun <T> f(){ /** doc */ final val x:T=1 }", Some("doc")),
+        ("fun <T> f(){ val x:T=1 }", None),
+    ] {
+        let result = parse(source);
+        let snapshot = result.snapshot();
+        let tree = result.tree_for(snapshot).unwrap();
+        let cancelled = || false;
+        let mut budget = documentation::Budget::new(&cancelled);
+        let lowered = documentation::lower(&result, snapshot, &mut budget).unwrap();
+        let property = lowered.declarations().iter().find(|d| d.raw_name() == "x").unwrap();
+        let attached = documentation::select(
+            &lowered, &result, snapshot, property.name_range().start, &mut budget,
+        ).unwrap();
+        assert!(std::ptr::eq(attached.declaration(), property));
+        assert_eq!(attached.prose(), prose);
+        let directory = build_regions(&lowered, &result, snapshot).unwrap();
+        let target = lowered.declarations().iter().find(|d| d.kind() == "TYPE_PARAMETER").unwrap();
+        let reference = tree.elements().iter().position(|e| {
+            e.kind == "REFERENCE_EXPRESSION"
+                && tree.elements()[e.parent.unwrap()].kind == "USER_TYPE"
+        }).unwrap();
+        assert_eq!(
+            bind_lexical_type_parameter(&directory, &result, reference, snapshot).unwrap_err(),
+            LocalBindingError::UnsupportedContext,
+        );
+        for anchor in [
+            TypeParameterAnchor::Declaration(target),
+            TypeParameterAnchor::AnnotationReference(reference),
+        ] {
+            assert_eq!(
+                type_parameter_occurrences(&directory, &result, anchor, snapshot).unwrap_err(),
+                LocalBindingError::UnsupportedContext,
+            );
+            for name in [None, Some("Fresh")] {
+                assert_eq!(
+                    guarded_type_parameter_rename(&directory, &result, anchor, snapshot, name)
+                        .unwrap_err(),
+                    LocalBindingError::UnsupportedContext,
+                );
+            }
+        }
+        if prose.is_none() {
+            let strict = lower_declarations(&result, snapshot).unwrap();
+            let directory = build_regions(&strict, &result, snapshot).unwrap();
+            let bound = bind_lexical_type_parameter(&directory, &result, reference, snapshot).unwrap();
+            assert_eq!(bound.target().raw_name(), "T");
+            let found = guarded_type_parameter_rename(
+                &directory, &result, TypeParameterAnchor::AnnotationReference(reference),
+                snapshot, Some("Fresh"),
+            ).unwrap();
+            assert!(std::ptr::eq(found.target(), bound.target()));
+            assert_eq!(found.occurrences().len(), 1);
+            assert_eq!(found.occurrences()[0].reference_index(), reference);
+        }
+    }
+}

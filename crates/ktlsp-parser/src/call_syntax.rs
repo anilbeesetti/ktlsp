@@ -590,6 +590,11 @@ pub(crate) fn validate_type_namespace<'a>(
     body_index: usize,
     b: &mut ReferenceBudget,
 ) -> Result<()> {
+    b.charge(1)?;
+    // Documentation-only prefix admission is not authority for semantic queries.
+    if lowered.documentation_operation.is_some() {
+        return Err(UNSUPPORTED);
+    }
     let node = b.element(parsed, function.cst_index())?;
     if function.incomplete() || function.owner().is_some() || node.parent != Some(0) {
         return Err(UNSUPPORTED);

@@ -1977,3 +1977,31 @@ success was admitted. User-existing optional tools remain permitted, never
 bundled or used for JVM semantic offload. Release/master and actual wire
 unknowns remain distinct; no repeated oracle probe/dispatch was performed.
 
+#### Union review correction: documentation-operation isolation
+
+The first FULL17 functionality review found a P2 provenance leak before any
+compiler/runtime: the new type proof skipped authenticated properties, while
+public documentation::lower legitimately returns the same private model with
+documentation-only prefix admission. Reusing that model through build_regions
+could bypass the former strict property's DOC_COMMENT/modifier rejection.
+This is an operation-authority bug, not evidence of a successful new feature.
+
+ROOT fixed the shared validate_type_namespace entry using the ALREADY retained
+private documentation_operation stamp: one charged guard rejects ALL such
+operation origins before trusting skipped strict-lowering subtrees. No new flag,
+field, mode, constructor or permissive fallback; production lowering and all
+non-type consumers remain unchanged. A meaningful cross-public-API regression
+retains actual doc-prose/original declaration selection, rejects semantic
+definition/occurrences/prepare/rename from doc-mode origins on both anchors,
+and preserves strict ordinary-source binding/rename on identical plain text.
+Documented property and documented final-property cases remain explicit.
+This is static-source correction, not a claimed failing-before/passing-after run.
+Both complete-union reviewers must recheck exact changed behavior before format.
+
+The separate public408 smoke source was also corrected before compilation:
+ClassId's private text storage is never exposed; public package/relative-name
+accessors and Debug are used. Explicitly AUTHORED signed own/Class collision,
+NAME parent-refusal/ambiguity and accepted/one-query-below typed resource
+controls now accompany genuine Result/Pairs. Independent adversarial static
+API sanity recheck is CLEAR; script and all composed behavior remain UNEXECUTED.
+

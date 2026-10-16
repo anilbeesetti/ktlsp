@@ -2,6 +2,7 @@
 pub mod ancestor_candidates;
 pub mod declaration_name_index;
 pub mod lowering;
+pub mod position_regions;
 pub mod structural_regions;
 
 use serde::{Deserialize, Serialize};

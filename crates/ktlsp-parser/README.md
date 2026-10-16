@@ -110,10 +110,15 @@ The first changed-source diagnostic workflow,
 refused both platforms before checkout: the event payload's optional
 `merge_commit_sha` was empty, although the immutable source/workflow SHA and
 merge ref agreed. Original identity artifacts were retained and independently
-rehash-verified. Source admission now records that absence, checks any supplied
-event merge SHA, and requires the actual ordered Git parents to match the original
-event base/head before native execution. This workflow correction is not a
-Windows source-guard diagnosis or a macOS parser observation; neither ran there.
+rehash-verified. The next original run,
+[38864989435](https://github.com/anilbeesetti/ktlsp/actions/runs/38864989435),
+also refused before checkout: the now-present payload merge SHA still named the
+older test merge while the original event head/base and actual source/workflow
+SHA had advanced. That payload field is retained as an observation, not admission
+authority. Admission requires the immutable context source/workflow SHA and ref,
+then actual ordered Git parents matching the original event base/head before
+native execution. Neither refusal diagnosed the Windows source guard or observed
+the macOS parser.
 
 Limits are enforced independently in parent and worker where applicable:
 

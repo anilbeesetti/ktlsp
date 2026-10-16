@@ -62,13 +62,14 @@ jobs:
             os_description = [System.Runtime.InteropServices.RuntimeInformation]::OSDescription
             powershell = $PSVersionTable.PSVersion.ToString()
           } | ConvertTo-Json | Set-Content "$evidence/identity.json" -Encoding utf8NoBOM
+          # The payload merge_commit_sha is observational: it may be absent or
+          # stale while GitHub has already selected a newer immutable test merge.
           if ($env:EVENT_NAME -cne 'pull_request' -or
               $env:SOURCE_SHA -cnotmatch '^[0-9a-f]{40}$' -or
               $env:PR_NUMBER -cnotmatch '^[1-9][0-9]*$' -or
               $env:SOURCE_REF -cne "refs/pull/$env:PR_NUMBER/merge" -or
               $env:PR_HEAD_SHA -cnotmatch '^[0-9a-f]{40}$' -or
               $env:PR_BASE_SHA -cnotmatch '^[0-9a-f]{40}$' -or
-              (-not [string]::IsNullOrEmpty($env:PR_MERGE_SHA) -and $env:PR_MERGE_SHA -cne $env:SOURCE_SHA) -or
               $env:WORKFLOW_SHA -cne $env:SOURCE_SHA -or
               $env:WORKFLOW_REF -cne "$env:REPOSITORY/.github/workflows/native-platform-checks.yml@refs/pull/$env:PR_NUMBER/merge") {
             throw 'Only the immutable actual PR merge SHA and its workflow are admitted'

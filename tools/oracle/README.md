@@ -239,3 +239,12 @@ Upstream source retains its notices: [flate2 MIT/Apache-2.0](https://docs.rs/cra
 and [simd-adler32 MIT](https://docs.rs/crate/simd-adler32/0.3.7/source/).
 These dependencies remain research-only; source publication/integration and
 all actual-host execution gates remain separate ROOT decisions.
+
+Bootstrap command/API prefixes are streamed once into protected
+`bootstrap/observer.evidence`, within the existing 128KiB reservation;
+the atomic completion receipt binds its actual byte count/digest and refuses
+incomplete writes before CREATE. They are not hex-encoded a second time into
+another full evidence buffer. This changes neither the aggregate 1MiB host
+allowance nor frozen Admission/handoff limits. Pre-CREATE supervisor failures
+retain their original bounded raw prefix separately when no partial observer
+file already exists.

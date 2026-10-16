@@ -119,7 +119,10 @@ fn no_disposal_failure()->Result<()> {
 }
 #[derive(Serialize,Deserialize)]
 #[serde(deny_unknown_fields,rename_all="camelCase")]
-struct BootstrapReceipt {schema_version:u8,scope:String,nonce:String,error:Option<String>,official_capture_success:bool,evidence_hex:String}
+struct BootstrapReceipt {
+    schema_version:u8,scope:String,nonce:String,error:Option<String>,official_capture_success:bool,
+    evidence_bytes:u64,evidence_sha256:Option<String>,evidence_complete:bool,
+}
 fn bootstrap() -> Result<Value> {
     protected(Path::new(STAGING),true)?;
     let expected:RootGrant=load(Path::new(EXPECTED_GRANT))?; expected.validate_shape()?;
@@ -131,8 +134,11 @@ fn bootstrap() -> Result<Value> {
     let dir=Path::new(ROOT).join(&nonce);mkdir(&dir,0o700)?;
     let end=mono_ms()?.checked_add(1_800_000).ok_or("bootstrap deadline overflow")?;
     let mut evidence=Evidence::preflight();
-    evidence.limit=64_000;
+    // Same 128KiB reservation, streamed once rather than hex-encoding JSONL twice.
+    evidence.limit=126_976;
     let result=(|| {
+        mkdir(&dir.join("bootstrap"),0o700)?;
+        evidence.commit(&dir.join("bootstrap"))?;
         let claims=Path::new(ROOT).join("grant-claims");
         match fs::create_dir(&claims){Ok(())=>fs::set_permissions(&claims,fs::Permissions::from_mode(0o700)).map_err(|e|e.to_string())?,Err(error)if error.kind()==ErrorKind::AlreadyExists=>{},Err(error)=>return Err(error.to_string())}
         protected(&claims,true)?;
@@ -168,12 +174,20 @@ fn bootstrap() -> Result<Value> {
         if evidence.failed{return Err("bootstrap service start evidence incomplete; supervisor must refuse CREATE".into());}
         Ok(json!({"status":"SUPERVISOR_STARTED","admissionDirectory":dir,"scope":admission.scope,"authority":"independent ROOT grant plus protected original workflow/OS-root custody; runtime receipts required"}))
     })();
-    let receipt=BootstrapReceipt{schema_version:1,scope:"PR174_BOOTSTRAP".into(),nonce,error:result.as_ref().err().cloned(),official_capture_success:false,evidence_hex:raw_hex(&evidence.pending)};
-    // Bootstrap preparation evidence has its own reserved part of the ONE observer allowance.
+    let evidence_path=dir.join("bootstrap/observer.evidence");
+    let measured:Result<(u64,String)>=(|| {
+        protected(&evidence_path,false)?;
+        let bytes=fs::metadata(&evidence_path).map_err(|e|e.to_string())?.len();
+        if bytes>126976{return Err("bootstrap evidence extent exceeded".into());}
+        Ok((bytes,sha_path(&evidence_path,end)?))
+    })();
+    let complete=evidence.file.is_some()&&!evidence.failed&&measured.as_ref().is_ok_and(|(bytes,_)|*bytes==evidence.used as u64);
+    let result=result.and_then(|value|if complete{Ok(value)}else{Err(measured.as_ref().err().cloned().unwrap_or_else(||"bootstrap raw evidence incomplete".into()))});
+    let receipt=BootstrapReceipt{schema_version:1,scope:"PR174_BOOTSTRAP".into(),nonce,error:result.as_ref().err().cloned(),official_capture_success:false,evidence_bytes:measured.as_ref().map(|(bytes,_)|*bytes).unwrap_or(0),evidence_sha256:measured.ok().map(|(_,hash)|hash),evidence_complete:complete};
     let bytes=serde_json::to_vec(&receipt).map_err(|e|e.to_string())?;
-    if bytes.len()>131072{return Err("bootstrap original evidence cap".into());}
+    if bytes.len()>4096{return Err("bootstrap receipt cap".into());}
     let saved=make_file(&dir.join("bootstrap-receipt.next"),&bytes,0o400).and_then(|()|fs::rename(dir.join("bootstrap-receipt.next"),dir.join("bootstrap-receipt.json")).map_err(|e|e.to_string()));
-    result.and_then(|v|{saved?;Ok(v)})
+    result.and_then(|value|{saved?;Ok(value)}).map_err(|error|format!("{error}; protected original evidence directory: {}",dir.display()))
 }
 fn install_supervisor(dir:&Path,a:&Admission,e:&mut Evidence)->Result<()> {
     let executable=std::env::current_exe().map_err(|e|e.to_string())?;protected(&executable,false)?;
@@ -212,8 +226,10 @@ fn bootstrap_receipt_gate(dir:&Path,a:&Admission)->Result<()> {
         match fs::symlink_metadata(dir.join("bootstrap-receipt.json")) {
             Ok(_)=>{
                 let path=dir.join("bootstrap-receipt.json");protected(&path,false)?;
-                let value:BootstrapReceipt=parse(&read_file(&path,131072)?)?;
-                if value.schema_version!=1||value.scope!="PR174_BOOTSTRAP"||value.nonce!=a.nonce||value.error.is_some()||value.official_capture_success{return Err("original bootstrap did not complete; no CREATE permission".into());}
+                let value:BootstrapReceipt=parse(&read_file(&path,4096)?)?;
+                if value.schema_version!=1||value.scope!="PR174_BOOTSTRAP"||value.nonce!=a.nonce||value.error.is_some()||value.official_capture_success||!value.evidence_complete||value.evidence_bytes>126976{return Err("original bootstrap did not complete; no CREATE permission".into());}
+                let evidence=dir.join("bootstrap/observer.evidence");protected(&evidence,false)?;
+                if fs::metadata(&evidence).map_err(|e|e.to_string())?.len()!=value.evidence_bytes||value.evidence_sha256.as_deref()!=Some(sha_path(&evidence,a.preparation_deadline_ms)?.as_str()){return Err("original bootstrap raw evidence binding changed; no CREATE".into());}
                 return Ok(());
             },
             Err(error)if error.kind()==ErrorKind::NotFound=>{

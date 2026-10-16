@@ -94,7 +94,7 @@ mod linux {
         io::{Read, Seek, SeekFrom, Write},
         os::{fd::{AsRawFd, FromRawFd, OwnedFd}, unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt}},
         path::{Path, PathBuf},
-        process::{Child, Command, Stdio},
+        process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio},
         thread,
         time::{Duration, Instant},
     };
@@ -371,11 +371,14 @@ mod linux {
         }
         fn decode(bytes: &[u8], exit: Option<bool>, count: usize) -> Result<Vec<CustodyChild>, String> {
             let frame: Self = serde_json::from_slice(bytes).map_err(|e| format!("custody child JSON: {e}"))?;
-            if let Some(original) = frame.first_failure { return Err(original); }
-            if exit != Some(true) || frame.children.len() != count {
+            frame.into_children(exit, count)
+        }
+        fn into_children(self, exit: Option<bool>, count: usize) -> Result<Vec<CustodyChild>, String> {
+            if let Some(original) = self.first_failure { return Err(original); }
+            if exit != Some(true) || self.children.len() != count {
                 return Err("custody child lacked complete original exit-zero cohort".into());
             }
-            Ok(frame.children)
+            Ok(self.children)
         }
     }
     #[repr(C)]
@@ -391,6 +394,14 @@ mod linux {
         fn process_vm_writev(pid: c_int, local: *const IoVector, local_count: c_ulong, remote: *const IoVector, remote_count: c_ulong, flags: c_ulong) -> isize;
         fn kill(pid: c_int, signal: c_int) -> c_int;
         fn truncate(path: *const c_char, length: i64) -> c_int;
+    }
+    fn nonblocking_fd(fd: c_int) -> Result<(), String> {
+        let flags = unsafe { fcntl(fd, 3) }; // F_GETFL; retain all existing flags.
+        if flags < 0 { return Err(error("custody F_GETFL", std::io::Error::last_os_error())); }
+        if unsafe { fcntl(fd, 4, flags | NONBLOCK) } < 0 {
+            return Err(error("custody F_SETFL O_NONBLOCK", std::io::Error::last_os_error()));
+        }
+        Ok(())
     }
     fn stream_pair() -> Result<(UnixStream, UnixStream), String> {
         let (a, b) = UnixStream::pair().map_err(|e| error("create bounded custody pipe", e))?;
@@ -439,6 +450,86 @@ mod linux {
         }
         Ok(bytes)
     }
+    #[derive(Default)]
+    struct CustodyIo {
+        stdout: Vec<u8>,
+        stderr: Vec<u8>,
+        stdout_seen: u64,
+        stderr_seen: u64,
+        stdout_eof: bool,
+        stderr_eof: bool,
+        exit: Option<bool>,
+        first_failure: Option<String>,
+    }
+    impl CustodyIo {
+        fn remember(&mut self, failure: String) {
+            if self.first_failure.is_none() { self.first_failure = Some(failure); }
+        }
+        // One nonblocking read per stream per turn keeps stdin and status polls
+        // live even if a failed child floods one pipe. Only error-free EOF is EOF.
+        fn drain(&mut self, reader: &mut impl Read, stderr: bool) -> bool {
+            let mut buffer = [0u8; 1024];
+            match reader.read(&mut buffer) {
+                Ok(0) => {
+                    if stderr { self.stderr_eof = true; } else { self.stdout_eof = true; }
+                }
+                Ok(count) => {
+                    if stderr { self.stderr_seen = self.stderr_seen.saturating_add(count as u64); }
+                    else { self.stdout_seen = self.stdout_seen.saturating_add(count as u64); }
+                    if stderr {
+                        let keep = count.min(512 - self.stderr.len());
+                        // An overflowing stdout must not erase the original
+                        // stderr prefix. Evict only stdout's retained tail.
+                        let evict = (self.stdout.len() + self.stderr.len() + keep).saturating_sub(CUSTODY_BYTES);
+                        self.stdout.truncate(self.stdout.len() - evict);
+                        self.stderr.extend_from_slice(&buffer[..keep]);
+                    } else {
+                        let available = CUSTODY_BYTES - self.stdout.len() - self.stderr.len();
+                        self.stdout.extend_from_slice(&buffer[..count.min(available)]);
+                    }
+                    if self.stdout_seen.saturating_add(self.stderr_seen) > CUSTODY_BYTES as u64 {
+                        self.remember("custody stdout+stderr combined byte bound exceeded".into());
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                Err(e) => {
+                    self.remember(error(if stderr { "read actual custody stderr" } else { "read actual custody stdout" }, e));
+                    return true; // Do not retry a failed descriptor.
+                }
+            }
+            false
+        }
+        fn finish(self) -> Result<Vec<CustodyChild>, String> {
+            let parsed = serde_json::from_slice::<CustodyFrame>(&self.stdout);
+            let child_failed = parsed.as_ref().is_ok_and(|frame| frame.first_failure.is_some());
+            let decoded = parsed.map_err(|e| format!("custody child JSON: {e}"))
+                .and_then(|frame| frame.into_children(self.exit, 2));
+            let original = match decoded {
+                Err(child) if child_failed => match self.first_failure {
+                    Some(parent) => format!("{child}; parentPipeFirstFailure={parent}"),
+                    None => child,
+                },
+                Err(child) => self.first_failure.unwrap_or(child),
+                Ok(children) => {
+                    if let Some(parent) = self.first_failure { parent }
+                    else if !self.stdout_eof || !self.stderr_eof || self.exit != Some(true) {
+                        "custody requires both actual pipe EOFs and reaped original exit zero".into()
+                    } else if self.stderr_seen != 0 {
+                        "custody child wrote unexpected stderr".into()
+                    } else { return Ok(children); }
+                }
+            };
+            let mut hex = String::with_capacity(self.stderr.len() * 2);
+            const HEX: &[u8; 16] = b"0123456789abcdef";
+            for byte in self.stderr {
+                hex.push(HEX[(byte >> 4) as usize] as char);
+                hex.push(HEX[(byte & 15) as usize] as char);
+            }
+            Err(format!("{original}; stdoutObservedBytes={} stdoutEof={} stderrObservedBytes={} stderrEof={} childReaped={} stderrPrefixHex={hex}",
+                self.stdout_seen, self.stdout_eof, self.stderr_seen, self.stderr_eof, self.exit.is_some()))
+        }
+    }
+
     struct CustodyEvidence {
         target: CustodyTarget,
         file: File,
@@ -448,8 +539,10 @@ mod linux {
     }
     struct CustodyPending {
         child: Child,
-        input: UnixStream,
-        output: UnixStream,
+        input: Option<ChildStdin>,
+        output: ChildStdout,
+        error: ChildStderr,
+        deadline: Instant,
         receipt: confinement::Receipt,
         files: Vec<CustodyEvidence>,
         // High, fixed CLOEXEC duplicate slots avoid confusing post-exec pipe FD
@@ -460,6 +553,7 @@ mod linux {
     }
     impl CustodyPending {
         fn spawn() -> Result<Self, String> {
+            let deadline = Instant::now() + PHASE;
             for leaf in confinement::profile().write_leaves {
                 fs::DirBuilder::new().mode(0o700).create(Path::new(CAPTURE).join(leaf))
                     .map_err(|e| error("create production-profile private leaf", e))?;
@@ -486,18 +580,22 @@ mod linux {
                 descriptors.push(descriptor);
                 files.push(CustodyEvidence { target, file, before, device: metadata.dev(), inode: metadata.ino() });
             }
-            let (input, child_input) = stream_pair()?;
-            let (output, child_output) = stream_pair()?;
             let mut command = Command::new(std::env::current_exe().map_err(|e| error("custody current executable", e))?);
-            command.args(["--custody-child", "direct"]).env_clear()
-                .stdin(Stdio::from(OwnedFd::from(child_input)))
-                .stdout(Stdio::from(OwnedFd::from(child_output))).stderr(Stdio::null());
+            command.args(["--custody-child", "direct"]).env_clear();
             // The single actual production launcher verifies nondumpable parent,
             // exact policy/ABI, descriptor closure and child-only restrictions.
-            let (child, receipt) = confinement::spawn(&mut command, Path::new(CAPTURE))
+            let (mut child, receipt) = confinement::spawn(&mut command, Path::new(CAPTURE))
                 .map_err(|failure| format!("production custody launcher refused: {}", failure.error))?;
             receipt.validate_enforced(std::process::id())?;
-            Ok(Self { child, input, output, receipt, files, descriptors, marker: Box::new([0x53; 64]), _abstract_listener: abstract_listener })
+            // Only the production launcher creates stdio. Its returned pipe
+            // handles, not caller-provided sockets, are the actual child path.
+            let input = child.stdin.take().ok_or("production custody stdin pipe missing")?;
+            let output = child.stdout.take().ok_or("production custody stdout pipe missing")?;
+            let error = child.stderr.take().ok_or("production custody stderr pipe missing")?;
+            nonblocking_fd(input.as_raw_fd())?;
+            nonblocking_fd(output.as_raw_fd())?;
+            nonblocking_fd(error.as_raw_fd())?;
+            Ok(Self { child, input: Some(input), output, error, deadline, receipt, files, descriptors, marker: Box::new([0x53; 64]), _abstract_listener: abstract_listener })
         }
         fn publish_ready(&mut self, bytes: &[u8]) -> Result<(), String> {
             let evidence = self.files.iter_mut().find(|file| file.target == CustodyTarget::ReadyReport).ok_or("reserved ready evidence missing")?;
@@ -508,18 +606,64 @@ mod linux {
             evidence.before = bytes.to_vec();
             Ok(())
         }
+        fn exchange(&mut self, frame: &[u8]) -> Result<Vec<CustodyChild>, String> {
+            let mut observed = CustodyIo::default();
+            let mut written = 0;
+            let mut stdout_failed = false;
+            let mut stderr_failed = false;
+            let mut wait_failed = false;
+            if frame.len() > 512 {
+                observed.remember("fixed custody start frame exceeds 512 bytes".into());
+                drop(self.input.take());
+            }
+            loop {
+                if Instant::now() >= self.deadline {
+                    observed.remember("custody original phase deadline expired".into());
+                    break;
+                }
+                if let Some(input) = &mut self.input {
+                    match input.write(&frame[written..]) {
+                        Ok(0) => {
+                            observed.remember("actual custody stdin write returned zero".into());
+                            drop(self.input.take());
+                        }
+                        Ok(count) => {
+                            written += count;
+                            if written == frame.len() { drop(self.input.take()); }
+                        }
+                        Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                        Err(e) => {
+                            observed.remember(error("write actual custody stdin", e));
+                            drop(self.input.take()); // Broken pipe never skips stdout/stderr collection.
+                        }
+                    }
+                }
+                if !observed.stdout_eof && !stdout_failed { stdout_failed = observed.drain(&mut self.output, false); }
+                if !observed.stderr_eof && !stderr_failed { stderr_failed = observed.drain(&mut self.error, true); }
+                if observed.first_failure.is_some() { drop(self.input.take()); }
+                if observed.exit.is_none() && !wait_failed {
+                    match self.child.try_wait() {
+                        Ok(status) => observed.exit = status.map(|status| status.success()),
+                        Err(e) => {
+                            observed.remember(error("poll actual custody child", e));
+                            wait_failed = true;
+                        }
+                    }
+                }
+                if self.input.is_none() && (observed.stdout_eof || stdout_failed)
+                    && (observed.stderr_eof || stderr_failed) && (observed.exit.is_some() || wait_failed) { break; }
+                thread::yield_now();
+            }
+            drop(self.input.take());
+            observed.finish()
+        }
         fn finish(mut self) -> Result<CustodyReceipt, String> {
-            let direct_original = identity(self.child.id())?;
+            let direct_original = identity(self.child.id());
             let evidence_fds: [i32; 5] = std::array::from_fn(|index| self.descriptors[index].as_raw_fd());
             let start = CustodyStart { schema_version: 1, memory_address: self.marker.as_ptr() as usize as u64, evidence_fds, run: true };
-            bounded_pipe_write(&mut self.input, &serde_json::to_vec(&start).map_err(|e| e.to_string())?)?;
-            drop(self.input); // EOF is the fixed private input frame boundary.
-            let mut child_exit = None;
-            let bytes = bounded_pipe_read(&mut self.output, CUSTODY_BYTES, || {
-                child_exit = self.child.try_wait().map(|status| status.map(|s| s.success())).map_err(|e| error("poll actual custody child", e))?;
-                Ok(child_exit.map(|_| true)) // Parse bounded original error frame even on nonzero exit.
-            })?;
-            let children = CustodyFrame::decode(&bytes, child_exit, 2)?;
+            let bytes = serde_json::to_vec(&start).map_err(|e| e.to_string())?;
+            let children = self.exchange(&bytes)?;
+            let direct_original = direct_original?;
             if children.first().map(|child| &child.original_process) != Some(&direct_original) {
                 return Err("custody direct child did not match original measured /proc identity".into());
             }
@@ -668,6 +812,7 @@ mod linux {
         Ok(vec![direct, inherited])
     }
     fn custody_child() -> Result<(), String> {
+        for fd in [0, 1, 2] { nonblocking_fd(fd)?; }
         let frame = CustodyFrame::from_result(custody_child_cohort());
         let mut output = unsafe { File::from_raw_fd(1) };
         let bytes = serde_json::to_vec(&frame).map_err(|e| e.to_string())?;
@@ -806,6 +951,80 @@ mod linux {
         }
         Ok(())
     }
+    #[cfg(test)]
+    mod pipe_state_tests {
+        use super::*;
+        fn synthetic_child(pid: u32) -> CustodyChild {
+            CustodyChild {
+                role: CustodyRole::Direct,
+                original_process: ProcessIdentity { pid, parent_pid: 2, process_group: 1, session: 1, start_time_ticks: 10, executable_device: 1, executable_inode: 2 },
+                recorder_pid: 2, recorder_start_time_ticks: 9, probes: Vec::new(),
+            }
+        }
+        fn synthetic_io() -> CustodyIo {
+            let frame = CustodyFrame { children: vec![synthetic_child(3), synthetic_child(4)], first_failure: None };
+            let stdout = serde_json::to_vec(&frame).unwrap();
+            CustodyIo { stdout_seen: stdout.len() as u64, stdout, stdout_eof: true, stderr_eof: true, exit: Some(true), ..CustodyIo::default() }
+        }
+        #[test]
+        fn synthetic_success_requires_both_eofs_and_reaped_original_exit_zero() {
+            assert_eq!(synthetic_io().finish().unwrap().len(), 2);
+            let mut missing_stderr_eof = synthetic_io();
+            missing_stderr_eof.stderr_eof = false;
+            assert!(missing_stderr_eof.finish().unwrap_err().contains("stderrEof=false"));
+            let mut missing_stdout_eof = synthetic_io();
+            missing_stdout_eof.stdout_eof = false;
+            assert!(missing_stdout_eof.finish().unwrap_err().contains("stdoutEof=false"));
+            let mut unreaped = synthetic_io();
+            unreaped.exit = None;
+            assert!(unreaped.finish().unwrap_err().contains("childReaped=false"));
+            let mut nonzero = synthetic_io();
+            nonzero.exit = Some(false);
+            assert!(nonzero.finish().is_err());
+        }
+        #[test]
+        fn synthetic_broken_pipe_keeps_original_child_failure_and_actual_stderr_prefix() {
+            let stdout = serde_json::to_vec(&CustodyFrame::from_result(Err("original child syscall failure".into()))).unwrap();
+            let mut observed = CustodyIo {
+                stdout_seen: stdout.len() as u64, stdout, stdout_eof: true, stderr_eof: true,
+                exit: Some(false), ..CustodyIo::default()
+            };
+            observed.remember("stdin broken pipe".into());
+            observed.remember("later cleanup failure".into());
+            let mut stderr = std::io::Cursor::new(b"first\n");
+            assert!(!observed.drain(&mut stderr, true));
+            let error = observed.finish().unwrap_err();
+            assert!(error.starts_with("original child syscall failure"));
+            assert!(error.contains("parentPipeFirstFailure=stdin broken pipe"));
+            assert!(error.contains("stderrPrefixHex=66697273740a"));
+            assert!(!error.contains("later cleanup failure"));
+        }
+        #[test]
+        fn synthetic_combined_cap_retains_bounded_prefix_without_faking_eof() {
+            let mut observed = CustodyIo::default();
+            let mut stderr = std::io::Cursor::new(vec![b'e'; 513]);
+            assert!(!observed.drain(&mut stderr, true));
+            assert_eq!(observed.stderr.len(), 512);
+            assert!(!observed.stderr_eof);
+            let mut stdout = std::io::Cursor::new(vec![b'x'; CUSTODY_BYTES]);
+            while !observed.stdout_eof { assert!(!observed.drain(&mut stdout, false)); }
+            assert!(observed.stdout.len() + observed.stderr.len() <= CUSTODY_BYTES);
+            assert!(observed.stdout_seen + observed.stderr_seen > CUSTODY_BYTES as u64);
+            let error = observed.finish().unwrap_err();
+            assert!(error.contains("combined byte bound exceeded"));
+            assert!(error.contains("stderrEof=false"));
+            assert!(error.contains("childReaped=false"));
+            let mut reversed = CustodyIo::default();
+            let mut stdout = std::io::Cursor::new(vec![b'x'; CUSTODY_BYTES]);
+            while !reversed.stdout_eof { assert!(!reversed.drain(&mut stdout, false)); }
+            let mut stderr = std::io::Cursor::new(vec![b'e'; 513]);
+            assert!(!reversed.drain(&mut stderr, true));
+            assert_eq!(reversed.stderr, vec![b'e'; 512]);
+            assert!(reversed.stdout.len() + reversed.stderr.len() <= CUSTODY_BYTES);
+            assert!(reversed.finish().unwrap_err().contains("stderrPrefixHex=656565"));
+        }
+    }
+
     pub(super) fn run(mode: Mode) -> Result<(), String> {
         require_identity()?;
         match mode {

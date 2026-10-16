@@ -1319,3 +1319,13 @@ UNEXERCISED for this source. ROOT will verify one expanded final source,
 including genuine native PUBLIC-API data smokes and actual hosted392 edits,
 before any ordinary guarded integration. Full parity is still not achieved.
 
+The two expanded91-file reviews at618ebc4068b47b648ffa3ebd0811993da7a9d087
+independently identified one source-proven integration regression:394's new
+linked-method negative case still classified68.0 as unsupported after399's
+shared version extension. ROOT kept the product policy, moved refusal to
+70.0/68.preview/69.1 and added68.0/69.0 checks for original method/name/
+descriptor pointer identity. This is a static correction, not an executed
+before/after claim; both exact changed-head rechecks remain required.
+ROOT also directly SHA-256 checked all four images, both modern JARs,
+Object/Pair class bytes and both JPS XML originals against retained provenance.
+

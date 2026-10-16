@@ -211,8 +211,18 @@ fn unsupported_container_versions_wrong_fields_and_late_framing_refuse_atomicall
         let mut class = function(); class.constants[index] = Constant::Integer(value);
         assert_eq!(result(&class),Err(Error::UnsupportedContainer));
     }
-    let mut class = function(); class.major = 68;
-    assert!(matches!(result(&class),Err(Error::Model(ktlsp_binary::Error::UnsupportedVersion {..}))));
+    for major in [68,69] {
+        let mut class = function(); class.major = major;
+        let linked = result(&class).unwrap();
+        assert!(std::ptr::eq(linked.method, &class.methods[0]));
+        assert_eq!(linked.member.kind, Kind::Function);
+        assert_eq!(linked.name.as_ptr(), class.utf16(17).unwrap().as_ptr());
+        assert_eq!(linked.descriptor.raw().as_ptr(), class.utf16(18).unwrap().as_ptr());
+    }
+    for (major,minor) in [(70,0),(68,u16::MAX),(69,1)] {
+        let mut class = function(); class.major = major; class.minor = minor;
+        assert!(matches!(result(&class),Err(Error::Model(ktlsp_binary::Error::UnsupportedVersion {major:m,minor:n})) if (m,n) == (major,minor)));
+    }
     let mut class = function(); class.attributes.clear();
     assert_eq!(result(&class),Err(Error::UnsupportedContainer));
 }

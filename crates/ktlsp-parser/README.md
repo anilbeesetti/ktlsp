@@ -401,6 +401,27 @@ types, stable cross-revision symbols or a new server capability.
   validation and compared bytes. Binding allocates nothing and is nonrecursive.
   This is not complete nested/outer/member/receiver/import/overload resolution,
   types, stable cross-revision identity or official navigation equivalence.
+- `local_value_binding::visible_local_values(directory, result, initializer_index,
+  current_snapshot)` authenticates an existing whole-identifier initializer
+  reference without requiring its spelling to bind. The owned result retains
+  the original site, borrowed directory/body and original declaration pointers
+  in declaration preorder. Same-function ordinary parameters and eligible
+  preceding direct immutable locals participate; containing/future locals do
+  not, and a preceding local hides its parameter. Every visible candidate name
+  must be unique separately in parameter/local scopes, including later
+  duplicates of that name. Unrelated future-only duplicates are not visible.
+  Ambiguity or unsupported spelling/context refuses the entire result, never
+  a prefix. Authentication, snapshot comparisons, complete body validation,
+  candidate scans, counting, exact fallible reservation and emission share one
+  2,097,152-work budget, starting before index selection. Output is capped at
+  1,024 borrowed declarations and 131,072 requested/retained capacity bytes.
+  Quadratic borrowed scans deliberately trade larger-body admission for no
+  additional index. `tests/visible_local_values.rs` provides real-producer,
+  original-pointer/order/shadow/snapshot/refusal assertions and bounded hosted
+  producer/public-consumer captures; private tests cover exact shared work and
+  storage boundaries. These assertions await ROOT-admitted hosted execution;
+  source alone is not acceptance evidence. No caret/hole, completion capability,
+  initializer chasing, global scope/type resolution or parity is claimed.
 - `local_value_binding::local_value_occurrences` accepts precisely an original
   `LocalValueAnchor::Declaration` or a `ReferenceExpression` CST-index anchor.
   The identical directory/lowerer/result authenticates selection, including

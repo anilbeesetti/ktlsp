@@ -121,6 +121,7 @@ pub struct Session {
     parser_provider: Option<Arc<document_symbols::Provider>>,
     symbol_client: document_symbols::Client,
     hover_format: Option<semantic_navigation::HoverFormat>,
+    rename_client: semantic_navigation::RenameClient,
     exit_code: Option<i32>,
     incarnations: HashMap<String, u64>,
     next_incarnation: u64,
@@ -173,6 +174,7 @@ impl Session {
             parser_provider: None,
             symbol_client: document_symbols::Client::default(),
             hover_format: Some(semantic_navigation::HoverFormat::Plaintext),
+            rename_client: semantic_navigation::RenameClient::default(),
             exit_code: None,
             incarnations: HashMap::new(),
             next_incarnation: 0,
@@ -290,6 +292,8 @@ impl Session {
                 | "textDocument/hover"
                 | "textDocument/references"
                 | "textDocument/documentHighlight"
+                | "textDocument/prepareRename"
+                | "textDocument/rename"
         ) && self.state == State::Running
         {
             return match self.start_parser(id.clone(), method, params) {
@@ -329,6 +333,13 @@ impl Session {
                     .expect("validated capabilities"),
             )
             .map_err(|e| (-32602, e))?;
+            let rename_client = semantic_navigation::RenameClient::parse(
+                params
+                    .and_then(|p| p.get("capabilities"))
+                    .expect("validated capabilities"),
+            )
+            .map_err(|e| (-32602, e))?;
+            self.rename_client = rename_client;
             self.symbol_client = symbol_client;
             self.hover_format = semantic_navigation::HoverFormat::negotiate(
                 params
@@ -346,6 +357,13 @@ impl Session {
                 result["capabilities"]["documentHighlightProvider"] = json!(true);
                 if self.hover_format.is_some() {
                     result["capabilities"]["hoverProvider"] = json!(true);
+                }
+                if self.rename_client.document_changes {
+                    result["capabilities"]["renameProvider"] = if self.rename_client.prepare {
+                        json!({"prepareProvider":true})
+                    } else {
+                        json!(true)
+                    };
                 }
             }
             if pull_diagnostics {
@@ -419,6 +437,12 @@ impl Session {
         if method == "textDocument/hover" && self.hover_format.is_none() {
             return Err((-32601, "Method not found"));
         }
+        if matches!(method, "textDocument/rename" | "textDocument/prepareRename")
+            && (!self.rename_client.document_changes
+                || (method == "textDocument/prepareRename" && !self.rename_client.prepare))
+        {
+            return Err((-32601, "Method not found"));
+        }
         let map = params
             .ok_or((-32602, "parser request params missing"))
             .and_then(|p| object(p).map_err(|e| (-32602, e)))?;
@@ -431,6 +455,9 @@ impl Session {
             .documents
             .get(uri)
             .ok_or((-32602, "parser request refers to unopened document"))?;
+        if document.text().len() > ktlsp_parser::MAX_SOURCE_BYTES {
+            return Err((-32803, "request exceeds the parser's 64 KiB source limit"));
+        }
         let query = if method == "textDocument/documentSymbol" {
             None
         } else {
@@ -463,15 +490,28 @@ impl Session {
                 "textDocument/documentHighlight" => {
                     semantic_navigation::Query::Highlights { offset }
                 }
-                _ => semantic_navigation::Query::Hover {
+                "textDocument/prepareRename" => {
+                    semantic_navigation::Query::PrepareRename { offset }
+                }
+                "textDocument/rename" => {
+                    let name = required(map, "newName")
+                        .and_then(|v| v.as_str().ok_or("newName must be a string"))
+                        .map_err(|e| (-32602, e))?;
+                    if !ktlsp_parser::local_value_binding::valid_local_rename_name(name) {
+                        return Err((-32602, "unsupported ASCII rename spelling"));
+                    }
+                    semantic_navigation::Query::Rename {
+                        offset,
+                        new_name: name.to_owned(),
+                    }
+                }
+                "textDocument/hover" => semantic_navigation::Query::Hover {
                     offset,
                     format: self.hover_format.expect("hover format checked"),
                 },
+                _ => return Err((-32601, "Method not found")),
             })
         };
-        if document.text().len() > ktlsp_parser::MAX_SOURCE_BYTES {
-            return Err((-32803, "request exceeds the parser's 64 KiB source limit"));
-        }
         if self.pending_parser.len() >= MAX_PENDING_PARSER_REQUESTS {
             return Err((-32803, "parser worker capacity exhausted"));
         }

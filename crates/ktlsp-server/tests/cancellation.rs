@@ -108,7 +108,7 @@ impl Package {
             session.handle(request(
                 json!(0),
                 "initialize",
-                json!({"capabilities":{"textDocument":{"diagnostic":{}}}})
+                json!({"capabilities":{"workspace":{"workspaceEdit":{"documentChanges":true}},"textDocument":{"diagnostic":{},"rename":{"prepareSupport":true}}}})
             ))[0]["result"]["capabilities"]["documentSymbolProvider"],
             true
         );
@@ -327,7 +327,7 @@ impl Client {
         client.send(request(
             json!(0),
             "initialize",
-            json!({"capabilities":{"textDocument":{"diagnostic":{}}}}),
+            json!({"capabilities":{"workspace":{"workspaceEdit":{"documentChanges":true}},"textDocument":{"diagnostic":{},"rename":{"prepareSupport":true}}}}),
         ));
         assert_eq!(
             client.reply()["result"]["capabilities"]["documentSymbolProvider"],
@@ -486,12 +486,14 @@ fn navigation_uses_shared_wire_ids_cancellation_and_snapshot_guards() {
         ("textDocument/hover", "hover"),
         ("textDocument/references", "references"),
         ("textDocument/documentHighlight", "highlight"),
+        ("textDocument/prepareRename", "prepare-rename"),
+        ("textDocument/rename", "rename"),
     ] {
         let navigation = |id: Value| {
             request(
                 id,
                 method,
-                json!({"textDocument":{"uri":URI},"position":{"line":1,"character":0},"context":{"includeDeclaration":true}}),
+                json!({"textDocument":{"uri":URI},"position":{"line":1,"character":0},"context":{"includeDeclaration":true},"newName":"fresh"}),
             )
         };
         let mut client = Client::new(&package);

@@ -711,3 +711,31 @@ final Linux CI. Unconditional window-predicate checks compile
 against the actual byte/EOF guard. These do not establish an end-to-end active-EOF
 recovery case; that gap remains for #83. Attributable production deadline/allocation/serialization-boundary evidence remains
 incomplete under #83. C17 adds no resource-boundary claim or grammar repair.
+
+## Guarded local immutable-val rename (#379)
+
+`guarded_local_value_rename` authenticates an original declaration/use anchor
+through the private occurrence collector and retains its original local-val
+declaration and every bound whole-initializer reference. `None` prepares that
+local target; parameters are explicitly refused because external named-argument
+callers are outside same-body analysis. The ordinary top-level function and its
+complete admitted body must pass the existing shape checks.
+
+A proposed name uses deliberately bare ASCII Kotlin spelling (letter/underscore,
+then letters/digits/underscores, excluding all-underscore names and hard keywords).
+There is no automatic quoting, Unicode normalization or full Kotlin name-validator
+claim. Existing supported quoted/Unicode targets may become supported ASCII.
+New-name validation, original collection, parameter/local conflicts (including
+future declarations) and potential capture checks consume the SAME 2,097,152-unit
+semantic budget, with the existing 1,024-site/131,072-byte storage bounds. An
+otherwise external/unresolved reference that would become captured is refused,
+never assumed globally safe. Same-semantic-name quote removal retains existing
+parameter/local shadow partitions. No partial edit set is returned on refusal.
+Original replacement boundaries must remain separate identifier tokens, even
+when preparing or removing semantically redundant quotes: `val` immediately
+followed by a quoted name is refused rather than emitting `valfresh`.
+
+The server adds versioned publication, growth and escaped-output guards; this is
+not parameter/member/workspace/full Kotlin rename or official parity. Permanent
+real-worker tests apply edits in memory and reparse/rebind, but execution remains
+hosted-only under #96; source changes do not imply new runtime acceptance.

@@ -286,7 +286,8 @@ fn lexical(value: &str, relative: Option<&Path>, doc: &str, offset: usize, b: &m
         return Err(unsupported(doc, offset, "UNC, device or drive-relative path"));
     }
     // Colons are only permitted in a native Windows drive prefix, never guessed on Unix.
-    if value.contains(':') && (!cfg!(windows) || !matches!(path.components().next(), Some(Component::Prefix(_)))) {
+    if path.components().any(|component| !matches!(component, Component::Prefix(_))
+        && component.as_os_str().as_encoded_bytes().contains(&b':')) {
         return Err(unsupported(doc, offset, "foreign path or scheme"));
     }
     let prefix = if path.is_absolute() { None } else { Some(relative.ok_or_else(|| invalid(doc, offset, "expected absolute path"))?) };

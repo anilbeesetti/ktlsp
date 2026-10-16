@@ -1258,3 +1258,18 @@ is researched/queued after392, not implemented. Full formatting is not ready
 for a parity claim: native rules, effective settings/read authority and actual
 official option/EditorConfig precedence remain missing rather than guessed.
 
+#### First full-union Windows path finding
+
+The adversarial full28-file review at019ef361 identified an absolute-path
+admission defect: once a Windows drive prefix existed, internal colons such as
+`file:///C:/workspace/src:stream` passed as declared directory roots, unlike
+the equivalent macro suffix. ROOT traced every lexical/resolve caller and
+changed the shared guard to reject colons in all non-prefix path components,
+preserving only the already validated native disk prefix. Four public-operation
+Windows cases cover absolute/macro and raw/percent-encoded colon spellings.
+An incidental error-reason wording pin was removed while retaining its actual
+macro-drive replacement refusal. No other path policy, bounds or assertions
+were relaxed. The before-fix counterexample is source-backed, not an executed
+Windows observation; exact rechecks and original hosted Windows execution
+remain required before acceptance. No local Kotlin runtime was admitted.
+

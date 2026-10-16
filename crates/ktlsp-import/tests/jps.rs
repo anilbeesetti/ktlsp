@@ -235,5 +235,20 @@ fn macro_suffix_cannot_replace_project_with_an_absolute_drive() {
     assert!(matches!(jps::source_projection(base(), &[
         Document { path: ".idea/modules.xml", bytes: m.as_bytes() },
         Document { path: "D:/a.iml", bytes: a.as_bytes() },
-    ]), Err(Error::Unsupported { reason: "macro suffix must remain relative", .. })));
+    ]), Err(Error::Unsupported { .. })));
+}
+
+#[cfg(windows)]
+#[test]
+fn absolute_and_macro_urls_cannot_admit_alternate_stream_source_roots() {
+    let m = manifest(&["a.iml"]);
+    for url in [
+        "file:///C:/workspace/src:stream",
+        "file:///C:/workspace/src%3Astream",
+        "file://$MODULE_DIR$/src:stream",
+        "file://$MODULE_DIR$/src%3Astream",
+    ] {
+        let a = module(&content(&format!(r#"<sourceFolder url="{url}"/>"#)));
+        assert!(matches!(import(&m, &a), Err(Error::Unsupported { .. })), "accepted {url}");
+    }
 }

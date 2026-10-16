@@ -982,10 +982,6 @@ fn parameter_shadowing_and_native_providers_compose_over_paired_stdio() {
         json!({"jsonrpc":"2.0","method":"exit"}),
     ];
     let replies = Package::new(true).exchange(&messages);
-    println!(
-        "KTLSP_PARAMETER_COMPOSED_WIRE {}",
-        json!({"source":source,"replies":replies})
-    );
     assert!(replies.iter().all(|reply| reply.get("id").is_some()));
     assert!(
         replies

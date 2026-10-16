@@ -459,32 +459,8 @@ fn quoted_crlf_parameters_keep_header_ownership_and_exclude_type_references() {
     let result = parse(source);
     let current = result.snapshot();
     let tree = result.tree_for(current).unwrap();
-    println!(
-        "KTLSP_PARAMETER_PRODUCER_CST {}",
-        serde_json::json!({
-            "source":source,
-            "nodes":tree.elements().iter().enumerate().filter(|(_, node)| {
-                matches!(node.kind.as_str(), "FUN" | "BLOCK" | "PROPERTY" |
-                    "VALUE_PARAMETER_LIST" | "VALUE_PARAMETER" | "TYPE_REFERENCE" |
-                    "USER_TYPE" | "REFERENCE_EXPRESSION" | "IDENTIFIER")
-            }).map(|(index,node)| serde_json::json!([
-                index,node.kind,node.token,node.start,node.end,node.parent,node.subtree_end
-            ])).collect::<Vec<_>>()
-        })
-    );
     let lowered = lower_declarations(&result, current).unwrap();
     let directory = build_regions(&lowered, &result, current).unwrap();
-    println!(
-        "KTLSP_PARAMETER_PRODUCER_IDENTITY {}",
-        serde_json::json!({
-            "declarations":lowered.declarations().iter().enumerate().map(|(ordinal,d)| {
-                serde_json::json!([ordinal,d.kind(),d.raw_name(),
-                    [d.range().start,d.range().end],[d.name_range().start,d.name_range().end],
-                    d.cst_parent_kind(),d.cst_parent_index(),d.owner(),
-                    directory.memberships()[ordinal].region()])
-            }).collect::<Vec<_>>()
-        })
-    );
     accepted(
         source,
         1,

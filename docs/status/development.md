@@ -581,3 +581,41 @@ are not workspace references; descriptors are not generics/nullability/linkage
 or semantic Java symbols. No new server capability or full-parity promotion
 follows. #96, broader parser recovery and full semantic/official parity remain open.
 
+## Verified platform integration and ordinary parameter source #369
+
+Guarded [PR339](https://github.com/anilbeesetti/ktlsp/pull/339) delivered exact
+main `3047b69d5f8bf57286eb78338b23fd1305694974`, tree
+`f04b29c4cd0e588a4865adbbce57839c5579c809`, sole parent
+`4225a328d0a43ded45cc3c50de1550778ce3a0eb`. Fresh separate read-only guards
+returned complete process/parsed exit0 before an ordinary expected-head squash.
+The lease remained exclusive through actual tree/sole-parent verification and
+independent OWNER+ROOT original attempt-1 push/main
+[Native38895653125/job116955367115](https://github.com/anilbeesetti/ktlsp/actions/runs/38895653125/job/116955367115):
+979 standard/doctest passes plus22 separate worker fault cases, then cleared.
+PR-only macOS/Windows checks passed on the identical reviewed tree; those are
+not exact-main macOS/Windows execution receipts. Strict20ms cleanup remains
+fail-closed; finite successful schedules do not prove hard OS scheduling bounds.
+
+ROOT separately admitted first changed-source
+[packaging38897028391](https://github.com/anilbeesetti/ktlsp/actions/runs/38897028391),
+attempt1 at that one verified main. Linux/macOS/Windows built both matching
+release binaries and passed full locked release workspace tests. ROOT and
+independent platform owners verified all original evidence/package ZIP digests,
+actual TAR contents/provenance/notices/checksums and native executable headers.
+[Exact experimental receipts](https://github.com/anilbeesetti/ktlsp/issues/46#issuecomment-6215164466)
+remain distinct from release certification: downloaded final archives were
+inspected, not executed locally; no first-party license grant was invented.
+#46/#96/B3/official-oracle/full-parity gates remain open or held.
+
+That verified main receives [#369 / PR370](https://github.com/anilbeesetti/ktlsp/pull/370):
+ordinary parameter lowering/ownership, same-function binding/local-shadow
+partitioning and single-budget declaration/reference occurrence anchors.
+First-source original Native38898391304/platform38898391737 passed at
+`9e96b16bcee0e10cf9228a7e467860c52576e9ec`; actual producer/paired-CLI captures
+were directly read before removing only temporary writers. See the
+[parser identity/CI receipt](../../crates/ktlsp-parser/README.md#ordinary-parameter-source-observation-369--pr370)
+and [provider behavior](../../crates/ktlsp-server/README.md#ordinary-parameters-and-local-shadowing-369).
+Cleanup/documentation reviews, final-source original full hosted CI and guarded
+integration remain separate required gates. No local parser/server/peer runtime,
+unchanged retry, compiler/type-resolution or full official parity claim follows.
+

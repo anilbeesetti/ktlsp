@@ -320,14 +320,17 @@ types, stable cross-revision symbols or a new server capability.
   UTF-16 positions, backtick dots, named/star/alias/duplicate imports and the actual
   authenticated f/x/y binding consumer. Hosted execution is required under #96;
   this source change alone is not hosted proof or package/import resolution.
-- Reference-bearing functions require an ordinary top-level zero-parameter
+- Reference- or parameter-bearing functions require an ordinary named top-level
   function with an ordered brace body of plain immutable local `val`s, optionally
-  annotated with one simple (bare or backtick) type-name,
-  whose initializers are integer constants or whole bare-identifier reference
-  subtrees. Parameters, receivers, nested/reference-bearing member contexts,
-  calls, qualified accesses, assignments and relevant error-bearing contexts
-  are not admitted. Accepting a reference initializer does not resolve its name,
-  enforce declaration-order visibility or diagnose self/forward references.
+  annotated with one simple (bare or backtick) type-name, whose initializers are
+  integer constants or whole-identifier reference subtrees. Ordinary parameters
+  require exactly a name, colon and the same simple type-name shape, separated
+  by commas with one optional trailing comma after a real parameter. Positive
+  complete shape is mandatory even when the parser reports no diagnostics.
+  Missing/reordered/repeated syntax, defaults, vararg, modifiers/annotations,
+  richer types, receivers/context/generics/explicit returns, expression bodies,
+  members/constructors/lambdas/nesting/destructuring and relevant recovery remain
+  refused. This is syntax admission, not resolved type or declaration visibility.
 - `Declaration::semantic_spelling` separately supports ASCII bare names and
   nonempty backtick bodies without backticks, CR/LF or NUL, borrowing unchanged
   bytes without normalization; unsupported names return `None`, not an identity.
@@ -335,6 +338,10 @@ types, stable cross-revision symbols or a new server capability.
   and snapshot result, then supplies file/class-body/function-body regions and
   ordered declaration memberships. Equal bytes from an independent parse do
   not establish origin. Regions and declaration owners are not Kotlin scopes.
+  Original `VALUE_PARAMETER` declarations retain their original parameter-list
+  parent and enclosing function owner ordinal. Header parameters remain file
+  structural members; locals remain block members. No property, `val` text or
+  body membership is fabricated, and raw name indices are not visibility rules.
 - `declaration_name_index` groups exact **raw** spellings within an identical
   borrowed region, retaining duplicates and result-local declaration ordinals.
   `ancestor_candidates` returns all such groups along structural ancestors,
@@ -378,39 +385,43 @@ types, stable cross-revision symbols or a new server capability.
   covers the original component source, not cleanup-head runtime validation,
   composed integration or Darwin reliability; no local parser/runtime tests ran
   and #96 remains OPEN/UNKNOWN. See [#363 / PR365 receipt](https://github.com/anilbeesetti/ktlsp/pull/365#issuecomment-6213206923).
-- `local_value_binding::bind_local_value` validates the complete ordinary top-level
-  zero-parameter function body once, then returns the original borrowed site,
-  identical body region and unique preceding complete direct local `val`.
-  Only plain immutable vals with integer or whole-identifier initializers and
-  optional simple type-name annotations
-  are admitted. Semantic-equivalent duplicates of the queried name anywhere in
-  that body, including later duplicates, refuse the query; unsupported candidate
-  spellings never disappear from the search. Containing and later declarations
-  never bind the occurrence. Initializers are not chased transitively.
-  Origin, stale, unsupported context/spelling, ambiguity, no eligible local and
-  resource errors expose no target; no eligible local is not global unresolvedness.
+- `local_value_binding::bind_local_value` validates the complete admitted top-level
+  function body, then returns the original borrowed site, identical body region
+  and target. For the queried semantic spelling, duplicates are counted separately
+  in parameter and local scopes, including later duplicates. A unique eligible
+  preceding complete direct immutable local `val` wins; otherwise the unique
+  parameter of that identical function. A local/parameter collision is legitimate
+  shadowing: before-shadow and `val p=p` initializer reads bind the parameter;
+  later reads bind the local. Unrelated duplicate-name behavior is unchanged.
+  Containing/later locals never bind the occurrence, and initializers are not
+  chased. Unsupported candidate spellings never disappear from the search.
+  Origin, stale, unsupported context/spelling, ambiguity, no eligible target and
+  resource errors expose no target; refusal is not global unresolvedness.
   One checked 2,097,152-unit work budget charges snapshot comparisons, traversal,
-  validation and compared bytes. The query allocates nothing and is nonrecursive.
-  This is library-only and is not complete references, nested/outer lookup,
-  parameter/receiver/import/overload resolution, types, stable cross-revision
-  identity, official navigation evidence or a new server capability.
-- `local_value_binding::local_value_occurrences` authenticates one original
-  declaration against the identical directory/lowerer/result, including unused
-  targets, and returns that borrowed target/body plus original authenticated
-  whole-initializer sites in source order. Only references which the existing
-  binder assigns to the identical target are included; self/forward and unrelated
-  names do not become references. Query-name duplicates refuse even unused
-  targets; unrelated duplicates do not make this target ambiguous. The entire
-  ordinary function and every candidate spelling must be admitted.
-  All authentication, snapshot/name comparisons, scanning, binding and emission
-  share one checked 2,097,152-unit work budget, without per-candidate resets.
+  validation and compared bytes. Binding allocates nothing and is nonrecursive.
+  This is not complete nested/outer/member/receiver/import/overload resolution,
+  types, stable cross-revision identity or official navigation equivalence.
+- `local_value_binding::local_value_occurrences` accepts precisely an original
+  `LocalValueAnchor::Declaration` or a `ReferenceExpression` CST-index anchor.
+  The identical directory/lowerer/result authenticates selection, including
+  unused local/parameter targets. Reference-anchor authentication and binding
+  consume the SAME 2,097,152-unit budget as collection, not a fresh preliminary
+  query. Parameter ownership identifies the unique introduced function body;
+  header type references never become value occurrences. Original borrowed
+  target/body and whole-initializer sites are returned in source order.
+  Same-body sites bound to a different target are excluded, preserving separate
+  parameter/local shadow sets; different-body/origin/stale failures remain.
+  Query-name duplicates refuse even unused targets; unrelated duplicates do not
+  make this target ambiguous. The whole function/candidate spelling must be
+  admitted. Snapshot/name comparisons, scanning, binding and emission share that
+  one budget, without per-candidate resets.
   Before allocation, a count pass bounds storage to 1,024 sites / 131,072 bytes;
   reservation failures or excessive returned capacity refuse the whole query.
   Borrowed source/producer objects are not copied. Repeated binding and
   authentication scans are quadratic in admitted input, including snapshot bytes;
   large otherwise valid bodies can therefore return `Resource`, never a partial
-  publishable result. This is a library prerequisite, not a references provider,
-  full Kotlin resolution, official navigation equivalence or capability change.
+  publishable result. This kernel supports finite native providers, not complete
+  Kotlin resolution, workspace references or official navigation equivalence.
   Permanent `tests/local_value_occurrences.rs` assertions use the production
   parser. At component source `12298d8a2b8ff835593f283f07370b1480a92155`,
   [original attempt-1 Linux CI38876375538/job116892312858](https://github.com/anilbeesetti/ktlsp/actions/runs/38876375538/job/116892312858)
@@ -430,6 +441,34 @@ types, stable cross-revision symbols or a new server capability.
   official equivalence or Darwin reliability. No local parser/runtime/tests ran;
   #96 remains OPEN/UNKNOWN. See child #357 under #330 (T027/#27) and the
   [component receipt](https://github.com/anilbeesetti/ktlsp/pull/361#issuecomment-6211943713).
+
+### Ordinary parameter source observation (#369 / PR370)
+
+At source `9e96b16bcee0e10cf9228a7e467860c52576e9ec`, tree
+`351c9b2a81ecb1e127190e237e7cefc5294152c8`, original attempt-1
+[Native38898391304/job116964308157](https://github.com/anilbeesetti/ktlsp/actions/runs/38898391304/job/116964308157)
+passed 983 standard/doctest cases plus 22 separate worker fault cases.
+[Platform38898391737](https://github.com/anilbeesetti/ktlsp/actions/runs/38898391737)
+passed macOS981 and Windows928 standard cases plus22 separate cases each.
+All checked synthetic `16182690c9275ad3801852e7f774a4d4f7f81d78`,
+ordered parents `[3047b69d5f8bf57286eb78338b23fd1305694974,9e96b16bcee0e10cf9228a7e467860c52576e9ec]`,
+with the exact source tree, pinned format/strict locked all-target Clippy/full
+workspace tests. Platform release tests additionally used `--no-fail-fast -- --nocapture`.
+
+ROOT directly read identical actual macOS/Windows producer and paired-CLI captures.
+The CRLF/nonBMP/backtick producer retained parameter CST11/name15..22/full15..30,
+original list CST9 and enclosing FUN CST3/declaration ordinal0. Both header
+parameters stayed FILE membership0; local `y` stayed BLOCK CST32/membership1.
+Value occurrence67..74 associated with the parameter; annotation57..64 did not
+become a value site. Parameter targets explicitly refuse integer-default inference
+before literal work; typed/untyped-local rules remain unchanged.
+
+Only the three temporary stdout capture writers were removed after direct readback;
+all permanent behavior/origin/freshness/shared-budget/atomic-refusal assertions
+remain. This receipt covers that first source, not an unexecuted cleanup/final head
+or official equivalence. No local parser/server/peer runtime ran; #96 and full
+scope/type/completion/official parity remain open.
+
 
 These consumers retain immutable producer association and require a synchronized
 current-document recheck before publication. Document/revision/kind/source

@@ -176,7 +176,7 @@ binary/source archives and canonical coordinates/digests: the actual
 JMOD kind, ordering, completeness, refusal and resource boundaries. Source
 attachment remains a path candidate, **not** proof of exact compilation or line
 provenance. Release is explicit, never inferred from SDK version or jvmTarget;
-the class reader still has its Java 23/non-preview ceiling. No full effective
+the class reader supports ordinary versions through Java 25, not preview. No full effective
 classpath, Kotlin reference resolution, source shadowing, access checking,
 type inference, SDK resolution or server/LSP capability is claimed.
 

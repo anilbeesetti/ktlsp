@@ -103,7 +103,7 @@ impl Budget {
 ///
 /// Public/forged inputs are checked at consumed references (including zero),
 /// containers and version; unrelated CP entries/class structure are not verified.
-/// Supported versions match `parse_class` (through 67.0); annotations need 49.0.
+/// Supported versions match `parse_class` (through 69.0); annotations need 49.0.
 pub fn decode<'a>(class: &'a ClassFile<'_>) -> Result<DeclarationAnnotations<'a>> {
     decode_with_budget(class, &mut Budget::default())
 }
@@ -112,8 +112,7 @@ pub(crate) fn decode_with_budget<'a>(
     class: &'a ClassFile<'_>,
     budget: &mut Budget,
 ) -> Result<DeclarationAnnotations<'a>> {
-    if !(class.major == 45 && class.minor <= 3
-        || (46..=67).contains(&class.major) && class.minor == 0)
+    if !crate::supported_class_version(class.major, class.minor)
     {
         return Err(Error::UnsupportedVersion {
             major: class.major,

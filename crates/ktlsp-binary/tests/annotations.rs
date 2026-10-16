@@ -62,7 +62,9 @@ fn setup() -> (ClassFile<'static>, u16, u16, u16) {
 
 #[test]
 fn every_tag_exact_bits_utf16_order_and_contexts() {
+    for major in [67, 68, 69] {
     let (mut c, visible, ty, _) = setup();
+    c.major = major;
     let invisible = text(&mut c, "RuntimeInvisibleAnnotations");
     let int = add(&mut c, Constant::Integer(0xffff_ffff));
     let float = add(&mut c, Constant::Float(0x7fc0_1234));
@@ -164,6 +166,7 @@ fn every_tag_exact_bits_utf16_order_and_contexts() {
         Value::Array(vec![Value::Int(u32::MAX), Value::Array(vec![])])
     );
     assert_eq!(c.attributes[0].bytes, bytes);
+    }
 }
 
 #[test]
@@ -338,7 +341,9 @@ fn descriptors_names_duplicates_versions_and_trailing_bytes() {
         (48, 0, false),
         (49, 0, true),
         (67, 0, true),
-        (68, 0, false),
+        (68, 0, true),
+        (69, 0, true),
+        (70, 0, false),
         (67, 65535, false),
     ] {
         c.major = major;

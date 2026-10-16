@@ -43,7 +43,7 @@ pub struct MethodTypeAnnotations<'a> {
 }
 
 /// Decode declarations, extensions, field types, then method types with one budget.
-/// Recognized method type attributes require 52.0–67.0. Other target tags are
+/// Recognized method type attributes require 52.0–69.0. Other target tags are
 /// malformed in method context; indices and type-path applicability are unvalidated.
 /// Any failure returns no partial output and leaves raw ClassFile bytes available.
 /// Method names/descriptors are unconsumed here; earlier parameter/default extensions

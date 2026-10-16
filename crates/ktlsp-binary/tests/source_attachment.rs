@@ -309,7 +309,7 @@ fn public_class_sourcefile_indices_context_and_version_are_checked() {
         E::Class(Error::Malformed(_))
     ));
     let mut c = class();
-    c.major = 68;
+    c.major = 70;
     assert!(matches!(
         refusal(&c, normal_zip()),
         E::Class(Error::UnsupportedVersion { .. })
@@ -537,4 +537,20 @@ fn crc_and_resource_refusals_cross_actual_consumer_boundary() {
         })
         .collect();
     assert_eq!(refusal(&c, normal_zip()), E::Limit("nodes"));
+}
+
+#[test]
+fn modern_authored_source_attachment_inherits_metadata_package_policy() {
+    for major in [68, 69] {
+        let mut c = class();
+        c.major = major;
+        let name = cp(&mut c, "RuntimeInvisibleAnnotations");
+        let bytes = metadata_attribute(&mut c, "source.pkg", 2);
+        c.attributes.push(Attribute { name, bytes: &bytes });
+        let artifact = verified(zip(&[(b"p/C.java", b"wrong"), (b"source/pkg/C.java", b"right")], 0, 0), None);
+        let index = index_zip_directory(&artifact).unwrap();
+        let mut scratch = Vec::new();
+        let result = attach(&c, &index, &mut scratch).unwrap();
+        assert_eq!((result.ordinal, result.bytes), (1, b"right".as_slice()));
+    }
 }

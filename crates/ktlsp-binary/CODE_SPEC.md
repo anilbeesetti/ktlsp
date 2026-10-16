@@ -17,7 +17,7 @@ Borrow raw and bytecode from the supplied Attribute, and nested payloads from ra
 
 Consume only version, CP shape, method access_flags/name, outer method attribute names/payloads, Code scalar/count/framing fields and consumed nested name/catch indices. Names are lossless UTF16 from crate::utf16, matched by crate::eq without String allocation; arbitrary valid UTF16 names (including empty/NUL/surrogates) may remain unknown. Method name is only used to distinguish exact <clinit>; member-name grammar/descriptors, unrelated pool entries, Class name links and unrelated class state are not revalidated. Forge-safe consumed CP checks apply even to hand-built public structs.
 
-Supported version predicate is exactly the existing reader: major=45, minor=0..3; or major=46..67, minor=0. Other/preview versions return UnsupportedVersion, even with no methods. CP vector length must be 1..65535, otherwise Malformed("code constant pool size"); slot zero must not be used as a name/catch index regardless of its forged contents. Unconsumed slot-zero shape and other CP contents are not validated.
+Supported version predicate is shared with the reader: major=45, minor=0..3; or major=46..69, minor=0. Other/preview versions return UnsupportedVersion, even with no methods. This is a supported-subset policy, not a claim that every historical nonzero minor is malformed. CP vector length must be 1..65535, otherwise Malformed("code constant pool size"); slot zero must not be used as a name/catch index regardless of its forged contents. Unconsumed slot-zero shape and other CP contents are not validated.
 
 ## Disposition, framing and error order
 

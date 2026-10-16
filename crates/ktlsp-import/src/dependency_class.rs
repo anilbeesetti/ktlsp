@@ -184,7 +184,7 @@ fn charge(total: &mut usize, amount: usize, max: usize, field: &'static str) -> 
 /// and lookup limits. Caller binding scans additionally cap at 65,536 records and
 /// 16 MiB library-key bytes, including unrelated bindings (which never add roots).
 /// Scratch/result lifetime follows lookup_class; explicit release is never SDK
-/// metadata, and the class reader still stops at Java 23/no preview.
+/// metadata; the class reader supports ordinary versions through Java 25, no preview.
 pub fn select_class<'model, 'data>(
     workspace: &'model ImportedWorkspace,
     source: &Path,

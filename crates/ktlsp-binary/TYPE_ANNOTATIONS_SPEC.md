@@ -20,9 +20,9 @@ each type_annotation contains u1 target_type, target_info, type_path and the
 existing annotation descriptor/pairs/element_value encoding. For fields the only
 accepted target_type is0x13 and target_info occupies ZERO bytes.
 
-Global supported versions remain45.0–45.3 or46–67 minor0; unsupported major/minor
+Global supported versions remain45.0–45.3 or46–69 minor0; unsupported major/minor
 returns existing UnsupportedVersion before scanning. A recognized FIELD type
-attribute requires52.0–67.0, including an empty payload/zero count. Pre52 returns
+attribute requires52.0–69.0, including an empty payload/zero count. Pre52 returns
 Malformed("type annotation version"). Class/method type attrs remain raw/opaque,
 including malformed payloads, duplicates and pre52 placements; their format is
 not validated by this field-only slice. Code and Record interiors remain opaque.
@@ -301,7 +301,7 @@ must return duplicate after valid first; different fields/visibilities independe
    method[255] fixture, Code/Record interiors unchanged. Forged field refs stay
    unconsumed; consumed attr/annotation/value refs reject0/out-of-range/wide holes/
    wrong types. No global CP validation accidentally added.
-2. Versions45.3/48/49/51 fail recognized field attrs,52/67 pass;68/nonzero newer
+2. Versions45.3/48/49/51 fail recognized field attrs,52/67/68/69 pass;70/nonzero
    minors/preview reject globally. Paths0/1/255, all four kinds, kind3 indices0/255,
    other kinds with nonzero indices and invalid kinds4/255; all255 wrong target
    bytes reject. A syntactically valid path incompatible with a descriptor is

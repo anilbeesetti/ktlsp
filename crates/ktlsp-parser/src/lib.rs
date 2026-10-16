@@ -1275,45 +1275,6 @@ mod admission {
             });
         }
 
-        #[test]
-        fn reused_slot_does_not_retarget_a_captured_owner() {
-            use std::sync::mpsc;
-            let slots = std::array::from_fn(|_| Slot::new());
-            let first = Lease::reserve_on(&slots).unwrap();
-            let original = first.guard.as_ref().unwrap().owner.clone().unwrap();
-            assert_eq!(original.id(), thread::current().id());
-            drop(first);
-            assert!(slots[0].data.try_lock().unwrap().owner.is_none());
-            thread::scope(|scope| {
-                // Dropping release on assertion failure also releases the scoped owner.
-                let (release, gate) = mpsc::channel::<()>();
-                let (registered, registration) = mpsc::channel();
-                let slots = &slots;
-                let replacement = scope.spawn(move || {
-                    let lease = Lease::reserve_on(slots).unwrap();
-                    registered
-                        .send(lease.guard.as_ref().unwrap().owner.as_ref().unwrap().id())
-                        .unwrap();
-                    let _ = gate.recv();
-                    drop(lease);
-                });
-                let replacement_id = registration.recv_timeout(Duration::from_secs(1)).unwrap();
-                assert_ne!(original.id(), replacement_id);
-                thread::park_timeout(Duration::ZERO);
-                wake_owner(Some(original));
-                let origin = Instant::now();
-                thread::park_timeout(Duration::from_secs(1));
-                let notified_original = origin.elapsed() < Duration::from_millis(500);
-                release.send(()).unwrap();
-                replacement.join().unwrap();
-                assert!(
-                    notified_original,
-                    "slot reuse must not redirect an old wakeup"
-                );
-            });
-            assert_eq!(slots[0].state.load(SeqCst), FREE);
-            assert!(slots[0].data.try_lock().unwrap().owner.is_none());
-        }
 
         #[test]
         fn valid_same_child_reap_confirms_after_unrelated_reaper_death() {

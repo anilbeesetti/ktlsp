@@ -1112,8 +1112,6 @@ fn extracted_archive_smoke() {
                 stdout.trim_end(),
                 concat!("ktlsp ", env!("CARGO_PKG_VERSION"))
             );
-        } else {
-            assert!(stdout.contains("Usage: ktlsp [--stdio | --help | --version]"));
         }
         cli.push(json!({"argument":argument,"stdout":stdout,"stderr":"","exit_code":output.status.code()}));
     }

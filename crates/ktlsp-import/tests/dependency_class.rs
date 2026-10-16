@@ -231,14 +231,20 @@ fn canonical_windows_artifact_keeps_provenance_and_binds_ordinary_import() {
     use std::path::{Component, Prefix};
     let original = genuine(false);
     let canonical = std::fs::canonicalize(fixture(false)).unwrap();
-    assert!(matches!(canonical.components().next(), Some(Component::Prefix(prefix))
-        if matches!(prefix.kind(), Prefix::VerbatimDisk(_) | Prefix::VerbatimUNC(_, _))));
+    assert!(
+        matches!(canonical.components().next(), Some(Component::Prefix(prefix))
+        if matches!(prefix.kind(), Prefix::VerbatimDisk(_) | Prefix::VerbatimUNC(_, _)))
+    );
     let mut provenance = original.provenance().clone();
     provenance.artifact_path = canonical.clone();
     let artifact = verify_sha256(
-        Artifact { bytes: original.bytes().to_vec(), provenance },
+        Artifact {
+            bytes: original.bytes().to_vec(),
+            provenance,
+        },
         *original.digest(),
-    ).unwrap();
+    )
+    .unwrap();
     let workspace = import(model(
         vec![edge("commons")],
         vec![library("commons", &[fixture(false)])],

@@ -114,7 +114,9 @@ fn nominal(
             _ => {}
         }
     }
-    if let Some((value, offset)) = flags && value != 0 {
+    if let Some((value, offset)) = flags
+        && value != 0
+    {
         return Err(failure(offset, ErrorKind::UnsupportedType));
     }
     let index = class.ok_or(failure(start, ErrorKind::MissingClass))?;

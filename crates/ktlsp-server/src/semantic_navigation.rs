@@ -427,18 +427,6 @@ fn render_rename(
     )
 }
 
-#[cfg(test)]
-mod rename_limits {
-    use super::*;
-    #[test]
-    fn growth_and_escaped_output_refuse_atomically() {
-        rename_output_size(65536, 1, 1, 1, 1).unwrap();
-        assert!(rename_output_size(65536, 1, 1, 2, 1).is_err());
-        assert!(rename_output_size(0, 0, 1025, 1, 200000).is_err());
-        assert!(rename_output_size(0, 0, usize::MAX, usize::MAX, usize::MAX).is_err());
-    }
-}
-
 fn render_completion(
     visible: &ktlsp_parser::local_value_binding::VisibleLocalValues<'_>,
     source: &str,
@@ -502,4 +490,16 @@ fn render_completion(
         })
         .collect::<Vec<_>>();
     Ok(json!({"isIncomplete":true,"items":items}))
+}
+
+#[cfg(test)]
+mod rename_limits {
+    use super::*;
+    #[test]
+    fn growth_and_escaped_output_refuse_atomically() {
+        rename_output_size(65536, 1, 1, 1, 1).unwrap();
+        assert!(rename_output_size(65536, 1, 1, 2, 1).is_err());
+        assert!(rename_output_size(0, 0, 1025, 1, 200000).is_err());
+        assert!(rename_output_size(0, 0, usize::MAX, usize::MAX, usize::MAX).is_err());
+    }
 }

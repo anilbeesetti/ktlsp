@@ -138,11 +138,19 @@ fn same_binding_path(left: &Path, right: &Path) -> bool {
         let mut left = left.components();
         let mut right = right.components();
         let equivalent = match (left.next(), right.next()) {
-            (Some(Component::Prefix(a)), Some(Component::Prefix(b))) => match (a.kind(), b.kind()) {
-                (Prefix::Disk(a) | Prefix::VerbatimDisk(a), Prefix::Disk(b) | Prefix::VerbatimDisk(b)) => a == b,
-                (Prefix::UNC(a, b) | Prefix::VerbatimUNC(a, b), Prefix::UNC(c, d) | Prefix::VerbatimUNC(c, d)) => a == c && b == d,
-                (a, b) => a == b,
-            },
+            (Some(Component::Prefix(a)), Some(Component::Prefix(b))) => {
+                match (a.kind(), b.kind()) {
+                    (
+                        Prefix::Disk(a) | Prefix::VerbatimDisk(a),
+                        Prefix::Disk(b) | Prefix::VerbatimDisk(b),
+                    ) => a == b,
+                    (
+                        Prefix::UNC(a, b) | Prefix::VerbatimUNC(a, b),
+                        Prefix::UNC(c, d) | Prefix::VerbatimUNC(c, d),
+                    ) => a == c && b == d,
+                    (a, b) => a == b,
+                }
+            }
             (a, b) => a == b,
         };
         equivalent && left.eq(right)
@@ -290,9 +298,7 @@ pub fn select_class<'model, 'data>(
             binary_root: root.binary_root,
         })?;
         let path = &binding.artifact.provenance().artifact_path;
-        if !normalized(path)
-            || !same_binding_path(path, &root.library.binaries[root.binary_root])
-        {
+        if !normalized(path) || !same_binding_path(path, &root.library.binaries[root.binary_root]) {
             return Err(Error::BindingPath {
                 library: root.library_index,
                 binary_root: root.binary_root,

@@ -91,8 +91,14 @@ fn nominal_flags_use_int32_width_and_last_scalar_precedence() {
             &[&declaration, &classifier],
         );
         let signatures = decode(&input, Limits::default()).unwrap();
-        assert_eq!(signatures[0].underlying.class_id.package_name(), units("pkg"));
-        assert_eq!(signatures[0].underlying.class_id.relative_class_name(), units("Value"));
+        assert_eq!(
+            signatures[0].underlying.class_id.package_name(),
+            units("pkg")
+        );
+        assert_eq!(
+            signatures[0].underlying.class_id.relative_class_name(),
+            units("Value")
+        );
         assert_eq!(signatures[0].underlying, signatures[0].expanded);
     }
 }

@@ -84,7 +84,7 @@ checks bounded proposed-run and preflight data for the two unchanged
 [PR174 fixtures](fixtures/official-pr174-symbols/README.md). Consistent inputs
 return `Ok(())`; invalid inputs return an error. It creates no evidence and
 spawns no process. This success is data validation, never launch authorization.
-No official CLI or recording path is delivered.
+The validator alone supplies no execution or recording authority.
 
 Both JSON inputs are regular, nonsymlink files limited to 16 KiB; source/script
 files must exactly match embedded bytes, including UTF-8/newlines. The proposed
@@ -98,9 +98,154 @@ This checks data consistency only. Matching supplied hashes do not authenticate
 the publisher, actual executable bytes, run, permissions or authorization. The
 validator supplies no trusted host handoff, effective isolation, runtime attestation
 or actual teardown evidence. The separate optional controller source above does
-not establish those live facts. A live recording entrypoint still requires a
-separately admitted official adapter/bootstrap, execution admission, containment
-calibration and independent review. Existing `record()` and `--synthetic-only`
-retain their scope, environment, limits and raw/error/cleanup behavior. No
-dependency, workflow, product or native default-test graph changes accompany
-this source preparation.
+not establish those live facts. Live recording additionally requires the separately
+admitted adapter/bootstrap, execution admission, real containment calibration and
+independent review. Existing `record()` and `--synthetic-only` retain their scope,
+environment, limits and raw/error/cleanup behavior. The validator remains data-only;
+the optional producer below never enters the default native graph.
+
+## Protected original-job workflow producer (#352 / #330 / #45)
+
+`.github/workflows/t045-pr174-official-symbols.yml` is manual, main-only, attempt
+one, with exactly one standard `ubuntu-24.04` job. It is source preparation,
+not permission to dispatch or evidence that its platform prerequisites hold.
+The job token has only `contents:read` and `actions:read`; it cannot post ROOT
+approval. Independent repository-owner comments are authenticated through the
+GitHub API by numeric owner identity as well as login and owner association.
+Matching two caller-authored grants, a shape validator, a supplied hash or a
+source approval never authorizes a calibration child or official JVM.
+
+The workflow first builds the three optional native tools under the pinned
+toolchain/lock with Rust wrappers/flags cleared, then calls `workflow-source`
+before any privileged installation/preparation. It compares actual context,
+checkout head/tree, original API run/job/suite and exact authenticated workflow
+bytes. All three comment IDs are distinct, positive and predesignated, including
+the unused official comment when `official=false`.
+
+### Independent comment schemas
+
+Bodies are one strict bounded JSON object (16 KiB maximum), without Markdown,
+duplicate/unknown fields or trailing input. `run` is the shared `OriginalRun`:
+repository, event, attempt, runId, jobId, suiteId, sourceHead and sourceTree,
+all bound to the actual original job. No example numeric identities are grants.
+
+The source comment is `WorkflowSourceAdmission`:
+
+- `schemaVersion:1`, `scope:"PR174_SOURCE_ADMISSION"`, `run`;
+- `workflowSha256` of actual immutable workflow bytes;
+- `contractSha256` equal to
+  `65eb16c5bd73c99fe7fc000fddf0242bf6abab09283676612edf5ce9f285b61d`;
+- `image` equal to
+  `ubuntu@sha256:f610ab94648195aa356059f5b41d6085c9d4d903c072430cdd1af7bdb646106b`;
+- `containmentTemplateSha256` from the exact native `describe-template` source;
+- `measuredFutureFacts` containing exactly `boot`, `daemon`, `host`,
+  `image-config`, `native-binaries`, `tools` (order is immaterial);
+- positive `calibrationComment` and `officialComment` matching the fixed inputs.
+
+This explicitly authorizes measuring future facts, not inventing their values,
+creating a container, launching a service or executing a JVM. Source approval
+must already match the original API identities when the source step runs.
+The privileged creator repeats authentication before preparation.
+
+The creator streams the exact publisher archive under finite size/time bounds,
+checks the unchanged archive/inventory/fixture pins, measures real binary/tool
+hashes, host/boot/daemon, actual image config and ABI/profile, and refuses piped
+core policy. It starts no container/service. It seals a root-owned proposal at
+`/etc/ktlsp-pr174/proposal/proposal.json`, uploaded as
+`pr174-measured-proposal` before any child can execute.
+
+The calibration and official comments use `WorkflowApproval`:
+
+- `schemaVersion:1`, `scope`, `run`;
+- `proposalSha256` of raw protected proposal JSON;
+- `proposalArtifactId` and `proposalArtifactApiDigest`, joined to the
+  authenticated original artifact and independently downloaded ZIP digest;
+- `calibrationSha256`, `calibrationArtifactId` and
+  `calibrationArtifactApiDigest` are all `null` for calibration approval;
+- calibration `scope` is `"PR174_MEASURED_CALIBRATION_ADMISSION"`;
+- official `scope` is `"PR174_SEPARATE_OFFICIAL_ADMISSION"` and all three
+  calibration fields bind the later exact protected ten-case report bytes and
+  original `pr174-calibration-report` artifact.
+
+ROOT independently retrieves the original run/source/job/artifact bytes and
+reviews the actual measurements before updating the designated owner comment.
+The creator verifies identity/binding before installing ten distinct finite
+per-case grants. It polls only the predesignated owner approval, for at most
+15 minutes; API errors, mismatches or expiry refuse, without retrying a case.
+No matching caller-provided expected/supplied pair can install authority.
+
+### Native command and custody boundary
+
+All `workflow-*` commands are fixed modes of `ktlsp-oracle-pr174-host`.
+`workflow-source` alone is nonprivileged. Other modes require Linux OS root:
+
+```text
+workflow-source
+workflow-prepare
+workflow-approve PROPOSAL_ARTIFACT_ID
+workflow-case CASE
+workflow-cancel-start
+workflow-cancel-wait
+workflow-finish CASE
+workflow-receipt CASE ARTIFACT_ID
+workflow-collect
+workflow-official CALIBRATION_REPORT_ARTIFACT_ID
+```
+
+The first two take the explicit original workflow context environment. Subsequent
+modes use protected fixed request/token files, never artifact-provided
+credentials. Source inputs/binaries are installed at fixed `/opt/ktlsp-pr174`
+paths; state, grants and readable upload snapshots live under
+`/etc/ktlsp-pr174`; actual unique native host admissions remain under
+`/run/ktlsp-pr174/NONCE`. The creator reuses bootstrap, protected file/hash
+helpers, canonical grant schemas and existing eight host tools. No arbitrary
+executable, image, flags, hash override or parser plugin is accepted.
+
+Each grant is independently approved by the measured proposal before installation.
+The existing exclusive grant claim and OS-random nonce remain authoritative.
+The creator reserves each case and protects its actual nonce before the
+outside-step service can launch, so interruption cannot erase the join.
+Every host authority gate joins the exact derived grant with the approved
+proposal and actual same boot/daemon before CREATE/START.
+Later START is blocked by a missing protected upload receipt, incomplete
+original closure or failed/incomplete ordinary owned-input disposal.
+
+The nine ordinary finite cases each have their own protected artifact and
+unique fixed `PR174 receipt CASE` step. Cancellation preparation first proves
+the actual original peer is active. Only then does the independently named
+`PR174 runner timeout calibration` step run a finite foreground wait, with
+runner `timeout-minutes:1` and `continue-on-error:true`. Following `always`
+collection waits for the real outside-step action and closure. It never emits
+a timeout marker, self-kills, restarts, uses Docker exec or replaces the job/VM.
+Unknown failures preserve only protected host/creator facts, not mutable child
+bytes or fabricated finals, through the always artifact upload.
+
+`workflow-receipt` independently downloads the uploaded artifact, checks its
+actual API digest and all protected inventory bytes, then emits exactly one
+canonical `KTLSP_PR174_PROTECTED_UPLOAD ` receipt from native code. It binds
+the API-discovered currently running named step, actual artifact ID, raw grant
+and export-binding hashes, nonce/CID and original identities. Child bytes are
+never echoed into trusted job/step logs. Upload precedes receipt publication;
+ordinary owned-input release occurs only afterward and never clears evidence.
+
+`workflow-collect` requires all ten actual same-host exports, genuine completed
+STEP timeout proof from authenticated original job **and exact step** logs,
+and a later protected outside-step live-original action. It uses the canonical
+receiver timeout validator, not a report boolean or whole-job cancellation.
+The outer job may still be running. Missing API/logs/custody/closure yields
+UNKNOWN and no official START. The final receiver separately requires the
+completed successful original outer run/job and independently admitted upload
+step identities; a pre-START gate never pretends the running job is completed.
+
+When separately requested, `workflow-official` authenticates an additional owner
+approval binding the actual collected raw report SHA and its uploaded bytes.
+It uses the same boot/daemon/image/template and a new finite official grant,
+not calibration permission. The official export has its own protected upload
+and receipt. Actual image dependency sufficiency, privileged host preparation,
+same-profile ten-case runtime, original log availability, authentic upload
+custody, exact-CID closure and official JVM/runtime/transport/symbol evidence
+remain real runtime prerequisites, not results established by this source.
+
+Change record: #352 adds only the optional manual workflow/native producer and
+unchanged pinned inventory data. No dispatch, privileged host/container/JVM
+execution, official evidence or native/default dependency change is implied.

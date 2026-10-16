@@ -1,0 +1,359 @@
+name: Optional PR174 official symbols
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Admitted immutable main SHA (40 lowercase hex)
+        type: string
+        required: true
+      source_comment:
+        description: Predesignated owner source comment ID
+        type: string
+        required: true
+      calibration_comment:
+        description: Predesignated owner proposal approval comment ID
+        type: string
+        required: true
+      official_comment:
+        description: Predesignated distinct owner official comment ID
+        type: string
+        required: true
+      official:
+        description: Separately approve official execution after calibration
+        type: boolean
+        required: true
+        default: false
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original:
+    name: PR174 original protected cohort
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.run_attempt == '1' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash --noprofile --norc -euo pipefail {0}
+    env:
+      PR174_HOST: /opt/ktlsp-pr174/bin/ktlsp-oracle-pr174-host
+      KTLSP_SOURCE_SHA: ${{ inputs.source_sha }}
+      KTLSP_SOURCE_COMMENT: ${{ inputs.source_comment }}
+      KTLSP_CALIBRATION_COMMENT: ${{ inputs.calibration_comment }}
+      KTLSP_OFFICIAL_COMMENT: ${{ inputs.official_comment }}
+      KTLSP_RUN_ID: ${{ github.run_id }}
+    steps:
+      - name: Checkout immutable source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        timeout-minutes: 3
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Build optional pinned native tools
+        timeout-minutes: 20
+        run: |
+          [[ "$KTLSP_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$KTLSP_SOURCE_SHA" = "$GITHUB_SHA"
+          rustup toolchain install 1.99.0 --profile minimal
+          env -u RUSTC_WRAPPER -u RUSTC_WORKSPACE_WRAPPER \
+            -u CARGO_BUILD_RUSTC_WRAPPER -u CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER \
+            -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS -u CARGO_BUILD_RUSTFLAGS \
+            -u CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS \
+            -u RUSTDOCFLAGS -u CARGO_ENCODED_RUSTDOCFLAGS \
+            cargo +1.99.0 build --release --locked --manifest-path tools/oracle/Cargo.toml \
+            --target-dir "$RUNNER_TEMP/pr174-build" \
+            --bin ktlsp-oracle-pr174-host --bin ktlsp-oracle-official-pr174 \
+            --bin ktlsp-oracle-calibration-peer
+      # No privileged installation/preparation precedes this authenticated source gate.
+      - name: Authenticate owner source admission
+        timeout-minutes: 17
+        env: &api-token
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          export KTLSP_CHECKOUT_SHA="$(git rev-parse HEAD)"
+          export KTLSP_CHECKOUT_TREE="$(git rev-parse HEAD^{tree})"
+          "$RUNNER_TEMP/pr174-build/release/ktlsp-oracle-pr174-host" workflow-source
+      - name: Install fixed admitted files
+        timeout-minutes: 3
+        run: |
+          for bin in ktlsp-oracle-pr174-host ktlsp-oracle-official-pr174 ktlsp-oracle-calibration-peer; do
+            sudo install -D -m 0755 "$RUNNER_TEMP/pr174-build/release/$bin" "/opt/ktlsp-pr174/bin/$bin"
+          done
+          for file in .github/workflows/t045-pr174-official-symbols.yml tools/oracle/Cargo.lock rust-toolchain.toml; do
+            sudo install -D -m 0644 "$file" "/opt/ktlsp-pr174/source/$file"
+          done
+          for file in declarations.kt error-node.kt script.json archive-members.json README.md; do
+            sudo install -D -m 0644 "tools/oracle/fixtures/official-pr174-symbols/$file" \
+              "/opt/ktlsp-pr174/source/tools/oracle/fixtures/official-pr174-symbols/$file"
+          done
+      - name: Measure protected host without START
+        id: prepare
+        timeout-minutes: 20
+        env: *api-token
+        run: |
+          export KTLSP_CHECKOUT_SHA="$(git rev-parse HEAD)"
+          export KTLSP_CHECKOUT_TREE="$(git rev-parse HEAD^{tree})"
+          status=0
+          sudo --preserve-env=GH_TOKEN,KTLSP_SOURCE_SHA,KTLSP_SOURCE_COMMENT,KTLSP_CALIBRATION_COMMENT,KTLSP_OFFICIAL_COMMENT,KTLSP_RUN_ID,GITHUB_SHA,GITHUB_REF,GITHUB_EVENT_NAME,GITHUB_RUN_ATTEMPT,GITHUB_REPOSITORY,KTLSP_CHECKOUT_SHA,KTLSP_CHECKOUT_TREE \
+            "$PR174_HOST" workflow-prepare || status=$?
+          if test -f /etc/ktlsp-pr174/proposal/proposal.json; then
+            printf 'export=true\n' >> "$GITHUB_OUTPUT"
+          fi
+          exit "$status"
+      - name: Preserve measured proposal
+        id: proposal
+        if: ${{ always() && steps.prepare.outputs.export == 'true' }}
+        uses: &upload actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        timeout-minutes: 3
+        with: {name: pr174-measured-proposal, path: /etc/ktlsp-pr174/proposal/proposal.json, compression-level: 0, if-no-files-found: error, include-hidden-files: true}
+      - name: Await owner proposal approval
+        id: approve
+        timeout-minutes: 17
+        env:
+          ARTIFACT_ID: ${{ steps.proposal.outputs.artifact-id }}
+        run: sudo "$PR174_HOST" workflow-approve "$ARTIFACT_ID"
+
+      # Default success() gates every START. Always collectors never erase a failed START.
+      - id: case_normal
+        timeout-minutes: 12
+        run: sudo "$PR174_HOST" workflow-case normal
+      - id: finish_normal
+        if: ${{ always() && steps.case_normal.outcome != 'skipped' }}
+        timeout-minutes: 8
+        env: { CASE: normal }
+        run: &finish |
+          status=0
+          sudo "$PR174_HOST" workflow-finish "$CASE" || status=$?
+          if test -d "/etc/ktlsp-pr174/uploads/$CASE"; then
+            printf 'export=true\n' >> "$GITHUB_OUTPUT"
+          fi
+          exit "$status"
+      - id: upload_normal
+        if: ${{ always() && steps.finish_normal.outputs.export == 'true' }}
+        uses: *upload
+        timeout-minutes: 3
+        with: {name: pr174-normal, path: /etc/ktlsp-pr174/uploads/normal, compression-level: 0, if-no-files-found: error, include-hidden-files: true}
+      - name: PR174 receipt normal
+        if: ${{ always() && steps.upload_normal.outputs.artifact-id != '' }}
+        timeout-minutes: 3
+        env:
+          CASE: normal
+          ARTIFACT_ID: ${{ steps.upload_normal.outputs.artifact-id }}
+        run: &receipt sudo "$PR174_HOST" workflow-receipt "$CASE" "$ARTIFACT_ID"
+      - id: case_same_group
+        timeout-minutes: 12
+        run: sudo "$PR174_HOST" workflow-case same-group
+      - id: finish_same_group
+        if: ${{ always() && steps.case_same_group.outcome != 'skipped' }}
+        timeout-minutes: 8
+        env: { CASE: same-group }
+        run: *finish
+      - id: upload_same_group
+        if: ${{ always() && steps.finish_same_group.outputs.export == 'true' }}
+        uses: *upload
+        timeout-minutes: 3
+        with: {name: pr174-same-group, path: /etc/ktlsp-pr174/uploads/same-group, compression-level: 0, if-no-files-found: error, include-hidden-files: true}
+      - name: PR174 receipt same-group
+        if: ${{ always() && steps.upload_same_group.outputs.artifact-id != '' }}
+        timeout-minutes: 3
+        env:
+          CASE: same-group
+          ARTIFACT_ID: ${{ steps.upload_same_group.outputs.artifact-id }}
+        run: *receipt
+      - id: case_setsid
+        timeout-minutes: 12
+        run: sudo "$PR174_HOST" workflow-case setsid
+      - id: finish_setsid
+        if: ${{ always() && steps.case_setsid.outcome != 'skipped' }}
+        timeout-minutes: 8
+        env: { CASE: setsid }
+        run: *finish
+      - id: upload_setsid
+        if: ${{ always() && steps.finish_setsid.outputs.export == 'true' }}
+        uses: *upload
+        timeout-minutes: 3
+        with: {name: pr174-setsid, path: /etc/ktlsp-pr174/uploads/setsid, compression-level: 0, if-no-files-found: error, include-hidden-files: true}
+      - name: PR174 receipt setsid
+        if: ${{ always() && steps.upload_setsid.outputs.artifact-id != '' }}
+        timeout-minutes: 3
+        env:
+          CASE: setsid
+          ARTIFACT_ID: ${{ steps.upload_setsid.outputs.artifact-id }}
+        run: *receipt
+      - id: case_setpgid
+        timeout-minutes: 12
+        run: sudo "$PR174_HOST" workflow-case setpgid
+      - id: finish_setpgid
+        if: ${{ always() && steps.case_setpgid.outcome != 'skipped' }}
+        timeout-minutes: 8
+        env: { CASE: setpgid }
+        run: *finish
+      - id: upload_setpgid
+        if: ${{ always() && steps.finish_setpgid.outputs.export == 'true' }}
+        uses: *upload
+        timeout-minutes: 3
+        with: {name: pr174-setpgid, path: /etc/ktlsp-pr174/uploads/setpgid, compression-level: 0, if-no-files-found: error, include-hidden-files: true}
+      - name: PR174 receipt setpgid
+        if: ${{ always() && steps.upload_setpgid.outputs.artifact-id != '' }}
+        timeout-minutes: 3
+        env:
+          CASE: setpgid
+          ARTIFACT_ID: ${{ steps.upload_setpgid.outputs.artifact-id }}
+        run: *receipt
+      - id: case_timeout
+        timeout-minutes: 12
+        run: sudo "$PR174_HOST" workflow-case timeout
+      - id: finish_timeout
+        if: ${{ always() && steps.case_timeout.outcome != 'skipped' }}
+        timeout-minutes: 8
+        env: { CASE: timeout }
+        run: *finish
+      - id: upload_timeout
+        if: ${{ always() && steps.finish_timeout.outputs.export == 'true' }}
+        uses: *upload
+        timeout-minutes: 3
+        with: {name: pr174-timeout, path: /etc/ktlsp-pr174/uploads/timeout, compression-level: 0, if-no-files-found: error, include-hidden-files: true}
+      - name: PR174 receipt timeout
+        if: ${{ always() && steps.upload_timeout.outputs.artifact-id != '' }}
+        timeout-minutes: 3
+        env:
+          CASE: timeout
+          ARTIFACT_ID: ${{ steps.upload_timeout.outputs.artifact-id }}
+        run: *receipt
+      - id: case_kill
+        timeout-minutes: 12
+        run: sudo "$PR174_HOST" workflow-case kill
+      - id: finish_kill
+        if: ${{ always() && steps.case_kill.outcome != 'skipped' }}
+        timeout-minutes: 8
+        env: { CASE: kill }
+        run: *finish
+      - id: upload_kill
+        if: ${{ always() && steps.finish_kill.outputs.export == 'true' }}
+        uses: *upload
+        timeout-minutes: 3
+        with: {name: pr174-kill, path: /etc/ktlsp-pr174/uploads/kill, compression-level: 0, if-no-files-found: error, include-hidden-files: true}
+      - name: PR174 receipt kill
+        if: ${{ always() && steps.upload_kill.outputs.artifact-id != '' }}
+        timeout-minutes: 3
+        env:
+          CASE: kill
+          ARTIFACT_ID: ${{ steps.upload_kill.outputs.artifact-id }}
+        run: *receipt
+      - id: case_storage
+        timeout-minutes: 12
+        run: sudo "$PR174_HOST" workflow-case storage-exhaustion
+      - id: finish_storage
+        if: ${{ always() && steps.case_storage.outcome != 'skipped' }}
+        timeout-minutes: 8
+        env: { CASE: storage-exhaustion }
+        run: *finish
+      - id: upload_storage
+        if: ${{ always() && steps.finish_storage.outputs.export == 'true' }}
+        uses: *upload
+        timeout-minutes: 3
+        with: {name: pr174-storage-exhaustion, path: /etc/ktlsp-pr174/uploads/storage-exhaustion, compression-level: 0, if-no-files-found: error, include-hidden-files: true}
+      - name: PR174 receipt storage-exhaustion
+        if: ${{ always() && steps.upload_storage.outputs.artifact-id != '' }}
+        timeout-minutes: 3
+        env:
+          CASE: storage-exhaustion
+          ARTIFACT_ID: ${{ steps.upload_storage.outputs.artifact-id }}
+        run: *receipt
+      - id: case_inode
+        timeout-minutes: 12
+        run: sudo "$PR174_HOST" workflow-case inode-exhaustion
+      - id: finish_inode
+        if: ${{ always() && steps.case_inode.outcome != 'skipped' }}
+        timeout-minutes: 8
+        env: { CASE: inode-exhaustion }
+        run: *finish
+      - id: upload_inode
+        if: ${{ always() && steps.finish_inode.outputs.export == 'true' }}
+        uses: *upload
+        timeout-minutes: 3
+        with: {name: pr174-inode-exhaustion, path: /etc/ktlsp-pr174/uploads/inode-exhaustion, compression-level: 0, if-no-files-found: error, include-hidden-files: true}
+      - name: PR174 receipt inode-exhaustion
+        if: ${{ always() && steps.upload_inode.outputs.artifact-id != '' }}
+        timeout-minutes: 3
+        env:
+          CASE: inode-exhaustion
+          ARTIFACT_ID: ${{ steps.upload_inode.outputs.artifact-id }}
+        run: *receipt
+      - id: case_boundary
+        timeout-minutes: 12
+        run: sudo "$PR174_HOST" workflow-case boundary-denials
+      - id: finish_boundary
+        if: ${{ always() && steps.case_boundary.outcome != 'skipped' }}
+        timeout-minutes: 8
+        env: { CASE: boundary-denials }
+        run: *finish
+      - id: upload_boundary
+        if: ${{ always() && steps.finish_boundary.outputs.export == 'true' }}
+        uses: *upload
+        timeout-minutes: 3
+        with: {name: pr174-boundary-denials, path: /etc/ktlsp-pr174/uploads/boundary-denials, compression-level: 0, if-no-files-found: error, include-hidden-files: true}
+      - name: PR174 receipt boundary-denials
+        if: ${{ always() && steps.upload_boundary.outputs.artifact-id != '' }}
+        timeout-minutes: 3
+        env:
+          CASE: boundary-denials
+          ARTIFACT_ID: ${{ steps.upload_boundary.outputs.artifact-id }}
+        run: *receipt
+
+      - id: cancel_start
+        timeout-minutes: 12
+        run: sudo "$PR174_HOST" workflow-cancel-start
+      - name: PR174 runner timeout calibration
+        timeout-minutes: 1
+        continue-on-error: true
+        run: sudo "$PR174_HOST" workflow-cancel-wait
+      - id: finish_cancel
+        if: ${{ always() && steps.cancel_start.outcome != 'skipped' }}
+        timeout-minutes: 8
+        env: { CASE: workflow-step-cancel }
+        run: *finish
+      - id: upload_cancel
+        if: ${{ always() && steps.finish_cancel.outputs.export == 'true' }}
+        uses: *upload
+        timeout-minutes: 3
+        with: {name: pr174-workflow-step-cancel, path: /etc/ktlsp-pr174/uploads/workflow-step-cancel, compression-level: 0, if-no-files-found: error, include-hidden-files: true}
+      - name: PR174 receipt workflow-step-cancel
+        if: ${{ always() && steps.upload_cancel.outputs.artifact-id != '' }}
+        timeout-minutes: 3
+        env:
+          CASE: workflow-step-cancel
+          ARTIFACT_ID: ${{ steps.upload_cancel.outputs.artifact-id }}
+        run: *receipt
+      - name: Authenticate protected cohort and runner timeout
+        timeout-minutes: 8
+        run: sudo "$PR174_HOST" workflow-collect
+      - id: calibration_report
+        uses: *upload
+        timeout-minutes: 3
+        with: {name: pr174-calibration-report, path: /etc/ktlsp-pr174/calibration-proposal/calibration.json, compression-level: 0, if-no-files-found: error, include-hidden-files: true}
+      - name: Await distinct owner official approval
+        id: official
+        if: ${{ inputs.official }}
+        timeout-minutes: 25
+        env:
+          ARTIFACT_ID: ${{ steps.calibration_report.outputs.artifact-id }}
+        run: sudo "$PR174_HOST" workflow-official "$ARTIFACT_ID"
+      - id: finish_official
+        if: ${{ always() && steps.official.outcome != 'skipped' }}
+        timeout-minutes: 8
+        env: { CASE: official }
+        run: *finish
+      - id: upload_official
+        if: ${{ always() && steps.finish_official.outputs.export == 'true' }}
+        uses: *upload
+        timeout-minutes: 3
+        with: {name: pr174-official, path: /etc/ktlsp-pr174/uploads/official, compression-level: 0, if-no-files-found: error, include-hidden-files: true}
+      - name: PR174 receipt official
+        if: ${{ always() && steps.upload_official.outputs.artifact-id != '' }}
+        timeout-minutes: 3
+        env:
+          CASE: official
+          ARTIFACT_ID: ${{ steps.upload_official.outputs.artifact-id }}
+        run: *receipt

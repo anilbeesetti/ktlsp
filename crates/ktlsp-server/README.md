@@ -1,6 +1,6 @@
 # Native server providers
 
-`ktlsp` supports bounded stdio lifecycle, open-document synchronization, `textDocument/foldingRange`, parser-backed syntactic `textDocument/documentSymbol`, finite local `textDocument/definition`, negotiated `textDocument/hover`, `textDocument/references` and `textDocument/documentHighlight`. Initialization advertises UTF-16, incremental sync and folding; parser-backed capabilities require the trusted matching worker, and only hover also requires a compatible content format. Clients advertising `textDocument.diagnostic` negotiate lexical/structural pull reports instead of legacy push diagnostics. Neither diagnostic path provides Kotlin compiler diagnostics.
+`ktlsp` supports bounded stdio lifecycle, open-document synchronization, `textDocument/foldingRange`, negotiated lexical `textDocument/semanticTokens/full` and `/range`, parser-backed syntactic `textDocument/documentSymbol`, finite local `textDocument/definition`, negotiated `textDocument/hover`, `textDocument/references` and `textDocument/documentHighlight`. Initialization advertises UTF-16, incremental sync and folding; lexical tokens require compatible client capabilities, parser-backed capabilities require the trusted matching worker, and hover also requires a compatible content format. Clients advertising `textDocument.diagnostic` negotiate lexical/structural pull reports instead of legacy push diagnostics. Neither diagnostic path provides Kotlin compiler diagnostics.
 
 ## Build and distribute both executables
 
@@ -11,7 +11,7 @@ cargo build --locked --release -p ktlsp-server -p ktlsp-parser --bins
 
 Install **both** `ktlsp` and `ktlsp-parser-worker` from that same build into the same trusted directory (with `.exe` suffixes on Windows). The default CLI discovers the worker only beside its own executable, checking that the sibling is a regular executable file on Unix. There is no PATH, current-directory or environment-selected worker fallback. Installation trust and matching build identity are the distributor's responsibility; this is not a sandbox, signature check or version-authentication protocol.
 
-Without that sibling, synchronization/folding/lexical diagnostics remain available, `documentSymbolProvider`/`definitionProvider`/`hoverProvider`/`referencesProvider`/`documentHighlightProvider` are omitted and their requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. A configured worker that subsequently fails is a request failure, not a fabricated outline or binding. No JVM/JDK, Kotlin compiler or C parser is required.
+Without that sibling, synchronization/folding/lexical diagnostics and compatible lexical semantic tokens remain available, `documentSymbolProvider`/`definitionProvider`/`hoverProvider`/`referencesProvider`/`documentHighlightProvider` are omitted and their requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. A configured worker that subsequently fails is a request failure, not a fabricated outline or binding. No JVM/JDK, Kotlin compiler or C parser is required.
 
 ## Folding and diagnostics
 
@@ -20,6 +20,57 @@ Folding recognizes matched multiline `{}`, `()`, `[]`, block-comment tokens, raw
 On a mismatched closer, report it and discard/diagnose all pending openers. This conservative recovery cannot create crossing delimiter folds; complete valid pairs encountered later can still fold. Unmatched closers and remaining openers produce structural diagnostics. For legacy clients, accepted open/change notifications publish replacement diagnostics (including empty arrays); close clears them. Negotiated pull clients receive no duplicate push notifications. Rejected/stale/invalid edits preserve the current document. Push diagnostics include document versions only when `publishDiagnostics.versionSupport` is true; close clearing omits version.
 
 Missing/closed-document folding requests return invalid params (`-32602`), without reading disk. Malformed request params/client folding capabilities also return invalid params. Analysis exhaustion leaves an accepted document version intact, replaces stale diagnostics with one explicit `analysis-limit` warning, and fails folding with RequestFailed (`-32803`). Subsequent edits can recover normally.
+
+## Lexical semantic-token transport (#380)
+
+`textDocument/semanticTokens/full` and `/range` use the bounded native lossless
+lexer, without a parser worker. This is standard relative semantic-token
+**transport over lexical categories**, not official semantic coloring or full
+Kotlin LSP parity. Only positively known keyword, comment (including shebang),
+string (including raw strings/characters), number and operator tokens are
+emitted. Identifiers/backtick identifiers, punctuation and unknown tokens are
+omitted: no type/function/variable identity or modifiers are guessed. Templates
+remain opaque strings, including their interpolation expressions; parser-backed
+resolution is required to go beyond this ceiling.
+
+Initialization requires valid `textDocument.semanticTokens` string arrays for
+`tokenTypes`, `tokenModifiers` and `formats`, including `relative`, and at least
+one supported full/range request. The fixed native order
+`keyword, comment, string, number, operator` is intersected with client-supported
+types; an empty intersection or malformed/incompatible profile disables only
+this feature. The advertised legend contains that intersection and no modifiers.
+Full and range are independently gated (`true` or an object enables each);
+client delta support never enables server delta support. Unnegotiated methods
+and `/full/delta` return MethodNotFound (`-32601`). No delta, `resultId`, token
+cache, identifier resolution, background job or JVM dependency is added.
+
+Each synchronous query reads the current immutable open document, lexes once
+and sweeps source/UTF-16 positions once. Multiline tokens become positive-length,
+nonoverlapping single-physical-line fragments, excluding CR/LF; CRLF, lone CR,
+LF and astral characters retain exact UTF-16 coordinates. Range endpoints are
+strict, half-open document positions, with partial-token clipping. The first
+returned token is relative to document `(0,0)`, not the requested range start.
+Empty documents/ranges and files with no supported categories return `data: []`.
+Malformed/reversed/out-of-range/split-surrogate ranges and unopened URIs return
+InvalidParams (`-32602`), never clamped output.
+
+Existing 8 MiB source, 1,000,000 lexer-token, 256 lexical-diagnostic and 128
+scanner-context limits remain. At most **10,000 emitted fragments** and a
+conservative **1 MiB encoded result** are admitted. Five maximum-width u32
+integers plus separators cost at most 55 bytes per fragment plus 11 bytes for
+the result object, so the fragment bound is tighter than the byte bound.
+Checks precede appending; exhaustion rejects the whole query with RequestFailed
+(`-32803`), never truncates or substitutes empty success. Range queries count
+only emitted/clipped fragments but still lex and validate the complete source.
+Rejected document edits retain the prior version and token result.
+
+Permanent provider regressions decode real lexer output, negotiate independent
+request/type profiles, cover strict UTF-16/mixed terminators/opaque templates,
+edit rollback and exact resource boundaries. The real CLI regression decodes
+full/range results and an applied edit with exact string/u64 IDs and pull-mode
+diagnostics. These are authored checks, not a claim of execution: no local
+server/parser runtime is authorized under #96. Original hosted proof and final
+composition remain separately ROOT-admitted; full official parity remains open.
 
 ## Finite local definition and declaration hover
 

@@ -5,6 +5,7 @@ mod cache;
 mod document_symbols;
 mod input;
 mod semantic_navigation;
+mod semantic_tokens;
 pub use input::StdinInput;
 mod structure;
 mod uri;
@@ -121,6 +122,7 @@ pub struct Session {
     parser_provider: Option<Arc<document_symbols::Provider>>,
     symbol_client: document_symbols::Client,
     hover_format: Option<semantic_navigation::HoverFormat>,
+    semantic_tokens: Option<semantic_tokens::Client>,
     exit_code: Option<i32>,
     incarnations: HashMap<String, u64>,
     next_incarnation: u64,
@@ -173,6 +175,7 @@ impl Session {
             parser_provider: None,
             symbol_client: document_symbols::Client::default(),
             hover_format: Some(semantic_navigation::HoverFormat::Plaintext),
+            semantic_tokens: None,
             exit_code: None,
             incarnations: HashMap::new(),
             next_incarnation: 0,
@@ -335,10 +338,18 @@ impl Session {
                     .and_then(|p| p.get("capabilities"))
                     .expect("validated capabilities"),
             );
+            self.semantic_tokens = semantic_tokens::Client::negotiate(
+                params
+                    .and_then(|p| p.get("capabilities"))
+                    .expect("validated capabilities"),
+            );
             self.configuration = configuration;
             self.pull_diagnostics = pull_diagnostics;
             self.state = State::Initializing;
             let mut result = json!({"capabilities":{"positionEncoding":"utf-16", "foldingRangeProvider":true, "textDocumentSync":{"openClose":true,"change":2,"save":false}}, "serverInfo":{"name":"ktlsp","version":env!("CARGO_PKG_VERSION")}});
+            if let Some(client) = &self.semantic_tokens {
+                result["capabilities"]["semanticTokensProvider"] = client.options();
+            }
             if self.parser_provider.is_some() {
                 result["capabilities"]["documentSymbolProvider"] = json!(true);
                 result["capabilities"]["definitionProvider"] = json!(true);
@@ -381,6 +392,37 @@ impl Session {
                     .document_diagnostics(uri)
                     .ok_or((-32602, "diagnostic refers to unopened document"))?;
                 Ok(json!({"kind":"full","items":diagnostics}))
+            }
+            "textDocument/semanticTokens/full" | "textDocument/semanticTokens/range" => {
+                let range_request = method == "textDocument/semanticTokens/range";
+                let client = self
+                    .semantic_tokens
+                    .as_ref()
+                    .filter(|client| client.supports(range_request))
+                    .ok_or((-32601, "Method not found"))?;
+                let map = params
+                    .ok_or((-32602, "semantic token params missing"))
+                    .and_then(|p| object(p).map_err(|e| (-32602, e)))?;
+                let uri = required(map, "textDocument")
+                    .and_then(object)
+                    .and_then(|d| required(d, "uri"))
+                    .and_then(uri_value)
+                    .map_err(|e| (-32602, e))?;
+                let document = self
+                    .documents
+                    .get(uri)
+                    .ok_or((-32602, "semantic tokens refer to unopened document"))?;
+                let range = if range_request {
+                    Some(
+                        serde_json::from_value::<ktlsp_text::Range>(
+                            required(map, "range").map_err(|e| (-32602, e))?.clone(),
+                        )
+                        .map_err(|_| (-32602, "invalid UTF-16 semantic token range"))?,
+                    )
+                } else {
+                    None
+                };
+                client.render(document.text(), range)
             }
             "textDocument/foldingRange" => {
                 let map = params

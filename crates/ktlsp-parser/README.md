@@ -16,8 +16,12 @@ stdin/stdout endpoint stays blocking. Input uses byte offsets and explicit write
 half-close for EOF, including best-effort half-close after a failed write. Each
 iteration attempts at most one 8 KiB read and one 8 KiB write, one pending
 half-close and one child-status poll. Cancellation precedes the original 500 ms
-deadline. Productive iterations continue; idle iterations sleep 2 ms. No Unix
-I/O threads or scoped joins remain. Non-Unix retains the pipe/scoped-thread path.
+deadline. Productive iterations continue; idle iterations wait for the unfinished
+read/write directions with one `poll` on the existing socket, requesting at most
+2 ms before another cancellation/deadline/child-status check. Completed writers
+are not watched for writability, and a fully finished exchange omits the socket
+while waiting for child status, avoiding writable/EOF busy loops. No Unix I/O
+threads or scoped joins remain. Non-Unix retains the pipe/scoped-thread path.
 
 The Unix pump samples reader errors before child status; allocation exit86 and
 other failed exits precede a remembered writer error. After successful child
@@ -31,9 +35,35 @@ pending cleanup and permanent failure pins. Admission happens before normalizati
 Command/observer allocation and terminal Once initialization. Once may block before
 the original exchange clock; cancellation is rechecked after initialization.
 A single retained cleanup reaper requests a 256 KiB stack and borrows each reserved
-Child in static storage. The caller closes its transport before publishing cleanup
-and observes it for 20 ms. The reaper requests termination and waits for that same
-child; no caller-side kill/wait/join remains on Unix.
+Child in static storage. Each reservation retains the originating thread handle
+under the same metadata mutex as its Child. The caller closes its transport,
+publishes cleanup, drops that mutex, and then unparks the retained reaper. The
+reaper requests termination and waits for that same child; no caller-side
+kill/wait/join remains on Unix.
+
+Cleanup still has its original strict 20 ms observation grace, with clock samples
+both before and after the ownership/death observation. Reaper and owner use
+`park_timeout` with the existing 2 ms cap instead of timer-only sleeps. Before
+publishing confirmation or failure, the reaper captures the original owner and
+releases the metadata mutex; only then does it publish and unpark that owner.
+Thus immediate confirmation consumption cannot mistake the reaper's own lock for
+invalid ownership. Stored unpark tokens cover notification before parking;
+spurious or stale tokens only trigger another unchanged state/deadline check.
+Slot reuse clears the retained owner, and an already captured notification still
+targets the old thread, never a later reservation. Startup/reaper failure also
+wakes registered waiters. There are still eight slots and one retained reaper;
+no per-request reader thread, queue, or new cleanup deadline is introduced.
+
+The original changed-source macOS probe run
+[38889917253, job 116936629275](https://github.com/anilbeesetti/ktlsp/actions/runs/38889917253/job/116936629275)
+on source `51f011a9b34b8b53ef519fdb939fe7cb2181cb96` observed same-child
+`CONFIRMED` only after the 20 ms grace (including a 21.5645 ms CLI sample and
+a 30.648 ms controlled Session sample). It did not timestamp publication, prove
+confirmation occurred within grace, or establish OS timer coalescing as the cause.
+The notification repair requires its own changed-source hosted evidence. Waking
+a thread does not guarantee the scheduler runs it within grace: late or otherwise
+unproved cleanup still fails closed, with no later promotion of the original
+request's boolean.
 
 Confirmed same-child reaping preserves the selected result, even if the reaper
 has died elsewhere. With valid pending cleanup at observation expiry, an already
@@ -81,6 +111,142 @@ Linux native checks do not establish Darwin/Windows reliability, resolve #96 or
 close B3/B4; historical MissingACK observations stay inconclusive. No comparative
 speed/RAM claim follows from the transport change. The parent capacity checks do not
 bound whole-process allocation, stack or RSS.
+
+### macOS fault evidence (#332)
+
+The original macOS release run
+[38854469458/job116822734134](https://github.com/anilbeesetti/ktlsp/actions/runs/38854469458/job/116822734134)
+failed the 4096-byte deadline-receipt datagram send with `Message too long`, and
+selected `Timeout` rather than the required `OutputLimit` for the oversize fixture.
+The receipt regression now sends an 18-byte valid-prefix datagram, which still
+exercises truncation by the consumer's 17-byte receive buffer. A separate
+4096-byte valid-prefix byte-slice regression preserves exact acknowledgement
+rejection without assuming the OS can transmit that datagram.
+
+The original logs did not establish the oversize cause. The later original
+changed-source release run
+[38868405795/job116866483405](https://github.com/anilbeesetti/ktlsp/actions/runs/38868405795/job/116866483405),
+at head `10c62efdbb109a3e8a097abd7133248f7b75526b`, recorded only 458,752 output
+bytes before selecting `Timeout` at 505.513 ms, with all eight input bytes sent
+and half-closed, no output EOF and no successful child exit observed. Repeated
+8 KiB progress/`WouldBlock` pairs were followed by roughly 18 ms idle gaps.
+The unconditional 2 ms sleep request was timer-throttling output draining on
+that observed host; the original strict `OutputLimit` assertion still failed.
+
+This repair replaces that sleep with readiness-driven `poll`, borrowing only
+the existing socket and retaining the per-tick I/O budgets and original clock.
+The positive wait is capped at 2 ms and rounds sub-millisecond remainders up to
+poll's integer-millisecond granularity; no deadline value is extended. Readiness,
+timeout, `EINTR` and hangup return to the ordinary control-first pump, without
+retrying the wait. Unexpected poll failure also checks cancellation/deadline
+before selecting `Io`. The direct Unix `libc = 0.2.190` OS-binding edge reuses
+the already audited locked package; it adds no C build or semantic engine.
+Changed-source hosted macOS release proof is still required; this source repair
+alone is not a macOS reliability claim.
+For ROOT-admitted **changed-source hosted** tests, set
+`KTLSP_NATIVE_IO_OBSERVE=1` and run the release workspace tests with `--nocapture`.
+Only the unit-test fault-worker command is observed; no product instrumentation
+or parser/source logging is compiled into ordinary builds.
+
+`KTLSP_NATIVE_IO_V1` records spawn completion, first read/write, input half-close,
+output EOF, observed successful exit, idle/total tick counts, the final 32 scalar
+pump states, and selected result/cleanup. At most eight child-stage receipts are
+retained: 1 = fixture entered, 2 = first input byte, 3 = input EOF,
+4 = oversize output buffer ready immediately before the stdout write call,
+5 = that write returns. Stage 4 does not prove the write has executed.
+Reads/counts include subprocess test-harness stdout, not only fixture bytes.
+Receipt timestamps are parent receive times, not child execution timestamps;
+absent stages remain inconclusive. Each collection tick/final drain receives at
+most eight tiny datagrams. Setup/send/logging failures never substitute a product
+result. Logging does not retry or flush, but a blocking stderr sink can delay
+return. Observation has unmeasured
+timing effects and leaves cancellation-before-deadline, the original deadline,
+exact input/output bounds, and failure-visible `OutputLimit` assertions unchanged.
+Local parser runtime remains prohibited under #96. Hosted macOS release full
+workspace and supervision proof is still required; #96 remains OPEN/UNKNOWN.
+
+The first changed-source diagnostic workflow,
+[38859356634](https://github.com/anilbeesetti/ktlsp/actions/runs/38859356634),
+refused both platforms before checkout: the event payload's optional
+`merge_commit_sha` was empty, although the immutable source/workflow SHA and
+merge ref agreed. Original identity artifacts were retained and independently
+rehash-verified. The next original run,
+[38864989435](https://github.com/anilbeesetti/ktlsp/actions/runs/38864989435),
+also refused before checkout: the now-present payload merge SHA still named the
+older test merge while the original event head/base and actual source/workflow
+SHA had advanced. That payload field is retained as an observation, not admission
+authority. Admission requires the immutable context source/workflow SHA and ref,
+then actual ordered Git parents matching the original event base/head before
+native execution. Neither refusal diagnosed the Windows source guard or observed
+the macOS parser.
+
+The later original changed-source release run
+[38875113607/job116888168806](https://github.com/anilbeesetti/ktlsp/actions/runs/38875113607/job/116888168806),
+at `0e8027d4905cf4ff7a66c3d860683112d98a8ef3`, passed source guards, format,
+strict Clippy and the parser library: 94 passed, zero failed, one ignored,
+including the previously failing strict oversize supervision case. It then failed two worker
+binary fixtures independently: the bounded queue-fill fixture received Darwin
+`ENOBUFS` (55) instead of `WouldBlock`, while the sampled-checkpoint fixture's
+post-disarm receive returned `ConnectionReset` after its sole worker endpoint
+was dropped. These use thread-local observer state; this was not mutex poisoning.
+The release workspace run did not pass.
+
+The worker-fixture repair classifies `ENOBUFS` as queue saturation only on Apple
+targets and only in the finite nonblocking fill fixture; all other errors remain
+fatal. The 4096-send bound is unchanged. A worker-endpoint alias now stays alive
+through empty-queue assertions, matching production's retained original stderr
+fd after the observer clone is dropped. This tests absence of an extra ACK
+without requiring any particular peer-close errno. The explicit peer-loss case
+still drops the parent endpoint and verifies disarm without receiving from it.
+The backpressure case drains exactly its queued noise after the first sampled
+attempt, then verifies no late ACK when capacity returns. Production checkpoint
+sampling, exact challenge validation, one ACK attempt and no-retry semantics are
+unchanged. This fixture source repair still requires an original changed-source
+hosted run; it establishes no full-workspace pass or #96 resolution.
+
+The next original changed-source run,
+[38879411025/job116902229288](https://github.com/anilbeesetti/ktlsp/actions/runs/38879411025/job/116902229288),
+at `74135c0a7dcdbb16f75b457a625569c11518488c`, passed the parser library
+(101 passed, one ignored) and worker fixtures (eight passed, one ignored).
+The frozen real generic-copy observation then returned `Invalid` instead of
+its unchanged exact `Complete(GenericCopyRecord)` requirement. An earlier
+unselected deadline observation also reported `Invalid`, without claiming a
+deadline witness. The logs did not expose which generic-copy receive failed.
+
+Both parent receipt validators run only after confirmed same-child cleanup.
+Previously, every worker-side datagram alias had closed by then, so a Darwin
+peer-close error could not satisfy the strict `WouldBlock` empty-queue sentinel.
+Deadline, generic-copy and native-I/O observation now share a request-owned
+datagram channel retaining an inert worker-side alias until validation finishes.
+That alias performs no I/O and cannot fabricate a child receipt. Validation
+still requires the exact packet, all scalar checks and a clean `WouldBlock`
+sentinel; `ConnectionReset`, malformed, truncated and extra packets remain
+nonaccepting. Unconfirmed cleanup still drops channels without receipt reads.
+Error/unwind/cancellation paths own and drop the same channel inside their
+existing reservation. Ordinary unobserved parsing creates no observation channel.
+
+Descriptor accounting is explicit, not a hard process-FD ceiling: the observed
+path has at most six known caller-owned FDs before Command disposal (three
+stream endpoints, channel receiver/keeper, and Command's child-stderr alias),
+up from five without the keeper. The unchanged eight-reservation admission cap
+therefore bounds those known observed-path FDs at 48, excluding ambient FDs,
+child stdio and Rust/OS spawn internals. The keeper uses the safe standard-library
+close-on-exec socket/clone operations; only the intended child stderr mapping
+survives exec. After Command disposal, only the parent stream plus two channel
+FDs remain; the stream closes before cleanup, and both channel FDs drop after
+receipt validation or earlier error/unwind disposal. Public observation APIs
+select one channel per request; ordinary parsing retains its three known stream
+FDs and allocates no channel. No kernel limits, reservation cap or resource-error
+handling are raised or bypassed; failed setup remains failure-visible.
+
+The native-I/O trace already required the subprocess fault-test name, excluding
+the real parser command in the failing run. It now also explicitly excludes
+both private observation-mode flags, so diagnostic setup cannot replace those
+stderr channels even if a future fixture combines arguments. Regressions close
+external worker/Command aliases before strict receipt validation, check channel
+descriptor `FD_CLOEXEC` flags, preserve malformed/duplicate rejection, and ensure
+child closure does not increment invalid native-stage counts. No local runtime
+has exercised this repair; full changed-source hosted proof remains required.
 
 Limits are enforced independently in parent and worker where applicable:
 

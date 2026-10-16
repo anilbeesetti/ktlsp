@@ -49,3 +49,49 @@ build metadata, special/module-owned libraries, symlink/foreign-platform path
 parity, build-tool execution and official oracle remain pending. Logical byte/
 node/path/output ceilings do not promise allocator capacity or RSS bounds.
 No full T021/import or platform-parity claim; parent #21 and #96 remain open.
+
+## Native Windows #329: remove the private-format snapshot
+
+The original changed-source native-platform
+[run 38884260319 / Windows job 116918089686](https://github.com/anilbeesetti/ktlsp/actions/runs/38884260319/job/116918089686),
+attempt 1, passed source admission, format and strict Clippy. Artifact lookup
+and binary targets passed before the importer library target failed:
+`tests::v2_intermediate_manifest_matches_frozen_literal` unwrapped a caller
+Schema error at `src/lib.rs:792`. The hard-coded `/ktlsp/t021` directory is
+rooted-only, not absolute on Windows. Original importer unit results were
+three passes and one failure; later importer integration targets were not reached.
+The original job's source/workflow SHA was
+`96f4b9562536ad34eefdfc6275c630dcbcb6961c`, with event head
+`b2417bed7387c34d6d52afcf45e97a1d3e99b1af` and base
+`abe98694226c86fced3aed31691b8f0945a565e0`.
+The retained log `ktlsp-platform-116918089686.log` has SHA-256
+`49a721dcdd7dcb1575f2a03d9f178d8d39ca1032129929715ab58d350d4e0095`.
+No unchanged retry or historical line-ending cause is claimed.
+
+The failed unit test only compared private `parse_workspace` intermediate
+`Value` keys/default omissions with a literal. That incidental implementation
+contract is removed, not repinned to a Windows directory. Its private projection
+fixture is deleted, and the README no longer promises that format. This supersedes
+the historical private-format freeze recorded above; the real public imported
+sidecar, native projection semantics and serialized/reloaded native model remain
+the contract. The integration test now asserts ordered public edge identities,
+scopes/exports, source memberships/kinds, library paths and roundtrip retention
+directly, without comparing the private intermediate representation. The
+exhaustive-error-match compile-only wiring helper is also removed; actual v1
+strictness and compatible-result behavior remain exercised.
+
+The same-cause audit replaces Unix-only success-case bases throughout importer-v2
+tests with native absolute paths. Logical caller/expanded-path limits retain
+their exact byte arithmetic by padding from the actual native root. The escaped
+projection boundary calculates native path/separator JSON escaping independently
+from its input, preserving exact-cap versus one-byte-over error expectations
+without increasing limits. The Maven oversized-caller probe likewise uses a
+native absolute base. V1's accepted absolute input uses forward-slash spelling of
+its real native prefix, preserving the documented rejection of backslash input.
+Intentionally invalid relative/NUL inputs and Unix-only non-UTF-8 controls remain.
+
+The production absolute UTF-8/non-NUL guard, path policy, parsers, APIs and all
+resource limits are unchanged. This source correction does not claim changed
+Windows/Cygwin execution, full import/platform parity, local parser/server
+execution, a push, dispatch or merge. ROOT composes the reviewed changes for a
+separately admitted original changed-source platform run.

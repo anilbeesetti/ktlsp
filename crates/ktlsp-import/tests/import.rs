@@ -181,7 +181,10 @@ fn malformed_json_duplicate_keys_and_enums() {
 #[test]
 fn paths_are_explicit_lexical_and_missing_artifacts_retained() {
     let mut value = fixture();
-    value["libraries"][0]["roots"][1]["path"] = json!(base().join("不存在.jar"));
+    // Import paths use slash spelling, including native Windows drive prefixes.
+    let absolute = base().join("不存在.jar");
+    value["libraries"][0]["roots"][1]["path"] =
+        json!(absolute.to_str().unwrap().replace('\\', "/"));
     assert!(import(value).is_ok());
     for value_path in [
         "src",

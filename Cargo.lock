@@ -103,6 +103,7 @@ dependencies = [
  "ktlsp-text",
  "ktrs-parser",
  "ktrs-syntax",
+ "libc",
  "serde",
  "serde_json",
 ]

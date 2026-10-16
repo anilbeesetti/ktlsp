@@ -37,18 +37,42 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           $ErrorActionPreference = 'Stop'
+          $evidence = "$env:RUNNER_TEMP/native-package-evidence"
+          New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+          @{
+            source_sha = $env:SOURCE_SHA
+            source_ref = $env:SOURCE_REF
+            workflow_sha = $env:WORKFLOW_SHA
+            workflow_ref = $env:WORKFLOW_REF
+            repository = $env:REPOSITORY
+            default_branch = $env:DEFAULT_BRANCH
+            run_id = '${{ github.run_id }}'
+            run_attempt = '${{ github.run_attempt }}'
+            runner_os = '${{ runner.os }}'
+            runner_arch = '${{ runner.arch }}'
+            image_os = $env:ImageOS
+            image_version = $env:ImageVersion
+            os_description = [System.Runtime.InteropServices.RuntimeInformation]::OSDescription
+            powershell = $PSVersionTable.PSVersion.ToString()
+          } | ConvertTo-Json | Set-Content "$evidence/identity.json" -Encoding utf8NoBOM
           if ($env:SOURCE_SHA -cnotmatch '^[0-9a-f]{40}$' -or
               $env:SOURCE_REF -cne "refs/heads/$env:DEFAULT_BRANCH" -or
               $env:WORKFLOW_SHA -cne $env:SOURCE_SHA -or
               $env:WORKFLOW_REF -cne "$env:REPOSITORY/.github/workflows/native-packaging-experiment.yml@refs/heads/$env:DEFAULT_BRANCH") {
             throw 'Only the immutable dispatch SHA and its default-branch workflow are admitted'
           }
-          New-Item -ItemType Directory "$env:RUNNER_TEMP/native-package-evidence" | Out-Null
           @(
             "CARGO_HOME=$env:RUNNER_TEMP/native-package-cargo"
             "CARGO_TARGET_DIR=$env:RUNNER_TEMP/native-package-target"
           ) | Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8
       - uses: actions/checkout@v4
+        # Match the shared preflight and final packaging cleanliness check.
+        env:
+          GIT_CONFIG_COUNT: '2'
+          GIT_CONFIG_KEY_0: core.autocrlf
+          GIT_CONFIG_VALUE_0: 'false'
+          GIT_CONFIG_KEY_1: core.eol
+          GIT_CONFIG_VALUE_1: lf
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -58,18 +82,9 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $evidence = "$env:RUNNER_TEMP/native-package-evidence"
-          git -c core.autocrlf=false -c core.eol=lf checkout-index --all --force
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $head = git rev-parse HEAD
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $tree = git rev-parse 'HEAD^{tree}'
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $status = @(git status --porcelain=v1 --untracked-files=all)
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if ($head -cne $env:SOURCE_SHA -or $tree -cnotmatch '^[0-9a-f]{40}$' -or $status.Count -ne 0) {
-            throw 'Source identity or clean checkout mismatch'
-          }
-          $tree | Set-Content "$evidence/source-tree.txt"
+          # #329: retain bounded original PowerShell facts and complementary raw
+          # queries; persist the same byte policy used by the initial checkout.
+          & ./tools/ci/native-source-preflight.ps1 -EvidenceDirectory $evidence
           rustup toolchain install 1.99.0 --profile minimal --component rustfmt --component clippy 2>&1 | Tee-Object "$evidence/toolchain-install.txt"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           rustc +1.99.0 -vV 2>&1 | Tee-Object "$evidence/rustc.txt"

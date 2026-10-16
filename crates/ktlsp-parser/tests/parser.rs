@@ -4,9 +4,18 @@ mod functional;
 use ktlsp_parser::{FileKind, MAX_NESTING, MAX_SOURCE_BYTES, Parser, ParserError};
 use std::{
     io::Write,
-    sync::atomic::AtomicBool,
+    path::PathBuf,
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
     time::{Duration, Instant},
 };
+
+struct MissingWorkerDirectory(PathBuf);
+impl Drop for MissingWorkerDirectory {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir(&self.0);
+    }
+}
+
 fn parser() -> Parser {
     Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap()
 }
@@ -154,8 +163,24 @@ fn preflight_limits_and_cancel_do_not_launch_work() {
         ParserError::Cancelled
     );
     assert!(Parser::new("relative-worker").is_err());
+    static NEXT: AtomicUsize = AtomicUsize::new(0);
+    let directory = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        "ktlsp-parser-missing-worker-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    std::fs::create_dir(&directory).unwrap();
+    let missing = MissingWorkerDirectory(directory);
+    let worker = missing
+        .0
+        .join(format!("worker{}", std::env::consts::EXE_SUFFIX));
+    assert!(worker.is_absolute());
     assert_eq!(
-        Parser::new("/definitely/missing/worker")
+        worker.symlink_metadata().unwrap_err().kind(),
+        std::io::ErrorKind::NotFound
+    );
+    assert_eq!(
+        Parser::new(worker)
             .unwrap()
             .parse("", FileKind::Source, &AtomicBool::new(false))
             .unwrap_err(),

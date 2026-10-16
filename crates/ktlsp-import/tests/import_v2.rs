@@ -1,18 +1,32 @@
 use ktlsp_import::{
     ImportError, MAX_BYTES, MAX_DEPTH, MAX_EXPANDED_PATH_BYTES, MAX_NODES, MAX_REPORTS, v2,
 };
-use ktlsp_project::{DependencyScope, ModuleDependency, ProjectError};
+use ktlsp_project::{DependencyScope, ModuleDependency, ProjectError, SourceRootKind};
 use serde_json::{Value, json};
-use std::{error::Error as _, path::PathBuf};
+use std::{
+    error::Error as _,
+    path::{Path, PathBuf},
+};
 
-const BASE: &str = "/ktlsp/t021";
+fn base() -> PathBuf {
+    std::env::temp_dir().join("ktlsp-import-v2")
+}
+
+fn base_with_bytes(bytes: usize) -> String {
+    let directory = base();
+    let root = directory.ancestors().last().unwrap().to_str().unwrap();
+    let value = format!("{root}{}", "x".repeat(bytes - root.len()));
+    assert!(Path::new(&value).is_absolute());
+    assert_eq!(value.len(), bytes);
+    value
+}
 const FIXTURE: &[u8] = include_bytes!("fixtures/scoped-exported.json");
 
 fn fixture() -> Value {
     serde_json::from_slice(FIXTURE).unwrap()
 }
 fn import(value: Value) -> Result<v2::ImportedWorkspace, v2::Error> {
-    v2::from_json(BASE, &serde_json::to_vec(&value).unwrap())
+    v2::from_json(base(), &serde_json::to_vec(&value).unwrap())
 }
 fn replace(value: &mut Value, pointer: &str, replacement: Value) {
     if let Some(target) = value.pointer_mut(pointer) {
@@ -44,10 +58,11 @@ fn validation(value: Value) -> ProjectError {
 }
 
 #[test]
-fn literal_scopes_exports_order_and_root_membership() {
+fn scopes_exports_order_and_root_membership_survive_import() {
     use DependencyScope::{Compile, Provided, Runtime, Test};
     use v2::Dependency::{Library, Module, ModuleSource};
-    let result = v2::from_json(BASE, FIXTURE).unwrap();
+    let directory = base();
+    let result = v2::from_json(&directory, FIXTURE).unwrap();
     assert_eq!(
         result
             .modules
@@ -114,35 +129,104 @@ fn literal_scopes_exports_order_and_root_membership() {
         ]
     );
     assert!(result.modules[1].dependencies.is_empty());
-    let expected = ktlsp_project::v2::from_json(
-        "/ktlsp/workspace.json",
-        include_bytes!("fixtures/scoped-exported-projection.json"),
-    )
-    .unwrap();
     let project = result.project_projection();
-    assert_eq!(project, &expected);
-    assert_eq!(project.modules[0].dependencies.len(), 10);
+    assert_eq!(
+        project
+            .modules
+            .iter()
+            .map(|module| module.id.as_str())
+            .collect::<Vec<_>>(),
+        ["app😀", "shared"]
+    );
+    assert_eq!(
+        project.modules[0]
+            .dependencies
+            .iter()
+            .map(|edge| match edge {
+                ktlsp_project::v2::Dependency::Library {
+                    library,
+                    scope,
+                    exported,
+                } => ("library", library.as_str(), *scope, *exported),
+                ktlsp_project::v2::Dependency::Module {
+                    module,
+                    scope,
+                    exported,
+                } => ("module", module.as_str(), *scope, *exported),
+                other => panic!("unexpected projected dependency: {other:?}"),
+            })
+            .collect::<Vec<_>>(),
+        [
+            ("library", "shared", Compile, false),
+            ("module", "shared", Provided, true),
+            ("library", "shared", Compile, true),
+            ("library", "shared", Test, false),
+            ("library", "shared", Test, true),
+            ("library", "shared", Runtime, false),
+            ("library", "shared", Runtime, true),
+            ("module", "shared", Provided, false),
+            ("library", "shared", Provided, false),
+            ("library", "shared", Provided, true),
+        ]
+    );
+    assert_eq!(
+        project.modules[0]
+            .source_roots
+            .iter()
+            .map(|root| (
+                root.path.strip_prefix(&directory).unwrap(),
+                root.kind,
+                root.generated
+            ))
+            .collect::<Vec<_>>(),
+        [
+            (
+                Path::new("app/src/kotlin"),
+                SourceRootKind::Production,
+                false
+            ),
+            (Path::new("app/test"), SourceRootKind::Test, false),
+            (Path::new("extra/src"), SourceRootKind::Production, false),
+        ]
+    );
+    assert!(project.modules[1].source_roots.is_empty());
+    assert!(project.modules[1].dependencies.is_empty());
+    assert_eq!(project.libraries.len(), 1);
+    assert_eq!(project.libraries[0].id, "shared");
+    assert_eq!(
+        project.libraries[0].binaries,
+        [directory.join("lib/classes.jar")]
+    );
+    assert_eq!(
+        project.libraries[0].sources,
+        [directory.join("lib/sources.zip")]
+    );
     assert_eq!(result.modules[0].content_roots.len(), 2);
     assert_eq!(
         result.modules[0].content_roots[0].path,
-        PathBuf::from("/ktlsp/t021/app")
+        directory.join("app")
     );
     assert_eq!(
         result.modules[0].content_roots[1].path,
-        PathBuf::from("/ktlsp/t021/extra")
+        directory.join("extra")
     );
     let roots: Vec<_> = result.modules[0]
         .content_roots
         .iter()
         .flat_map(|c| &c.source_roots)
-        .map(|r| (r.path.to_str().unwrap(), r.root_type.as_str()))
+        .map(|r| {
+            (
+                r.path.strip_prefix(&directory).unwrap(),
+                r.root_type.as_str(),
+            )
+        })
         .collect();
     assert_eq!(
         roots,
         [
-            ("/ktlsp/t021/app/src/kotlin", "kotlin-source"),
-            ("/ktlsp/t021/app/test", "java-test"),
-            ("/ktlsp/t021/extra/src", "java-source"),
+            (Path::new("app/src/kotlin"), "kotlin-source"),
+            (Path::new("app/test"), "java-test"),
+            (Path::new("extra/src"), "java-source"),
         ]
     );
     assert_eq!(result.libraries.len(), 1);
@@ -151,16 +235,23 @@ fn literal_scopes_exports_order_and_root_membership() {
         result.libraries[0]
             .roots
             .iter()
-            .map(|r| (r.path.to_str().unwrap(), r.root_type.as_str()))
+            .map(|r| (
+                r.path.strip_prefix(&directory).unwrap(),
+                r.root_type.as_str()
+            ))
             .collect::<Vec<_>>(),
         [
-            ("/ktlsp/t021/lib/sources.zip", "SOURCES"),
-            ("/ktlsp/t021/lib/classes.jar", "CLASSES"),
+            (Path::new("lib/sources.zip"), "SOURCES"),
+            (Path::new("lib/classes.jar"), "CLASSES"),
         ]
     );
     let bytes = serde_json::to_vec(project).unwrap();
     assert_eq!(
-        ktlsp_project::v2::from_json("/elsewhere/workspace.json", &bytes).unwrap(),
+        ktlsp_project::v2::from_json(
+            std::env::temp_dir().join("elsewhere/workspace.json"),
+            &bytes
+        )
+        .unwrap(),
         *project
     );
 }
@@ -410,37 +501,27 @@ fn malformed_duplicate_and_truncated_json_is_controlled() {
         br#"{"future":{"x":1,"x":2}}"#,
         br#"{"modules":[{"name":"a","dependencies":[{"type":"library","name":"x","scope":"test","isExported":false,"isExpor\u0074ed":true}]}]}"#,
     ] {
-        assert!(matches!(v2::from_json(BASE, bytes), Err(v2::Error::Import(ImportError::Json(_)))));
+        assert!(matches!(v2::from_json(base(), bytes), Err(v2::Error::Import(ImportError::Json(_)))));
     }
     let end = FIXTURE
         .iter()
         .rposition(|byte| !byte.is_ascii_whitespace())
         .unwrap();
     for cut in 0..=end {
-        assert!(v2::from_json(BASE, &FIXTURE[..cut]).is_err(), "cut {cut}");
+        assert!(v2::from_json(base(), &FIXTURE[..cut]).is_err(), "cut {cut}");
     }
-    assert!(v2::from_json(BASE, &FIXTURE[..=end]).is_ok());
+    assert!(v2::from_json(base(), &FIXTURE[..=end]).is_ok());
 }
 
 #[test]
-fn old_api_stays_strict_and_exhaustive_matches_compile() {
-    fn old_error(error: ImportError) {
-        match error {
-            ImportError::Json(_)
-            | ImportError::BudgetExceeded(_)
-            | ImportError::Schema { .. }
-            | ImportError::Unsupported { .. }
-            | ImportError::Project(_) => {}
-        }
-    }
-    old_error(ktlsp_import::from_json(BASE, FIXTURE).unwrap_err());
+fn old_api_stays_strict_and_preserves_compatible_results() {
     assert!(matches!(
-        ktlsp_import::from_json(BASE, FIXTURE),
+        ktlsp_import::from_json(base(), FIXTURE),
         Err(ImportError::Unsupported { .. })
     ));
     let source = include_bytes!("fixtures/source-model.json");
-    let old = ktlsp_import::from_json(BASE, source).unwrap();
-    let new = v2::from_json(BASE, source).unwrap();
+    let old = ktlsp_import::from_json(base(), source).unwrap();
+    let new = v2::from_json(base(), source).unwrap();
     assert_eq!(old.libraries, new.libraries);
     for (old, new) in old.modules.iter().zip(&new.modules) {
         assert_eq!(old.name, new.name);
@@ -471,7 +552,7 @@ fn old_api_stays_strict_and_exhaustive_matches_compile() {
     ]},{"name":"b"}]});
     assert!(import(value.clone()).is_ok());
     assert!(matches!(
-        ktlsp_import::from_json(BASE, &serde_json::to_vec(&value).unwrap()),
+        ktlsp_import::from_json(base(), &serde_json::to_vec(&value).unwrap()),
         Err(ImportError::Project(
             ProjectError::DuplicateDependency { .. }
         ))
@@ -482,23 +563,23 @@ fn old_api_stays_strict_and_exhaustive_matches_compile() {
 fn byte_caller_node_and_depth_boundaries_keep_wrapped_errors() {
     let mut bytes = vec![b' '; MAX_BYTES];
     bytes[..2].copy_from_slice(b"{}");
-    assert!(v2::from_json(BASE, &bytes).is_ok());
+    assert!(v2::from_json(base(), &bytes).is_ok());
     bytes.push(b' ');
     assert!(matches!(
         v2::from_json("relative", &bytes),
         Err(v2::Error::Import(ImportError::BudgetExceeded("bytes")))
     ));
-    let base = format!("/{}", "x".repeat(MAX_EXPANDED_PATH_BYTES - 1));
-    assert!(v2::from_json(&base, b"{}").is_ok());
+    let caller = base_with_bytes(MAX_EXPANDED_PATH_BYTES);
+    assert!(v2::from_json(&caller, b"{}").is_ok());
     assert!(matches!(
-        v2::from_json(format!("{base}x"), b"{"),
+        v2::from_json(format!("{caller}x"), b"{"),
         Err(v2::Error::Import(ImportError::BudgetExceeded(
             "project directory bytes"
         )))
     ));
     for nodes in [MAX_NODES, MAX_NODES + 1] {
         let text = format!("{{\"future\":[{}]}}", vec!["null"; nodes - 2].join(","));
-        match v2::from_json(BASE, text.as_bytes()).unwrap_err() {
+        match v2::from_json(base(), text.as_bytes()).unwrap_err() {
             v2::Error::Import(ImportError::Unsupported { .. }) => assert_eq!(nodes, MAX_NODES),
             v2::Error::Import(ImportError::BudgetExceeded("nodes")) => {
                 assert_eq!(nodes, MAX_NODES + 1)
@@ -512,7 +593,7 @@ fn byte_caller_node_and_depth_boundaries_keep_wrapped_errors() {
             "[".repeat(depth - 2),
             "]".repeat(depth - 2)
         );
-        match v2::from_json(BASE, text.as_bytes()).unwrap_err() {
+        match v2::from_json(base(), text.as_bytes()).unwrap_err() {
             v2::Error::Import(ImportError::Unsupported { .. }) => assert_eq!(depth, MAX_DEPTH),
             v2::Error::Import(ImportError::BudgetExceeded("depth")) => {
                 assert_eq!(depth, MAX_DEPTH + 1)
@@ -524,7 +605,7 @@ fn byte_caller_node_and_depth_boundaries_keep_wrapped_errors() {
 
 #[test]
 fn aggregate_content_paths_are_charged_before_join_and_normalization() {
-    let base = format!("/{}", "x".repeat(MAX_EXPANDED_PATH_BYTES / 2 - 2));
+    let base = base_with_bytes(MAX_EXPANDED_PATH_BYTES / 2 - 1);
     let value = json!({"modules":[{"name":"a","contentRoots":[{"path":"<WORKSPACE>/"},{"path":"<WORKSPACE>/"}]}]});
     assert_eq!(2 * (base.len() + 1), MAX_EXPANDED_PATH_BYTES);
     assert!(v2::from_json(&base, &serde_json::to_vec(&value).unwrap()).is_ok());
@@ -544,7 +625,7 @@ fn aggregate_content_paths_are_charged_before_join_and_normalization() {
             "expanded path bytes"
         )))
     ));
-    let mixed_base = format!("/{}", "x".repeat(MAX_EXPANDED_PATH_BYTES / 3 - 1));
+    let mixed_base = base_with_bytes(MAX_EXPANDED_PATH_BYTES / 3);
     let mixed = json!({
         "modules":[{"name":"a","contentRoots":[{"path":"<WORKSPACE>/","sourceRoots":[{"path":"<WORKSPACE>/s","type":"java-source"}]}]}],
         "libraries":[{"name":"lib","type":null,"roots":[{"path":"<WORKSPACE>/l"}]}]
@@ -563,12 +644,16 @@ fn aggregate_content_paths_are_charged_before_join_and_normalization() {
 
 #[test]
 fn escaped_projection_boundary_is_independent_of_input_bytes() {
-    let value = json!({"modules":[{"name":"a","contentRoots":[{"path":"/content","sourceRoots":[{"path":"<WORKSPACE>/s","type":"java-source"}]}]}]});
-    let expected = |base: &str| json!({"schemaVersion":2,"modules":[{"id":"a","sourceRoots":[{"path":format!("{base}/s"),"kind":"production"}],"dependencies":[]}],"libraries":[]});
-    let overhead = serde_json::to_vec(&expected("/b")).unwrap().len();
+    let value = json!({"modules":[{"name":"a","contentRoots":[{"path":"<WORKSPACE>/","sourceRoots":[{"path":"<WORKSPACE>/s","type":"java-source"}]}]}]});
+    let expected = |base: &str| json!({"schemaVersion":2,"modules":[{"id":"a","sourceRoots":[{"path":Path::new(base).join("s"),"kind":"production"}],"dependencies":[]}],"libraries":[]});
+    let directory = base();
+    let prefix = directory.ancestors().last().unwrap().join("b");
+    let prefix = prefix.to_str().unwrap();
+    // Include native separator escaping when calculating the exact byte boundary.
+    let overhead = serde_json::to_vec(&expected(prefix)).unwrap().len();
     let remaining = MAX_BYTES - overhead;
     let base = format!(
-        "/b{}{}",
+        "{prefix}{}{}",
         "\u{1}".repeat(remaining / 6),
         "a".repeat(remaining % 6)
     );
@@ -578,7 +663,7 @@ fn escaped_projection_boundary_is_independent_of_input_bytes() {
     );
     let bytes = serde_json::to_vec(&value).unwrap();
     assert!(bytes.len() < 256);
-    assert!(base.len() + 2 + "/content".len() < MAX_EXPANDED_PATH_BYTES);
+    assert!(2 * base.len() + 3 < MAX_EXPANDED_PATH_BYTES);
     assert!(matches!(
         v2::from_json(&base, &bytes),
         Err(v2::Error::Project(
@@ -657,18 +742,20 @@ fn paths_and_error_sources_retain_boundary_validation() {
             matches!(import(value), Err(v2::Error::Import(ImportError::Schema { path, .. })) if path == "/libraries/0/roots/0/path")
         );
     }
-    for base in ["relative", "/nul\0path"] {
+    let mut nul_directory = base().into_os_string();
+    nul_directory.push("\0path");
+    for directory in [PathBuf::from("relative"), PathBuf::from(nul_directory)] {
         assert!(
-            matches!(v2::from_json(base, b"{}"), Err(v2::Error::Import(ImportError::Schema { path, .. })) if path.is_empty())
+            matches!(v2::from_json(directory, b"{}"), Err(v2::Error::Import(ImportError::Schema { path, .. })) if path.is_empty())
         );
     }
     let mut value = fixture();
     value["libraries"][0]["roots"][0]["path"] = json!("<WORKSPACE>/../不存在.zip");
     assert_eq!(
         import(value).unwrap().libraries[0].roots[0].path,
-        PathBuf::from("/ktlsp/不存在.zip")
+        base().parent().unwrap().join("不存在.zip")
     );
-    let error = v2::from_json(BASE, b"{").unwrap_err();
+    let error = v2::from_json(base(), b"{").unwrap_err();
     assert!(
         error
             .source()

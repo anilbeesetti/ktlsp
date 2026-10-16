@@ -308,3 +308,43 @@ passed again. The authoritative combined-head Linux workflow, new leading-trivia
 runtime outcome and renewed separate reviews/finished architect remain pending.
 Root expected-head merge authorization and exact merged-main checks are still
 required. No local runtime or JVM/oracle ran; #7/#83/#96 remain open.
+
+# Native Windows #329: an actually absent absolute worker fixture
+
+The original full no-fail-fast platform probe
+[run 38889917253 / Windows job 116936629045](https://github.com/anilbeesetti/ktlsp/actions/runs/38889917253/job/116936629045),
+attempt 1, used source/workflow SHA
+`cd25bd8c84bc4e29003e6076eb8ff4bbcfe1bdc4`, event head
+`51f011a9b34b8b53ef519fdb939fe7cb2181cb96` and base
+`bcbc65c8e4cdad0e1b3d006ccbab84a663dcf7d8`. The parser integration target
+reported six passes and one failure at `tests/parser.rs:159`:
+`Parser::new("/definitely/missing/worker").unwrap()` received `Err(Io)`.
+The retained log `ktlsp-platform-116936629045.log` has SHA-256
+`64c68f85d92651f5a1832ebf791db0c79d651c01d3bce3cba3fc8edd7b6cbb77`.
+Expected compile-fail doctest diagnostics elsewhere are not additional failed
+targets. No unchanged parser retry was used.
+
+The constructor correctly rejects a rooted path without a Windows drive/prefix:
+that string is not an absolute native executable path. The fixture instead
+intends successful construction followed by parse-time `Io` for an absent worker.
+It now exclusively creates an empty directory under the canonical native temp
+directory, named by process ID and a deterministic atomic nonce. A collision
+fails creation rather than adopting an existing directory. An uncreated child
+uses the native executable suffix; absolute-path and `symlink_metadata`/`NotFound`
+preconditions exclude an existing executable. Directory ownership remains alive
+through the parse result, with nonrecursive cleanup on scope exit.
+
+The audit leaves intentional constructor negatives and distinct consumer intents
+unchanged: `Parser::new("relative-worker")`, the corresponding relative Session
+negative, the server's already native-absolute missing-file constructor fixture,
+and the Unix-only generic-copy precancellation fixture whose literal is absolute
+on its selected platform and never intends a spawn. Real-but-wrong executable
+protocol tests remain real executable tests, not missing-worker replacements.
+No server Package/copy helper refactor is part of this correction.
+
+The parse-time `Io` assertion, preflight/cancellation assertions, production
+constructor guard, deadlines, resource caps, Cargo graph and MSRV are unchanged.
+Changed-source Windows behavior still requires ROOT's admitted composed run.
+Local parser/server/test execution remains prohibited under #96; source review
+and compile-only checks are not runtime proof. This source correction supplies
+no push, dispatch, merge, generic fixture framework or new dependency.

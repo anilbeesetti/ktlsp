@@ -222,6 +222,8 @@ same-function new-name parameter/local conflicts (including future declarations)
 potential new-name capture, semantic-work/storage exhaustion, source growth past
 64 KiB or escaped output past 1 MiB fail atomically with `-32803`. Quote removal
 with unchanged semantic spelling preserves existing shadow partitions.
+Unsafe lexical quote removal (such as an adjacent `val` keyword and quoted name)
+is refused even by preparation, rather than merging tokens in the edited source.
 Parameters are refused even if their current body uses are known: external
 named-argument calls are not covered.
 

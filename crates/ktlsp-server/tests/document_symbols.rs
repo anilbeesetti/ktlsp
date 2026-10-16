@@ -1448,13 +1448,13 @@ fn apply_original_rename(source: &str, response: &Value, uri: &str, version: i32
 fn local_val_rename_prepares_applies_and_rebinds_over_real_paired_stdio() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let package = Package::new(true);
-    let source = "// 🦀 x\r\nval text = \"x\"\r\nfun f(p: T) {\r\n val `x🦀`: `x🦀` = 1\r\n val a = `x🦀`\r\n val b = a\r\n}\r\nfun g() { val `x🦀` = 2; val c = `x🦀` }\r\n";
+    let source = "// 🦀 x \"x\"\r\nfun f(p: T) {\r\n val `x🦀`: `x🦀` = 1\r\n val a = `x🦀`\r\n val b = a\r\n}\r\nfun g() { val `x🦀` = 2; val c = `x🦀` }\r\n";
     let declaration = source.find("val `x🦀`").unwrap() + 4;
     let read = source.find("= `x🦀`").unwrap() + 2;
     let range = |offset| references_range(source, offset, "`x🦀`".len());
     let messages = [
         json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{"capabilities":rename_capabilities(true)}}),
-        json!({"jsonrpc":"2.0","method":"initialized"}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":7,"text":source}}}),
         json!({"jsonrpc":"2.0","id":"prepare-declaration","method":"textDocument/prepareRename","params":navigation_params(source,declaration)}),
         json!({"jsonrpc":"2.0","id":"prepare-use","method":"textDocument/prepareRename","params":navigation_params(source,read)}),
@@ -1475,7 +1475,7 @@ fn local_val_rename_prepares_applies_and_rebinds_over_real_paired_stdio() {
     assert_eq!(replies[3]["result"], expected);
     assert_eq!(replies[4]["result"], expected);
     let edited = apply_original_rename(source, &replies[3], URI, 7);
-    assert_eq!(edited, "// 🦀 x\r\nval text = \"x\"\r\nfun f(p: T) {\r\n val fresh: `x🦀` = 1\r\n val a = fresh\r\n val b = a\r\n}\r\nfun g() { val `x🦀` = 2; val c = `x🦀` }\r\n");
+    assert_eq!(edited, "// 🦀 x \"x\"\r\nfun f(p: T) {\r\n val fresh: `x🦀` = 1\r\n val a = fresh\r\n val b = a\r\n}\r\nfun g() { val `x🦀` = 2; val c = `x🦀` }\r\n");
     let declaration = edited.find("val fresh").unwrap() + 4;
     let read = edited.find("= fresh").unwrap() + 2;
     let replay = [
@@ -1568,6 +1568,7 @@ fn local_rename_rejects_conflicts_parameters_invalid_names_and_positions() {
         "fun f() { val x = 1; val a = x; val y = 2 }",
         "fun f() { val x = 1; val a = call() }",
         "fun f() { val x = 1; val x = 2 }",
+        "fun f() { val x = 1; val a = x }\nval text = \"x\"",
     ].iter().enumerate() {
         change(&mut session, i as i32 + 2, text);
         let offset = text.find("val x").unwrap() + 4;
@@ -1647,5 +1648,30 @@ fn local_rename_growth_and_semantic_work_fail_without_partial_edits() {
     let response = request(&mut session, "textDocument/rename", rename_params(base,offset,&name));
     assert_eq!(response["error"]["code"], -32803, "{response}");
     assert!(response.get("result").is_none());
+    let oversized = format!("{base}{}", " ".repeat(65536));
+    change(&mut session, 2, &oversized);
+    let response = request(&mut session, "textDocument/rename", rename_params(&oversized,offset,"fresh"));
+    assert_eq!(response["error"]["code"], -32803, "{response}");
+    assert!(response.get("result").is_none());
+    assert_eq!(session.pending_requests(), 0, "oversized source is refused before admission");
+    assert!(session.close().1);
+}
+
+#[test]
+fn local_rename_refuses_quote_removal_that_merges_keyword_and_identifier() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = running_rename();
+    let source = "fun f(){val`x`=1;val a=`x`}";
+    open(&mut session, source);
+    for offset in [source.find("`x`").unwrap(), source.rfind("`x`").unwrap()] {
+        for method in ["textDocument/prepareRename", "textDocument/rename"] {
+            for name in ["x", "fresh"] {
+                let response = request(&mut session, method, rename_params(source,offset,name));
+                assert_eq!(response["error"]["code"], -32803, "{response}");
+                assert!(response.get("result").is_none());
+                assert_eq!(session.document(URI).unwrap().text(), source);
+            }
+        }
+    }
     assert!(session.close().1);
 }

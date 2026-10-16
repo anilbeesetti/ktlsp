@@ -449,6 +449,9 @@ impl Session {
             .documents
             .get(uri)
             .ok_or((-32602, "parser request refers to unopened document"))?;
+        if document.text().len() > ktlsp_parser::MAX_SOURCE_BYTES {
+            return Err((-32803, "request exceeds the parser's 64 KiB source limit"));
+        }
         let query = if method == "textDocument/documentSymbol" {
             None
         } else {
@@ -497,9 +500,6 @@ impl Session {
                 _ => return Err((-32601, "Method not found")),
             })
         };
-        if document.text().len() > ktlsp_parser::MAX_SOURCE_BYTES {
-            return Err((-32803, "request exceeds the parser's 64 KiB source limit"));
-        }
         if self.pending_parser.len() >= MAX_PENDING_PARSER_REQUESTS {
             return Err((-32803, "parser worker capacity exhausted"));
         }

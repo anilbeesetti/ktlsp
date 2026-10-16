@@ -616,3 +616,49 @@ fn rename_guard_authenticates_origin_snapshot_and_resource() {
         LocalValueAnchor::Declaration(&lower.declarations()[1]), current, Some(&huge))
         .unwrap_err(), LocalBindingError::Resource);
 }
+
+#[test]
+fn rename_quote_removal_refuses_keyword_token_merging_before_preparation() {
+    use ktlsp_parser::local_value_binding::guarded_local_value_rename;
+    let _serial = functional::serial();
+    for (source, safe) in [
+        ("fun f(){val`x`=1;val a=`x`}", false),
+        ("fun f(){val `x`=1;val a=`x`}", true),
+        ("fun f(){val/*comment*/`x`=1;val a=`x`}", true),
+    ] {
+        let result = parse(source);
+        let current = result.snapshot();
+        let lower = lower_declarations(&result, current).unwrap();
+        let directory = build_regions(&lower, &result, current).unwrap();
+        let original = local_value_occurrences(&directory, &result,
+            LocalValueAnchor::Declaration(&lower.declarations()[1]), current).unwrap();
+        assert_eq!(original.occurrences().len(), 1);
+        for anchor in [
+            LocalValueAnchor::Declaration(original.target()),
+            LocalValueAnchor::ReferenceExpression(original.occurrences()[0].expression_index()),
+        ] {
+            for name in [None, Some("x"), Some("fresh")] {
+                let guarded = guarded_local_value_rename(&directory, &result, anchor, current, name);
+                if !safe {
+                    assert_eq!(guarded.unwrap_err(), LocalBindingError::UnsupportedContext);
+                } else {
+                    let guarded = guarded.unwrap();
+                    if let Some(name) = name {
+                        let mut edited = source.to_owned();
+                        for range in guarded.occurrences().iter().map(|s| s.range()).rev()
+                            .chain(std::iter::once(guarded.target().name_range())) {
+                            edited.replace_range(range, name);
+                        }
+                        let reparsed = parse(&edited);
+                        let lower = lower_declarations(&reparsed, reparsed.snapshot()).unwrap();
+                        let directory = build_regions(&lower, &reparsed, reparsed.snapshot()).unwrap();
+                        let rebound = guarded_local_value_rename(&directory, &reparsed,
+                            LocalValueAnchor::Declaration(&lower.declarations()[1]), reparsed.snapshot(), None).unwrap();
+                        assert_eq!(rebound.occurrences().len(), 1);
+                        assert_eq!(rebound.target().semantic_spelling(), Some(name));
+                    }
+                }
+            }
+        }
+    }
+}

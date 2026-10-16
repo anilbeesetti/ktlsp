@@ -695,6 +695,9 @@ semantic budget, with the existing 1,024-site/131,072-byte storage bounds. An
 otherwise external/unresolved reference that would become captured is refused,
 never assumed globally safe. Same-semantic-name quote removal retains existing
 parameter/local shadow partitions. No partial edit set is returned on refusal.
+Original replacement boundaries must remain separate identifier tokens, even
+when preparing or removing semantically redundant quotes: `val` immediately
+followed by a quoted name is refused rather than emitting `valfresh`.
 
 The server adds versioned publication, growth and escaped-output guards; this is
 not parameter/member/workspace/full Kotlin rename or official parity. Permanent

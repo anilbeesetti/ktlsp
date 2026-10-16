@@ -475,6 +475,20 @@ pub(super) fn rename_with_budget<'a>(
     if !b.equal(found.target.kind(), "PROPERTY")? {
         return Err(LocalBindingError::UnsupportedContext);
     }
+    for range in std::iter::once(found.target.name_range())
+        .chain(found.occurrences.iter().map(|site| site.range())) {
+        b.charge(4)?;
+        let bytes = current.source().as_bytes();
+        let before = range.start.checked_sub(1).and_then(|i| bytes.get(i));
+        let after = bytes.get(range.end);
+        if [before, after].into_iter().flatten()
+            .any(|byte| byte.is_ascii_alphanumeric() || *byte == b'_' || !byte.is_ascii()) {
+            // Removing quotes from val`x` would produce valfresh, not a
+            // declaration. Check every original boundary even for preparation
+            // and unchanged semantic spelling; never add unrequested trivia.
+            return Err(LocalBindingError::UnsupportedContext);
+        }
+    }
     let Some(new_name) = new_name else { return Ok(found) };
     let old_name = b.spelling(found.target.raw_name())?
         .ok_or(LocalBindingError::UnsupportedSpelling)?;

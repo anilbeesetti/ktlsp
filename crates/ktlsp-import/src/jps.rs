@@ -599,5 +599,6 @@ mod boundaries {
         // The input-byte-only allowance cannot cover even the reader's minimum
         // opening-name and index capacities; refuse before the unclosed tag.
         assert!(matches!(parse("tiny", b"<x>", &mut budget), Err(Error::Budget("allocated storage"))));
+        assert_eq!(budget.storage, MAX_STORAGE_BYTES - 6);
     }
 }

@@ -451,3 +451,9 @@ This documentation reconciliation records evidence through the named frozen chec
 5. T044 budgets/incremental workloads follow T007/T043 and accepted baseline evidence. Equivalent supported behavior, hardware/profile/cache/method must precede comparative claims.
 
 The coordinator dispatches accepted children and merge windows. These gates preserve completed research and do not grant implementation/merge admission.
+
+## Pending G2 Python import-isolation correction
+
+Review of PR281 found that the phase invocation omitted Python isolated mode even though provisioning used it. An unpinned adjacent `pathlib.py` could run before the frozen route checked its publication allowlist. Both invocations now use `-I`; payload hashes and phase admission remain unchanged.
+
+A bounded macOS Python 3.15 subprocess observation copied the unchanged auxiliary route into a temporary directory with an adjacent module that raises a sentinel exception. The original invocation executed that module; isolated mode excluded it and reached the route's argument validation instead. No provisioning, candidate compilation, workflow dispatch, JVM, or official capture ran. Linux execution and final reviewed-head CI remain pending; G2 stays UNVERIFIED and compile admission remains HOLD. The historical PR281 workflow-template hash does not identify this corrected source.

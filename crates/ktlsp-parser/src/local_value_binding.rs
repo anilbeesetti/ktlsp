@@ -115,6 +115,20 @@ impl<'a> BodyCheck<'a, '_> {
         let (index, node) = self.expect("PROPERTY", false, body, end)?;
         self.expect("VAL_KEYWORD", true, index, node.subtree_end)?;
         self.expect("IDENTIFIER", true, index, node.subtree_end)?;
+        self.trivia(index, node.subtree_end)?;
+        let colon = if self.cursor < node.subtree_end {
+            let next = self.peek()?;
+            self.b.equal(&next.kind, "COLON")?
+        } else {
+            false
+        };
+        if colon {
+            self.expect("COLON", true, index, node.subtree_end)?;
+            let (_, annotation) = self.expect("TYPE_REFERENCE", false, index, node.subtree_end)?;
+            // The authenticated lowerer already checked the exact annotation
+            // subtree; do not introduce a second type grammar in the binder.
+            self.cursor = annotation.subtree_end;
+        }
         self.expect("EQ", true, index, node.subtree_end)?;
         self.trivia(index, node.subtree_end)?;
         let expression_index = self.cursor;
@@ -188,6 +202,22 @@ impl<'a> BodyCheck<'a, '_> {
         self.finish(body_index, body.subtree_end)?;
         self.finish(function_index, function.subtree_end)
     }
+}
+
+// Only called on an authenticated lowerer's tree: USER_TYPE references belong
+// exclusively to its exact retained annotation shape, never to value syntax.
+fn annotation_reference(
+    parsed: &Parsed,
+    element: &Element,
+    b: &mut ReferenceBudget,
+) -> Result<bool> {
+    let parent = b.element(
+        parsed,
+        element
+            .parent
+            .ok_or(LocalBindingError::UnsupportedContext)?,
+    )?;
+    Ok(!parent.token && b.equal(&parent.kind, "USER_TYPE")?)
 }
 
 /// Return the unique earlier complete direct local val, preserving original identity.
@@ -400,7 +430,10 @@ pub(super) fn occurrences_with_budget<'a>(
     let mut count = 0usize;
     for index in body_index..body.subtree_end() {
         let element = b.element(parsed, index)?;
-        if !element.token && b.equal(&element.kind, "REFERENCE_EXPRESSION")? {
+        if !element.token
+            && b.equal(&element.kind, "REFERENCE_EXPRESSION")?
+            && !annotation_reference(parsed, element, b)?
+        {
             count = count.checked_add(1).ok_or(LocalBindingError::Resource)?;
         }
     }
@@ -417,7 +450,10 @@ pub(super) fn occurrences_with_budget<'a>(
     // binding index only if real consumers need larger admitted bodies.
     for index in body_index..body.subtree_end() {
         let element = b.element(parsed, index)?;
-        if element.token || !b.equal(&element.kind, "REFERENCE_EXPRESSION")? {
+        if element.token
+            || !b.equal(&element.kind, "REFERENCE_EXPRESSION")?
+            || annotation_reference(parsed, element, b)?
+        {
             continue;
         }
         let site = reference_site_with_budget(directory.lowered(), result, current, index, b)?;

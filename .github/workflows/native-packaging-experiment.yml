@@ -1,4 +1,4 @@
-# Source-only child #325; source PR remains on root aggregate #324 HOLD.
+# Separately admitted experimental archives; #373 records original extracted-runtime receipts.
 # No dispatch/execution proof is implied by source review or ordinary native CI.
 # Manual, experimental evidence only; dispatch requires a separate root admission
 # after the reviewed paired worker/symbol product is verified on default-branch main.

@@ -461,6 +461,29 @@ fn ordinary_parameters_and_preceding_locals_partition_shadowed_value_uses() {
 }
 
 #[test]
+fn ordinary_generic_parameter_is_a_real_value_binding() {
+    let _serial = functional::serial();
+    let source = "fun <T> f(p: T) { val use = p }";
+    let parameter = source.find("p:").unwrap();
+    let read = source.rfind("= p").unwrap() + 2;
+    accepted(
+        source,
+        2,
+        parameter..parameter + 1,
+        std::slice::from_ref(&(read..read + 1)),
+    );
+    let source = "fun <T> f(p: T) { val before = p; val p = p; val after = p }";
+    let parameter = source.find("p:").unwrap();
+    let local = source.find("val p =").unwrap() + 4;
+    let uses: Vec<_> = source
+        .match_indices("= p")
+        .map(|(offset, _)| offset + 2..offset + 3)
+        .collect();
+    accepted(source, 2, parameter..parameter + 1, &uses[..2]);
+    accepted(source, 4, local..local + 1, &uses[2..]);
+}
+
+#[test]
 fn quoted_crlf_parameters_keep_header_ownership_and_exclude_type_references() {
     let _serial = functional::serial();
     let source = "// 😀\r\nfun f(`p🦀`: `Long`, unused: Int,) {\r\n val y: `p🦀` = `p🦀`\r\n}\r\n";
@@ -532,7 +555,6 @@ fn parameter_ambiguity_and_unsupported_headers_never_publish_partial_bindings() 
         "fun f(p: List<T>) { val use = p }",
         "fun f(p: () -> T) { val use = p }",
         "fun T.f(p: T) { val use = p }",
-        "fun <T> f(p: T) { val use = p }",
         "fun f(p: T): T { val use = p }",
         "fun f(p: T) = p",
         "class C { fun f(p: T) { val use = p } }",
@@ -631,6 +653,258 @@ fn rename_guard_preserves_original_partitions_and_refuses_capture() {
             assert_eq!(rebound.occurrences().len() + 1, original_count);
             assert_eq!(rebound.target().semantic_spelling(), Some(name));
         }
+    }
+}
+
+#[test]
+fn lexical_type_parameters_borrow_original_annotations_targets_and_owners() {
+    use ktlsp_parser::local_value_binding::bind_lexical_type_parameter;
+    let _serial = functional::serial();
+    // Bind real annotations to original lexical declarations, without freezing
+    // producer indices or confusing inherited regions with type visibility.
+    for source in [
+        "import elsewhere.T\nimport elsewhere.Other as T\nclass T {}\nfun <T> f(p: T) { val x: T = p; val use = x }",
+        "fun <T, U> f(p: U) { val x: T = p; val use = x }\nfun <T> g(p: T) { val x: T = p }",
+        "fun <`T`> f(T: T) { val x: `T` = T; val use = x }",
+        "// 😀\r\nfun /* header */ < /* before */ `🦀`, // list\r\n U, /* trailing */ > f(p: `🦀`) {\r\n val x: U = p; val use = x\r\n}\r\n",
+    ] {
+        let result = parse(source);
+        let current = result.snapshot();
+        let tree = result.tree_for(current).unwrap();
+        assert!(tree.diagnostics().is_empty(), "{:?}", tree.diagnostics());
+        let lower = lower_declarations(&result, current).unwrap();
+        let directory = build_regions(&lower, &result, current).unwrap();
+        for (index, reference) in tree.elements().iter().enumerate().filter(|(_, node)| {
+            node.kind == "REFERENCE_EXPRESSION"
+                && node
+                    .parent
+                    .is_some_and(|parent| tree.elements()[parent].kind == "USER_TYPE")
+        }) {
+            let binding = bind_lexical_type_parameter(&directory, &result, index, current).unwrap();
+            let annotated = binding.annotated();
+            let function = binding.function();
+            let function_start = function.range().start;
+            let header_end = source[function_start..].find('>').unwrap() + function_start;
+            let spelling = &source[reference.start..reference.end];
+            let unquoted = spelling.trim_matches('`');
+            let target_start = source[function_start..header_end]
+                .find(if unquoted == "🦀" {
+                    "`🦀`"
+                } else if source[function_start..header_end].contains("`T`") {
+                    "`T`"
+                } else {
+                    unquoted
+                })
+                .unwrap()
+                + function_start;
+            let target = lower
+                .declarations()
+                .iter()
+                .find(|d| d.name_range().start == target_start)
+                .unwrap();
+            assert!(std::ptr::eq(binding.target(), target));
+            assert!(std::ptr::eq(binding.reference(), reference));
+            assert!(std::ptr::eq(
+                binding.name_token(),
+                &tree.elements()[index + 1]
+            ));
+            assert_eq!(target.kind(), "TYPE_PARAMETER");
+            assert_eq!(target.cst_parent_kind(), "TYPE_PARAMETER_LIST");
+            assert_eq!(target.owner(), annotated.owner());
+            assert!(std::ptr::eq(
+                &lower.declarations()[target.owner().unwrap()],
+                function,
+            ));
+            assert_eq!(
+                tree.elements()[target.cst_parent_index().unwrap()].parent,
+                Some(function.cst_index())
+            );
+            assert_eq!(binding.body().introducer(), annotated.owner());
+            assert_eq!(
+                target.raw_name().as_ptr(),
+                tree.source()[target.name_range()].as_ptr()
+            );
+            assert_eq!(
+                ktlsp_parser::lowering::reference_site(&lower, &result, current, index)
+                    .unwrap_err(),
+                ktlsp_parser::lowering::ReferenceSiteError::UnsupportedContext,
+            );
+            assert_eq!(
+                local_value_occurrences(
+                    &directory,
+                    &result,
+                    LocalValueAnchor::Declaration(target),
+                    current
+                )
+                .unwrap_err(),
+                LocalBindingError::UnsupportedContext,
+            );
+            let stale =
+                SourceSnapshot::new(current.document(), 8, FileKind::Source, source).unwrap();
+            assert_eq!(
+                bind_lexical_type_parameter(&directory, &result, index, &stale).unwrap_err(),
+                LocalBindingError::StaleSnapshot,
+            );
+        }
+        for (index, _) in tree.elements().iter().enumerate().filter(|(_, node)| {
+            node.kind == "REFERENCE_EXPRESSION"
+                && node
+                    .parent
+                    .is_some_and(|parent| tree.elements()[parent].kind == "PROPERTY")
+        }) {
+            let site = reference_site(&lower, &result, current, index).unwrap();
+            let binding = bind_local_value(&directory, &site, current).unwrap();
+            assert!(matches!(
+                binding.target().kind(),
+                "PROPERTY" | "VALUE_PARAMETER"
+            ));
+            assert_eq!(
+                ktlsp_parser::integer_initializer_types::infer_integer_initializer(&binding, current).unwrap_err(),
+                ktlsp_parser::integer_initializer_types::IntegerInitializerError::UnsupportedContext,
+            );
+        }
+    }
+}
+
+#[test]
+fn lexical_type_parameter_duplicates_no_match_foreign_and_value_roles_refuse() {
+    use ktlsp_parser::local_value_binding::{bind_lexical_type_parameter, visible_local_values};
+    let _serial = functional::serial();
+    for (source, error) in [
+        (
+            "fun <T, `T`> f(p: T) { val x: T = p }",
+            LocalBindingError::AmbiguousTypeParameter,
+        ),
+        (
+            "fun <T, U, `T`> f(p: T) {}",
+            LocalBindingError::AmbiguousTypeParameter,
+        ),
+        (
+            "class T {}\nfun <U> f(p: T) {}",
+            LocalBindingError::NoEligibleTypeParameter,
+        ),
+        (
+            "fun <T> f() {}\nfun <U> g(p: T) {}",
+            LocalBindingError::NoEligibleTypeParameter,
+        ),
+        (
+            "class T {}\nfun f(p: T) {}",
+            LocalBindingError::NoEligibleTypeParameter,
+        ),
+    ] {
+        let result = parse(source);
+        let current = result.snapshot();
+        let tree = result.tree_for(current).unwrap();
+        let lower = lower_declarations(&result, current).unwrap();
+        let directory = build_regions(&lower, &result, current).unwrap();
+        for (index, _) in tree
+            .elements()
+            .iter()
+            .enumerate()
+            .filter(|(_, node)| node.kind == "REFERENCE_EXPRESSION")
+        {
+            assert_eq!(
+                bind_lexical_type_parameter(&directory, &result, index, current).unwrap_err(),
+                if tree.elements()[tree.elements()[index].parent.unwrap()].kind == "USER_TYPE" {
+                    error
+                } else {
+                    LocalBindingError::UnsupportedContext
+                },
+                "{source}",
+            );
+        }
+    }
+    let source = "fun <T, U> f(T: T) { val x: U = T; val use = x }";
+    let result = parse(source);
+    let foreign = parse(source);
+    let current = result.snapshot();
+    let tree = result.tree_for(current).unwrap();
+    let lower = lower_declarations(&result, current).unwrap();
+    let directory = build_regions(&lower, &result, current).unwrap();
+    let annotation = tree
+        .elements()
+        .iter()
+        .position(|node| node.kind == "REFERENCE_EXPRESSION")
+        .unwrap();
+    assert_eq!(
+        bind_lexical_type_parameter(&directory, &foreign, annotation, foreign.snapshot())
+            .unwrap_err(),
+        LocalBindingError::InvalidOrigin,
+    );
+    let value = tree
+        .elements()
+        .iter()
+        .enumerate()
+        .find(|(_, node)| {
+            node.kind == "REFERENCE_EXPRESSION" && node.start == source.rfind("= x").unwrap() + 2
+        })
+        .unwrap()
+        .0;
+    let visible = visible_local_values(&directory, &result, value, current).unwrap();
+    assert_eq!(
+        visible
+            .values()
+            .iter()
+            .map(|d| (d.kind(), d.raw_name()))
+            .collect::<Vec<_>>(),
+        [("VALUE_PARAMETER", "T"), ("PROPERTY", "x")]
+    );
+    assert_eq!(
+        bind_lexical_type_parameter(&directory, &result, value, current).unwrap_err(),
+        LocalBindingError::UnsupportedContext,
+    );
+    for index in [usize::MAX, tree.elements().len(), annotation + 1] {
+        assert!(bind_lexical_type_parameter(&directory, &result, index, current).is_err());
+    }
+}
+
+#[test]
+fn generic_headers_require_complete_restricted_syntax_even_without_value_reads() {
+    let _serial = functional::serial();
+    for source in ["fun <T> f() {}", "fun <T, U,> f() { val x = 1 }"] {
+        let result = parse(source);
+        let lower = lower_declarations(&result, result.snapshot()).unwrap();
+        assert_eq!(lower.declarations()[1].kind(), "TYPE_PARAMETER");
+    }
+    for source in [
+        "fun <> f() {}",
+        "fun <T",
+        "fun <T> () {}",
+        "fun <T, , U> f() {}",
+        "fun <T U> f() {}",
+        "fun <T,,> f() {}",
+        "fun <T: Any> f() {}",
+        "fun <out T> f() {}",
+        "fun <in T> f() {}",
+        "fun <reified T> f() {}",
+        "fun <@A T> f() {}",
+        "inline fun <T> f() {}",
+        "fun <T> f() where T: Any {}",
+        "fun f<T>() {}",
+        "fun <T> f<U>() {}",
+        "fun <T> T.f() {}",
+        "context(T) fun <T> f() {}",
+        "fun <T> f(): T {}",
+        "fun <T> f() = 1",
+        "fun <T> f()",
+        "fun <T> f() {",
+        "fun <T> f() { val x: T }",
+        "fun <T> f() { val x = }",
+        "fun <T> f() { var x = 1 }",
+        "class C { fun <T> f() {} }",
+        "fun outer() { fun <T> f() {} }",
+        "fun <T> f(p: T?) {}",
+        "fun <T> f(p: pkg.T) {}",
+        "fun <T> f() { val x: List<T> = 1 }",
+        "fun <T> f() { val x: @A T = 1 }",
+        "fun <T> f() { val x: (T) = 1 }",
+        "fun <T> f() { val x: T & Any = 1 }",
+    ] {
+        let result = parse(source);
+        assert!(
+            lower_declarations(&result, result.snapshot()).is_err(),
+            "{source}"
+        );
     }
 }
 

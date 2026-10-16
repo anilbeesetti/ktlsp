@@ -48,7 +48,9 @@ inserted into its own TAR. Failure evidence remains always-uploaded; the package
 is uploaded only after the extracted smoke succeeds. Source and compile checks
 are not runtime proof. The first separately admitted [original experiment38911945117](https://github.com/anilbeesetti/ktlsp/issues/373#issuecomment-6218039840), attempt1 at verified main `f5f8a409dea209d44f9a9abe11c0becdf20f658e`, actually exercised the extracted Linux/macOS pairs after full unfiltered release workspace tests. Independent platform owners and ROOT authenticated all archive bytes and directly read the 16-reply receipts with successful CLI/stdio, empty PATH/no Java-home variables and retained directories. These are finite observations at that source, not the current source's archive acceptance.
 
-Windows failed its full workspace before staging: an actual definition reply was `-32803`, `parser deadline exceeded`, not `result:null`; no Windows package or extracted receipt exists for that run. #373/#377 remain open, with phase/root cause unestablished. No unchanged retry or general platform/parity claim follows. Every later manual dispatch requires a separate ROOT admission after reviewed source and exact-main verification. #96, #46, the first-party-license hold and official/full-parity release gates remain open.
+Windows failed that first experiment's full workspace before staging: an actual definition reply was `-32803`, `parser deadline exceeded`, not `result:null`; no Windows package or extracted receipt exists for that run. The failure's phase/root cause remains unestablished, not repaired by later success. Every later manual dispatch still requires separate ROOT admission after reviewed source and exact-main verification.
+
+At later independently verified main `040dbba580d908c649c7256405687e2044e4cec2`, separately admitted original [run38926477362](https://github.com/anilbeesetti/ktlsp/issues/373#issuecomment-6219465863), attempt1, actually exercised the extracted Linux/macOS/Windows pairs after full unfiltered release workspace checks. ROOT and independent platform owners authenticated all six original ZIPs, three outer TAR/sidecars, complete inner inventories/checksums/notices/provenance and native ELF/Mach-O/PE headers. Actual empty-PATH/no-Java CLI/stdio succeeded with retained borrowed directories; all three 19-message/16-reply wire payloads are byte-identical. Receipts remain separate from their TARs. #373's concrete extracted-runtime gap is closed, not the historical Windows timeout/#377 or general platform/official/release gates. Artifacts remain experimental14-day evidence; #96/B3/#46/first-party licensing/full parity remain open.
 
 ## Folding and diagnostics
 
@@ -193,6 +195,48 @@ guarded integration and independent original exact-main proof remain mandatory.
 
 Over open Kotlin documents, a strict UTF-16 position selects an actual original value `REFERENCE_EXPRESSION` containing that position (end-exclusive). The existing declaration lowerer, structural-region directory, authenticated `ReferenceSite` and `bind_local_value` prove a unique eligible preceding direct immutable local `val` or same-function ordinary parameter. Only ordinary named top-level block functions with complete plain integer/whole-identifier local initializers and simple syntax-only parameter/local annotations are eligible. Definition returns the original target **name** range and same URI. Hover returns the original target **declaration text** (`p: T` for a parameter) and original reference range: no invented types, initializer chasing or inferred global unresolvedness.
 
+Definition additionally accepts an authenticated simple parameter/local annotation
+inside an admitted ordinary top-level block function with one nonempty leading
+unbounded/unmodified type-parameter list. The annotation-only lexical query
+returns the unique original same-function `TYPE_PARAMETER` name range and URI.
+Multiple parameters, supported bare/backtick spellings, trivia and a real trailing
+comma retain original identity; matching duplicate spellings refuse even when
+the duplicate is later in the list. Outer classes, imports/aliases, other functions
+and values are not candidates or fallbacks. Bounds/variance/reified/annotations,
+where clauses, malformed/empty/post-name/second lists, receivers/context,
+explicit returns, expression bodies, members/local functions and richer annotation
+syntax remain unsupported. Bare `T` does not imply semantic non-nullability.
+All eight existing parser-backed consumers retain their original value/body
+contracts on this generic body. Type parameters stay out of value completion,
+occurrences and rename edits; annotation references stay outside value partitions.
+No typeDefinition method/capability, type-parameter hover/references/rename,
+generic inference or full Kotlin type resolution is added. First original hosted
+producer/paired-CLI behavior is recorded below; cleanup-source CI and guarded
+main acceptance remain separate. #96/full parity and unknown official runtime
+behavior remain unchanged.
+
+At first source `1f118a4efe990f044759e1162bcd2b0361df4991`, original attempt1
+Native38930044366/job117071397551 passed1052+22; platform38930044300
+Windows117071396385 passed997+22 and macOS117071396733 passed1050+22.
+Each full census has131 rows/0failed/3ignored/0filtered. Actual checkout
+4b34cec4a99bdc4de9963b8413a680e3ec86feb8 has tree
+2591f559118236a038ab158a59c51b07644a95b6 and ordered parents
+`[040dbba580d908c649c7256405687e2044e4cec2,1f118a4efe990f044759e1162bcd2b0361df4991]`.
+
+ROOT and the source owner independently read every original four-packet producer
+set and the complete actual CLI payload on both platform hosts. Actual annotation
+targets are T3:5–6, quoted-U3:8–13 and isolated g-T7:5–6; ordinary p/x still target
+their original values. The main23-message/20-reply exchange exercises all eight
+consumers. Returned completion and version7 local-x→T rename edits independently
+reconstruct the actual version8 reopened sources; both real followups retain the
+original generic-T annotation target. Type parameters do not enter value edits.
+Original raw CLI payload13563bytes SHA256
+c36709b823583840c882e02639a18c5fd6c44329ed16b11d489d18ebd0a1ce34
+is identical across hosts. Linux's eprintln captures are not observed.
+Only temporary writers/bookkeeping were removed; all semantic, edit/rebinding
+and refusal assertions remain. This is finite native behavior, not official
+generic semantics, an extracted current-source archive or a #377 repair.
+
 Hover also accepts the unique original half-open **name-token** range of a complete lowered `CLASS`, `FUN`, `PROPERTY` or ordinary `VALUE_PARAMETER`, returning that declaration's exact original source and its name range through the same negotiated renderer. Same-spelled declarations at different positions remain distinct, including parameter/local shadows; no binder or inferred type identity is needed for a declaration's own name. Definition on those names remains null. Keywords, whitespace, braces, name ends and EOF remain null; incomplete selected declarations and unsupported whole-tree lowering fail explicitly, without syntactic-symbol fallback. Unsupported reference lookup never falls back to an enclosing declaration. This is declaration-source hover, not KDoc, type resolution or full official hover parity.
 
 At first changed-diagnostic union source `2c940228bb4af10f76020503ce007dbd1cfa8b44`, [original platform run38907884039](https://github.com/anilbeesetti/ktlsp/actions/runs/38907884039), attempt 1, passed pinned format, strict locked Clippy and full release workspace tests on macOS/job116995986538 (**992 standard/doctest passes**) and Windows/job116995986522 (**939 passes**), each with zero failures, three ignored tests and 22 separately reported worker protocol fault cases. Actual checkout `0d1c4c35e5351a738e95d39ea209d4359acb2dc1` has ordered parents `[594cc51cb4f1994b5e4e896e3a3c171b0ff3bcf4,2c940228bb4af10f76020503ce007dbd1cfa8b44]` and tree `9ac8b5af275e357ba81153bb633651cc4b078823`. ROOT and the hover owner independently authenticated original API/checkout identities and directly read all six captured default/Markdown/plaintext paired-CLI payloads. Both hosts returned seven exact original IDs once each, including integer `18446744073709551615`, with no unsolicited pushes. Declaration-name ranges were class `1:6..1:10`, property `4:3..4:11`, function `5:4..5:8`, parameter `5:9..5:17` and local shadow `6:5..6:13`; contents preserved original CRLF/non-BMP source and the class's bound leading comment. Markdown preference skipped the unknown format and fenced the hostile four-backtick property comment with five backticks; plaintext-first and absent-format profiles returned plaintext.
@@ -221,7 +265,7 @@ Both providers are independent of hover content-format negotiation and require t
 
 Output is bounded by the kernel's 1,024-site/storage ceiling and a conservative 1 MiB rendered-size ceiling (including repeated escaped URIs), failing the whole query rather than truncating. Only the admitted same function body is searched; identical names in other functions and unrelated duplicate names do not change the target. This is **not workspace/cross-file/full Kotlin references or highlight completeness**, general type resolution, or official parity.
 
-The composed typed-local lowerer admits an optional single simple type-name annotation on these same plain local vals, including supported backtick names. This is retained declaration syntax only: hover preserves it exactly, type-name tokens are not value occurrences, and no builtin-name whitelist or resolved type identity is inferred. Explicitly typed targets refuse integer-default inference; an annotated containing val does not invalidate a different untyped target. Qualified/nullable/generic/annotated/parenthesized/function/intersection/dynamic types remain outside this bounded subset. The paired-stdio composition regression also uses a type-name token spelled exactly like the value target, checking that it never enters references or highlights.
+The composed typed-local lowerer admits an optional single simple type-name annotation on these same plain local vals, including supported backtick names. Outside the lexical type-parameter lane above, this is retained declaration syntax only: hover preserves it exactly, type-name tokens are not value occurrences, and no builtin-name whitelist or global type identity is inferred. Explicitly typed targets refuse integer-default inference; an annotated containing val does not invalidate a different untyped target. Qualified/nullable/generic/annotated/parenthesized/function/intersection/dynamic types remain outside this bounded subset. The paired-stdio composition regression also uses a type-name token spelled exactly like the value target, checking that it never enters references or highlights.
 
 The #364 permanent regressions assert real same-build packaged CLI payloads/IDs, declaration/use/unused anchors, includeDeclaration, highlight kinds/order, Unicode/CRLF and missing-worker behavior without duplicate pull-mode pushes. Additional real-worker cases assert semantic-equivalent quoted names, function isolation, no chasing, strict invalid input and atomic refusal. Shared controlled-peer tests cover each provider's exact cancellation and stale/lifecycle guards; those deliberately failing peers do not fabricate successful CST.
 
@@ -266,10 +310,11 @@ runtime observation is not attributed to an unexecuted cleanup head.
 
 Ordinary parameters require positive name/colon/simple-type shape, comma separation
 and at most one trailing comma after a real parameter. Missing/richer types,
-defaults, vararg/modifiers/annotations, receivers/context/generics/explicit returns,
+defaults, vararg/modifiers/annotations, receivers/context/explicit returns,
 expression bodies, members/constructors/lambdas/nesting/destructuring and relevant
-recovery remain refused. Type names are retained syntax, never resolved builtin
-identities. Queried-name duplicates are checked separately in parameter/local
+recovery remain refused. The leading unbounded function-type-parameter list
+described above is the only generic header extension. Type names otherwise remain
+retained syntax, never resolved builtin identities. Queried-name duplicates are checked separately in parameter/local
 scopes; a unique preceding local wins, otherwise its same-function parameter.
 Before-shadow and `val p=p` initializer reads bind the parameter; later reads bind
 the local. References/highlights exclude valid same-body sites bound to the other

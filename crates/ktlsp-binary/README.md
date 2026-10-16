@@ -218,8 +218,9 @@ Indices and paths are encoded data, without descriptor, Signature, bound, receiv
 
 `metadata::resolved_alias_signature::decode` consumes supported decoded kind 2/5,
 mv 2.3.0 Package data and returns declaration names plus underlying/expanded
-nominal ClassIds, effective nullable values and nullable presence. ClassIds expose
-lossless UTF-16 package/relative-class parts and resolver local membership.
+nominal ClassIds, effective nullable values and nullable presence. The shared
+`metadata::class_id::ClassId` exposes lossless UTF-16 package/relative-class parts
+and resolver local membership; the former alias-owned type path is removed.
 Encoded declaration ordinals and decoded-d1 spans are provenance, not symbol IDs.
 The genuine checked-in `KTypeParameterBaseKt.class.bin` supplies
 `TypeParameterContainer` → `kotlin/Any` for both roles through predefined index 0,
@@ -248,3 +249,57 @@ No lossy Unicode conversion, alias lookup/expansion, generics/substitution,
 subtyping, module linkage, parser/server integration or official LSP parity is
 claimed. The existing raw TypeAlias/Types APIs still preserve opaque occurrences;
 this separate consumer does not broaden their contracts.
+
+## Class-owned parameter property returns (#387)
+
+`metadata::resolved_class_properties::decode` selects one decoded kind 1,
+mv 2.3.0 Class internally and returns one owner context, original ordered
+parameter declarations and properties whose inline bare parameter-ID return
+Types bind to that owner's declaration ordinals. Class/property/parameter/Type
+raw bodies borrow the same decoded d1; field/body spans are d1-relative, while
+opaque bound spans stay parameter-relative. Property ordinals count all encoded
+Class fields. Identity is this returned owner context plus declaration ordinal,
+not the raw ID, spelling or a global ClassId. Owner ClassId and all names use the
+actual resolver and retain lossless UTF-16, including lone surrogates.
+
+The unchanged genuine kotlin-stdlib 2.3.20 `Pair.class.bin` is the consumer fixture:
+`first`/`second` reference the original Class declarations `A`/`B`, not independent
+name copies. Distribution provenance does not establish compiler provenance.
+`TypeHeader.nullable` retains encoded marking only; absent marking on `A`/`B`
+does **not** establish effective non-nullability.
+
+All Class parameters are read before properties regardless of wire order.
+IDs compare exact signed int32 values, not positions; reordered/noncontiguous/
+negative IDs work and equal names do not collapse distinct declarations.
+Duplicate owning IDs and unknown IDs (including unavailable enclosing scopes)
+refuse. Property-owned parameters and parameter-NAME classifiers refuse:
+ID lookup can reach the Class parent, but name lookup cannot leave the immediate
+property scope. No spelling-based fallback is performed.
+
+One inline return Type is required. Inline wins over an accompanying table ID;
+table-only/missing returns and duplicate inline messages refuse. Arguments,
+class/alias/name classifiers or classifier conflicts, flexible/outer/abbreviated
+Types, nonzero effective Type flags and receiver/context forms refuse, including
+wrong-wire significant fields. Existing raw required-field/scalar validators
+are reused; last recognized scalars and int32 width are preserved. Bounds,
+annotations, accessors and unselected Class tables remain bounded opaque data,
+not interpreted semantics. Unknown fields keep the existing bounded-wire policy.
+Any selected-property failure returns no partial property vector.
+
+One monotonic schema/wire/name/output budget covers combined decoded d1+d2
+admission, all scans, ID comparisons, names, shared ClassId conversion and vector
+capacities. Public per-member decoders are not used to reset allowances.
+Selected leaves retain the existing hard depth-2 convention, not recursive
+Class→Property→Type depth-3 traversal; no cap or dependency is added. Native
+class→annotations→Metadata→consumer tests are pure data processing, not Kotlin
+execution. This is not general generics, type-table lookup, merging, bounds
+interpretation, substitution/inference, source/Java linkage, server integration
+or official Kotlin LSP parity.
+
+The complete native binary suite passed481 cases across52 suites on the composed
+source; original platform38930044300 independently passed those481 on macOS and
+Windows, including all10 property-consumer and6 alias-signature cases. ROOT's
+throwaway actual public-API executable observed Pair.first→original A(id0,ordinal0,
+d1 declaration54..60/Type238..240) and second→B(id1,ordinal1,62..68/263..265),
+with original borrowed pointers and absent nullable marking. The example source
+was removed. These are native data observations, not official generics or linkage.

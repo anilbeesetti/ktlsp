@@ -16,6 +16,8 @@ pub enum LocalBindingError {
     UnsupportedSpelling,
     AmbiguousLocal,
     NoEligibleLocal,
+    AmbiguousTypeParameter,
+    NoEligibleTypeParameter,
     Resource,
 }
 impl std::fmt::Display for LocalBindingError {
@@ -167,6 +169,21 @@ impl<'a> BodyCheck<'a, '_> {
             .checked_add(1)
             .ok_or(LocalBindingError::Resource)?;
         self.expect("FUN_KEYWORD", true, function_index, function.subtree_end)?;
+        self.trivia(function_index, function.subtree_end)?;
+        if self.cursor < function.subtree_end {
+            let next = self.peek()?;
+            if !next.token && self.b.equal(&next.kind, "TYPE_PARAMETER_LIST")? {
+                let (_, list) = self.expect(
+                    "TYPE_PARAMETER_LIST",
+                    false,
+                    function_index,
+                    function.subtree_end,
+                )?;
+                // The authenticated lowerer owns the complete leading-list grammar.
+                self.b.charge(list.subtree_end - self.cursor)?;
+                self.cursor = list.subtree_end;
+            }
+        }
         self.expect("IDENTIFIER", true, function_index, function.subtree_end)?;
         let (parameters_index, parameters) = self.expect(
             "VALUE_PARAMETER_LIST",
@@ -239,6 +256,223 @@ fn annotation_reference(
             .ok_or(LocalBindingError::UnsupportedContext)?,
     )?;
     Ok(!parent.token && b.equal(&parent.kind, "USER_TYPE")?)
+}
+
+/// An annotation-only lexical identity, not a value binding or inferred type.
+#[derive(Debug)]
+pub struct LexicalTypeParameterBinding<'a> {
+    annotated: &'a Declaration<'a>,
+    function: &'a Declaration<'a>,
+    body: &'a Region<'a>,
+    reference: &'a Element,
+    name_token: &'a Element,
+    target: &'a Declaration<'a>,
+}
+impl<'a> LexicalTypeParameterBinding<'a> {
+    pub fn annotated(&self) -> &'a Declaration<'a> {
+        self.annotated
+    }
+    pub fn function(&self) -> &'a Declaration<'a> {
+        self.function
+    }
+    pub fn body(&self) -> &'a Region<'a> {
+        self.body
+    }
+    pub fn reference(&self) -> &'a Element {
+        self.reference
+    }
+    pub fn name_token(&self) -> &'a Element {
+        self.name_token
+    }
+    pub fn target(&self) -> &'a Declaration<'a> {
+        self.target
+    }
+}
+
+/// Resolve only an authenticated simple annotation to one same-function type
+/// parameter. Outer declarations, imports and values are never candidates.
+pub fn bind_lexical_type_parameter<'a>(
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    annotation_reference_cst_index: usize,
+    current: &SourceSnapshot,
+) -> Result<LexicalTypeParameterBinding<'a>> {
+    type_parameter_with_budget(
+        directory,
+        result,
+        annotation_reference_cst_index,
+        current,
+        &mut ReferenceBudget::default(),
+    )
+}
+
+pub(super) fn type_parameter_with_budget<'a>(
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    index: usize,
+    current: &SourceSnapshot,
+    b: &mut ReferenceBudget,
+) -> Result<LexicalTypeParameterBinding<'a>> {
+    let lowered = directory.lowered();
+    if !std::ptr::eq(directory.snapshot(), lowered.snapshot()) {
+        return Err(LocalBindingError::InvalidOrigin);
+    }
+    let parsed = authenticated_tree(lowered, result, current, b)?;
+    let reference = b.element(parsed, index)?;
+    let token_index = index.checked_add(1).ok_or(LocalBindingError::Resource)?;
+    let token = b.element(parsed, token_index)?;
+    if reference.token
+        || !b.equal(&reference.kind, "REFERENCE_EXPRESSION")?
+        || !token.token
+        || !b.equal(&token.kind, "IDENTIFIER")?
+        || token.parent != Some(index)
+        || reference.subtree_end
+            != token_index
+                .checked_add(1)
+                .ok_or(LocalBindingError::Resource)?
+        || reference.start != token.start
+        || reference.end != token.end
+        || reference.start >= reference.end
+    {
+        return Err(LocalBindingError::UnsupportedContext);
+    }
+    let user_index = reference
+        .parent
+        .ok_or(LocalBindingError::UnsupportedContext)?;
+    let user = b.element(parsed, user_index)?;
+    let annotation_index = user.parent.ok_or(LocalBindingError::UnsupportedContext)?;
+    let annotation = b.element(parsed, annotation_index)?;
+    let annotated_index = annotation
+        .parent
+        .ok_or(LocalBindingError::UnsupportedContext)?;
+    let annotated_node = b.element(parsed, annotated_index)?;
+    if user.token
+        || !b.equal(&user.kind, "USER_TYPE")?
+        || annotation.token
+        || !b.equal(&annotation.kind, "TYPE_REFERENCE")?
+        || annotated_node.token
+    {
+        return Err(LocalBindingError::UnsupportedContext);
+    }
+    // The authenticated lowerer proved the complete simple annotation grammar;
+    // select its original ancestry rather than introducing a second type grammar.
+    let mut annotated = None;
+    for (ordinal, declaration) in lowered.declarations().iter().enumerate() {
+        b.charge(1)?;
+        if declaration.cst_index() == annotated_index {
+            annotated = Some((ordinal, declaration));
+        }
+    }
+    let (ordinal, annotated) = annotated.ok_or(LocalBindingError::UnsupportedContext)?;
+    let function_ordinal = annotated
+        .owner()
+        .ok_or(LocalBindingError::UnsupportedContext)?;
+    b.charge(1)?;
+    let function = lowered
+        .declarations()
+        .get(function_ordinal)
+        .ok_or(LocalBindingError::InvalidOrigin)?;
+    if annotated.incomplete() || function.incomplete() || !b.equal(function.kind(), "FUN")? {
+        return Err(LocalBindingError::UnsupportedContext);
+    }
+    let mut body = None;
+    for (body_ordinal, region) in directory.regions().iter().enumerate() {
+        b.charge(1)?;
+        if region.introducer() == Some(function_ordinal)
+            && b.equal(region.kind(), "BLOCK")?
+            && body.replace((body_ordinal, region)).is_some()
+        {
+            return Err(LocalBindingError::InvalidOrigin);
+        }
+    }
+    let (body_ordinal, body) = body.ok_or(LocalBindingError::UnsupportedContext)?;
+    let parameter = b.equal(annotated.kind(), "VALUE_PARAMETER")?;
+    let parent_index = annotated
+        .cst_parent_index()
+        .ok_or(LocalBindingError::UnsupportedContext)?;
+    let parent = b.element(parsed, parent_index)?;
+    b.charge(2)?;
+    let expected_region = if parameter {
+        if parent.token
+            || !b.equal(&parent.kind, "VALUE_PARAMETER_LIST")?
+            || parent.parent != Some(function.cst_index())
+        {
+            return Err(LocalBindingError::UnsupportedContext);
+        }
+        directory
+            .memberships()
+            .get(function_ordinal)
+            .ok_or(LocalBindingError::InvalidOrigin)?
+            .region()
+    } else {
+        if !b.equal(annotated.kind(), "PROPERTY")? || parent_index != body.cst_index() {
+            return Err(LocalBindingError::UnsupportedContext);
+        }
+        body_ordinal
+    };
+    if directory
+        .memberships()
+        .get(ordinal)
+        .ok_or(LocalBindingError::InvalidOrigin)?
+        .region()
+        != expected_region
+    {
+        return Err(LocalBindingError::UnsupportedContext);
+    }
+    BodyCheck {
+        parsed,
+        cursor: 0,
+        b,
+    }
+    .function(function, body.cst_index())?;
+    b.charge(5)?;
+    let raw = parsed
+        .source()
+        .get(token.start..token.end)
+        .ok_or(LocalBindingError::UnsupportedContext)?;
+    let spelling = b
+        .spelling(raw)?
+        .ok_or(LocalBindingError::UnsupportedSpelling)?;
+    let mut target = None;
+    let mut duplicate = false;
+    for declaration in lowered.declarations() {
+        b.charge(1)?;
+        if declaration.owner() != Some(function_ordinal)
+            || !b.equal(declaration.kind(), "TYPE_PARAMETER")?
+        {
+            continue;
+        }
+        let list = b.element(
+            parsed,
+            declaration
+                .cst_parent_index()
+                .ok_or(LocalBindingError::InvalidOrigin)?,
+        )?;
+        if declaration.incomplete()
+            || list.token
+            || !b.equal(&list.kind, "TYPE_PARAMETER_LIST")?
+            || list.parent != Some(function.cst_index())
+        {
+            return Err(LocalBindingError::UnsupportedContext);
+        }
+        let name = b
+            .spelling(declaration.raw_name())?
+            .ok_or(LocalBindingError::UnsupportedSpelling)?;
+        if b.equal(name, spelling)? && target.replace(declaration).is_some() {
+            duplicate = true;
+        }
+    }
+    if duplicate {
+        return Err(LocalBindingError::AmbiguousTypeParameter);
+    }
+    Ok(LexicalTypeParameterBinding {
+        annotated,
+        function,
+        body,
+        reference,
+        name_token: token,
+        target: target.ok_or(LocalBindingError::NoEligibleTypeParameter)?,
+    })
 }
 
 /// Return the unique eligible preceding local val or same-function parameter.

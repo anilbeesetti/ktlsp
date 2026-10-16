@@ -145,10 +145,9 @@ fn class_id_quoted_slash_nested_local_and_lossless_units() {
     let slash_root = units("/Root");
     let plain = decode(&input_for_class(&root), Limits::default()).unwrap();
     let prefixed = decode(&input_for_class(&slash_root), Limits::default()).unwrap();
-    assert_eq!(
-        plain[0].underlying.class_id,
-        prefixed[0].underlying.class_id
-    );
+    let plain: &metadata::class_id::ClassId = &plain[0].underlying.class_id;
+    let prefixed: &metadata::class_id::ClassId = &prefixed[0].underlying.class_id;
+    assert_eq!(plain, prefixed);
 }
 fn input_for_class(name: &[u16]) -> metadata::Outcome<'_> {
     input(package(&alias(&[0x30, 1], &[0x30, 1])), &[&[65], name])

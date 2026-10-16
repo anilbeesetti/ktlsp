@@ -267,4 +267,29 @@ fn production_reference_initializer_preserves_declarations_and_regions() {
             .collect::<Vec<_>>(),
         [0, 1, 1]
     );
+    let site = ktlsp_parser::lowering::reference_site(&lower, &result, &snapshot, 32).unwrap();
+    assert!(std::ptr::eq(site.origin(), &lower));
+    assert_eq!(site.expression_index(), 32);
+    assert_eq!(site.token_index(), 33);
+    assert_eq!(site.range(), 29..30);
+    assert_eq!(site.raw_spelling(), "x");
+    assert_eq!(site.semantic_spelling(), Some("x"));
+    assert_eq!(
+        site.raw_spelling().as_ptr(),
+        parsed.source()[29..30].as_ptr()
+    );
+    assert!(std::ptr::eq(
+        site.containing_property(),
+        &lower.declarations()[2]
+    ));
+    assert_eq!(site.body_index(), 11);
+    assert!(std::ptr::eq(site.function(), &lower.declarations()[0]));
+    let binding =
+        ktlsp_parser::local_value_binding::bind_local_value(&directory, &site, &snapshot).unwrap();
+    assert!(std::ptr::eq(binding.site(), &site));
+    assert!(std::ptr::eq(binding.body(), &directory.regions()[1]));
+    assert!(std::ptr::eq(binding.target(), &lower.declarations()[1]));
+    assert_eq!(binding.target().cst_index(), 14);
+    assert_eq!(binding.target().range(), 10..19);
+    assert_eq!(binding.target().name_range(), 14..15);
 }

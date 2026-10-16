@@ -1,6 +1,8 @@
 use std::io::{self, BufRead, BufReader, Cursor, Read, Write};
 
-use ktlsp_protocol::{MAX_HEADER_BYTES, MAX_PAYLOAD_BYTES, ProtocolError, read_frame, write_frame};
+use ktlsp_protocol::{
+    FrameReader, MAX_HEADER_BYTES, MAX_PAYLOAD_BYTES, ProtocolError, read_frame, write_frame,
+};
 
 fn read(bytes: &[u8]) -> Result<Option<Vec<u8>>, ProtocolError> {
     read_frame(&mut Cursor::new(bytes))
@@ -289,7 +291,11 @@ fn propagates_read_and_write_errors() {
     }
     impl BufRead for BrokenBody {
         fn fill_buf(&mut self) -> io::Result<&[u8]> {
-            self.0.fill_buf()
+            if self.0.position() == self.0.get_ref().len() as u64 {
+                Err(io::ErrorKind::ConnectionReset.into())
+            } else {
+                self.0.fill_buf()
+            }
         }
         fn consume(&mut self, amount: usize) {
             self.0.consume(amount);
@@ -346,6 +352,104 @@ fn deterministic_adversarial_corpus_never_panics() {
         for capacity in [1, 7, 32] {
             let mut reader = BufReader::with_capacity(capacity, Cursor::new(&bytes));
             assert!(read_frame(&mut reader).is_err());
+        }
+    }
+}
+
+/// One temporary readiness gap, including gaps inside a header/body.
+struct Paused<'a> {
+    bytes: &'a [u8],
+    position: usize,
+    pause: usize,
+    paused: bool,
+}
+impl Read for Paused<'_> {
+    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        let available = self.fill_buf()?;
+        let count = available.len().min(output.len());
+        output[..count].copy_from_slice(&available[..count]);
+        self.consume(count);
+        Ok(count)
+    }
+}
+impl BufRead for Paused<'_> {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        if !self.paused && self.position == self.pause {
+            self.paused = true;
+            return Err(io::ErrorKind::WouldBlock.into());
+        }
+        let end = if self.paused {
+            self.bytes.len()
+        } else {
+            self.pause
+        };
+        Ok(&self.bytes[self.position..end])
+    }
+    fn consume(&mut self, count: usize) {
+        self.position += count;
+    }
+}
+
+#[test]
+fn resumable_decoder_preserves_every_split_and_back_to_back_frame() {
+    use std::task::Poll;
+    let mut wire = Vec::new();
+    for payload in ["λ😀".as_bytes(), b"".as_slice(), b"next"] {
+        write_frame(&mut wire, payload).unwrap();
+    }
+    for pause in 0..=wire.len() {
+        let mut reader = Paused {
+            bytes: &wire,
+            position: 0,
+            pause,
+            paused: false,
+        };
+        let mut decoder = FrameReader::default();
+        let mut frames = Vec::new();
+        let mut pending = 0;
+        loop {
+            match decoder.poll(&mut reader).unwrap() {
+                Poll::Ready(Some(frame)) => frames.push(frame),
+                Poll::Ready(None) => break,
+                Poll::Pending => pending += 1,
+            }
+        }
+        assert_eq!(pending, 1, "split {pause}");
+        assert_eq!(frames, ["λ😀".as_bytes(), b"".as_slice(), b"next"]);
+    }
+}
+
+#[test]
+fn resumable_decoder_keeps_fatal_grammar_and_eof_errors() {
+    use std::task::Poll;
+    let cases: &[&[u8]] = &[
+        b"Content-Length: 1\r\nContent-Length: 1\r\n\r\nx",
+        b"Content-Length: -1\r\n\r\n",
+        b"Content-Type: text/plain; charset=utf-16\r\nContent-Length: 0\r\n\r\n",
+        b"Content-Length: 0\nX: a\r\n\r\n",
+        b"Content-Length: 4\r\n\r\nabc",
+        b"Content-Length: 1\r\n",
+    ];
+    for &wire in cases {
+        let expected = std::mem::discriminant(&read(wire).unwrap_err());
+        for pause in 0..=wire.len() {
+            let mut reader = Paused {
+                bytes: wire,
+                position: 0,
+                pause,
+                paused: false,
+            };
+            let mut decoder = FrameReader::default();
+            loop {
+                match decoder.poll(&mut reader) {
+                    Ok(Poll::Pending) => continue,
+                    Err(error) => {
+                        assert_eq!(std::mem::discriminant(&error), expected);
+                        break;
+                    }
+                    other => panic!("unexpected decoded invalid frame: {other:?}"),
+                }
+            }
         }
     }
 }

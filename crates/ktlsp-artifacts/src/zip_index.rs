@@ -176,6 +176,82 @@ impl std::fmt::Display for ZipIndexError {
 
 impl std::error::Error for ZipIndexError {}
 
+/// A JMOD 1.0 directory borrowing the embedded ZIP in the verified allocation.
+/// ZIP claims and ZIP error offsets are relative to byte 4 of the full JMOD.
+///
+/// ```compile_fail
+/// use ktlsp_artifacts::{VerifiedArtifact, JmodDirectoryIndex, index_jmod_directory};
+/// fn escape(artifact: VerifiedArtifact) -> JmodDirectoryIndex<'static> {
+///     index_jmod_directory(&artifact).unwrap()
+/// }
+/// ```
+/// ```compile_fail
+/// use ktlsp_artifacts::JmodDirectoryIndex;
+/// let index = JmodDirectoryIndex { index: todo!() };
+/// ```
+#[derive(Debug)]
+pub struct JmodDirectoryIndex<'a> {
+    index: ZipDirectoryIndex<'a>,
+}
+
+impl<'a> JmodDirectoryIndex<'a> {
+    /// Access the shared ZIP directory and its checked stored/deflated payloads.
+    pub fn zip_index(&self) -> &ZipDirectoryIndex<'a> {
+        &self.index
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum JmodIndexError {
+    TruncatedHeader,
+    InvalidMagic,
+    UnsupportedVersion {
+        major: u8,
+        minor: u8,
+    },
+    /// Offsets are relative to the embedded ZIP, not the full JMOD.
+    Structure(ZipIndexError),
+}
+
+impl std::fmt::Display for JmodIndexError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "JMOD directory index: {self:?}")
+    }
+}
+
+impl std::error::Error for JmodIndexError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Structure(error) => Some(error),
+            _ => None,
+        }
+    }
+}
+
+/// Check exactly `JM\x01\x00`, then index the ZIP beginning at full-file byte 4.
+/// No offset correction, byte copy, path access or module interpretation occurs.
+/// The existing artifact cap includes the four-byte JMOD header.
+pub fn index_jmod_directory(
+    artifact: &VerifiedArtifact,
+) -> Result<JmodDirectoryIndex<'_>, JmodIndexError> {
+    let bytes = artifact.bytes();
+    limit(bytes.len(), MAX_ARTIFACT_BYTES, 0, "artifact bytes")
+        .map_err(JmodIndexError::Structure)?;
+    let header = bytes.get(..4).ok_or(JmodIndexError::TruncatedHeader)?;
+    if &header[..2] != b"JM" {
+        return Err(JmodIndexError::InvalidMagic);
+    }
+    if header[2..] != [1, 0] {
+        return Err(JmodIndexError::UnsupportedVersion {
+            major: header[2],
+            minor: header[3],
+        });
+    }
+    index_zip_bytes(&bytes[4..])
+        .map(|index| JmodDirectoryIndex { index })
+        .map_err(JmodIndexError::Structure)
+}
+
 fn malformed(offset: usize, reason: &'static str) -> ZipIndexError {
     ZipIndexError::Malformed { offset, reason }
 }
@@ -241,6 +317,12 @@ pub fn index_zip_directory(
 ) -> Result<ZipDirectoryIndex<'_>, ZipIndexError> {
     let bytes = artifact.bytes();
     limit(bytes.len(), MAX_ARTIFACT_BYTES, 0, "artifact bytes")?;
+    index_zip_bytes(bytes)
+}
+
+// Only verified-artifact entry points call this helper, with an already bounded
+// whole allocation. All ZIP-relative metadata and payload checks share this view.
+fn index_zip_bytes(bytes: &[u8]) -> Result<ZipDirectoryIndex<'_>, ZipIndexError> {
     let last = bytes
         .len()
         .checked_sub(22)

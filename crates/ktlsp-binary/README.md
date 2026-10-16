@@ -60,6 +60,103 @@ bytes matching member SHA-256
 `e288160745c56dff019f2af9393039558018308de89509bdd81a8535bfa9b03d`.
 This proof is classfile data consumption, not JVM verification or LSP parity.
 
+## Source attachment candidates (#343 / #330 / #17 / #7)
+
+`source_attachment::attach(&class, &source_index, &mut scratch)` consumes a
+`ClassFile` and an immutable `ZipDirectoryIndex` backed by a `VerifiedArtifact`.
+It requires exactly one class-level `SourceFile` attribute with exactly two bytes
+and a nonzero UTF-16 CP index. Missing attributes/candidates, malformed indices,
+duplicate attributes, member-level context, unsupported metadata and resource
+refusals remain explicit. Publicly constructed or changed classes are checked at
+consumed references; this is not a second whole-class verifier.
+
+The class package plus the safe unqualified filename selects exactly one raw
+central-directory name. No allocation/copy of a candidate path or entry names,
+normalization, suffix search, traversal, extraction, duplicate winner or fallback
+occurs. Duplicate exact matches return `Ambiguous` with the first two central
+ordinals, even when bytes are identical. UTF-16 must decode losslessly; lone
+surrogates are refused, never replaced. Non-ASCII matching ZIP names require the
+UTF-8 flag rather than assuming the legacy encoding. Pinned Metadata decoding
+reuses the existing header contract (`mv=[2,3,0]`, kinds 1/2/5); nonempty `pn`
+overrides the JVM package using a safe dotted source package. Unsupported fields,
+versions/kinds and malformed headers refuse rather than selecting the Java-style
+path. `JvmPackageName`/`KotlinJvmPackageName` annotations are explicitly unsupported.
+
+Attachment scanning is bounded by 65,535 container/attribute nodes, 16 MiB
+attribute bytes, 16 Mi work units and 4,096 UTF-8 path bytes. The reused annotation,
+Metadata and selected stored/DEFLATE decoders retain their separate budgets;
+there is no combined RSS guarantee. Returned central entry identity is borrowed
+from the index; source bytes borrow the verified artifact (stored) or reusable
+scratch (DEFLATE), without a redundant payload copy. Scratch is cleared on every
+entry/refusal and cannot be reused while its returned source slice is borrowed.
+
+`tests/source_attachment.rs` exercises the actual production boundary, including
+the unchanged genuine Commons Lang 3.17.0 source JAR. Binary ordinal 31's
+`AppendableJoiner$Builder` SourceFile selects source ordinal 27,
+`org/apache/commons/lang3/AppendableJoiner.java`: 11,798 exact bytes, SHA-256
+`bb5a9762fa8614c2a49e5ccb770f1378c60d5fdb7b8679039c85bdabe7f57315`.
+The source JAR SHA-256 is
+`5fdcac21ad329766054a95367d7583dfcdca737d221d5e01a5f2a198c04c6b18`;
+the canonical primary Maven URL and acquisition facts are in existing
+`fixtures/t017c1/provenance.json`. Source-JAR Apache LICENSE/NOTICE are byte-identical
+to the retained notices. Tests are offline, with no JVM, compiler or extraction.
+The post-review offline package wave passed formatting, strict locked all-target
+Clippy and all 448 binary-crate tests. A separate throwaway compiled Rust consumer
+called the public artifact/index/class/attachment APIs and observed source ordinal
+27, the exact path above, 11,798 bytes equal to the independently validated source
+payload. No local parser/server runtime or whole-workspace execution was used.
+
+This returns only a **path-based attachment candidate**: neither artifact digest
+equality nor SourceFile establishes that the binary was compiled from these
+source bytes, resolved declaration identity, or line mapping. No decompiler,
+filesystem extraction, Java/network runtime, server integration or LSP capability
+is introduced. Other Kotlin versions/kinds, JvmPackageName interpretation,
+multi-release/source-root policies, full Kotlin attachments and semantic
+navigation remain pending; parents #330/#17/#7 remain open.
+
+## Ordered archive class lookup (#353 / 330/17/7)
+
+`class_path::lookup_class(&roots, internal_name, java_release, &mut scratch)`
+queries borrowed `ClasspathRoot::Jar(&ZipDirectoryIndex)` and
+`ClasspathRoot::Jmod(&JmodDirectoryIndex)` values in caller-specified order.
+No caller ordinal, repeated indexing or owning self-reference is required.
+`None` means missing; the first matching root wins, retaining its index,
+central ordinal and `ClassRank`. Duplicate entries at the winning rank are
+ambiguous. Selected CRC/payload/class/name/version failures never fall through
+to an older version or a later root. Declared `this_class` UTF-16 must exactly
+match the requested Unicode scalar name, without normalization or replacement.
+Names are bounded UTF-8 JVM internal names; empty segments, controls, dot,
+semicolon, array prefix, backslash and colon are rejected. Archive names are
+compared as exact UTF-8 bytes, not platform paths or legacy code-page strings.
+
+JAR selection follows the [primary JAR specification](https://docs.oracle.com/en/java/javase/23/docs/specs/jar/jar.html)
+and [JEP 238](https://openjdk.org/jeps/238): only a well-formed actual manifest
+main section with case-insensitive `Multi-Release: true` (no value whitespace)
+enables versioning. CRLF/LF/CR and continued UTF-8 values are supported;
+`Manifest-Version` is required first in its specified case, headers are unique
+case-insensitively, physical lines are at most 72 bytes, values at most 65,535
+bytes, and the main section ends with an empty line. Named sections are ignored.
+Malformed/duplicate manifests error rather than silently enabling/disabling MR.
+Manifest archive names are found case-insensitively; multiple candidates error.
+The highest canonical decimal `N >= 9` not exceeding the explicit Java feature
+release wins, then base; `META-INF` contents are not versioned. Versioned classes
+must have major <= N+44; base/JMOD major <= requested release+44. Existing
+unsupported class versions/minors remain unsupported, not disguised as missing.
+JMOD queries only `classes/name.class` and never consult manifests or MR areas.
+
+Whole-query metadata preflight precedes allocation: at most 64 roots, 65,536
+aggregate entries, 16 MiB aggregate scanned name bytes (three bounded passes),
+256 KiB each manifest compressed/decoded size and 1 MiB aggregate manifest
+compressed+decoded sizes. Main sections allow at most 4,096 headers, with
+bounded temporary header/value storage. Selected payload and class output/work
+retain the existing archive/class-reader ceilings. Only one class is returned.
+Tests use unchanged genuine Commons Lang Builder and its Java 9 MR
+`module-info.class`; adversarial archives/classfiles are independently authored
+data. Nothing runs Java, reads paths, extracts files, follows manifest
+`Class-Path`, validates signatures, resolves modules or verifies API equivalence.
+This is ROOT/data-only groundwork, not SDK integration, JVM verification,
+semantic classpath resolution or full official Kotlin LSP parity.
+
 ## Encoded method type annotations
 
 `method_type_annotations::decode` composes declaration/extension/field data with all six legal method targets (0x01, 0x12, 0x14, 0x15, 0x16, 0x17), sharing one annotation budget. `target_type` retains the raw tag and `target_info: MethodTargetInfo` retains fixed-width indices. **Breaking API change:** `formal_parameter_index` was removed; formal-parameter data is now `MethodTargetInfo::FormalParameter(index)`. External field reads/literals/patterns and derived Debug/layout/size can change.

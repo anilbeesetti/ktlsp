@@ -1,18 +1,29 @@
-//! Native LSP lifecycle, bounded document synchronization and lexical/structural
-//! providers. Semantic analysis and project import remain unsupported.
+//! Native LSP lifecycle, bounded synchronization, lexical/structural providers
+//! and finite authenticated local navigation. Project import is unsupported.
 
 mod cache;
 mod document_symbols;
+mod input;
+mod semantic_navigation;
+pub use input::StdinInput;
 mod structure;
 mod uri;
 use ktlsp_parser::{FileKind, ParserError, SourceSnapshot};
-use ktlsp_protocol::{read_frame, write_frame};
+use ktlsp_protocol::{FrameReader, write_frame};
 use ktlsp_text::{Document, MAX_CHANGES, TextChange};
 use serde_json::{Map, Number, Value, json};
+use std::task::Poll;
 use std::{
     collections::HashMap,
     io::{BufRead, Write},
     path::Path,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicU8, Ordering},
+        mpsc::{self, Receiver, TryRecvError},
+    },
+    thread::{self, JoinHandle},
+    time::{Duration, Instant},
 };
 
 pub const MAX_OPEN_DOCUMENTS: usize = 128;
@@ -20,6 +31,46 @@ pub const MAX_OPEN_BYTES: usize = 64 * 1024 * 1024;
 pub const MAX_URI_BYTES: usize = 8 * 1024;
 pub const MAX_ERROR_RECORDS: usize = 128;
 pub const MAX_WORKSPACE_FOLDERS: usize = 128;
+/// Includes cancelled work until its thread has actually terminated.
+pub const MAX_PENDING_PARSER_REQUESTS: usize = 8;
+const CLEANUP_TIMEOUT: Duration = Duration::from_secs(1);
+static PARSER_THREADS: Mutex<[Option<ParserThread>; MAX_PENDING_PARSER_REQUESTS]> =
+    Mutex::new([const { None }; MAX_PENDING_PARSER_REQUESTS]);
+
+struct ParserThread {
+    handle: JoinHandle<()>,
+    // 0: retained unfinished thread, 1: joined successfully, 2: joined panic.
+    outcome: Arc<AtomicU8>,
+}
+fn reap_parser_threads(threads: &mut [Option<ParserThread>; MAX_PENDING_PARSER_REQUESTS]) {
+    for slot in threads {
+        if slot
+            .as_ref()
+            .is_some_and(|thread| thread.handle.is_finished())
+        {
+            let thread = slot.take().expect("finished handle checked");
+            let outcome = if thread.handle.join().is_ok() { 1 } else { 2 };
+            thread.outcome.store(outcome, Ordering::Relaxed);
+        }
+    }
+}
+
+type ParserResult = Result<Value, (i32, &'static str)>;
+#[derive(Debug)]
+struct PendingParser {
+    id: Option<Value>,
+    snapshot: SourceSnapshot,
+    incarnation: u64,
+    cancelled: Arc<AtomicBool>,
+    result: Receiver<(ParserResult, bool)>,
+    outcome: Arc<AtomicU8>,
+}
+impl PendingParser {
+    fn cancel(&mut self, code: i32, message: &str) -> Option<Value> {
+        self.cancelled.store(true, Ordering::Relaxed);
+        self.id.take().map(|id| response_error(id, code, message))
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum State {
@@ -67,9 +118,14 @@ pub struct Session {
     open_bytes: usize,
     errors: Vec<String>,
     configuration: Configuration,
-    symbol_provider: Option<document_symbols::Provider>,
+    parser_provider: Option<Arc<document_symbols::Provider>>,
     symbol_client: document_symbols::Client,
+    hover_format: Option<semantic_navigation::HoverFormat>,
     exit_code: Option<i32>,
+    incarnations: HashMap<String, u64>,
+    next_incarnation: u64,
+    pending_parser: Vec<PendingParser>,
+    cleanup_confirmed: bool,
 }
 impl Default for Session {
     fn default() -> Self {
@@ -114,17 +170,22 @@ impl Session {
             open_bytes: 0,
             errors: Vec::new(),
             configuration: Configuration::default(),
-            symbol_provider: None,
+            parser_provider: None,
             symbol_client: document_symbols::Client::default(),
+            hover_format: Some(semantic_navigation::HoverFormat::Plaintext),
             exit_code: None,
+            incarnations: HashMap::new(),
+            next_incarnation: 0,
+            pending_parser: Vec::new(),
+            cleanup_confirmed: true,
         }
     }
-    /// Enable syntactic document symbols using a trusted, matching installed worker.
+    /// Enable parser-backed symbols and finite local navigation with a trusted worker.
     /// The caller, not document content, chooses this absolute executable path.
     pub fn with_parser(worker: impl AsRef<Path>) -> Result<Self, ParserError> {
         let provider = document_symbols::Provider::new(worker.as_ref())?;
         let mut session = Self::new();
-        session.symbol_provider = Some(provider);
+        session.parser_provider = Some(Arc::new(provider));
         Ok(session)
     }
     pub fn state(&self) -> State {
@@ -142,6 +203,8 @@ impl Session {
     pub fn open_bytes(&self) -> usize {
         self.open_bytes
     }
+    /// Lifecycle exit intent, not cleanup proof. A successful owner must also
+    /// require the true cleanup outcome from `close()` before reporting success.
     pub fn exit_code(&self) -> Option<i32> {
         self.exit_code
     }
@@ -157,6 +220,7 @@ impl Session {
         }
     }
     /// Handle one decoded message. JSON-RPC batches are invalid in LSP.
+    /// Parser-backed requests are deferred: call `poll` while servicing input.
     /// Notifications never receive errors; valid client responses are ignored.
     pub fn handle(&mut self, message: Value) -> Vec<Value> {
         if self.state == State::Exited {
@@ -208,11 +272,38 @@ impl Session {
         if !valid_id(id) {
             return invalid(self);
         }
+        if self
+            .pending_parser
+            .iter()
+            .any(|pending| pending.id.as_ref() == Some(id))
+        {
+            return vec![response_error(
+                Value::Null,
+                -32600,
+                "request id is already active",
+            )];
+        }
+        if matches!(
+            method,
+            "textDocument/documentSymbol" | "textDocument/definition" | "textDocument/hover"
+        ) && self.state == State::Running
+        {
+            return match self.start_parser(id.clone(), method, params) {
+                Ok(()) => Vec::new(),
+                Err((code, message)) => vec![response_error(id.clone(), code, message)],
+            };
+        }
         let result = self.request(method, params);
-        vec![match result {
+        let mut responses = if method == "shutdown" && result.is_ok() {
+            self.cancel_parser(None, -32800, "Request cancelled by shutdown")
+        } else {
+            Vec::new()
+        };
+        responses.push(match result {
             Ok(result) => json!({"jsonrpc":"2.0", "id":id, "result":result}),
             Err((code, message)) => response_error(id.clone(), code, message),
-        }]
+        });
+        responses
     }
     fn request(
         &mut self,
@@ -235,12 +326,21 @@ impl Session {
             )
             .map_err(|e| (-32602, e))?;
             self.symbol_client = symbol_client;
+            self.hover_format = semantic_navigation::HoverFormat::negotiate(
+                params
+                    .and_then(|p| p.get("capabilities"))
+                    .expect("validated capabilities"),
+            );
             self.configuration = configuration;
             self.pull_diagnostics = pull_diagnostics;
             self.state = State::Initializing;
             let mut result = json!({"capabilities":{"positionEncoding":"utf-16", "foldingRangeProvider":true, "textDocumentSync":{"openClose":true,"change":2,"save":false}}, "serverInfo":{"name":"ktlsp","version":env!("CARGO_PKG_VERSION")}});
-            if self.symbol_provider.is_some() {
+            if self.parser_provider.is_some() {
                 result["capabilities"]["documentSymbolProvider"] = json!(true);
+                result["capabilities"]["definitionProvider"] = json!(true);
+                if self.hover_format.is_some() {
+                    result["capabilities"]["hoverProvider"] = json!(true);
+                }
             }
             if pull_diagnostics {
                 result["capabilities"]["diagnosticProvider"] =
@@ -257,7 +357,6 @@ impl Session {
                 self.state = State::Shutdown;
                 Ok(Value::Null)
             }
-            "textDocument/documentSymbol" => self.document_symbols(params),
             "textDocument/diagnostic" if self.pull_diagnostics => {
                 let map = params
                     .ok_or((-32602, "diagnostic params missing"))
@@ -301,13 +400,21 @@ impl Session {
             _ => Err((-32601, "Method not found")),
         }
     }
-    fn document_symbols(&self, params: Option<&Value>) -> Result<Value, (i32, &'static str)> {
+    fn start_parser(
+        &mut self,
+        id: Value,
+        method: &str,
+        params: Option<&Value>,
+    ) -> Result<(), (i32, &'static str)> {
         let provider = self
-            .symbol_provider
+            .parser_provider
             .as_ref()
             .ok_or((-32601, "Method not found"))?;
+        if method == "textDocument/hover" && self.hover_format.is_none() {
+            return Err((-32601, "Method not found"));
+        }
         let map = params
-            .ok_or((-32602, "document symbol params missing"))
+            .ok_or((-32602, "parser request params missing"))
             .and_then(|p| object(p).map_err(|e| (-32602, e)))?;
         let uri = required(map, "textDocument")
             .and_then(object)
@@ -317,36 +424,188 @@ impl Session {
         let document = self
             .documents
             .get(uri)
-            .ok_or((-32602, "document symbols refer to unopened document"))?;
+            .ok_or((-32602, "parser request refers to unopened document"))?;
+        let query = if method == "textDocument/documentSymbol" {
+            None
+        } else {
+            let position = map
+                .get("position")
+                .ok_or((-32602, "position missing"))
+                .and_then(|value| {
+                    serde_json::from_value::<ktlsp_text::Position>(value.clone())
+                        .map_err(|_| (-32602, "invalid UTF-16 position"))
+                })?;
+            let offset = ktlsp_text::position_to_offset(document.text(), position)
+                .map_err(|_| (-32602, "invalid UTF-16 position"))?;
+            Some(if method == "textDocument/definition" {
+                semantic_navigation::Query::Definition { offset }
+            } else {
+                semantic_navigation::Query::Hover {
+                    offset,
+                    format: self.hover_format.expect("hover format checked"),
+                }
+            })
+        };
         if document.text().len() > ktlsp_parser::MAX_SOURCE_BYTES {
-            return Err((
-                -32803,
-                "document symbols exceed the parser's 64 KiB source limit",
-            ));
+            return Err((-32803, "request exceeds the parser's 64 KiB source limit"));
         }
+        if self.pending_parser.len() >= MAX_PENDING_PARSER_REQUESTS {
+            return Err((-32803, "parser worker capacity exhausted"));
+        }
+        let mut threads = PARSER_THREADS
+            .try_lock()
+            .map_err(|_| (-32803, "parser worker admission unavailable"))?;
+        reap_parser_threads(&mut threads);
+        let slot = threads
+            .iter()
+            .position(Option::is_none)
+            .ok_or((-32803, "parser worker capacity exhausted"))?;
         let snapshot = SourceSnapshot::new(
             uri,
             i64::from(document.version()),
             FileKind::Source,
             document.text(),
         )
-        .map_err(|_| (-32803, "document symbol snapshot exceeds parser limits"))?;
-        let parsed = provider.parse(&snapshot).map_err(|e| (-32803, e))?;
-        // No result survives this synchronous request, including close/reopen.
-        // Recheck the authoritative revision/content before publishing byte ranges.
-        let current = self
-            .documents
-            .get(uri)
-            .filter(|current| {
-                i64::from(current.version()) == snapshot.revision()
-                    && current.text() == snapshot.source()
+        .map_err(|_| (-32803, "snapshot exceeds parser limits"))?;
+        let incarnation = self.incarnations[uri];
+        let worker_snapshot = snapshot.clone();
+        let provider = Arc::clone(provider);
+        let client = self.symbol_client.clone();
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let worker_cancelled = Arc::clone(&cancelled);
+        let (sender, result) = mpsc::sync_channel(1);
+        let thread = thread::Builder::new()
+            .name("ktlsp-parser".into())
+            .spawn(move || {
+                let (parsed, cleanup_confirmed) =
+                    provider.parse(&worker_snapshot, &worker_cancelled);
+                let result = (|| {
+                    let parsed = parsed.map_err(|error| {
+                        if error == ParserError::Cancelled {
+                            (-32800, "Request cancelled")
+                        } else {
+                            (-32803, "parser failed or exceeded its resource limits")
+                        }
+                    })?;
+                    if worker_cancelled.load(Ordering::Relaxed) {
+                        return Err((-32800, "Request cancelled"));
+                    }
+                    if let Some(query) = query {
+                        semantic_navigation::render(&parsed, &worker_snapshot, query)
+                            .map_err(|error| (-32803, error))
+                    } else {
+                        let tree = parsed
+                            .tree_for(&worker_snapshot)
+                            .map_err(|_| (-32801, "parser snapshot is stale"))?;
+                        document_symbols::render(tree, &client, worker_snapshot.document())
+                            .map_err(|error| (-32803, error))
+                    }
+                })();
+                let _ = sender.send((result, cleanup_confirmed));
             })
-            .ok_or((-32803, "document symbol snapshot is stale"))?;
-        let tree = parsed
-            .tree_for(&snapshot)
-            .map_err(|_| (-32803, "document symbol snapshot is stale"))?;
-        debug_assert_eq!(tree.source(), current.text());
-        document_symbols::render(tree, &self.symbol_client, uri).map_err(|e| (-32803, e))
+            .map_err(|_| (-32803, "parser worker could not start"))?;
+        let outcome = Arc::new(AtomicU8::new(0));
+        threads[slot] = Some(ParserThread {
+            handle: thread,
+            outcome: Arc::clone(&outcome),
+        });
+        self.pending_parser.push(PendingParser {
+            id: Some(id),
+            snapshot,
+            incarnation,
+            cancelled,
+            result,
+            outcome,
+        });
+        Ok(())
+    }
+
+    /// Nonblocking completion collection. Call after handling incoming messages;
+    /// committed document mutations invalidate work before it can be published.
+    pub fn poll(&mut self) -> Vec<Value> {
+        if let Ok(mut threads) = PARSER_THREADS.try_lock() {
+            reap_parser_threads(&mut threads);
+        }
+        let mut responses = Vec::new();
+        let mut index = 0;
+        while index < self.pending_parser.len() {
+            let outcome = self.pending_parser[index].outcome.load(Ordering::Relaxed);
+            if outcome == 0 {
+                index += 1;
+                continue;
+            }
+            let mut pending = self.pending_parser.swap_remove(index);
+            let result = if outcome != 1 {
+                self.cleanup_confirmed = false;
+                Err((-32803, "parser worker failed"))
+            } else {
+                match pending.result.try_recv() {
+                    Ok((result, cleanup_confirmed)) => {
+                        self.cleanup_confirmed &= cleanup_confirmed;
+                        result
+                    }
+                    Err(TryRecvError::Empty | TryRecvError::Disconnected) => {
+                        self.cleanup_confirmed = false;
+                        Err((-32803, "parser worker failed"))
+                    }
+                }
+            };
+            let Some(id) = pending.id.take() else {
+                continue;
+            };
+            let current = self.documents.get(pending.snapshot.document());
+            let fresh = self.incarnations.get(pending.snapshot.document())
+                == Some(&pending.incarnation)
+                && current.is_some_and(|document| {
+                    i64::from(document.version()) == pending.snapshot.revision()
+                        && document.text() == pending.snapshot.source()
+                });
+            let result = if !fresh {
+                Err((-32801, "parser snapshot is stale"))
+            } else if pending.cancelled.load(Ordering::Relaxed) {
+                Err((-32800, "Request cancelled"))
+            } else {
+                result
+            };
+            responses.push(match result {
+                Ok(result) => json!({"jsonrpc":"2.0","id":id,"result":result}),
+                Err((code, message)) => response_error(id, code, message),
+            });
+        }
+        responses
+    }
+
+    /// Retained jobs, including cancelled jobs awaiting actual thread completion.
+    pub fn pending_requests(&self) -> usize {
+        self.pending_parser.len()
+    }
+
+    fn cancel_parser(&mut self, uri: Option<&str>, code: i32, message: &str) -> Vec<Value> {
+        self.pending_parser
+            .iter_mut()
+            .filter(|pending| uri.is_none_or(|uri| pending.snapshot.document() == uri))
+            .filter_map(|pending| pending.cancel(code, message))
+            .collect()
+    }
+
+    /// Terminal cleanup: return cancellation responses and whether all owned
+    /// threads joined and each request proved child closure/no spawn attempt.
+    /// The thread grace is one second excluding OS calls. An unproved parser
+    /// cleanup/panic permanently prevents clean success for this Session.
+    pub fn close(&mut self) -> (Vec<Value>, bool) {
+        let responses = self.cancel_parser(None, -32800, "Request cancelled by transport close");
+        let deadline = Instant::now() + CLEANUP_TIMEOUT;
+        while !self.pending_parser.is_empty() && Instant::now() < deadline {
+            let _ = self.poll();
+            if !self.pending_parser.is_empty() {
+                thread::sleep(Duration::from_millis(2));
+            }
+        }
+        self.state = State::Exited;
+        (
+            responses,
+            self.pending_parser.is_empty() && self.cleanup_confirmed,
+        )
     }
     fn document_diagnostics(&mut self, uri: &str) -> Option<(i32, Vec<Value>)> {
         let document = self.documents.get(uri)?;
@@ -368,7 +627,7 @@ impl Session {
             }
             self.exit_code = Some(if self.state == State::Shutdown { 0 } else { 1 });
             self.state = State::Exited;
-            return Vec::new();
+            return self.cancel_parser(None, -32800, "Request cancelled by exit");
         }
         if self.state == State::Shutdown {
             return Vec::new();
@@ -399,28 +658,48 @@ impl Session {
             self.record("document notification before initialized");
             return Vec::new();
         }
+        if method == "$/cancelRequest" {
+            let id = params
+                .ok_or("cancel params missing")
+                .and_then(object)
+                .and_then(|map| required(map, "id"))
+                .and_then(|id| valid_id(id).then_some(id).ok_or("invalid cancellation id"));
+            return match id {
+                Ok(id) => self
+                    .pending_parser
+                    .iter_mut()
+                    .find(|pending| pending.id.as_ref() == Some(id))
+                    .and_then(|pending| pending.cancel(-32800, "Request cancelled"))
+                    .into_iter()
+                    .collect(),
+                Err(error) => {
+                    self.record(error);
+                    Vec::new()
+                }
+            };
+        }
         let result = match method {
             "textDocument/didOpen" => self.did_open(params),
             "textDocument/didChange" => self.did_change(params),
             "textDocument/didClose" => self.did_close(params),
             "textDocument/didSave" => self.did_save(params),
-            "$/cancelRequest" => params
-                .ok_or("cancel params missing")
-                .and_then(object)
-                .and_then(|m| {
-                    if valid_id(required(m, "id")?) {
-                        Ok(())
-                    } else {
-                        Err("invalid cancellation id")
-                    }
-                })
-                .map_err(str::to_owned),
             _ => unreachable!(),
         };
         if let Err(error) = result {
             self.record(error);
             return Vec::new();
         }
+        let mut responses = if matches!(
+            method,
+            "textDocument/didOpen" | "textDocument/didChange" | "textDocument/didClose"
+        ) {
+            let uri = params.expect("validated notification params")["textDocument"]["uri"]
+                .as_str()
+                .expect("validated URI");
+            self.cancel_parser(Some(uri), -32801, "parser snapshot is stale")
+        } else {
+            Vec::new()
+        };
         if !self.pull_diagnostics
             && matches!(
                 method,
@@ -441,11 +720,11 @@ impl Session {
             {
                 params["version"] = json!(version);
             }
-            return vec![
+            responses.push(
                 json!({"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":params}),
-            ];
+            );
         }
-        Vec::new()
+        responses
     }
     fn did_open(&mut self, params: Option<&Value>) -> Result<(), String> {
         let map = object(params.ok_or("open params missing")?)?;
@@ -473,6 +752,12 @@ impl Session {
             return Err("aggregate open document size limit exceeded".into());
         }
         let document = Document::new(version, text.into()).map_err(|e| e.to_string())?;
+        let incarnation = self
+            .next_incarnation
+            .checked_add(1)
+            .ok_or("document incarnation limit exceeded")?;
+        self.next_incarnation = incarnation;
+        self.incarnations.insert(uri.into(), incarnation);
         self.documents.insert(uri.into(), document);
         self.analysis_cache.invalidate(uri);
         self.open_bytes = bytes;
@@ -528,6 +813,7 @@ impl Session {
         self.analysis_cache.invalidate(uri);
         if let Some(document) = self.documents.remove(uri) {
             self.open_bytes -= document.text().len();
+            self.incarnations.remove(uri);
         }
         Ok(())
     }
@@ -547,6 +833,16 @@ impl Session {
             return Err("invalid save text".into());
         }
         Ok(())
+    }
+}
+
+impl Drop for Session {
+    fn drop(&mut self) {
+        for pending in &self.pending_parser {
+            pending.cancelled.store(true, Ordering::Relaxed);
+        }
+        // Global bounded ownership retains unfinished handles. Admission/poll
+        // reap them only after is_finished(); close() reports cleanup outcome.
     }
 }
 
@@ -634,9 +930,12 @@ fn parse_initialize(params: Option<&Value>) -> Result<(Configuration, bool), &'s
     Ok((configuration, pull_diagnostics))
 }
 
-/// Run framed stdio-style communication. Framing/write errors are fatal;
-/// complete invalid JSON payloads produce recoverable parse-error responses.
-/// Logs go exclusively to `errors`. EOF succeeds only after shutdown.
+/// Run framed communication, including deferred parser completions. Input must
+/// yield WouldBlock regularly when idle (the CLI uses `StdinInput`); a blocking
+/// reader can delay completions. Output writes/flushes are synchronous and can
+/// block on client backpressure. No input thread or input queue is created.
+/// Framing/write errors are fatal; complete invalid JSON is recoverable.
+/// EOF succeeds only after shutdown and confirmed owned-job cleanup.
 pub fn run<R: BufRead, W: Write, E: Write>(reader: &mut R, writer: &mut W, errors: &mut E) -> i32 {
     // Resolve only beside this executable, never PATH, cwd, or an environment
     // override. Distribution must install the worker from the same build here.
@@ -652,40 +951,105 @@ pub fn run<R: BufRead, W: Write, E: Write>(reader: &mut R, writer: &mut W, error
         })
         .and_then(|worker| Session::with_parser(worker).ok())
         .unwrap_or_default();
-    loop {
-        let payload = match read_frame(reader) {
-            Ok(Some(payload)) => payload,
-            Ok(None) => {
-                return if session.state == State::Shutdown {
-                    0
-                } else {
-                    1
-                };
+    let mut frames = FrameReader::default();
+    let mut output_failed = false;
+    let status = 'exchange: loop {
+        let mut responses = match frames.poll(reader) {
+            Ok(Poll::Ready(Some(payload))) => match serde_json::from_slice::<Value>(&payload) {
+                Ok(message) => session.handle(message),
+                Err(_) => vec![response_error(Value::Null, -32700, "Parse error")],
+            },
+            Ok(Poll::Pending) => {
+                thread::sleep(Duration::from_millis(1));
+                Vec::new()
             }
+            Ok(Poll::Ready(None)) => break i32::from(session.state != State::Shutdown),
             Err(error) => {
                 let _ = writeln!(errors, "ktlsp: {error}");
-                return 1;
+                break 1;
             }
         };
-        let responses = match serde_json::from_slice::<Value>(&payload) {
-            Ok(message) => session.handle(message),
-            Err(_) => vec![response_error(Value::Null, -32700, "Parse error")],
-        };
+        responses.extend(session.poll());
         for error in session.drain_errors() {
             let _ = writeln!(errors, "ktlsp: {error}");
         }
         for response in responses {
-            let result = serde_json::to_vec(&response)
-                .map_err(|e| e.to_string())
-                .and_then(|payload| write_frame(writer, &payload).map_err(|e| e.to_string()))
-                .and_then(|()| writer.flush().map_err(|e| e.to_string()));
-            if let Err(error) = result {
+            if let Err(error) = send_response(writer, &response) {
                 let _ = writeln!(errors, "ktlsp: {error}");
-                return 1;
+                output_failed = true;
+                break 'exchange 1;
             }
         }
         if let Some(code) = session.exit_code() {
-            return code;
+            break code;
         }
+    };
+    let (cancelled, clean) = session.close();
+    if !clean {
+        let _ = writeln!(errors, "ktlsp: document symbol cleanup incomplete");
+    }
+    if !output_failed {
+        for response in cancelled {
+            if let Err(error) = send_response(writer, &response) {
+                let _ = writeln!(errors, "ktlsp: {error}");
+                output_failed = true;
+                break;
+            }
+        }
+    }
+    if clean && !output_failed { status } else { 1 }
+}
+
+fn send_response(writer: &mut impl Write, response: &Value) -> Result<(), String> {
+    let payload = serde_json::to_vec(response).map_err(|error| error.to_string())?;
+    write_frame(writer, &payload).map_err(|error| error.to_string())?;
+    writer.flush().map_err(|error| error.to_string())
+}
+
+#[cfg(test)]
+mod cleanup_tests {
+    use super::*;
+
+    #[test]
+    fn unproved_child_cleanup_cannot_become_clean_after_threads_finish() {
+        let mut session = Session::new();
+        session.state = State::Shutdown;
+        // Pure control-state regression: no parser/provider or worker is run.
+        session.cleanup_confirmed = false;
+        assert_eq!(session.pending_requests(), 0);
+        assert!(!session.close().1);
+        assert!(
+            !session.close().1,
+            "later calls must not invent closure proof"
+        );
+    }
+
+    #[test]
+    fn idle_would_block_input_has_bounded_poll_rate() {
+        struct IdleInput(usize);
+        impl std::io::Read for IdleInput {
+            fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+                if buffer.is_empty() {
+                    return Ok(0);
+                }
+                self.fill_buf().map(|bytes| bytes.len())
+            }
+        }
+        impl BufRead for IdleInput {
+            fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+                if self.0 == 0 {
+                    return Ok(&[]);
+                }
+                self.0 -= 1;
+                Err(std::io::ErrorKind::WouldBlock.into())
+            }
+            fn consume(&mut self, count: usize) {
+                assert_eq!(count, 0);
+            }
+        }
+        let started = Instant::now();
+        assert_eq!(run(&mut IdleInput(16), &mut Vec::new(), &mut Vec::new()), 1);
+        // At most 4,000 idle probes/second, not an exact scheduler interval.
+        assert!(started.elapsed() >= Duration::from_millis(4));
     }
 }

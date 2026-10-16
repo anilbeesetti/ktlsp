@@ -19,9 +19,17 @@ fn worker() -> PathBuf {
     ))
 }
 fn request(session: &mut Session, method: &str, params: Value) -> Value {
-    session
-        .handle(json!({"jsonrpc":"2.0","id":1,"method":method,"params":params}))
-        .remove(0)
+    let mut responses =
+        session.handle(json!({"jsonrpc":"2.0","id":1,"method":method,"params":params}));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    while responses.is_empty() && std::time::Instant::now() < deadline {
+        responses.extend(session.poll());
+        if responses.is_empty() {
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+    }
+    assert_eq!(responses.len(), 1, "{responses:?}");
+    responses.remove(0)
 }
 fn notify(session: &mut Session, method: &str, params: Value) {
     session.handle(json!({"jsonrpc":"2.0","method":method,"params":params}));
@@ -380,11 +388,30 @@ impl Package {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-        let mut input = Vec::new();
+        let mut input = child.stdin.take().unwrap();
+        let mut reader = std::io::BufReader::new(child.stdout.take().unwrap());
+        let mut responses: Vec<Value> = Vec::new();
         for message in messages {
             ktlsp_protocol::write_frame(&mut input, &serde_json::to_vec(message).unwrap()).unwrap();
+            input.flush().unwrap();
+            // Requests really finish before later edits/shutdown. Bulk-writing
+            // the entire session would now legitimately cancel/stale symbols.
+            if let Some(id) = message.get("id") {
+                loop {
+                    let frame = ktlsp_protocol::read_frame(&mut reader).unwrap().unwrap();
+                    let response: Value = serde_json::from_slice(&frame).unwrap();
+                    let matched = response.get("id") == Some(id);
+                    responses.push(response);
+                    if matched {
+                        break;
+                    }
+                }
+            }
         }
-        child.stdin.take().unwrap().write_all(&input).unwrap();
+        drop(input);
+        while let Some(frame) = ktlsp_protocol::read_frame(&mut reader).unwrap() {
+            responses.push(serde_json::from_slice(&frame).unwrap());
+        }
         let output = child.wait_with_output().unwrap();
         assert!(output.status.success(), "{:?}", output.status);
         assert!(
@@ -392,11 +419,6 @@ impl Package {
             "{}",
             String::from_utf8_lossy(&output.stderr)
         );
-        let mut reader = std::io::Cursor::new(output.stdout);
-        let mut responses = Vec::new();
-        while let Some(frame) = ktlsp_protocol::read_frame(&mut reader).unwrap() {
-            responses.push(serde_json::from_slice(&frame).unwrap());
-        }
         responses
     }
 }
@@ -481,4 +503,249 @@ fn packaged_stdio_combines_symbols_pull_and_mandatory_utf16_fallback() {
     );
     let rejected_symbols = replies.iter().find(|reply| reply["id"] == 5).unwrap();
     assert_eq!(rejected_symbols["error"]["code"], -32803);
+}
+
+fn navigation_params(source: &str, offset: usize) -> Value {
+    json!({"textDocument":{"uri":URI},"position":offset_to_position(source, offset).unwrap()})
+}
+
+#[test]
+fn actual_local_binding_definition_hover_ranges_and_refusals() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = running(json!({}));
+    let source = "// 😀\r\nfun f() {\r\n val `x 😀` = 1\r\n val y = `x 😀`\r\n}";
+    open(&mut session, source);
+    let reference = source.rfind("`x 😀`").unwrap();
+    let params = navigation_params(source, reference + 1);
+    let definition = request(&mut session, "textDocument/definition", params.clone());
+    assert_eq!(
+        definition["result"],
+        json!({"uri":URI,"range":span(source, "`x 😀`")})
+    );
+    let hover = request(&mut session, "textDocument/hover", params);
+    assert_eq!(
+        hover["result"],
+        json!({
+            "contents":{"kind":"plaintext","value":"val `x 😀` = 1"},
+            "range":{"start":{"line":3,"character":9},"end":{"line":3,"character":15}}
+        })
+    );
+    // End-exclusive reference selection, and no invented result on a declaration.
+    for offset in [source.find("`x 😀`").unwrap(), reference + "`x 😀`".len()] {
+        assert_eq!(
+            request(
+                &mut session,
+                "textDocument/definition",
+                navigation_params(source, offset)
+            )["result"],
+            Value::Null
+        );
+    }
+    for position in [
+        json!({"line":0,"character":4}),
+        json!({"line":50,"character":0}),
+        json!({"line":1,"character":-1}),
+        json!({"line":1}),
+        Value::Null,
+    ] {
+        let response = request(
+            &mut session,
+            "textDocument/hover",
+            json!({"textDocument":{"uri":URI},"position":position}),
+        );
+        assert_eq!(response["error"]["code"], -32602, "{response}");
+    }
+    for (version, source) in [
+        (2, "fun f() { val y = unknown }"),
+        (3, "fun f() { val y = x; val x = 1 }"),
+        (4, "fun f() { val x = 1; val x = 2; val y = x }"),
+        (5, "fun f() { var x = 1; val y = x }"),
+        (6, "fun f(arg: Int) { val x = 1; val y = x }"),
+        (7, "fun f() { val x: Int = 1; val y = x }"),
+        (8, "fun f() { val x = 1; val y = x + 1 }"),
+        (9, "val x = 1; val y = x"),
+        (10, "fun f() { val x = x }"),
+    ] {
+        change(&mut session, version, source);
+        let reference = if source.contains("unknown") {
+            source.find("unknown").unwrap()
+        } else {
+            source.rfind("= x").unwrap() + 2
+        };
+        for method in ["textDocument/definition", "textDocument/hover"] {
+            let response = request(&mut session, method, navigation_params(source, reference));
+            assert_eq!(response["error"]["code"], -32803, "{source}: {response}");
+            assert!(response.get("result").is_none());
+        }
+    }
+    notify(
+        &mut session,
+        "textDocument/didClose",
+        json!({"textDocument":{"uri":URI}}),
+    );
+    assert_eq!(
+        request(
+            &mut session,
+            "textDocument/definition",
+            json!({"textDocument":{"uri":URI},"position":{"line":0,"character":0}})
+        )["error"]["code"],
+        -32602
+    );
+}
+
+#[test]
+fn actual_packaged_stdio_navigation_negotiation_and_existing_providers() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let source =
+        "// 😀\r\nclass Combined { val item = 1 }\r\nfun f() { val `x😀` = 1; val y = `x😀` }";
+    let assert_ids = |replies: &[Value]| {
+        let expected = [
+            json!(1),
+            json!("definition"),
+            json!(u64::MAX),
+            json!(4),
+            json!(5),
+            json!(6),
+        ];
+        assert_eq!(
+            replies.len(),
+            expected.len(),
+            "no unsolicited/push output: {replies:?}"
+        );
+        for id in expected {
+            assert_eq!(
+                replies
+                    .iter()
+                    .filter(|reply| reply.get("id") == Some(&id))
+                    .count(),
+                1,
+                "each original request ID exactly once: {id}: {replies:?}"
+            );
+        }
+    };
+    for (profile, expected_kind) in [
+        (json!({}), Some("plaintext")),
+        (
+            json!({"contentFormat":["unknown","markdown","plaintext"]}),
+            Some("markdown"),
+        ),
+        (
+            json!({"contentFormat":["plaintext","markdown"]}),
+            Some("plaintext"),
+        ),
+        (json!({"contentFormat":["unknown"]}), None),
+        (json!({"contentFormat":[]}), None),
+        (json!({"contentFormat":false}), None),
+        (json!({"contentFormat":[false,"markdown"]}), None),
+        (json!({"contentFormat":["plaintext",null]}), None),
+        (json!(false), None),
+        (Value::Null, None),
+    ] {
+        let params = navigation_params(source, source.rfind("`x😀`").unwrap() + 1);
+        let messages = [
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{"general":{"positionEncodings":["utf-8"]},"textDocument":{"hover":profile,"documentSymbol":{"hierarchicalDocumentSymbolSupport":true},"diagnostic":{}}}}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
+            json!({"jsonrpc":"2.0","id":"definition","method":"textDocument/definition","params":params}),
+            json!({"jsonrpc":"2.0","id":u64::MAX,"method":"textDocument/hover","params":params}),
+            json!({"jsonrpc":"2.0","id":4,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":URI}}}),
+            json!({"jsonrpc":"2.0","id":5,"method":"textDocument/diagnostic","params":{"textDocument":{"uri":URI}}}),
+            json!({"jsonrpc":"2.0","id":6,"method":"shutdown"}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ];
+        let replies = Package::new(true).exchange(&messages);
+        assert_ids(&replies);
+        let caps = &replies[0]["result"]["capabilities"];
+        assert_eq!(caps["positionEncoding"], "utf-16");
+        assert_eq!(caps["definitionProvider"], true);
+        assert_eq!(caps.get("hoverProvider").is_some(), expected_kind.is_some());
+        let definition = replies.iter().find(|r| r["id"] == "definition").unwrap();
+        assert_eq!(
+            definition["result"],
+            json!({"uri":URI,"range":span(source, "`x😀`")})
+        );
+        let hover = replies.iter().find(|r| r["id"] == u64::MAX).unwrap();
+        if let Some(kind) = expected_kind {
+            assert_eq!(hover["result"]["contents"]["kind"], kind, "{hover}");
+            let expected = if kind == "markdown" {
+                "```kotlin\nval `x😀` = 1\n```"
+            } else {
+                "val `x😀` = 1"
+            };
+            assert_eq!(hover["result"]["contents"]["value"], expected);
+            assert_eq!(
+                hover["result"]["range"],
+                json!({"start":{"line":2,"character":33},"end":{"line":2,"character":38}})
+            );
+        } else {
+            assert_eq!(hover["error"]["code"], -32601);
+        }
+        let symbols = replies.iter().find(|r| r["id"] == 4).unwrap();
+        assert_eq!(symbols["result"][0]["name"], "Combined");
+        assert_eq!(symbols["result"][0]["children"][0]["name"], "item");
+        assert_eq!(
+            replies.iter().find(|r| r["id"] == 5).unwrap()["result"],
+            json!({"kind":"full","items":[]})
+        );
+        let missing = Package::new(false).exchange(&messages);
+        assert_ids(&missing);
+        let caps = &missing[0]["result"]["capabilities"];
+        assert!(caps.get("definitionProvider").is_none() && caps.get("hoverProvider").is_none());
+        for id in [json!("definition"), json!(u64::MAX)] {
+            assert_eq!(
+                missing.iter().find(|r| r["id"] == id).unwrap()["error"]["code"],
+                -32601
+            );
+        }
+    }
+}
+
+#[test]
+fn actual_hover_preserves_declaration_without_initializer_chasing_or_markdown_escape() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = Session::with_parser(worker()).unwrap();
+    let initialized = request(
+        &mut session,
+        "initialize",
+        json!({"capabilities":{"textDocument":{"hover":{"contentFormat":["markdown"]}}}}),
+    );
+    assert_eq!(initialized["result"]["capabilities"]["hoverProvider"], true);
+    notify(&mut session, "initialized", json!({}));
+    let declaration = "val /*\r\n````\r\n[untrusted](https://invalid.test)\r\n*/ `x` = 1";
+    let source = format!("fun f() {{ {declaration}; val y = `x`; val z = y }}");
+    open(&mut session, &source);
+    let reference = source.rfind("`x`").unwrap();
+    let hover = request(
+        &mut session,
+        "textDocument/hover",
+        navigation_params(&source, reference),
+    );
+    assert_eq!(
+        hover["result"]["contents"]["value"],
+        format!("`````kotlin\n{declaration}\n`````"),
+        "{hover}"
+    );
+    let reference = source.rfind("= y").unwrap() + 2;
+    let params = navigation_params(&source, reference);
+    let definition = request(&mut session, "textDocument/definition", params.clone());
+    assert_eq!(
+        definition["result"],
+        json!({"uri":URI,"range":span(&source, "y")})
+    );
+    let hover = request(&mut session, "textDocument/hover", params);
+    assert_eq!(
+        hover["result"]["contents"]["value"], "```kotlin\nval y = `x`\n```",
+        "{hover}"
+    );
+    let mut failed = Session::with_parser(env!("CARGO_BIN_EXE_ktlsp")).unwrap();
+    initialize(&mut failed, json!({}));
+    open(&mut failed, "fun f() { val x = 1; val y = x }");
+    for method in ["textDocument/definition", "textDocument/hover"] {
+        let response = request(
+            &mut failed,
+            method,
+            json!({"textDocument":{"uri":URI},"position":{"line":0,"character":29}}),
+        );
+        assert_eq!(response["error"]["code"], -32803, "{response}");
+    }
 }

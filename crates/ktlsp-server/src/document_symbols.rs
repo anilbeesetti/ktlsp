@@ -9,7 +9,7 @@ pub(crate) const MAX_SYMBOL_DEPTH: usize = 32;
 const MAX_RENDERED_BYTES: usize = 1024 * 1024;
 const UNSUPPORTED: &str = "document symbols require a complete supported declaration tree";
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Client {
     hierarchical: bool,
     kinds: [bool; 27],
@@ -102,11 +102,9 @@ impl Provider {
     pub(crate) fn parse(
         &self,
         snapshot: &SourceSnapshot,
-    ) -> Result<ktlsp_parser::SnapshotResult, &'static str> {
-        // The session is synchronous; this is not a cancellation implementation.
-        self.0
-            .parse_snapshot(snapshot, &AtomicBool::new(false))
-            .map_err(|_| "document symbol parser failed or exceeded its resource limits")
+        cancelled: &AtomicBool,
+    ) -> (Result<ktlsp_parser::SnapshotResult, ParserError>, bool) {
+        self.0.parse_snapshot_with_cleanup(snapshot, cancelled)
     }
 }
 

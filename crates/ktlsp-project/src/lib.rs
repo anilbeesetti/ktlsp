@@ -37,6 +37,8 @@ pub enum Budget {
     ArchivePaths,
     CallerPathBytes,
     ExpandedPathBytes,
+    Sdks,
+    SdkRoots,
 }
 
 #[derive(Debug)]
@@ -249,7 +251,7 @@ pub fn from_json(
             limit: MAX_MANIFEST_BYTES,
         });
     }
-    preflight(bytes)?;
+    preflight(bytes, false)?;
     let mut manifest: Manifest = serde_json::from_slice(bytes).map_err(ProjectError::Json)?;
     if manifest.schema_version != 1 {
         return Err(ProjectError::UnsupportedSchemaVersion(
@@ -589,16 +591,22 @@ enum Context {
     Dependencies,
     SourceRoots,
     Archives,
+    Sdks,
+    Sdk,
+    SdkRoots,
     Other,
 }
 
 #[derive(Default)]
 struct Counts {
+    sdk_model: bool,
     modules: usize,
     libraries: usize,
     dependencies: usize,
     roots: usize,
     archives: usize,
+    sdks: usize,
+    sdk_roots: usize,
     exceeded: Option<(Budget, usize)>,
 }
 impl Counts {
@@ -613,6 +621,8 @@ impl Counts {
             ),
             Context::SourceRoots => (&mut self.roots, Budget::SourceRoots, MAX_SOURCE_ROOTS),
             Context::Archives => (&mut self.archives, Budget::ArchivePaths, MAX_ARCHIVE_PATHS),
+            Context::Sdks => (&mut self.sdks, Budget::Sdks, v2::MAX_SDKS),
+            Context::SdkRoots => (&mut self.sdk_roots, Budget::SdkRoots, v2::MAX_SDK_ROOTS),
             _ => return true,
         };
         *count += 1;
@@ -661,6 +671,7 @@ impl<'de> Visitor<'de> for Scan<'_> {
         let child = match self.context {
             Context::Modules => Context::Module,
             Context::Libraries => Context::Library,
+            Context::Sdks => Context::Sdk,
             _ => Context::Other,
         };
         // Count before deserializing each item, including the first excess item.
@@ -679,6 +690,8 @@ impl<'de> Visitor<'de> for Scan<'_> {
             let context = match (self.context, key.as_str()) {
                 (Context::Manifest, "modules") => Context::Modules,
                 (Context::Manifest, "libraries") => Context::Libraries,
+                (Context::Manifest, "sdks") if self.counts.sdk_model => Context::Sdks,
+                (Context::Sdk, "roots") if self.counts.sdk_model => Context::SdkRoots,
                 (Context::Manifest, "sdkArchives") | (Context::Library, "binaries" | "sources") => {
                     Context::Archives
                 }
@@ -714,8 +727,11 @@ impl<'de> DeserializeSeed<'de> for CountedScan<'_> {
         .deserialize(deserializer)
     }
 }
-fn preflight(bytes: &[u8]) -> Result<(), ProjectError> {
-    let mut counts = Counts::default();
+fn preflight(bytes: &[u8], sdk_model: bool) -> Result<(), ProjectError> {
+    let mut counts = Counts {
+        sdk_model,
+        ..Counts::default()
+    };
     let mut deserializer = serde_json::Deserializer::from_slice(bytes);
     let result = Scan {
         counts: &mut counts,

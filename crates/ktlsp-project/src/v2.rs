@@ -11,6 +11,9 @@ use std::path::{Path, PathBuf};
 
 /// Conservative byte bound before joining caller-supplied bases to model paths.
 pub const MAX_EXPANDED_PATH_BYTES: usize = 8 * 1024 * 1024;
+pub const MAX_SDKS: usize = 8_192;
+pub const MAX_SDK_ROOTS: usize = 32_768;
+pub const MAX_SDK_DATA_BYTES: usize = 2 * 1024 * 1024;
 
 #[derive(Debug)]
 pub enum Error {
@@ -18,6 +21,8 @@ pub enum Error {
     UnsupportedSchemaVersion(u64),
     ExpandedPathBudgetExceeded { limit: usize },
     NormalizedOutputBudgetExceeded { limit: usize },
+    InvalidSdk { field: &'static str },
+    SdkBudgetExceeded { budget: &'static str, limit: usize },
 }
 
 impl From<super::ProjectError> for Error {
@@ -42,6 +47,10 @@ impl fmt::Display for Error {
             Self::NormalizedOutputBudgetExceeded { limit } => {
                 write!(f, "project normalized output byte budget exceeds {limit}")
             }
+            Self::InvalidSdk { field } => write!(f, "invalid SDK {field}"),
+            Self::SdkBudgetExceeded { budget, limit } => {
+                write!(f, "project SDK {budget} budget exceeds {limit}")
+            }
         }
     }
 }
@@ -52,7 +61,9 @@ impl std::error::Error for Error {
             Self::Validation(error) => Some(error),
             Self::UnsupportedSchemaVersion(_)
             | Self::ExpandedPathBudgetExceeded { .. }
-            | Self::NormalizedOutputBudgetExceeded { .. } => None,
+            | Self::NormalizedOutputBudgetExceeded { .. }
+            | Self::InvalidSdk { .. }
+            | Self::SdkBudgetExceeded { .. } => None,
         }
     }
 }
@@ -65,6 +76,8 @@ pub struct ProjectModel {
     pub modules: Vec<Module>,
     pub libraries: Vec<Library>,
     pub sdk_archives: Vec<PathBuf>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub sdks: Vec<Sdk>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -96,6 +109,42 @@ pub enum Dependency {
         #[serde(default)]
         exported: bool,
     },
+    Sdk {
+        name: String,
+        kind: String,
+    },
+    #[serde(rename = "inheritedSdk")]
+    InheritedSdk {},
+}
+
+/// Pinned SDK catalog record. Home spelling and URLs are data, not discovered paths.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Sdk {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub sdk_type: String,
+    #[serde(deserialize_with = "required_nullable")]
+    pub version: Option<String>,
+    #[serde(deserialize_with = "required_nullable")]
+    pub home_path: Option<String>,
+    #[serde(default)]
+    pub roots: Option<Vec<SdkRoot>>,
+    pub additional_data: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SdkRoot {
+    pub url: String,
+    #[serde(rename = "type")]
+    pub root_type: String,
+}
+
+fn required_nullable<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error> {
+    Option::deserialize(deserializer)
 }
 
 #[derive(Deserialize)]
@@ -107,6 +156,8 @@ struct Manifest {
     libraries: Vec<Library>,
     #[serde(default)]
     sdk_archives: Vec<PathBuf>,
+    #[serde(default)]
+    sdks: Vec<Sdk>,
 }
 
 /// Reads at most the shared byte limit plus one sentinel byte.
@@ -131,12 +182,13 @@ pub fn from_json(manifest_path: impl AsRef<Path>, bytes: &[u8]) -> Result<Projec
         }
         .into());
     }
-    super::preflight(bytes)?;
+    super::preflight(bytes, true)?;
     let mut manifest: Manifest =
         serde_json::from_slice(bytes).map_err(super::ProjectError::Json)?;
     if manifest.schema_version != 2 {
         return Err(Error::UnsupportedSchemaVersion(manifest.schema_version));
     }
+    let sdks = validate_sdks(&manifest.sdks)?;
     let path = manifest_path.as_ref();
     unicode_path(path)?;
     let absolute = if path.is_absolute() {
@@ -152,7 +204,7 @@ pub fn from_json(manifest_path: impl AsRef<Path>, bytes: &[u8]) -> Result<Projec
         .filter(|_| absolute.is_absolute())
         .ok_or_else(|| super::ProjectError::InvalidPath(path.to_string_lossy().into_owned()))?;
     validate_path_budget(&manifest, base)?;
-    validate_graph(&manifest)?;
+    validate_graph(&manifest, sdks)?;
 
     // Move only shared root/settings/archive data through the existing validator;
     // v2 edges stay untouched and never become v1 dependency/library references.
@@ -182,6 +234,7 @@ pub fn from_json(manifest_path: impl AsRef<Path>, bytes: &[u8]) -> Result<Projec
         modules: manifest.modules,
         libraries: shared.libraries,
         sdk_archives: shared.sdk_archives,
+        sdks: manifest.sdks,
     };
     let mut output = OutputBudget(0);
     if let Err(error) = serde_json::to_writer(&mut output, &model) {
@@ -257,13 +310,18 @@ fn validate_path_budget(manifest: &Manifest, base: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-fn validate_graph(manifest: &Manifest) -> Result<(), super::ProjectError> {
+fn validate_graph(
+    manifest: &Manifest,
+    sdks: HashSet<(&str, &str)>,
+) -> Result<(), super::ProjectError> {
     let modules = super::ids(manifest.modules.iter().map(|m| m.id.as_str()), "module")?;
     let libraries = super::ids(manifest.libraries.iter().map(|l| l.id.as_str()), "library")?;
     let mut graph = vec![Vec::new(); manifest.modules.len()];
     let mut indegree = vec![0usize; manifest.modules.len()];
     for (index, module) in manifest.modules.iter().enumerate() {
         let mut seen = HashSet::new();
+        let mut sdk_edges = HashSet::new();
+        let mut inherited_sdk = false;
         for dependency in &module.dependencies {
             match dependency {
                 Dependency::Module {
@@ -307,6 +365,28 @@ fn validate_graph(manifest: &Manifest) -> Result<(), super::ProjectError> {
                         });
                     }
                 }
+                Dependency::Sdk { name, kind } => {
+                    if !sdks.contains(&(name.as_str(), kind.as_str())) {
+                        return Err(super::ProjectError::UnknownReference {
+                            kind: "SDK",
+                            id: format!("{name:?}/{kind:?}"),
+                        });
+                    }
+                    if !sdk_edges.insert((name, kind)) {
+                        return Err(super::ProjectError::DuplicateDependency {
+                            module: module.id.clone(),
+                            dependency: format!("SDK {name:?}/{kind:?}"),
+                        });
+                    }
+                }
+                Dependency::InheritedSdk {} => {
+                    if std::mem::replace(&mut inherited_sdk, true) {
+                        return Err(super::ProjectError::DuplicateDependency {
+                            module: module.id.clone(),
+                            dependency: "inheritedSdk".into(),
+                        });
+                    }
+                }
             }
         }
     }
@@ -329,4 +409,87 @@ fn validate_graph(manifest: &Manifest) -> Result<(), super::ProjectError> {
         return Err(super::ProjectError::DependencyCycle);
     }
     Ok(())
+}
+
+fn sdk_text(value: &str, field: &'static str, empty: bool) -> Result<(), Error> {
+    if (!empty && value.is_empty()) || value.contains('\0') {
+        return Err(Error::InvalidSdk { field });
+    }
+    Ok(())
+}
+
+fn validate_sdks(sdks: &[Sdk]) -> Result<HashSet<(&str, &str)>, Error> {
+    let mut identities = HashSet::new();
+    let mut bytes = 0usize;
+    let mut roots = 0usize;
+    for sdk in sdks {
+        sdk_text(&sdk.name, "name", false)?;
+        sdk_text(&sdk.sdk_type, "type", false)?;
+        if !identities.insert((sdk.name.as_str(), sdk.sdk_type.as_str())) {
+            return Err(super::ProjectError::DuplicateId {
+                kind: "SDK",
+                id: format!("{:?}/{:?}", sdk.name, sdk.sdk_type),
+            }
+            .into());
+        }
+        bytes = bytes
+            .saturating_add(sdk.name.len())
+            .saturating_add(sdk.sdk_type.len())
+            .saturating_add(sdk.additional_data.len());
+        sdk_text(&sdk.additional_data, "additionalData", true)?;
+        if let Some(version) = &sdk.version {
+            sdk_text(version, "version", true)?;
+            bytes = bytes.saturating_add(version.len());
+        }
+        if let Some(home) = &sdk.home_path {
+            sdk_text(home, "homePath", false)?;
+            // ponytail: retain supported lexical spelling; filesystem/foreign-platform resolution is separate.
+            let workspace = home.strip_prefix("<WORKSPACE>/");
+            if home.contains('\\')
+                || home.contains("://")
+                || workspace.unwrap_or(home).contains('<')
+                || workspace.is_some_and(|rest| rest.starts_with('/'))
+                || (workspace.is_none() && !Path::new(home).is_absolute())
+            {
+                return Err(Error::InvalidSdk { field: "homePath" });
+            }
+            bytes = bytes.saturating_add(home.len());
+        }
+        for root in sdk.roots.iter().flatten() {
+            sdk_text(&root.root_type, "root type", false)?;
+            sdk_text(&root.url, "root URL", false)?;
+            let Some((scheme, rest)) = root.url.split_once("://") else {
+                return Err(Error::InvalidSdk { field: "root URL" });
+            };
+            if rest.is_empty()
+                || !scheme
+                    .as_bytes()
+                    .first()
+                    .is_some_and(u8::is_ascii_alphabetic)
+                || !scheme
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'-' | b'.'))
+                || root
+                    .url
+                    .chars()
+                    .any(|c| c.is_whitespace() || c.is_control() || c == '\\')
+            {
+                return Err(Error::InvalidSdk { field: "root URL" });
+            }
+            roots = roots.saturating_add(1);
+            bytes = bytes
+                .saturating_add(root.url.len())
+                .saturating_add(root.root_type.len());
+        }
+    }
+    for (count, budget, limit) in [
+        (sdks.len(), "catalog", MAX_SDKS),
+        (roots, "roots", MAX_SDK_ROOTS),
+        (bytes, "data bytes", MAX_SDK_DATA_BYTES),
+    ] {
+        if count > limit {
+            return Err(Error::SdkBudgetExceeded { budget, limit });
+        }
+    }
+    Ok(identities)
 }

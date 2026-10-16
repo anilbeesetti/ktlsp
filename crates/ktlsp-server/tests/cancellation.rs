@@ -2,7 +2,7 @@
 //! controlled failing Rust peer. It proves cancellation mechanics, not CST or
 //! official Kotlin behavior; actual CST assertions remain in document_symbols.
 use ktlsp_protocol::{read_frame, write_frame};
-use ktlsp_server::{MAX_PENDING_SYMBOL_REQUESTS, Session};
+use ktlsp_server::{MAX_PENDING_PARSER_REQUESTS, Session};
 use serde_json::{Value, json};
 use std::{
     io::{BufReader, Write},
@@ -225,17 +225,17 @@ fn controlled_worker_cancellation_ids_invalidations_shutdown_and_capacity() {
     }
 
     let mut session = package.session("capacity");
-    for id in 0..MAX_PENDING_SYMBOL_REQUESTS {
+    for id in 0..MAX_PENDING_PARSER_REQUESTS {
         assert!(session.handle(symbols(json!(id))).is_empty());
     }
-    assert_eq!(session.pending_requests(), MAX_PENDING_SYMBOL_REQUESTS);
+    assert_eq!(session.pending_requests(), MAX_PENDING_PARSER_REQUESTS);
     error(
         &session.handle(symbols(json!("overflow")))[0],
         json!("overflow"),
         -32803,
     );
     let (responses, clean) = session.close();
-    assert_eq!(responses.len(), MAX_PENDING_SYMBOL_REQUESTS);
+    assert_eq!(responses.len(), MAX_PENDING_PARSER_REQUESTS);
     assert!(
         responses
             .iter()
@@ -248,7 +248,7 @@ fn controlled_worker_cancellation_ids_invalidations_shutdown_and_capacity() {
     assert!(recovered.handle(symbols(json!(0))).is_empty());
     assert!(recovered.close().1);
     let mut owners = Vec::new();
-    for id in 0..MAX_PENDING_SYMBOL_REQUESTS {
+    for id in 0..MAX_PENDING_PARSER_REQUESTS {
         let mut owner = package.session(&format!("owner{id}"));
         assert!(owner.handle(symbols(json!(id))).is_empty());
         owners.push(owner);
@@ -472,6 +472,51 @@ fn interactive_stdio_cancels_active_work_and_cleans_shutdown_exit_and_eof() {
                 !PathBuf::from(format!("/proc/{pid}")).exists(),
                 "worker {pid} was not reaped"
             );
+        }
+    }
+}
+
+#[test]
+fn navigation_uses_shared_wire_ids_cancellation_and_snapshot_guards() {
+    let _serial = SERIAL.lock().unwrap_or_else(|poison| poison.into_inner());
+    let package = Package::new();
+    for (method, token) in [("textDocument/definition", "definition"), ("textDocument/hover", "hover")] {
+        let navigation = |id: Value| request(id, method, json!({"textDocument":{"uri":URI},"position":{"line":1,"character":0}}));
+        let mut client = Client::new(&package);
+        client.send(open(token));
+        client.send(navigation(json!(u64::MAX)));
+        package.started(token);
+        client.send(symbols(json!(u64::MAX)));
+        error(&client.reply(), Value::Null, -32600);
+        client.send(cancel(json!("18446744073709551615")));
+        client.send(cancel(json!(u64::MAX)));
+        error(&client.reply(), json!(u64::MAX), -32800);
+        client.send(navigation(json!(u64::MAX))); // Reuse does not reuse the cancelled generation.
+        client.send(request(json!("stop"), "shutdown", Value::Null));
+        error(&client.reply(), json!(u64::MAX), -32800);
+        assert_eq!(client.reply()["id"], "stop");
+        client.send(notify("exit", Value::Null));
+        client.finish(0);
+
+        for (suffix, mutation) in [
+            ("edit", change(2, "new")),
+            ("reopen", notify("textDocument/didClose", json!({"textDocument":{"uri":URI}}))),
+        ] {
+            let token = format!("{token}-{suffix}");
+            let mut session = package.session(&token);
+            assert!(session.handle(navigation(json!("stale"))).is_empty());
+            package.started(&token);
+            assert!(session.handle(change(1, "rejected")).is_empty());
+            assert_eq!(session.drain_errors().len(), 1);
+            assert!(session.poll().is_empty(), "rejected edit leaves original work active");
+            let responses = session.handle(mutation);
+            assert_eq!(responses.len(), 1);
+            error(&responses[0], json!("stale"), -32801);
+            if suffix == "reopen" {
+                assert!(session.handle(open(&token)).is_empty()); // Identical bytes/version, new incarnation.
+            }
+            assert!(collect(&mut session).is_empty());
+            assert!(session.close().1);
         }
     }
 }

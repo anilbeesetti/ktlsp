@@ -336,3 +336,36 @@ fn complete_index_slot_string_capacity_and_late_shared_prefix_work_limits() {
         }
     }
 }
+
+#[test]
+fn moduleless_image_identity_cannot_impersonate_an_exact_module_resource_pair() {
+    let mut moduleless = Record::stored(b"", b"placeholder", b"not-a-module-payload");
+    moduleless.base = b"/m/r".to_vec();
+    let a = verified(image(&[moduleless]).bytes); let i = index_jimage(&a).unwrap();
+    assert_eq!(i.resource_count(), 1); // structurally admitted, not a module root
+    assert!(i.select_resource(b"m", b"r").unwrap().is_none());
+    let real = Record::stored(b"m", b"r", b"actual-module-payload");
+    let a = verified(image(&[real]).bytes); let i = index_jimage(&a).unwrap();
+    let selected = i.select_resource(b"m", b"r").unwrap().unwrap();
+    assert_eq!(selected.module_mutf8(), b"m");
+    assert_eq!(selected.resource_mutf8(), b"r");
+    assert_eq!(selected.payload(&mut Vec::new()).unwrap(), b"actual-module-payload");
+}
+
+#[test]
+fn short_final_magic_prefix_is_original_data_not_a_subsequent_packed_header() {
+    for length in [4usize, 28] {
+        let mut original = vec![0xaa; length];
+        original[..4].copy_from_slice(&0xcafefafau32.to_le_bytes());
+        for layers in [1, 8] {
+            let mut data = original.clone();
+            for _ in 0..layers { data = zip_layer(&data, 1, 1); }
+            let a = verified(image(&[compressed(data, original.len())]).bytes); let i = index_jimage(&a).unwrap();
+            let r = i.select_resource(b"m", b"p/resource").unwrap().unwrap();
+            assert_eq!(r.payload(&mut Vec::new()).unwrap(), original);
+        }
+    }
+    // An initially declared compressed envelope still requires all 29 bytes.
+    let truncated = 0xcafefafau32.to_le_bytes().to_vec();
+    assert_eq!(payload_error(compressed(truncated, 4)), E::Malformed("compressed header"));
+}

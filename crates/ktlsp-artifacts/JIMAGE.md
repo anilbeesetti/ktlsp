@@ -33,8 +33,10 @@ a second verified class artifact. Whole-image authority remains on the retained
 resource handle. Payload, non-class selection, declared-name and class-reader
 failures are distinct; all failures clear scratch. A small private error-only
 cleanup guard uses a raw pointer to empty scratch only after failed class borrows
-have ceased; it is disarmed before any borrowed class escapes. This avoids a
-second parse/copy solely to satisfy the cleanup/borrowed-result contract.
+have ceased; it is disarmed before any borrowed class escapes. The payload
+reborrow derives from that same saved pointer, never a sibling reborrow of the
+original exclusive reference. This avoids a second parse/copy solely to satisfy
+the cleanup/borrowed-result contract.
 
 ## Pinned format and strict admission
 
@@ -83,7 +85,8 @@ slot. Every admitted identity must route to its **actual original slot** before
 any successful index/absence. Nonzero location count must equal resource count.
 All complete reconstructed identities must be unique, even with different
 attribute decompositions. The private complete index uses exact full-identity
-binary search, not a hash candidate as proof of identity.
+binary search followed by an exact module/resource-pair comparison, not a hash
+candidate or a moduleless identity spelling as proof of a module selection.
 
 Each stored span is resource-region-relative, checked against the whole retained
 image. Nonempty spans cannot overlap; physical order need not equal slot order.
@@ -102,7 +105,9 @@ Compressed resources use the exact packed 29-byte header, in image byte order:
 The layer length excludes its header and must consume the entire current layer.
 The final original length is frozen from the location, not replaced by an
 intermediate layer length. Terminal must be 0 or 1, but does **not** control the
-loop: pinned OpenJDK recognizes another compression header in decoded output.
+loop: pinned OpenJDK recognizes another complete 29-byte compression header in
+decoded output. A 4..28-byte final original payload with the magic prefix remains
+data; an initially declared compressed resource still requires a complete header.
 See [CompressedResourceHeader](https://github.com/openjdk/jdk/blob/6705a9255d28f351950e7fbca9d05e73942a4e27/src/java.base/share/classes/jdk/internal/jimage/decompressor/CompressedResourceHeader.java)
 and [Decompressor](https://github.com/openjdk/jdk/blob/6705a9255d28f351950e7fbca9d05e73942a4e27/src/java.base/share/classes/jdk/internal/jimage/decompressor/Decompressor.java).
 

@@ -86,7 +86,12 @@ pub fn parse_jimage_class<'s>(
         }
     }
     let mut cleanup = ClearOnFailure { scratch, armed: true };
-    let payload = resource.payload(scratch).map_err(JimageClassError::Payload)?;
+    // SAFETY: derive the sole payload reborrow from the saved pointer itself,
+    // not a sibling reborrow of the original &mut (which could invalidate the
+    // saved pointer's provenance). Caller scratch stays live for 's; cleanup
+    // only writes after this borrow ceases on failure, never on success.
+    let payload = resource.payload(unsafe { &mut *cleanup.scratch })
+        .map_err(JimageClassError::Payload)?;
     let class = parse_class(payload).map_err(JimageClassError::Class)?;
     let crate::Constant::Class(declared) = class.constants[usize::from(class.this_class)] else {
         return Err(JimageClassError::DeclaredName);

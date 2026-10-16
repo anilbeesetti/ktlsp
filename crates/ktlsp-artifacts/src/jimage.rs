@@ -146,7 +146,10 @@ impl<'a> JimageIndex<'a> {
         // Entries are sorted by the full encoded identity, not a decoded/normalized name.
         let key = [b"/".as_slice(), module_mutf8, b"/".as_slice(), resource_mutf8];
         let found = self.entries.binary_search_by(|e| e.identity.iter().copied().cmp(key.iter().flat_map(|s| s.iter().copied())));
-        Ok(found.ok().map(|n| JimageResource { index: self, entry: &self.entries[n] }))
+        Ok(found.ok().filter(|&n| {
+            let entry = &self.entries[n];
+            entry.module() == module_mutf8 && entry.resource() == resource_mutf8
+        }).map(|n| JimageResource { index: self, entry: &self.entries[n] }))
     }
 }
 impl JimageResource<'_, '_> {
@@ -401,7 +404,7 @@ fn sort_identities(entries: &mut [Entry], work: &mut usize) -> Result<()> {
     for end in (1..entries.len()).rev() { entries.swap(0, end); sift(entries, 0, end, work)?; }
     Ok(())
 }
-fn has_header(endian: Endian, bytes: &[u8]) -> bool { bytes.len() >= 4 && endian.u32(bytes) == 0xcafefafa }
+fn has_header(endian: Endian, bytes: &[u8]) -> bool { bytes.len() >= 29 && endian.u32(bytes) == 0xcafefafa }
 impl JimageIndex<'_> {
     fn layer<'b>(&self, input: &'b [u8]) -> Result<(&'b [u8], usize)> {
         if input.len() < 29 { return Err(JimageError::Malformed("compressed header")); }

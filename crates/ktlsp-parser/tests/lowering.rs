@@ -6,7 +6,13 @@ use ktlsp_parser::{FileKind, Parser, SourceSnapshot, lowering::lower_declaration
 use serde_json::Value;
 use std::sync::atomic::AtomicBool;
 
-fn acceptance(source: &str, expected: &str, declarations: usize, errors: usize) {
+fn acceptance(
+    source: &str,
+    expected: &str,
+    declarations: usize,
+    errors: usize,
+    semantic_spellings: &[&str],
+) {
     let expected: Value = serde_json::from_str(expected).unwrap();
     let identity = &expected["source"];
     assert_eq!(source.len(), identity["bytes"].as_u64().unwrap() as usize);
@@ -37,7 +43,13 @@ fn acceptance(source: &str, expected: &str, declarations: usize, errors: usize) 
                 .unwrap()
         })
     };
-    for (record, fact) in lowered.declarations().iter().zip(facts) {
+    assert_eq!(semantic_spellings.len(), declarations);
+    for ((record, fact), &spelling) in lowered
+        .declarations()
+        .iter()
+        .zip(facts)
+        .zip(semantic_spellings)
+    {
         assert_eq!(record.kind(), fact["kind"].as_str().unwrap());
         assert_eq!(record.raw_name(), fact["raw_name"].as_str().unwrap());
         assert_eq!(
@@ -58,6 +70,12 @@ fn acceptance(source: &str, expected: &str, declarations: usize, errors: usize) 
         assert_eq!(record.cst_parent_index(), node.parent);
         assert_eq!(record.range(), node.start..node.end);
         assert_eq!(&source[record.name_range()], record.raw_name());
+        assert_eq!(record.semantic_spelling(), Some(spelling));
+        let start = record.name_range().start + usize::from(record.raw_name().starts_with('`'));
+        assert_eq!(
+            record.semantic_spelling().unwrap().as_ptr(),
+            parsed.source()[start..].as_ptr()
+        );
     }
     let facts = expected["errors"].as_array().unwrap();
     assert_eq!(facts.len(), errors);
@@ -82,6 +100,15 @@ fn production_declarations_preserve_all_seven_literal_records() {
         include_str!("../../../docs/specs/lowering-acceptance/declarations.json"),
         7,
         0,
+        &[
+            "Host",
+            "same",
+            "same",
+            "Local",
+            "inner",
+            "local 🦀e\u{301}",
+            "same",
+        ],
     );
 }
 
@@ -93,5 +120,6 @@ fn production_error_preserves_three_declarations_and_one_ancestral_error() {
         include_str!("../../../docs/specs/lowering-acceptance/error-node.json"),
         3,
         1,
+        &["broken", "later", "healthy"],
     );
 }

@@ -354,6 +354,17 @@ allowance nor frozen Admission/handoff limits. Pre-CREATE supervisor failures
 retain their original bounded raw prefix separately when no partial observer
 file already exists.
 
+Protected export completion, bootstrap completion, the peer observer gate and
+the cleanup-service readiness payload are written and synced in exclusive
+staging files, then published by the shared atomic no-replace rename primitive:
+Linux `renameat2(RENAME_NOREPLACE)`, or macOS `renamex_np(RENAME_EXCL)` for ordinary
+filesystem tests. Other operating systems fail closed; actual host execution
+remains Linux-only. Complete contents and the single-link invariant are visible
+together. Existing destinations and failed staging writes remain untouched;
+malformed JSON is never retried and no limit is raised. Cancellation,
+START-intent, watchdog/prearm and cleanup-clock tombstones retain their original
+existence semantics; the general `make_file`/`side` helpers are unchanged.
+
 ## Protected original-job workflow producer (#352 / #330 / #45)
 
 `.github/workflows/t045-pr174-official-symbols.yml` is manual, main-only, attempt
@@ -471,8 +482,10 @@ unique fixed `PR174 receipt CASE` step. Cancellation preparation first proves
 the actual original peer and outside-step supervisor are active. Readiness is
 a protected host-root `calibration-observer-ready.json` receipt, not a marker
 under the UID65532-owned state mount. Its complete synced staging file is
-published by atomic no-replace hard-link creation and staging unlink; concurrent
-publishers cannot overwrite the winner or expose partial JSON. The preparation and timed commands both
+published by the shared atomic no-replace rename primitive (`renameat2` on
+Linux, `renamex_np` on macOS; unsupported platforms refuse). It never exposes
+a transient second hard link. Concurrent publishers cannot overwrite the winner
+or expose partial JSON. The preparation and timed commands both
 join original live init/service PID-start identities, exact CID/daemon, armed
 clock and a finite one-minute reserve. Only then does the independently named
 `PR174 runner timeout calibration` step run a finite foreground wait, with
@@ -481,6 +494,10 @@ collection waits for the real outside-step action and closure. It never emits
 a timeout marker, self-kills, restarts, uses Docker exec or replaces the job/VM.
 Unknown failures preserve only protected host/creator facts, not mutable child
 bytes or fabricated finals, through the always artifact upload.
+The native export wait is six minutes, leaving the existing eight-minute
+collector step a 60-second bounded copy allowance, 10-second protected failure
+snapshot allowance and runner-output reserve. No step timeout, host deadline or
+data cap is raised; missing export becomes retained UNKNOWN before the step ends.
 
 `workflow-receipt` independently downloads the uploaded artifact, checks its
 actual API digest and all protected inventory bytes, then emits exactly one
@@ -503,6 +520,18 @@ UNKNOWN and no official START. The final receiver separately requires the
 completed successful original outer run/job and independently admitted upload
 step identities; a pre-START gate never pretends the running job is completed.
 
+Collection diagnostics are a separate always-uploaded `pr174-collection`
+artifact from the root-owned readable `/etc/ktlsp-pr174/uploads/collection`
+snapshot. The native collector writes an actual entered/UNKNOWN timestamp
+before any collector API operation. After success or refusal it copies the exact
+protected per-nonce `cancellation-authentication.json` first, then available
+protected inputs/report, and records the actual collection error, snapshot
+error and missing facts in `collection-result.json`. A collection or snapshot
+failure still fails the step and blocks official START. A killed or incomplete
+collector retains only the initial UNKNOWN and whatever actual files completed.
+This never mutates an already sealed/uploaded case artifact, invents a report or
+acts as an official receiver grant/export/upload receipt.
+
 When separately requested, `workflow-official` authenticates an additional owner
 approval binding the actual collected raw report SHA and its uploaded bytes.
 It uses the same boot/daemon/image/template and a new finite official grant,
@@ -515,10 +544,3 @@ remain real runtime prerequisites, not results established by this source.
 Change record: #352 adds only the optional manual workflow/native producer and
 unchanged pinned inventory data. No dispatch, privileged host/container/JVM
 execution, official evidence or native/default dependency change is implied.
-
-Protected export completion uses an exclusively created, fully written and
-synced `export-binding.next`, then the shared atomic no-replace hard-link
-publication primitive. Consumers wait for publication to finish under their
-existing deadline; malformed JSON is still an error, not retried. Failed
-temporary writes and preexisting final bindings are preserved. Cancellation,
-START-intent and prearm existence tombstones retain their original semantics.

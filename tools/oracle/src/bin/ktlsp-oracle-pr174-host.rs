@@ -615,6 +615,38 @@ mod host {
         // Failed writes remain tombstones: removing a cancellation latch could permit START.
         write(&mut f, b).map_err(|e| e.to_string())
     }
+    fn publish_complete_no_replace(staged: &Path, final_path: &Path) -> Result<()> {
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        {
+            let staged = std::ffi::CString::new(staged.as_os_str().as_encoded_bytes())
+                .map_err(|_| "staged publication path contains NUL")?;
+            let final_path = std::ffi::CString::new(final_path.as_os_str().as_encoded_bytes())
+                .map_err(|_| "final publication path contains NUL")?;
+            #[cfg(target_os = "linux")]
+            let status = unsafe {
+                libc::renameat2(
+                    libc::AT_FDCWD,
+                    staged.as_ptr(),
+                    libc::AT_FDCWD,
+                    final_path.as_ptr(),
+                    libc::RENAME_NOREPLACE,
+                )
+            };
+            #[cfg(target_os = "macos")]
+            let status = unsafe {
+                libc::renamex_np(staged.as_ptr(), final_path.as_ptr(), libc::RENAME_EXCL)
+            };
+            if status != 0 {
+                return Err(std::io::Error::last_os_error().to_string());
+            }
+            Ok(())
+        }
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+        {
+            let _ = (staged, final_path);
+            Err("atomic no-replace publication unsupported on this OS".into())
+        }
+    }
     fn unit(nonce: &str, role: &str) -> String {
         format!("ktlsp-pr174-{nonce}-{role}")
     }
@@ -1586,13 +1618,15 @@ mod host {
         format!("{}:{}:{}\n", b.nonce, b.container_id, b.boot_id)
     }
     fn publish_cleanup_service(dir: &Path, b: &Binding, e: &mut Evidence) -> Result<()> {
+        let next = dir.join("cleanup-service-ready.next");
         side(
             e,
-            &dir.join("cleanup-service-ready"),
+            &next,
             cleanup_service_identity(b).as_bytes(),
             0o600,
             false,
-        )
+        )?;
+        publish_complete_no_replace(&next, &dir.join("cleanup-service-ready"))
     }
     fn cancellation_latched(dir: &Path) -> Result<bool> {
         match fs::symlink_metadata(dir.join("cleanup-requested")) {

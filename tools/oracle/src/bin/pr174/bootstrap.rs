@@ -188,7 +188,8 @@ fn bootstrap() -> Result<Value> {
     let receipt=BootstrapReceipt{schema_version:1,scope:"PR174_BOOTSTRAP".into(),nonce,error:result.as_ref().err().cloned(),official_capture_success:false,evidence_bytes:measured.as_ref().map(|(bytes,_)|*bytes).unwrap_or(0),evidence_sha256:measured.ok().map(|(_,hash)|hash),evidence_complete:complete};
     let bytes=serde_json::to_vec(&receipt).map_err(|e|e.to_string())?;
     if bytes.len()>4096{return Err("bootstrap receipt cap".into());}
-    let saved=make_file(&dir.join("bootstrap-receipt.next"),&bytes,0o400).and_then(|()|fs::rename(dir.join("bootstrap-receipt.next"),dir.join("bootstrap-receipt.json")).map_err(|e|e.to_string()));
+    let next=dir.join("bootstrap-receipt.next");
+    let saved=make_file(&next,&bytes,0o400).and_then(|()|publish_complete_no_replace(&next,&dir.join("bootstrap-receipt.json")));
     result.and_then(|value|{saved?;Ok(value)}).map_err(|error|format!("{error}; protected original evidence directory: {}",dir.display()))
 }
 fn install_supervisor(dir:&Path,a:&Admission,e:&mut Evidence)->Result<()> {

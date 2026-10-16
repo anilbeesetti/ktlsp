@@ -98,7 +98,9 @@ fn observe_calibration(dir:&Path,a:&Admission,b:&Binding,e:&mut Evidence,case:Ca
         };
         if !relationship{return Err("original host /proc did not prove fixed descendant group/session case".into());}
     }
-    side(e,&dir.join("state/calibration-observer-ready"),b"observed\n",0o444,false)?;
+    let ready_next=dir.join("state/calibration-observer-ready.next");
+    side(e,&ready_next,b"observed\n",0o444,false)?;
+    publish_complete_no_replace(&ready_next,&dir.join("state/calibration-observer-ready"))?;
     workflow_publish_calibration_ready(dir,a,b,&identity,case,e)?;
     let mut final_report=None;
     loop {

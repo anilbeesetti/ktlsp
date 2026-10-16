@@ -53,7 +53,7 @@ fn protected_export_until(dir:&Path,end:u64)->Result<Value> {
 fn publish_export_binding(output:&Path,bytes:&[u8])->Result<()> {
     let next=output.join("export-binding.next");
     make_file(&next,bytes,0o400)?;
-    wf_link_readiness_file(&next,&output.join("export-binding.json"))
+    publish_complete_no_replace(&next,&output.join("export-binding.json"))
 }
 
 #[cfg(test)]
@@ -78,6 +78,64 @@ mod export_source_tests {
         assert!(publish_export_binding(&dir,b"{\"replacement\":true}").is_err());
         assert_eq!(fs::read(&published).unwrap(),b"{\"complete\":true}");
         assert_eq!(fs::read(&next).unwrap(),b"{\"replacement\":true}");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn synthetic_atomic_publication_has_one_complete_single_link_winner() {
+        let dir=std::env::temp_dir().join(format!("ktlsp-publication-race-synthetic-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir(&dir).unwrap();
+        let published=dir.join("ready");
+        let barrier=std::sync::Arc::new(std::sync::Barrier::new(3));
+        let mut publishers=Vec::new();
+        for (name,bytes) in [("a.next",b"{\"complete\":\"a\"}".as_slice()),("b.next",b"{\"complete\":\"b\"}".as_slice())] {
+            let next=dir.join(name);
+            make_file(&next,bytes,0o400).unwrap();
+            let final_path=published.clone();
+            let barrier=barrier.clone();
+            publishers.push(std::thread::spawn(move || {barrier.wait();publish_complete_no_replace(&next,&final_path)}));
+        }
+        barrier.wait();
+        let end=Instant::now()+Duration::from_secs(5);
+        while publishers.iter().any(|thread|!thread.is_finished()) {
+            match fs::read(&published) {
+                Ok(bytes) => {
+                    assert!(bytes==b"{\"complete\":\"a\"}"||bytes==b"{\"complete\":\"b\"}");
+                    assert_eq!(fs::metadata(&published).unwrap().nlink(),1);
+                }
+                Err(error) if error.kind()==ErrorKind::NotFound => {}
+                Err(error) => panic!("publication reader: {error}"),
+            }
+            assert!(Instant::now()<end,"bounded synthetic publication");
+            std::thread::yield_now();
+        }
+        let winners=publishers.into_iter().map(|thread|thread.join().unwrap()).filter(|result|result.is_ok()).count();
+        assert_eq!(winners,1);
+        assert_eq!(fs::metadata(&published).unwrap().nlink(),1);
+        assert_eq!([dir.join("a.next"),dir.join("b.next")].iter().filter(|path|path.exists()).count(),1);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn synthetic_publication_syscall_and_path_errors_preserve_originals() {
+        use std::os::unix::ffi::OsStrExt;
+        let dir=std::env::temp_dir().join(format!("ktlsp-publication-errors-synthetic-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir(&dir).unwrap();
+        let staged=dir.join("ready.next");
+        make_file(&staged,b"complete",0o400).unwrap();
+        let invalid=dir.join(std::ffi::OsStr::from_bytes(b"invalid\0destination"));
+        assert!(publish_complete_no_replace(&staged,&invalid).is_err());
+        assert_eq!(fs::read(&staged).unwrap(),b"complete");
+        let victim=dir.join("victim");
+        make_file(&victim,b"preserved",0o400).unwrap();
+        let final_path=dir.join("ready");
+        std::os::unix::fs::symlink(&victim,&final_path).unwrap();
+        assert!(publish_complete_no_replace(&staged,&final_path).is_err());
+        assert_eq!(fs::read_link(&final_path).unwrap(),victim);
+        assert_eq!(fs::read(&victim).unwrap(),b"preserved");
+        assert_eq!(fs::read(&staged).unwrap(),b"complete");
+        assert!(publish_complete_no_replace(&dir.join("missing"),&dir.join("absent")).is_err());
+        assert!(!dir.join("absent").exists());
         fs::remove_dir_all(dir).unwrap();
     }
 }

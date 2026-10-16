@@ -534,3 +534,28 @@ Root integration reviews, final original hosted CI and a fresh guarded merge
 remain separate gates for this new source. Full T009/T026/T027, types,
 cross-file/module identity, #96 and official/platform parity remain unverified.
 
+## Composed SDK catalog and binary source attachment #330
+
+ROOT composes reviewed #342/PR345 source `26102e766e03fe77c15f0e0756ebc99672bf9065`
+and #343/PR344 source `5c349aaff8a2e4addb01c80e085b10e4e1d123fa` on verified
+incoming main `bb6a75f61fd467c9b090210a369c7e1d225713d5`.
+[Original SDK CI38863006259/job116849374105](https://github.com/anilbeesetti/ktlsp/actions/runs/38863006259/job/116849374105)
+passed 901 workspace tests; [original attachment CI38862785909/job116848676296](https://github.com/anilbeesetti/ktlsp/actions/runs/38862785909/job/116848676296)
+passed 897. ROOT independently authenticated original checkout trees, ordered
+parents, immutable workflow and mandatory steps; these do not replace aggregate CI.
+
+The actual integrated throwaway public-API consumer imported an explicit JavaSDK
+edge followed by unresolved inherited SDK, preserved the raw jrt root and opaque
+additionalData, and round-tripped the complete projected model. It independently
+verified retained Commons Lang binary/source JAR digests, parsed class ordinal31,
+then attached `org/apache/commons/lang3/AppendableJoiner.java` at source ordinal27:
+11,798 original bytes, SHA256
+`bb5a9762fa8614c2a49e5ccb770f1378c60d5fdb7b8679039c85bdabe7f57315`.
+This was native pure-data execution, not a JVM/compiler/parser run.
+
+SDK catalog data does not discover SDKs, infer inherited SDKs or create semantic
+symbols. SourceFile attachment is a candidate lookup, not compilation provenance,
+line mapping or server navigation. Two independent code/adversarial union reviews
+cleared the composed source; final aggregate hosted CI and guarded integration
+remain separate gates. Native-only/T004 boundaries, #96 and full parity remain.
+

@@ -31,6 +31,8 @@ pub enum LoweringLimit {
     Tokens,
     KindBytes,
     Declarations,
+    Directives,
+    NameComponents,
     Errors,
     MessageBytes,
     Depth,
@@ -87,7 +89,7 @@ struct Budget {
     #[cfg(test)]
     fail_reservation: Option<usize>,
     #[cfg(test)]
-    extra_capacity: [usize; 2],
+    extra_capacity: [usize; 3],
     #[cfg(test)]
     emitted: usize,
 }
@@ -126,6 +128,8 @@ pub struct LoweredDeclarations<'a> {
     parsed: &'a Parsed,
     declarations: Vec<Declaration<'a>>,
     errors: Vec<LoweredSyntaxError<'a>>,
+    package: Option<PackageDirective<'a>>,
+    imports: Vec<ImportDirective<'a>>,
 }
 impl<'a> LoweredDeclarations<'a> {
     pub fn snapshot(&self) -> &SourceSnapshot {
@@ -136,6 +140,100 @@ impl<'a> LoweredDeclarations<'a> {
     }
     pub fn errors(&self) -> &[LoweredSyntaxError<'a>] {
         &self.errors
+    }
+    pub fn package(&self) -> Option<&PackageDirective<'a>> {
+        self.package.as_ref()
+    }
+    pub fn imports(&self) -> &[ImportDirective<'a>] {
+        &self.imports
+    }
+}
+
+/// A validated producer name. Components are never joined: a backtick dot remains
+/// inside its original component, not a qualified-name separator.
+#[derive(Debug)]
+pub struct QualifiedName<'a> {
+    parsed: &'a Parsed,
+    index: usize,
+    node: &'a Element,
+}
+impl<'a> QualifiedName<'a> {
+    pub fn cst_index(&self) -> usize {
+        self.index
+    }
+    pub fn range(&self) -> Range<usize> {
+        self.node.start..self.node.end
+    }
+    pub fn raw_spelling(&self) -> &'a str {
+        &self.parsed.source()[self.range()]
+    }
+    pub fn segments(&self) -> impl Iterator<Item = NameSegment<'a>> + '_ {
+        self.parsed.elements()[self.index..self.node.subtree_end]
+            .iter()
+            .filter(|e| e.token && e.kind == "IDENTIFIER")
+            .map(|node| NameSegment {
+                node,
+                raw: &self.parsed.source()[node.start..node.end],
+            })
+    }
+}
+#[derive(Debug)]
+pub struct NameSegment<'a> {
+    node: &'a Element,
+    raw: &'a str,
+}
+impl<'a> NameSegment<'a> {
+    pub fn range(&self) -> Range<usize> {
+        self.node.start..self.node.end
+    }
+    pub fn raw_spelling(&self) -> &'a str {
+        self.raw
+    }
+    pub fn semantic_spelling(&self) -> &'a str {
+        // Projection admits only successful spellings.
+        semantic_spelling(self.raw).expect("validated header component")
+    }
+}
+#[derive(Debug)]
+pub struct PackageDirective<'a> {
+    index: usize,
+    node: &'a Element,
+    name: QualifiedName<'a>,
+}
+impl<'a> PackageDirective<'a> {
+    pub fn cst_index(&self) -> usize {
+        self.index
+    }
+    pub fn range(&self) -> Range<usize> {
+        self.node.start..self.node.end
+    }
+    pub fn name(&self) -> &QualifiedName<'a> {
+        &self.name
+    }
+}
+#[derive(Debug)]
+pub struct ImportDirective<'a> {
+    index: usize,
+    node: &'a Element,
+    name: QualifiedName<'a>,
+    on_demand: bool,
+    alias: Option<NameSegment<'a>>,
+}
+impl<'a> ImportDirective<'a> {
+    pub fn cst_index(&self) -> usize {
+        self.index
+    }
+    pub fn range(&self) -> Range<usize> {
+        self.node.start..self.node.end
+    }
+    pub fn name(&self) -> &QualifiedName<'a> {
+        &self.name
+    }
+    pub fn on_demand(&self) -> bool {
+        self.on_demand
+    }
+    pub fn alias(&self) -> Option<&NameSegment<'a>> {
+        self.alias.as_ref()
     }
 }
 #[derive(Debug)]
@@ -591,6 +689,9 @@ struct Counts {
     tokens: usize,
     declarations: usize,
     errors: usize,
+    directives: usize,
+    components: usize,
+    imports: usize,
 }
 fn element<'a>(p: &'a Parsed, i: usize, b: &mut Budget) -> Result<&'a Element> {
     b.work(1)?;
@@ -668,6 +769,8 @@ fn lower_with_budget<'a>(
         parsed,
         declarations: Vec::new(),
         errors: Vec::new(),
+        package: None,
+        imports: Vec::new(),
     };
     let parsed = out.parsed;
     b.work(DEPTH)?; // initialize the one fixed array, reused across every pass
@@ -724,15 +827,284 @@ fn lower_with_budget<'a>(
             LoweringLimit::RetainedCapacity,
         )?;
     }
+    if counts.imports != 0 {
+        let n = bytes(
+            counts.imports,
+            size_of::<ImportDirective<'a>>(),
+            LoweringLimit::RequestedHeap,
+        )?;
+        add(&mut b.requested, n, REQUESTED, LoweringLimit::RequestedHeap)?;
+        let reserve = counts.imports;
+        #[cfg(test)]
+        let reserve = b.reservation_count(reserve)?;
+        out.imports
+            .try_reserve_exact(reserve)
+            .map_err(|_| LoweringError::Allocation)?;
+        let n = bytes(
+            out.imports.capacity(),
+            size_of::<ImportDirective<'a>>(),
+            LoweringLimit::RetainedCapacity,
+        )?;
+        add(
+            &mut b.retained,
+            n,
+            RETAINED,
+            LoweringLimit::RetainedCapacity,
+        )?;
+    }
     let emitted = walk(parsed, Pass::Emit, &mut stack, b, &mut out)?;
     if emitted.declarations != counts.declarations
         || emitted.errors != counts.errors
         || out.declarations.len() != counts.declarations
         || out.errors.len() != counts.errors
+        || emitted.directives != counts.directives
+        || emitted.components != counts.components
+        || out.imports.len() != counts.imports
     {
         return Err(LoweringError::InvalidCst { element: None });
     }
     Ok(out)
+}
+
+// Producer: parsing/declarations/preamble.rs; names are left-associated trees.
+fn header_child<'a>(
+    p: &'a Parsed,
+    cursor: &mut usize,
+    end: usize,
+    b: &mut Budget,
+) -> Result<Option<(usize, &'a Element)>> {
+    while *cursor < end {
+        b.work(1)?;
+        let i = *cursor;
+        let e = element(p, i, b)?;
+        *cursor = e.subtree_end;
+        if e.token && b.one_of(&e.kind, &["WHITE_SPACE", "EOL_COMMENT", "BLOCK_COMMENT"])? {
+            continue;
+        }
+        return Ok(Some((i, e)));
+    }
+    Ok(None)
+}
+fn header_expect<'a>(
+    p: &'a Parsed,
+    cursor: &mut usize,
+    end: usize,
+    b: &mut Budget,
+) -> Result<(usize, &'a Element)> {
+    header_child(p, cursor, end, b)?.ok_or(unsupported(end.saturating_sub(1)))
+}
+fn header_token(
+    p: &Parsed,
+    i: usize,
+    e: &Element,
+    kind: &str,
+    raw: &str,
+    b: &mut Budget,
+) -> Result<()> {
+    if !e.token || !b.equal(&e.kind, kind)? {
+        return Err(unsupported(i));
+    }
+    b.work(5)?;
+    if !b.equal(p.source().get(e.start..e.end).ok_or(invalid(i))?, raw)? {
+        return Err(unsupported(i));
+    }
+    Ok(())
+}
+fn header_segment<'a>(
+    p: &'a Parsed,
+    i: usize,
+    e: &'a Element,
+    counts: &mut Counts,
+    b: &mut Budget,
+) -> Result<NameSegment<'a>> {
+    add(
+        &mut counts.components,
+        1,
+        DECLARATIONS,
+        LoweringLimit::NameComponents,
+    )?;
+    if !e.token || !b.equal(&e.kind, "IDENTIFIER")? {
+        return Err(unsupported(i));
+    }
+    b.work(5)?;
+    let raw = p.source().get(e.start..e.end).ok_or(invalid(i))?;
+    let work = raw
+        .len()
+        .checked_mul(40)
+        .and_then(|n| n.checked_add(64))
+        .ok_or(LoweringError::Limit(LoweringLimit::Work))?;
+    b.work(work)?;
+    if semantic_spelling(raw).is_none() {
+        return Err(unsupported(i));
+    }
+    Ok(NameSegment { node: e, raw })
+}
+fn header_reference(
+    p: &Parsed,
+    i: usize,
+    e: &Element,
+    counts: &mut Counts,
+    b: &mut Budget,
+) -> Result<()> {
+    if e.token || !b.equal(&e.kind, "REFERENCE_EXPRESSION")? || e.subtree_end != i + 2 {
+        return Err(unsupported(i));
+    }
+    let token = element(p, i + 1, b)?;
+    if token.start != e.start || token.end != e.end {
+        return Err(unsupported(i));
+    }
+    header_segment(p, i + 1, token, counts, b)?;
+    Ok(())
+}
+fn header_name<'a>(
+    p: &'a Parsed,
+    index: usize,
+    node: &'a Element,
+    counts: &mut Counts,
+    b: &mut Budget,
+) -> Result<QualifiedName<'a>> {
+    let (mut i, mut e) = (index, node);
+    while !e.token && b.equal(&e.kind, "DOT_QUALIFIED_EXPRESSION")? {
+        b.work(1)?;
+        let mut cursor = i + 1;
+        let (left_i, left) = header_expect(p, &mut cursor, e.subtree_end, b)?;
+        let (dot_i, dot) = header_expect(p, &mut cursor, e.subtree_end, b)?;
+        header_token(p, dot_i, dot, "DOT", ".", b)?;
+        let (right_i, right) = header_expect(p, &mut cursor, e.subtree_end, b)?;
+        header_reference(p, right_i, right, counts, b)?;
+        if header_child(p, &mut cursor, e.subtree_end, b)?.is_some() {
+            return Err(unsupported(i));
+        }
+        (i, e) = (left_i, left);
+    }
+    header_reference(p, i, e, counts, b)?;
+    Ok(QualifiedName {
+        parsed: p,
+        index,
+        node,
+    })
+}
+fn header_directive<'a>(
+    p: &'a Parsed,
+    i: usize,
+    node: &'a Element,
+    package: bool,
+    counts: &mut Counts,
+    b: &mut Budget,
+) -> Result<ImportDirective<'a>> {
+    add(
+        &mut counts.directives,
+        1,
+        DECLARATIONS,
+        LoweringLimit::Directives,
+    )?;
+    let mut cursor = i + 1;
+    let (k, keyword) = header_expect(p, &mut cursor, node.subtree_end, b)?;
+    header_token(
+        p,
+        k,
+        keyword,
+        if package {
+            "PACKAGE_KEYWORD"
+        } else {
+            "IMPORT_KEYWORD"
+        },
+        if package { "package" } else { "import" },
+        b,
+    )?;
+    let (n, name) = header_expect(p, &mut cursor, node.subtree_end, b)?;
+    let name = header_name(p, n, name, counts, b)?;
+    let mut tail = header_child(p, &mut cursor, node.subtree_end, b)?;
+    let mut on_demand = false;
+    let mut alias = None;
+    let star_tail = match tail {
+        Some((_, e)) if e.token => b.equal(&e.kind, "DOT")?,
+        _ => false,
+    };
+    if !package && star_tail {
+        let (j, dot) = tail.ok_or(invalid(i))?;
+        header_token(p, j, dot, "DOT", ".", b)?;
+        let (j, star) = header_expect(p, &mut cursor, node.subtree_end, b)?;
+        header_token(p, j, star, "MUL", "*", b)?;
+        on_demand = true;
+        tail = header_child(p, &mut cursor, node.subtree_end, b)?;
+    }
+    let alias_tail = match tail {
+        Some((_, e)) if !e.token => b.equal(&e.kind, "IMPORT_ALIAS")?,
+        _ => false,
+    };
+    if !package && !on_demand && alias_tail {
+        let (j, a) = tail.ok_or(invalid(i))?;
+        let mut at = j + 1;
+        let (k, keyword) = header_expect(p, &mut at, a.subtree_end, b)?;
+        header_token(p, k, keyword, "AS_KEYWORD", "as", b)?;
+        let (k, identifier) = header_expect(p, &mut at, a.subtree_end, b)?;
+        alias = Some(header_segment(p, k, identifier, counts, b)?);
+        if header_child(p, &mut at, a.subtree_end, b)?.is_some() {
+            return Err(unsupported(j));
+        }
+        tail = header_child(p, &mut cursor, node.subtree_end, b)?;
+    }
+    if let Some((j, semi)) = tail {
+        header_token(p, j, semi, "SEMICOLON", ";", b)?;
+        if header_child(p, &mut cursor, node.subtree_end, b)?.is_some() {
+            return Err(unsupported(i));
+        }
+    }
+    Ok(ImportDirective {
+        index: i,
+        node,
+        name,
+        on_demand,
+        alias,
+    })
+}
+fn project_header<'a>(
+    p: &'a Parsed,
+    i: usize,
+    package: bool,
+    pass: Pass,
+    counts: &mut Counts,
+    b: &mut Budget,
+    out: &mut LoweredDeclarations<'a>,
+) -> Result<()> {
+    let e = element(p, i, b)?;
+    if package {
+        if e.start == e.end && e.subtree_end == i + 1 {
+            return Ok(());
+        }
+        let directive = header_directive(p, i, e, true, counts, b)?;
+        if pass == Pass::Emit {
+            b.work(1)?;
+            out.package = Some(PackageDirective {
+                index: i,
+                node: e,
+                name: directive.name,
+            });
+        }
+    } else {
+        let mut cursor = i + 1;
+        while let Some((j, node)) = header_child(p, &mut cursor, e.subtree_end, b)? {
+            if node.token || !b.equal(&node.kind, "IMPORT_DIRECTIVE")? {
+                return Err(unsupported(j));
+            }
+            let directive = header_directive(p, j, node, false, counts, b)?;
+            add(
+                &mut counts.imports,
+                1,
+                DECLARATIONS,
+                LoweringLimit::Directives,
+            )?;
+            if pass == Pass::Emit {
+                if out.imports.len() >= out.imports.capacity() {
+                    return Err(invalid(j));
+                }
+                b.work(2)?;
+                out.imports.push(directive);
+            }
+        }
+    }
+    Ok(())
 }
 
 // Strict ordered states are enforced only for reference-bearing functions.
@@ -809,13 +1181,11 @@ fn close_frames<'a>(
     Ok(())
 }
 
-fn context(t: Tag, parent: Option<Frame<'_>>, e: &Element, i: usize) -> Result<()> {
+fn context(t: Tag, parent: Option<Frame<'_>>, i: usize) -> Result<()> {
     let p = parent.map(|f| f.tag);
     let allowed = match t {
         Tag::Root => i == 0 && p.is_none(),
-        Tag::Package | Tag::Imports => {
-            p == Some(Tag::Root) && e.start == e.end && e.subtree_end == i + 1
-        }
+        Tag::Package | Tag::Imports => p == Some(Tag::Root),
         Tag::Class | Tag::Fun | Tag::Property => {
             matches!(p, Some(Tag::Root | Tag::ClassBody | Tag::Block))
         }
@@ -993,7 +1363,13 @@ fn walk<'a>(
     let mut counts = Counts::default();
     let mut depth = 0usize;
     let mut cursor = 0usize;
+    let mut skip_until = 0usize;
+    let mut header_phase = 0u8;
     for i in 0..len {
+        if i < skip_until {
+            b.work(1)?;
+            continue;
+        }
         close_frames(s, &mut depth, i, pass, b)?;
         b.work(1)?;
         let e = element(p, i, b)?;
@@ -1064,7 +1440,31 @@ fn walk<'a>(
             tag(&e.kind, i, b)?
         };
         if pass != Pass::Structure {
-            context(t, parent, e, i)?;
+            context(t, parent, i)?;
+            if matches!(t, Tag::Package | Tag::Imports) {
+                if (t == Tag::Package && header_phase != 0)
+                    || (t == Tag::Imports && header_phase > 1)
+                {
+                    return Err(unsupported(i));
+                }
+                header_phase = if t == Tag::Package { 1 } else { 2 };
+                project_header(p, i, t == Tag::Package, pass, &mut counts, b, out)?;
+                skip_until = e.subtree_end;
+                continue;
+            }
+            // Preamble parsing can finish a valid prefix before malformed tail
+            // tokens; top-level recovery then emits a sibling ERROR_ELEMENT.
+            b.work(1)?;
+            if t == Tag::Error
+                && parent.is_some_and(|f| f.tag == Tag::Root)
+                && header_phase < 3
+                && counts.directives != 0
+            {
+                return Err(unsupported(i));
+            }
+            if t != Tag::Root {
+                header_phase = 3;
+            }
             if t == Tag::Reference
                 && (depth != 4
                     || frame(s, 0, b)?.tag != Tag::Root
@@ -1259,6 +1659,210 @@ mod tests {
     fn lower(result: &SnapshotResult) -> Result<LoweredDeclarations<'_>> {
         lower_declarations(result, result.snapshot())
     }
+
+    fn import(tree: &mut Tree, name: &str) {
+        tree.open("IMPORT_DIRECTIVE");
+        tree.token("IMPORT_KEYWORD", "import");
+        tree.token("WHITE_SPACE", " ");
+        tree.open("REFERENCE_EXPRESSION");
+        tree.token("IDENTIFIER", name);
+        tree.close();
+        tree.close();
+    }
+
+    #[test]
+    fn headers_refuse_unsupported_spelling_and_shapes_atomically() {
+        for name in ["_", "é", "``", "`x\n`", "class"] {
+            let mut tree = Tree::new();
+            tree.open("IMPORT_LIST");
+            import(&mut tree, "good");
+            import(&mut tree, name);
+            tree.close();
+            assert!(matches!(
+                lower(&tree.finish()),
+                Err(LoweringError::Unsupported { .. })
+            ));
+        }
+        for kind in [
+            "ERROR_ELEMENT",
+            "IMPORT_ALIAS",
+            "REFERENCE_EXPRESSION",
+            "DOT_QUALIFIED_EXPRESSION",
+        ] {
+            let mut tree = Tree::new();
+            tree.open("IMPORT_LIST");
+            import(&mut tree, "good");
+            tree.open(kind);
+            tree.close();
+            if kind == "ERROR_ELEMENT" {
+                tree.diagnostics.push(Diagnostic {
+                    start: tree.source.len(),
+                    end: tree.source.len(),
+                    message: "bad import".into(),
+                });
+            }
+            tree.close();
+            assert!(matches!(
+                lower(&tree.finish()),
+                Err(LoweringError::Unsupported { .. })
+            ));
+        }
+        for kind in ["PACKAGE_DIRECTIVE", "IMPORT_LIST"] {
+            let mut tree = Tree::new();
+            tree.open(kind);
+            tree.close();
+            tree.open(kind);
+            tree.close();
+            assert!(matches!(
+                lower(&tree.finish()),
+                Err(LoweringError::Unsupported { .. })
+            ));
+        }
+        // A valid token stream in a non-producer flat qualified shape is refused.
+        let mut tree = Tree::new();
+        tree.open("IMPORT_LIST");
+        tree.open("IMPORT_DIRECTIVE");
+        tree.token("IMPORT_KEYWORD", "import");
+        tree.open("REFERENCE_EXPRESSION");
+        tree.token("IDENTIFIER", "a");
+        tree.close();
+        tree.token("DOT", ".");
+        tree.open("REFERENCE_EXPRESSION");
+        tree.token("IDENTIFIER", "b");
+        tree.close();
+        tree.close();
+        tree.close();
+        assert!(matches!(
+            lower(&tree.finish()),
+            Err(LoweringError::Unsupported { .. })
+        ));
+    }
+
+    #[test]
+    fn recovered_preamble_tail_is_not_published_as_a_valid_prefix() {
+        for package in [true, false] {
+            let mut tree = Tree::new();
+            if package {
+                tree.open("PACKAGE_DIRECTIVE");
+                tree.token("PACKAGE_KEYWORD", "package");
+                tree.open("REFERENCE_EXPRESSION");
+                tree.token("IDENTIFIER", "a");
+                tree.close();
+                tree.close();
+            }
+            tree.open("IMPORT_LIST");
+            if !package {
+                import(&mut tree, "a");
+            }
+            tree.close();
+            tree.open("ERROR_ELEMENT");
+            let start = tree.source.len();
+            tree.token("RANGE", "..");
+            tree.close();
+            tree.diagnostics.push(Diagnostic {
+                start,
+                end: tree.source.len(),
+                message: "Expecting a top level declaration".into(),
+            });
+            let result = tree.finish();
+            let mut budget = Budget::default();
+            assert!(matches!(
+                lower_with_budget(&result, result.snapshot(), &mut budget),
+                Err(LoweringError::Unsupported { .. })
+            ));
+            assert_eq!(budget.reservations, 0);
+            assert_eq!(budget.emitted, 0);
+        }
+    }
+
+    #[test]
+    fn header_counts_and_new_reservation_share_existing_budgets() {
+        for count in [DECLARATIONS, DECLARATIONS + 1] {
+            let mut tree = Tree::new();
+            tree.open("IMPORT_LIST");
+            for _ in 0..count {
+                import(&mut tree, "x");
+            }
+            tree.close();
+            let result = tree.finish();
+            let mut b = Budget::default();
+            let result = lower_with_budget(&result, result.snapshot(), &mut b);
+            if count == DECLARATIONS {
+                assert_eq!(result.unwrap().imports().len(), count);
+            } else {
+                assert_eq!(b.reservations, 0, "count refusal must precede reservation");
+                assert_eq!(
+                    result.unwrap_err(),
+                    LoweringError::Limit(LoweringLimit::Directives)
+                );
+            }
+        }
+        let mut tree = Tree::new();
+        tree.open("IMPORT_LIST");
+        import(&mut tree, "`a.b`");
+        tree.close();
+        let result = tree.finish();
+        let mut b = Budget {
+            fail_reservation: Some(0),
+            ..Budget::default()
+        };
+        assert_eq!(
+            lower_with_budget(&result, result.snapshot(), &mut b).unwrap_err(),
+            LoweringError::Allocation
+        );
+        let mut b = Budget::default();
+        b.extra_capacity[0] = RETAINED;
+        limit(
+            lower_with_budget(&result, result.snapshot(), &mut b),
+            LoweringLimit::RetainedCapacity,
+        );
+        let lowered = lower(&result).unwrap();
+        assert_eq!(
+            lowered.imports()[0]
+                .name()
+                .segments()
+                .map(|s| s.semantic_spelling())
+                .collect::<Vec<_>>(),
+            ["a.b"]
+        );
+    }
+
+    #[test]
+    fn header_spelling_and_component_limits_refuse_before_validation() {
+        let mut tree = Tree::new();
+        tree.token("IDENTIFIER", "é");
+        let result = tree.finish();
+        let token = &result.parsed.elements()[1];
+        // 20 kind-comparison units, 5 slice checks, 40*2+64 spelling units.
+        let mut b = Budget {
+            work: WORK - 168,
+            ..Budget::default()
+        };
+        limit(
+            header_segment(&result.parsed, 1, token, &mut Counts::default(), &mut b),
+            LoweringLimit::Work,
+        );
+        assert_eq!(b.work, WORK - 143);
+        let mut b = Budget {
+            work: WORK - 169,
+            ..Budget::default()
+        };
+        assert_eq!(
+            header_segment(&result.parsed, 1, token, &mut Counts::default(), &mut b).unwrap_err(),
+            unsupported(1)
+        );
+        assert_eq!(b.work, WORK);
+        let mut counts = Counts {
+            components: DECLARATIONS,
+            ..Counts::default()
+        };
+        let mut b = Budget::default();
+        limit(
+            header_segment(&result.parsed, 1, token, &mut counts, &mut b),
+            LoweringLimit::NameComponents,
+        );
+        assert_eq!(b.work, 0);
+    }
     fn with_error() -> SnapshotResult {
         let mut tree = Tree::new();
         tree.header("f");
@@ -1420,6 +2024,8 @@ mod tests {
             parsed: &other.parsed,
             declarations: vec![],
             errors: vec![],
+            package: None,
+            imports: vec![],
         };
         assert_eq!(
             reference_site(&forged, &result, result.snapshot(), index).unwrap_err(),
@@ -1612,6 +2218,8 @@ mod tests {
             parsed: &result.parsed,
             declarations: vec![],
             errors: vec![],
+            package: None,
+            imports: vec![],
         };
         walk(
             &result.parsed,
@@ -2050,7 +2658,7 @@ mod tests {
             tree.open(kind);
             tree.token("IDENTIFIER", "x");
             tree.close();
-            assert_eq!(lower(&tree.finish()).unwrap_err(), unsupported(1));
+            assert_eq!(lower(&tree.finish()).unwrap_err(), unsupported(2));
         }
         for token in ["INTERFACE_KEYWORD", "VAR_KEYWORD", "WHITESPACE"] {
             let mut tree = Tree::new();

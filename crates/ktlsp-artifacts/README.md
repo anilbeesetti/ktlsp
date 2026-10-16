@@ -89,6 +89,17 @@ only `adler2` 2.0.1. Published license notices are retained in `notices/`.
 This is selected ordinal access, not archive-name selection, extraction,
 multi-release/signature interpretation, whole-JAR validity or symbol resolution.
 
+### JMOD 1.0 directory data
+
+`index_jmod_directory(&verified)` checks exactly `JM\x01\x00`, then borrows the
+embedded ZIP without copying or constructing another verified artifact.
+`JmodDirectoryIndex::zip_index()` exposes the same directory and stored/deflated
+payload operations. ZIP offsets, including errors, are relative to full-file
+byte 4; the 64 MiB artifact cap includes the header. See the
+[JMOD format and refusal policy](ZIP_INDEX.md#jmod-10-wrapper).
+This is data only: no JDK/JVM execution, SDK discovery, section-name validation,
+module visibility/resolution, or server capability.
+
 Fixtures are independently authored temporary local files; default tests are
 Rust-only and execute no JVM/Gradle/Maven. No official oracle comparison is claimed.
 Parent T020 remains open. Authenticated checksum acquisition and bounded archive verification,

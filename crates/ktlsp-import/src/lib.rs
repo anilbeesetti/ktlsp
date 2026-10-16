@@ -264,20 +264,25 @@ pub fn from_json(
     let modules = parsed
         .modules
         .into_iter()
-        .map(|module| ImportedModule {
-            name: module.name,
-            content_roots: module.content_roots,
-            dependencies: module
-                .dependencies
-                .into_iter()
-                .map(|edge| match edge {
-                    v2::Dependency::Module(edge) => Dependency::Module(edge),
-                    v2::Dependency::Library { library, .. } => Dependency::Library(library),
-                    v2::Dependency::ModuleSource => Dependency::ModuleSource,
-                })
-                .collect(),
+        .map(|module| {
+            Ok(ImportedModule {
+                name: module.name,
+                content_roots: module.content_roots,
+                dependencies: module
+                    .dependencies
+                    .into_iter()
+                    .map(|edge| match edge {
+                        v2::Dependency::Module(edge) => Ok(Dependency::Module(edge)),
+                        v2::Dependency::Library { library, .. } => Ok(Dependency::Library(library)),
+                        v2::Dependency::ModuleSource => Ok(Dependency::ModuleSource),
+                        v2::Dependency::Sdk { .. } | v2::Dependency::InheritedSdk => {
+                            Err(schema("", "SDK edges cannot enter a v1 projection"))
+                        }
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, ImportError>>()?;
     Ok(ImportedWorkspace {
         project,
         modules,
@@ -313,7 +318,19 @@ fn parse_workspace(
     }
     let mut workspace = object(json::parse(bytes)?, "")?;
     let mut reports = Reports::default();
-    for key in ["sdks", "kotlinSettings", "javaSettings"] {
+    let sdks = if use_v2 {
+        v2::parse_sdks(&mut workspace, &mut reports)?
+    } else {
+        reports.neutral(
+            &mut workspace,
+            "sdks",
+            json!([]),
+            "",
+            "SDK catalog requires v2",
+        );
+        Vec::new()
+    };
+    for key in ["kotlinSettings", "javaSettings"] {
         reports.neutral(
             &mut workspace,
             key,
@@ -419,6 +436,16 @@ fn parse_workspace(
                     }
                 }
                 "moduleSource" => dependencies.push(v2::Dependency::ModuleSource),
+                "sdk" if use_v2 => {
+                    let name: String = required(&mut d, "name", &p)?;
+                    let kind: String = required(&mut d, "kind", &p)?;
+                    native_edges.push(json!({"type":"sdk","name":name,"kind":kind}));
+                    dependencies.push(v2::Dependency::Sdk { name, kind });
+                }
+                "inheritedSdk" if use_v2 => {
+                    native_edges.push(json!({"type":"inheritedSdk"}));
+                    dependencies.push(v2::Dependency::InheritedSdk);
+                }
                 _ => reports.add(
                     field_path(&p, "type"),
                     "unsupported dependency variant (including SDK bindings)",
@@ -573,7 +600,10 @@ fn parse_workspace(
             truncated: reports.truncated,
         });
     }
-    let manifest = json!({"schemaVersion": if use_v2 { 2 } else { 1 }, "modules": native_modules, "libraries": native_libraries});
+    let mut manifest = json!({"schemaVersion": if use_v2 { 2 } else { 1 }, "modules": native_modules, "libraries": native_libraries});
+    if !sdks.is_empty() {
+        manifest["sdks"] = json!(sdks);
+    }
     Ok(ParsedWorkspace {
         manifest,
         modules,
@@ -599,6 +629,10 @@ pub mod v2 {
         pub fn project_projection(&self) -> &ktlsp_project::v2::ProjectModel {
             &self.project
         }
+        /// Canonical catalog shared with the native projection; no mirrored SDK copy.
+        pub fn sdks(&self) -> &[ktlsp_project::v2::Sdk] {
+            &self.project.sdks
+        }
     }
     #[derive(Debug, PartialEq, Eq)]
     pub struct ImportedModule {
@@ -615,6 +649,11 @@ pub mod v2 {
             exported: bool,
         },
         ModuleSource,
+        Sdk {
+            name: String,
+            kind: String,
+        },
+        InheritedSdk,
     }
     #[derive(Debug)]
     pub enum Error {
@@ -683,6 +722,59 @@ pub mod v2 {
         fn flush(&mut self) -> io::Result<()> {
             Ok(())
         }
+    }
+
+    pub(super) fn parse_sdks(
+        workspace: &mut serde_json::Map<String, serde_json::Value>,
+        reports: &mut super::Reports,
+    ) -> Result<Vec<ktlsp_project::v2::Sdk>, ImportError> {
+        use ktlsp_project::v2::{MAX_SDK_ROOTS, MAX_SDKS, Sdk, SdkRoot};
+        let values: Vec<serde_json::Value> = super::default(workspace, "sdks", "", vec![])?;
+        if values.len() > MAX_SDKS {
+            return Err(ImportError::BudgetExceeded("SDK catalog"));
+        }
+        let mut sdks = Vec::new();
+        let mut root_count = 0usize;
+        for (index, value) in values.into_iter().enumerate() {
+            let p = format!("/sdks/{index}");
+            let mut record = super::object(value, &p)?;
+            let name = super::required(&mut record, "name", &p)?;
+            let sdk_type = super::required(&mut record, "type", &p)?;
+            let version = super::required(&mut record, "version", &p)?;
+            let home_path = super::required(&mut record, "homePath", &p)?;
+            let additional_data = super::required(&mut record, "additionalData", &p)?;
+            let values: Option<Vec<serde_json::Value>> =
+                super::default(&mut record, "roots", &p, None)?;
+            let roots = if let Some(values) = values {
+                root_count = root_count.saturating_add(values.len());
+                if root_count > MAX_SDK_ROOTS {
+                    return Err(ImportError::BudgetExceeded("SDK roots"));
+                }
+                let mut roots = Vec::new();
+                for (index, value) in values.into_iter().enumerate() {
+                    let p = format!("{p}/roots/{index}");
+                    let mut record = super::object(value, &p)?;
+                    roots.push(SdkRoot {
+                        url: super::required(&mut record, "url", &p)?,
+                        root_type: super::required(&mut record, "type", &p)?,
+                    });
+                    reports.unknown(record, &p);
+                }
+                Some(roots)
+            } else {
+                None
+            };
+            sdks.push(Sdk {
+                name,
+                sdk_type,
+                version,
+                home_path,
+                roots,
+                additional_data,
+            });
+            reports.unknown(record, &p);
+        }
+        Ok(sdks)
     }
 }
 

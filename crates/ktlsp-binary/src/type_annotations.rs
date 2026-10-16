@@ -34,7 +34,7 @@ pub struct FieldTypeAnnotations<'a> {
 }
 
 /// Decode declarations, extensions, then field type annotations with one budget.
-/// Recognized field attributes require 52.0–67.0. Field names/descriptors and
+/// Recognized field attributes require 52.0–69.0. Field names/descriptors and
 /// unrelated CP entries are unconsumed; this is not whole-class verification.
 /// New vector capacity consumes nodes; inherited vectors keep their original
 /// logical-node bounds. Neither allocator overhead nor RSS is bounded here.

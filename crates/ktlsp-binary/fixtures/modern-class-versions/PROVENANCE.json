@@ -1,0 +1,2827 @@
+{
+  "repository": "https://github.com/eclipse-jdt/eclipse.jdt.core",
+  "commit": "81575c8d352e1bd6e54970cb13f6b91ceccb3300",
+  "scope": "Unchanged compiled minimal JCL test-library data; not a stock SDK, exact compiler patch, or Kotlin LSP bundled JDK.",
+  "archives": {
+    "24": {
+      "path": "org.eclipse.jdt.core.tests.model/JCL/jclMin24.jar",
+      "bytes": 28685,
+      "git_blob_sha1": "5b1c7c9ee797e20c6925decf9b9a9aa4ff2e4a80",
+      "sha256": "49335cdc8f8e0a2a7f529e8c5167181ee67acf334150e23a2f0dd3a03c7c57db",
+      "entries": [
+        {
+          "ordinal": 0,
+          "name": "META-INF/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 1,
+          "name": "META-INF/MANIFEST.MF",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 96,
+          "bytes": 106,
+          "crc32": "f10d2c8a",
+          "local_offset": 43,
+          "sha256": "9e8d91ae371c49c3ad0045654b73fdee35757208b195e8125180bff5bb42e02f",
+          "header": null
+        },
+        {
+          "ordinal": 2,
+          "name": "java/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 189,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 3,
+          "name": "java/io/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 224,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 4,
+          "name": "java/lang/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 262,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 5,
+          "name": "java/lang/annotation/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 302,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 6,
+          "name": "java/lang/invoke/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 353,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 7,
+          "name": "java/lang/runtime/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 400,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 8,
+          "name": "java/util/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 448,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 9,
+          "name": "java/util/function/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 488,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 10,
+          "name": "javax/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 537,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 11,
+          "name": "javax/lang/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 573,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 12,
+          "name": "javax/lang/model/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 614,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 13,
+          "name": "java/io/InputStream.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 203,
+          "bytes": 274,
+          "crc32": "58debc0c",
+          "local_offset": 661,
+          "sha256": "d2c11611f70a1a0832e2ca347902417841580bfcdf4b2fdeba4258674a66f9cd",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 14,
+          "name": "java/io/PrintStream.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 269,
+          "bytes": 478,
+          "crc32": "6690507c",
+          "local_offset": 919,
+          "sha256": "66b7ee0132d52f673752189e5aacd5b677c3501a737e05925f4991c5c3993fa0",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 15,
+          "name": "java/io/Serializable.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 94,
+          "bytes": 113,
+          "crc32": "192211ab",
+          "local_offset": 1243,
+          "sha256": "8b4440d6d4fccddbf24f96007a4d5af28921307462fcd0f1ff8ad76b95de65a5",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 16,
+          "name": "java/lang/CharSequence.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 112,
+          "bytes": 138,
+          "crc32": "010d9fce",
+          "local_offset": 1393,
+          "sha256": "949cf8a5d728d1cbcdaab4ec53a2ab753a611a6308d267103deef530acd574f5",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 17,
+          "name": "java/lang/Class.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 242,
+          "bytes": 391,
+          "crc32": "e3077a49",
+          "local_offset": 1563,
+          "sha256": "d650515c774bf4a957d7658cc23b97e98edfb53ba17b0e01c8d27b146d747dd4",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 18,
+          "name": "java/lang/ClassNotFoundException.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 391,
+          "bytes": 785,
+          "crc32": "0c4141fd",
+          "local_offset": 1856,
+          "sha256": "29b2b5ea79d5368a1cf595c7976191bebb81d014c748494956a7e5ac2ee83b0a",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 19,
+          "name": "java/lang/CloneNotSupportedException.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 213,
+          "bytes": 326,
+          "crc32": "f14c97bf",
+          "local_offset": 2315,
+          "sha256": "307c7e38c4d3c6f318aa0e3b61bd6d217a06d5d0f6c21b825cedaf5d006fac95",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 20,
+          "name": "java/lang/Comparable.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 116,
+          "bytes": 174,
+          "crc32": "5dd00ebc",
+          "local_offset": 2600,
+          "sha256": "21e384228ac9d022e2e13b1eadaadf8d1bdc730fdce63a733a07080e717552a2",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 21,
+          "name": "java/lang/Deprecated.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 204,
+          "bytes": 331,
+          "crc32": "0675dcb1",
+          "local_offset": 2772,
+          "sha256": "91720a212c611c7be69ac7e1ddbb0e962f12a3bde3f410e49d1b748437d627df",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 22,
+          "name": "java/lang/Double.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 182,
+          "bytes": 263,
+          "crc32": "2fcad6a8",
+          "local_offset": 3032,
+          "sha256": "d036e2937164cd524801e154bc2698b490ae42fa65af83f8ae263c4ca292850c",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 23,
+          "name": "java/lang/Enum.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 517,
+          "bytes": 1121,
+          "crc32": "9e0845c6",
+          "local_offset": 3266,
+          "sha256": "1a6951b64944ce0a3e1980767ff467aba2fb32405c81c4147fc03c1008f93c68",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 24,
+          "name": "java/lang/Error.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 286,
+          "bytes": 553,
+          "crc32": "6a3cb60a",
+          "local_offset": 3833,
+          "sha256": "93e070e49aa4d64b264d321eb291136263057a2f6ae761e19c14aa98898bdfff",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 25,
+          "name": "java/lang/Exception.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 348,
+          "bytes": 707,
+          "crc32": "9799dba6",
+          "local_offset": 4170,
+          "sha256": "19c88080c0f12383d54198f611eb5d904b78835aa27a52d16c206c3dcd0a7c2f",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 26,
+          "name": "java/lang/Float.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 185,
+          "bytes": 260,
+          "crc32": "ea24f1d0",
+          "local_offset": 4573,
+          "sha256": "314c41517453b5c664d7e1cb75d9ea2c047527ede1ce7381947bad83a21ccd5d",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 27,
+          "name": "java/lang/IllegalAccessException.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 218,
+          "bytes": 321,
+          "crc32": "e51a0c38",
+          "local_offset": 4809,
+          "sha256": "cf05522fdb6c0b6d2e70c1330551dfc2dd67b0c5d5defbd9b48a0b2b39f2ffb3",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 28,
+          "name": "java/lang/IllegalMonitorStateException.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 219,
+          "bytes": 339,
+          "crc32": "6304c10c",
+          "local_offset": 5095,
+          "sha256": "354e4f6de05ffd9c8fa5c8cad10bf02d3d36382400efb30e4f1a17203b7bd7e0",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 29,
+          "name": "java/lang/IncompatibleClassChangeError.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 273,
+          "bytes": 474,
+          "crc32": "7f399daf",
+          "local_offset": 5388,
+          "sha256": "11daf78f935dc69fe41ea4e07de41b2c38ea4944669e658672110eb47fc251fc",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 30,
+          "name": "java/lang/Integer.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 581,
+          "bytes": 1330,
+          "crc32": "66008a7c",
+          "local_offset": 5735,
+          "sha256": "ac76907005f698a732926ed9df97b44179df9b5be82b2c09436c7d7626cde38d",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 31,
+          "name": "java/lang/InterruptedException.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 209,
+          "bytes": 308,
+          "crc32": "d1d09804",
+          "local_offset": 6369,
+          "sha256": "27c28b7bfde2fa5619ed2170bec6a2f9355534802f3ff8b8ef08dbdb8b5ba6b2",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 32,
+          "name": "java/lang/Iterable.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 325,
+          "bytes": 649,
+          "crc32": "e3854e1e",
+          "local_offset": 6644,
+          "sha256": "b18573b1cccbec3377d959aee7ffc34344769ad33890ce899f8fc22c5c68d24c",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 33,
+          "name": "java/lang/LinkageError.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 323,
+          "bytes": 593,
+          "crc32": "dd399b11",
+          "local_offset": 7023,
+          "sha256": "2cfdd9f1b6f5bcba3290bcc17553778b59940acd7f48bae2f70fbf9cf93146a9",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 34,
+          "name": "java/lang/Long.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 183,
+          "bytes": 257,
+          "crc32": "72ea9590",
+          "local_offset": 7404,
+          "sha256": "da15c4f8edb63ade97938862acb4eaf2b94ef74420536278b85ffcbdbe6a4f52",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 35,
+          "name": "java/lang/NoClassDefFoundError.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 272,
+          "bytes": 450,
+          "crc32": "7048efd6",
+          "local_offset": 7637,
+          "sha256": "8c39a93270eadc5ba52c2611ce2610625845deb27f5c41821dea43b17e71e3bf",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 36,
+          "name": "java/lang/NoSuchFieldError.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 280,
+          "bytes": 454,
+          "crc32": "6c4b9685",
+          "local_offset": 7975,
+          "sha256": "c5b6c941d60c05f0170d5715a27ce6de44830124acc4001fb70f33579173306e",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 37,
+          "name": "java/lang/NoSuchMethodException.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 216,
+          "bytes": 318,
+          "crc32": "7f24db48",
+          "local_offset": 8317,
+          "sha256": "f91525cce2108ff6067cbe2f73c1466730142948711d972b4b20fb543463fd0f",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 38,
+          "name": "java/lang/NullPointerException.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 275,
+          "bytes": 454,
+          "crc32": "365c18d3",
+          "local_offset": 8600,
+          "sha256": "e352a52f5b8c6ddca809353be5eb2655fcc0f39dcd4b31975083509c0f94393a",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 39,
+          "name": "java/lang/Number.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 206,
+          "bytes": 291,
+          "crc32": "9170995f",
+          "local_offset": 8941,
+          "sha256": "f0a4026c6458054095f4b698c6cf9865cadcec913c9f374c9e68243ebe07f9ff",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 40,
+          "name": "java/lang/Object.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 579,
+          "bytes": 1431,
+          "crc32": "4916435a",
+          "local_offset": 9199,
+          "sha256": "9d2cb7b162d5e44ee196d1cc16dd1e88e886d71ebf13038d6f79689a5688cc6c",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 41,
+          "name": "java/lang/Override.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 226,
+          "bytes": 378,
+          "crc32": "2d586a95",
+          "local_offset": 9830,
+          "sha256": "89f7e47dc9d95d1c12aca47a3918122e9acc28237614ee2d8f60d046eac23faa",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 42,
+          "name": "java/lang/Record.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 251,
+          "bytes": 371,
+          "crc32": "15d395a5",
+          "local_offset": 10110,
+          "sha256": "22e336d1ad35893b9fe4969036b5115176017f168e42c0fafbb8204f2514fdfc",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 43,
+          "name": "java/lang/ReflectiveOperationException.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 459,
+          "bytes": 936,
+          "crc32": "95680505",
+          "local_offset": 10413,
+          "sha256": "fb6bd08a38ac56810239e08ca8705dc88c00b4b5da8be0c4e3c8eeee1e796c38",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 44,
+          "name": "java/lang/RuntimeException.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 251,
+          "bytes": 424,
+          "crc32": "d4cfe5c9",
+          "local_offset": 10946,
+          "sha256": "986d0674e85ade63e13e987247f8a9ded70f354af444a20c6ee79b1d6a2a530c",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 45,
+          "name": "java/lang/String.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 287,
+          "bytes": 467,
+          "crc32": "02c169a9",
+          "local_offset": 11259,
+          "sha256": "94e1e60d07c078f74cef0581205250e2876486e391b261d02fb4576a57e6adc4",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 46,
+          "name": "java/lang/StringTemplate$Processor.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 258,
+          "bytes": 468,
+          "crc32": "d1a37af8",
+          "local_offset": 11598,
+          "sha256": "6e8d32a1fdd96b56cb0e6664e683b78300e4dcb03e95df09bc16b4ae1186de7f",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 47,
+          "name": "java/lang/StringTemplate.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 659,
+          "bytes": 1714,
+          "crc32": "58e55421",
+          "local_offset": 11926,
+          "sha256": "cf7a03725b35d4736747e68aaad7e78c127b996415fafce337a445663e3b1706",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 48,
+          "name": "java/lang/System.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 311,
+          "bytes": 475,
+          "crc32": "982dd415",
+          "local_offset": 12645,
+          "sha256": "7a44093b37915b3f5341695f076551015fa9070651061b970aeb426b736d4015",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 49,
+          "name": "java/lang/Throwable.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 305,
+          "bytes": 646,
+          "crc32": "01735425",
+          "local_offset": 13008,
+          "sha256": "ad11a9e3c0f3e3d0e9894d3c54cbfd570ea029d25cfb2249efd43bd3b0b081fa",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 50,
+          "name": "java/lang/annotation/Annotation.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 93,
+          "bytes": 122,
+          "crc32": "84bfc6d6",
+          "local_offset": 13368,
+          "sha256": "7824f99d83b726f24b76a6d205612ac9aa7e8bdf9fbee2280264f0ba3bd69419",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 51,
+          "name": "java/lang/annotation/Documented.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 243,
+          "bytes": 443,
+          "crc32": "ed24042f",
+          "local_offset": 13528,
+          "sha256": "2d9a3348979d3abc79318991d1e9e1b134c463a7f696f5d02dbbf3a8a1be3358",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 52,
+          "name": "java/lang/annotation/ElementType.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 870,
+          "bytes": 1606,
+          "crc32": "796ff195",
+          "local_offset": 13838,
+          "sha256": "a7b1c8524a156bd1e61df5b8f1982d5d483cf0ce603a3c8f67c191d446da33c4",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 53,
+          "name": "java/lang/annotation/Inherited.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 250,
+          "bytes": 441,
+          "crc32": "0593b55a",
+          "local_offset": 14776,
+          "sha256": "e0ea68a16feb3fa9b6227088907d133b1609fcb0e4f535fca095f352959c619b",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 54,
+          "name": "java/lang/annotation/Retention.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 258,
+          "bytes": 492,
+          "crc32": "09fc69ea",
+          "local_offset": 15092,
+          "sha256": "8f5797be006c4e0e8d721d1abe94c22e747bc4de3310f7662845983e0513cbb4",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 55,
+          "name": "java/lang/annotation/RetentionPolicy.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 572,
+          "bytes": 1122,
+          "crc32": "3f1ccfbe",
+          "local_offset": 15416,
+          "sha256": "8e23b8f0c3f0fb3cfa352bde8860e27d423e46ccb98a179bb06e1b9883742a39",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 56,
+          "name": "java/lang/annotation/Target.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 262,
+          "bytes": 483,
+          "crc32": "650946ca",
+          "local_offset": 16060,
+          "sha256": "b0e357338f325d1743a89b608c821a8f60624f53bedf853520affdf730ce8e4f",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 57,
+          "name": "java/lang/invoke/MethodHandle$PolymorphicSignature.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 299,
+          "bytes": 523,
+          "crc32": "ae1ca100",
+          "local_offset": 16385,
+          "sha256": "c5433d38593f91be3dc208b453281444d23807e26fc6364ef6eada974d33f660",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 58,
+          "name": "java/lang/invoke/MethodHandle.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 442,
+          "bytes": 832,
+          "crc32": "5886a8f2",
+          "local_offset": 16770,
+          "sha256": "d82001552c5260bd27f840136e410b79678365b865416b52e6f3e484b2be9e0d",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 59,
+          "name": "java/lang/invoke/MethodHandles$Lookup.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 484,
+          "bytes": 1131,
+          "crc32": "652afb97",
+          "local_offset": 17277,
+          "sha256": "ccf1946877d147507f29a38d7be17e38368f5778da9eaafdbeaf7267baa272fa",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 60,
+          "name": "java/lang/invoke/MethodHandles.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 293,
+          "bytes": 506,
+          "crc32": "8397845f",
+          "local_offset": 17834,
+          "sha256": "17e56481b800e6a29e7ad670dcd09ec3a1faf63fdae1023418c776823698cdb9",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 61,
+          "name": "java/lang/invoke/MethodType.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 429,
+          "bytes": 1047,
+          "crc32": "8926a4a6",
+          "local_offset": 18193,
+          "sha256": "0f3493f8b3b9d78356c39093971a3ccdf1b5abbd7be732be2129159f14fc60f9",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 62,
+          "name": "java/lang/invoke/StringConcatFactory.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 216,
+          "bytes": 316,
+          "crc32": "44fe0587",
+          "local_offset": 18685,
+          "sha256": "a10c15dbbce6580c4512149891641c172793f1d0645e57787c7a364f70984036",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 63,
+          "name": "java/lang/invoke/TypeDescriptor.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 129,
+          "bytes": 176,
+          "crc32": "3a65409a",
+          "local_offset": 18973,
+          "sha256": "8e940463385dabafd41ac60b632c9e0137f0390786b0bbac91fe30934bf35021",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 64,
+          "name": "java/lang/runtime/ObjectMethods.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 514,
+          "bytes": 1251,
+          "crc32": "501ce26a",
+          "local_offset": 19169,
+          "sha256": "f74b0d01616c67e0f0e7c794bfe0bfe5fc620ad95cba8dc72abdf96a69a00465",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 65,
+          "name": "java/lang/runtime/SwitchBootstraps.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 216,
+          "bytes": 309,
+          "crc32": "632479a9",
+          "local_offset": 19750,
+          "sha256": "579adef52c2e4db529c7a4ac342a2ec2cc4c0532066eb09c681ddf8be707a002",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 66,
+          "name": "java/lang/runtime/TemplateRuntime.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 210,
+          "bytes": 306,
+          "crc32": "ec0b9c01",
+          "local_offset": 20036,
+          "sha256": "10ca37468eb85ea8bf01e560dc0f6ce6e011ea58492e375ac66613caec953ca2",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 67,
+          "name": "java/util/Collection.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 287,
+          "bytes": 551,
+          "crc32": "182cdee3",
+          "local_offset": 20315,
+          "sha256": "9a7c66ee618d0062f709bee2713adf20ac9b56283138124ee843365896fbbde8",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 68,
+          "name": "java/util/Iterator.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 185,
+          "bytes": 271,
+          "crc32": "a10a505b",
+          "local_offset": 20658,
+          "sha256": "a7728e20226caedc44ee01d2b319c8f0d611c758adba49b55f360f2f467d98e6",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 69,
+          "name": "java/util/List.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 141,
+          "bytes": 217,
+          "crc32": "838c7abf",
+          "local_offset": 20897,
+          "sha256": "8096bf0e6d8365370e6cf53db42d558934325bf18a4e1cb96d3c35debb127068",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 70,
+          "name": "java/util/Map.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 117,
+          "bytes": 180,
+          "crc32": "7bc53e16",
+          "local_offset": 21088,
+          "sha256": "f61c68790bc3a5ef93863859a1bd198d6cc8d545e7e72d8a4bf0c1b394b0892a",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 71,
+          "name": "java/util/function/Consumer.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 310,
+          "bytes": 681,
+          "crc32": "1df97c53",
+          "local_offset": 21254,
+          "sha256": "dc1f9a6cafc79420a5d980df2cbd9511af534bae4b511f146c02db0ba7ed8809",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 72,
+          "name": "javax/lang/model/SourceVersion.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 1284,
+          "bytes": 2881,
+          "crc32": "3718eba4",
+          "local_offset": 21627,
+          "sha256": "ee2de520ffc113f42e8afeb714563e918cd29918f3e99766edce3e378545cbfe",
+          "header": "cafebabe00000044"
+        },
+        {
+          "ordinal": 73,
+          "name": "module-info.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 159,
+          "bytes": 248,
+          "crc32": "3db98f88",
+          "local_offset": 22977,
+          "sha256": "d0acfc6b0081cb2d0f0b03caef6f956554c5ce20760b0802fc7d054c8fbf9e45",
+          "header": "cafebabe00000044"
+        }
+      ]
+    },
+    "25": {
+      "path": "org.eclipse.jdt.core.tests.model/JCL/jclMin25.jar",
+      "bytes": 25061,
+      "git_blob_sha1": "25b49348dfad2e70546d27a1c5283ef55ea01164",
+      "sha256": "8eb40b1a47696cf92b4a83a70fd07c885bea858a5dd907edc962ed48b74585da",
+      "entries": [
+        {
+          "ordinal": 0,
+          "name": "META-INF/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 1,
+          "name": "META-INF/MANIFEST.MF",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 96,
+          "bytes": 106,
+          "crc32": "7c23a0d0",
+          "local_offset": 43,
+          "sha256": "3d5896405ceab53cd5c950accbc332b0190df4d2ab8c7a5b77f2ed6078ac033f",
+          "header": null
+        },
+        {
+          "ordinal": 2,
+          "name": "java/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 189,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 3,
+          "name": "java/io/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 224,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 4,
+          "name": "java/lang/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 262,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 5,
+          "name": "java/lang/annotation/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 302,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 6,
+          "name": "java/lang/invoke/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 353,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 7,
+          "name": "java/lang/runtime/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 400,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 8,
+          "name": "java/util/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 448,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 9,
+          "name": "java/util/function/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 488,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 10,
+          "name": "javax/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 537,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 11,
+          "name": "javax/lang/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 573,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 12,
+          "name": "javax/lang/model/",
+          "flags": 2048,
+          "method": 0,
+          "compressed_bytes": 0,
+          "bytes": 0,
+          "crc32": "00000000",
+          "local_offset": 614,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "header": null
+        },
+        {
+          "ordinal": 13,
+          "name": "java/io/InputStream.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 159,
+          "bytes": 200,
+          "crc32": "36f7e6d7",
+          "local_offset": 661,
+          "sha256": "7e1d328219df5c83175b7693891601a3a3946faad2ca42485dbea1a005f3e9ce",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 14,
+          "name": "java/io/PrintStream.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 165,
+          "bytes": 229,
+          "crc32": "e26797a9",
+          "local_offset": 875,
+          "sha256": "cbb66d1a5e11780a089a2bab8cd19d17b569a9671df114cf7138f3c62879b3cf",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 15,
+          "name": "java/io/Serializable.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 66,
+          "bytes": 72,
+          "crc32": "a5280060",
+          "local_offset": 1095,
+          "sha256": "3c3c1c52c1fce599f8d08c6cc22e4e4d5d09cb28cd69790a37c5c02b97189709",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 16,
+          "name": "java/lang/AssertionError.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 239,
+          "bytes": 356,
+          "crc32": "523a5a3d",
+          "local_offset": 1217,
+          "sha256": "709f80612235e007453b45ee4dc0defa92dcb2821ac6f0e9d18aeef14b067226",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 17,
+          "name": "java/lang/AutoCloseable.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 114,
+          "bytes": 145,
+          "crc32": "f56e4f13",
+          "local_offset": 1516,
+          "sha256": "fdaabf40031dc7fce090c1263f09c0838fb1d3981c2d88eb4bda10cb5e5afa50",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 18,
+          "name": "java/lang/CharSequence.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 84,
+          "bytes": 97,
+          "crc32": "b82fee76",
+          "local_offset": 1689,
+          "sha256": "adfde84db0db71f725c93ec8c2b6246fcb7605cf888689dee17876bf733e0774",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 19,
+          "name": "java/lang/Class.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 139,
+          "bytes": 193,
+          "crc32": "62c6cd78",
+          "local_offset": 1831,
+          "sha256": "6241e065ae348d4e6e3eb083efd8471154994db5aef6e4fb798ac052423fd695",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 20,
+          "name": "java/lang/ClassNotFoundException.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 265,
+          "bytes": 463,
+          "crc32": "6ba37116",
+          "local_offset": 2021,
+          "sha256": "a8c90d35d7b5fafe8e1473e1e3cefb375f2664b5fd82006d63c991fe297313d3",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 21,
+          "name": "java/lang/CloneNotSupportedException.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 125,
+          "bytes": 154,
+          "crc32": "9cc20dd4",
+          "local_offset": 2354,
+          "sha256": "fab9998ecbdd6a5c2465a15a27dd7ebbc0e5f14d7cd1fd7ec1f9c3d4e4425809",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 22,
+          "name": "java/lang/Comparable.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 93,
+          "bytes": 135,
+          "crc32": "86ed6b1b",
+          "local_offset": 2551,
+          "sha256": "02261983e02a19ea79cd6e938cea35ce07eaf2097ee650f64a98d6a722679473",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 23,
+          "name": "java/lang/Deprecated.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 179,
+          "bytes": 292,
+          "crc32": "f9e4e4c2",
+          "local_offset": 2700,
+          "sha256": "e41e6317c06a3e37c1ffd6ef994b1971010a4947cd03adc8ad85f9f6ec6a910c",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 24,
+          "name": "java/lang/Double.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 108,
+          "bytes": 131,
+          "crc32": "d9ce68cd",
+          "local_offset": 2935,
+          "sha256": "eae6a81adfd489b0c1b3a893b8fd8561065794e6a51b0122c4f3fba03040af9d",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 25,
+          "name": "java/lang/Enum.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 349,
+          "bytes": 666,
+          "crc32": "51e27a36",
+          "local_offset": 3095,
+          "sha256": "cb8a7cabafab1ddaa2b4509f4bd5b3f3ab60841996337528cc379a459d407212",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 26,
+          "name": "java/lang/Error.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 154,
+          "bytes": 264,
+          "crc32": "c04d70d3",
+          "local_offset": 3494,
+          "sha256": "723e759b0eccb1243ff885db26edc3440dde746a2298d34991c2d2cc47ed926c",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 27,
+          "name": "java/lang/Exception.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 201,
+          "bytes": 360,
+          "crc32": "8d01efe0",
+          "local_offset": 3699,
+          "sha256": "98e2e6482b37475514a98e8a043fa20ab068de891e42e034613c32393b2a09cc",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 28,
+          "name": "java/lang/Float.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 110,
+          "bytes": 130,
+          "crc32": "00a7c90c",
+          "local_offset": 3955,
+          "sha256": "16acf2e6c4deca073e063af454b349a00f20a363403795332a583e8d3063d2c8",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 29,
+          "name": "java/lang/IllegalAccessException.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 128,
+          "bytes": 157,
+          "crc32": "d081f7ed",
+          "local_offset": 4116,
+          "sha256": "a190fa06bbfa4f5be1034e5688939521ac53114713877b30a00ca60d68ac83c2",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 30,
+          "name": "java/lang/IllegalMonitorStateException.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 132,
+          "bytes": 163,
+          "crc32": "479bf2fc",
+          "local_offset": 4312,
+          "sha256": "7a18fc1c3aa02728cd920669aeb518d8ac62598c4dbd0f3e21a74db02627506d",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 31,
+          "name": "java/lang/IncompatibleClassChangeError.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 219,
+          "bytes": 289,
+          "crc32": "b3517f2f",
+          "local_offset": 4518,
+          "sha256": "10223a922cda87a640f6a5ffcc6515629ca7dc70bd9b17bf32431ff60a486d72",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 32,
+          "name": "java/lang/Integer.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 443,
+          "bytes": 859,
+          "crc32": "6b9481a0",
+          "local_offset": 4811,
+          "sha256": "e52ec3e5309caf7ae94774fd2b095f946b4ed60c825754ea5bbd62aedf7b48b1",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 33,
+          "name": "java/lang/InterruptedException.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 119,
+          "bytes": 148,
+          "crc32": "5d95ffed",
+          "local_offset": 5307,
+          "sha256": "5f7586083dcfcda6d9e98f304eeeadf90270a988fe5830a6083f63d378125aa9",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 34,
+          "name": "java/lang/Iterable.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 204,
+          "bytes": 343,
+          "crc32": "39e42063",
+          "local_offset": 5492,
+          "sha256": "edd57f635ce159771f319ddeab303b139dc8d3efc7c458873ca15ccc1098f564",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 35,
+          "name": "java/lang/LinkageError.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 238,
+          "bytes": 354,
+          "crc32": "13f815d2",
+          "local_offset": 5750,
+          "sha256": "fcd436e282cedd5eac74d99ef91be44cde6c456d51a39ff372dd2650c13c58db",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 36,
+          "name": "java/lang/Long.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 109,
+          "bytes": 129,
+          "crc32": "9126d5fd",
+          "local_offset": 6046,
+          "sha256": "1cc35a2291bc60804547fb0f4176c7211011c9ae87c272349fa84b80b17e7123",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 37,
+          "name": "java/lang/NoClassDefFoundError.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 216,
+          "bytes": 281,
+          "crc32": "02843f0c",
+          "local_offset": 6205,
+          "sha256": "e6122793467f9016fb3da85eeb03919ddc6caa13092dcf8bf6fceba797ff9222",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 38,
+          "name": "java/lang/NoSuchFieldError.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 225,
+          "bytes": 293,
+          "crc32": "e405b0f5",
+          "local_offset": 6487,
+          "sha256": "c0b304a4029b4060cd5351203c556a12e8b31cf936ca3b9bcc7747601ec5211a",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 39,
+          "name": "java/lang/NoSuchMethodException.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 127,
+          "bytes": 156,
+          "crc32": "e5c72827",
+          "local_offset": 6774,
+          "sha256": "629d4a08d342503e4b824b4fe6d0c9939a6a9fd510724e6eb38b17ebbf3a0fd1",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 40,
+          "name": "java/lang/NullPointerException.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 166,
+          "bytes": 221,
+          "crc32": "13287213",
+          "local_offset": 6968,
+          "sha256": "3f2f24a75ed62fa4ed269322d0e826bca67522d6caee2474a5bdb11783bb12f1",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 41,
+          "name": "java/lang/Number.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 134,
+          "bytes": 159,
+          "crc32": "d28c3956",
+          "local_offset": 7200,
+          "sha256": "ca51bdf0c7f22f355353fb1bdbb6c2962cbdd738c8c5bbcef787e77757e5d408",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 42,
+          "name": "java/lang/Object.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 410,
+          "bytes": 898,
+          "crc32": "679d4a69",
+          "local_offset": 7386,
+          "sha256": "dfd977f31a68312983afe5caf1705e9be0412c3add2b588e9817fc71cb4d5e0a",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 43,
+          "name": "java/lang/Override.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 206,
+          "bytes": 341,
+          "crc32": "96d52600",
+          "local_offset": 7848,
+          "sha256": "dd4fe7000cde0f4c0bb28605f98701d526237587aaaaf61b8ab96f83221e6fc8",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 44,
+          "name": "java/lang/Record.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 174,
+          "bytes": 239,
+          "crc32": "e45c2264",
+          "local_offset": 8108,
+          "sha256": "b33f328ceb35b118050bdce833ac8d87563f8509c746226e0584e780efd3fdec",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 45,
+          "name": "java/lang/ReflectiveOperationException.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 300,
+          "bytes": 521,
+          "crc32": "6fdf5eaa",
+          "local_offset": 8334,
+          "sha256": "ff70a70f09ebe355ceded987a358ed8aaad59be8226a7af3a86757e817eefeb9",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 46,
+          "name": "java/lang/RuntimeException.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 140,
+          "bytes": 199,
+          "crc32": "477d3378",
+          "local_offset": 8708,
+          "sha256": "617b6dd392bf834fad217a5ca230a29dee9d3e1527aa41fa85f62ef449ab5806",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 47,
+          "name": "java/lang/String.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 182,
+          "bytes": 253,
+          "crc32": "b7834098",
+          "local_offset": 8910,
+          "sha256": "0a96a425c161e91ea7ac7d4542f5f9a9e46a3cf3d7ebc6ea2084a3d4872100be",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 48,
+          "name": "java/lang/StringTemplate$Processor.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 239,
+          "bytes": 425,
+          "crc32": "9775de48",
+          "local_offset": 9144,
+          "sha256": "5b6c8fc9ab532dfaeab5440423e9a3590a74bb7b51084b8b4f8b214577b6ce39",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 49,
+          "name": "java/lang/StringTemplate.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 510,
+          "bytes": 1250,
+          "crc32": "be647b2b",
+          "local_offset": 9453,
+          "sha256": "a351b1e901bc1e725064f03e3d478814ec30fa58d5d5d07855648aa6b59e198d",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 50,
+          "name": "java/lang/System.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 227,
+          "bytes": 311,
+          "crc32": "88c1595c",
+          "local_offset": 10023,
+          "sha256": "988c0f0b2cb0866fc8fabdd6f857cdf80312a516627d94d37a0fa3c15fb336bd",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 51,
+          "name": "java/lang/Throwable.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 162,
+          "bytes": 323,
+          "crc32": "cfebeeaa",
+          "local_offset": 10302,
+          "sha256": "33adf03daa9e57a1c4141b87f942bfa70ff9ce6f16792dbe8bdf9d96a27b43cd",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 52,
+          "name": "java/lang/annotation/Annotation.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 64,
+          "bytes": 83,
+          "crc32": "91ecd65f",
+          "local_offset": 10519,
+          "sha256": "025d1399be6dc16ef894af90bc108c4e152591f5572294d740434fb57717e2eb",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 53,
+          "name": "java/lang/annotation/Documented.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 221,
+          "bytes": 404,
+          "crc32": "477bb42e",
+          "local_offset": 10650,
+          "sha256": "09aafccf29a18e540ae26981f4fa32b2e2d6e730f64a481b5ed6238f6efba399",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 54,
+          "name": "java/lang/annotation/ElementType.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 741,
+          "bytes": 1384,
+          "crc32": "38716031",
+          "local_offset": 10938,
+          "sha256": "7495ccc83d5eb646753fd8a204b316086e1bbc2254af85f172167a7d82e6c3ab",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 55,
+          "name": "java/lang/annotation/Inherited.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 229,
+          "bytes": 403,
+          "crc32": "421adebb",
+          "local_offset": 11747,
+          "sha256": "00fca724de5ba45d355418b8e5c8ede82be2d4ffdccd083fafc8f9d1ae580f8e",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 56,
+          "name": "java/lang/annotation/Retention.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 236,
+          "bytes": 454,
+          "crc32": "cd972a2d",
+          "local_offset": 12042,
+          "sha256": "b847645590683c2951515ba1475dd0e5dc58442d7b2c9ba11bddbb19d8a53d84",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 57,
+          "name": "java/lang/annotation/RetentionPolicy.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 514,
+          "bytes": 972,
+          "crc32": "6f7b66d3",
+          "local_offset": 12344,
+          "sha256": "4edf6cef90fe7ec99f014cfe7c14f9bf671f30097a5dd8780fc59da218400d1f",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 58,
+          "name": "java/lang/annotation/Target.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 239,
+          "bytes": 448,
+          "crc32": "5e6aee70",
+          "local_offset": 12930,
+          "sha256": "1eb673688ab083092991fb3b78a9d123c1ec71486dd131a3abbae8bdd9ae24e1",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 59,
+          "name": "java/lang/invoke/LambdaMetafactory.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 129,
+          "bytes": 149,
+          "crc32": "ab65c7db",
+          "local_offset": 13232,
+          "sha256": "69c96f5c05a197b156b912ebb5b1a246e62fcec3d88c0ab7bee2760a3c99f9bb",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 60,
+          "name": "java/lang/invoke/MethodHandle$PolymorphicSignature.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 278,
+          "bytes": 482,
+          "crc32": "895e8eda",
+          "local_offset": 13431,
+          "sha256": "f8ee27128b1431e5253d8aa2421bd16c969b9217d5c9f7b89e8f2481fb79bf21",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 61,
+          "name": "java/lang/invoke/MethodHandle.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 370,
+          "bytes": 681,
+          "crc32": "29ca7834",
+          "local_offset": 13795,
+          "sha256": "d8e67437c191369dd5bf08678db301c542c423ac561add475d1e1d1fd2e3aadb",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 62,
+          "name": "java/lang/invoke/MethodHandles$Lookup.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 335,
+          "bytes": 673,
+          "crc32": "000fbc7a",
+          "local_offset": 14230,
+          "sha256": "8309e88534529fe29221774455aea318091e563c1fa9a8be906abd493911ff60",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 63,
+          "name": "java/lang/invoke/MethodHandles.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 218,
+          "bytes": 333,
+          "crc32": "9856040d",
+          "local_offset": 14638,
+          "sha256": "0d10d150223878e55349489788a811df383b4b51b24a18eb32030098631441e5",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 64,
+          "name": "java/lang/invoke/MethodType.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 249,
+          "bytes": 608,
+          "crc32": "da8448b1",
+          "local_offset": 14922,
+          "sha256": "2b7462b0f8b7a48321f1bc6fcce27deee5944b2bf8e9fea666f0d4a41407ca00",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 65,
+          "name": "java/lang/invoke/StringConcatFactory.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 131,
+          "bytes": 151,
+          "crc32": "f097b883",
+          "local_offset": 15234,
+          "sha256": "1488c4012414d3eed9c41d2cf868fcc144ccbcdd3b575003bd2c79d5cc743336",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 66,
+          "name": "java/lang/invoke/TypeDescriptor.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 101,
+          "bytes": 133,
+          "crc32": "bb1b5b3b",
+          "local_offset": 15437,
+          "sha256": "7ecaffa4c76e94e9ee215217b7be02d2745701840149ee71c1b997cf32985ae9",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 67,
+          "name": "java/lang/runtime/ObjectMethods.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 322,
+          "bytes": 736,
+          "crc32": "cbeea3bb",
+          "local_offset": 15605,
+          "sha256": "2bfd10da38b6705328048c5538f96765070d0b6d55ee079c989ee695e593db2d",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 68,
+          "name": "java/lang/runtime/SwitchBootstraps.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 129,
+          "bytes": 149,
+          "crc32": "e5e99961",
+          "local_offset": 15994,
+          "sha256": "8518ff0b9553265df764d426307b2548ed879c4d67715b9132fbcc8ae143795a",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 69,
+          "name": "java/lang/runtime/TemplateRuntime.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 124,
+          "bytes": 148,
+          "crc32": "e4ae272a",
+          "local_offset": 16193,
+          "sha256": "979666cbe7094d07daa14e37575e33e34bd44b825fe620432531043f6bdcb1b1",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 70,
+          "name": "java/util/Collection.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 262,
+          "bytes": 512,
+          "crc32": "b657681c",
+          "local_offset": 16386,
+          "sha256": "e96a9316a1cfdda08e9c80110167701db759b4bd6dae84819daf01a9db6f4235",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 71,
+          "name": "java/util/Iterator.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 162,
+          "bytes": 234,
+          "crc32": "3ed7d2ed",
+          "local_offset": 16704,
+          "sha256": "15ee40269def9d4025dd4a51db7b0ec9e7114109e18aea151bac6df9c3f0b9df",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 72,
+          "name": "java/util/List.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 119,
+          "bytes": 184,
+          "crc32": "8ec6be21",
+          "local_offset": 16920,
+          "sha256": "70bb8f5800a683b0ddaedf0d5dd7a2e19e886a0479a0bc56a8a75b4f2fc6415a",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 73,
+          "name": "java/util/Map.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 94,
+          "bytes": 148,
+          "crc32": "4cd0a95e",
+          "local_offset": 17089,
+          "sha256": "1158d30b7700c3814d2ee9cc2a83673d37a728e2c151c707a262121cca12535b",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 74,
+          "name": "java/util/Set.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 240,
+          "bytes": 693,
+          "crc32": "04203a47",
+          "local_offset": 17232,
+          "sha256": "608072a76b8cc64ebc3449e0ae5a547acfcea2531c1803af57870a80c494ae5c",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 75,
+          "name": "java/util/function/Consumer.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 198,
+          "bytes": 390,
+          "crc32": "182c38df",
+          "local_offset": 17521,
+          "sha256": "14459e02d9d31de40cb71bd79690339bb288000d9e8fecd204cc52dfddde89ac",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 76,
+          "name": "javax/lang/model/SourceVersion.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 1225,
+          "bytes": 2717,
+          "crc32": "fd88f5c8",
+          "local_offset": 17782,
+          "sha256": "de2972ca0a6a08a7899a4c392c5069d87bd28d458d0a74ea13dda4c9c2135979",
+          "header": "cafebabe00000045"
+        },
+        {
+          "ordinal": 77,
+          "name": "module-info.class",
+          "flags": 2048,
+          "method": 8,
+          "compressed_bytes": 137,
+          "bytes": 208,
+          "crc32": "00f6111d",
+          "local_offset": 19073,
+          "sha256": "63e502a5e3a2bf64fe58fe5d967b69181370fa203519aaf94ce437058effa3a3",
+          "header": "cafebabe00000045"
+        }
+      ]
+    }
+  },
+  "notices": {
+    "about.html": {
+      "path": "org.eclipse.jdt.core.tests.model/about.html",
+      "bytes": 1460,
+      "sha256": "ee66d2fb3b4c0d2ed2e7f698bc9ed4e3d6cf77fa5caf40ad03296125db1ac5f0"
+    },
+    "build.xml": {
+      "path": "org.eclipse.jdt.core.tests.model/JCL/build.xml",
+      "bytes": 6592,
+      "sha256": "3f178858472c4cd931ee3d8c9b6a5cf51153610bb51516a808c765ed6497ea92"
+    },
+    "EPL-2.0.txt": {
+      "path": "LICENSE",
+      "bytes": 14198,
+      "sha256": "0becf16567beb77fa252b7664631dd177c8f9a1889e48995b45379c7130e5303"
+    },
+    "24-Serializable.java": {
+      "path": "JCL/converterJclMin24/src/java/io/Serializable.java",
+      "bytes": 52,
+      "sha256": "7a256e1050eaa8a180043cd4966cb8a6e2cf15797c2c7d337e52b4353c82819f"
+    },
+    "25-Serializable.java": {
+      "path": "JCL/converterJclMin25/src/java/io/Serializable.java",
+      "bytes": 52,
+      "sha256": "7a256e1050eaa8a180043cd4966cb8a6e2cf15797c2c7d337e52b4353c82819f"
+    },
+    "24-Object.java": {
+      "path": "JCL/converterJclMin24/src/java/lang/Object.java",
+      "bytes": 826,
+      "sha256": "73e9502d7026bc2cfad992b8f1c1c361cd4e341ef04a368b2f734ebd5c7d12c4"
+    },
+    "25-Object.java": {
+      "path": "JCL/converterJclMin25/src/java/lang/Object.java",
+      "bytes": 826,
+      "sha256": "73e9502d7026bc2cfad992b8f1c1c361cd4e341ef04a368b2f734ebd5c7d12c4"
+    }
+  },
+  "selected_class_byte_inventory": {
+    "24-Serializable.class.bin": {
+      "bytes": 113,
+      "minor": 0,
+      "major": 68,
+      "constant_pool": [
+        null,
+        {
+          "offset": 10,
+          "tag": 7,
+          "value": 2
+        },
+        {
+          "offset": 13,
+          "tag": 1,
+          "value": "java/io/Serializable"
+        },
+        {
+          "offset": 36,
+          "tag": 7,
+          "value": 4
+        },
+        {
+          "offset": 39,
+          "tag": 1,
+          "value": "java/lang/Object"
+        },
+        {
+          "offset": 58,
+          "tag": 1,
+          "value": "SourceFile"
+        },
+        {
+          "offset": 71,
+          "tag": 1,
+          "value": "Serializable.java"
+        }
+      ],
+      "flags": 1537,
+      "this_class": "java/io/Serializable",
+      "super_class": "java/lang/Object",
+      "interfaces": [],
+      "fields": [],
+      "methods": [],
+      "attributes": [
+        {
+          "offset": 105,
+          "name": "SourceFile",
+          "bytes": 2,
+          "hex": "0006"
+        }
+      ],
+      "consumed": 113,
+      "hex": "cafebabe0000004400070700020100146a6176612f696f2f53657269616c697a61626c650700040100106a6176612f6c616e672f4f626a65637401000a536f7572636546696c6501001153657269616c697a61626c652e6a61766106010001000300000000000000010005000000020006"
+    },
+    "24-Object.class.bin": {
+      "bytes": 1431,
+      "minor": 0,
+      "major": 68,
+      "constant_pool": [
+        null,
+        {
+          "offset": 10,
+          "tag": 7,
+          "value": 2
+        },
+        {
+          "offset": 13,
+          "tag": 1,
+          "value": "java/lang/Object"
+        },
+        {
+          "offset": 32,
+          "tag": 1,
+          "value": "<init>"
+        },
+        {
+          "offset": 41,
+          "tag": 1,
+          "value": "()V"
+        },
+        {
+          "offset": 47,
+          "tag": 1,
+          "value": "Code"
+        },
+        {
+          "offset": 54,
+          "tag": 1,
+          "value": "LineNumberTable"
+        },
+        {
+          "offset": 72,
+          "tag": 1,
+          "value": "LocalVariableTable"
+        },
+        {
+          "offset": 93,
+          "tag": 1,
+          "value": "this"
+        },
+        {
+          "offset": 100,
+          "tag": 1,
+          "value": "Ljava/lang/Object;"
+        },
+        {
+          "offset": 121,
+          "tag": 1,
+          "value": "clone"
+        },
+        {
+          "offset": 129,
+          "tag": 1,
+          "value": "()Ljava/lang/Object;"
+        },
+        {
+          "offset": 152,
+          "tag": 1,
+          "value": "Exceptions"
+        },
+        {
+          "offset": 165,
+          "tag": 7,
+          "value": 14
+        },
+        {
+          "offset": 168,
+          "tag": 1,
+          "value": "java/lang/CloneNotSupportedException"
+        },
+        {
+          "offset": 207,
+          "tag": 1,
+          "value": "equals"
+        },
+        {
+          "offset": 216,
+          "tag": 1,
+          "value": "(Ljava/lang/Object;)Z"
+        },
+        {
+          "offset": 240,
+          "tag": 1,
+          "value": "obj"
+        },
+        {
+          "offset": 246,
+          "tag": 1,
+          "value": "finalize"
+        },
+        {
+          "offset": 257,
+          "tag": 7,
+          "value": 20
+        },
+        {
+          "offset": 260,
+          "tag": 1,
+          "value": "java/lang/Throwable"
+        },
+        {
+          "offset": 282,
+          "tag": 1,
+          "value": "getClass"
+        },
+        {
+          "offset": 293,
+          "tag": 1,
+          "value": "()Ljava/lang/Class;"
+        },
+        {
+          "offset": 315,
+          "tag": 1,
+          "value": "Signature"
+        },
+        {
+          "offset": 327,
+          "tag": 1,
+          "value": "()Ljava/lang/Class<+Ljava/lang/Object;>;"
+        },
+        {
+          "offset": 370,
+          "tag": 1,
+          "value": "hashCode"
+        },
+        {
+          "offset": 381,
+          "tag": 1,
+          "value": "()I"
+        },
+        {
+          "offset": 387,
+          "tag": 1,
+          "value": "notify"
+        },
+        {
+          "offset": 396,
+          "tag": 7,
+          "value": 29
+        },
+        {
+          "offset": 399,
+          "tag": 1,
+          "value": "java/lang/IllegalMonitorStateException"
+        },
+        {
+          "offset": 440,
+          "tag": 1,
+          "value": "notifyAll"
+        },
+        {
+          "offset": 452,
+          "tag": 1,
+          "value": "toString"
+        },
+        {
+          "offset": 463,
+          "tag": 1,
+          "value": "()Ljava/lang/String;"
+        },
+        {
+          "offset": 486,
+          "tag": 1,
+          "value": "wait"
+        },
+        {
+          "offset": 493,
+          "tag": 7,
+          "value": 35
+        },
+        {
+          "offset": 496,
+          "tag": 1,
+          "value": "java/lang/InterruptedException"
+        },
+        {
+          "offset": 529,
+          "tag": 1,
+          "value": "(J)V"
+        },
+        {
+          "offset": 536,
+          "tag": 1,
+          "value": "millis"
+        },
+        {
+          "offset": 545,
+          "tag": 1,
+          "value": "J"
+        },
+        {
+          "offset": 549,
+          "tag": 1,
+          "value": "(JI)V"
+        },
+        {
+          "offset": 557,
+          "tag": 1,
+          "value": "nanos"
+        },
+        {
+          "offset": 565,
+          "tag": 1,
+          "value": "I"
+        },
+        {
+          "offset": 569,
+          "tag": 1,
+          "value": "SourceFile"
+        },
+        {
+          "offset": 582,
+          "tag": 1,
+          "value": "Object.java"
+        }
+      ],
+      "flags": 33,
+      "this_class": "java/lang/Object",
+      "super_class": null,
+      "interfaces": [],
+      "fields": [],
+      "methods": [
+        {
+          "offset": 608,
+          "flags": 1,
+          "name": "<init>",
+          "descriptor": "()V",
+          "attributes": [
+            {
+              "offset": 616,
+              "name": "Code",
+              "bytes": 43,
+              "hex": "0000000100000001b10000000200060000000600010000000500070000000c000100000001000800090000"
+            }
+          ]
+        },
+        {
+          "offset": 665,
+          "flags": 4,
+          "name": "clone",
+          "descriptor": "()Ljava/lang/Object;",
+          "attributes": [
+            {
+              "offset": 673,
+              "name": "Exceptions",
+              "bytes": 4,
+              "hex": "0001000d"
+            },
+            {
+              "offset": 683,
+              "name": "Code",
+              "bytes": 44,
+              "hex": "000100010000000201b00000000200060000000600010000000800070000000c000100000002000800090000"
+            }
+          ]
+        },
+        {
+          "offset": 733,
+          "flags": 1,
+          "name": "equals",
+          "descriptor": "(Ljava/lang/Object;)Z",
+          "attributes": [
+            {
+              "offset": 741,
+              "name": "Code",
+              "bytes": 54,
+              "hex": "000100020000000203ac0000000200060000000600010000000b00070000001600020000000200080009000000000002001100090001"
+            }
+          ]
+        },
+        {
+          "offset": 801,
+          "flags": 4,
+          "name": "finalize",
+          "descriptor": "()V",
+          "attributes": [
+            {
+              "offset": 809,
+              "name": "Exceptions",
+              "bytes": 4,
+              "hex": "00010013"
+            },
+            {
+              "offset": 819,
+              "name": "Code",
+              "bytes": 43,
+              "hex": "0000000100000001b10000000200060000000600010000000d00070000000c000100000001000800090000"
+            }
+          ]
+        },
+        {
+          "offset": 868,
+          "flags": 17,
+          "name": "getClass",
+          "descriptor": "()Ljava/lang/Class;",
+          "attributes": [
+            {
+              "offset": 876,
+              "name": "Signature",
+              "bytes": 2,
+              "hex": "0018"
+            },
+            {
+              "offset": 884,
+              "name": "Code",
+              "bytes": 44,
+              "hex": "000100010000000201b00000000200060000000600010000001000070000000c000100000002000800090000"
+            }
+          ]
+        },
+        {
+          "offset": 934,
+          "flags": 1,
+          "name": "hashCode",
+          "descriptor": "()I",
+          "attributes": [
+            {
+              "offset": 942,
+              "name": "Code",
+              "bytes": 44,
+              "hex": "000100010000000202ac0000000200060000000600010000001300070000000c000100000002000800090000"
+            }
+          ]
+        },
+        {
+          "offset": 992,
+          "flags": 17,
+          "name": "notify",
+          "descriptor": "()V",
+          "attributes": [
+            {
+              "offset": 1000,
+              "name": "Exceptions",
+              "bytes": 4,
+              "hex": "0001001c"
+            },
+            {
+              "offset": 1010,
+              "name": "Code",
+              "bytes": 43,
+              "hex": "0000000100000001b10000000200060000000600010000001500070000000c000100000001000800090000"
+            }
+          ]
+        },
+        {
+          "offset": 1059,
+          "flags": 17,
+          "name": "notifyAll",
+          "descriptor": "()V",
+          "attributes": [
+            {
+              "offset": 1067,
+              "name": "Exceptions",
+              "bytes": 4,
+              "hex": "0001001c"
+            },
+            {
+              "offset": 1077,
+              "name": "Code",
+              "bytes": 43,
+              "hex": "0000000100000001b10000000200060000000600010000001700070000000c000100000001000800090000"
+            }
+          ]
+        },
+        {
+          "offset": 1126,
+          "flags": 1,
+          "name": "toString",
+          "descriptor": "()Ljava/lang/String;",
+          "attributes": [
+            {
+              "offset": 1134,
+              "name": "Code",
+              "bytes": 44,
+              "hex": "000100010000000201b00000000200060000000600010000001a00070000000c000100000002000800090000"
+            }
+          ]
+        },
+        {
+          "offset": 1184,
+          "flags": 17,
+          "name": "wait",
+          "descriptor": "()V",
+          "attributes": [
+            {
+              "offset": 1192,
+              "name": "Exceptions",
+              "bytes": 6,
+              "hex": "0002001c0022"
+            },
+            {
+              "offset": 1204,
+              "name": "Code",
+              "bytes": 43,
+              "hex": "0000000100000001b10000000200060000000600010000001c00070000000c000100000001000800090000"
+            }
+          ]
+        },
+        {
+          "offset": 1253,
+          "flags": 17,
+          "name": "wait",
+          "descriptor": "(J)V",
+          "attributes": [
+            {
+              "offset": 1261,
+              "name": "Exceptions",
+              "bytes": 6,
+              "hex": "0002001c0022"
+            },
+            {
+              "offset": 1273,
+              "name": "Code",
+              "bytes": 53,
+              "hex": "0000000300000001b10000000200060000000600010000001e00070000001600020000000100080009000000000001002500260001"
+            }
+          ]
+        },
+        {
+          "offset": 1332,
+          "flags": 17,
+          "name": "wait",
+          "descriptor": "(JI)V",
+          "attributes": [
+            {
+              "offset": 1340,
+              "name": "Exceptions",
+              "bytes": 6,
+              "hex": "0002001c0022"
+            },
+            {
+              "offset": 1352,
+              "name": "Code",
+              "bytes": 63,
+              "hex": "0000000400000001b1000000020006000000060001000000200007000000200003000000010008000900000000000100250026000100000001002800290003"
+            }
+          ]
+        }
+      ],
+      "attributes": [
+        {
+          "offset": 1423,
+          "name": "SourceFile",
+          "bytes": 2,
+          "hex": "002b"
+        }
+      ],
+      "consumed": 1431,
+      "hex": "cafebabe00000044002c0700020100106a6176612f6c616e672f4f626a6563740100063c696e69743e010003282956010004436f646501000f4c696e654e756d6265725461626c650100124c6f63616c5661726961626c655461626c65010004746869730100124c6a6176612f6c616e672f4f626a6563743b010005636c6f6e6501001428294c6a6176612f6c616e672f4f626a6563743b01000a457863657074696f6e7307000e0100246a6176612f6c616e672f436c6f6e654e6f74537570706f72746564457863657074696f6e010006657175616c73010015284c6a6176612f6c616e672f4f626a6563743b295a0100036f626a01000866696e616c697a650700140100136a6176612f6c616e672f5468726f7761626c65010008676574436c61737301001328294c6a6176612f6c616e672f436c6173733b0100095369676e617475726501002828294c6a6176612f6c616e672f436c6173733c2b4c6a6176612f6c616e672f4f626a6563743b3e3b01000868617368436f64650100032829490100066e6f7469667907001d0100266a6176612f6c616e672f496c6c6567616c4d6f6e69746f725374617465457863657074696f6e0100096e6f74696679416c6c010008746f537472696e6701001428294c6a6176612f6c616e672f537472696e673b0100047761697407002301001e6a6176612f6c616e672f496e746572727570746564457863657074696f6e010004284a29560100066d696c6c69730100014a010005284a4929560100056e616e6f730100014901000a536f7572636546696c6501000b4f626a6563742e6a61766100210001000000000000000c000100030004000100050000002b0000000100000001b10000000200060000000600010000000500070000000c0001000000010008000900000004000a000b0002000c000000040001000d00050000002c000100010000000201b00000000200060000000600010000000800070000000c0001000000020008000900000001000f00100001000500000036000100020000000203ac0000000200060000000600010000000b000700000016000200000002000800090000000000020011000900010004001200040002000c000000040001001300050000002b0000000100000001b10000000200060000000600010000000d00070000000c0001000000010008000900000011001500160002001700000002001800050000002c000100010000000201b00000000200060000000600010000001000070000000c00010000000200080009000000010019001a000100050000002c000100010000000202ac0000000200060000000600010000001300070000000c0001000000020008000900000011001b00040002000c000000040001001c00050000002b0000000100000001b10000000200060000000600010000001500070000000c0001000000010008000900000011001e00040002000c000000040001001c00050000002b0000000100000001b10000000200060000000600010000001700070000000c0001000000010008000900000001001f0020000100050000002c000100010000000201b00000000200060000000600010000001a00070000000c0001000000020008000900000011002100040002000c000000060002001c002200050000002b0000000100000001b10000000200060000000600010000001c00070000000c0001000000010008000900000011002100240002000c000000060002001c00220005000000350000000300000001b10000000200060000000600010000001e000700000016000200000001000800090000000000010025002600010011002100270002000c000000060002001c002200050000003f0000000400000001b10000000200060000000600010000002000070000002000030000000100080009000000000001002500260001000000010028002900030001002a00000002002b"
+    },
+    "25-Serializable.class.bin": {
+      "bytes": 72,
+      "minor": 0,
+      "major": 69,
+      "constant_pool": [
+        null,
+        {
+          "offset": 10,
+          "tag": 7,
+          "value": 2
+        },
+        {
+          "offset": 13,
+          "tag": 1,
+          "value": "java/io/Serializable"
+        },
+        {
+          "offset": 36,
+          "tag": 7,
+          "value": 4
+        },
+        {
+          "offset": 39,
+          "tag": 1,
+          "value": "java/lang/Object"
+        }
+      ],
+      "flags": 1537,
+      "this_class": "java/io/Serializable",
+      "super_class": "java/lang/Object",
+      "interfaces": [],
+      "fields": [],
+      "methods": [],
+      "attributes": [],
+      "consumed": 72,
+      "hex": "cafebabe0000004500050700020100146a6176612f696f2f53657269616c697a61626c650700040100106a6176612f6c616e672f4f626a6563740601000100030000000000000000"
+    },
+    "25-Object.class.bin": {
+      "bytes": 898,
+      "minor": 0,
+      "major": 69,
+      "constant_pool": [
+        null,
+        {
+          "offset": 10,
+          "tag": 7,
+          "value": 2
+        },
+        {
+          "offset": 13,
+          "tag": 1,
+          "value": "java/lang/Object"
+        },
+        {
+          "offset": 32,
+          "tag": 1,
+          "value": "<init>"
+        },
+        {
+          "offset": 41,
+          "tag": 1,
+          "value": "()V"
+        },
+        {
+          "offset": 47,
+          "tag": 1,
+          "value": "Code"
+        },
+        {
+          "offset": 54,
+          "tag": 1,
+          "value": "clone"
+        },
+        {
+          "offset": 62,
+          "tag": 1,
+          "value": "()Ljava/lang/Object;"
+        },
+        {
+          "offset": 85,
+          "tag": 1,
+          "value": "Exceptions"
+        },
+        {
+          "offset": 98,
+          "tag": 7,
+          "value": 10
+        },
+        {
+          "offset": 101,
+          "tag": 1,
+          "value": "java/lang/CloneNotSupportedException"
+        },
+        {
+          "offset": 140,
+          "tag": 1,
+          "value": "equals"
+        },
+        {
+          "offset": 149,
+          "tag": 1,
+          "value": "(Ljava/lang/Object;)Z"
+        },
+        {
+          "offset": 173,
+          "tag": 1,
+          "value": "finalize"
+        },
+        {
+          "offset": 184,
+          "tag": 7,
+          "value": 15
+        },
+        {
+          "offset": 187,
+          "tag": 1,
+          "value": "java/lang/Throwable"
+        },
+        {
+          "offset": 209,
+          "tag": 1,
+          "value": "getClass"
+        },
+        {
+          "offset": 220,
+          "tag": 1,
+          "value": "()Ljava/lang/Class;"
+        },
+        {
+          "offset": 242,
+          "tag": 1,
+          "value": "Signature"
+        },
+        {
+          "offset": 254,
+          "tag": 1,
+          "value": "()Ljava/lang/Class<+Ljava/lang/Object;>;"
+        },
+        {
+          "offset": 297,
+          "tag": 1,
+          "value": "hashCode"
+        },
+        {
+          "offset": 308,
+          "tag": 1,
+          "value": "()I"
+        },
+        {
+          "offset": 314,
+          "tag": 1,
+          "value": "notify"
+        },
+        {
+          "offset": 323,
+          "tag": 7,
+          "value": 24
+        },
+        {
+          "offset": 326,
+          "tag": 1,
+          "value": "java/lang/IllegalMonitorStateException"
+        },
+        {
+          "offset": 367,
+          "tag": 1,
+          "value": "notifyAll"
+        },
+        {
+          "offset": 379,
+          "tag": 1,
+          "value": "toString"
+        },
+        {
+          "offset": 390,
+          "tag": 1,
+          "value": "()Ljava/lang/String;"
+        },
+        {
+          "offset": 413,
+          "tag": 1,
+          "value": "wait"
+        },
+        {
+          "offset": 420,
+          "tag": 7,
+          "value": 30
+        },
+        {
+          "offset": 423,
+          "tag": 1,
+          "value": "java/lang/InterruptedException"
+        },
+        {
+          "offset": 456,
+          "tag": 1,
+          "value": "(J)V"
+        },
+        {
+          "offset": 463,
+          "tag": 1,
+          "value": "(JI)V"
+        }
+      ],
+      "flags": 33,
+      "this_class": "java/lang/Object",
+      "super_class": null,
+      "interfaces": [],
+      "fields": [],
+      "methods": [
+        {
+          "offset": 483,
+          "flags": 1,
+          "name": "<init>",
+          "descriptor": "()V",
+          "attributes": [
+            {
+              "offset": 491,
+              "name": "Code",
+              "bytes": 13,
+              "hex": "0000000100000001b100000000"
+            }
+          ]
+        },
+        {
+          "offset": 510,
+          "flags": 4,
+          "name": "clone",
+          "descriptor": "()Ljava/lang/Object;",
+          "attributes": [
+            {
+              "offset": 518,
+              "name": "Code",
+              "bytes": 14,
+              "hex": "000100010000000201b000000000"
+            },
+            {
+              "offset": 538,
+              "name": "Exceptions",
+              "bytes": 4,
+              "hex": "00010009"
+            }
+          ]
+        },
+        {
+          "offset": 548,
+          "flags": 1,
+          "name": "equals",
+          "descriptor": "(Ljava/lang/Object;)Z",
+          "attributes": [
+            {
+              "offset": 556,
+              "name": "Code",
+              "bytes": 14,
+              "hex": "000100020000000203ac00000000"
+            }
+          ]
+        },
+        {
+          "offset": 576,
+          "flags": 4,
+          "name": "finalize",
+          "descriptor": "()V",
+          "attributes": [
+            {
+              "offset": 584,
+              "name": "Code",
+              "bytes": 13,
+              "hex": "0000000100000001b100000000"
+            },
+            {
+              "offset": 603,
+              "name": "Exceptions",
+              "bytes": 4,
+              "hex": "0001000e"
+            }
+          ]
+        },
+        {
+          "offset": 613,
+          "flags": 17,
+          "name": "getClass",
+          "descriptor": "()Ljava/lang/Class;",
+          "attributes": [
+            {
+              "offset": 621,
+              "name": "Code",
+              "bytes": 14,
+              "hex": "000100010000000201b000000000"
+            },
+            {
+              "offset": 641,
+              "name": "Signature",
+              "bytes": 2,
+              "hex": "0013"
+            }
+          ]
+        },
+        {
+          "offset": 649,
+          "flags": 1,
+          "name": "hashCode",
+          "descriptor": "()I",
+          "attributes": [
+            {
+              "offset": 657,
+              "name": "Code",
+              "bytes": 14,
+              "hex": "000100010000000202ac00000000"
+            }
+          ]
+        },
+        {
+          "offset": 677,
+          "flags": 17,
+          "name": "notify",
+          "descriptor": "()V",
+          "attributes": [
+            {
+              "offset": 685,
+              "name": "Code",
+              "bytes": 13,
+              "hex": "0000000100000001b100000000"
+            },
+            {
+              "offset": 704,
+              "name": "Exceptions",
+              "bytes": 4,
+              "hex": "00010017"
+            }
+          ]
+        },
+        {
+          "offset": 714,
+          "flags": 17,
+          "name": "notifyAll",
+          "descriptor": "()V",
+          "attributes": [
+            {
+              "offset": 722,
+              "name": "Code",
+              "bytes": 13,
+              "hex": "0000000100000001b100000000"
+            },
+            {
+              "offset": 741,
+              "name": "Exceptions",
+              "bytes": 4,
+              "hex": "00010017"
+            }
+          ]
+        },
+        {
+          "offset": 751,
+          "flags": 1,
+          "name": "toString",
+          "descriptor": "()Ljava/lang/String;",
+          "attributes": [
+            {
+              "offset": 759,
+              "name": "Code",
+              "bytes": 14,
+              "hex": "000100010000000201b000000000"
+            }
+          ]
+        },
+        {
+          "offset": 779,
+          "flags": 17,
+          "name": "wait",
+          "descriptor": "()V",
+          "attributes": [
+            {
+              "offset": 787,
+              "name": "Code",
+              "bytes": 13,
+              "hex": "0000000100000001b100000000"
+            },
+            {
+              "offset": 806,
+              "name": "Exceptions",
+              "bytes": 6,
+              "hex": "00020017001d"
+            }
+          ]
+        },
+        {
+          "offset": 818,
+          "flags": 17,
+          "name": "wait",
+          "descriptor": "(J)V",
+          "attributes": [
+            {
+              "offset": 826,
+              "name": "Code",
+              "bytes": 13,
+              "hex": "0000000300000001b100000000"
+            },
+            {
+              "offset": 845,
+              "name": "Exceptions",
+              "bytes": 6,
+              "hex": "00020017001d"
+            }
+          ]
+        },
+        {
+          "offset": 857,
+          "flags": 17,
+          "name": "wait",
+          "descriptor": "(JI)V",
+          "attributes": [
+            {
+              "offset": 865,
+              "name": "Code",
+              "bytes": 13,
+              "hex": "0000000400000001b100000000"
+            },
+            {
+              "offset": 884,
+              "name": "Exceptions",
+              "bytes": 6,
+              "hex": "00020017001d"
+            }
+          ]
+        }
+      ],
+      "attributes": [],
+      "consumed": 898,
+      "hex": "cafebabe0000004500210700020100106a6176612f6c616e672f4f626a6563740100063c696e69743e010003282956010004436f6465010005636c6f6e6501001428294c6a6176612f6c616e672f4f626a6563743b01000a457863657074696f6e7307000a0100246a6176612f6c616e672f436c6f6e654e6f74537570706f72746564457863657074696f6e010006657175616c73010015284c6a6176612f6c616e672f4f626a6563743b295a01000866696e616c697a6507000f0100136a6176612f6c616e672f5468726f7761626c65010008676574436c61737301001328294c6a6176612f6c616e672f436c6173733b0100095369676e617475726501002828294c6a6176612f6c616e672f436c6173733c2b4c6a6176612f6c616e672f4f626a6563743b3e3b01000868617368436f64650100032829490100066e6f746966790700180100266a6176612f6c616e672f496c6c6567616c4d6f6e69746f725374617465457863657074696f6e0100096e6f74696679416c6c010008746f537472696e6701001428294c6a6176612f6c616e672f537472696e673b0100047761697407001e01001e6a6176612f6c616e672f496e746572727570746564457863657074696f6e010004284a2956010005284a49295600210001000000000000000c000100030004000100050000000d0000000100000001b100000000000400060007000200050000000e000100010000000201b000000000000800000004000100090001000b000c000100050000000e000100020000000203ac000000000004000d0004000200050000000d0000000100000001b1000000000008000000040001000e001100100011000200050000000e000100010000000201b0000000000012000000020013000100140015000100050000000e000100010000000202ac00000000001100160004000200050000000d0000000100000001b10000000000080000000400010017001100190004000200050000000d0000000100000001b100000000000800000004000100170001001a001b000100050000000e000100010000000201b0000000000011001c0004000200050000000d0000000100000001b10000000000080000000600020017001d0011001c001f000200050000000d0000000300000001b10000000000080000000600020017001d0011001c0020000200050000000d0000000400000001b10000000000080000000600020017001d0000"
+    }
+  }
+}

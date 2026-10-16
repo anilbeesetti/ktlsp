@@ -367,7 +367,7 @@ fn context_attributes_duplicates_lengths_indices_and_versions() {
     c.attributes[0].bytes = &[0, 0];
     assert!(decode_signatures(&c).is_err());
     c.attributes[0].bytes = &[0, 3];
-    for (major, minor) in [(48, 0), (68, 0), (67, 65535), (44, 0)] {
+    for (major, minor) in [(48, 0), (70, 0), (67, 65535), (44, 0)] {
         c.major = major;
         c.minor = minor;
         assert!(decode_signatures(&c).is_err());
@@ -754,5 +754,22 @@ fn optional_suffixes_have_valid_complete_prefixes() {
                 "{s} prefix {end}"
             );
         }
+    }
+}
+
+#[test]
+fn modern_nonempty_signatures_preserve_owner_contexts() {
+    for major in [68, 69] {
+        let mut c = blank();
+        c.major = major;
+        c.constants.push(Constant::Utf8(u("Ljava/lang/Object;")));
+        c.constants.push(Constant::Utf8(u("()V")));
+        c.attributes.push(Attribute { name: 1, bytes: &[0, 3] });
+        c.fields.push(member(vec![attr()]));
+        c.methods.push(member(vec![Attribute { name: 1, bytes: &[0, 4] }]));
+        let got = decode_signatures(&c).unwrap();
+        assert!(matches!(got.class, Some(Signature::Class(_))));
+        assert!(matches!(got.fields[0], Some(Signature::Field(_))));
+        assert!(matches!(got.methods[0], Some(Signature::Method(_))));
     }
 }

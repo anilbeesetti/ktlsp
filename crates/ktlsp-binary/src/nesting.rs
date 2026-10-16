@@ -140,7 +140,7 @@ fn optional(i: u16) -> Option<u16> {
 /// entries; MAX_BYTES across UTF-16 pool storage and raw attribute payloads;
 /// MAX_VALIDATION_UNITS across referenced text and relationship validation.
 pub fn decode<'a>(c: &'a ClassFile<'_>) -> Result<Nesting<'a>> {
-    if !(c.major == 45 && c.minor <= 3 || (46..=67).contains(&c.major) && c.minor == 0) {
+    if !crate::supported_class_version(c.major, c.minor) {
         return Err(Error::UnsupportedVersion {
             major: c.major,
             minor: c.minor,

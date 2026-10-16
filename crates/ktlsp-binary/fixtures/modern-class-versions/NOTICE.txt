@@ -1,0 +1,18 @@
+Eclipse JDT Core minimal JCL test-library data
+Repository: https://github.com/eclipse-jdt/eclipse.jdt.core
+Commit: 81575c8d352e1bd6e54970cb13f6b91ceccb3300
+
+The two jclMin24.jar.bin / jclMin25.jar.bin archives and four selected .class.bin
+members are unchanged upstream compiled test data. Matching original Serializable
+and Object sources, JCL/build.xml, plug-in about.html and root LICENSE (retained
+as EPL-2.0.txt) come from that same commit. Original notices remain unchanged.
+See PROVENANCE.json for exact upstream paths, Git blob identities, actual SHA-256,
+complete ZIP-entry inventory and selected class byte walks/hex.
+
+These are minimal JCL test libraries, NOT stock JDK distributions, proof of an
+exact compiler version, or evidence of the official Kotlin LSP's bundled JDK.
+No Java/JDK/compiler tool was executed. Data ingestion used hashing and ZIP/byte
+inventory only. Rust parser/attribute/classpath/import tests are authored source;
+no native test, build, lint, formatter or external public-API smoke was run by
+this implementation owner. Authored version/header/JMOD controls in tests are
+not genuine upstream class fixtures.

@@ -490,7 +490,7 @@ fn selected_payload_identity_version_failures_never_fall_through() {
     let good = class("p/C", 52);
     let wrong = class("p/D", 52);
     let newer = class("p/C", 55);
-    let unsupported = class("p/C", 68);
+    let unsupported = class("p/C", 70);
     let lower = verified(zip(&[(b"p/C.class", &good)], false));
     let li = index_zip_directory(&lower).unwrap();
     for (bytes, expected) in [
@@ -518,7 +518,7 @@ fn selected_payload_identity_version_failures_never_fall_through() {
             _ => assert!(matches!(
                 error,
                 ClasspathError::ClassPayload {
-                    error: ZipClassError::Class(Error::UnsupportedVersion { major: 68, .. }),
+                    error: ZipClassError::Class(Error::UnsupportedVersion { major: 70, .. }),
                     ..
                 }
             )),
@@ -792,4 +792,58 @@ fn whole_query_budgets_precede_scratch_growth_even_for_later_roots() {
         lookup_class(&[ClasspathRoot::Jar(&names); 5], "p/C", 8, &mut fresh).unwrap_err(),
         ClasspathError::Limit("scan bytes")
     );
+}
+
+#[test]
+fn modern_multi_release_rank_bound_is_not_the_requested_release() {
+    let base = class("p/C", 52);
+    let java24 = class("p/C", 68);
+    let java25 = class("p/C", 69);
+    let entries: &[(&[u8], &[u8])] = &[
+        (b"META-INF/MANIFEST.MF", MANIFEST),
+        (b"p/C.class", &base),
+        (b"META-INF/versions/24/p/C.class", &java24),
+        (b"META-INF/versions/25/p/C.class", &java25),
+        (b"META-INF/versions/024/p/C.class", b"noncanonical"),
+        (b"META-INF/versions/+25/p/C.class", b"noncanonical"),
+    ];
+    assert_eq!(rank(entries, 23).unwrap(), Some(ClassRank::Base));
+    assert_eq!(rank(entries, 24).unwrap(), Some(ClassRank::Version(24)));
+    assert_eq!(rank(entries, 25).unwrap(), Some(ClassRank::Version(25)));
+    assert!(matches!(rank(&[entries[0], entries[1], (entries[2].0, &java25)], 25), Err(ClasspathError::IncompatibleVersion { major: 69, maximum: 68, .. })));
+    assert_eq!(rank(&[entries[0], entries[1], (entries[3].0, &java24)], 25).unwrap(), Some(ClassRank::Version(25)));
+    let mut preview = java25.clone();
+    preview[4..6].copy_from_slice(&65535u16.to_be_bytes());
+    let newer = class("p/C", 70);
+    let wrong = class("p/D", 69);
+    let lower = verified(zip(&[(b"p/C.class", &base)], false));
+    let lower_index = index_zip_directory(&lower).unwrap();
+    for (selected, kind) in [(b"bad".as_slice(), 0), (&preview, 1), (&newer, 2), (&wrong, 3)] {
+        let artifact = verified(zip(&[entries[0], entries[1], entries[2], (entries[3].0, selected)], false));
+        let index = index_zip_directory(&artifact).unwrap();
+        let error = lookup_class(&[ClasspathRoot::Jar(&index), ClasspathRoot::Jar(&lower_index)], "p/C", 25, &mut Vec::new()).unwrap_err();
+        match kind {
+            0 => assert!(matches!(error, ClasspathError::ClassPayload { error: ZipClassError::Class(Error::Truncated), .. })),
+            1 => assert!(matches!(error, ClasspathError::ClassPayload { error: ZipClassError::Class(Error::UnsupportedVersion { major: 69, minor: 65535 }), .. })),
+            2 => assert!(matches!(error, ClasspathError::ClassPayload { error: ZipClassError::Class(Error::UnsupportedVersion { major: 70, minor: 0 }), .. })),
+            _ => assert!(matches!(error, ClasspathError::DeclaredName { .. })),
+        }
+    }
+}
+
+#[test]
+fn authored_modern_jmod_uses_explicit_release_not_format_header() {
+    for major in [68, 69] {
+        let payload = class("p/C", major);
+        let mut bytes = b"JM\x01\x00".to_vec();
+        bytes.extend(zip(&[(b"classes/p/C.class", &payload)], false));
+        let artifact = verified(bytes);
+        let index = index_jmod_directory(&artifact).unwrap();
+        let roots = [ClasspathRoot::Jmod(&index)];
+        let release = major - 44;
+        let mut scratch = Vec::new();
+        let selected = lookup_class(&roots, "p/C", release, &mut scratch).unwrap().unwrap();
+        assert_eq!((selected.origin.rank, selected.class.major), (ClassRank::Jmod, major));
+        assert!(matches!(lookup_class(&roots, "p/C", release - 1, &mut scratch), Err(ClasspathError::IncompatibleVersion { maximum, .. }) if maximum == u32::from(major - 1)));
+    }
 }

@@ -165,9 +165,9 @@ supported entry encountered earlier wins over a later unsupported target. An
 unsupported tag encountered first wins over missing/invalid later bytes. No
 pre-scan/reordering or silent target skip.
 
-Existing declarations accept only45.0–45.3 or46..67 minor0 and reject all other
+Existing declarations accept only45.0–45.3 or46..69 minor0 and reject all other
 major/minor first with UnsupportedVersion{major,minor}. A recognized FIELD or
-METHOD type attr requires major52..67 minor0, even count0/truncated attr: before
+METHOD type attr requires major52..69 minor0, even count0/truncated attr: before
 its payload read, pre52 returns Malformed("type annotation version"). Without
 recognized field/method type attrs, earlier supported versions retain inherited
 acceptance. Class type attrs remain opaque even pre52 or duplicate/malformed;

@@ -418,12 +418,12 @@ fn path_widths_every_prefix_and_trailing_data() {
 #[test]
 fn versions_duplicates_opaque_contexts_and_declaration_precedence() {
     let bytes = fixture!("parameter0");
-    for major in 45..=68 {
+    for major in 45..=70 {
         for minor in [0, 1, 3, 65535] {
             let mut c = base();
             c.major = major;
             c.minor = minor;
-            let supported = major == 45 && minor <= 3 || (46..=67).contains(&major) && minor == 0;
+            let supported = major == 45 && minor <= 3 || (46..=69).contains(&major) && minor == 0;
             if !supported {
                 assert_eq!(
                     decode(&c).unwrap_err(),
@@ -500,11 +500,11 @@ fn versions_duplicates_opaque_contexts_and_declaration_precedence() {
         decode(&c).unwrap_err(),
         Error::Malformed("annotation constant pool size")
     );
-    c.major = 68;
+    c.major = 70;
     assert_eq!(
         decode(&c).unwrap_err(),
         Error::UnsupportedVersion {
-            major: 68,
+            major: 70,
             minor: 0
         }
     );

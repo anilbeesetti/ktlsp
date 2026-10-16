@@ -242,7 +242,9 @@ fn default_context_method_flags_and_version_sensitive_strict() {
         (60, 0, 0xc01, false),
         (61, 0, 0xc01, true),
         (67, 0, 0xc01, true),
-        (68, 0, 0x401, false),
+        (68, 0, 0x401, true),
+        (69, 0, 0x401, true),
+        (70, 0, 0x401, false),
         (67, 65535, 0x401, false),
         (49, 0, 0xc01, false),
     ] {
@@ -329,7 +331,9 @@ fn placements_duplicate_content_versions_and_opaque_interiors() {
             (48, 0, false),
             (49, 0, true),
             (67, 0, true),
-            (68, 0, false),
+            (68, 0, true),
+            (69, 0, true),
+            (70, 0, false),
             (67, 1, false),
             (67, 65535, false),
         ] {
@@ -734,5 +738,21 @@ fn precompiled_parameter_annotations_and_defaults_data_only() {
                 .any(|(n, v)| *n == name && **v == expected_value),
             "{expected_name}"
         );
+    }
+}
+
+#[test]
+fn modern_nonempty_parameter_annotations_preserve_encoded_positions() {
+    let a = annotation(&scalar(b's', 16));
+    let bytes = parameters(&[vec![], vec![a]]);
+    for major in [68, 69] {
+        let mut c = base();
+        c.major = major;
+        method_descriptor(&mut c, "(I)V");
+        c.methods[0].attributes = vec![attr(1, &bytes)];
+        let out = decode(&c).unwrap();
+        assert_eq!(out.methods[0].parameters[0].parameters.len(), 2);
+        assert!(out.methods[0].parameters[0].parameters[0].is_empty());
+        assert_eq!(out.methods[0].parameters[0].parameters[1][0].elements[0].value, Value::String(&[0, 0xd800, 97, 0xdc00]));
     }
 }

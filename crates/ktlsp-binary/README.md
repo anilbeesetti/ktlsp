@@ -2,9 +2,26 @@
 
 `parse_class(&[u8]) -> Result<ClassFile<'_>, Error>` reads classfile structure as data, using only Rust's standard library. No existing server caller or capability uses it yet. All fixtures in `tests/classfile.rs` are independently authored Rust byte builders, with no copied third-party code or compiler-produced artifacts. No JVM/compiler/oracle was run.
 
-Supported version subset: 45.0–45.3 and 46.0–67.0 (through Java 23). Preview minors, nonzero minors for majors 46–67, newer and older versions return `UnsupportedVersion`. This deliberately excludes some historically valid versions. New CP tags are gated at 51 (method handle/type/invokedynamic), 53 (module/package), and 55 (dynamic). Unknown tags return `UnsupportedTag`.
+Supported version subset: 45.0–45.3 and 46.0–69.0 (through Java 25). Preview minors, nonzero minors for majors 46–69, newer and older versions return `UnsupportedVersion`. This deliberately excludes some historically valid versions. All six structural/attribute entry gates share this policy. New CP tags are gated at 51 (method handle/type/invokedynamic), 53 (module/package), and 55 (dynamic). Unknown tags return `UnsupportedTag`.
 
 The result preserves raw access flags, CP indices, interface/member order, and borrowed opaque attribute payloads. CP zero/wide second slots are `Constant::Unusable`. Integer and floating constants preserve their bits. `utf16(index)` exposes modified UTF-8 losslessly as UTF-16 code units, including encoded NUL and isolated surrogates; callers decide whether conversion to a Rust string is appropriate.
+
+Java 24/25 admission changes only ordinary version support, not JVM verification,
+descriptor grammar, tag introduction floors, attribute applicability or resource
+bounds. [JVMS 23](https://docs.oracle.com/javase/specs/jvms/se23/html/jvms-4.html),
+[24](https://docs.oracle.com/javase/specs/jvms/se24/html/jvms-4.html) and
+[25](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html) retain the
+consumed constant tags, member/descriptor and outer-attribute framing. Unknown
+attribute interiors remain opaque; no preview, Q descriptors or Java-source
+constructor-order restriction is added. Historical review receipts below and in
+`*_REVIEW.md` describe their original reviewed ceilings, not the current policy.
+
+Pinned Eclipse JDT minimal JCL **test-library** fixtures for 68.0/69.0 reside in
+`fixtures/modern-class-versions`: unchanged archives, exact extracted Serializable
+and method-bearing Object classes, matching source/build/about/EPL-2.0 notices,
+and `PROVENANCE.json` with whole ZIP inventory, SHA-256 and selected byte walks.
+They are not stock SDKs or evidence of an exact compiler or bundled LSP JDK.
+These new test expectations have not yet been exercised; ROOT owns validation.
 
 Validation covers structural typed CP references, method-handle kinds/targets, class/member names and descriptors, array depth (255), parameter slots (255, including receiver for declared instance methods), attribute name indices and lengths, and exact EOF. It does not resolve external classes. Special method names have descriptor/handle restrictions. Attribute names are validated as UTF-8 pool references; their text and contents are otherwise opaque.
 

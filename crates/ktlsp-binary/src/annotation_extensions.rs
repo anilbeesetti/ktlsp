@@ -27,7 +27,7 @@ pub struct AnnotationExtensions<'a> {
 }
 
 /// One shared declaration/extension byte/node/work/depth budget (see #115).
-/// Raw attributes remain intact; recognized extensions require 49.0 through67.0.
+/// Raw attributes remain intact; recognized extensions require 49.0 through 69.0.
 /// Only consumed references/local default shapes are validated, not JVM semantics.
 /// The additional scan can exhaust work on inputs accepted by declaration-only decode.
 pub fn decode<'a>(class: &'a ClassFile<'_>) -> Result<AnnotationExtensions<'a>> {

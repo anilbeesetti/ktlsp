@@ -822,3 +822,41 @@ fn unix_foreign_backslash_source_path_is_not_admitted_as_a_native_separator() {
         Err(Error::InvalidSourcePath)
     ));
 }
+
+#[test]
+fn genuine_minimal_jcl_source_owner_uses_explicit_java24_java25_release() {
+    // Genuine Eclipse JDT test libraries, not stock SDKs or Maven artifacts.
+    for (release, bytes, expected) in [
+        (24u16, include_bytes!("../../ktlsp-binary/fixtures/modern-class-versions/jclMin24.jar.bin").as_slice(), "49335cdc8f8e0a2a7f529e8c5167181ee67acf334150e23a2f0dd3a03c7c57db"),
+        (25, include_bytes!("../../ktlsp-binary/fixtures/modern-class-versions/jclMin25.jar.bin").as_slice(), "8eb40b1a47696cf92b4a83a70fd07c885bea858a5dd907edc962ed48b74585da"),
+    ] {
+        assert_eq!(format!("{:x}", Sha256::digest(bytes)), expected);
+        let path: PathBuf = project().join(format!("crates/ktlsp-binary/fixtures/modern-class-versions/jclMin{release}.jar.bin")).components().collect();
+        let artifact = verify_sha256(Artifact {
+            bytes: bytes.to_vec(),
+            provenance: Provenance {
+                coordinate: Coordinate::new("fixture", "eclipse-jdt-minimal-jcl", &release.to_string(), None, "jar").unwrap(),
+                repository_root: path.parent().unwrap().into(),
+                artifact_path: path.clone(),
+                byte_length: bytes.len(),
+                checksum: ChecksumStatus::Unverified,
+            },
+        }, Sha256::digest(bytes).into()).unwrap();
+        let workspace = import(model(vec![edge("minimal-jcl")], vec![library("minimal-jcl", std::slice::from_ref(&path))]));
+        let bindings = [binding("minimal-jcl", 0, &artifact)];
+        let mut scratch = Vec::new();
+        {
+            let result = select_class(&workspace, &source(), "java/io/Serializable", release, &bindings, &mut scratch).unwrap();
+            assert_eq!(result.owner.module.id, "app");
+            assert_eq!(result.owner.source_root.kind, SourceRootKind::Production);
+            let found = result.class.unwrap();
+            assert_eq!(found.library.id, "minimal-jcl");
+            assert_eq!(found.binary_root, 0);
+            assert_eq!(found.import_path, path);
+            assert!(std::ptr::eq(found.artifact, &artifact));
+            assert_eq!(found.selected.origin.rank, ClassRank::Base);
+            assert_eq!((found.selected.class.major, found.selected.class.minor), (release + 44, 0));
+        }
+        assert!(matches!(select_class(&workspace, &source(), "java/io/Serializable", release - 1, &bindings, &mut scratch), Err(Error::Classpath(ClasspathError::IncompatibleVersion { maximum, .. })) if maximum == u32::from(release + 43)));
+    }
+}

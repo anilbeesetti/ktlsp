@@ -40,8 +40,8 @@ before duplicate check, duplicate check before second payload read; first payloa
 failure wins before a later duplicate. Exact payload exhaustion is required,
 otherwise Malformed("type annotation trailing bytes").
 
-Global versions inherited from declarations:45.0..45.3 or46..67 minor0 only;
-UnsupportedVersion first. Recognized class type attr requires major52..67,
+Global versions inherited from declarations:45.0..45.3 or46..69 minor0 only;
+UnsupportedVersion first. Recognized class type attr requires major52..69,
 even count0/empty/truncated payload: pre52 -> Malformed("type annotation version").
 Absent class type attrs do not impose52. Field/method type attrs, Code/Record
 interiors and non-type attrs remain opaque to this new phase, including duplicate,

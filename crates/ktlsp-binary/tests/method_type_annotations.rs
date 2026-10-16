@@ -539,6 +539,8 @@ fn all_target_dispositions_path_and_version_boundaries() {
         (52, 0),
         (67, 0),
         (68, 0),
+        (69, 0),
+        (70, 0),
         (67, 1),
         (67, 65535),
     ] {
@@ -546,7 +548,7 @@ fn all_target_dispositions_path_and_version_boundaries() {
         c.major = major;
         c.minor = minor;
         c.methods[0].attributes = vec![attr(1, &[0, 0])];
-        if major > 67 || minor != 0 && major != 45 {
+        if major > 69 || minor != 0 && major != 45 {
             assert_eq!(
                 decode(&c).unwrap_err(),
                 Error::UnsupportedVersion { major, minor }
@@ -669,12 +671,12 @@ fn inherited_errors_precede_methods_and_unconsumed_refs_stay_unconsumed() {
         decode(&c).unwrap_err(),
         Error::Malformed("annotation extension context")
     );
-    c.major = 68;
+    c.major = 70;
     c.constants.clear();
     assert_eq!(
         decode(&c).unwrap_err(),
         Error::UnsupportedVersion {
-            major: 68,
+            major: 70,
             minor: 0
         }
     );
@@ -1634,5 +1636,20 @@ fn genuine_bound_and_formal_parameter_fixture_matches_frozen_bytes() {
                 .encode_utf16()
                 .collect::<Vec<_>>()
         );
+    }
+}
+
+#[test]
+fn modern_all_six_nonempty_method_type_targets() {
+    for major in [68, 69] {
+        for (tag, info) in target_infos() {
+            let bytes = payload(&[target_root(tag, info, &[], None)]);
+            let mut c = base();
+            c.major = major;
+            c.methods[0].attributes = vec![attr(1, &bytes)];
+            let out = decode(&c).unwrap();
+            assert_eq!(out.methods[0][0].annotations[0].target_type, tag);
+            assert_eq!(out.methods[0][0].annotations[0].annotation.descriptor, c.utf16(3).unwrap());
+        }
     }
 }

@@ -416,8 +416,8 @@ types, stable cross-revision symbols or a new server capability.
   is validated; **every** call must prove this same local-function identity.
   Callees are a distinct authenticated role, never initializer `ReferenceSite`s.
   All original value binding, integer-default, visibility, occurrences and
-  guarded rename remain available in admitted mixed bodies. Function/type
-  parameters and callees never enter value completions or value occurrences.
+  guarded rename remain available in admitted mixed bodies. Local function
+  declarations, type parameters and callees never enter value completions or occurrences.
   Lookup inspects every relevant semantic-equivalent local declaration and
   parameter before eligibility; unsupported competition, overloads (including
   different arities), values/classifiers, unsupported spellings and richer call
@@ -429,11 +429,14 @@ types, stable cross-revision symbols or a new server capability.
   covers origin, complete body, every callee and all competitor/rename work.
   Private lookup never recursively invokes public body validation, allocates no
   names/candidates, and selected-call resolution is not repeated. Permanent real
-  producer and paired-CLI tests apply actual edits and rebind updated source;
-  bounded `TEMP_389` writers retain first hosted CST/diagnostic/target/wire
-  observations for ROOT before removal. They are not locally exercised proof.
+  producer and paired-CLI tests apply actual edits and rebind updated source.
+  ROOT and the source owner read all three complete original CST/target packets
+  and real mixed-body/returned-edit/rebind wire on both original platform hosts;
+  corrected-source38941146673 passed all full workspace checks. Writers were
+  removed only after readback; meaningful identity/edit/refusal assertions remain.
+  This is hosted native behavior, not local runtime or official equivalence.
   General overload/invoke, nonempty/nested local bodies, package/global fallback,
-  function references/rename/hover and official equivalence remain unsupported;
+  callee references/hover and function rename remain unsupported;
   #96 quarantine and the full-parity gap are unchanged.
 - `local_value_binding::bind_lexical_type_parameter(directory, result,
   annotation_reference_index, current)` authenticates original snapshot/tree

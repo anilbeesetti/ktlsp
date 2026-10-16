@@ -97,7 +97,17 @@ the cache. As with rename, an already delivered URI/version literal retained by
 a client across an identical-version reopen has no stronger incarnation guarantee.
 Provider and real-stdio regressions apply the actual returned edit, then require
 the exact version-8 text, fresh empty diagnostics and no remaining action.
-First original hosted observation remains separate from source review.
+At reviewed sourcee24c011, original platform38941146673 actually emitted the
+complete8-message/6-reply exchange on both hosts. ROOT and the independent owner
+read all packets and independently applied the received1:0–1:1 version-7 edit.
+The actual sent incremental change omitted absent `rangeLength`, committed
+version8, and produced fresh empty diagnostics followed by no further action.
+Corresponding observation packets match across hosts:2707bytes, SHA256
+564b94d9bfe250206a4ef4e45bbbe756cd60e0c53d640dc254059e105ec18790.
+Successful exit/empty stderr/empty PATH/no Java homes are exercised source
+assertions, not separate fields in that packet. No parser-backed request appears;
+an available worker is not ruled out. Only temporary writers/bookkeeping were
+removed after readback; cleanup-source CI/integration remain separate gates.
 
 
 ## Lexical semantic-token transport (#380)
@@ -257,8 +267,16 @@ or qualified/postfix shapes, nonempty local bodies and unsupported local headers
 fail atomically rather than pretending globally unresolved. This adds callee
 definition, not callee hover/references, function rename, general overload/invoke,
 signature help or official equivalence; declaration-name source hover is unchanged.
-First genuine producer/paired-CLI proof
-is still required before source review becomes runtime evidence.
+ROOT and the source owner directly read all three original producer/target
+records on both platform hosts:39/141/39 UTF8bytes,33/107/33 CSTelements,
+empty diagnostics and exact original callee/target/body/owner relationships.
+Actual minimal and mixed CLI exchanges retain6/3 and20/17 message/reply counts;
+all eight value consumers, generic targets, function-name conflict and callee
+refusals are distinct. Independently applied returned completion/rename edits
+match actual version8 reopened sources and preserve function/typeparameter
+targets. Sourcee24c011 passed original full Native38941146516 and platform
+38941146673; the earlier failed bad67 run remains immutable. Temporary writers
+were removed afterward; changed completion/rename rebind assertions remain.
 
 ## Finite local definition and declaration hover
 

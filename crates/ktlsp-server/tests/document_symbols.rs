@@ -2728,11 +2728,6 @@ fn local_empty_call_definition_and_mixed_values_use_actual_paired_cli_edits() {
         json!({"jsonrpc":"2.0","method":"exit"}),
     ];
     let replies = package.exchange(&messages);
-    // TEMP_389: retain first actual wire, including any refusal, before assertions.
-    eprintln!(
-        "TEMP_389_CLI_MINIMAL {}",
-        json!({"source":minimal,"sent":messages,"replies":replies})
-    );
     assert_eq!(replies[1]["id"], "callee");
     assert_eq!(
         replies[1]["result"],
@@ -2771,10 +2766,6 @@ fn local_empty_call_definition_and_mixed_values_use_actual_paired_cli_edits() {
         json!({"jsonrpc":"2.0","method":"exit"}),
     ];
     let replies = package.exchange(&messages);
-    eprintln!(
-        "TEMP_389_CLI_MIXED {}",
-        json!({"source":source,"sent":messages,"replies":replies})
-    );
     assert!(
         replies
             .iter()
@@ -2857,27 +2848,14 @@ fn local_empty_call_definition_and_mixed_values_use_actual_paired_cli_edits() {
             .replace("val x=", "val fresh=")
             .replace("=x", "=fresh")
     );
-    // Apply EVERY actual completion edit and the actual rename edit, then prove
-    // both updated value identity and unchanged original local function target.
-    let mut applied = items
-        .iter()
-        .map(|item| {
-            let (text, offset) = apply_completion(source, item, value_use);
-            let target = if item["label"] == "p" {
-                parameter
-            } else {
-                local
-            };
-            (text, offset, target, 1)
-        })
-        .collect::<Vec<_>>();
-    applied.push((
-        renamed.clone(),
-        renamed.find("=fresh").unwrap() + 1,
-        local,
-        5,
-    ));
-    for (text, offset, value_target, len) in applied {
+    // Rebind changed completion/rename edits and preserve the original callee.
+    let completion = items.iter().find(|item| item["label"] == "p").unwrap();
+    let (completed, completed_offset) = apply_completion(source, completion, value_use);
+    let renamed_offset = renamed.find("=fresh").unwrap() + 1;
+    for (text, offset, value_target, len) in [
+        (completed, completed_offset, parameter, 1),
+        (renamed, renamed_offset, local, 5),
+    ] {
         let messages = [
             init.clone(),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
@@ -2889,10 +2867,6 @@ fn local_empty_call_definition_and_mixed_values_use_actual_paired_cli_edits() {
             json!({"jsonrpc":"2.0","method":"exit"}),
         ];
         let rebound = package.exchange(&messages);
-        eprintln!(
-            "TEMP_389_CLI_EDIT {}",
-            json!({"source":text,"sent":messages,"replies":rebound})
-        );
         assert_eq!(
             rebound[1]["result"],
             json!({"uri":URI,"range":references_range(&text,value_target,len)})

@@ -1033,3 +1033,77 @@ No extra parse is added. Source reviews/native data are not actual provider or
 official equivalence; first hosted readback, writer-only cleanup, final original
 native/platformCI and guarded integration/OWNER+ROOTmain remain required.
 
+### First original local-call and quickfix outcomes
+
+First reviewedbad67b5931abfd6e671719aee0510c9131dda265/treeee9060a3
+ran original Native38939434901/job117103045641 and platform38939435059:
+Windows117103045825/Mac117103046326. Native stopped at one obsolete empty-local
+function refusal; platform full132-row censuses each retained5failures,
+3ignored/0filtered (1015Windows/1068Mac passes). Original source
+fd53323201105d36ab2f3d34605d663d18549682 has treeee90/parents[c4,bad67].
+Both failure ZIPs12063405406/12062641957 were authenticated; no retry occurred.
+
+All five failures were test/contract issues: two formerly unsupported empty
+functions are now intentionally admitted; a CLI negative indexed a diagnostic
+notification instead of matching its callee reply; both edit-application tests
+serialized native `TextChange` as `rangeLength:null`, which the unchanged strict
+wire validator correctly rejected. ROOT migrated exact empty cases to original-
+identity positives, retained nonempty-body refusal and all11 callee negatives,
+selected the exact response ID, and sent actual edit-derived range/text with
+absent rangeLength omitted. No production, input guard, serializer, bound or
+two-second timeout changed. Both reviewers cleared expanded21-file
+e24c0114d05250ade17ff1fb9aa49cdc9954bf9d/treeb3f32d5239b16e3eb62e1dede2c014fbc8932658;
+pinned format/strict workspace-all-target Clippy passed.
+
+That changed source's OWN original attempt1 checks passed, without filters:
+
+|Original run/job|Workspace passes|Separate faultcases|
+|---|---:|---:|
+|Native38941146516/117108802041|1075|22|
+|Platform38941146673/Windows117108802992|1020|22|
+|Platform38941146673/macOS117108803352|1073|22|
+
+All132 resultrows have0failed/3ignored/0filtered. Actual checkout
+8e43cccc0d6f3b0285beb3617e8e0bc9f14cb9fb has exact treeb3f32d and
+ordered parents[c4,e24]; the older event merge SHAfd533 was not substituted for
+actual source. Complete clean preflight/zero mandatory exits and original API
+ZIPs agree: macOS12063582424 SHA256
+612ff25f4ca2a9b27f657ee5bad1726d3e577b7a2842827f8857cf789c5bbec1;
+Windows12063397200 SHA256
+7a6fc53a176f025d79a6cfa7de9caee4ff5095189c8f02589afbd96af6ed0c98.
+
+ROOT and independent owners directly read corresponding actual packets.
+All13 records agree byte-for-byte across hosts; the11 local-call records also
+match the earlier failed-source positives. Three complete CSTs retain39/141/39
+UTF8bytes,33/107/33 elements,21/74/21 tokens and0diagnostics. Original minimal
+target name17..23 precedes its call; mixed local quotedtarget76..84 belongs to
+the original outer function/body, not same-name import/top-level declarations.
+Complete token/child partitions, UTF8 boundaries and original associations passed.
+Actual minimal6/3 and mixed20/17 messages/replies exercise all8 consumers.
+ROOT and owner independently applied actual returned UTF16 completion/rename
+edits; all three captured8/5 version8 followups preserve callee/typeparameter
+targets and bind values correctly. No-op self-completion's redundant reopen was
+removed during cleanup; both completion candidates and the meaningful changed
+completion/rename application/rebinding assertions remain.
+
+The first complete actual quickfix packet has8sent/6received messages:
+source `val s = "😀"\r\n)` at URIuntitled:fix/version7; actual versioned one-edit
+deletion1:0–1:1; actualdidChange8 with returned range/emptytext and absent
+rangeLength; actualfresh version8 empty diagnostics, nextaction[] and shutdownnull.
+ROOT and owner independently applied the received edit to exactly
+`val s = "😀"\r\n`. Full2707-byte observationpacket SHA256
+564b94d9bfe250206a4ef4e45bbbe756cd60e0c53d640dc254059e105ec18790;
+325-byte actual-actionpacket SHA256
+a5dd1aa0e73d6ec20d61fa44f65750114deef1c9d8108a0853471987128254f7.
+Source assertions exercise empty PATH/no Java homes/exit0/empty stderr;
+these are not additional raw receipt fields. Available worker absence is not
+proved, but no parser-backed request occurs. Linux executed these tests;
+successful eprintln packets were not observed in its captured libtest output.
+
+Only temporary writers/bookkeeping and the duplicate no-op replay were removed
+after readback. All original identity, actual changed-edit/version8/rebinding,
+strict validation, budgets and refusal assertions remain. Final cleanup-source
+exact reviews/full original native/platformCI, fresh separate read-only guard/
+expected-head merge/actual tree+soleparent/OWNER+ROOToriginalmain remain required.
+Full parity,96/B3/46/license/official and377cause gates are not closed.
+

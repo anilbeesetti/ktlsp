@@ -538,21 +538,16 @@ fn real_stdio_structural_action_applies_received_edit_and_observes_fresh_diagnos
             }
         }
     });
-    let mut sent = Vec::new();
-    let mut replies = Vec::new();
     let mut send = |message: Value| {
         input
             .write_all(&encode(std::slice::from_ref(&message)))
             .unwrap();
         input.flush().unwrap();
-        sent.push(message);
     };
-    let mut receive = || {
-        let reply = receiver
+    let receive = || {
+        receiver
             .recv_timeout(Duration::from_secs(2))
-            .expect("structural action stdio reply timeout");
-        replies.push(reply.clone());
-        reply
+            .expect("structural action stdio reply timeout")
     };
     let uri = "untitled:fix";
     let source = "val s = \"😀\"\r\n)";
@@ -593,10 +588,6 @@ fn real_stdio_structural_action_applies_received_edit_and_observes_fresh_diagnos
         action_params.clone(),
     ));
     let action = receive();
-    eprintln!(
-        "TEMP_391_ACTION {}",
-        json!({"source":source,"reply":action})
-    );
     assert_eq!(action["id"], "action");
     assert_eq!(
         action["result"],
@@ -666,10 +657,4 @@ fn real_stdio_structural_action_applies_received_edit_and_observes_fresh_diagnos
     let mut errors = String::new();
     std::io::Read::read_to_string(child.0.stderr.as_mut().unwrap(), &mut errors).unwrap();
     assert!(errors.is_empty(), "{errors}");
-    // TEMP_391: ROOT reads the first original hosted payload before removing this writer.
-    eprintln!(
-        "TEMP_391 {}",
-        json!({"source":source,"sent":sent,"replies":replies,
-        "appliedSource":applied.text(),"appliedVersion":applied.version()})
-    );
 }

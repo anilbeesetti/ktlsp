@@ -1036,13 +1036,6 @@ fn local_empty_function_callees_preserve_original_identity_and_mixed_values() {
         let result = parse(source);
         let current = result.snapshot();
         let tree = result.tree_for(current).unwrap();
-        // TEMP_389: first genuine producer path only; no additional parse/capture.
-        eprintln!(
-            "TEMP_389_PRODUCER {}",
-            serde_json::json!({"source":source,"document":current.document(),
-                "revision":current.revision(),"elements":tree.elements(),
-                "diagnostics":tree.diagnostics()})
-        );
         assert!(tree.diagnostics().is_empty());
         let lower = lower_declarations(&result, current).unwrap();
         let directory = build_regions(&lower, &result, current).unwrap();
@@ -1102,15 +1095,6 @@ fn local_empty_function_callees_preserve_original_identity_and_mixed_values() {
         ] {
             assert!(bind_local_function_callee(&directory, &result, index, current).is_err());
         }
-        eprintln!(
-            "TEMP_389_TARGET {}",
-            serde_json::json!({"source":source,"calleeIndex":callee_index,
-                "target":{"kind":target.kind(),"cstIndex":target.cst_index(),
-                    "name":target.raw_name(),"nameRange":target.name_range(),
-                    "owner":target.owner(),"cstParentIndex":target.cst_parent_index()},
-                "functionIndex":binding.function().cst_index(),
-                "bodyIndex":binding.body().cst_index()})
-        );
         if !source.contains("val x") {
             continue;
         }

@@ -14,6 +14,50 @@ Success is **not JVM verification**. Attribute interiors (Code, BootstrapMethods
 
 Format contract: [JVMS Java SE 23 chapter 4](https://docs.oracle.com/javase/specs/jvms/se23/html/jvms-4.html). This reader implements only the subset above.
 
+## Borrowed descriptor structure (#358)
+
+`descriptors::FieldDescriptor::parse(&[u16])` and
+`MethodDescriptor::parse(&[u16], SlotContext)` validate complete input before
+returning private-field, copyable borrowed views. `raw()` preserves descriptor
+identity; `dimensions()` is the flattened array rank (0–255), and `component()`
+distinguishes all eight primitive kinds from a borrowed lossless UTF-16 internal
+object name. No String/Vec/Box or text conversion is performed per descriptor.
+The class reader's existing descriptor validator delegates to these same parsers;
+parameter iteration uses the sole shared field-type grammar.
+
+`parameters()` produces a fresh allocation-free iterator in encoded order.
+`result()` is `None` only for void; V is rejected for fields, array components
+and parameters. `parameter_slots()` includes an implicit receiver only when the
+caller explicitly selects `SlotContext::WithReceiver`. The receiver is not an
+encoded parameter; long/double use two slots, arrays/references one, and totals
+over 255 fail. Constant-pool descriptors with no known invocation context can use
+`WithoutReceiver`; declaration callers must supply their actual receiver context.
+
+Each supplied slice is capped at 65,535 UTF-16 units before scanning. This is a
+decoded-unit cap, not validation of modified-UTF-8 encoded byte length (the
+classfile reader checks its u2 byte length separately). Validation is iterative,
+linear, at most two scans of object names, and uses checked rank/slot arithmetic.
+Each iterator traversal reparses only its validated parameter slice linearly.
+Malformed, missing, trailing and oversized input returns `Error`, with no partial
+successful view, lossy normalization or recursive allocation. Existing aggregate
+classfile validation-work limits remain unchanged.
+
+Format rules: [JVMS §4.3.2 field descriptors and §4.3.3 method descriptors](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html#jvms-4.3.2),
+including 255 dimensions and 255 parameter slots with receiver. Names reuse the
+reader's internal-name validation. This is structural data only: generic
+`Signature` parsing remains in `signatures`; descriptors establish no Kotlin
+nullability, generic substitution, linkage, access control or resolved symbols.
+No server capability or public feature-parity claim changes.
+
+`tests/descriptors.rs` exercises all three unchanged retained Commons Lang 3.17.0
+classfiles from `fixtures/t017c1` through the public API, plus malformed, void,
+slot/rank/input boundaries and borrowed-pointer identity. Existing
+`provenance.json`, LICENSE and NOTICE remain authoritative and unchanged.
+The separate native pure-data consumer is reproducible with
+`cargo run --locked -p ktlsp-binary --example descriptor_smoke`; it reads the
+retained Builder classfile and checks borrowed fields, parameters, return/void,
+primitive/array structure and explicit malformed-input failure without Java.
+
 ## Selected archive classfiles
 
 `parse_zip_class(&index, ordinal, &mut scratch)` is the production composition of

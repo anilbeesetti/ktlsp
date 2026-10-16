@@ -17,7 +17,7 @@ fn alias(underlying: &[u8], expanded: &[u8]) -> Vec<u8> {
     out
 }
 fn package(body: &[u8]) -> Vec<u8> {
-    let mut out = vec![0]; // Empty StringTableTypes: resolver must use d2.
+    let mut out = vec![4, 0x0a, 0, 0x0a, 0]; // Two fallback records select d2[0/1].
     out.extend(message(5, body));
     out
 }
@@ -48,7 +48,7 @@ fn class_id_quoted_slash_nested_local_and_lossless_units() {
     let mut name = units("a/b/`Outer/Quoted`.Inner");
     name.extend([0xd800, 0, 0xdc00]);
     let declaration = [0xd800, 0];
-    let mut bytes = vec![2, 0x28, 1]; // local_name = 1.
+    let mut bytes = vec![6, 0x0a, 0, 0x0a, 0, 0x28, 1]; // Two records; local_name = 1.
     bytes.extend(message(5, &alias(&[0x30,1,0x18,0], &[0x30,1,0x18,1])));
     let input = input(bytes, &[&declaration, &name]);
     let result = decode(&input, Limits::default()).unwrap();

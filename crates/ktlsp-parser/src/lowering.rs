@@ -840,16 +840,15 @@ fn walk<'a>(
         };
         if pass != Pass::Structure {
             context(t, parent, e, i)?;
-            if t == Tag::Reference {
-                if depth != 4
+            if t == Tag::Reference
+                && (depth != 4
                     || frame(s, 0, b)?.tag != Tag::Root
                     || frame(s, 1, b)?.tag != Tag::Fun
                     || frame(s, 2, b)?.tag != Tag::Block
                     || frame(s, 3, b)?.tag != Tag::Property
-                    || e.subtree_end != i + 2
-                {
-                    return Err(unsupported(i));
-                }
+                    || e.subtree_end != i + 2)
+            {
+                return Err(unsupported(i));
             }
             if let Some(mut f) = parent {
                 plain_child(&mut f, t, b)?;

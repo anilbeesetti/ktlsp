@@ -267,4 +267,21 @@ fn production_reference_initializer_preserves_declarations_and_regions() {
             .collect::<Vec<_>>(),
         [0, 1, 1]
     );
+    // TEMPORARY SEMANTIC_PREREQ_SMOKE: remove only after authenticated aggregate Linux proof.
+    {
+        use std::io::Write;
+        writeln!(
+            std::io::stdout().lock(),
+            "SEMANTIC_PREREQ_SMOKE capture={actual:?} diagnostics={:?} declarations={:?} errors={:?} regions={:?} memberships={:?} same_snapshot={} same_lowered={} same_directory_snapshot={}",
+            parsed.diagnostics(),
+            lower.declarations(),
+            lower.errors(),
+            directory.regions(),
+            directory.memberships(),
+            std::ptr::eq(lower.snapshot(), result.snapshot()),
+            std::ptr::eq(directory.lowered(), &lower),
+            std::ptr::eq(directory.snapshot(), result.snapshot()),
+        )
+        .unwrap();
+    }
 }

@@ -1388,3 +1388,54 @@ Its TEMP_392 writers remain deliberately intact until ROOT and independent
 owner have read those actual payloads. Full native/platform original CI,
 capture-free final own-source CI and guarded integration remain required.
 
+#### Original full hosted CI and actual type-parameter product proof
+
+PR400's first reviewed headb56d1b24dfaf80e8b4bf872e60790354104f28ca/tree5154c3ef3941b0480d4b5a1bd44bb7587540672f
+passed its own ORIGINAL attempt1 full native/platform workflows. Actual test
+merge406598002f1a338c515f09c4b2cad7ffecc75860 has that exact tree and ordered
+parents[verified6a621285,b56d1b24], independently checked against both original
+platform source preflights, API commit metadata and all three full job logs.
+Source/workflow identities, complete clean-worktree/raw command observations,
+byte policy, original parents and format/strict-Clippy/full-workspace exits0
+were read and authenticated; no retry or modified CI/source/bounds was used.
+
+| Original workflow | Job | Passed tests/doctests | Result rows | Failed | Ignored | Filtered |
+| --- | --- | --- | --- | --- | --- | --- |
+|Native38960726451|117174808109|1151|137|0|3|0|
+|Platform38960726407 macOS|117174808477|1149|137|0|3|0|
+|Platform38960726407 Windows|117174808085|1098|137|0|3|0|
+
+Original Windows artifact12073290413 is57166 bytes/SHA-256
+7ce58eca1bc39a1644e498fa09dadf8bde3ea9dcc9ae228904f16198f1a0b33f;
+macOS12072478144 is62262 bytes/SHA-256
+8ce97abf51b2eaf4cb460c1efcfb87a2328b77902ca0cb50a1bc03b58d876796.
+Both actual ZIP digests match the original API metadata. Complete raw job
+logs, ZIPs, identity/preflight/parent records and complete capture packets
+were retained, not inferred from the passing check badge.
+
+ROOT and the independent TypeParameterConsumers OWNER read ALL actual
+8 producer snapshots,104 identity records and8 CLI packets PER HOST.
+The two complete451110-byte packet sets are byte-identical, SHA-256
+c8bc0d1744934caff3ed0e6681b02c2b30e7aec31f28194252eada6134aa3332.
+Every original/edited tree has173 elements/zero diagnostics. Fresh/U/out/
+reified preserve actual admitted type-parameter grammar, declaration/list/
+function/body ownership, unrelated-function identity, value shadow partitions
+and the original local Fresh callee. CST spans are UTF-8 bytes, not host
+codepoint indices; LSP positions are UTF-16 with emoji/CRLF preserved.
+
+Each actual returned four-edit version7 rename was independently applied in
+descending ORIGINAL coordinates and matched the exact captured source reopened
+at version8. All edited type/value/callee definitions, references and next
+version8 edits were read; unused-declaration/includeDeclaration/prepare/
+highlight variants and T/Spare→Int capture refusals matched real replies.
+No Linux packet claim is made: Linux's full checks passed without exposing
+those temporary payloads. No target runtime was rerun locally for readback.
+
+Only AFTER both complete semantic readbacks, ROOT removed the TEMP_392
+producer/identity/wire writers and writer-only phase guard. Original source,
+real edit application, identity/partition/version/capture/budget assertions,
+meaningful permanent regressions, timeouts and cleanup requirements remain.
+The capture-free final source needs its OWN exact reviews and ORIGINAL full
+CI before a fresh guarded merge; this first candidate is not merge authority.
+395/377's historical failure attribution,96 and full-parity limits remain.
+

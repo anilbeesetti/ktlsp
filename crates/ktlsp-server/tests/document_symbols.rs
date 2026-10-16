@@ -3001,11 +3001,6 @@ fn type_parameter_versioned_rename_actual_cli_rebinds_types_values_and_local_cal
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
         let replies = package.exchange(&messages);
-        // TEMP_392: received actual packets BEFORE semantic assertions/unwraps.
-        eprintln!(
-            "TEMP_392_WIRE {}",
-            json!({"phase":"original","name":name,"requests":messages,"responses":replies})
-        );
         assert!(
             replies
                 .iter()
@@ -3133,10 +3128,6 @@ fn type_parameter_versioned_rename_actual_cli_rebinds_types_values_and_local_cal
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
         let rebound = package.exchange(&replay);
-        eprintln!(
-            "TEMP_392_WIRE {}",
-            json!({"phase":"edited","name":name,"source":edited,"requests":replay,"responses":rebound})
-        );
         assert!(
             rebound
                 .iter()

@@ -1385,15 +1385,6 @@ fn type_parameter_occurrences_preserve_original_type_value_and_callee_partitions
         let result = parse(original);
         let current = result.snapshot();
         let tree = result.tree_for(current).unwrap();
-        // TEMP_392: actual already-produced source/CST before admission assertions.
-        eprintln!(
-            "TEMP_392_PRODUCER {}",
-            serde_json::json!({
-                "phase":"original", "new_name":new_name, "document":current.document(),
-                "version":current.revision(), "source":tree.source(),
-                "elements":tree.elements(), "diagnostics":tree.diagnostics()
-            })
-        );
         let lower = lower_declarations(&result, current).unwrap();
         let directory = build_regions(&lower, &result, current).unwrap();
         let type_start = original.find("<T").unwrap() + 1;
@@ -1513,17 +1504,6 @@ fn type_parameter_occurrences_preserve_original_type_value_and_callee_partitions
             };
             let snapshot = rebound.snapshot();
             let tree = rebound.tree_for(snapshot).unwrap();
-            // TEMP_392: records actual edited producer grammar for soft names too.
-            if phase == "edited" {
-                eprintln!(
-                    "TEMP_392_PRODUCER {}",
-                    serde_json::json!({
-                        "phase":phase, "new_name":new_name, "document":snapshot.document(),
-                        "version":snapshot.revision(), "source":tree.source(),
-                        "elements":tree.elements(), "diagnostics":tree.diagnostics()
-                    })
-                );
-            }
             assert!(
                 tree.diagnostics().is_empty(),
                 "{actual}: {:?}",
@@ -1554,20 +1534,6 @@ fn type_parameter_occurrences_preserve_original_type_value_and_callee_partitions
                 }
                 if parent.kind == "USER_TYPE" {
                     let bound = bind_lexical_type_parameter(&directory, rebound, index, snapshot);
-                    // TEMP_392: actual original associations before assertions.
-                    eprintln!(
-                        "TEMP_392_IDENTITY {}",
-                        serde_json::json!({
-                            "phase":phase,"new_name":new_name,"role":"annotation","index":index,
-                            "range":[node.start,node.end],"binding":match &bound {
-                                Ok(b) => serde_json::json!({"annotated":b.annotated().cst_index(),
-                                    "function":b.function().cst_index(),"body":b.body().cst_index(),
-                                    "target":b.target().cst_index(),"owner":b.target().owner(),
-                                    "list":b.target().cst_parent_index(),"name":b.target().name_range()}),
-                                Err(e) => serde_json::json!({"error":format!("{e:?}")}),
-                            }
-                        })
-                    );
                     let spelling = &actual[node.start..node.end];
                     type_names.push(spelling);
                     if spelling == "Int" {
@@ -1595,18 +1561,6 @@ fn type_parameter_occurrences_preserve_original_type_value_and_callee_partitions
                     }
                 } else if parent.kind == "CALL_EXPRESSION" {
                     let bound = bind_local_function_callee(&directory, rebound, index, snapshot);
-                    eprintln!(
-                        "TEMP_392_IDENTITY {}",
-                        serde_json::json!({
-                            "phase":phase,"new_name":new_name,"role":"callee","index":index,
-                            "range":[node.start,node.end],"binding":match &bound {
-                                Ok(b) => serde_json::json!({"function":b.function().cst_index(),
-                                    "body":b.body().cst_index(),"target":b.target().cst_index(),
-                                    "owner":b.target().owner(),"name":b.target().name_range()}),
-                                Err(e) => serde_json::json!({"error":format!("{e:?}")}),
-                            }
-                        })
-                    );
                     let bound = bound.unwrap();
                     assert_eq!(bound.target().kind(), "FUN");
                     assert_eq!(bound.target().raw_name(), "Fresh");
@@ -1614,19 +1568,6 @@ fn type_parameter_occurrences_preserve_original_type_value_and_callee_partitions
                 } else {
                     let site = reference_site(&lower, rebound, snapshot, index).unwrap();
                     let bound = bind_local_value(&directory, &site, snapshot);
-                    eprintln!(
-                        "TEMP_392_IDENTITY {}",
-                        serde_json::json!({
-                            "phase":phase,"new_name":new_name,"role":"value","index":index,
-                            "range":[node.start,node.end],"binding":match &bound {
-                                Ok(b) => serde_json::json!({"annotated":site.containing_property().cst_index(),
-                                    "function":site.function().cst_index(),"body":b.body().cst_index(),
-                                    "target":b.target().cst_index(),"owner":b.target().owner(),
-                                    "name":b.target().name_range()}),
-                                Err(e) => serde_json::json!({"error":format!("{e:?}")}),
-                            }
-                        })
-                    );
                     let bound = bound.unwrap();
                     assert_eq!(
                         &actual[site.range()],

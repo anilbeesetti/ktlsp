@@ -180,10 +180,11 @@ job. The reason for these 404 responses is **unproved**. Do not diagnose a
 specific permission, rollout or service condition from this observation alone.
 
 Consequently, original completed-step logs during the same still-running
-calibration job—and independent step-log retrieval after completion—remain
-unverified prerequisites. Missing evidence stays unauthenticated/UNKNOWN and
-blocks official START/success. Whole-job-only text, copied streams, matching
-prefixes/hashes, receipt booleans or fabricated runner markers are not substitutes.
+calibration job—and the canonical admitted step-log retrieval path after
+completion—remain unverified prerequisites. Missing evidence stays
+unauthenticated/UNKNOWN and blocks official START/success. Whole-job-only text,
+copied streams, matching prefixes/hashes, receipt booleans or fabricated runner
+markers are not substitutes.
 Passing synthetic/native CI does not establish this external custody prerequisite.
 
 Next research is limited to primary availability/authentication documentation and
@@ -191,4 +192,26 @@ ROOT's retained response/request metadata or an upstream service clarification.
 These observations do not authorize new case retries, unrelated probes, workflow
 dispatch, privileged preparation, a JVM run or a weaker custody path. No receiver
 code change is justified by the presently unproved cause.
+
+### Completed-attempt archive observation — research only
+
+ROOT subsequently observed `GET /actions/runs/38882109234/attempts/1/logs`
+return HTTP200 for a completed native run, yielding a 104790-byte ZIP. Members
+included `0_native.txt` and separate `native/{API-number}_StepName.txt` files:
+`4_Format` (238 bytes), `5_Clippy` (4913 bytes), and `6_Tests` (248915 bytes).
+The observed archive used deflate, flags8 and data descriptors. These are
+read-only observations of original completed native logs, not oracle evidence
+or a claim that the receiver has authenticated a new archive-to-job/step mapping.
+
+The same attempt-archive endpoint returned HTTP404 for active platform run
+`38884260319`. Thus the completed-run archive does not prove same-job log
+availability before official START or settle the preofficial calibration gate.
+
+Separate step bytes in a completed original-attempt archive warrant narrowly
+scoped future research; they are not a whole-job-only text substitute. Any
+future receiver clean cutover requires explicit ROOT admission and review of
+the exact original job/step mapping and archive trust/bounds, rather than
+artifact names, prefix search or silent fallback. No alternative retrieval
+path, additional probe, retry, dispatch or runtime is admitted by these facts.
+The existing canonical gate and fail-closed UNKNOWN behavior remain unchanged.
 

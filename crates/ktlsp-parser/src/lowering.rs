@@ -161,6 +161,13 @@ impl Declaration<'_> {
     pub fn raw_name(&self) -> &str {
         self.raw_name
     }
+    /// Borrowed spelling for supported bare and backtick names, without resolution.
+    /// `None` means unsupported or malformed: compare only two successful spellings.
+    /// Raw spelling/ranges, declaration identity and incompleteness remain unchanged.
+    // shortcut: non-ASCII bare names are unsupported; upgrade when Unicode-category validation is admitted.
+    pub fn semantic_spelling(&self) -> Option<&str> {
+        semantic_spelling(self.raw_name)
+    }
     pub fn name_range(&self) -> Range<usize> {
         self.name.start..self.name.end
     }
@@ -177,6 +184,64 @@ impl Declaration<'_> {
         self.incomplete
     }
 }
+fn semantic_spelling(raw: &str) -> Option<&str> {
+    if raw.len() > SOURCE {
+        return None;
+    }
+    if let Some(body) = raw.strip_prefix('`') {
+        let body = body.strip_suffix('`')?;
+        return (!body.is_empty() && !body.bytes().any(|b| matches!(b, b'`' | b'\r' | b'\n' | 0)))
+            .then_some(body);
+    }
+    let first = raw.as_bytes().first()?;
+    if !first.is_ascii_alphabetic() && *first != b'_' {
+        return None;
+    }
+    let mut named = false;
+    for b in raw.bytes() {
+        if !b.is_ascii_alphanumeric() && b != b'_' {
+            return None;
+        }
+        named |= b != b'_';
+    }
+    if !named
+        || matches!(
+            raw,
+            "as" | "break"
+                | "class"
+                | "continue"
+                | "do"
+                | "else"
+                | "false"
+                | "for"
+                | "fun"
+                | "if"
+                | "in"
+                | "interface"
+                | "is"
+                | "null"
+                | "object"
+                | "package"
+                | "return"
+                | "super"
+                | "this"
+                | "throw"
+                | "true"
+                | "try"
+                | "typealias"
+                | "typeof"
+                | "val"
+                | "var"
+                | "when"
+                | "while"
+        )
+    {
+        None
+    } else {
+        Some(raw)
+    }
+}
+
 #[derive(Debug)]
 pub struct LoweredSyntaxError<'a> {
     cst_index: usize,
@@ -894,6 +959,138 @@ mod tests {
     }
     fn limit<T: std::fmt::Debug>(result: Result<T>, expected: LoweringLimit) {
         assert_eq!(result.unwrap_err(), LoweringError::Limit(expected));
+    }
+
+    #[test]
+    fn semantic_spelling_literals_keep_source_borrows_and_declaration_data() {
+        let cases = [
+            ("x", Some("x")),
+            ("`x`", Some("x")),
+            ("X", Some("X")),
+            ("`é`", Some("é")),
+            ("`e\u{301}`", Some("e\u{301}")),
+            ("é", None),
+            ("`local 🦀e\u{301}`", Some("local 🦀e\u{301}")),
+            ("`if`", Some("if")),
+            ("if", None),
+            ("field", Some("field")),
+            ("`field`", Some("field")),
+            ("_x1", Some("_x1")),
+            ("`_x1`", Some("_x1")),
+            ("___", None),
+            ("`___`", Some("___")),
+            ("`a\\u0061`", Some("a\\u0061")),
+            ("aa", Some("aa")),
+            ("`a.b`", Some("a.b")),
+            ("``", None),
+            ("`x", None),
+            ("x`", None),
+            ("`x`y`", None),
+            ("`a\nb`", None),
+            ("`a\rb`", None),
+            ("`a\0b`", None),
+            ("9x", None),
+            ("x y", None),
+            ("x.y", None),
+            ("$x", None),
+            ("e\u{301}", None),
+            ("broken", Some("broken")),
+            ("`broken`", Some("broken")),
+            ("`a\tb`", Some("a\tb")),
+            ("x", Some("x")),
+        ];
+        let mut tree = Tree::new();
+        for (raw, _) in cases {
+            tree.header(raw);
+            if raw == "broken" {
+                tree.error("missing");
+            }
+            tree.close();
+        }
+        let result = tree.finish();
+        let out = lower(&result).unwrap();
+        assert_eq!(out.declarations().len(), cases.len());
+        for (record, (raw, expected)) in out.declarations().iter().zip(cases) {
+            assert_eq!(record.raw_name(), raw);
+            assert_eq!(&result.parsed.source()[record.name_range()], raw);
+            assert_eq!(record.semantic_spelling(), expected);
+            if let Some(spelling) = record.semantic_spelling() {
+                let start = record.name_range().start + usize::from(raw.starts_with('`'));
+                assert_eq!(spelling.as_ptr(), result.parsed.source()[start..].as_ptr());
+            }
+            assert_eq!(record.owner(), None);
+            assert_eq!(record.incomplete(), raw == "broken");
+        }
+        let spelling = |i: usize| out.declarations()[i].semantic_spelling().unwrap();
+        assert_eq!(spelling(0), spelling(1));
+        assert_ne!(spelling(0), spelling(2));
+        assert_ne!(spelling(3), spelling(4));
+        assert_ne!(spelling(15), spelling(16));
+        assert_eq!(spelling(30), spelling(31));
+        assert_eq!(spelling(0), spelling(33));
+        assert_ne!(
+            out.declarations()[0].name_range(),
+            out.declarations()[33].name_range()
+        );
+        assert_eq!(out.errors().len(), 1);
+        assert_eq!(out.errors()[0].owner(), Some(30));
+        assert_eq!(out.errors()[0].message(), "missing");
+        assert!(semantic_spelling("").is_none());
+    }
+
+    #[test]
+    fn semantic_spelling_refuses_hard_keywords_but_keeps_contextual_names() {
+        for raw in [
+            "as",
+            "break",
+            "class",
+            "continue",
+            "do",
+            "else",
+            "false",
+            "for",
+            "fun",
+            "if",
+            "in",
+            "interface",
+            "is",
+            "null",
+            "object",
+            "package",
+            "return",
+            "super",
+            "this",
+            "throw",
+            "true",
+            "try",
+            "typealias",
+            "typeof",
+            "val",
+            "var",
+            "when",
+            "while",
+        ] {
+            assert!(semantic_spelling(raw).is_none(), "{raw}");
+        }
+        for raw in ["field", "import", "const", "suspend", "_1"] {
+            assert_eq!(semantic_spelling(raw), Some(raw));
+        }
+        for raw in ["_", "`", "a\0b", "a\rb", "a\nb", "🦀"] {
+            assert!(semantic_spelling(raw).is_none(), "{raw:?}");
+        }
+    }
+
+    #[test]
+    fn semantic_spelling_byte_cap_is_inclusive_for_bare_and_multibyte_quoted_names() {
+        let bare = "x".repeat(SOURCE);
+        assert_eq!(semantic_spelling(&bare), Some(bare.as_str()));
+        assert!(semantic_spelling(&(bare + "x")).is_none());
+        let quoted = format!("`{}`", "é".repeat((SOURCE - 2) / 2));
+        assert_eq!(quoted.len(), SOURCE);
+        assert_eq!(semantic_spelling(&quoted), Some(&quoted[1..SOURCE - 1]));
+        let over = format!("`{}x`", &quoted[1..SOURCE - 1]);
+        assert_eq!(over.len(), SOURCE + 1);
+        assert!(semantic_spelling(&over).is_none());
     }
 
     #[test]

@@ -155,7 +155,8 @@ types, stable cross-revision symbols or a new server capability.
   authenticated f/x/y binding consumer. Hosted execution is required under #96;
   this source change alone is not hosted proof or package/import resolution.
 - Reference-bearing functions require an ordinary top-level zero-parameter
-  function with an ordered brace body of plain immutable untyped local `val`s,
+  function with an ordered brace body of plain immutable local `val`s, optionally
+  annotated with one simple (bare or backtick) type-name,
   whose initializers are integer constants or whole bare-identifier reference
   subtrees. Parameters, receivers, nested/reference-bearing member contexts,
   calls, qualified accesses, assignments and relevant error-bearing contexts
@@ -182,10 +183,22 @@ types, stable cross-revision symbols or a new server capability.
   parsed tree, result and current snapshot. Private fields retain borrowed origin,
   original range/spelling, containing property, body CST index and function.
   `ReferenceSite::semantic_spelling` reuses the declaration spelling helper.
+  Annotation `TYPE_REFERENCE(USER_TYPE(REFERENCE_EXPRESSION(IDENTIFIER)))`
+  subtrees are authenticated retained syntax, not local value occurrences or
+  successful reference sites; their names are not resolved, even when a class or
+  import shares a builtin spelling. Qualified, nullable, generic, annotated,
+  parenthesized, function, intersection and dynamic types remain refused, as do
+  malformed/reordered annotations. Binder consumers reuse the lowerer's shape,
+  not a second type grammar. Explicitly typed integer-initializer query targets
+  return `UnsupportedContext` rather than pretending their declaration type is
+  the literal's default `Int`; an annotated containing val does not invalidate
+  inference for a different untyped target. Original declarations and hover text
+  retain annotations unchanged. This finite extension is not Kotlin type resolution.
 - `local_value_binding::bind_local_value` validates the complete ordinary top-level
   zero-parameter function body once, then returns the original borrowed site,
   identical body region and unique preceding complete direct local `val`.
-  Only plain immutable untyped vals with integer or whole-identifier initializers
+  Only plain immutable vals with integer or whole-identifier initializers and
+  optional simple type-name annotations
   are admitted. Semantic-equivalent duplicates of the queried name anywhere in
   that body, including later duplicates, refuse the query; unsupported candidate
   spellings never disappear from the search. Containing and later declarations

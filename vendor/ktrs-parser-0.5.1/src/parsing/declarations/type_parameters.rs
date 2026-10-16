@@ -252,7 +252,14 @@ impl Parser {
                                 identifiers += 1;
                             }
                             plain
-                                && (if identifiers == 2 && probe.consume_if(SAFE_ACCESS) {
+                                && (if identifiers == 2 && probe.consume_if(LT) {
+                                    generic_receiver_name
+                                        && probe.my_builder.get_token_text() != Some("suspend")
+                                        && probe.expect(IDENTIFIER)
+                                        && probe.expect(GT)
+                                        && probe.expect(DOT)
+                                        && probe.expect(IDENTIFIER)
+                                } else if identifiers == 2 && probe.consume_if(SAFE_ACCESS) {
                                     probe.expect(IDENTIFIER)
                                 } else if identifiers == 2 && probe.consume_if(QUEST) {
                                     probe.expect(DOT) && probe.expect(IDENTIFIER)

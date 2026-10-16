@@ -1,12 +1,15 @@
 //! Bounded exact Maven-layout lookup and caller-provided SHA-256 verification.
 //! See the crate README for the filesystem and integrity trust boundaries.
 
+pub mod lockfile;
+
 mod integrity;
 pub use integrity::{ExpectedDigestOrigin, IntegrityError, VerifiedArtifact, verify_sha256};
 
 mod zip_index;
 pub use zip_index::{
-    ZipDirectoryEntry, ZipDirectoryIndex, ZipIndexError, ZipStoredError, index_zip_directory,
+    ZipDeflateError, ZipDirectoryEntry, ZipDirectoryIndex, ZipIndexError, ZipStoredError,
+    index_zip_directory,
 };
 
 use std::collections::HashSet;

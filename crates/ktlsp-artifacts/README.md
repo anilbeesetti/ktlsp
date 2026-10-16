@@ -6,11 +6,12 @@ one artifact from the Maven layout
 `group/as/directories/artifact/version/artifact-version[-classifier].extension`.
 Use classifier `Some("sources")` and extension `"jar"` for exact source lookup.
 Coordinate getters and `relative_path()` are available to T021 and future
-Maven/Gradle consumers. No consumers or LSP capabilities are integrated here.
+Maven/Gradle consumers. `ktlsp-binary` consumes selected archive class payloads;
+no LSP capability or live project importer uses this library.
 
 Success returns owned bytes and `Provenance` containing the coordinate, canonical
 repository root, artifact path, actual byte count and `ChecksumStatus::Unverified`.
-The library never reads checksum sidecars, validates ZIP/JAR contents, scans
+Lookup never reads checksum sidecars, validates ZIP/JAR contents, scans
 directories, resolves transitive graphs, downloads, writes caches or runs tools.
 Nonempty arbitrary bytes can succeed. Corrupt means empty entry, wrong filesystem
 kind or an observed length change; it does not mean all data corruption is detected.
@@ -71,6 +72,22 @@ contents, or guarantee anything about future path contents. Manually constructed
 artifacts are accepted when their actual size/recorded length/digest agree.
 No constant-time secret comparison is promised; digests here are public integrity
 values. See [dependency and vector audit](INTEGRITY.md) and retained `notices/`.
+
+### Selected ZIP payloads
+
+After `index_zip_directory(&verified)`, `stored_payload(ordinal)` borrows method-0
+bytes and `deflated_payload(ordinal, &mut scratch)` decodes method 8 into reusable
+caller scratch. Shared validation checks selected local/central agreement,
+name/extra framing, CRC and complete declared-envelope overlaps, including
+competing descriptor tails. Bit 3 supports matching signed/unsigned non-ZIP64
+descriptors with zero local CRC/size placeholders. Each compressed/decoded
+payload is capped at 8 MiB; errors never return partial decoded bytes.
+
+See [the payload policy and dependency audit](ZIP_STORED.md). Pure-Rust
+`miniz_oxide` 0.9.1 uses no default or optional features; its active closure adds
+only `adler2` 2.0.1. Published license notices are retained in `notices/`.
+This is selected ordinal access, not archive-name selection, extraction,
+multi-release/signature interpretation, whole-JAR validity or symbol resolution.
 
 Fixtures are independently authored temporary local files; default tests are
 Rust-only and execute no JVM/Gradle/Maven. No official oracle comparison is claimed.

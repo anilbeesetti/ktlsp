@@ -20,6 +20,7 @@ pub mod name_resolver;
 pub mod package_member_names;
 pub mod payload;
 pub mod property_header;
+pub mod property_types;
 pub mod string_table;
 pub mod type_alias;
 pub mod type_alias_types;

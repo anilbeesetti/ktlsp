@@ -702,3 +702,18 @@ fn semantic_token_fragment_and_lexer_resource_boundaries_fail_whole_queries() {
     change(&mut session, 12, "7");
     assert_eq!(decoded_tokens(&tokens(&mut session, None), &options), expected_tokens(&[(0,0,1,"number")]));
 }
+
+#[test]
+fn invalid_semantic_ranges_take_precedence_over_resource_exhaustion() {
+    let (mut session, _) = token_session(token_capabilities(json!({"full":true,"range":true})));
+    open(&mut session, &format!("{}\"😀\"", "1 ".repeat(10_001)));
+    for end in [(0,20_007), (1,0), (0,20_004)] {
+        assert_eq!(tokens(&mut session, Some(token_range((0,0),end)))["error"]["code"], -32602);
+    }
+    assert_eq!(tokens(&mut session, Some(token_range((0,0),(0,20_006))))["error"]["code"], -32803);
+    change(&mut session, 2, &format!("{}\"😀\"", "§ ".repeat(257)));
+    for end in [(0,519), (1,0), (0,516)] {
+        assert_eq!(tokens(&mut session, Some(token_range((0,0),end)))["error"]["code"], -32602);
+    }
+    assert_eq!(tokens(&mut session, Some(token_range((0,0),(0,518))))["error"]["code"], -32803);
+}

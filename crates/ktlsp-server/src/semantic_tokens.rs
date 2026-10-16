@@ -83,14 +83,16 @@ impl Client {
         if range.is_some_and(|range| range.start > range.end) {
             return Err(INVALID_RANGE);
         }
-        let lexed = lex(text).map_err(|_| LIMIT)?;
+        let lexed = lex(text);
+        let lexical_error = lexed.is_err();
         let mut output = Output::default();
+        let mut output_error = None;
         let mut position = Position { line: 0, character: 0 };
         let mut start_seen = range.is_none();
         let mut end_seen = range.is_none();
         // One source/position sweep also validates strict range endpoints: neither
         // surrogate interiors nor the byte inside CRLF is ever a cursor position.
-        for token in lexed.tokens {
+        let spans = lexed.into_iter().flat_map(|lexed| lexed.tokens).map(|token| {
             // ponytail: identifiers and opaque template interiors have no semantic
             // identity here; upgrade with parser-backed resolution, not name guesses.
             let category = match token.kind {
@@ -102,15 +104,22 @@ impl Client {
                 _ => None,
             };
             let index = category.and_then(|category| self.indices[category]);
+            (index, &text[token.start..token.end])
+        });
+        // On lexical exhaustion, validate coordinates over one unclassified span
+        // before returning failure; an invalid range must still be InvalidParams.
+        for (index, text) in spans.chain((lexical_error && range.is_some()).then_some((None, text))) {
             let mut fragment = position;
-            let mut chars = text[token.start..token.end].chars().peekable();
+            let mut chars = text.chars().peekable();
             while let Some(c) = chars.next() {
                 if let Some(range) = range {
                     start_seen |= position == range.start;
                     end_seen |= position == range.end;
                 }
                 if matches!(c, '\r' | '\n') {
-                    output.fragment(fragment, position, index, range)?;
+                    if output_error.is_none() {
+                        output_error = output.fragment(fragment, position, index, range).err();
+                    }
                     if c == '\r' && chars.peek() == Some(&'\n') {
                         chars.next();
                     }
@@ -121,7 +130,9 @@ impl Client {
                     position.character = position.character.checked_add(c.len_utf16() as u32).ok_or(LIMIT)?;
                 }
             }
-            output.fragment(fragment, position, index, range)?;
+            if output_error.is_none() {
+                output_error = output.fragment(fragment, position, index, range).err();
+            }
         }
         if let Some(range) = range {
             start_seen |= position == range.start;
@@ -129,6 +140,12 @@ impl Client {
         }
         if !start_seen || !end_seen {
             return Err(INVALID_RANGE);
+        }
+        if lexical_error {
+            return Err(LIMIT);
+        }
+        if let Some(error) = output_error {
+            return Err(error);
         }
         Ok(json!({"data":output.data}))
     }

@@ -435,6 +435,85 @@ pub fn local_value_occurrences<'a>(
     )
 }
 
+/// Supported rename output is deliberately bare ASCII, not Kotlin's full name
+/// grammar. Existing quoted targets remain eligible; output is never autoquoted.
+pub fn valid_local_rename_name(name: &str) -> bool {
+    name.len() <= crate::MAX_SOURCE_BYTES
+        && name.as_bytes().first().is_some_and(|b| *b != b'`')
+        && crate::lowering::semantic_spelling(name).is_some()
+}
+
+/// Authenticate a local immutable-val rename (None prepares the original target).
+/// Parameters are refused: same-body occurrences omit external named arguments.
+/// Collection and hypothetical-name conflict/capture checks share ONE budget.
+pub fn guarded_local_value_rename<'a>(
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    anchor: LocalValueAnchor<'a>,
+    current: &SourceSnapshot,
+    new_name: Option<&str>,
+) -> Result<LocalValueOccurrences<'a>> {
+    rename_with_budget(directory, result, anchor, current, new_name, &mut ReferenceBudget::default())
+}
+
+pub(super) fn rename_with_budget<'a>(
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    anchor: LocalValueAnchor<'a>,
+    current: &SourceSnapshot,
+    new_name: Option<&str>,
+    b: &mut ReferenceBudget,
+) -> Result<LocalValueOccurrences<'a>> {
+    if let Some(name) = new_name {
+        // Bound/charge validation before scanning or comparing user name bytes.
+        b.spelling(name)?;
+        if !valid_local_rename_name(name) {
+            return Err(LocalBindingError::UnsupportedSpelling);
+        }
+    }
+    let found = occurrences_with_budget(directory, result, anchor, current, b)?;
+    if !b.equal(found.target.kind(), "PROPERTY")? {
+        return Err(LocalBindingError::UnsupportedContext);
+    }
+    let Some(new_name) = new_name else { return Ok(found) };
+    let old_name = b.spelling(found.target.raw_name())?
+        .ok_or(LocalBindingError::UnsupportedSpelling)?;
+    if b.equal(old_name, new_name)? {
+        // Quote removal changes spelling, not identity. Keep parameter/local
+        // shadow partitions rather than rejecting the existing parameter.
+        return Ok(found);
+    }
+    let function = directory.lowered().declarations().get(
+        found.target.owner().ok_or(LocalBindingError::InvalidOrigin)?
+    ).ok_or(LocalBindingError::InvalidOrigin)?;
+    let body_index = found.body.cst_index();
+    let (ordinal, _) = find_body(directory, body_index, b)?;
+    let (local, parameter) =
+        value_candidates(directory, ordinal, body_index, function, new_name, b)?;
+    if local.is_some() || parameter.is_some() {
+        return Err(LocalBindingError::AmbiguousLocal);
+    }
+    let parsed = authenticated_tree(directory.lowered(), result, current, b)?;
+    for index in body_index..found.body.subtree_end() {
+        let element = b.element(parsed, index)?;
+        if element.token || !b.equal(&element.kind, "REFERENCE_EXPRESSION")?
+            || annotation_reference(parsed, element, b)? {
+            continue;
+        }
+        let site = reference_site_with_budget(directory.lowered(), result, current, index, b)?;
+        let spelling = b.spelling(site.raw_spelling())?
+            .ok_or(LocalBindingError::UnsupportedSpelling)?;
+        if b.equal(spelling, new_name)?
+            && site.containing_property().cst_index() > found.target.cst_index()
+            && found.target.range().end <= site.range().start {
+            // No global resolver exists. A previously unresolved value may be
+            // external; never turn it into a newly captured local reference.
+            return Err(LocalBindingError::UnsupportedContext);
+        }
+    }
+    Ok(found)
+}
+
 const MAX_OCCURRENCES: usize = 1_024;
 const OCCURRENCE_BYTES: usize = 131_072;
 
@@ -609,6 +688,19 @@ pub(super) fn occurrences_with_budget<'a>(
 #[cfg(test)]
 mod occurrence_storage_tests {
     use super::*;
+
+    #[test]
+    fn rename_output_name_is_deliberately_ascii_without_autoquoting() {
+        for valid in ["x", "_x", "x_0", "field", "get", "value"] {
+            assert!(valid_local_rename_name(valid), "{valid}");
+        }
+        for invalid in ["", "_", "___", "fun", "val", "typeof", "1x", "`x`",
+            "a.b", "a/b", "a\\b", "a:b", "a;b", "a[b", "a<b", "a>b",
+            "a b", "a\tb", "a\0b", "a\nb", "é", "x😀"] {
+            assert!(!valid_local_rename_name(invalid), "{invalid:?}");
+        }
+        assert!(!valid_local_rename_name(&"x".repeat(crate::MAX_SOURCE_BYTES + 1)));
+    }
 
     #[test]
     fn result_storage_refuses_count_and_byte_overflow_before_reservation() {

@@ -2,7 +2,8 @@
 use ktlsp_parser::{
     SnapshotResult, SourceSnapshot,
     local_value_binding::{
-        LocalValueAnchor, LocalValueOccurrences, bind_local_value, local_value_occurrences,
+        LocalValueAnchor, LocalValueOccurrences, bind_local_value, guarded_local_value_rename,
+        local_value_occurrences,
     },
     lowering::{lower_declarations, reference_site},
     structural_regions::build_regions,
@@ -41,7 +42,32 @@ impl HoverFormat {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default)]
+pub(crate) struct RenameClient {
+    pub document_changes: bool,
+    pub prepare: bool,
+}
+impl RenameClient {
+    pub fn parse(capabilities: &Value) -> Result<Self, &'static str> {
+        fn member<'a>(value: Option<&'a Value>, key: &str) -> Result<Option<&'a Value>, &'static str> {
+            value.map(|v| v.as_object().ok_or("invalid rename capability object"))
+                .transpose().map(|object| object.and_then(|o| o.get(key)))
+        }
+        fn boolean(value: Option<&Value>) -> Result<bool, &'static str> {
+            value.map(|v| v.as_bool().ok_or("invalid rename capability boolean"))
+                .transpose().map(|b| b.unwrap_or(false))
+        }
+        let workspace = member(Some(capabilities), "workspace")?;
+        let edit = member(workspace, "workspaceEdit")?;
+        let document_changes = boolean(member(edit, "documentChanges")?)?;
+        let text = member(Some(capabilities), "textDocument")?;
+        let rename = member(text, "rename")?;
+        let prepare = boolean(member(rename, "prepareSupport")?)?;
+        Ok(Self { document_changes, prepare })
+    }
+}
+
+#[derive(Debug)]
 pub(crate) enum Query {
     Definition {
         offset: usize,
@@ -57,6 +83,8 @@ pub(crate) enum Query {
     Highlights {
         offset: usize,
     },
+    PrepareRename { offset: usize },
+    Rename { offset: usize, new_name: String },
 }
 
 pub(crate) fn render(
@@ -65,11 +93,13 @@ pub(crate) fn render(
     query: Query,
 ) -> Result<Value, &'static str> {
     let tree = result.tree_for(snapshot).map_err(|_| UNSUPPORTED)?;
-    let offset = match query {
+    let offset = match &query {
         Query::Definition { offset }
         | Query::Hover { offset, .. }
         | Query::References { offset, .. }
-        | Query::Highlights { offset } => offset,
+        | Query::Highlights { offset }
+        | Query::PrepareRename { offset }
+        | Query::Rename { offset, .. } => *offset,
     };
     let mut references = tree.elements().iter().enumerate().filter(|(_, e)| {
         !e.token && e.kind == "REFERENCE_EXPRESSION" && e.start <= offset && offset < e.end
@@ -78,7 +108,9 @@ pub(crate) fn render(
     if references.next().is_some() {
         return Err(UNSUPPORTED);
     }
-    let occurrence_query = matches!(query, Query::References { .. } | Query::Highlights { .. });
+    let rename_query = matches!(query, Query::PrepareRename { .. } | Query::Rename { .. });
+    let occurrence_query = rename_query
+        || matches!(query, Query::References { .. } | Query::Highlights { .. });
     if reference.is_none()
         && (!occurrence_query
             || !tree.elements().iter().any(|element| {
@@ -88,6 +120,9 @@ pub(crate) fn render(
                     && offset < element.end
             }))
     {
+        if rename_query {
+            return Err(UNSUPPORTED);
+        }
         return Ok(Value::Null);
     }
     let lowered = lower_declarations(result, snapshot).map_err(|_| UNSUPPORTED)?;
@@ -108,9 +143,19 @@ pub(crate) fn render(
         };
         // Authentication, use-anchor binding and complete occurrence collection
         // are one semantic query under the kernel's single shared work budget.
+        if rename_query {
+            let new_name = match &query {
+                Query::Rename { new_name, .. } => Some(new_name.as_str()),
+                _ => None,
+            };
+            let occurrences = guarded_local_value_rename(
+                &directory, result, anchor, snapshot, new_name,
+            ).map_err(|_| UNSUPPORTED)?;
+            return render_rename(&occurrences, snapshot, &query, offset);
+        }
         let occurrences = local_value_occurrences(&directory, result, anchor, snapshot)
             .map_err(|_| UNSUPPORTED)?;
-        return render_occurrences(&occurrences, snapshot, query);
+        return render_occurrences(&occurrences, snapshot, &query);
     }
     let site = reference_site(
         &lowered,
@@ -124,7 +169,8 @@ pub(crate) fn render(
     let bytes = match query {
         Query::Definition { .. } => target.name_range(),
         Query::Hover { .. } => site.range(),
-        Query::References { .. } | Query::Highlights { .. } => unreachable!("rendered above"),
+        Query::References { .. } | Query::Highlights { .. }
+        | Query::PrepareRename { .. } | Query::Rename { .. } => unreachable!("rendered above"),
     };
     // Two authenticated original endpoints, using the existing UTF-16 sweep.
     let positions = crate::structure::positions(tree.source(), &[bytes.start, bytes.end]);
@@ -152,14 +198,15 @@ pub(crate) fn render(
             };
             Ok(json!({"contents":{"kind":kind,"value":value},"range":range}))
         }
-        Query::References { .. } | Query::Highlights { .. } => unreachable!("rendered above"),
+        Query::References { .. } | Query::Highlights { .. }
+        | Query::PrepareRename { .. } | Query::Rename { .. } => unreachable!("rendered above"),
     }
 }
 
 fn render_occurrences(
     occurrences: &LocalValueOccurrences<'_>,
     snapshot: &SourceSnapshot,
-    query: Query,
+    query: &Query,
 ) -> Result<Value, &'static str> {
     let include_declaration = !matches!(
         query,
@@ -214,4 +261,64 @@ fn render_occurrences(
         })
         .collect::<Vec<_>>();
     Ok(Value::Array(values))
+}
+
+fn rename_output_size(
+    source_len: usize, removed: usize, count: usize, name_len: usize, uri_len: usize,
+) -> Result<(), &'static str> {
+    let inserted = count.checked_mul(name_len).ok_or(UNSUPPORTED)?;
+    let resulting = source_len.checked_sub(removed)
+        .and_then(|n| n.checked_add(inserted)).ok_or(UNSUPPORTED)?;
+    let output = uri_len.checked_mul(6)
+        .and_then(|n| n.checked_add(512))
+        .and_then(|n| count.checked_mul(name_len.checked_add(256)?)
+            .and_then(|edits| n.checked_add(edits))).ok_or(UNSUPPORTED)?;
+    if resulting > ktlsp_parser::MAX_SOURCE_BYTES || output > 1024 * 1024 {
+        return Err("rename source growth or rendered output limit exceeded");
+    }
+    Ok(())
+}
+
+fn render_rename(
+    found: &LocalValueOccurrences<'_>, snapshot: &SourceSnapshot, query: &Query, offset: usize,
+) -> Result<Value, &'static str> {
+    if matches!(query, Query::PrepareRename { .. }) {
+        let selected = std::iter::once(found.target().name_range())
+            .chain(found.occurrences().iter().map(|site| site.range()))
+            .find(|range| range.start <= offset && offset < range.end).ok_or(UNSUPPORTED)?;
+        let positions = crate::structure::positions(snapshot.source(), &[selected.start, selected.end]);
+        let placeholder = found.target().semantic_spelling().ok_or(UNSUPPORTED)?;
+        if placeholder.len().checked_mul(6).and_then(|n| n.checked_add(256))
+            .is_none_or(|n| n > 1024 * 1024) { return Err(UNSUPPORTED); }
+        return Ok(json!({"range":Range { start:positions[0], end:positions[1] }, "placeholder":placeholder}));
+    }
+    let Query::Rename { new_name, .. } = query else { unreachable!("rename query") };
+    let count = found.occurrences().len() + 1;
+    let removed = std::iter::once(found.target().name_range())
+        .chain(found.occurrences().iter().map(|site| site.range()))
+        .try_fold(0usize, |n, range| n.checked_add(range.len())).ok_or(UNSUPPORTED)?;
+    // ASCII newName needs no JSON escaping. Validate growth/output BEFORE
+    // allocating offsets, edit objects or repeated replacement strings.
+    rename_output_size(snapshot.source().len(), removed, count, new_name.len(), snapshot.document().len())?;
+    let mut offsets = Vec::with_capacity(count * 2);
+    let name = found.target().name_range();
+    offsets.extend([name.start, name.end]);
+    for site in found.occurrences() { let range = site.range(); offsets.extend([range.start, range.end]); }
+    let positions = crate::structure::positions(snapshot.source(), &offsets);
+    let edits = positions.as_chunks::<2>().0.iter().map(|p|
+        json!({"range":Range { start:p[0], end:p[1] }, "newText":new_name})
+    ).collect::<Vec<_>>();
+    Ok(json!({"documentChanges":[{"textDocument":{"uri":snapshot.document(), "version":snapshot.revision()}, "edits":edits}]}))
+}
+
+#[cfg(test)]
+mod rename_limits {
+    use super::*;
+    #[test]
+    fn growth_and_escaped_output_refuse_atomically() {
+        rename_output_size(65536, 1, 1, 1, 1).unwrap();
+        assert!(rename_output_size(65536, 1, 1, 2, 1).is_err());
+        assert!(rename_output_size(0, 0, 1025, 1, 200000).is_err());
+        assert!(rename_output_size(0, 0, usize::MAX, usize::MAX, usize::MAX).is_err());
+    }
 }

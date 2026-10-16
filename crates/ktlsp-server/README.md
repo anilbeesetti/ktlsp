@@ -195,3 +195,42 @@ The line-comment subset has independently specified native regression fixtures f
 ## Local performance observation
 
 2026-10-12, macOS arm64 Apple M4 / 16 GiB, pinned Rust 1.99.0 release build. `/usr/bin/time -l target/release/deps/providers-7d4529ca788e2bde --exact many_folds_and_long_unicode_line_have_bounded_outputs --nocapture` measured 0.11 s wall time, 63,520,768 bytes maximum RSS and 62,390,752 bytes peak footprint for the complete test process (including generated source, retained JSON results and test harness). Within that run, 50,000 sequential multiline pairs (200,000 source bytes, result capped at 10,000) took 30.36 ms for open plus folding; a roughly 1.2 MB single Unicode line with 200,000 astral string characters and 200,000 single-line pairs, then one multiline pair, took 82.19 ms for change plus folding. An earlier run reported 45.93/84.13 ms. These are observations on one host, not budgets, isolated per-query memory, stable benchmarks or comparisons with the official server. Real native stdio also passes 30,000-fold/limit/recovery coverage.
+
+## Versioned finite local-val rename (#379)
+
+With the matching trusted parser worker and
+`workspace.workspaceEdit.documentChanges: true`, `textDocument/rename` supports
+the authenticated ordinary-function immutable local-val subset described above.
+`renameProvider` is `true` unless `textDocument.rename.prepareSupport: true`,
+when it is `{ "prepareProvider": true }` and `textDocument/prepareRename` is
+available. Missing versioned-edit support omits both methods, which return
+MethodNotFound rather than falling back to unversioned changes.
+
+Preparation returns the selected original declaration/use range and semantic
+placeholder. Rename returns one `WorkspaceEdit.documentChanges` text-document
+edit at the exact open URI and guarded current integer version, containing the
+original declaration-name and every bound whole-value use once, in nonoverlapping
+original-coordinate order, with the actual new spelling. Nothing is applied to
+disk or sent as a server-originated applyEdit/command/resolve request.
+
+Output names are deliberately bare ASCII: initial letter/underscore followed by
+letters/digits/underscores, excluding hard keywords and all-underscore names.
+Quoted or Unicode existing targets may become these supported names; new names
+are never autoquoted or normalized. Invalid names/URI/UTF-16/unopened-document
+requests return `-32602`. Unsupported bodies, parameters, ambiguous targets,
+same-function new-name parameter/local conflicts (including future declarations),
+potential new-name capture, semantic-work/storage exhaustion, source growth past
+64 KiB or escaped output past 1 MiB fail atomically with `-32803`. Quote removal
+with unchanged semantic spelling preserves existing shadow partitions.
+Parameters are refused even if their current body uses are known: external
+named-argument calls are not covered.
+
+Both methods share the original asynchronous parser admission, cancellation,
+cleanup and incarnation/version/content publication guards (`-32800` cancellation,
+`-32801` stale). All bounds are checked before repeated replacement strings are
+materialized. This guarantees atomic computation/publication, not client rollback
+after applying an edit; standard versions cannot encode post-publication reopen
+incarnations. No workspace/member/parameter/full Kotlin rename, compiler conflict
+analysis or official rename equivalence is claimed. Permanent paired-worker tests
+apply the actual returned original-coordinate edits in memory and reparse/rebind;
+their runtime is hosted-only under #96 and awaits independently admitted evidence.

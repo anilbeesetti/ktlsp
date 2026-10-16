@@ -1407,3 +1407,245 @@ fn typed_local_original_definition_hover_and_annotation_refusals() {
         }
     }
 }
+
+fn rename_capabilities(prepare: bool) -> Value {
+    json!({"workspace":{"workspaceEdit":{"documentChanges":true}},
+        "textDocument":{"rename":{"prepareSupport":prepare},"diagnostic":{}}})
+}
+fn running_rename() -> Session {
+    let mut session = Session::with_parser(worker()).unwrap();
+    let response = request(&mut session, "initialize", json!({"capabilities":rename_capabilities(true)}));
+    assert_eq!(response["result"]["capabilities"]["renameProvider"], json!({"prepareProvider":true}));
+    notify(&mut session, "initialized", json!({}));
+    session
+}
+fn rename_params(source: &str, offset: usize, name: &str) -> Value {
+    let mut params = navigation_params(source, offset);
+    params["newName"] = json!(name);
+    params
+}
+fn apply_original_rename(source: &str, response: &Value, uri: &str, version: i32) -> String {
+    assert!(response.get("error").is_none(), "{response}");
+    let changes = response["result"]["documentChanges"].as_array().unwrap();
+    assert_eq!(changes.len(), 1);
+    assert_eq!(changes[0]["textDocument"], json!({"uri":uri,"version":version}));
+    let edits = changes[0]["edits"].as_array().unwrap();
+    let mut original = Vec::new();
+    for edit in edits {
+        let range: Range = serde_json::from_value(edit["range"].clone()).unwrap();
+        let start = ktlsp_text::position_to_offset(source, range.start).unwrap();
+        let end = ktlsp_text::position_to_offset(source, range.end).unwrap();
+        assert!(start < end);
+        assert!(original.last().is_none_or(|(previous, _): &(std::ops::Range<usize>, &str)| previous.end <= start));
+        original.push((start..end, edit["newText"].as_str().unwrap()));
+    }
+    let mut text = source.to_owned();
+    for (range, name) in original.into_iter().rev() { text.replace_range(range, name); }
+    text
+}
+
+#[test]
+fn local_val_rename_prepares_applies_and_rebinds_over_real_paired_stdio() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let package = Package::new(true);
+    let source = "// 🦀 x\r\nval text = \"x\"\r\nfun f(p: T) {\r\n val `x🦀`: `x🦀` = 1\r\n val a = `x🦀`\r\n val b = a\r\n}\r\nfun g() { val `x🦀` = 2; val c = `x🦀` }\r\n";
+    let declaration = source.find("val `x🦀`").unwrap() + 4;
+    let read = source.find("= `x🦀`").unwrap() + 2;
+    let range = |offset| references_range(source, offset, "`x🦀`".len());
+    let messages = [
+        json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{"capabilities":rename_capabilities(true)}}),
+        json!({"jsonrpc":"2.0","method":"initialized"}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":7,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":"prepare-declaration","method":"textDocument/prepareRename","params":navigation_params(source,declaration)}),
+        json!({"jsonrpc":"2.0","id":"prepare-use","method":"textDocument/prepareRename","params":navigation_params(source,read)}),
+        json!({"jsonrpc":"2.0","id":u64::MAX,"method":"textDocument/rename","params":rename_params(source,read,"fresh")}),
+        json!({"jsonrpc":"2.0","id":"rename-declaration","method":"textDocument/rename","params":rename_params(source,declaration,"fresh")}),
+        json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ];
+    let replies = package.exchange(&messages);
+    assert!(replies.iter().map(|r| &r["id"]).eq(messages.iter().filter_map(|m| m.get("id"))));
+    assert_eq!(replies[0]["result"]["capabilities"]["renameProvider"], json!({"prepareProvider":true}));
+    assert_eq!(replies[1]["result"], json!({"range":range(declaration),"placeholder":"x🦀"}));
+    assert_eq!(replies[2]["result"], json!({"range":range(read),"placeholder":"x🦀"}));
+    let expected = json!({"documentChanges":[{
+        "textDocument":{"uri":URI,"version":7},
+        "edits":[{"range":range(declaration),"newText":"fresh"},{"range":range(read),"newText":"fresh"}]
+    }]});
+    assert_eq!(replies[3]["result"], expected);
+    assert_eq!(replies[4]["result"], expected);
+    let edited = apply_original_rename(source, &replies[3], URI, 7);
+    assert_eq!(edited, "// 🦀 x\r\nval text = \"x\"\r\nfun f(p: T) {\r\n val fresh: `x🦀` = 1\r\n val a = fresh\r\n val b = a\r\n}\r\nfun g() { val `x🦀` = 2; val c = `x🦀` }\r\n");
+    let declaration = edited.find("val fresh").unwrap() + 4;
+    let read = edited.find("= fresh").unwrap() + 2;
+    let replay = [
+        messages[0].clone(), messages[1].clone(),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":8,"text":edited}}}),
+        json!({"jsonrpc":"2.0","id":"rebound","method":"textDocument/references","params":references_params(&edited,read,true)}),
+        json!({"jsonrpc":"2.0","id":"definition","method":"textDocument/definition","params":navigation_params(&edited,read)}),
+        messages[7].clone(), messages[8].clone(),
+    ];
+    let rebound = package.exchange(&replay);
+    assert!(rebound.iter().map(|r| &r["id"]).eq(replay.iter().filter_map(|m| m.get("id"))));
+    assert_eq!(rebound[1]["result"], json!([
+        {"uri":URI,"range":references_range(&edited,declaration,5)},
+        {"uri":URI,"range":references_range(&edited,read,5)}
+    ]));
+    assert_eq!(rebound[2]["result"], json!({"uri":URI,"range":references_range(&edited,declaration,5)}));
+}
+
+#[test]
+fn local_rename_quote_equivalence_keeps_shadow_partitions_and_unused_edit() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = running_rename();
+    let source = "fun f(p: T) { val before = p; val `p` = p; val after = `p`; val unused = 1 }";
+    open(&mut session, source);
+    let declaration = source.find("`p`").unwrap();
+    let read = source.rfind("`p`").unwrap();
+    for (name, expected) in [
+        ("p", "fun f(p: T) { val before = p; val p = p; val after = p; val unused = 1 }"),
+        ("fresh", "fun f(p: T) { val before = p; val fresh = p; val after = fresh; val unused = 1 }"),
+    ] {
+        let renamed = request(&mut session, "textDocument/rename", rename_params(source, declaration, name));
+        assert_eq!(renamed["result"]["documentChanges"][0]["edits"], json!([
+            {"range":references_range(source,declaration,3),"newText":name},
+            {"range":references_range(source,read,3),"newText":name}
+        ]));
+        let edited = apply_original_rename(source, &renamed, URI, 1);
+        assert_eq!(edited, expected);
+        change(&mut session, 2, &edited);
+        let renamed_read = edited.rfind(&format!("= {name}")).unwrap() + 2;
+        let refs = request(&mut session, "textDocument/references", references_params(&edited,renamed_read,true));
+        assert_eq!(refs["result"].as_array().unwrap().len(), 2, "{refs}");
+        // Restore a genuinely newer version before the next original-coordinate request.
+        notify(&mut session, "textDocument/didClose", json!({"textDocument":{"uri":URI}}));
+        open(&mut session, source);
+    }
+    let unused = source.find("unused").unwrap();
+    let response = request(&mut session, "textDocument/rename", rename_params(source, unused, "alone"));
+    assert_eq!(response["result"]["documentChanges"][0]["edits"],
+        json!([{"range":references_range(source,unused,6),"newText":"alone"}]));
+    assert!(session.close().1);
+}
+
+#[test]
+fn local_rename_rejects_conflicts_parameters_invalid_names_and_positions() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = running_rename();
+    let source = "// 😀\r\nfun f() { val x = 1; val a = x }";
+    open(&mut session, source);
+    let offset = source.find("val x").unwrap() + 4;
+    for name in [Value::Null, json!(1), json!(true), json!(""), json!("__"), json!("1x"),
+        json!("fun"), json!("a.b"), json!("a/b"), json!("a\\b"), json!("x\n"), json!("`x`"),
+        json!("é"), json!("x😀"), json!("a\0"), json!("a-b"), json!("a".repeat(65537))] {
+        let mut params = navigation_params(source, offset);
+        params["newName"] = name;
+        let response = request(&mut session, "textDocument/rename", params);
+        assert_eq!(response["error"]["code"], -32602, "{response}");
+        assert!(response.get("result").is_none());
+    }
+    let response = request(&mut session, "textDocument/rename", navigation_params(source,offset));
+    assert_eq!(response["error"]["code"], -32602);
+    for method in ["textDocument/prepareRename", "textDocument/rename"] {
+        for params in [
+            json!({"textDocument":{"uri":URI},"position":{"line":0,"character":4},"newName":"fresh"}),
+            json!({"textDocument":{"uri":URI},"position":{"line":200,"character":0},"newName":"fresh"}),
+            json!({"textDocument":{"uri":URI},"position":{"line":1,"character":-1},"newName":"fresh"}),
+            json!({"textDocument":{"uri":"untitled:closed"},"position":{"line":0,"character":0},"newName":"fresh"}),
+            json!({"textDocument":{"uri":"relative"},"position":{"line":0,"character":0},"newName":"fresh"}),
+        ] {
+            let response = request(&mut session, method, params);
+            assert_eq!(response["error"]["code"], -32602, "{response}");
+            assert!(response.get("result").is_none());
+        }
+    }
+    for (i, text) in [
+        "fun f() { val x = 1; val y = 2; val a = x }",
+        "fun f() { val y = 2; val x = 1; val a = x }",
+        "fun f(y: T) { val x = 1; val a = x }",
+        "fun f() { val x = 1; val a = y }",
+        "fun f() { val x = 1; val a = `y` }",
+        "fun f() { val x = 1; val a = x; val y = 2 }",
+        "fun f() { val x = 1; val a = call() }",
+        "fun f() { val x = 1; val x = 2 }",
+    ].iter().enumerate() {
+        change(&mut session, i as i32 + 2, text);
+        let offset = text.find("val x").unwrap() + 4;
+        let response = request(&mut session, "textDocument/rename", rename_params(text,offset,"y"));
+        assert_eq!(response["error"]["code"], -32803, "{text}: {response}");
+        assert!(response.get("result").is_none());
+    }
+    let text = "fun f(p: T) { val a = p }\nfun caller() = f(p = 1)";
+    change(&mut session, 20, text);
+    for offset in [text.find("p:").unwrap(), text.find("= p").unwrap() + 2] {
+        for method in ["textDocument/prepareRename", "textDocument/rename"] {
+            let response = request(&mut session, method, rename_params(text,offset,"fresh"));
+            assert_eq!(response["error"]["code"], -32803, "{response}");
+            assert!(response.get("result").is_none());
+        }
+    }
+    assert!(session.close().1);
+}
+
+#[test]
+fn local_rename_capability_negotiation_is_strict_and_versioned_only() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    for (profile, expected) in [
+        (json!({}), Value::Null),
+        (json!({"workspace":{"workspaceEdit":{"documentChanges":false}}}), Value::Null),
+        (rename_capabilities(false), json!(true)),
+        (rename_capabilities(true), json!({"prepareProvider":true})),
+    ] {
+        let mut session = Session::with_parser(worker()).unwrap();
+        let initialized = request(&mut session, "initialize", json!({"capabilities":profile}));
+        assert_eq!(initialized["result"]["capabilities"]["renameProvider"], expected);
+        notify(&mut session, "initialized", json!({}));
+        if expected.is_null() {
+            for method in ["textDocument/prepareRename","textDocument/rename"] {
+                assert_eq!(request(&mut session, method, json!({}))["error"]["code"], -32601);
+            }
+        } else if expected == true {
+            assert_eq!(request(&mut session, "textDocument/prepareRename", json!({}))["error"]["code"], -32601);
+        }
+        assert!(session.close().1);
+    }
+    for profile in [
+        json!({"workspace":null}), json!({"workspace":{"workspaceEdit":[]}}),
+        json!({"workspace":{"workspaceEdit":{"documentChanges":"true"}}}),
+        json!({"textDocument":{"rename":null}}), json!({"textDocument":{"rename":{"prepareSupport":1}}}),
+    ] {
+        let mut session = Session::with_parser(worker()).unwrap();
+        let response = request(&mut session, "initialize", json!({"capabilities":profile}));
+        assert_eq!(response["error"]["code"], -32602);
+        // A malformed profile must leave initialize retryable.
+        assert_eq!(request(&mut session, "initialize", json!({"capabilities":rename_capabilities(true)}))
+            ["result"]["capabilities"]["renameProvider"], json!({"prepareProvider":true}));
+        assert!(session.close().1);
+    }
+    let mut missing = Session::new();
+    assert!(request(&mut missing, "initialize", json!({"capabilities":rename_capabilities(true)}))
+        ["result"]["capabilities"].get("renameProvider").is_none());
+    notify(&mut missing, "initialized", json!({}));
+    assert_eq!(request(&mut missing, "textDocument/rename", json!({}))["error"]["code"], -32601);
+}
+
+#[test]
+fn local_rename_growth_and_semantic_work_fail_without_partial_edits() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = running_rename();
+    let base = "fun f() { val x = 1; val a = x }";
+    open(&mut session, base);
+    let offset = base.find("val x").unwrap() + 4;
+    // Repeated newName would expand past 64 KiB despite fitting name validation
+    // and the single semantic budget. The original document is never mutated.
+    let name = "a".repeat(33000);
+    let response = request(&mut session, "textDocument/rename", rename_params(base,offset,&name));
+    assert_eq!(response["error"]["code"], -32803, "{response}");
+    assert!(response.get("result").is_none());
+    assert_eq!(session.document(URI).unwrap().text(), base);
+    let name = "a".repeat(65536);
+    let response = request(&mut session, "textDocument/rename", rename_params(base,offset,&name));
+    assert_eq!(response["error"]["code"], -32803, "{response}");
+    assert!(response.get("result").is_none());
+    assert!(session.close().1);
+}

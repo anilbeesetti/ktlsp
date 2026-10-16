@@ -301,6 +301,8 @@ fn target_path_and_version_boundaries_are_encoded_data_only() {
         (52, 0),
         (67, 0),
         (68, 0),
+        (69, 0),
+        (70, 0),
         (67, 1),
         (67, 65535),
     ] {
@@ -308,7 +310,7 @@ fn target_path_and_version_boundaries_are_encoded_data_only() {
         c.major = major;
         c.minor = minor;
         c.fields[0].attributes = vec![attr(1, &[0, 0])];
-        if major > 67 || minor != 0 && major != 45 {
+        if major > 69 || minor != 0 && major != 45 {
             assert_eq!(
                 decode(&c).unwrap_err(),
                 Error::UnsupportedVersion { major, minor }
@@ -681,5 +683,19 @@ fn licensed_precompiled_field_data_matches_frozen_byte_expectations() {
                 .encode_utf16()
                 .collect::<Vec<_>>()
         );
+    }
+}
+
+#[test]
+fn modern_nonempty_field_type_annotations() {
+    let bytes = payload(&[root(&[(3, 255)], None)]);
+    for major in [68, 69] {
+        let mut c = base();
+        c.major = major;
+        c.fields[0].attributes = vec![attr(1, &bytes)];
+        let out = decode(&c).unwrap();
+        let annotation = &out.fields[0][0].annotations[0];
+        assert_eq!(annotation.path[0].argument_index, 255);
+        assert_eq!(annotation.annotation.descriptor, c.utf16(3).unwrap());
     }
 }

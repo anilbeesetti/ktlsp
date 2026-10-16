@@ -72,11 +72,23 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<MethodSignatureExtension<'
         owned_bytes: limits.owned_bytes,
         ..Default::default()
     });
-    let mut out = MethodSignatureExtension {
+    let (signature, bodies) =
+        scan_with_budget(bytes, &mut budget, |raw, span| SignatureBody { raw, span })?;
+    Ok(MethodSignatureExtension {
         raw: bytes,
-        signature: None,
-        bodies: Vec::new(),
-    };
+        signature,
+        bodies,
+    })
+}
+
+// Share the scanner without retaining self-borrows in the owning method consumer.
+pub(super) fn scan_with_budget<'a, T>(
+    bytes: &'a [u8],
+    budget: &mut string_table::Budget,
+    body: impl Fn(&'a [u8], Range<usize>) -> T,
+) -> Result<(Option<JvmMethodSignature>, Vec<T>), Error> {
+    let mut signature = None;
+    let mut bodies = Vec::new();
     let mut pos = 0;
     while pos < bytes.len() {
         let field = wire::field(bytes, &mut pos, bytes.len(), &mut budget.wire)?;
@@ -84,7 +96,7 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<MethodSignatureExtension<'
         budget.wire.work(1, start)?;
         if let (100, Value::Bytes(raw)) = (field.number, field.value) {
             let span = field.span.end - raw.len()..field.span.end;
-            let signature = out.signature.get_or_insert(JvmMethodSignature {
+            let signature = signature.get_or_insert(JvmMethodSignature {
                 name: None,
                 desc: None,
             });
@@ -98,8 +110,8 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<MethodSignatureExtension<'
                     _ => {}
                 }
             }
-            budget.push(&mut out.bodies, SignatureBody { raw, span }, start)?;
+            budget.push(&mut bodies, body(raw, span), start)?;
         }
     }
-    Ok(out)
+    Ok((signature, bodies))
 }

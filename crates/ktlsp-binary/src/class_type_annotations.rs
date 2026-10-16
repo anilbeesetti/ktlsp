@@ -42,7 +42,7 @@ pub struct ClassTypeAnnotations<'a> {
 }
 
 /// Decode declarations then class type attributes with one structural budget.
-/// Recognized class type attributes require 52.0–67.0. Field/method type
+/// Recognized class type attributes require 52.0–69.0. Field/method type
 /// attributes, Code and Record interiors remain opaque. Any error returns no
 /// partial output and leaves the raw input available. New vector capacity is
 /// charged; inherited annotation vectors retain their logical-node accounting.

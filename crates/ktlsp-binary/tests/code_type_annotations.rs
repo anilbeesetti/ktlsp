@@ -276,6 +276,8 @@ fn duplicates_and_version_precedence() {
         (52, 0),
         (67, 0),
         (68, 0),
+        (69, 0),
+        (70, 0),
         (52, 1),
     ] {
         let raw = raw(&[(2, &[])]);
@@ -285,7 +287,7 @@ fn duplicates_and_version_precedence() {
         let body = bodies.remove(0).unwrap();
         c.major = major;
         c.minor = minor;
-        let expected = if major == 68 || minor == 1 {
+        let expected = if major == 70 || minor == 1 {
             Error::UnsupportedVersion { major, minor }
         } else if major < 52 {
             Error::Malformed("type annotation version")
@@ -610,5 +612,50 @@ fn annotation_depth_duplicates_and_deterministic_mutations() {
                 assert_eq!(body.raw, before);
             });
         }
+    }
+}
+
+#[test]
+fn modern_authored_nonempty_code_type_annotations_and_tightened_bytes() {
+    let payload = fixture();
+    let raw = raw(&[(2, &payload)]);
+    for major in [68, 69] {
+        let mut c = make_class(&raw);
+        c.major = major;
+        let bodies = code::decode(&c, code::Limits::default()).unwrap();
+        let body = bodies[0].as_ref().unwrap();
+        let out = decode(&c, body, Limits::default()).unwrap();
+        assert_eq!(
+            out[0]
+                .annotations
+                .iter()
+                .map(|a| a.target_type)
+                .collect::<Vec<_>>(),
+            (0x40..=0x4b).collect::<Vec<_>>()
+        );
+        assert_eq!(out[0].raw.as_ptr(), body.attributes[0].bytes.as_ptr());
+        assert!(
+            decode(
+                &c,
+                body,
+                Limits {
+                    bytes: raw.len(),
+                    ..Limits::default()
+                }
+            )
+            .is_ok()
+        );
+        assert_eq!(
+            decode(
+                &c,
+                body,
+                Limits {
+                    bytes: raw.len() - 1,
+                    ..Limits::default()
+                }
+            )
+            .unwrap_err(),
+            Error::Limit("code type annotation bytes")
+        );
     }
 }

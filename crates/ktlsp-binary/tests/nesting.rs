@@ -194,7 +194,7 @@ fn lengths_duplicates_contexts_and_versions() {
             );
         }
     }
-    for (major, minor) in [(44, 0), (45, 4), (67, 1), (68, 0), (65535, 65535)] {
+    for (major, minor) in [(44, 0), (45, 4), (67, 1), (70, 0), (65535, 65535)] {
         let mut c = model(vec![]);
         c.major = major;
         c.minor = minor;
@@ -538,5 +538,25 @@ fn precompiled_apache_fixtures_and_every_byte_truncation() {
         for end in 0..bytes.len() {
             assert!(parse_class(&bytes[..end]).is_err());
         }
+    }
+}
+
+#[test]
+fn modern_nonempty_nesting_keeps_encoded_relationships() {
+    for major in [68, 69] {
+        let inner = words(&[1, 2, 4, 9, 0x800a]);
+        let mut c = model(vec![attr(5, &inner)]);
+        c.major = major;
+        let decoded = nesting::decode(&c).unwrap();
+        let row = &decoded.inner_classes.as_ref().unwrap()[0];
+        assert_eq!(
+            (
+                row.inner.index,
+                row.outer.unwrap().index,
+                row.name_index,
+                row.access_flags
+            ),
+            (2, 4, Some(9), 0x800a)
+        );
     }
 }

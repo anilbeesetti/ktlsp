@@ -2,9 +2,26 @@
 
 `parse_class(&[u8]) -> Result<ClassFile<'_>, Error>` reads classfile structure as data, using only Rust's standard library. No existing server caller or capability uses it yet. All fixtures in `tests/classfile.rs` are independently authored Rust byte builders, with no copied third-party code or compiler-produced artifacts. No JVM/compiler/oracle was run.
 
-Supported version subset: 45.0–45.3 and 46.0–67.0 (through Java 23). Preview minors, nonzero minors for majors 46–67, newer and older versions return `UnsupportedVersion`. This deliberately excludes some historically valid versions. New CP tags are gated at 51 (method handle/type/invokedynamic), 53 (module/package), and 55 (dynamic). Unknown tags return `UnsupportedTag`.
+Supported version subset: 45.0–45.3 and 46.0–69.0 (through Java 25). Preview minors, nonzero minors for majors 46–69, newer and older versions return `UnsupportedVersion`. This deliberately excludes some historically valid versions. All six structural/attribute entry gates share this policy. New CP tags are gated at 51 (method handle/type/invokedynamic), 53 (module/package), and 55 (dynamic). Unknown tags return `UnsupportedTag`.
 
 The result preserves raw access flags, CP indices, interface/member order, and borrowed opaque attribute payloads. CP zero/wide second slots are `Constant::Unusable`. Integer and floating constants preserve their bits. `utf16(index)` exposes modified UTF-8 losslessly as UTF-16 code units, including encoded NUL and isolated surrogates; callers decide whether conversion to a Rust string is appropriate.
+
+Java 24/25 admission changes only ordinary version support, not JVM verification,
+descriptor grammar, tag introduction floors, attribute applicability or resource
+bounds. [JVMS 23](https://docs.oracle.com/javase/specs/jvms/se23/html/jvms-4.html),
+[24](https://docs.oracle.com/javase/specs/jvms/se24/html/jvms-4.html) and
+[25](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html) retain the
+consumed constant tags, member/descriptor and outer-attribute framing. Unknown
+attribute interiors remain opaque; no preview, Q descriptors or Java-source
+constructor-order restriction is added. Historical review receipts below and in
+`*_REVIEW.md` describe their original reviewed ceilings, not the current policy.
+
+Pinned Eclipse JDT minimal JCL **test-library** fixtures for 68.0/69.0 reside in
+`fixtures/modern-class-versions`: unchanged archives, exact extracted Serializable
+and method-bearing Object classes, matching source/build/about/EPL-2.0 notices,
+and `PROVENANCE.json` with whole ZIP inventory, SHA-256 and selected byte walks.
+They are not stock SDKs or evidence of an exact compiler or bundled LSP JDK.
+These new test expectations have not yet been exercised; ROOT owns validation.
 
 Validation covers structural typed CP references, method-handle kinds/targets, class/member names and descriptors, array depth (255), parameter slots (255, including receiver for declared instance methods), attribute name indices and lengths, and exact EOF. It does not resolve external classes. Special method names have descriptor/handle restrictions. Attribute names are validated as UTF-8 pool references; their text and contents are otherwise opaque.
 
@@ -81,6 +98,15 @@ multi-release, signature, class linkage, semantic symbols or server integration.
 No extraction, network or Java is used. Payload flags, local placeholders,
 descriptors and independent compressed/decoded/work ceilings are specified in
 [the artifacts payload contract](../ktlsp-artifacts/ZIP_STORED.md).
+
+`parse_jimage_class(&resource, &mut scratch)` consumes one private origin-bound
+`ktlsp-artifacts::JimageResource`, preserving whole-image authority rather than
+constructing a second verified class artifact. It invokes the existing class
+reader and compares declared `this_class` with the selected module-relative
+MUTF-8 `.class` path losslessly, including surrogate units. All failure paths
+clear scratch. Stored attributes borrow the original image; decoded attributes
+borrow scratch. [JImage format/budget/fixture details](../ktlsp-artifacts/JIMAGE.md)
+remain separate from SDK selection, classpath/module semantics and server parity.
 
 `tests/archive.rs` includes the unchanged genuine Commons Lang 3.17.0 JAR in
 `fixtures/t017c1/commons-lang3-3.17.0.jar.bin`. Existing `provenance.json` records
@@ -354,3 +380,44 @@ depth ceilings are used: selected fixed leaves follow the existing depth2 rule.
 Property/alias contracts remain unchanged. No general generic reconstruction,
 substitution, bounds/type-table interpretation, source/module linkage, server
 integration or official Kotlin LSP parity is claimed; #96 remains open.
+
+## Same-model JVM method identity (#394)
+
+`metadata::linked_class_method::decode(&class, all_class_field_ordinal, limits)`
+extracts that supplied ClassFile model's own original class annotations and
+Metadata, admits kind1/mv2.3.0, completes Class framing, selects one original
+Constructor(field8) or Function(field9), and joins its effective JVM identity to
+exactly one original `&class.methods[method_ordinal]`. The public mutable model
+is the authority, **not proof of a parse or retained archive bytes**. Consumed
+model counts, CP tags/indices, UTF16 sizes, annotations and descriptors are
+revalidated; foreign caller-authored Header/Outcome objects are not inputs.
+
+Extension100 occurrences merge in encounter order with last recognized scalar
+wins and signed resolver indices. An explicit descriptor is mandatory. A present
+extension name wins; an absent name uses required Function.name or literal
+`<init>` for constructors, following pinned Kotlin
+[`JvmProtoBufUtil.kt` lines79–125](https://github.com/JetBrains/kotlin/blob/d57eb4a26ed01ab03cf195da686c8047032ff16f/core/metadata.jvm/src/org/jetbrains/kotlin/metadata/jvm/deserialization/JvmProtoBufUtil.kt#L79-L125).
+Absence is not index0; omitted descriptors are not inferred. All original methods,
+including bridges and overloads, participate in full lossless UTF16
+name+descriptor uniqueness, including return type. Zero/duplicate tuples refuse.
+Constructors require nonstatic `<init>` and void; ordinary Functions cannot bind
+`<init>`/`<clinit>`. Actual access flags determine descriptor receiver slots;
+metadata formal counts are not asserted equal to JVM arity.
+
+The result borrows the original Member and actual CP name/descriptor/owner, and
+owns one decoded-d1 buffer plus necessary lossless ClassId and metadata identity/
+spans. `this_class` is resolved through typed Class→Utf8. Owner mapping converts
+ClassId package dots to `/` and relative nested dots to `$` separately; local,
+quoted or otherwise unproved mappings refuse. No reverse-dollar or flattened-name
+guess establishes ownership.
+
+One monotonic schema/wire/name/work/capacity allowance also covers annotation and
+header decoding, d1+d2, complete framing, extension merging, owner/tuple comparison
+and native descriptor parsing. `Limits.bytes` includes visited original attribute
+payloads, decoded d1 and d2 UTF16 bytes; requested capacities exclude allocator
+surplus/churn and RSS. Existing raw/property/alias/selected-return APIs retain
+their separate contracts. Permanent pure-data checks cover genuine Pair Class
+constructor ordinal5→method0/CP8,9 and copy ordinal9→method6/CP50,51; these tests
+are source coverage, not an execution receipt. ROOT's separate public-API smoke
+and native-data admission remain required. No JVM/compiler, parser/server runtime,
+general Kotlin linkage/overload engine or official Kotlin LSP parity is claimed.

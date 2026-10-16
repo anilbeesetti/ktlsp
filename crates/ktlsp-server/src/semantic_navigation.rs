@@ -2,11 +2,12 @@
 use ktlsp_parser::{
     SnapshotResult, SourceSnapshot,
     local_value_binding::{
-        LocalValueAnchor, LocalValueOccurrences, bind_lexical_type_parameter,
+        LocalValueAnchor, TypeParameterAnchor, bind_lexical_type_parameter,
         bind_local_function_callee, bind_local_value, guarded_local_value_rename,
-        local_value_occurrences, visible_local_values,
+        guarded_type_parameter_rename, local_value_occurrences, type_parameter_occurrences,
+        visible_local_values,
     },
-    lowering::{lower_declarations, reference_site},
+    lowering::{Declaration, lower_declarations, reference_site},
     structural_regions::build_regions,
 };
 use ktlsp_text::Range;
@@ -212,6 +213,52 @@ pub(crate) fn render(
         return render_target(tree.source(), snapshot, query, target, target.name_range());
     }
     if occurrence_query {
+        let annotation_anchor = reference.filter(|(_, expression)| {
+            expression
+                .parent
+                .is_some_and(|parent| tree.elements()[parent].kind == "USER_TYPE")
+        });
+        let declaration_anchor = if reference.is_none() {
+            let mut selected = lowered.declarations().iter().filter(|declaration| {
+                let range = declaration.name_range();
+                range.start <= offset && offset < range.end
+            });
+            let first = selected.next();
+            if selected.next().is_some() {
+                return Err(UNSUPPORTED);
+            }
+            first.filter(|declaration| declaration.kind() == "TYPE_PARAMETER")
+        } else {
+            None
+        };
+        let anchor = annotation_anchor
+            .map(|(index, _)| TypeParameterAnchor::AnnotationReference(index))
+            .or_else(|| declaration_anchor.map(TypeParameterAnchor::Declaration));
+        if let Some(anchor) = anchor {
+            // Positive type roles, never failed value-binding fallback. The
+            // kernel authenticates the original target/body once per query.
+            let found = if rename_query {
+                let name = match &query {
+                    Query::Rename { new_name, .. } => Some(new_name.as_str()),
+                    _ => None,
+                };
+                guarded_type_parameter_rename(&directory, result, anchor, snapshot, name)
+            } else {
+                type_parameter_occurrences(&directory, result, anchor, snapshot)
+            }
+            .map_err(|_| UNSUPPORTED)?;
+            let ranges = found
+                .occurrences()
+                .iter()
+                .map(|annotation| annotation.range());
+            return if rename_query {
+                render_rename(found.target(), ranges, snapshot, &query, offset)
+            } else {
+                render_occurrences(found.target(), ranges, snapshot, &query)
+            };
+        }
+    }
+    if occurrence_query {
         let anchor = if let Some((index, _)) = reference {
             LocalValueAnchor::ReferenceExpression(index)
         } else {
@@ -235,11 +282,22 @@ pub(crate) fn render(
             let occurrences =
                 guarded_local_value_rename(&directory, result, anchor, snapshot, new_name)
                     .map_err(|_| UNSUPPORTED)?;
-            return render_rename(&occurrences, snapshot, &query, offset);
+            return render_rename(
+                occurrences.target(),
+                occurrences.occurrences().iter().map(|site| site.range()),
+                snapshot,
+                &query,
+                offset,
+            );
         }
         let occurrences = local_value_occurrences(&directory, result, anchor, snapshot)
             .map_err(|_| UNSUPPORTED)?;
-        return render_occurrences(&occurrences, snapshot, &query);
+        return render_occurrences(
+            occurrences.target(),
+            occurrences.occurrences().iter().map(|site| site.range()),
+            snapshot,
+            &query,
+        );
     }
     let site = reference_site(
         &lowered,
@@ -304,7 +362,8 @@ fn render_target(
 }
 
 fn render_occurrences(
-    occurrences: &LocalValueOccurrences<'_>,
+    target: &Declaration<'_>,
+    ranges: impl ExactSizeIterator<Item = std::ops::Range<usize>>,
     snapshot: &SourceSnapshot,
     query: &Query,
 ) -> Result<Value, &'static str> {
@@ -315,7 +374,7 @@ fn render_occurrences(
             ..
         }
     );
-    let count = occurrences.occurrences().len() + usize::from(include_declaration);
+    let count = ranges.len() + usize::from(include_declaration);
     // Same conservative 1 MiB rendering ceiling as document symbols, including
     // worst-case JSON escaping of a repeated original URI. Kernel caps sites.
     let uri_bytes = if matches!(query, Query::References { .. }) {
@@ -328,11 +387,10 @@ fn render_occurrences(
     }
     let mut offsets = Vec::with_capacity(count * 2);
     if include_declaration {
-        let range = occurrences.target().name_range();
+        let range = target.name_range();
         offsets.extend([range.start, range.end]);
     }
-    for site in occurrences.occurrences() {
-        let range = site.range();
+    for range in ranges {
         offsets.extend([range.start, range.end]);
     }
     // The authenticated target precedes every retained site; sites are already
@@ -391,19 +449,20 @@ fn rename_output_size(
 }
 
 fn render_rename(
-    found: &LocalValueOccurrences<'_>,
+    target: &Declaration<'_>,
+    ranges: impl ExactSizeIterator<Item = std::ops::Range<usize>> + Clone,
     snapshot: &SourceSnapshot,
     query: &Query,
     offset: usize,
 ) -> Result<Value, &'static str> {
     if matches!(query, Query::PrepareRename { .. }) {
-        let selected = std::iter::once(found.target().name_range())
-            .chain(found.occurrences().iter().map(|site| site.range()))
+        let selected = std::iter::once(target.name_range())
+            .chain(ranges)
             .find(|range| range.start <= offset && offset < range.end)
             .ok_or(UNSUPPORTED)?;
         let positions =
             crate::structure::positions(snapshot.source(), &[selected.start, selected.end]);
-        let placeholder = found.target().semantic_spelling().ok_or(UNSUPPORTED)?;
+        let placeholder = target.semantic_spelling().ok_or(UNSUPPORTED)?;
         if placeholder
             .len()
             .checked_mul(6)
@@ -419,9 +478,9 @@ fn render_rename(
     let Query::Rename { new_name, .. } = query else {
         unreachable!("rename query")
     };
-    let count = found.occurrences().len() + 1;
-    let removed = std::iter::once(found.target().name_range())
-        .chain(found.occurrences().iter().map(|site| site.range()))
+    let count = ranges.len() + 1;
+    let removed = std::iter::once(target.name_range())
+        .chain(ranges.clone())
         .try_fold(0usize, |n, range| n.checked_add(range.len()))
         .ok_or(UNSUPPORTED)?;
     // ASCII newName needs no JSON escaping. Validate growth/output BEFORE
@@ -434,10 +493,9 @@ fn render_rename(
         snapshot.document().len(),
     )?;
     let mut offsets = Vec::with_capacity(count * 2);
-    let name = found.target().name_range();
+    let name = target.name_range();
     offsets.extend([name.start, name.end]);
-    for site in found.occurrences() {
-        let range = site.range();
+    for range in ranges {
         offsets.extend([range.start, range.end]);
     }
     let positions = crate::structure::positions(snapshot.source(), &offsets);

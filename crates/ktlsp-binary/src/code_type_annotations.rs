@@ -74,9 +74,7 @@ pub fn decode<'a>(
     code: &'a CodeBody<'_>,
     limits: Limits,
 ) -> Result<Vec<CodeTypeAnnotationAttribute<'a>>> {
-    if !(class.major == 45 && class.minor <= 3
-        || (46..=67).contains(&class.major) && class.minor == 0)
-    {
+    if !crate::supported_class_version(class.major, class.minor) {
         return Err(Error::UnsupportedVersion {
             major: class.major,
             minor: class.minor,

@@ -278,6 +278,34 @@ targets. Sourcee24c011 passed original full Native38941146516 and platform
 38941146673; the earlier failed bad67 run remains immutable. Temporary writers
 were removed afterward; changed completion/rename rebind assertions remain.
 
+## Finite function type-parameter references and rename (#392)
+
+References/highlights and negotiated prepare/versioned rename now positively
+select an original function type-parameter declaration (including unused names)
+or a supported simple parameter/direct-local annotation. Original initializer,
+callee and value-declaration roles remain separate. Type hover/typeDefinition
+and richer types remain unsupported; no new capability is advertised for them.
+
+The kernel authenticates the complete ordinary function once, retaining proved
+empty local calls, and scans the entire type list and all annotations under one
+existing budget. Rename refuses matching semantic duplicates and capture of an
+unedited annotation, even before the body or when the target was unused.
+Value-only names and proved local-function/callee spellings are not type
+collisions. Bare `where`, `dynamic` and `suspend` outputs refuse context changes
+before same-name quote removal; value-rename name admission is unchanged.
+
+Rendering reuses sorted original UTF-16 coordinates, declaration-Write and
+annotation-Read highlights, exact selected-token preparation and a single
+current-URI/integer-version `documentChanges` edit. Existing 64 KiB edited-source,
+1 MiB escaped-output, negotiation, eight-slot admission, cancellation and
+incarnation/version/content publication guards are unchanged. Permanent real
+producer/paired-CLI regressions apply returned edits with native `TextChange`
+helpers, reopen version8, and rebind original type/value/callee partitions,
+including contextual `out`/`reified` outputs. These new tests and temporary
+bounded first-hosted observation writers have not run locally; hosted acceptance
+is ROOT-gated. This is not workspace refactoring, generic inference, official
+equivalence or full parity; #96/#377/#395 remain separate open limits.
+
 ## Finite local definition and declaration hover
 
 Over open Kotlin documents, a strict UTF-16 position selects an actual original value `REFERENCE_EXPRESSION` containing that position (end-exclusive). The existing declaration lowerer, structural-region directory, authenticated `ReferenceSite` and `bind_local_value` prove a unique eligible preceding direct immutable local `val` or same-function ordinary parameter. Only ordinary named top-level block functions with complete plain integer/whole-identifier local initializers and simple syntax-only parameter/local annotations are eligible. Definition returns the original target **name** range and same URI. Hover returns the original target **declaration text** (`p: T` for a parameter) and original reference range: no invented types, initializer chasing or inferred global unresolvedness.
@@ -296,9 +324,10 @@ richer annotation syntax remain unsupported. Bare `T` does not imply semantic no
 All eight existing parser-backed consumers retain their original value/body
 contracts on this generic body. Type parameters stay out of value completion,
 occurrences and rename edits; annotation references stay outside value partitions.
-No typeDefinition method/capability, type-parameter hover/references/rename,
-generic inference or full Kotlin type resolution is added. First original hosted
-producer/paired-CLI behavior is recorded below. Capture-free reviewed b5f6128
+The original #386 delivery added no typeDefinition method/capability, type-parameter
+hover/references/rename, generic inference or full Kotlin type resolution.
+Its hosted producer/paired-CLI behavior is recorded below; #392's separate finite
+reference/rename extension is described above. Capture-free reviewed b5f6128
 passed final original native/platform CI, then guarded PR388 produced c4c7c6d,
 exact reviewed treeba361/soleparent040. Independent OWNER+ROOT authenticated
 original exact-main38933481416/job117083027573:1052passed+22faultcases.

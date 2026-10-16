@@ -1156,3 +1156,286 @@ reviews, full original checks and all guarded integration/main-evidence gates.
 Unresolved395/377/96/B3 and official/release/full-parity limits remain separate.
 
 
+### Verified local-call, applied-return and structural-action delivery (PR393)
+
+[PR393](https://github.com/anilbeesetti/ktlsp/pull/393) delivered389/390/391.
+Reviewed capture-freef03e441b9c5f3fbd22498a6007bcc32fdd0faa31 had two
+independent full22-file product reviews with no actionable source findings.
+Its own original Native38947579646/job117130498540 passed1075+22;
+platform38947579596/macOS117130497862 passed1073+22 and
+Windows117130498114 passed1020+22. All132rows/job have0failed/3ignored/0filtered.
+Actual tested4448a7903662fa1649ef4c47d19a8649df25347e has exact reviewed
+tree2a44fef2e548b8db2946d85f9a1b58cf274f3672 and ordered parents[c4,f03].
+
+ROOT separately inspected fresh strictly read-only guard process0/parsed0,
+exact remote main/head/base/tree/parents, clean local reviewed identity,
+complete22scope/configuration4/3successfulchecks/0statuses/2originalworkflows.
+Only then did a separate ordinary expected-head squash merge execute.
+Actual main6a62128542955a6c0c75154716de238bf589041d has identical reviewed
+tree2a44 and soleparentc4c7c6dfe72aa28fbb327e9581916eddc375d4ad.
+
+ROOT and independent OWNER StructuralQuickfixImplementation authenticated
+[original exact-main38949030791/job117135423997](https://github.com/anilbeesetti/ktlsp/actions/runs/38949030791/job/117135423997):
+push/main attempt1, exact checkout6a621285, pinned Rust1.99, format,
+strict locked workspace-all-target Clippy and unfiltered full workspace
+passed1075+22;132rows/0failed/3ignored/0filtered. Full raw log279802bytes
+SHA25667fb932e538350423ff0e76215497f4000d3cd023008c43e8e0ac61499379881.
+The exclusive base lease remained held through actual tree/soleparent and
+both original-main proofs, then cleared. GitHub CLI watch network
+failures were monitoring transport failures, not CI reruns or accepted failures.
+
+First actual producer/CLI and applied-edit evidence above remains source-
+specific and unchanged; the native Pair.copy public-API smoke and491-case
+binary data suite passed. Temporary writers were removed only after readback.
+Original8be macOS failure395 is still OPEN/UNKNOWN; neither later passing
+source nor this merge diagnoses its lost subcase/stderr or repairs its cause.
+No strict cleanup/deadline/assertion relaxation or local Kotlin parser,
+server/Session/worker/peer runtime occurred. 377/96/B3/official/license/release
+and full-parity gates remain open.
+
+ROOT admitted392/typeparameter occurrences+safe versioned rename,
+394/supplied-ClassFile Metadata-to-original-method identity and396/original
+JPS XML declared-source projection to three isolated owners from ONLY verified
+6a621285. Each receives two independent static review slots; common docs,
+Cargo, union/runtime admission, original CI and integration remain ROOT-owned.
+These are pending implementations, not new capabilities or completed parity.
+
+### Type-role, JVM-method and original-XML consumer composition
+
+ROOT composed three isolated, independently reviewed components from the single
+verified6a621285 incoming main; user/older/component worktrees remain preserved.
+
+|Child|Exact selected component head|Declared operation|
+|---|---|---|
+|392|7cde8254517d82b25e8c6f85e8f55ea75bca069e|Original same-function typeparameter occurrences and guarded versioned rename|
+|394|05ece9f87ab14de6de8da32b127a9a5b326d9e73|Supplied-model Metadata to unique original JVM method identity|
+|396|b0f3f114a70b33df2efe30d6a2e62d11f3986f2e|Original JPS XML to validated declared-source projection|
+
+Each exact head/tree has separate functionality/adversarial static clearances
+and changed-head rechecks; ROOT read those independent reports. Composition
+has no conflicts, Cargo/dependency/lock/workflow/vendor changes or bound raises.
+No compilation/runtime/test evidence is implied by static clearance.
+
+392 keeps value/callee/type roles disjoint and validates a complete function
+once under one query budget. All parameter/local annotations, including those
+before the body and unrelated names/unused targets, participate in capture
+preservation. Contextual output names are checked before same-name unquoting.
+Versioned actual-returned edits are applied in original-coordinate-safe order
+before edited-source rebinding tests. Existing unrelated refusals remain.
+TEMP_392 producer/identity/wire writers are deliberately retained pending
+ROOT and independent owner actual hosted readback; they are not yet observations.
+
+394 internally extracts the supplied public ClassFile model's Metadata rather
+than trusting a foreign Header/Outcome. It selects all-Class-field ordinals,
+uses explicit JVM descriptors with pinned absent-name defaults, maps typed
+owner names and requires a unique complete UTF16 tuple among original methods.
+Returned methods/CP descriptors stay borrowed; decoded-d1 storage is owned once.
+Private shared-budget seams preserve existing callers. Supplied-model authority
+is not archive-byte/SDK authentication or a JVM verifier. Static CP0 and composed
+annotation-grammar undercharging findings were fixed at shared consuming points
+and independently rechecked with meaningful regression coverage.
+
+396 consumes only caller snapshot bytes, preserves original XML provenance,
+manifest/source order and declared root kinds, then uses existing native model
+validation/serialization. No filesystem/SDK/build execution or effective JPS
+membership/classpath claim. Unknown source-affecting semantics, malformed or
+ambiguous documents and exhausted aggregate XML/path/storage/output work refuse
+atomically. Genuine release-pinned original XML and Apache2 notices are retained.
+Review fixes include diagnostic/allocation envelopes and native Windows path
+semantics; static clearance is not Windows execution proof.
+
+ROOT's full-union reviews, pinned format/strict compile, native binary/import
+DATA suites and actual genuine external PUBLIC-API smoke remain mandatory.
+Kotlin parser/server/Session/worker/peer paths run ONLY through separately
+admitted original hosted full CI, with direct actual392 packet readback before
+capture cleanup and final exact-head review/checks. Fresh guarded integration
+and independent OWNER+ROOT original exact-main proof are still required.
+395/377/96/B3, official-custody, release/license and full parity remain open.
+
+The initial28-file review excluded independent398/JImage and399/Java24-25
+components. Both finished before any compilation/check/runtime admission;
+ROOT then composed them from the SAME verified6a621285 base to avoid a
+duplicate integration/CI epoch. The expanded source requires fresh affected
+full-union reviews; earlier28-file clearances alone do not approve it.
+397/KDoc is researched/queued after392, not implemented. Full formatting
+still lacks native rules, effective settings/read authority and actual official
+option/EditorConfig precedence; those requirements are not replaced by guesses.
+
+#### First full-union Windows path finding
+
+The adversarial full28-file review at019ef361 identified an absolute-path
+admission defect: once a Windows drive prefix existed, internal colons such as
+`file:///C:/workspace/src:stream` passed as declared directory roots, unlike
+the equivalent macro suffix. ROOT traced every lexical/resolve caller and
+changed the shared guard to reject colons in all non-prefix path components,
+preserving only the already validated native disk prefix. Four public-operation
+Windows cases cover absolute/macro and raw/percent-encoded colon spellings.
+An incidental error-reason wording pin was removed while retaining its actual
+macro-drive replacement refusal. No other path policy, bounds or assertions
+were relaxed. The before-fix counterexample is source-backed, not an executed
+Windows observation; exact rechecks and original hosted Windows execution
+remain required before acceptance. No local Kotlin runtime was admitted.
+
+#### Expanded native JDK data composition
+
+399 selected exact62ce2179e2a3fa60981e136d853b011c19aeff47/tree676968786f6f77e84c27113f833acd0dd19a4ff1.
+One crate-private predicate replaces all six direct version policies at their
+existing gate positions; inherited readers retain their error/resource order.
+Only ordinary68.0/69.0 are added, with historical supported minors unchanged
+and all preview/major70 still unsupported. No descriptor/tag/opaque-attribute
+policy, classpath winner/release semantics or resource ceiling is loosened.
+Both exact component reviews cleared fixes for Windows fixture paths and
+complete source-attachment version coverage. Genuine pinned Eclipse minimal
+JCL24/25 archives/classes, source/build/about and EPL2 notices are retained;
+they are compiled TEST libraries, not stock SDK/compiler/LSP-JDK proof.
+
+398 selected exact472da0c8700a17e7fe21af30d70940cd28bcf540/treed94182c267bcec10ef86d9e2c2798fe48a995433.
+Private origin-bound JImage views retain the original verified carrier and
+complete bounded endian/table/hash/location/string/count/identity/span proof
+before selection or absence. Stored bytes borrow; selected nested zlib output
+uses exact checksums/consumption/length and global layer/work/live-buffer bounds.
+The real selected-class bridge checks declared names and clears scratch on
+failure. Its small private unsafe cleanup guard was specifically reviewed
+for raw-pointer provenance, borrow/drop order and successful disarming; that
+static assessment is not executed Miri/runtime proof. Unknown/compact-cp
+codecs refuse rather than emit transformed class bytes or fall back.
+Both exact component reviews cleared moduleless aliasing, short final
+magic-prefixed payload handling and cleanup-pointer provenance corrections.
+
+Four genuine MIT upstream small images in both byte orders retain12 structural
+records each:5 ordinary resources and7 internal records. Original Object160
+bytes/67.0 is an authored image-generator fixture, not a stock JDK class.
+Immutable Git blobs, actual raw hashes, complete inventories, MIT/BSD notices
+and generator-as-data provenance are retained. No Java tools were invoked.
+The64MiB carrier limit, unsupported compact-cp and absent SDK/root association
+remain explicit; no claim that full real runtime images fit is made.
+
+All five component implementations came from the one verified6a621285 base.
+ROOT merged the new data branches without conflicts; automatic annotation and
+binary-export/README combinations still require renewed affected review.
+No Cargo, dependency, lock, workflow, vendor, JVM or parser-runtime change
+was introduced. Builds/lints/tests/format/smokes/platform execution remain
+UNEXERCISED for this source. ROOT will verify one expanded final source,
+including genuine native PUBLIC-API data smokes and actual hosted392 edits,
+before any ordinary guarded integration. Full parity is still not achieved.
+
+The two expanded91-file reviews at618ebc4068b47b648ffa3ebd0811993da7a9d087
+independently identified one source-proven integration regression:394's new
+linked-method negative case still classified68.0 as unsupported after399's
+shared version extension. ROOT kept the product policy, moved refusal to
+70.0/68.preview/69.1 and added68.0/69.0 checks for original method/name/
+descriptor pointer identity. This is a static correction, not an executed
+before/after claim; both exact changed-head rechecks remain required.
+ROOT also directly SHA-256 checked all four images, both modern JARs,
+Object/Pair class bytes and both JPS XML originals against retained provenance.
+
+Both full-union and all ten affected-component reviewers cleared formatted
+bf7734ccc3755d9ca349cf0e8c56f96d9fd53966/tree68744178328d97bcf0cb7edda03c8a1fa12a09e0
+statically. ROOT's first strict locked all-target workspace Clippy then
+exited101 with E0282 at the shared authored JImage builder:77: an unconstrained
+payload Vec extended from borrowed bytes. ROOT traced both artifact/binary
+test consumers and made its intended byte element type explicit as Vec<u8>.
+No test/runtime was run to reconfirm that compiler report. This correction
+requires exact rechecks and a new strict compilation; native data/smoke and
+hosted/full-workspace runtime gates remain unexercised.
+
+#### Actual native DATA and public-API verification
+
+At353f0995f1b8492a68f51f7060febc5ae37f23eb/tree0a7d51d9a1364dd0c3684a820e33ca6f0a239e69,
+ROOT passed strict locked all-target workspace Clippy with --keep-going and
+-D warnings. The additional flag collects all diagnostics; it does not weaken
+warning/error policy. Local Rust/cargo1.99.0, rustc b940084d7, host
+aarch64-apple-darwin were observed, not assumed.
+
+The preceding changed-source checks also exposed two default-field initializer
+lints, a manual-divisibility lint and a role-audit E0597. ROOT used equivalent
+direct Limits initializers and the native nonzero-divisor predicate. The audit
+retains its actual pointer-derived target ordinal, borrowing original property
+name bytes from the authenticated source range and target kind/name from the
+same stable lowering, rather than the iteration-local ReferenceSite. No string
+copies, unsafe workaround, production API change, weakened assertions, raised
+bounds or suppressions were introduced. Each correction received both exact
+ROOT full-union and affected-component static rechecks before compilation.
+
+ROOT ran cargo test --locked for ONLY ktlsp-artifacts, ktlsp-binary and
+ktlsp-import:696 passed across73 actual result rows;0 failed/ignored/measured/
+filtered, process0. The complete62698-byte native DATA log has SHA-256
+efe339086add9b70e74e0cfd766e18c0d28eed77f2225add61a5fbce4040c95c.
+This is not a local workspace/parser/server/Session/worker/peer run.
+
+Three throwaway standalone Rust executables linked actual Cargo-reported
+public rlibs, rather than private helpers or copied models. Each actual
+compilation/execution exited0 with empty stderr; ROOT and the four separate
+component owners directly read the complete commands, source and outputs:
+
+| Consumer | Actual native public-API observation |
+| --- | --- |
+|394|Genuine Pair constructor selector5→original method0/CP8,9 and copy9→method6/CP50,51; original Member/name/descriptor/typed-owner pointers, exact d1 member/extension ranges/defaults, two parameters/three receiver-inclusive slots; selectors3/MAX refused.|
+|396|Genuine moduleB source39..562, manifest reference123..213, production root325..392 and test399..466; exact original XML bytes/document paths, real native project serialization/reload and input permutation equal.|
+|398|Both stored and both compressed original images admitted; exact java.base/java/lang/Object.class, slot6/location63or67, original spans7109..7269/3142..3306, actual160-byte67.0 declared Object; retained artifact/provenance pointers, stored borrowing, compressed byte equality and extensionless payload checked.|
+|399|Both pinned genuine JCL archives→ZIP74/78 entries→Serializable15 with actual113/72 bytes and68.0/69.0; inherited readers/Metadata absence, same classpath origin,25-at-release24 refused as69>68; Object40/42 each12 methods and12 decoded Code bodies, actual extraction equal to retained original class fixtures.|
+
+The smoke sources were removed ONLY after ROOT and independent owner readback;
+complete immutable command/output/rlib records remain verification artifacts.
+Meaningful permanent boundary/identity/error tests remain in the source.
+None of this establishes mutable-model archive authentication, effective JPS,
+stock SDK/compiler/verifier authority, Miri safety, Windows execution, full
+runtime-image coverage or Java/Kotlin/LSP semantic parity.
+
+392's actual original/edited CST, identity and returned CLI edit/readback must
+still be observed in the original hosted full-workspace platform jobs.
+Its TEMP_392 writers remain deliberately intact until ROOT and independent
+owner have read those actual payloads. Full native/platform original CI,
+capture-free final own-source CI and guarded integration remain required.
+
+#### Original full hosted CI and actual type-parameter product proof
+
+PR400's first reviewed headb56d1b24dfaf80e8b4bf872e60790354104f28ca/tree5154c3ef3941b0480d4b5a1bd44bb7587540672f
+passed its own ORIGINAL attempt1 full native/platform workflows. Actual test
+merge406598002f1a338c515f09c4b2cad7ffecc75860 has that exact tree and ordered
+parents[verified6a621285,b56d1b24], independently checked against both original
+platform source preflights, API commit metadata and all three full job logs.
+Source/workflow identities, complete clean-worktree/raw command observations,
+byte policy, original parents and format/strict-Clippy/full-workspace exits0
+were read and authenticated; no retry or modified CI/source/bounds was used.
+
+| Original workflow | Job | Passed tests/doctests | Result rows | Failed | Ignored | Filtered |
+| --- | --- | --- | --- | --- | --- | --- |
+|Native38960726451|117174808109|1151|137|0|3|0|
+|Platform38960726407 macOS|117174808477|1149|137|0|3|0|
+|Platform38960726407 Windows|117174808085|1098|137|0|3|0|
+
+Original Windows artifact12073290413 is57166 bytes/SHA-256
+7ce58eca1bc39a1644e498fa09dadf8bde3ea9dcc9ae228904f16198f1a0b33f;
+macOS12072478144 is62262 bytes/SHA-256
+8ce97abf51b2eaf4cb460c1efcfb87a2328b77902ca0cb50a1bc03b58d876796.
+Both actual ZIP digests match the original API metadata. Complete raw job
+logs, ZIPs, identity/preflight/parent records and complete capture packets
+were retained, not inferred from the passing check badge.
+
+ROOT and the independent TypeParameterConsumers OWNER read ALL actual
+8 producer snapshots,104 identity records and8 CLI packets PER HOST.
+The two complete451110-byte packet sets are byte-identical, SHA-256
+c8bc0d1744934caff3ed0e6681b02c2b30e7aec31f28194252eada6134aa3332.
+Every original/edited tree has173 elements/zero diagnostics. Fresh/U/out/
+reified preserve actual admitted type-parameter grammar, declaration/list/
+function/body ownership, unrelated-function identity, value shadow partitions
+and the original local Fresh callee. CST spans are UTF-8 bytes, not host
+codepoint indices; LSP positions are UTF-16 with emoji/CRLF preserved.
+
+Each actual returned four-edit version7 rename was independently applied in
+descending ORIGINAL coordinates and matched the exact captured source reopened
+at version8. All edited type/value/callee definitions, references and next
+version8 edits were read; unused-declaration/includeDeclaration/prepare/
+highlight variants and T/Spare→Int capture refusals matched real replies.
+No Linux packet claim is made: Linux's full checks passed without exposing
+those temporary payloads. No target runtime was rerun locally for readback.
+
+Only AFTER both complete semantic readbacks, ROOT removed the TEMP_392
+producer/identity/wire writers and writer-only phase guard. Original source,
+real edit application, identity/partition/version/capture/budget assertions,
+meaningful permanent regressions, timeouts and cleanup requirements remain.
+The capture-free final source needs its OWN exact reviews and ORIGINAL full
+CI before a fresh guarded merge; this first candidate is not merge authority.
+395/377's historical failure attribution,96 and full-parity limits remain.
+

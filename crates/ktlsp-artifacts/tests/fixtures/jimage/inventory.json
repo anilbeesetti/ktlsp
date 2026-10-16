@@ -1,0 +1,910 @@
+[
+  {
+    "file": "non-compressed_little-endian.jimage",
+    "header": [
+      65536,
+      0,
+      12,
+      12,
+      129,
+      171
+    ],
+    "locations_start": 124,
+    "strings_start": 253,
+    "resource_start": 424,
+    "string_hex": "00636c617373006a6176612e62617365006a6176612f6c616e670068616e6b00747874004f626a65637400776974686f75745f657874006d6f64756c652d696e666f00776974686f75745f706172656e74006d6f64756c6573006a6176612e626173652f6a6176612f6c616e67006a6176612e626173652f6a617661002f6d6f64756c6573007061636b61676573006a617661006a6176612e6c616e67002f7061636b6167657300000000",
+    "entries": [
+      {
+        "slot": 0,
+        "location": 1,
+        "location_end": 11,
+        "identity": "/modules/java.base/java",
+        "span": [
+          7483,
+          7487
+        ],
+        "compressed": 0,
+        "original": 4,
+        "sha256": "db15613685adaff9a991ea7f93de0c717fab1971b7ffca25b27e209ff0130391",
+        "layers": [],
+        "hex": "6b000000"
+      },
+      {
+        "slot": 1,
+        "location": 11,
+        "location_end": 23,
+        "identity": "/java.base/module-info.class",
+        "span": [
+          7298,
+          7446
+        ],
+        "compressed": 0,
+        "original": 148,
+        "sha256": "c8a4a968e9bc23901b35efede100d8cb8c93975679ca0adb5b45d2fc6a6db815",
+        "layers": [],
+        "hex": null
+      },
+      {
+        "slot": 2,
+        "location": 23,
+        "location_end": 33,
+        "identity": "/modules/java.base",
+        "span": [
+          7487,
+          7499
+        ],
+        "compressed": 0,
+        "original": 12,
+        "sha256": "c0cd7f7a941e954a02d9e693787bea2ab93463517ffcb6ad79ad6a65f0f34d2d",
+        "layers": [],
+        "hex": "010000000b00000057000000"
+      },
+      {
+        "slot": 3,
+        "location": 33,
+        "location_end": 43,
+        "identity": "/packages/java.lang",
+        "span": [
+          7511,
+          7519
+        ],
+        "compressed": 0,
+        "original": 8,
+        "sha256": "4e65285e650a360f443a4924e7caee49f419179d9613682c162ab6c5ee39046e",
+        "layers": [],
+        "hex": "0000000007000000"
+      },
+      {
+        "slot": 4,
+        "location": 43,
+        "location_end": 51,
+        "identity": "/packages",
+        "span": [
+          7519,
+          7527
+        ],
+        "compressed": 0,
+        "original": 8,
+        "sha256": "e5b3665648877d5ea3457d905a4e862ea4dd2d16b18cd283004e88e18285d869",
+        "layers": [],
+        "hex": "4d00000021000000"
+      },
+      {
+        "slot": 5,
+        "location": 51,
+        "location_end": 63,
+        "identity": "/java.base/java/lang/without_ext",
+        "span": [
+          7269,
+          7298
+        ],
+        "compressed": 0,
+        "original": 29,
+        "sha256": "39368894d14c311c64dd28656c44d680d0fa6ad5cf5ca9cedf4db5edeced178d",
+        "layers": [],
+        "hex": "49276d2066696c6520776974686f757420616e20657874656e73696f6e"
+      },
+      {
+        "slot": 6,
+        "location": 63,
+        "location_end": 77,
+        "identity": "/java.base/java/lang/Object.class",
+        "span": [
+          7109,
+          7269
+        ],
+        "compressed": 0,
+        "original": 160,
+        "sha256": "1467daa5037c5ca733b7042b3616630bde7413f75a9c281256ff5873ba25912d",
+        "layers": [],
+        "hex": null
+      },
+      {
+        "slot": 7,
+        "location": 77,
+        "location_end": 87,
+        "identity": "/packages/java",
+        "span": [
+          7503,
+          7511
+        ],
+        "compressed": 0,
+        "original": 8,
+        "sha256": "f0e6dfdca14da812bd3febae22fe83f4f7ea295365ca71128ed6502c9847b92e",
+        "layers": [],
+        "hex": "0100000007000000"
+      },
+      {
+        "slot": 8,
+        "location": 87,
+        "location_end": 99,
+        "identity": "/java.base/without_parent.txt",
+        "span": [
+          7446,
+          7471
+        ],
+        "compressed": 0,
+        "original": 25,
+        "sha256": "fea663a556d7e0d897015604f56e2b4e7a92f532545decde1cc277bc1c832dda",
+        "layers": [],
+        "hex": "49276d2066696c6520776974686f7574206120706172656e74"
+      },
+      {
+        "slot": 9,
+        "location": 99,
+        "location_end": 107,
+        "identity": "/modules",
+        "span": [
+          7499,
+          7503
+        ],
+        "compressed": 0,
+        "original": 4,
+        "sha256": "a376d173ece243d587f352f04307fb971f10cdbc9b9d850e8ecbd414a586fa3c",
+        "layers": [],
+        "hex": "17000000"
+      },
+      {
+        "slot": 10,
+        "location": 107,
+        "location_end": 117,
+        "identity": "/modules/java.base/java/lang",
+        "span": [
+          7471,
+          7483
+        ],
+        "compressed": 0,
+        "original": 12,
+        "sha256": "d2ee1ef853c59db056aac02a54a854e8deacddfba84bd7d52f397c9e5477a826",
+        "layers": [],
+        "hex": "3f0000007500000033000000"
+      },
+      {
+        "slot": 11,
+        "location": 117,
+        "location_end": 129,
+        "identity": "/java.base/java/lang/hank.txt",
+        "span": [
+          424,
+          7109
+        ],
+        "compressed": 0,
+        "original": 6685,
+        "sha256": "2464c7c9126b014901d58b57c86abd0e10695527708ca326178147786ba32824",
+        "layers": [],
+        "hex": null
+      }
+    ],
+    "unclaimed_resource_spans": [
+      {
+        "span": [
+          7527,
+          7535
+        ],
+        "hex": "630000002b000000",
+        "sha256": "0b2ed7895e98bda56454327f087cc78a2127b0102b2f30632b0ffb9ca2d74f6b"
+      }
+    ]
+  },
+  {
+    "file": "non-compressed_big-endian.jimage",
+    "header": [
+      65536,
+      0,
+      12,
+      12,
+      129,
+      171
+    ],
+    "locations_start": 124,
+    "strings_start": 253,
+    "resource_start": 424,
+    "string_hex": "00636c617373006a6176612e62617365006a6176612f6c616e670068616e6b00747874004f626a65637400776974686f75745f657874006d6f64756c652d696e666f00776974686f75745f706172656e74006d6f64756c6573006a6176612e626173652f6a6176612f6c616e67006a6176612e626173652f6a617661002f6d6f64756c6573007061636b61676573006a617661006a6176612e6c616e67002f7061636b6167657300000000",
+    "entries": [
+      {
+        "slot": 0,
+        "location": 1,
+        "location_end": 11,
+        "identity": "/modules/java.base/java",
+        "span": [
+          7483,
+          7487
+        ],
+        "compressed": 0,
+        "original": 4,
+        "sha256": "71d1a017200e14b3dda3002d8a94dcf4ed14a1b6bbc960355896152048e003f8",
+        "layers": [],
+        "hex": "0000006b"
+      },
+      {
+        "slot": 1,
+        "location": 11,
+        "location_end": 23,
+        "identity": "/java.base/module-info.class",
+        "span": [
+          7298,
+          7446
+        ],
+        "compressed": 0,
+        "original": 148,
+        "sha256": "c8a4a968e9bc23901b35efede100d8cb8c93975679ca0adb5b45d2fc6a6db815",
+        "layers": [],
+        "hex": null
+      },
+      {
+        "slot": 2,
+        "location": 23,
+        "location_end": 33,
+        "identity": "/modules/java.base",
+        "span": [
+          7487,
+          7499
+        ],
+        "compressed": 0,
+        "original": 12,
+        "sha256": "2ffdf53723891154c3710f9804642c8a8ccc331b0c182eb82b2e70798aff26b0",
+        "layers": [],
+        "hex": "000000010000000b00000057"
+      },
+      {
+        "slot": 3,
+        "location": 33,
+        "location_end": 43,
+        "identity": "/packages/java.lang",
+        "span": [
+          7511,
+          7519
+        ],
+        "compressed": 0,
+        "original": 8,
+        "sha256": "a3eb8db89fc5123ccfd49585059f292bc40a1c0d550b860f24f84efb4760fbf2",
+        "layers": [],
+        "hex": "0000000000000007"
+      },
+      {
+        "slot": 4,
+        "location": 43,
+        "location_end": 51,
+        "identity": "/packages",
+        "span": [
+          7519,
+          7527
+        ],
+        "compressed": 0,
+        "original": 8,
+        "sha256": "5919dc58547403a68688be95dced4913cdda0ae3e546951b2fb18acd5b7f67f6",
+        "layers": [],
+        "hex": "0000004d00000021"
+      },
+      {
+        "slot": 5,
+        "location": 51,
+        "location_end": 63,
+        "identity": "/java.base/java/lang/without_ext",
+        "span": [
+          7269,
+          7298
+        ],
+        "compressed": 0,
+        "original": 29,
+        "sha256": "39368894d14c311c64dd28656c44d680d0fa6ad5cf5ca9cedf4db5edeced178d",
+        "layers": [],
+        "hex": "49276d2066696c6520776974686f757420616e20657874656e73696f6e"
+      },
+      {
+        "slot": 6,
+        "location": 63,
+        "location_end": 77,
+        "identity": "/java.base/java/lang/Object.class",
+        "span": [
+          7109,
+          7269
+        ],
+        "compressed": 0,
+        "original": 160,
+        "sha256": "1467daa5037c5ca733b7042b3616630bde7413f75a9c281256ff5873ba25912d",
+        "layers": [],
+        "hex": null
+      },
+      {
+        "slot": 7,
+        "location": 77,
+        "location_end": 87,
+        "identity": "/packages/java",
+        "span": [
+          7503,
+          7511
+        ],
+        "compressed": 0,
+        "original": 8,
+        "sha256": "c5e58eae65539948cbb14e0d893fc209f576fdc400f7768d3d9ff03f2d523514",
+        "layers": [],
+        "hex": "0000000100000007"
+      },
+      {
+        "slot": 8,
+        "location": 87,
+        "location_end": 99,
+        "identity": "/java.base/without_parent.txt",
+        "span": [
+          7446,
+          7471
+        ],
+        "compressed": 0,
+        "original": 25,
+        "sha256": "fea663a556d7e0d897015604f56e2b4e7a92f532545decde1cc277bc1c832dda",
+        "layers": [],
+        "hex": "49276d2066696c6520776974686f7574206120706172656e74"
+      },
+      {
+        "slot": 9,
+        "location": 99,
+        "location_end": 107,
+        "identity": "/modules",
+        "span": [
+          7499,
+          7503
+        ],
+        "compressed": 0,
+        "original": 4,
+        "sha256": "58ec452ede72799baf21664edc953297b592ad9e95f2381710593ad7a32f31ef",
+        "layers": [],
+        "hex": "00000017"
+      },
+      {
+        "slot": 10,
+        "location": 107,
+        "location_end": 117,
+        "identity": "/modules/java.base/java/lang",
+        "span": [
+          7471,
+          7483
+        ],
+        "compressed": 0,
+        "original": 12,
+        "sha256": "6486bce97c44cdfaf05af647fde909cacb2781b89e1870966705b13d061868be",
+        "layers": [],
+        "hex": "0000003f0000007500000033"
+      },
+      {
+        "slot": 11,
+        "location": 117,
+        "location_end": 129,
+        "identity": "/java.base/java/lang/hank.txt",
+        "span": [
+          424,
+          7109
+        ],
+        "compressed": 0,
+        "original": 6685,
+        "sha256": "2464c7c9126b014901d58b57c86abd0e10695527708ca326178147786ba32824",
+        "layers": [],
+        "hex": null
+      }
+    ],
+    "unclaimed_resource_spans": [
+      {
+        "span": [
+          7527,
+          7535
+        ],
+        "hex": "000000630000002b",
+        "sha256": "49c7ddfb32f2193b8d47efb79d2aa9d7ddf86d85cb6966bb1d21969dd2f97185"
+      }
+    ]
+  },
+  {
+    "file": "compressed_little-endian.jimage",
+    "header": [
+      65536,
+      0,
+      12,
+      12,
+      143,
+      175
+    ],
+    "locations_start": 124,
+    "strings_start": 267,
+    "resource_start": 442,
+    "string_hex": "00636c617373007a6970006a6176612e62617365006a6176612f6c616e670068616e6b00747874004f626a65637400776974686f75745f657874006d6f64756c652d696e666f00776974686f75745f706172656e74006d6f64756c6573006a6176612e626173652f6a6176612f6c616e67006a6176612e626173652f6a617661002f6d6f64756c6573007061636b61676573006a617661006a6176612e6c616e67002f7061636b6167657300000000",
+    "entries": [
+      {
+        "slot": 0,
+        "location": 1,
+        "location_end": 11,
+        "identity": "/modules/java.base/java",
+        "span": [
+          3588,
+          3592
+        ],
+        "compressed": 0,
+        "original": 4,
+        "sha256": "52e9e3add38bf08350e260942004423cf95fce71609ae1a46b260442db2608bb",
+        "layers": [],
+        "hex": "73000000"
+      },
+      {
+        "slot": 1,
+        "location": 11,
+        "location_end": 25,
+        "identity": "/java.base/module-info.class",
+        "span": [
+          3372,
+          3514
+        ],
+        "compressed": 142,
+        "original": 148,
+        "sha256": "c8a4a968e9bc23901b35efede100d8cb8c93975679ca0adb5b45d2fc6a6db815",
+        "layers": [
+          {
+            "compressed": 113,
+            "output": 148,
+            "plugin": "zip",
+            "config": 4294967295,
+            "terminal": 1
+          }
+        ],
+        "hex": null
+      },
+      {
+        "slot": 2,
+        "location": 25,
+        "location_end": 35,
+        "identity": "/modules/java.base",
+        "span": [
+          3592,
+          3604
+        ],
+        "compressed": 0,
+        "original": 12,
+        "sha256": "3e999baf93d3cc34aeb9f79dbd6b1e0bc3a2b25b08d8cfa5072e0bc8cfca0e3a",
+        "layers": [],
+        "hex": "010000000b0000005d000000"
+      },
+      {
+        "slot": 3,
+        "location": 35,
+        "location_end": 45,
+        "identity": "/packages/java.lang",
+        "span": [
+          3616,
+          3624
+        ],
+        "compressed": 0,
+        "original": 8,
+        "sha256": "f1d6ff082118a9340d8abc5a0fe9e260334b1ac106bd9307ced6e4b7b6e7a4d3",
+        "layers": [],
+        "hex": "000000000b000000"
+      },
+      {
+        "slot": 4,
+        "location": 45,
+        "location_end": 53,
+        "identity": "/packages",
+        "span": [
+          3624,
+          3632
+        ],
+        "compressed": 0,
+        "original": 8,
+        "sha256": "b441fba68af4770df37db6c08a8753ef01514d765219c8cfd2e43488db2f4b65",
+        "layers": [],
+        "hex": "5300000023000000"
+      },
+      {
+        "slot": 5,
+        "location": 53,
+        "location_end": 67,
+        "identity": "/java.base/java/lang/without_ext",
+        "span": [
+          3306,
+          3372
+        ],
+        "compressed": 66,
+        "original": 29,
+        "sha256": "39368894d14c311c64dd28656c44d680d0fa6ad5cf5ca9cedf4db5edeced178d",
+        "layers": [
+          {
+            "compressed": 37,
+            "output": 29,
+            "plugin": "zip",
+            "config": 4294967295,
+            "terminal": 1
+          }
+        ],
+        "hex": "49276d2066696c6520776974686f757420616e20657874656e73696f6e"
+      },
+      {
+        "slot": 6,
+        "location": 67,
+        "location_end": 83,
+        "identity": "/java.base/java/lang/Object.class",
+        "span": [
+          3142,
+          3306
+        ],
+        "compressed": 164,
+        "original": 160,
+        "sha256": "1467daa5037c5ca733b7042b3616630bde7413f75a9c281256ff5873ba25912d",
+        "layers": [
+          {
+            "compressed": 135,
+            "output": 160,
+            "plugin": "zip",
+            "config": 4294967295,
+            "terminal": 1
+          }
+        ],
+        "hex": null
+      },
+      {
+        "slot": 7,
+        "location": 83,
+        "location_end": 93,
+        "identity": "/packages/java",
+        "span": [
+          3608,
+          3616
+        ],
+        "compressed": 0,
+        "original": 8,
+        "sha256": "b9608793c43f2472ac93c8b6e4d4a0720a7e342e817d7dfcaae88c33a70b7e16",
+        "layers": [],
+        "hex": "010000000b000000"
+      },
+      {
+        "slot": 8,
+        "location": 93,
+        "location_end": 107,
+        "identity": "/java.base/without_parent.txt",
+        "span": [
+          3514,
+          3576
+        ],
+        "compressed": 62,
+        "original": 25,
+        "sha256": "fea663a556d7e0d897015604f56e2b4e7a92f532545decde1cc277bc1c832dda",
+        "layers": [
+          {
+            "compressed": 33,
+            "output": 25,
+            "plugin": "zip",
+            "config": 4294967295,
+            "terminal": 1
+          }
+        ],
+        "hex": "49276d2066696c6520776974686f7574206120706172656e74"
+      },
+      {
+        "slot": 9,
+        "location": 107,
+        "location_end": 115,
+        "identity": "/modules",
+        "span": [
+          3604,
+          3608
+        ],
+        "compressed": 0,
+        "original": 4,
+        "sha256": "0623ccb9b1619bd388284a438034d8cb6431964ba727d8b1c450303105735488",
+        "layers": [],
+        "hex": "19000000"
+      },
+      {
+        "slot": 10,
+        "location": 115,
+        "location_end": 125,
+        "identity": "/modules/java.base/java/lang",
+        "span": [
+          3576,
+          3588
+        ],
+        "compressed": 0,
+        "original": 12,
+        "sha256": "9a3bc16db9d87010cecde6dbc3ade71a7583065c7d89c4864c54c25667e7e338",
+        "layers": [],
+        "hex": "430000007d00000035000000"
+      },
+      {
+        "slot": 11,
+        "location": 125,
+        "location_end": 140,
+        "identity": "/java.base/java/lang/hank.txt",
+        "span": [
+          442,
+          3142
+        ],
+        "compressed": 2700,
+        "original": 6685,
+        "sha256": "2464c7c9126b014901d58b57c86abd0e10695527708ca326178147786ba32824",
+        "layers": [
+          {
+            "compressed": 2671,
+            "output": 6685,
+            "plugin": "zip",
+            "config": 4294967295,
+            "terminal": 1
+          }
+        ],
+        "hex": null
+      }
+    ],
+    "unclaimed_resource_spans": [
+      {
+        "span": [
+          3632,
+          3640
+        ],
+        "hex": "6b0000002d000000",
+        "sha256": "321032983d3c209a5975b686cf9f31a786ef550b2b8f62b9447de5da8c84e2f3"
+      }
+    ]
+  },
+  {
+    "file": "compressed_big-endian.jimage",
+    "header": [
+      65536,
+      0,
+      12,
+      12,
+      143,
+      175
+    ],
+    "locations_start": 124,
+    "strings_start": 267,
+    "resource_start": 442,
+    "string_hex": "00636c617373007a6970006a6176612e62617365006a6176612f6c616e670068616e6b00747874004f626a65637400776974686f75745f657874006d6f64756c652d696e666f00776974686f75745f706172656e74006d6f64756c6573006a6176612e626173652f6a6176612f6c616e67006a6176612e626173652f6a617661002f6d6f64756c6573007061636b61676573006a617661006a6176612e6c616e67002f7061636b6167657300000000",
+    "entries": [
+      {
+        "slot": 0,
+        "location": 1,
+        "location_end": 11,
+        "identity": "/modules/java.base/java",
+        "span": [
+          3588,
+          3592
+        ],
+        "compressed": 0,
+        "original": 4,
+        "sha256": "1320281aa20eedf2c08c101c682264c48006536fb8366cf913ffc915e160d114",
+        "layers": [],
+        "hex": "00000073"
+      },
+      {
+        "slot": 1,
+        "location": 11,
+        "location_end": 25,
+        "identity": "/java.base/module-info.class",
+        "span": [
+          3372,
+          3514
+        ],
+        "compressed": 142,
+        "original": 148,
+        "sha256": "c8a4a968e9bc23901b35efede100d8cb8c93975679ca0adb5b45d2fc6a6db815",
+        "layers": [
+          {
+            "compressed": 113,
+            "output": 148,
+            "plugin": "zip",
+            "config": 4294967295,
+            "terminal": 1
+          }
+        ],
+        "hex": null
+      },
+      {
+        "slot": 2,
+        "location": 25,
+        "location_end": 35,
+        "identity": "/modules/java.base",
+        "span": [
+          3592,
+          3604
+        ],
+        "compressed": 0,
+        "original": 12,
+        "sha256": "d5944b11b7db5ecc9ffb5d10e431626f03823a73dce1727f4a00ca58c44b79b0",
+        "layers": [],
+        "hex": "000000010000000b0000005d"
+      },
+      {
+        "slot": 3,
+        "location": 35,
+        "location_end": 45,
+        "identity": "/packages/java.lang",
+        "span": [
+          3616,
+          3624
+        ],
+        "compressed": 0,
+        "original": 8,
+        "sha256": "0b5000b73a53f0916c93c68f4b9b6ba8af5a10978634ae4f2237e1f3fbe324fa",
+        "layers": [],
+        "hex": "000000000000000b"
+      },
+      {
+        "slot": 4,
+        "location": 45,
+        "location_end": 53,
+        "identity": "/packages",
+        "span": [
+          3624,
+          3632
+        ],
+        "compressed": 0,
+        "original": 8,
+        "sha256": "9195d35539667f2c6f27a62d46adab21e812fc2023036be00f1d66727d6f70dd",
+        "layers": [],
+        "hex": "0000005300000023"
+      },
+      {
+        "slot": 5,
+        "location": 53,
+        "location_end": 67,
+        "identity": "/java.base/java/lang/without_ext",
+        "span": [
+          3306,
+          3372
+        ],
+        "compressed": 66,
+        "original": 29,
+        "sha256": "39368894d14c311c64dd28656c44d680d0fa6ad5cf5ca9cedf4db5edeced178d",
+        "layers": [
+          {
+            "compressed": 37,
+            "output": 29,
+            "plugin": "zip",
+            "config": 4294967295,
+            "terminal": 1
+          }
+        ],
+        "hex": "49276d2066696c6520776974686f757420616e20657874656e73696f6e"
+      },
+      {
+        "slot": 6,
+        "location": 67,
+        "location_end": 83,
+        "identity": "/java.base/java/lang/Object.class",
+        "span": [
+          3142,
+          3306
+        ],
+        "compressed": 164,
+        "original": 160,
+        "sha256": "1467daa5037c5ca733b7042b3616630bde7413f75a9c281256ff5873ba25912d",
+        "layers": [
+          {
+            "compressed": 135,
+            "output": 160,
+            "plugin": "zip",
+            "config": 4294967295,
+            "terminal": 1
+          }
+        ],
+        "hex": null
+      },
+      {
+        "slot": 7,
+        "location": 83,
+        "location_end": 93,
+        "identity": "/packages/java",
+        "span": [
+          3608,
+          3616
+        ],
+        "compressed": 0,
+        "original": 8,
+        "sha256": "09da8010bedba8545eda785c6b74bf395886aa8c7f4cfe3eff7226270d79d270",
+        "layers": [],
+        "hex": "000000010000000b"
+      },
+      {
+        "slot": 8,
+        "location": 93,
+        "location_end": 107,
+        "identity": "/java.base/without_parent.txt",
+        "span": [
+          3514,
+          3576
+        ],
+        "compressed": 62,
+        "original": 25,
+        "sha256": "fea663a556d7e0d897015604f56e2b4e7a92f532545decde1cc277bc1c832dda",
+        "layers": [
+          {
+            "compressed": 33,
+            "output": 25,
+            "plugin": "zip",
+            "config": 4294967295,
+            "terminal": 1
+          }
+        ],
+        "hex": "49276d2066696c6520776974686f7574206120706172656e74"
+      },
+      {
+        "slot": 9,
+        "location": 107,
+        "location_end": 115,
+        "identity": "/modules",
+        "span": [
+          3604,
+          3608
+        ],
+        "compressed": 0,
+        "original": 4,
+        "sha256": "282a163f3e6f52ab35cf838079369bce33cf5a1f151d2822846095a6d07e1ae2",
+        "layers": [],
+        "hex": "00000019"
+      },
+      {
+        "slot": 10,
+        "location": 115,
+        "location_end": 125,
+        "identity": "/modules/java.base/java/lang",
+        "span": [
+          3576,
+          3588
+        ],
+        "compressed": 0,
+        "original": 12,
+        "sha256": "6289ec6f36cdacfe5d540c0b5898d0f8f69c2831c0705a6eeb3a7bbb5460e0af",
+        "layers": [],
+        "hex": "000000430000007d00000035"
+      },
+      {
+        "slot": 11,
+        "location": 125,
+        "location_end": 140,
+        "identity": "/java.base/java/lang/hank.txt",
+        "span": [
+          442,
+          3142
+        ],
+        "compressed": 2700,
+        "original": 6685,
+        "sha256": "2464c7c9126b014901d58b57c86abd0e10695527708ca326178147786ba32824",
+        "layers": [
+          {
+            "compressed": 2671,
+            "output": 6685,
+            "plugin": "zip",
+            "config": 4294967295,
+            "terminal": 1
+          }
+        ],
+        "hex": null
+      }
+    ],
+    "unclaimed_resource_spans": [
+      {
+        "span": [
+          3632,
+          3640
+        ],
+        "hex": "0000006b0000002d",
+        "sha256": "b5d87b27d39c076784564cd888176c5f7128769a03b9a41fe85652ebcaf84080"
+      }
+    ]
+  }
+]

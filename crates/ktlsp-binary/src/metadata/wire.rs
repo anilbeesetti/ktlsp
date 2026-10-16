@@ -75,7 +75,7 @@ pub struct Sections<'a> {
     pub payload: Section<'a>,
 }
 
-pub(super) struct Budget {
+pub(crate) struct Budget {
     records: usize,
     pub(super) work: usize,
 }
@@ -94,11 +94,15 @@ impl Budget {
         }
     }
 
+    pub(crate) fn records(&mut self, count: usize) -> Result<(), Error> {
+        charge(&mut self.records, count, 0, "records")?;
+        self.work(count, 0)
+    }
     pub(super) fn record(&mut self, offset: usize) -> Result<(), Error> {
         charge(&mut self.records, 1, offset, "records")?;
         self.work(1, offset)
     }
-    pub(super) fn work(&mut self, n: usize, offset: usize) -> Result<(), Error> {
+    pub(crate) fn work(&mut self, n: usize, offset: usize) -> Result<(), Error> {
         charge(&mut self.work, n, offset, "work")
     }
 }

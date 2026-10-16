@@ -46,7 +46,7 @@ fail Malformed("type annotation trailing bytes"). All errors discard partial out
 
 ## Trust boundary and accounting
 
-First supported class version45.0..45.3 /46..67.0, then nonempty CP length<=65535.
+First supported class version45.0..45.3 /46..69.0, then nonempty CP length<=65535.
 No other class state is consumed. Selected Code need not belong to class.methods;
 caller supplies the matching CP. Charge raw length against clamped bytes and work,
 then precharge code exception/attribute container nodes before traversal. Re-read

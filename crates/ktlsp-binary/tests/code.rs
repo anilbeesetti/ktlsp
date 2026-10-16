@@ -467,7 +467,11 @@ fn version_cp_shape_and_consumed_reference_checks_on_forged_models() {
         (45, 4, false),
         (46, 1, false),
         (67, 65535, false),
-        (68, 0, false),
+        (68, 0, true),
+        (69, 0, true),
+        (68, 65535, false),
+        (69, 65535, false),
+        (70, 0, false),
     ] {
         let mut c = class(&raw);
         c.major = major;
@@ -490,12 +494,12 @@ fn version_cp_shape_and_consumed_reference_checks_on_forged_models() {
     let mut c = class(&[]);
     c.methods.clear();
     assert_eq!(decode(&c, zero).unwrap(), vec![]);
-    c.major = 68;
+    c.major = 70;
     c.constants.clear();
     assert_eq!(
         decode(&c, zero),
         Err(Error::UnsupportedVersion {
-            major: 68,
+            major: 70,
             minor: 0
         })
     );
@@ -963,4 +967,25 @@ fn hard_record_byte_work_caps_cannot_be_raised_by_caller() {
     );
     c.constants[9] = Constant::Utf8(vec![89; 64490]);
     assert_eq!(decode(&c, unlimited()), Err(Error::Limit("code work")));
+}
+
+#[test]
+fn modern_authored_code_keeps_exact_tightened_limits() {
+    let raw = hex(V01);
+    for major in [68, 69] {
+        let mut c = class(&raw);
+        c.major = major;
+        let bodies = decode(&c, unlimited()).unwrap();
+        assert_eq!(bodies[0].as_ref().unwrap().bytecode, [0xb1]);
+        assert_eq!(bodies[0].as_ref().unwrap().raw.as_ptr(), raw.as_ptr());
+        cuts(
+            &c,
+            Limits {
+                bytes: 13,
+                records: 2,
+                work: 22,
+                owned_bytes: storage(1, 0, 0),
+            },
+        );
+    }
 }

@@ -419,9 +419,7 @@ pub fn decode_signatures_with_limits<'a>(
     class: &'a ClassFile<'_>,
     limits: Limits,
 ) -> Result<Signatures<'a>> {
-    if !(class.major == 45 && class.minor <= 3
-        || (46..=67).contains(&class.major) && class.minor == 0)
-    {
+    if !crate::supported_class_version(class.major, class.minor) {
         return Err(Error::UnsupportedVersion {
             major: class.major,
             minor: class.minor,

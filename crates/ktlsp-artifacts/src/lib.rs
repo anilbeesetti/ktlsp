@@ -12,6 +12,9 @@ pub use zip_index::{
     ZipIndexError, ZipStoredError, index_jmod_directory, index_zip_directory,
 };
 
+mod jimage;
+pub use jimage::{JimageError, JimageIndex, JimageResource, index_jimage};
+
 use std::collections::HashSet;
 use std::fs::{self, File, Metadata};
 use std::io::{self, Read};

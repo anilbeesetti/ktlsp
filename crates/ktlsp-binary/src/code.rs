@@ -112,16 +112,14 @@ impl Budget {
 
 /// Frame all methods in input order, with None for ordinary abstract/native ones.
 /// One aggregate byte/record/work/requested-storage budget covers the whole call,
-/// including ignored outer attributes. Versions match parse_class (through 67.0).
+/// including ignored outer attributes. Versions match parse_class (through 69.0).
 /// Consumed names/indices are checked even for forged public ClassFile values;
 /// unrelated class state, descriptors and flag combinations are not revalidated.
 /// Exact <clinit> requires Code regardless of abstract/native bits. Errors return
 /// no partial output. Success establishes no opcode, stack, instruction-boundary,
 /// nested-attribute, Throwable, control-flow or JVM semantic verification.
 pub fn decode<'a>(class: &'a ClassFile<'_>, limits: Limits) -> Result<Vec<Option<CodeBody<'a>>>> {
-    if !(class.major == 45 && class.minor <= 3
-        || (46..=67).contains(&class.major) && class.minor == 0)
-    {
+    if !crate::supported_class_version(class.major, class.minor) {
         return Err(Error::UnsupportedVersion {
             major: class.major,
             minor: class.minor,

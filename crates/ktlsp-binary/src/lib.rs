@@ -2,7 +2,7 @@
 
 pub mod annotation_extensions;
 pub mod archive;
-pub use archive::{ZipClassError, parse_zip_class};
+pub use archive::{JimageClassError, ZipClassError, parse_jimage_class, parse_zip_class};
 pub mod annotations;
 pub mod class_path;
 pub mod class_type_annotations;
@@ -180,7 +180,14 @@ impl<'a> Reader<'a> {
     }
 }
 
+// Supported subset, not a claim that other historical minors are malformed JVMS input.
+// Preview classfiles are intentionally unsupported at every release.
+fn supported_class_version(major: u16, minor: u16) -> bool {
+    major == 45 && minor <= 3 || (46..=69).contains(&major) && minor == 0
+}
+
 /// Reads a supported structural subset. Success does not establish JVM verification.
+/// Accepts 45.0–45.3 and ordinary 46.0–69.0 (Java 25); preview is unsupported.
 pub fn parse_class(bytes: &[u8]) -> Result<ClassFile<'_>> {
     if bytes.len() > MAX_BYTES {
         return Err(Error::Limit("bytes"));
@@ -195,7 +202,7 @@ pub fn parse_class(bytes: &[u8]) -> Result<ClassFile<'_>> {
     }
     let minor = r.u16()?;
     let major = r.u16()?;
-    if !(major == 45 && minor <= 3 || (46..=67).contains(&major) && minor == 0) {
+    if !crate::supported_class_version(major, minor) {
         return Err(Error::UnsupportedVersion { major, minor });
     }
     let n = r.count()?;

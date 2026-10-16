@@ -1275,7 +1275,6 @@ mod admission {
             });
         }
 
-
         #[test]
         fn valid_same_child_reap_confirms_after_unrelated_reaper_death() {
             for dead in [false, true] {

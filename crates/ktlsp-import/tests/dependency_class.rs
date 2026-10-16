@@ -225,6 +225,35 @@ fn genuine_class_owner_identity_and_owning_library_source_composition() {
     );
 }
 
+#[cfg(windows)]
+#[test]
+fn canonical_windows_artifact_keeps_provenance_and_binds_ordinary_import() {
+    use std::path::{Component, Prefix};
+    let original = genuine(false);
+    let canonical = std::fs::canonicalize(fixture(false)).unwrap();
+    assert!(matches!(canonical.components().next(), Some(Component::Prefix(prefix))
+        if matches!(prefix.kind(), Prefix::VerbatimDisk(_) | Prefix::VerbatimUNC(_, _))));
+    let mut provenance = original.provenance().clone();
+    provenance.artifact_path = canonical.clone();
+    let artifact = verify_sha256(
+        Artifact { bytes: original.bytes().to_vec(), provenance },
+        *original.digest(),
+    ).unwrap();
+    let workspace = import(model(
+        vec![edge("commons")],
+        vec![library("commons", &[fixture(false)])],
+    ));
+    let bindings = [binding("commons", 0, &artifact)];
+    let mut scratch = Vec::new();
+    let result = select_class(&workspace, &source(), BUILDER, 8, &bindings, &mut scratch).unwrap();
+    assert_eq!(result.owner.module.id, "app");
+    let selected = result.class.unwrap();
+    assert_eq!(selected.selected.class.major, 52);
+    assert_eq!(selected.import_path, fixture(false));
+    assert_eq!(selected.artifact.provenance().artifact_path, canonical);
+    assert_eq!(selected.artifact.digest(), original.digest());
+}
+
 #[test]
 fn owner_and_dependency_order_control_visibility_precedence_and_complete_absence() {
     let binary = genuine(false);

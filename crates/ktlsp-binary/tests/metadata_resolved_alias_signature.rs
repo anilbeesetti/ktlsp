@@ -79,6 +79,25 @@ fn genuine_predefined_any_is_not_empty_d2() {
 }
 
 #[test]
+fn nominal_flags_use_int32_width_and_last_scalar_precedence() {
+    let declaration = units("Alias");
+    let classifier = units("pkg/Value");
+    for underlying in [
+        &[0x08, 0x80, 0x80, 0x80, 0x80, 0x10, 0x30, 1][..],
+        &[0x08, 1, 0x08, 0x80, 0x80, 0x80, 0x80, 0x10, 0x30, 1][..],
+    ] {
+        let input = input(
+            package(&alias(underlying, &[0x30, 1])),
+            &[&declaration, &classifier],
+        );
+        let signatures = decode(&input, Limits::default()).unwrap();
+        assert_eq!(signatures[0].underlying.class_id.package_name(), units("pkg"));
+        assert_eq!(signatures[0].underlying.class_id.relative_class_name(), units("Value"));
+        assert_eq!(signatures[0].underlying, signatures[0].expanded);
+    }
+}
+
+#[test]
 fn class_id_quoted_slash_nested_local_and_lossless_units() {
     let mut name = units("a/b/`Outer/Quoted`.Inner");
     name.extend([0xd800, 0, 0xdc00]);

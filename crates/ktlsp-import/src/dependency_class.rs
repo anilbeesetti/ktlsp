@@ -131,6 +131,28 @@ fn normalized(path: &Path) -> bool {
     canonical.as_os_str() == path.as_os_str()
 }
 
+fn same_binding_path(left: &Path, right: &Path) -> bool {
+    #[cfg(windows)]
+    {
+        use std::path::Prefix;
+        let mut left = left.components();
+        let mut right = right.components();
+        let equivalent = match (left.next(), right.next()) {
+            (Some(Component::Prefix(a)), Some(Component::Prefix(b))) => match (a.kind(), b.kind()) {
+                (Prefix::Disk(a) | Prefix::VerbatimDisk(a), Prefix::Disk(b) | Prefix::VerbatimDisk(b)) => a == b,
+                (Prefix::UNC(a, b) | Prefix::VerbatimUNC(a, b), Prefix::UNC(c, d) | Prefix::VerbatimUNC(c, d)) => a == c && b == d,
+                (a, b) => a == b,
+            },
+            (a, b) => a == b,
+        };
+        equivalent && left.eq(right)
+    }
+    #[cfg(not(windows))]
+    {
+        left.as_os_str() == right.as_os_str()
+    }
+}
+
 fn charge(total: &mut usize, amount: usize, max: usize, field: &'static str) -> Result<(), Error> {
     *total = total
         .checked_add(amount)
@@ -269,7 +291,7 @@ pub fn select_class<'model, 'data>(
         })?;
         let path = &binding.artifact.provenance().artifact_path;
         if !normalized(path)
-            || path.as_os_str() != root.library.binaries[root.binary_root].as_os_str()
+            || !same_binding_path(path, &root.library.binaries[root.binary_root])
         {
             return Err(Error::BindingPath {
                 library: root.library_index,

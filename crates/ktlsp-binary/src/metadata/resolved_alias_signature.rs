@@ -99,19 +99,23 @@ fn nominal(
     let mut pos = 0;
     let mut class = None;
     let mut nullable = None;
+    let mut flags = None;
     while pos < bytes.len() {
         let f = wire::field(bytes, &mut pos, bytes.len(), &mut budget.wire)
             .map_err(|e| failure(start + e.offset, ErrorKind::Wire(e.kind)))?;
         let offset = start + f.span.start;
         budget.wire.work(1, offset)?;
         match (f.number, f.value) {
-            (1, wire::Value::Varint(0)) => {}
+            (1, wire::Value::Varint(v)) => flags = Some((v as u32 as i32, offset)),
             (3, wire::Value::Varint(v)) => nullable = Some(v != 0),
             (6, wire::Value::Varint(v)) => class = Some(v as u32 as i32),
             // Reject all significant non-nominal forms, including wrong-wire encodings.
             (1..=14, _) => return Err(failure(offset, ErrorKind::UnsupportedType)),
             _ => {}
         }
+    }
+    if let Some((value, offset)) = flags && value != 0 {
+        return Err(failure(offset, ErrorKind::UnsupportedType));
     }
     let index = class.ok_or(failure(start, ErrorKind::MissingClass))?;
     let mut text = resolver

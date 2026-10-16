@@ -263,3 +263,33 @@ handling, not Windows test correctness. A future runtime attempt requires new
 reviewed immutable workflow bytes and separate root admission; neither W1/H1 nor
 W2/H2 may be retried. Mutable runner, uncapped raw logs, finite artifact retention
 and all previously recorded platform/resource/semantic limits remain unchanged.
+
+## Native platform #329 continuation: first strict Clippy outcome
+
+The separate native-platform workflow's original
+[run 38875113607 / Windows job 116888169239](https://github.com/anilbeesetti/ktlsp/actions/runs/38875113607/job/116888169239),
+attempt 1, used reviewed source head
+`0e8027d4905cf4ff7a66c3d860683112d98a8ef3`. Source admission, checkout,
+preflight identity/cleanliness, ordered merge-parent verification, pinned
+toolchain installation and format passed. This observes the explicit consistent
+checkout/status byte policy working; it does not prove an earlier failure's
+byte/config cause or alter historical W1/W2/W3 outcomes.
+
+Strict locked workspace Clippy then rejected
+`tests/v1_path_budget.rs:434`, where the retained-prefix assertion constructed
+its expected path with `small_caller.parent().unwrap().join("/a")`.
+The original log is retained as `ktlsp-platform-116888169239.log`, SHA-256
+`43f4c57e7feca05377677388b4997359843bc1a37210a6872527029e026aa796`.
+This is a real Windows compile/lint failure, not a project test-body result;
+the full release workspace tests were not reached.
+
+The source correction uses the independent expected native path
+`\\server\share\a`, matching the existing v2 retained-prefix test convention.
+A rooted-only input discards `dir` while retaining the UNC server/share prefix;
+removing the input's leading separator would instead test the wrong behavior.
+The input paths, exact-limit admission and one-byte-over-limit rejection,
+error budget/limit, v1/v2 comparison, platform cfg and production resolver are
+unchanged. No lint allowance, warning suppression or resource-limit change is
+introduced. Windows/Cygwin execution of this changed assertion remains pending
+a separately admitted original changed-source platform run; no unchanged retry,
+local parser execution, push, dispatch or merge is supplied by this correction.

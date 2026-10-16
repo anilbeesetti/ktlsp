@@ -2533,51 +2533,111 @@ fn lexical_generic_definition_preserves_all_eight_paired_cli_consumers_and_edits
     ];
     let package = Package::new(true);
     let replies = package.exchange(&messages);
-    assert!(replies.iter().filter_map(|r| r.get("id"))
-        .eq(messages.iter().filter_map(|m| m.get("id"))), "{replies:?}");
+    assert!(
+        replies
+            .iter()
+            .filter_map(|r| r.get("id"))
+            .eq(messages.iter().filter_map(|m| m.get("id"))),
+        "{replies:?}"
+    );
     let reply = |id: &str| replies.iter().find(|r| r["id"] == id).unwrap();
     let capabilities = &reply("init")["result"]["capabilities"];
     assert_eq!(capabilities["positionEncoding"], "utf-16");
     assert!(capabilities.get("typeDefinitionProvider").is_none());
     for (id, start, len) in [
-        ("annotation-t", type_t, 1), ("annotation-u", type_u, "`U🦀`".len()),
-        ("other-type", other_type, 1), ("value-p", parameter, 1), ("value-x", local, 1),
+        ("annotation-t", type_t, 1),
+        ("annotation-u", type_u, "`U🦀`".len()),
+        ("other-type", other_type, 1),
+        ("value-p", parameter, 1),
+        ("value-x", local, 1),
     ] {
-        assert_eq!(reply(id)["result"], json!({"uri":URI,"range":references_range(source,start,len)}), "{id}: {:?}", reply(id));
+        assert_eq!(
+            reply(id)["result"],
+            json!({"uri":URI,"range":references_range(source,start,len)}),
+            "{id}: {:?}",
+            reply(id)
+        );
     }
-    assert_eq!(reply("hover")["result"], json!({
-        "contents":{"kind":"plaintext","value":"val x: `U🦀` = p"},
-        "range":references_range(source,local_use,1),
-    }));
-    assert_eq!(reply("references")["result"], json!([
-        {"uri":URI,"range":references_range(source,local,1)},
-        {"uri":URI,"range":references_range(source,local_use,1)},
-    ]));
-    assert_eq!(reply("parameter-references")["result"], json!([
-        {"uri":URI,"range":references_range(source,parameter,1)},
-        {"uri":URI,"range":references_range(source,parameter_use,1)},
-    ]));
-    assert_eq!(reply("highlights")["result"], json!([
-        {"range":references_range(source,local,1),"kind":3},
-        {"range":references_range(source,local_use,1),"kind":2},
-    ]));
+    assert_eq!(
+        reply("hover")["result"],
+        json!({
+            "contents":{"kind":"plaintext","value":"val x: `U🦀` = p"},
+            "range":references_range(source,local_use,1),
+        })
+    );
+    assert_eq!(
+        reply("references")["result"],
+        json!([
+            {"uri":URI,"range":references_range(source,local,1)},
+            {"uri":URI,"range":references_range(source,local_use,1)},
+        ])
+    );
+    assert_eq!(
+        reply("parameter-references")["result"],
+        json!([
+            {"uri":URI,"range":references_range(source,parameter,1)},
+            {"uri":URI,"range":references_range(source,parameter_use,1)},
+        ])
+    );
+    assert_eq!(
+        reply("highlights")["result"],
+        json!([
+            {"range":references_range(source,local,1),"kind":3},
+            {"range":references_range(source,local_use,1),"kind":2},
+        ])
+    );
     let symbols = reply("symbols")["result"].as_array().unwrap();
-    assert_eq!(symbols.iter().map(|s| s["name"].as_str().unwrap()).collect::<Vec<_>>(), ["T","f","g"]);
-    assert_eq!(symbols[1]["children"].as_array().unwrap().iter()
-        .map(|s| s["name"].as_str().unwrap()).collect::<Vec<_>>(), ["x","use"]);
-    assert_eq!(symbols[1]["children"][0]["selectionRange"], references_range(source,local,1));
-    assert_eq!(reply("prepare")["result"], json!({"range":references_range(source,local_use,1),"placeholder":"x"}));
-    for id in ["type-hover", "type-references", "type-prepare", "type-rename"] {
+    assert_eq!(
+        symbols
+            .iter()
+            .map(|s| s["name"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        ["T", "f", "g"]
+    );
+    assert_eq!(
+        symbols[1]["children"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s["name"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        ["x", "use"]
+    );
+    assert_eq!(
+        symbols[1]["children"][0]["selectionRange"],
+        references_range(source, local, 1)
+    );
+    assert_eq!(
+        reply("prepare")["result"],
+        json!({"range":references_range(source,local_use,1),"placeholder":"x"})
+    );
+    for id in [
+        "type-hover",
+        "type-references",
+        "type-prepare",
+        "type-rename",
+    ] {
         assert_eq!(reply(id)["error"]["code"], -32803, "{:?}", reply(id));
         assert!(reply(id).get("result").is_none());
     }
     assert_eq!(reply("type-definition-method")["error"]["code"], -32601);
     let items = reply("completion")["result"]["items"].as_array().unwrap();
-    assert_eq!(items.iter().map(|item| item["label"].as_str().unwrap()).collect::<Vec<_>>(), ["p","x"]);
+    assert_eq!(
+        items
+            .iter()
+            .map(|item| item["label"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        ["p", "x"]
+    );
     let (completed, completed_use) = apply_completion(source, &items[0], local_use);
     assert_eq!(completed, source.replacen("= x", "= p", 1));
     let renamed = apply_original_rename(source, reply("rename"), URI, 7);
-    assert_eq!(renamed, source.replacen("val x:", "val T:", 1).replacen("= x", "= T", 1));
+    assert_eq!(
+        renamed,
+        source
+            .replacen("val x:", "val T:", 1)
+            .replacen("= x", "= T", 1)
+    );
     // Both real edits are applied and fed to the paired CLI. Type annotations,
     // the generic list and the unrelated function retain their original bytes.
     let mut rebound_wire = Vec::new();
@@ -2597,9 +2657,15 @@ fn lexical_generic_definition_preserves_all_eight_paired_cli_consumers_and_edits
         let rebound = package.exchange(&rebound_messages);
         assert_eq!(rebound.len(), 4, "{rebound:?}");
         assert_eq!(rebound[1]["id"], "rebound-value");
-        assert_eq!(rebound[1]["result"], json!({"uri":URI,"range":references_range(text,target,len)}));
+        assert_eq!(
+            rebound[1]["result"],
+            json!({"uri":URI,"range":references_range(text,target,len)})
+        );
         assert_eq!(rebound[2]["id"], "preserved-type");
-        assert_eq!(rebound[2]["result"], json!({"uri":URI,"range":references_range(text,type_t,1)}));
+        assert_eq!(
+            rebound[2]["result"],
+            json!({"uri":URI,"range":references_range(text,type_t,1)})
+        );
         rebound_wire.push(json!({"requests":rebound_messages,"responses":rebound}));
     }
     // TEMP #386: bounded actual wire/edit observation, no instrumentation parse.
@@ -2617,7 +2683,10 @@ fn generic_annotation_definition_is_lexical_unique_and_definition_only() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let mut session = running_rename();
     for (source, accepted) in [
-        ("import elsewhere.T\nimport elsewhere.X as T\nclass T {}\nfun <`T`> f(p: T) { val x: `T` = p }", true),
+        (
+            "import elsewhere.T\nimport elsewhere.X as T\nclass T {}\nfun <`T`> f(p: T) { val x: `T` = p }",
+            true,
+        ),
         ("fun <T, `T`> f(p: T) {}", false),
         ("fun <T, U, `T`> f(p: T) {}", false),
         ("class T {}\nfun <U> f(p: T) {}", false),
@@ -2627,15 +2696,26 @@ fn generic_annotation_definition_is_lexical_unique_and_definition_only() {
     ] {
         open(&mut session, source);
         let annotation = source.find("p: T").unwrap() + 3;
-        let response = request(&mut session, "textDocument/definition", navigation_params(source,annotation));
+        let response = request(
+            &mut session,
+            "textDocument/definition",
+            navigation_params(source, annotation),
+        );
         if accepted {
             let target = source.find("`T`").unwrap();
-            assert_eq!(response["result"], json!({"uri":URI,"range":references_range(source,target,3)}));
+            assert_eq!(
+                response["result"],
+                json!({"uri":URI,"range":references_range(source,target,3)})
+            );
         } else {
             assert_eq!(response["error"]["code"], -32803, "{source}: {response}");
             assert!(response.get("result").is_none());
         }
-        notify(&mut session, "textDocument/didClose", json!({"textDocument":{"uri":URI}}));
+        notify(
+            &mut session,
+            "textDocument/didClose",
+            json!({"textDocument":{"uri":URI}}),
+        );
     }
     assert!(session.close().1);
 }

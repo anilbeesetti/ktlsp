@@ -188,7 +188,9 @@ pub(crate) fn render(
     let directory = build_regions(&lowered, result, snapshot).map_err(|_| UNSUPPORTED)?;
     if matches!(query, Query::Definition { .. })
         && let Some((index, expression)) = reference
-        && expression.parent.is_some_and(|parent| tree.elements()[parent].kind == "USER_TYPE")
+        && expression
+            .parent
+            .is_some_and(|parent| tree.elements()[parent].kind == "USER_TYPE")
     {
         // Annotation role is selected positively, never as a failed-value fallback.
         let binding = bind_lexical_type_parameter(&directory, result, index, snapshot)

@@ -425,7 +425,16 @@ fn walk<'a>(
             }
             continue;
         }
-        let selected = b.one_of(&e.kind, &["CLASS", "FUN", "PROPERTY", "VALUE_PARAMETER", "TYPE_PARAMETER"])?;
+        let selected = b.one_of(
+            &e.kind,
+            &[
+                "CLASS",
+                "FUN",
+                "PROPERTY",
+                "VALUE_PARAMETER",
+                "TYPE_PARAMETER",
+            ],
+        )?;
         let is_region = b.one_of(&e.kind, &["KT_FILE", "CLASS_BODY", "BLOCK"])?;
         let inherited = parent.and_then(|f| f.region);
         let declaration = if selected {
@@ -463,7 +472,14 @@ fn walk<'a>(
                     .and_then(|owner| out.lowered.declarations().get(owner))
                     .ok_or(invalid(i))?;
                 if pe.token
-                    || !b.equal(&pe.kind, if value_parameter { "VALUE_PARAMETER_LIST" } else { "TYPE_PARAMETER_LIST" })?
+                    || !b.equal(
+                        &pe.kind,
+                        if value_parameter {
+                            "VALUE_PARAMETER_LIST"
+                        } else {
+                            "TYPE_PARAMETER_LIST"
+                        },
+                    )?
                     || function.token
                     || function.parent != Some(0)
                     || !b.equal(&function.kind, "FUN")?

@@ -174,7 +174,10 @@ impl<'a> BodyCheck<'a, '_> {
             let next = self.peek()?;
             if !next.token && self.b.equal(&next.kind, "TYPE_PARAMETER_LIST")? {
                 let (_, list) = self.expect(
-                    "TYPE_PARAMETER_LIST", false, function_index, function.subtree_end,
+                    "TYPE_PARAMETER_LIST",
+                    false,
+                    function_index,
+                    function.subtree_end,
                 )?;
                 // The authenticated lowerer owns the complete leading-list grammar.
                 self.b.charge(list.subtree_end - self.cursor)?;
@@ -295,7 +298,10 @@ pub fn bind_lexical_type_parameter<'a>(
     current: &SourceSnapshot,
 ) -> Result<LexicalTypeParameterBinding<'a>> {
     type_parameter_with_budget(
-        directory, result, annotation_reference_cst_index, current,
+        directory,
+        result,
+        annotation_reference_cst_index,
+        current,
         &mut ReferenceBudget::default(),
     )
 }
@@ -320,21 +326,30 @@ pub(super) fn type_parameter_with_budget<'a>(
         || !token.token
         || !b.equal(&token.kind, "IDENTIFIER")?
         || token.parent != Some(index)
-        || reference.subtree_end != token_index.checked_add(1).ok_or(LocalBindingError::Resource)?
+        || reference.subtree_end
+            != token_index
+                .checked_add(1)
+                .ok_or(LocalBindingError::Resource)?
         || reference.start != token.start
         || reference.end != token.end
         || reference.start >= reference.end
     {
         return Err(LocalBindingError::UnsupportedContext);
     }
-    let user_index = reference.parent.ok_or(LocalBindingError::UnsupportedContext)?;
+    let user_index = reference
+        .parent
+        .ok_or(LocalBindingError::UnsupportedContext)?;
     let user = b.element(parsed, user_index)?;
     let annotation_index = user.parent.ok_or(LocalBindingError::UnsupportedContext)?;
     let annotation = b.element(parsed, annotation_index)?;
-    let annotated_index = annotation.parent.ok_or(LocalBindingError::UnsupportedContext)?;
+    let annotated_index = annotation
+        .parent
+        .ok_or(LocalBindingError::UnsupportedContext)?;
     let annotated_node = b.element(parsed, annotated_index)?;
-    if user.token || !b.equal(&user.kind, "USER_TYPE")?
-        || annotation.token || !b.equal(&annotation.kind, "TYPE_REFERENCE")?
+    if user.token
+        || !b.equal(&user.kind, "USER_TYPE")?
+        || annotation.token
+        || !b.equal(&annotation.kind, "TYPE_REFERENCE")?
         || annotated_node.token
     {
         return Err(LocalBindingError::UnsupportedContext);
@@ -349,9 +364,13 @@ pub(super) fn type_parameter_with_budget<'a>(
         }
     }
     let (ordinal, annotated) = annotated.ok_or(LocalBindingError::UnsupportedContext)?;
-    let function_ordinal = annotated.owner().ok_or(LocalBindingError::UnsupportedContext)?;
+    let function_ordinal = annotated
+        .owner()
+        .ok_or(LocalBindingError::UnsupportedContext)?;
     b.charge(1)?;
-    let function = lowered.declarations().get(function_ordinal)
+    let function = lowered
+        .declarations()
+        .get(function_ordinal)
         .ok_or(LocalBindingError::InvalidOrigin)?;
     if annotated.incomplete() || function.incomplete() || !b.equal(function.kind(), "FUN")? {
         return Err(LocalBindingError::UnsupportedContext);
@@ -359,7 +378,8 @@ pub(super) fn type_parameter_with_budget<'a>(
     let mut body = None;
     for (body_ordinal, region) in directory.regions().iter().enumerate() {
         b.charge(1)?;
-        if region.introducer() == Some(function_ordinal) && b.equal(region.kind(), "BLOCK")?
+        if region.introducer() == Some(function_ordinal)
+            && b.equal(region.kind(), "BLOCK")?
             && body.replace((body_ordinal, region)).is_some()
         {
             return Err(LocalBindingError::InvalidOrigin);
@@ -367,33 +387,52 @@ pub(super) fn type_parameter_with_budget<'a>(
     }
     let (body_ordinal, body) = body.ok_or(LocalBindingError::UnsupportedContext)?;
     let parameter = b.equal(annotated.kind(), "VALUE_PARAMETER")?;
-    let parent_index = annotated.cst_parent_index().ok_or(LocalBindingError::UnsupportedContext)?;
+    let parent_index = annotated
+        .cst_parent_index()
+        .ok_or(LocalBindingError::UnsupportedContext)?;
     let parent = b.element(parsed, parent_index)?;
     b.charge(2)?;
     let expected_region = if parameter {
-        if parent.token || !b.equal(&parent.kind, "VALUE_PARAMETER_LIST")?
+        if parent.token
+            || !b.equal(&parent.kind, "VALUE_PARAMETER_LIST")?
             || parent.parent != Some(function.cst_index())
         {
             return Err(LocalBindingError::UnsupportedContext);
         }
-        directory.memberships().get(function_ordinal)
-            .ok_or(LocalBindingError::InvalidOrigin)?.region()
+        directory
+            .memberships()
+            .get(function_ordinal)
+            .ok_or(LocalBindingError::InvalidOrigin)?
+            .region()
     } else {
         if !b.equal(annotated.kind(), "PROPERTY")? || parent_index != body.cst_index() {
             return Err(LocalBindingError::UnsupportedContext);
         }
         body_ordinal
     };
-    if directory.memberships().get(ordinal).ok_or(LocalBindingError::InvalidOrigin)?.region()
+    if directory
+        .memberships()
+        .get(ordinal)
+        .ok_or(LocalBindingError::InvalidOrigin)?
+        .region()
         != expected_region
     {
         return Err(LocalBindingError::UnsupportedContext);
     }
-    BodyCheck { parsed, cursor: 0, b }.function(function, body.cst_index())?;
+    BodyCheck {
+        parsed,
+        cursor: 0,
+        b,
+    }
+    .function(function, body.cst_index())?;
     b.charge(5)?;
-    let raw = parsed.source().get(token.start..token.end)
+    let raw = parsed
+        .source()
+        .get(token.start..token.end)
         .ok_or(LocalBindingError::UnsupportedContext)?;
-    let spelling = b.spelling(raw)?.ok_or(LocalBindingError::UnsupportedSpelling)?;
+    let spelling = b
+        .spelling(raw)?
+        .ok_or(LocalBindingError::UnsupportedSpelling)?;
     let mut target = None;
     let mut duplicate = false;
     for declaration in lowered.declarations() {
@@ -403,14 +442,21 @@ pub(super) fn type_parameter_with_budget<'a>(
         {
             continue;
         }
-        let list = b.element(parsed, declaration.cst_parent_index()
-            .ok_or(LocalBindingError::InvalidOrigin)?)?;
-        if declaration.incomplete() || list.token || !b.equal(&list.kind, "TYPE_PARAMETER_LIST")?
+        let list = b.element(
+            parsed,
+            declaration
+                .cst_parent_index()
+                .ok_or(LocalBindingError::InvalidOrigin)?,
+        )?;
+        if declaration.incomplete()
+            || list.token
+            || !b.equal(&list.kind, "TYPE_PARAMETER_LIST")?
             || list.parent != Some(function.cst_index())
         {
             return Err(LocalBindingError::UnsupportedContext);
         }
-        let name = b.spelling(declaration.raw_name())?
+        let name = b
+            .spelling(declaration.raw_name())?
             .ok_or(LocalBindingError::UnsupportedSpelling)?;
         if b.equal(name, spelling)? && target.replace(declaration).is_some() {
             duplicate = true;
@@ -420,7 +466,11 @@ pub(super) fn type_parameter_with_budget<'a>(
         return Err(LocalBindingError::AmbiguousTypeParameter);
     }
     Ok(LexicalTypeParameterBinding {
-        annotated, function, body, reference, name_token: token,
+        annotated,
+        function,
+        body,
+        reference,
+        name_token: token,
         target: target.ok_or(LocalBindingError::NoEligibleTypeParameter)?,
     })
 }

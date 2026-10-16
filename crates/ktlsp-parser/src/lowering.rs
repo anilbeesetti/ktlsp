@@ -1315,9 +1315,7 @@ fn emit_declaration<'a>(
     let parent = element(p, node.parent.ok_or(invalid(i))?, b)?;
     b.work(5)?;
     let raw_name = p.source().get(name.start..name.end).ok_or(invalid(i))?;
-    if out.declarations.len() != ordinal
-        || out.declarations.len() >= out.declarations.capacity()
-    {
+    if out.declarations.len() != ordinal || out.declarations.len() >= out.declarations.capacity() {
         return Err(invalid(i));
     }
     b.work(2)?;
@@ -1377,12 +1375,19 @@ fn token<'a>(
                 return Err(unsupported(i));
             }
             f.name = true;
-            let from = if f.tag == Tag::Fun && f.plain == 7 { 7 } else { 1 };
+            let from = if f.tag == Tag::Fun && f.plain == 7 {
+                7
+            } else {
+                1
+            };
             plain_step(&mut f, from, 2, b)?;
             if f.tag == Tag::TypeParameter {
                 b.work(5)?;
                 let raw = p.source().get(e.start..e.end).ok_or(invalid(i))?;
-                let work = raw.len().checked_mul(40).and_then(|n| n.checked_add(64))
+                let work = raw
+                    .len()
+                    .checked_mul(40)
+                    .and_then(|n| n.checked_add(64))
                     .ok_or(LoweringError::Limit(LoweringLimit::Work))?;
                 b.work(work)?;
                 if semantic_spelling(raw).is_none() {
@@ -1424,7 +1429,11 @@ fn token<'a>(
             }
             Tag::Parameters | Tag::TypeParameters => {
                 let generic = f.tag == Tag::TypeParameters;
-                let (open, close) = if generic { ("LT", "GT") } else { ("LPAR", "RPAR") };
+                let (open, close) = if generic {
+                    ("LT", "GT")
+                } else {
+                    ("LPAR", "RPAR")
+                };
                 if !b.one_of(&e.kind, &[open, close, "COMMA"])? {
                     return Err(unsupported(i));
                 }
@@ -1438,7 +1447,8 @@ fn token<'a>(
                         true
                     }
                     kind if kind == close
-                        && (matches!(f.plain, 3 | 4) || !generic && f.plain == 1) => {
+                        && (matches!(f.plain, 3 | 4) || !generic && f.plain == 1) =>
+                    {
                         let from = f.plain;
                         plain_step(&mut f, from, 2, b)?;
                         true
@@ -1724,7 +1734,11 @@ fn walk<'a>(
                 ordinal,
                 outer_owner,
                 core: matches!(t, Tag::Parameter | Tag::TypeParameter),
-                plain: if matches!(t, Tag::Parameter | Tag::TypeParameter) { 1 } else { 0 },
+                plain: if matches!(t, Tag::Parameter | Tag::TypeParameter) {
+                    1
+                } else {
+                    0
+                },
                 reference: matches!(t, Tag::Reference | Tag::Parameter | Tag::TypeParameters),
                 ..Frame::EMPTY
             },
@@ -1846,7 +1860,9 @@ mod tests {
         tree.open("TYPE_PARAMETER_LIST");
         tree.token("LT", "<");
         for (n, name) in ["T", "U", "V"].into_iter().enumerate() {
-            if n != 0 { tree.token("COMMA", ","); }
+            if n != 0 {
+                tree.token("COMMA", ",");
+            }
             tree.open("TYPE_PARAMETER");
             tree.token("IDENTIFIER", name);
             tree.close();
@@ -1884,21 +1900,37 @@ mod tests {
         let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
         let mut measured = ReferenceBudget::default();
         let binding = type_parameter_with_budget(
-            &directory, &result, reference, result.snapshot(), &mut measured,
-        ).unwrap();
+            &directory,
+            &result,
+            reference,
+            result.snapshot(),
+            &mut measured,
+        )
+        .unwrap();
         assert!(std::ptr::eq(binding.target(), &lower.declarations()[1]));
         assert!(std::ptr::eq(binding.annotated(), &lower.declarations()[4]));
-        let mut exact = ReferenceBudget { work: WORK - measured.work };
+        let mut exact = ReferenceBudget {
+            work: WORK - measured.work,
+        };
         type_parameter_with_budget(
-            &directory, &result, reference, result.snapshot(), &mut exact,
-        ).unwrap();
+            &directory,
+            &result,
+            reference,
+            result.snapshot(),
+            &mut exact,
+        )
+        .unwrap();
         assert_eq!(exact.work, WORK);
         for work in [WORK - measured.work + 1, usize::MAX] {
             assert_eq!(
                 type_parameter_with_budget(
-                    &directory, &result, reference, result.snapshot(),
+                    &directory,
+                    &result,
+                    reference,
+                    result.snapshot(),
                     &mut ReferenceBudget { work },
-                ).unwrap_err(),
+                )
+                .unwrap_err(),
                 LocalBindingError::Resource,
             );
         }

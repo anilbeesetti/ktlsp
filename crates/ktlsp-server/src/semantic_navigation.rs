@@ -1,14 +1,16 @@
 //! Deliberately finite local binding, never a global unresolved-name answer.
 use ktlsp_parser::{
     SnapshotResult, SourceSnapshot,
-    local_value_binding::{LocalValueOccurrences, bind_local_value, local_value_occurrences},
+    local_value_binding::{
+        LocalValueAnchor, LocalValueOccurrences, bind_local_value, local_value_occurrences,
+    },
     lowering::{lower_declarations, reference_site},
     structural_regions::build_regions,
 };
 use ktlsp_text::Range;
 use serde_json::{Value, json};
 
-const UNSUPPORTED: &str = "navigation requires a supported unambiguous preceding local val binding; global resolution is unavailable";
+const UNSUPPORTED: &str = "navigation requires a supported unambiguous function parameter or preceding local val binding; global resolution is unavailable";
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum HoverFormat {
@@ -91,14 +93,8 @@ pub(crate) fn render(
     let lowered = lower_declarations(result, snapshot).map_err(|_| UNSUPPORTED)?;
     let directory = build_regions(&lowered, result, snapshot).map_err(|_| UNSUPPORTED)?;
     if occurrence_query {
-        let site = reference
-            .map(|(index, _)| reference_site(&lowered, result, snapshot, index))
-            .transpose()
-            .map_err(|_| UNSUPPORTED)?;
-        let target = if let Some(site) = &site {
-            bind_local_value(&directory, site, snapshot)
-                .map_err(|_| UNSUPPORTED)?
-                .target()
+        let anchor = if let Some((index, _)) = reference {
+            LocalValueAnchor::ReferenceExpression(index)
         } else {
             let mut declarations = lowered.declarations().iter().filter(|declaration| {
                 let range = declaration.name_range();
@@ -108,11 +104,11 @@ pub(crate) fn render(
             if declarations.next().is_some() {
                 return Err(UNSUPPORTED);
             }
-            target
+            LocalValueAnchor::Declaration(target)
         };
-        // This single call authenticates even unused declaration targets and
-        // atomically collects the complete bounded same-body occurrence set.
-        let occurrences = local_value_occurrences(&directory, result, target, snapshot)
+        // Authentication, use-anchor binding and complete occurrence collection
+        // are one semantic query under the kernel's single shared work budget.
+        let occurrences = local_value_occurrences(&directory, result, anchor, snapshot)
             .map_err(|_| UNSUPPORTED)?;
         return render_occurrences(&occurrences, snapshot, query);
     }

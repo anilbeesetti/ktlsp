@@ -141,14 +141,20 @@ fn genuine_pair_binds_original_declarations_through_native_public_api() {
         assert_eq!(property.ordinal, selected[ordinal].0);
         assert_eq!(property.span, span);
         assert_eq!(property.body_span, span.start + 2..span.end);
-        assert_eq!(property.header.raw.as_ptr(), bytes[property.body_span.clone()].as_ptr());
+        assert_eq!(
+            property.header.raw.as_ptr(),
+            bytes[property.body_span.clone()].as_ptr()
+        );
         let reference = &property.return_type;
         assert_eq!(reference.body_span, type_span);
         assert_eq!(reference.header.raw.as_ptr(), bytes[type_span].as_ptr());
         assert_eq!(reference.header.nullable, None);
         let declaration = &result.parameters[reference.parameter_ordinal];
         assert!(std::ptr::eq(declaration, &result.parameters[ordinal]));
-        assert_eq!(declaration.parameter.raw.as_ptr(), bytes[declaration.body_span.clone()].as_ptr());
+        assert_eq!(
+            declaration.parameter.raw.as_ptr(),
+            bytes[declaration.body_span.clone()].as_ptr()
+        );
     }
 }
 
@@ -165,13 +171,19 @@ fn signed_noncontiguous_reordered_ids_and_equal_names_preserve_identity() {
     assert_eq!(result.parameters[1].parameter.id, -7);
     assert_eq!(result.properties[0].return_type.parameter_ordinal, 1);
     assert_eq!(result.properties[1].return_type.parameter_ordinal, 0);
-    assert_ne!(result.parameters[0].body_span, result.parameters[1].body_span);
+    assert_ne!(
+        result.parameters[0].body_span,
+        result.parameters[1].body_span
+    );
     // Both ten-byte signed and five-byte uint32 encodings decode the same int32 ID.
     let mut fields = parameter(-7, 1);
     fields.extend(property(3, &scalar(7, (-7i64) as u64)));
     assert_eq!(
-        decode(&input_for_fields(&fields), Limits::default()).unwrap().properties[0]
-            .return_type.parameter_ordinal,
+        decode(&input_for_fields(&fields), Limits::default())
+            .unwrap()
+            .properties[0]
+            .return_type
+            .parameter_ordinal,
         0
     );
 }
@@ -237,7 +249,10 @@ fn inline_precedence_duplicate_merge_refusal_and_atomic_failure() {
     for (body, expected) in [
         (vec![0x10, 3], ErrorKind::MissingRole),
         (vec![0x10, 3, 0x48, 0], ErrorKind::UnsupportedTableRole),
-        (message(3, &id_type(0)), ErrorKind::Property(metadata::property_header::ErrorKind::MissingName)),
+        (
+            message(3, &id_type(0)),
+            ErrorKind::Property(metadata::property_header::ErrorKind::MissingName),
+        ),
     ] {
         let mut fields = ordinary_fields();
         fields.extend(message(10, &body));
@@ -251,9 +266,18 @@ fn inline_precedence_duplicate_merge_refusal_and_atomic_failure() {
 #[test]
 fn all_nonbare_type_forms_and_significant_wrong_wires_refuse() {
     for extra in [
-        vec![8, 1], vec![0x12, 0], vec![0x20, 0], vec![0x2a, 0],
-        vec![0x30, 0], vec![0x40, 0], vec![0x48, 1], vec![0x52, 0],
-        vec![0x58, 0], vec![0x60, 0], vec![0x6a, 0], vec![0x70, 0],
+        vec![8, 1],
+        vec![0x12, 0],
+        vec![0x20, 0],
+        vec![0x2a, 0],
+        vec![0x30, 0],
+        vec![0x40, 0],
+        vec![0x48, 1],
+        vec![0x52, 0],
+        vec![0x58, 0],
+        vec![0x60, 0],
+        vec![0x6a, 0],
+        vec![0x70, 0],
     ] {
         let mut ty = id_type(0);
         ty.extend(extra);
@@ -277,9 +301,18 @@ fn all_nonbare_type_forms_and_significant_wrong_wires_refuse() {
     fields.extend(property(3, &[]));
     assert_eq!(kind(&fields), ErrorKind::MissingParameterId);
     for extra in [
-        message(5, &[]), scalar(10, 0), message(12, &[]), scalar(13, 0), message(17, &[]),
-        message(1, &[]), message(2, &[]), scalar(3, 0), message(7, &[]),
-        message(8, &[]), message(9, &[]), message(11, &[]),
+        message(5, &[]),
+        scalar(10, 0),
+        message(12, &[]),
+        scalar(13, 0),
+        message(17, &[]),
+        message(1, &[]),
+        message(2, &[]),
+        scalar(3, 0),
+        message(7, &[]),
+        message(8, &[]),
+        message(9, &[]),
+        message(11, &[]),
     ] {
         let mut body = vec![0x10, 3];
         body.extend(message(3, &id_type(0)));
@@ -290,7 +323,11 @@ fn all_nonbare_type_forms_and_significant_wrong_wires_refuse() {
     }
     for number in [1, 3, 5, 10] {
         let mut fields = ordinary_fields();
-        fields.extend(if matches!(number, 5 | 10) { scalar(number, 0) } else { message(number, &[]) });
+        fields.extend(if matches!(number, 5 | 10) {
+            scalar(number, 0)
+        } else {
+            message(number, &[])
+        });
         assert_eq!(kind(&fields), ErrorKind::UnsupportedClass);
     }
     for number in [1, 2] {
@@ -334,27 +371,47 @@ fn scalar_width_last_values_nullable_marking_and_opaque_provenance() {
 #[test]
 fn required_fields_name_failures_and_container_selection() {
     for (fields, expected) in [
-        (message(5, &[]), ErrorKind::TypeParameter(metadata::type_parameter::ErrorKind::MissingId)),
-        (message(5, &[8, 0]), ErrorKind::TypeParameter(metadata::type_parameter::ErrorKind::MissingName)),
+        (
+            message(5, &[]),
+            ErrorKind::TypeParameter(metadata::type_parameter::ErrorKind::MissingId),
+        ),
+        (
+            message(5, &[8, 0]),
+            ErrorKind::TypeParameter(metadata::type_parameter::ErrorKind::MissingName),
+        ),
     ] {
         assert_eq!(kind(&fields), expected);
     }
     let missing_class = input(vec![4, 0x0a, 2, 8, 5], NAMES);
-    assert_eq!(decode(&missing_class, Limits::default()).unwrap_err().kind,
-        ErrorKind::Class(metadata::class_header::ErrorKind::MissingFqName));
+    assert_eq!(
+        decode(&missing_class, Limits::default()).unwrap_err().kind,
+        ErrorKind::Class(metadata::class_header::ErrorKind::MissingFqName)
+    );
     for index in [0, 1, 2] {
         let mut fields = parameter(0, if index == 1 { 5 } else { 1 });
         fields.extend(property(if index == 2 { 5 } else { 3 }, &id_type(0)));
         let mut bytes = class(&fields);
-        if index == 0 { bytes[6] = 5; }
-        assert!(matches!(decode(&input(bytes, NAMES), Limits::default()).unwrap_err().kind, ErrorKind::Name(_)));
+        if index == 0 {
+            bytes[6] = 5;
+        }
+        assert!(matches!(
+            decode(&input(bytes, NAMES), Limits::default())
+                .unwrap_err()
+                .kind,
+            ErrorKind::Name(_)
+        ));
     }
     for (k, mv) in [(2, vec![2, 3, 0]), (1, vec![2, 2, 0])] {
         let mut value = input_for_fields(&ordinary_fields());
-        let metadata::Outcome::Decoded { header, .. } = &mut value else { unreachable!() };
+        let metadata::Outcome::Decoded { header, .. } = &mut value else {
+            unreachable!()
+        };
         header.k = k;
         header.mv = mv;
-        assert_eq!(decode(&value, Limits::default()).unwrap_err().kind, ErrorKind::UnsupportedContainer);
+        assert_eq!(
+            decode(&value, Limits::default()).unwrap_err().kind,
+            ErrorKind::UnsupportedContainer
+        );
     }
 }
 
@@ -363,9 +420,15 @@ fn exact_shared_boundaries_cover_all_members_and_cannot_reset() {
     let fields = ordinary_fields();
     let input = input_for_fields(&fields);
     let axes: [fn(&mut Limits, usize); 10] = [
-        |l, n| l.bytes = n, |l, n| l.records = n, |l, n| l.nodes = n,
-        |l, n| l.depth = n, |l, n| l.work = n, |l, n| l.owned_bytes = n,
-        |l, n| l.entries = n, |l, n| l.range_slots = n, |l, n| l.queries = n,
+        |l, n| l.bytes = n,
+        |l, n| l.records = n,
+        |l, n| l.nodes = n,
+        |l, n| l.depth = n,
+        |l, n| l.work = n,
+        |l, n| l.owned_bytes = n,
+        |l, n| l.entries = n,
+        |l, n| l.range_slots = n,
+        |l, n| l.queries = n,
         |l, n| l.output_units = n,
     ];
     let mut exact = Limits::default();
@@ -375,7 +438,11 @@ fn exact_shared_boundaries_cover_all_members_and_cannot_reset() {
             let mid = low + (high - low) / 2;
             let mut limits = Limits::default();
             axis(&mut limits, mid);
-            if decode(&input, limits).is_ok() { high = mid; } else { low = mid + 1; }
+            if decode(&input, limits).is_ok() {
+                high = mid;
+            } else {
+                low = mid + 1;
+            }
         }
         assert!(low > 0);
         axis(&mut exact, low);
@@ -388,20 +455,39 @@ fn exact_shared_boundaries_cover_all_members_and_cannot_reset() {
     assert_eq!(exact.depth, 2);
     assert_eq!(exact.queries, 6); // owner string/local, two declaration names, two properties.
     assert_eq!(exact.output_units, 7 + 2 + 5 + 6);
-    let metadata::Outcome::Decoded { header, bytes } = &input else { unreachable!() };
-    assert_eq!(exact.bytes, bytes.len() + header.d2.iter().map(|s| s.len() * 2).sum::<usize>());
+    let metadata::Outcome::Decoded { header, bytes } = &input else {
+        unreachable!()
+    };
+    assert_eq!(
+        exact.bytes,
+        bytes.len() + header.d2.iter().map(|s| s.len() * 2).sum::<usize>()
+    );
     let mut more = fields;
     more.extend(property(3, &id_type(0)));
     let more = input_for_fields(&more);
     for (axis, n) in [
-        (axes[1], exact.records), (axes[2], exact.nodes), (axes[4], exact.work),
-        (axes[5], exact.owned_bytes), (axes[8], exact.queries), (axes[9], exact.output_units),
+        (axes[1], exact.records),
+        (axes[2], exact.nodes),
+        (axes[4], exact.work),
+        (axes[5], exact.owned_bytes),
+        (axes[8], exact.queries),
+        (axes[9], exact.output_units),
     ] {
         let mut limits = Limits::default();
         axis(&mut limits, n);
         assert!(decode(&more, limits).is_err());
     }
-    assert_eq!(decode(&input, Limits { depth: usize::MAX, ..exact }).unwrap(), expected);
+    assert_eq!(
+        decode(
+            &input,
+            Limits {
+                depth: usize::MAX,
+                ..exact
+            }
+        )
+        .unwrap(),
+        expected
+    );
 }
 
 #[test]

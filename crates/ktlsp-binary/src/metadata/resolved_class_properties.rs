@@ -269,11 +269,12 @@ pub fn decode<'a>(metadata: &'a Outcome<'_>, limits: Limits) -> Result<ClassProp
         &mut budget,
     )
     .map_err(|e| name_error(framed.string_table_span.start, e))?;
-    let class_id = class_id::resolve(class.fq_name, start, &mut resolver, &mut budget)
-        .map_err(|e| match e {
+    let class_id = class_id::resolve(class.fq_name, start, &mut resolver, &mut budget).map_err(
+        |e| match e {
             class_id::Error::Wire(e) => Error::from(e),
             class_id::Error::Name(e) => name_error(start, e),
-        })?;
+        },
+    )?;
     let mut parameters: Vec<Parameter<'a>> = Vec::new();
     let mut pos = start;
     // Read ALL owning declarations first, including declarations encoded after properties.
@@ -286,8 +287,10 @@ pub fn decode<'a>(metadata: &'a Outcome<'_>, limits: Limits) -> Result<ClassProp
             (5, wire::Value::Bytes(body)) => {
                 let body_span = field.span.end - body.len()..field.span.end;
                 budget.node(2, body_span.start)?;
-                let parameter = type_parameter::decode_with_budget(body, &mut budget)
-                    .map_err(|e| failure(body_span.start + e.offset, ErrorKind::TypeParameter(e.kind)))?;
+                let parameter =
+                    type_parameter::decode_with_budget(body, &mut budget).map_err(|e| {
+                        failure(body_span.start + e.offset, ErrorKind::TypeParameter(e.kind))
+                    })?;
                 let mut child_pos = 0;
                 while child_pos < body.len() {
                     let child = wire::field(body, &mut child_pos, body.len(), &mut budget.wire)

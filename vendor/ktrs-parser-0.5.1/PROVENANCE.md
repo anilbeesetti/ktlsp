@@ -1004,3 +1004,48 @@ These checks and source-only reviews do not replace the preserved first failed
 Linux run or establish a passing repair runtime. Remote head remains original
 EFabc; unpublished draft readiness still requires completed retained SAME3
 packet review and ROOT admission for any later action.
+
+## C13 exactly two-component qualified generic receiver source
+
+The assigned delivery base is56775ca722425af1f27cf3590ced0dbf97171323,
+tree3c269c4b4fe8d8547e3ead366f59a2f79f716a84, sole parent45619398c7d8d5ca7b59acc5178acb4b208a67ee.
+N261 OWNER+ROOT original exact-main delivery/vendor release cleared this source
+turn. Its tuple-return probe/classifier calls and all165 N fixtures are inherited.
+Only the existing private plain-DOT scratch arm adds exactly two receiver
+components with one simple unqualified nonnullable argument on the second:
+qualifier.Receiver<Argument>.name(. A plain suffix DOT and observable LPAR are
+mandatory. The new arm leaves longer_receiver=false and verified_prefix=None;
+false alone is not a general proof of old FUN-only decline ownership. No new
+helper/module/export/live grammar/server/Cargo/limit change is introduced.
+
+Accepted contract81 cases/40 full token-inclusive CST literals/32 boundaries/
+262754 UTF16 expectations remain unchanged. Two exact-ID/source historical
+overlays supersede generic qualified-receiver and qualified-decline-generic-second
+without rewriting raw payloads or existing nullable/N overlays. Qualified nullable,
+two arguments, generic-middle/longer qualified chains and complex arguments remain
+declined. Shared4096/256 raw/4096 bytes, active EOF,64KiB and worker supervision
+limits are inherited. See ../../crates/ktlsp-parser/reviews/c13-qualified-generic-receiver-recovery.md.
+
+Pinned Rust1.99.0 format and compile-only locked workspace/all-target Clippy
+passed, including recheck after two harness findings. No local native/parser/
+tokenizer/worker/server/test/bench/JVM/oracle execution occurred under#96. One
+fresh current-candidate pristine archive -> recovery.patch -> formatting.patch
+owner replay passed with zero offsets/fuzz and all54 final bytes/hashes equal.
+Previously accepted replays were not repeated. Other53 behavior/final source
+files, upstream archive/inventory, manifests/locks and notices remain unchanged.
+Counts stay16 behavior files/50 formatting files/54 final files/four pristine
+survivors; type_parameters formatting delta is whitespace-only.
+
+Current derived artifacts:
+- recovery.patch SHA256 76dce8c91827b34e9ee6016c72b67f4734d12ed81dc2e7c5d727234b43b902e4
+- formatting.patch SHA256 0a6965e7bc53b46ec731a042cf7a4a9083a6cf91965c1376cd44b07707c22452
+- formatted-sha256.json SHA256 31152d770cc9c2c4cc926882335f26e98c4d383e2a9ace76b049364f8ee9424c
+- final type_parameters.rs SHA256 3b72823d6d0817cba5fe433f519973745bc60e2d4f56db86b9dfc2b6fa48ae1b
+
+Retained correctness/adversarial/architect actual-source and original unchanged
+hosted Linux fmt/locked Clippy/workspace-test reviews remain required. Publication
+is authorized; merge waits for an exclusive exact root head/base lease and fresh
+standalone read-only guards, followed by expected-head merge and OWNER+ROOT
+original exact-main verification. No full C13/B3/B4/B11, T008 or semantic parity
+promotion follows. C13/B3/B4 GAP, fullB11 UNVERIFIED, T008/T008a HOLD, #7/#83 OPEN
+and #96 Darwin OPEN/UNKNOWN remain.

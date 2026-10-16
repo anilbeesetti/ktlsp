@@ -672,7 +672,7 @@
  
                  if !self.at(COMMA) {
                      break;
-@@ -39,13 +94,243 @@
+@@ -39,13 +94,250 @@
                  }
              }
  
@@ -836,7 +836,14 @@
 +                                identifiers += 1;
 +                            }
 +                            plain
-+                                && (if identifiers == 2 && probe.consume_if(SAFE_ACCESS) {
++                                && (if identifiers == 2 && probe.consume_if(LT) {
++                                    generic_receiver_name
++                                        && probe.my_builder.get_token_text() != Some("suspend")
++                                        && probe.expect(IDENTIFIER)
++                                        && probe.expect(GT)
++                                        && probe.expect(DOT)
++                                        && probe.expect(IDENTIFIER)
++                                } else if identifiers == 2 && probe.consume_if(SAFE_ACCESS) {
 +                                    probe.expect(IDENTIFIER)
 +                                } else if identifiers == 2 && probe.consume_if(QUEST) {
 +                                    probe.expect(DOT) && probe.expect(IDENTIFIER)
@@ -918,7 +925,7 @@
      }
  
      /*
-@@ -106,13 +391,13 @@
+@@ -106,13 +398,13 @@
          self.parse_annotations(AnnotationParsingMode::Default);
  
          let reference = self.mark();
@@ -934,7 +941,7 @@
  
          self.parse_type_ref();
  
-@@ -132,23 +417,43 @@
+@@ -132,23 +424,43 @@
       *   : modifiers SimpleName (":" userType)?
       *   ;
       */

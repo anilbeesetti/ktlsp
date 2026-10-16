@@ -341,14 +341,24 @@ impl Client {
         write_frame(input, &serde_json::to_vec(&value).unwrap()).unwrap();
         input.flush().unwrap();
     }
+    #[track_caller]
     fn reply(&self) -> Value {
-        self.replies
+        let reply = self
+            .replies
             .recv_timeout(Duration::from_secs(2))
-            .expect("interactive stdio response timeout")
+            .expect("interactive stdio response timeout");
+        let caller = std::panic::Location::caller();
+        eprintln!(
+            "CANCELLATION_REPLY_V1 {}",
+            json!({"callerLine":caller.line(),"reply":reply})
+        );
+        reply
     }
+    #[track_caller]
     fn finish(self, expected: i32) {
         self.finish_with_errors(expected, false);
     }
+    #[track_caller]
     fn finish_with_errors(mut self, expected: i32, errors_expected: bool) {
         // Keep stdin open while waiting: exit must not hide a blocked reader join.
         let deadline = Instant::now() + Duration::from_secs(2);
@@ -362,7 +372,15 @@ impl Client {
             );
             thread::sleep(Duration::from_millis(2));
         };
-        assert_eq!(status.code(), Some(expected));
+        let mut errors = String::new();
+        std::io::Read::read_to_string(self.child.stderr.as_mut().unwrap(), &mut errors).unwrap();
+        let caller = std::panic::Location::caller();
+        eprintln!(
+            "CANCELLATION_EXIT_V1 {}",
+            json!({"callerLine":caller.line(),"expected":expected,
+                "actual":status.code(),"stderr":errors})
+        );
+        assert_eq!(status.code(), Some(expected), "server stderr: {errors}");
         self.input.take();
         if let Some(reader) = self.reader.take() {
             reader.join().unwrap();
@@ -371,8 +389,6 @@ impl Client {
             self.replies.try_recv().is_err(),
             "unexpected duplicate/notification output"
         );
-        let mut errors = String::new();
-        std::io::Read::read_to_string(self.child.stderr.as_mut().unwrap(), &mut errors).unwrap();
         assert_eq!(!errors.is_empty(), errors_expected, "{errors}");
     }
 }

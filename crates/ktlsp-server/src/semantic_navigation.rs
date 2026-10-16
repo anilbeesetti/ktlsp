@@ -3,6 +3,7 @@ use ktlsp_parser::{
     SnapshotResult, SourceSnapshot,
     local_value_binding::{
         LocalValueAnchor, LocalValueOccurrences, bind_lexical_type_parameter, bind_local_value,
+        bind_local_function_callee,
         guarded_local_value_rename, local_value_occurrences, visible_local_values,
     },
     lowering::{lower_declarations, reference_site},
@@ -194,6 +195,18 @@ pub(crate) fn render(
     {
         // Annotation role is selected positively, never as a failed-value fallback.
         let binding = bind_lexical_type_parameter(&directory, result, index, snapshot)
+            .map_err(|_| UNSUPPORTED)?;
+        let target = binding.target();
+        return render_target(tree.source(), snapshot, query, target, target.name_range());
+    }
+    if matches!(query, Query::Definition { .. })
+        && let Some((index, expression)) = reference
+        && expression
+            .parent
+            .is_some_and(|parent| tree.elements()[parent].kind == "CALL_EXPRESSION")
+    {
+        // Positive callee-role dispatch, never a failed-value textual fallback.
+        let binding = bind_local_function_callee(&directory, result, index, snapshot)
             .map_err(|_| UNSUPPORTED)?;
         let target = binding.target();
         return render_target(tree.source(), snapshot, query, target, target.name_range());

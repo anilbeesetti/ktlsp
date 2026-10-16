@@ -60,6 +60,9 @@ impl<'a> LocalValueBinding<'a> {
 // element visits, kind comparisons, snapshot checks and name bytes share b.
 struct BodyCheck<'a, 'b> {
     parsed: &'a Parsed,
+    directory: &'a RegionDirectory<'a>,
+    selected: Option<usize>,
+    selected_target: Option<&'a Declaration<'a>>,
     cursor: usize,
     b: &'b mut ReferenceBudget,
 }
@@ -159,7 +162,49 @@ impl<'a> BodyCheck<'a, '_> {
         self.finish(expression_index, expression.subtree_end)?;
         self.finish(index, node.subtree_end)
     }
-    fn function(&mut self, declaration: &Declaration<'_>, body_index: usize) -> Result<()> {
+    fn empty_function(&mut self, body: usize, end: usize) -> Result<()> {
+        let (index, node) = self.expect("FUN", false, body, end)?;
+        self.expect("FUN_KEYWORD", true, index, node.subtree_end)?;
+        self.expect("IDENTIFIER", true, index, node.subtree_end)?;
+        let (parameters, list) =
+            self.expect("VALUE_PARAMETER_LIST", false, index, node.subtree_end)?;
+        self.expect("LPAR", true, parameters, list.subtree_end)?;
+        self.expect("RPAR", true, parameters, list.subtree_end)?;
+        self.finish(parameters, list.subtree_end)?;
+        let (block, node_body) = self.expect("BLOCK", false, index, node.subtree_end)?;
+        self.expect("LBRACE", true, block, node_body.subtree_end)?;
+        self.expect("RBRACE", true, block, node_body.subtree_end)?;
+        self.finish(block, node_body.subtree_end)?;
+        self.finish(index, node.subtree_end)
+    }
+    fn call(&mut self, function: &Declaration<'a>, body: usize, end: usize) -> Result<()> {
+        let (index, node) = self.expect("CALL_EXPRESSION", false, body, end)?;
+        let (callee, reference) =
+            self.expect("REFERENCE_EXPRESSION", false, index, node.subtree_end)?;
+        let (_, token) = self.expect("IDENTIFIER", true, callee, reference.subtree_end)?;
+        if token.start != reference.start || token.end != reference.end {
+            return Err(LocalBindingError::UnsupportedContext);
+        }
+        self.finish(callee, reference.subtree_end)?;
+        let (arguments, list) =
+            self.expect("VALUE_ARGUMENT_LIST", false, index, node.subtree_end)?;
+        self.expect("LPAR", true, arguments, list.subtree_end)?;
+        self.expect("RPAR", true, arguments, list.subtree_end)?;
+        self.finish(arguments, list.subtree_end)?;
+        self.finish(index, node.subtree_end)?;
+        let target = callable_target(
+            self.directory, self.parsed, function, body, index, reference, self.b,
+        )?;
+        if self.selected == Some(callee) {
+            self.selected_target = Some(target);
+        }
+        Ok(())
+    }
+    fn function(
+        &mut self,
+        declaration: &'a Declaration<'a>,
+        body_index: usize,
+    ) -> Result<()> {
         let function_index = declaration.cst_index();
         let function = self.b.element(self.parsed, function_index)?;
         if function.token || function.parent != Some(0) || declaration.incomplete() {
@@ -232,30 +277,141 @@ impl<'a> BodyCheck<'a, '_> {
             }
             if e.token && e.parent == Some(body_index) && self.b.equal(&e.kind, "SEMICOLON")? {
                 self.advance()?;
+            } else if !e.token && self.b.equal(&e.kind, "FUN")? {
+                self.empty_function(body_index, body.subtree_end)?;
+            } else if !e.token && self.b.equal(&e.kind, "CALL_EXPRESSION")? {
+                self.call(declaration, body_index, body.subtree_end)?;
             } else {
                 self.property(body_index, body.subtree_end)?;
             }
         }
         self.expect("RBRACE", true, body_index, body.subtree_end)?;
         self.finish(body_index, body.subtree_end)?;
-        self.finish(function_index, function.subtree_end)
+        self.finish(function_index, function.subtree_end)?;
+        Ok(())
     }
 }
 
-// Only called on an authenticated lowerer's tree: USER_TYPE references belong
-// exclusively to its exact retained annotation shape, never to value syntax.
-fn annotation_reference(
-    parsed: &Parsed,
-    element: &Element,
+/// Original local function identity for an authenticated standalone empty call.
+/// This is definition-only, not an initializer ReferenceSite or overload resolver.
+#[derive(Debug)]
+pub struct LocalFunctionBinding<'a> {
+    target: &'a Declaration<'a>,
+    function: &'a Declaration<'a>,
+    body: &'a Region<'a>,
+    callee: &'a Element,
+}
+impl<'a> LocalFunctionBinding<'a> {
+    pub fn target(&self) -> &'a Declaration<'a> { self.target }
+    pub fn function(&self) -> &'a Declaration<'a> { self.function }
+    pub fn body(&self) -> &'a Region<'a> { self.body }
+    pub fn callee(&self) -> &'a Element { self.callee }
+}
+
+/// Authenticate the entire ordinary outer body and every call under one budget.
+pub fn bind_local_function_callee<'a>(
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    callee_index: usize,
+    current: &SourceSnapshot,
+) -> Result<LocalFunctionBinding<'a>> {
+    callable_with_budget(directory, result, callee_index, current, &mut ReferenceBudget::default())
+}
+
+pub(super) fn callable_with_budget<'a>(
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    callee_index: usize,
+    current: &SourceSnapshot,
     b: &mut ReferenceBudget,
-) -> Result<bool> {
-    let parent = b.element(
-        parsed,
-        element
-            .parent
-            .ok_or(LocalBindingError::UnsupportedContext)?,
-    )?;
-    Ok(!parent.token && b.equal(&parent.kind, "USER_TYPE")?)
+) -> Result<LocalFunctionBinding<'a>> {
+    if !std::ptr::eq(directory.snapshot(), directory.lowered().snapshot()) {
+        return Err(LocalBindingError::InvalidOrigin);
+    }
+    let parsed = authenticated_tree(directory.lowered(), result, current, b)?;
+    let callee = b.element(parsed, callee_index)?;
+    if callee.token || !b.equal(&callee.kind, "REFERENCE_EXPRESSION")? {
+        return Err(LocalBindingError::UnsupportedContext);
+    }
+    let call = b.element(parsed, callee.parent.ok_or(LocalBindingError::UnsupportedContext)?)?;
+    if call.token || !b.equal(&call.kind, "CALL_EXPRESSION")? {
+        return Err(LocalBindingError::UnsupportedContext);
+    }
+    let body_index = call.parent.ok_or(LocalBindingError::UnsupportedContext)?;
+    let (_, body) = find_body(directory, body_index, b)?;
+    let body_node = b.element(parsed, body_index)?;
+    let function_index = body_node.parent.ok_or(LocalBindingError::UnsupportedContext)?;
+    let mut function = None;
+    for declaration in directory.lowered().declarations() {
+        b.charge(1)?;
+        if declaration.cst_index() == function_index {
+            function = Some(declaration);
+        }
+    }
+    let function = function.ok_or(LocalBindingError::UnsupportedContext)?;
+    let mut check = BodyCheck {
+        parsed, directory, selected: Some(callee_index), selected_target: None, cursor: 0, b,
+    };
+    check.function(function, body_index)?;
+    let target = check.selected_target.ok_or(LocalBindingError::UnsupportedContext)?;
+    Ok(LocalFunctionBinding { target, function, body, callee })
+}
+
+// Private lookup is called only by the complete-body walk, never recursively
+// through the public query. No name/candidate allocation or per-call reset.
+fn callable_target<'a>(
+    directory: &'a RegionDirectory<'a>,
+    parsed: &'a Parsed,
+    function: &Declaration<'a>,
+    body: usize,
+    call: usize,
+    callee: &Element,
+    b: &mut ReferenceBudget,
+) -> Result<&'a Declaration<'a>> {
+    b.charge(1)?;
+    let raw = parsed.source().get(callee.start..callee.end)
+        .ok_or(LocalBindingError::UnsupportedContext)?;
+    let spelling = b.spelling(raw)?.ok_or(LocalBindingError::UnsupportedSpelling)?;
+    let (body_ordinal, _) = find_body(directory, body, b)?;
+    let mut target = None;
+    for (ordinal, declaration) in directory.lowered().declarations().iter().enumerate() {
+        b.charge(3)?;
+        let parameter = b.equal(declaration.kind(), "VALUE_PARAMETER")?
+            && declaration.owner().and_then(|owner| directory.lowered().declarations().get(owner))
+                .is_some_and(|owner| std::ptr::eq(owner, function));
+        let local = directory.memberships().get(ordinal)
+            .ok_or(LocalBindingError::InvalidOrigin)?.region() == body_ordinal;
+        if !parameter && !local { continue; }
+        if declaration.incomplete() || local && declaration.cst_parent_index() != Some(body) {
+            return Err(LocalBindingError::UnsupportedContext);
+        }
+        // Inspect every relevant spelling before any candidate eligibility.
+        let name = b.spelling(declaration.raw_name())?
+            .ok_or(LocalBindingError::UnsupportedSpelling)?;
+        if !b.equal(name, spelling)? { continue; }
+        if parameter || !b.equal(declaration.kind(), "FUN")? {
+            return Err(LocalBindingError::AmbiguousLocal);
+        }
+        // Future duplicates are conservative conflicts, NOT forward candidates.
+        if target.replace(declaration).is_some() {
+            return Err(LocalBindingError::AmbiguousLocal);
+        }
+    }
+    let target = target.ok_or(LocalBindingError::NoEligibleLocal)?;
+    b.charge(3)?;
+    if target.cst_index() >= call || target.range().end > callee.start {
+        return Err(LocalBindingError::NoEligibleLocal);
+    }
+    // BodyCheck separately proves every local FUN's exact empty-body grammar.
+    Ok(target)
+}
+
+// Only after BodyCheck proves every call is a local FUN may its callee be
+// excluded from value occurrences. Unknown reference roles still refuse.
+fn non_value_reference(parsed: &Parsed, element: &Element, b: &mut ReferenceBudget) -> Result<bool> {
+    let parent = b.element(parsed, element.parent.ok_or(LocalBindingError::UnsupportedContext)?)?;
+    Ok(!parent.token
+        && (b.equal(&parent.kind, "USER_TYPE")? || b.equal(&parent.kind, "CALL_EXPRESSION")?))
 }
 
 /// An annotation-only lexical identity, not a value binding or inferred type.
@@ -419,11 +575,7 @@ pub(super) fn type_parameter_with_budget<'a>(
     {
         return Err(LocalBindingError::UnsupportedContext);
     }
-    BodyCheck {
-        parsed,
-        cursor: 0,
-        b,
-    }
+    BodyCheck { parsed, directory, selected: None, selected_target: None, cursor: 0, b }
     .function(function, body.cst_index())?;
     b.charge(5)?;
     let raw = parsed
@@ -510,11 +662,7 @@ fn binding_target_with_budget<'a>(
     let spelling = b
         .spelling(site.raw_spelling())?
         .ok_or(LocalBindingError::UnsupportedSpelling)?;
-    BodyCheck {
-        parsed,
-        cursor: 0,
-        b,
-    }
+    BodyCheck { parsed, directory, selected: None, selected_target: None, cursor: 0, b }
     .function(site.function(), site.body_index())?;
     let (body_ordinal, body) = find_body(directory, site.body_index(), b)?;
     let (local, parameter) = value_candidates(
@@ -585,7 +733,8 @@ fn value_candidates<'a>(
                 continue;
             }
             if declaration.cst_parent_index() != Some(body_index)
-                || !b.equal(declaration.kind(), "PROPERTY")?
+                || !(b.equal(declaration.kind(), "PROPERTY")?
+                    || b.equal(declaration.kind(), "FUN")?)
             {
                 return Err(LocalBindingError::UnsupportedContext);
             }
@@ -597,6 +746,11 @@ fn value_candidates<'a>(
             .spelling(declaration.raw_name())?
             .ok_or(LocalBindingError::UnsupportedSpelling)?;
         if b.equal(name, spelling)? {
+            if !is_parameter && !b.equal(declaration.kind(), "PROPERTY")? {
+                // Also protects renamed values from capturing proved local calls,
+                // including conservative conflicts with future local functions.
+                return Err(LocalBindingError::AmbiguousLocal);
+            }
             let matches = if is_parameter {
                 &mut parameter_matches
             } else {
@@ -684,6 +838,9 @@ fn visible_winner(
     b.charge(3)?;
     let declaration = &directory.lowered().declarations()[ordinal];
     let parameter = b.equal(declaration.kind(), "VALUE_PARAMETER")?;
+    if !parameter && !b.equal(declaration.kind(), "PROPERTY")? {
+        return Ok(false);
+    }
     if parameter {
         let owner = declaration
             .owner()
@@ -740,11 +897,7 @@ pub(super) fn visible_with_budget<'a>(
     b.spelling(site.raw_spelling())?
         .ok_or(LocalBindingError::UnsupportedSpelling)?;
     let parsed = site.tree(current, b)?;
-    BodyCheck {
-        parsed,
-        cursor: 0,
-        b,
-    }
+    BodyCheck { parsed, directory, selected: None, selected_target: None, cursor: 0, b }
     .function(site.function(), site.body_index())?;
     let (body_ordinal, body) = find_body(directory, site.body_index(), b)?;
 
@@ -931,7 +1084,7 @@ pub(super) fn rename_with_budget<'a>(
         let element = b.element(parsed, index)?;
         if element.token
             || !b.equal(&element.kind, "REFERENCE_EXPRESSION")?
-            || annotation_reference(parsed, element, b)?
+            || non_value_reference(parsed, element, b)?
         {
             continue;
         }
@@ -1041,11 +1194,7 @@ pub(super) fn occurrences_with_budget<'a>(
     {
         return Err(LocalBindingError::UnsupportedContext);
     }
-    BodyCheck {
-        parsed,
-        cursor: 0,
-        b,
-    }
+    BodyCheck { parsed, directory, selected: None, selected_target: None, cursor: 0, b }
     .function(function, body_index)?;
     let spelling = b
         .spelling(target.raw_name())?
@@ -1064,7 +1213,7 @@ pub(super) fn occurrences_with_budget<'a>(
         let element = b.element(parsed, index)?;
         if !element.token
             && b.equal(&element.kind, "REFERENCE_EXPRESSION")?
-            && !annotation_reference(parsed, element, b)?
+            && !non_value_reference(parsed, element, b)?
         {
             count = count.checked_add(1).ok_or(LocalBindingError::Resource)?;
         }
@@ -1084,7 +1233,7 @@ pub(super) fn occurrences_with_budget<'a>(
         let element = b.element(parsed, index)?;
         if element.token
             || !b.equal(&element.kind, "REFERENCE_EXPRESSION")?
-            || annotation_reference(parsed, element, b)?
+            || non_value_reference(parsed, element, b)?
         {
             continue;
         }

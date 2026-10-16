@@ -2709,3 +2709,152 @@ fn generic_annotation_definition_is_lexical_unique_and_definition_only() {
     }
     assert!(session.close().1);
 }
+
+#[test]
+fn local_empty_call_definition_and_mixed_values_use_actual_paired_cli_edits() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let package = Package::new(true);
+    let init = json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{"capabilities":{
+        "workspace":{"workspaceEdit":{"documentChanges":true}},
+        "textDocument":{"documentSymbol":{"hierarchicalDocumentSymbolSupport":true},"rename":{"prepareSupport":true},"hover":{"contentFormat":["plaintext"]},"diagnostic":{}}
+    }}});
+    let minimal = "fun outer(){ fun target(){}; target() }";
+    let messages = [
+        init.clone(),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":7,"text":minimal}}}),
+        json!({"jsonrpc":"2.0","id":"callee","method":"textDocument/definition","params":navigation_params(minimal,minimal.rfind("target").unwrap())}),
+        json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ];
+    let replies = package.exchange(&messages);
+    // TEMP_389: retain first actual wire, including any refusal, before assertions.
+    eprintln!("TEMP_389_CLI_MINIMAL source={minimal:?} replies={replies:?}");
+    assert_eq!(replies[1]["id"], "callee");
+    assert_eq!(replies[1]["result"], json!({"uri":URI,"range":references_range(minimal,minimal.find("target").unwrap(),6)}));
+
+    let source = "// 🦀\r\nimport elsewhere.target\r\nfun target() {}\r\nfun <T> outer(p: T){ fun `target`(){}; val x=1; target(); val y=x; val z=p; val unused=2 }\r\n";
+    let target = source.find("`target`").unwrap();
+    let callee = source.rfind("target()").unwrap();
+    let parameter = source.find("p: T").unwrap();
+    let annotation = parameter+3;
+    let type_parameter = source.find("<T").unwrap()+1;
+    let local = source.find("val x").unwrap()+4;
+    let value_use = source.find("=x").unwrap()+1;
+    let parameter_use = source.find("=p").unwrap()+1;
+    let messages = [
+        init.clone(),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":7,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":"callee","method":"textDocument/definition","params":navigation_params(source,callee)}),
+        json!({"jsonrpc":"2.0","id":"annotation","method":"textDocument/definition","params":navigation_params(source,annotation)}),
+        json!({"jsonrpc":"2.0","id":"value","method":"textDocument/definition","params":navigation_params(source,value_use)}),
+        json!({"jsonrpc":"2.0","id":"parameter","method":"textDocument/definition","params":navigation_params(source,parameter_use)}),
+        json!({"jsonrpc":"2.0","id":"hover","method":"textDocument/hover","params":navigation_params(source,value_use)}),
+        json!({"jsonrpc":"2.0","id":"references","method":"textDocument/references","params":references_params(source,value_use,true)}),
+        json!({"jsonrpc":"2.0","id":"highlights","method":"textDocument/documentHighlight","params":navigation_params(source,value_use)}),
+        json!({"jsonrpc":"2.0","id":"symbols","method":"textDocument/documentSymbol","params":{"textDocument":{"uri":URI}}}),
+        json!({"jsonrpc":"2.0","id":"completion","method":"textDocument/completion","params":navigation_params(source,value_use)}),
+        json!({"jsonrpc":"2.0","id":"prepare","method":"textDocument/prepareRename","params":navigation_params(source,value_use)}),
+        json!({"jsonrpc":"2.0","id":"rename","method":"textDocument/rename","params":rename_params(source,value_use,"fresh")}),
+        json!({"jsonrpc":"2.0","id":"conflict","method":"textDocument/rename","params":rename_params(source,value_use,"target")}),
+        json!({"jsonrpc":"2.0","id":"call-references","method":"textDocument/references","params":references_params(source,callee,true)}),
+        json!({"jsonrpc":"2.0","id":"call-hover","method":"textDocument/hover","params":navigation_params(source,callee)}),
+        json!({"jsonrpc":"2.0","id":"call-rename","method":"textDocument/rename","params":rename_params(source,callee,"fresh")}),
+        json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ];
+    let replies = package.exchange(&messages);
+    eprintln!("TEMP_389_CLI_MIXED source={source:?} replies={replies:?}");
+    assert!(replies.iter().filter_map(|r|r.get("id")).eq(messages.iter().filter_map(|r|r.get("id"))));
+    let reply = |id: &str| replies.iter().find(|r|r["id"] == id).unwrap();
+    for (id, start, len) in [
+        ("callee", target, 8), ("annotation", type_parameter, 1),
+        ("value", local, 1), ("parameter", parameter, 1),
+    ] {
+        assert_eq!(reply(id)["result"], json!({"uri":URI,"range":references_range(source,start,len)}), "{id}: {:?}",reply(id));
+    }
+    assert_eq!(reply("hover")["result"], json!({"contents":{"kind":"plaintext","value":"val x=1"},"range":references_range(source,value_use,1)}));
+    assert_eq!(reply("references")["result"], json!([
+        {"uri":URI,"range":references_range(source,local,1)},
+        {"uri":URI,"range":references_range(source,value_use,1)}
+    ]));
+    assert_eq!(reply("highlights")["result"], json!([
+        {"range":references_range(source,local,1),"kind":3},
+        {"range":references_range(source,value_use,1),"kind":2}
+    ]));
+    let symbols = reply("symbols")["result"].as_array().unwrap();
+    assert_eq!(symbols.iter().map(|s|s["name"].as_str().unwrap()).collect::<Vec<_>>(), ["target","outer"]);
+    assert_eq!(symbols[1]["children"].as_array().unwrap().iter().map(|s|s["name"].as_str().unwrap()).collect::<Vec<_>>(), ["`target`","x","y","z","unused"]);
+    assert_eq!(symbols[1]["children"][0]["selectionRange"], references_range(source,target,8));
+    assert_eq!(reply("prepare")["result"], json!({"range":references_range(source,value_use,1),"placeholder":"x"}));
+    for id in ["conflict","call-references","call-hover","call-rename"] {
+        assert_eq!(reply(id)["error"]["code"], -32803, "{id}: {:?}",reply(id));
+        assert!(reply(id).get("result").is_none());
+    }
+    let items = reply("completion")["result"]["items"].as_array().unwrap();
+    assert_eq!(items.iter().map(|i|i["label"].as_str().unwrap()).collect::<Vec<_>>(), ["p","x"]);
+    let renamed = apply_original_rename(source, reply("rename"), URI, 7);
+    assert_eq!(renamed, source.replace("val x=", "val fresh=").replace("=x", "=fresh"));
+    // Apply EVERY actual completion edit and the actual rename edit, then prove
+    // both updated value identity and unchanged original local function target.
+    let mut applied = items.iter().map(|item| {
+        let (text, offset) = apply_completion(source,item,value_use);
+        let target = if item["label"] == "p" { parameter } else { local };
+        (text,offset,target,1)
+    }).collect::<Vec<_>>();
+    applied.push((renamed.clone(), renamed.find("=fresh").unwrap()+1, local, 5));
+    for (text, offset, value_target, len) in applied {
+        let messages = [
+            init.clone(),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":8,"text":text}}}),
+            json!({"jsonrpc":"2.0","id":"value","method":"textDocument/definition","params":navigation_params(&text,offset)}),
+            json!({"jsonrpc":"2.0","id":"callee","method":"textDocument/definition","params":navigation_params(&text,text.rfind("target()").unwrap())}),
+            json!({"jsonrpc":"2.0","id":"annotation","method":"textDocument/definition","params":navigation_params(&text,annotation)}),
+            json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ];
+        let rebound = package.exchange(&messages);
+        eprintln!("TEMP_389_CLI_EDIT source={text:?} replies={rebound:?}");
+        assert_eq!(rebound[1]["result"], json!({"uri":URI,"range":references_range(&text,value_target,len)}));
+        assert_eq!(rebound[2]["result"], json!({"uri":URI,"range":references_range(&text,target,8)}));
+        assert_eq!(rebound[3]["result"], json!({"uri":URI,"range":references_range(&text,type_parameter,1)}));
+    }
+}
+
+#[test]
+fn local_call_definitions_refuse_unproved_whole_bodies_on_actual_cli() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let package = Package::new(true);
+    for source in [
+        "fun outer(){ target(); fun target(){} }",
+        "fun outer(){ fun target(){}; fun `target`(){}; target() }",
+        "fun outer(){ fun target(){}; fun target(x: Int){}; target() }",
+        "fun outer(){ fun target(){}; class target; target() }",
+        "fun outer(target: Int){ fun target(){}; target() }",
+        "fun outer(){ fun target(){}; val target=1; target() }",
+        "fun outer(){ fun target(){ target() }; target() }",
+        "fun outer(){ fun target(){}; target(1) }",
+        "fun outer(){ fun target(){}; target()() }",
+        "fun outer(){ fun target(){}; target<Int>() }",
+        "fun outer(){ fun target(){}; target(); unknown() }",
+    ] {
+        let callee = if source.starts_with("fun outer(){ target()") {
+            source.find("target").unwrap()
+        } else {
+            source.rfind("target").unwrap()
+        };
+        let messages = [
+            json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{"capabilities":{}}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
+            json!({"jsonrpc":"2.0","id":"callee","method":"textDocument/definition","params":navigation_params(source,callee)}),
+            json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ];
+        let replies = package.exchange(&messages);
+        assert_eq!(replies[1]["error"]["code"], -32803, "{source}: {:?}",replies[1]);
+        assert!(replies[1].get("result").is_none());
+    }
+}

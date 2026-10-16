@@ -1019,3 +1019,159 @@ fn rename_quote_removal_refuses_keyword_token_merging_before_preparation() {
         }
     }
 }
+
+#[test]
+fn local_empty_function_callees_preserve_original_identity_and_mixed_values() {
+    use ktlsp_parser::local_value_binding::{
+        bind_lexical_type_parameter, bind_local_function_callee, guarded_local_value_rename,
+        visible_local_values,
+    };
+    let _serial = functional::serial();
+    for source in [
+        "fun outer(){ fun target(){}; target() }",
+        "// 🦀\r\nimport elsewhere.target\r\nfun target() {}\r\nfun <T> outer(p: T){ fun `target`(){}; val x=1; target(); val y=x; val z=p; val unused=2 }",
+        "fun outer(){ fun `🦀`(){}; `🦀`() }",
+    ] {
+        let result = parse(source);
+        let current = result.snapshot();
+        let tree = result.tree_for(current).unwrap();
+        // TEMP_389: first genuine producer path only; no additional parse/capture.
+        eprintln!("TEMP_389_PRODUCER source={source:?} elements={:?} diagnostics={:?}",
+            tree.elements(), tree.diagnostics());
+        assert!(tree.diagnostics().is_empty());
+        let lower = lower_declarations(&result, current).unwrap();
+        let directory = build_regions(&lower, &result, current).unwrap();
+        let (callee_index, callee) = tree.elements().iter().enumerate().find(|(_, e)| {
+            e.kind == "REFERENCE_EXPRESSION"
+                && e.parent.is_some_and(|p| tree.elements()[p].kind == "CALL_EXPRESSION")
+        }).unwrap();
+        let binding = bind_local_function_callee(&directory, &result, callee_index, current).unwrap();
+        let target = lower.declarations().iter().find(|d| {
+            d.kind() == "FUN" && d.cst_parent_kind() == "BLOCK"
+        }).unwrap();
+        assert!(std::ptr::eq(binding.target(), target));
+        assert!(std::ptr::eq(binding.callee(), callee));
+        assert_eq!(binding.target().owner(), binding.body().introducer());
+        assert_eq!(binding.target().cst_parent_index(), Some(binding.body().cst_index()));
+        assert_eq!(binding.function().cst_index(), tree.elements()[binding.body().cst_index()].parent.unwrap());
+        assert_eq!(tree.elements()[callee.parent.unwrap()].parent, Some(binding.body().cst_index()));
+        assert_eq!(target.raw_name().as_ptr(), tree.source()[target.name_range()].as_ptr());
+        assert!(reference_site(&lower, &result, current, callee_index).is_err());
+        let stale = SourceSnapshot::new(current.document(), current.revision()+1, FileKind::Source, source).unwrap();
+        assert_eq!(bind_local_function_callee(&directory, &result, callee_index, &stale).unwrap_err(), LocalBindingError::StaleSnapshot);
+        for index in [usize::MAX, tree.elements().len(), callee_index+1, target.cst_index()] {
+            assert!(bind_local_function_callee(&directory, &result, index, current).is_err());
+        }
+        eprintln!("TEMP_389_TARGET target={target:?} binding={binding:?}");
+        if !source.contains("val x") { continue; }
+        let x = lower.declarations().iter().find(|d| d.raw_name() == "x").unwrap();
+        let p = lower.declarations().iter().find(|d| d.kind() == "VALUE_PARAMETER").unwrap();
+        let y_use = tree.elements().iter().position(|e| {
+            e.kind == "REFERENCE_EXPRESSION" && e.start == source.find("=x").unwrap() + 1
+        }).unwrap();
+        let site = reference_site(&lower, &result, current, y_use).unwrap();
+        let value = bind_local_value(&directory, &site, current).unwrap();
+        assert!(std::ptr::eq(value.target(), x));
+        assert_eq!(ktlsp_parser::integer_initializer_types::infer_integer_initializer(&value, current)
+            .unwrap().default_type(), ktlsp_parser::integer_initializer_types::IntegerType::Int);
+        let visible = visible_local_values(&directory, &result, y_use, current).unwrap();
+        assert_eq!(visible.values().iter().map(|d| d.raw_name()).collect::<Vec<_>>(), ["p", "x"]);
+        for (target, expected) in [(x, vec![source.find("=x").unwrap()+1]), (p, vec![source.find("=p").unwrap()+1])] {
+            let uses = local_value_occurrences(&directory, &result, LocalValueAnchor::Declaration(target), current).unwrap();
+            assert_eq!(uses.occurrences().iter().map(|s| s.range().start).collect::<Vec<_>>(), expected);
+        }
+        let unused = lower.declarations().iter().find(|d| d.raw_name() == "unused").unwrap();
+        assert!(local_value_occurrences(&directory, &result, LocalValueAnchor::Declaration(unused), current).unwrap().occurrences().is_empty());
+        let annotation = tree.elements().iter().position(|e| {
+            e.kind == "REFERENCE_EXPRESSION" && e.start == source.find("p: T").unwrap()+3
+        }).unwrap();
+        assert_eq!(bind_lexical_type_parameter(&directory, &result, annotation, current).unwrap().target().raw_name(), "T");
+        assert_eq!(guarded_local_value_rename(&directory, &result, LocalValueAnchor::Declaration(x), current, Some("target")).unwrap_err(), LocalBindingError::AmbiguousLocal);
+        let rename = guarded_local_value_rename(&directory, &result, LocalValueAnchor::Declaration(x), current, Some("fresh")).unwrap();
+        let mut edited = source.to_owned();
+        for range in std::iter::once(x.name_range()).chain(rename.occurrences().iter().map(|s| s.range())).rev() {
+            edited.replace_range(range, "fresh");
+        }
+        let updated = parse(&edited);
+        assert_eq!(bind_local_function_callee(&directory, &updated, callee_index, updated.snapshot()).unwrap_err(), LocalBindingError::InvalidOrigin);
+        let lower2 = lower_declarations(&updated, updated.snapshot()).unwrap();
+        let directory2 = build_regions(&lower2, &updated, updated.snapshot()).unwrap();
+        let tree2 = updated.tree_for(updated.snapshot()).unwrap();
+        let callee2 = tree2.elements().iter().position(|e| e.kind == "REFERENCE_EXPRESSION" && e.start == edited.rfind("target()").unwrap()).unwrap();
+        let rebound = bind_local_function_callee(&directory2, &updated, callee2, updated.snapshot()).unwrap();
+        assert_eq!(rebound.target().range(), target.range());
+        assert_eq!(rebound.target().name_range(), target.name_range());
+        assert_eq!(rebound.target().owner(), target.owner());
+        let fresh_use = tree2.elements().iter().position(|e| e.kind == "REFERENCE_EXPRESSION" && e.start == edited.find("=fresh").unwrap()+1).unwrap();
+        let fresh_site = reference_site(&lower2, &updated, updated.snapshot(), fresh_use).unwrap();
+        assert_eq!(bind_local_value(&directory2, &fresh_site, updated.snapshot()).unwrap().target().raw_name(), "fresh");
+    }
+}
+
+#[test]
+fn local_callee_competitors_shapes_and_unproved_calls_refuse_atomically() {
+    use ktlsp_parser::local_value_binding::bind_local_function_callee;
+    let _serial = functional::serial();
+    for source in [
+        "fun outer(){ target(); fun target(){} }",
+        "fun outer(){ fun target(){}; fun `target`(){}; target() }",
+        "fun outer(){ fun target(){}; fun target(x: Int){}; target() }",
+        "fun outer(){ fun target(){}; fun target(x: Int=1){}; target() }",
+        "fun outer(){ fun target(){}; fun <T> target(){}; target() }",
+        "fun outer(){ fun target(){}; class target; target() }",
+        "fun outer(){ fun target(){}; val `target`=1; target() }",
+        "fun outer(target: Int){ fun target(){}; target() }",
+        "fun outer(){ fun target(){ target() }; target() }",
+        "fun outer(){ fun target(){ val capture=1 }; target() }",
+        "fun outer(){ fun target(){}; target(1) }",
+        "fun outer(){ fun target(){}; target<Int>() }",
+        "fun outer(){ fun target(){}; target(){} }",
+        "fun outer(){ fun target(){}; target()() }",
+        "fun outer(){ fun target(){}; (target)() }",
+        "fun outer(){ fun target(){}; object.target() }",
+        "fun outer(){ fun target(){}; target(); unknown() }",
+        "fun outer(){ fun target(){}; val x=1; x(); val y=x }",
+        "fun outer(){ fun `🦀`(){}; val `🦀`=1; `🦀`() }",
+        "// 🦀\r\nfun outer(){ fun `target`(){}; fun target(){}; target() }\r\n",
+        "fun outer(){ fun target(){}; val é=1; target() }",
+    ] {
+        let result = parse(source);
+        let current = result.snapshot();
+        let Ok(lower) = lower_declarations(&result, current) else { continue; };
+        let Ok(directory) = build_regions(&lower, &result, current) else { continue; };
+        let tree = result.tree_for(current).unwrap();
+        for (index, _) in tree.elements().iter().enumerate().filter(|(_, e)| e.kind == "REFERENCE_EXPRESSION") {
+            assert!(bind_local_function_callee(&directory, &result, index, current).is_err(), "{source}");
+        }
+        for target in lower.declarations().iter().filter(|d| d.kind() == "PROPERTY") {
+            assert!(local_value_occurrences(&directory, &result, LocalValueAnchor::Declaration(target), current).is_err(), "{source}");
+        }
+    }
+}
+
+#[test]
+fn mixed_callees_keep_parameter_shadow_and_self_initializer_partitions() {
+    let _serial = functional::serial();
+    let source = "fun f(p: Int){ fun target(){}; val before=p; val p=p; target(); val after=p; val unused=1 }";
+    let parameter = source.find("p:").unwrap();
+    let local = source.find("val p").unwrap()+4;
+    accepted(source, 1, parameter..parameter+1, &[source.find("before=p").unwrap()+7..source.find("before=p").unwrap()+8, local+2..local+3]);
+    accepted(source, 4, local..local+1, &[source.find("after=p").unwrap()+6..source.find("after=p").unwrap()+7]);
+}
+
+#[test]
+fn mixed_rename_refuses_future_function_names_and_unresolved_value_capture() {
+    use ktlsp_parser::local_value_binding::guarded_local_value_rename;
+    let _serial = functional::serial();
+    for (source, name) in [
+        ("fun f(){ val x=1; val use=x; fun later(){} }", "later"),
+        ("fun f(){ fun target(){}; val x=1; target(); val use=external }", "external"),
+    ] {
+        let result = parse(source);
+        let current = result.snapshot();
+        let lower = lower_declarations(&result,current).unwrap();
+        let directory = build_regions(&lower,&result,current).unwrap();
+        let x = lower.declarations().iter().find(|d|d.raw_name()=="x").unwrap();
+        assert!(guarded_local_value_rename(&directory,&result,LocalValueAnchor::Declaration(x),current,Some(name)).is_err());
+    }
+}

@@ -157,3 +157,38 @@ identities and protocol records; an executable Rust-peer test exercises the
 actual recorder export → receiver → `Evidence::load` → existing replay path.
 Those mechanics do not authenticate GitHub origin, containment calibration or
 official behavior. No default native graph or workflow is changed here.
+
+## Observed step-log availability gate — runtime HOLD
+
+ROOT retained read-only prerequisite observations on 2026-10-16, not oracle,
+cancellation or containment evidence:
+
+- Completed original native job `116894807060`, head
+  `9dfbea4df035ffdc5d4c62e293d0974eee0fd504`: authenticated whole-job logs
+  were retrievable, but every documented zero-based step position `0–7`
+  returned HTTP404 with the explicit `2026-03-10` API version. This included
+  nonempty toolchain, Clippy and test steps. Response documentation URLs
+  identified the documented step-log endpoint.
+- While PR362 job `116906596240` was running, the already-completed Format
+  step returned HTTP404 both with and without the explicit API version.
+  Whole-job logs also returned HTTP404 while that job was running.
+
+The [primary endpoint documentation](https://docs.github.com/en/rest/actions/workflow-jobs#download-step-logs-for-a-workflow-run-job)
+agrees with the implemented route, API version and zero-based semantics; that
+does not establish actual endpoint availability or permissions for an original
+job. The reason for these 404 responses is **unproved**. Do not diagnose a
+specific permission, rollout or service condition from this observation alone.
+
+Consequently, original completed-step logs during the same still-running
+calibration job—and independent step-log retrieval after completion—remain
+unverified prerequisites. Missing evidence stays unauthenticated/UNKNOWN and
+blocks official START/success. Whole-job-only text, copied streams, matching
+prefixes/hashes, receipt booleans or fabricated runner markers are not substitutes.
+Passing synthetic/native CI does not establish this external custody prerequisite.
+
+Next research is limited to primary availability/authentication documentation and
+ROOT's retained response/request metadata or an upstream service clarification.
+These observations do not authorize new case retries, unrelated probes, workflow
+dispatch, privileged preparation, a JVM run or a weaker custody path. No receiver
+code change is justified by the presently unproved cause.
+

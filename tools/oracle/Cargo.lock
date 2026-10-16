@@ -94,6 +94,7 @@ dependencies = [
  "flate2",
  "ktlsp-protocol",
  "ktlsp-text",
+ "libc",
  "serde",
  "serde_json",
  "sha2",

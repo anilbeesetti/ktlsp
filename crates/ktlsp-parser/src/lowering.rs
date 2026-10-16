@@ -619,7 +619,10 @@ enum Tag {
 }
 impl Tag {
     fn selected(self) -> bool {
-        matches!(self, Self::Class | Self::Fun | Self::Property | Self::Parameter)
+        matches!(
+            self,
+            Self::Class | Self::Fun | Self::Property | Self::Parameter
+        )
     }
     fn keyword(self) -> Option<&'static str> {
         match self {
@@ -2359,12 +2362,17 @@ mod tests {
             let lower = lower(&result).unwrap();
             let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
             let target = &lower.declarations()[1];
-            let reference = result.parsed.elements.iter().position(|node| {
-                node.kind == "REFERENCE_EXPRESSION"
-                    && node.parent.is_some_and(|parent| {
-                        result.parsed.elements[parent].kind == "PROPERTY"
-                    })
-            }).unwrap();
+            let reference = result
+                .parsed
+                .elements
+                .iter()
+                .position(|node| {
+                    node.kind == "REFERENCE_EXPRESSION"
+                        && node
+                            .parent
+                            .is_some_and(|parent| result.parsed.elements[parent].kind == "PROPERTY")
+                })
+                .unwrap();
             let mut declaration_cost = None;
             for anchor in [
                 LocalValueAnchor::Declaration(target),
@@ -2372,30 +2380,52 @@ mod tests {
             ] {
                 let mut measured = ReferenceBudget::default();
                 assert_eq!(
-                    occurrences_with_budget(&directory, &result, anchor, result.snapshot(), &mut measured)
-                        .unwrap().occurrences().len(),
+                    occurrences_with_budget(
+                        &directory,
+                        &result,
+                        anchor,
+                        result.snapshot(),
+                        &mut measured
+                    )
+                    .unwrap()
+                    .occurrences()
+                    .len(),
                     2
                 );
                 if let Some(cost) = declaration_cost {
                     // Exactly enough for collection cannot also hide use lookup.
                     let mut shared = ReferenceBudget { work: WORK - cost };
                     assert_eq!(
-                        occurrences_with_budget(&directory, &result, anchor, result.snapshot(), &mut shared)
-                            .unwrap_err(),
+                        occurrences_with_budget(
+                            &directory,
+                            &result,
+                            anchor,
+                            result.snapshot(),
+                            &mut shared
+                        )
+                        .unwrap_err(),
                         LocalBindingError::Resource
                     );
                 } else {
                     declaration_cost = Some(measured.work);
                 }
-                let mut exact = ReferenceBudget { work: WORK - measured.work };
+                let mut exact = ReferenceBudget {
+                    work: WORK - measured.work,
+                };
                 occurrences_with_budget(&directory, &result, anchor, result.snapshot(), &mut exact)
                     .unwrap();
                 assert_eq!(exact.work, WORK);
                 for work in [WORK - measured.work + 1, usize::MAX] {
                     let mut exhausted = ReferenceBudget { work };
                     assert_eq!(
-                        occurrences_with_budget(&directory, &result, anchor, result.snapshot(), &mut exhausted)
-                            .unwrap_err(),
+                        occurrences_with_budget(
+                            &directory,
+                            &result,
+                            anchor,
+                            result.snapshot(),
+                            &mut exhausted
+                        )
+                        .unwrap_err(),
                         LocalBindingError::Resource
                     );
                 }

@@ -476,7 +476,9 @@ pub(super) fn occurrences_with_budget<'a>(
         }
     }
     let target_ordinal = target_ordinal.ok_or(LocalBindingError::InvalidOrigin)?;
-    let function_ordinal = target.owner().ok_or(LocalBindingError::UnsupportedContext)?;
+    let function_ordinal = target
+        .owner()
+        .ok_or(LocalBindingError::UnsupportedContext)?;
     let function = directory
         .lowered()
         .declarations()
@@ -487,15 +489,18 @@ pub(super) fn occurrences_with_budget<'a>(
         let mut body = None;
         for (ordinal, region) in directory.regions().iter().enumerate() {
             b.charge(1)?;
-            if region.introducer() == Some(function_ordinal) && b.equal(region.kind(), "BLOCK")? {
-                if body.replace((ordinal, region)).is_some() {
-                    return Err(LocalBindingError::InvalidOrigin);
-                }
+            if region.introducer() == Some(function_ordinal)
+                && b.equal(region.kind(), "BLOCK")?
+                && body.replace((ordinal, region)).is_some()
+            {
+                return Err(LocalBindingError::InvalidOrigin);
             }
         }
         body.ok_or(LocalBindingError::UnsupportedContext)?
     } else if b.equal(target.kind(), "PROPERTY")? {
-        let index = target.cst_parent_index().ok_or(LocalBindingError::UnsupportedContext)?;
+        let index = target
+            .cst_parent_index()
+            .ok_or(LocalBindingError::UnsupportedContext)?;
         find_body(directory, index, b)?
     } else {
         return Err(LocalBindingError::UnsupportedContext);
@@ -531,8 +536,8 @@ pub(super) fn occurrences_with_budget<'a>(
         .ok_or(LocalBindingError::UnsupportedSpelling)?;
     let (local, parameter_target) =
         value_candidates(directory, body_ordinal, body_index, function, spelling, b)?;
-    let unique = if parameter { parameter_target } else { local }
-        .ok_or(LocalBindingError::InvalidOrigin)?;
+    let unique =
+        if parameter { parameter_target } else { local }.ok_or(LocalBindingError::InvalidOrigin)?;
     if !std::ptr::eq(unique, target) {
         return Err(LocalBindingError::InvalidOrigin);
     }

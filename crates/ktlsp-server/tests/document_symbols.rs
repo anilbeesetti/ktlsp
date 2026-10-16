@@ -982,30 +982,67 @@ fn parameter_shadowing_and_native_providers_compose_over_paired_stdio() {
         json!({"jsonrpc":"2.0","method":"exit"}),
     ];
     let replies = Package::new(true).exchange(&messages);
-    println!("KTLSP_PARAMETER_COMPOSED_WIRE {}", json!({"source":source,"replies":replies}));
+    println!(
+        "KTLSP_PARAMETER_COMPOSED_WIRE {}",
+        json!({"source":source,"replies":replies})
+    );
     assert!(replies.iter().all(|reply| reply.get("id").is_some()));
-    assert!(replies.iter().map(|reply| &reply["id"])
-        .eq(messages.iter().filter_map(|message| message.get("id"))),
-        "original IDs exactly once; no duplicate or push output: {replies:?}");
+    assert!(
+        replies
+            .iter()
+            .map(|reply| &reply["id"])
+            .eq(messages.iter().filter_map(|message| message.get("id"))),
+        "original IDs exactly once; no duplicate or push output: {replies:?}"
+    );
     let expected = [
-        (json!("parameter-definition"), json!({"uri":URI,"range":parameter})),
-        (json!(u64::MAX), json!({"contents":{"kind":"plaintext","value":"`p🦀`: Long"},"range":before})),
-        (json!("parameter-declaration-references"), json!([
-            {"uri":URI,"range":parameter},{"uri":URI,"range":before},{"uri":URI,"range":self_initializer}
-        ])),
-        (json!("parameter-use-references"), json!([
-            {"uri":URI,"range":before},{"uri":URI,"range":self_initializer}
-        ])),
-        (json!("parameter-highlights"), json!([
-            {"range":parameter,"kind":3},{"range":before,"kind":2},{"range":self_initializer,"kind":2}
-        ])),
+        (
+            json!("parameter-definition"),
+            json!({"uri":URI,"range":parameter}),
+        ),
+        (
+            json!(u64::MAX),
+            json!({"contents":{"kind":"plaintext","value":"`p🦀`: Long"},"range":before}),
+        ),
+        (
+            json!("parameter-declaration-references"),
+            json!([
+                {"uri":URI,"range":parameter},{"uri":URI,"range":before},{"uri":URI,"range":self_initializer}
+            ]),
+        ),
+        (
+            json!("parameter-use-references"),
+            json!([
+                {"uri":URI,"range":before},{"uri":URI,"range":self_initializer}
+            ]),
+        ),
+        (
+            json!("parameter-highlights"),
+            json!([
+                {"range":parameter,"kind":3},{"range":before,"kind":2},{"range":self_initializer,"kind":2}
+            ]),
+        ),
         (json!("local-definition"), json!({"uri":URI,"range":local})),
-        (json!("local-references"), json!([{"uri":URI,"range":local},{"uri":URI,"range":after}])),
-        (json!("local-highlights"), json!([{"range":local,"kind":3},{"range":after,"kind":2}])),
+        (
+            json!("local-references"),
+            json!([{"uri":URI,"range":local},{"uri":URI,"range":after}]),
+        ),
+        (
+            json!("local-highlights"),
+            json!([{"range":local,"kind":3},{"range":after,"kind":2}]),
+        ),
         (json!("unused-references"), json!([])),
-        (json!("unused-declaration"), json!([{"uri":URI,"range":unused}])),
-        (json!("unused-highlights"), json!([{"range":unused,"kind":3}])),
-        (json!("other-function"), json!([{"uri":URI,"range":other},{"uri":URI,"range":other_use}])),
+        (
+            json!("unused-declaration"),
+            json!([{"uri":URI,"range":unused}]),
+        ),
+        (
+            json!("unused-highlights"),
+            json!([{"range":unused,"kind":3}]),
+        ),
+        (
+            json!("other-function"),
+            json!([{"uri":URI,"range":other},{"uri":URI,"range":other_use}]),
+        ),
         (json!("pull"), json!({"kind":"full","items":[]})),
         (json!("stop"), Value::Null),
     ];
@@ -1014,7 +1051,10 @@ fn parameter_shadowing_and_native_providers_compose_over_paired_stdio() {
         assert!(reply.get("error").is_none(), "{reply}");
         assert_eq!(reply["result"], payload, "{reply}");
     }
-    let annotation = replies.iter().find(|reply| reply["id"] == "annotation-is-not-value").unwrap();
+    let annotation = replies
+        .iter()
+        .find(|reply| reply["id"] == "annotation-is-not-value")
+        .unwrap();
     assert_eq!(annotation["error"]["code"], -32803);
     assert!(annotation.get("result").is_none());
 }

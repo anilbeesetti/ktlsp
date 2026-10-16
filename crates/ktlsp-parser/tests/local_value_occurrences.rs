@@ -34,7 +34,13 @@ fn accepted(
     assert!(lowered.errors().is_empty());
     let directory = build_regions(&lowered, &result, current).unwrap();
     let target = &lowered.declarations()[target_ordinal];
-    let found = local_value_occurrences(&directory, &result, LocalValueAnchor::Declaration(target), current).unwrap();
+    let found = local_value_occurrences(
+        &directory,
+        &result,
+        LocalValueAnchor::Declaration(target),
+        current,
+    )
+    .unwrap();
     assert!(std::ptr::eq(found.directory(), &directory));
     assert!(std::ptr::eq(found.target(), target));
     assert_eq!(found.target().name_range(), target_range);
@@ -57,12 +63,19 @@ fn accepted(
     }
     if let Some(first) = found.occurrences().first() {
         let by_use = local_value_occurrences(
-            &directory, &result,
-            LocalValueAnchor::ReferenceExpression(first.expression_index()), current
-        ).unwrap();
+            &directory,
+            &result,
+            LocalValueAnchor::ReferenceExpression(first.expression_index()),
+            current,
+        )
+        .unwrap();
         assert!(std::ptr::eq(by_use.target(), target));
         assert_eq!(
-            by_use.occurrences().iter().map(|site| site.range()).collect::<Vec<_>>(),
+            by_use
+                .occurrences()
+                .iter()
+                .map(|site| site.range())
+                .collect::<Vec<_>>(),
             ranges
         );
     }
@@ -143,10 +156,16 @@ fn production_origin_and_all_snapshot_dimensions_are_authenticated() {
     let directory = build_regions(&lowered, &result, snapshot).unwrap();
     let target = &lowered.declarations()[1];
     let tree = result.tree_for(snapshot).unwrap();
-    let reference = tree.elements().iter().position(|node| {
-        node.kind == "REFERENCE_EXPRESSION"
-            && node.parent.is_some_and(|parent| tree.elements()[parent].kind == "PROPERTY")
-    }).unwrap();
+    let reference = tree
+        .elements()
+        .iter()
+        .position(|node| {
+            node.kind == "REFERENCE_EXPRESSION"
+                && node
+                    .parent
+                    .is_some_and(|parent| tree.elements()[parent].kind == "PROPERTY")
+        })
+        .unwrap();
     let foreign_lower = lower_declarations(&result, snapshot).unwrap();
     let foreign_directory = build_regions(&foreign_lower, &result, snapshot).unwrap();
     assert_eq!(
@@ -160,17 +179,34 @@ fn production_origin_and_all_snapshot_dimensions_are_authenticated() {
         LocalBindingError::InvalidOrigin
     );
     assert_eq!(
-        local_value_occurrences(&foreign_directory, &result, LocalValueAnchor::Declaration(target), snapshot).unwrap_err(),
+        local_value_occurrences(
+            &foreign_directory,
+            &result,
+            LocalValueAnchor::Declaration(target),
+            snapshot
+        )
+        .unwrap_err(),
         LocalBindingError::InvalidOrigin
     );
     let foreign_result = parse(source);
     assert_eq!(
-        local_value_occurrences(&directory, &foreign_result, LocalValueAnchor::Declaration(target), snapshot).unwrap_err(),
+        local_value_occurrences(
+            &directory,
+            &foreign_result,
+            LocalValueAnchor::Declaration(target),
+            snapshot
+        )
+        .unwrap_err(),
         LocalBindingError::InvalidOrigin
     );
     assert_eq!(
-        local_value_occurrences(&directory, &foreign_result,
-            LocalValueAnchor::ReferenceExpression(reference), snapshot).unwrap_err(),
+        local_value_occurrences(
+            &directory,
+            &foreign_result,
+            LocalValueAnchor::ReferenceExpression(reference),
+            snapshot
+        )
+        .unwrap_err(),
         LocalBindingError::InvalidOrigin
     );
     for current in [
@@ -255,8 +291,13 @@ fn production_ambiguity_unsupported_context_and_resource_are_atomic() {
     let lowered = lower_declarations(&result, current).unwrap();
     let directory = build_regions(&lowered, &result, current).unwrap();
     assert_eq!(
-        local_value_occurrences(&directory, &result, LocalValueAnchor::Declaration(&lowered.declarations()[1]), current)
-            .unwrap_err(),
+        local_value_occurrences(
+            &directory,
+            &result,
+            LocalValueAnchor::Declaration(&lowered.declarations()[1]),
+            current
+        )
+        .unwrap_err(),
         LocalBindingError::Resource
     );
 }
@@ -287,7 +328,13 @@ fn typed_local_annotations_are_syntax_not_occurrences_or_inferred_types() {
             (5, source.rfind("= a").unwrap() + 2, Some(IntegerType::Int)),
         ] {
             let target = &lower.declarations()[ordinal];
-            let found = local_value_occurrences(&directory, &result, LocalValueAnchor::Declaration(target), snapshot).unwrap();
+            let found = local_value_occurrences(
+                &directory,
+                &result,
+                LocalValueAnchor::Declaration(target),
+                snapshot,
+            )
+            .unwrap();
             assert_eq!(found.occurrences().len(), 1);
             let site = &found.occurrences()[0];
             assert_eq!(site.range().start, reference);
@@ -375,13 +422,16 @@ fn typed_local_unsupported_annotations_refuse_the_whole_projection() {
 #[test]
 fn ordinary_parameters_and_preceding_locals_partition_shadowed_value_uses() {
     let _serial = functional::serial();
-    let source = "fun f(p: T, unused: Q) { val a = p; val p = p; val b = p }\nfun g(p: T) { val a = p }\n";
+    let source =
+        "fun f(p: T, unused: Q) { val a = p; val p = p; val b = p }\nfun g(p: T) { val a = p }\n";
     let p = source.find("p: T").unwrap();
     let unused = source.find("unused").unwrap();
     let local = source.find("val p").unwrap() + 4;
     let other = source.rfind("p: T").unwrap();
-    let uses: Vec<_> = source.match_indices("= p")
-        .map(|(offset, _)| offset + 2..offset + 3).collect();
+    let uses: Vec<_> = source
+        .match_indices("= p")
+        .map(|(offset, _)| offset + 2..offset + 3)
+        .collect();
     accepted(source, 1, p..p + 1, &uses[..2]);
     accepted(source, 2, unused..unused + 6, &[]);
     accepted(source, 4, local..local + 1, &uses[2..3]);
@@ -391,7 +441,12 @@ fn ordinary_parameters_and_preceding_locals_partition_shadowed_value_uses() {
     let unrelated = "fun f(p: T, `p`: Q) { val x = 1; val y = x }";
     let x = unrelated.find("x =").unwrap();
     let reference = unrelated.rfind("= x").unwrap() + 2;
-    accepted(unrelated, 3, x..x + 1, &[reference..reference + 1]);
+    accepted(
+        unrelated,
+        3,
+        x..x + 1,
+        std::slice::from_ref(&(reference..reference + 1)),
+    );
 }
 
 #[test]
@@ -404,35 +459,52 @@ fn quoted_crlf_parameters_keep_header_ownership_and_exclude_type_references() {
     let result = parse(source);
     let current = result.snapshot();
     let tree = result.tree_for(current).unwrap();
-    println!("KTLSP_PARAMETER_PRODUCER_CST {}", serde_json::json!({
-        "source":source,
-        "nodes":tree.elements().iter().enumerate().filter(|(_, node)| {
-            matches!(node.kind.as_str(), "FUN" | "BLOCK" | "PROPERTY" |
-                "VALUE_PARAMETER_LIST" | "VALUE_PARAMETER" | "TYPE_REFERENCE" |
-                "USER_TYPE" | "REFERENCE_EXPRESSION" | "IDENTIFIER")
-        }).map(|(index,node)| serde_json::json!([
-            index,node.kind,node.token,node.start,node.end,node.parent,node.subtree_end
-        ])).collect::<Vec<_>>()
-    }));
+    println!(
+        "KTLSP_PARAMETER_PRODUCER_CST {}",
+        serde_json::json!({
+            "source":source,
+            "nodes":tree.elements().iter().enumerate().filter(|(_, node)| {
+                matches!(node.kind.as_str(), "FUN" | "BLOCK" | "PROPERTY" |
+                    "VALUE_PARAMETER_LIST" | "VALUE_PARAMETER" | "TYPE_REFERENCE" |
+                    "USER_TYPE" | "REFERENCE_EXPRESSION" | "IDENTIFIER")
+            }).map(|(index,node)| serde_json::json!([
+                index,node.kind,node.token,node.start,node.end,node.parent,node.subtree_end
+            ])).collect::<Vec<_>>()
+        })
+    );
     let lowered = lower_declarations(&result, current).unwrap();
     let directory = build_regions(&lowered, &result, current).unwrap();
-    println!("KTLSP_PARAMETER_PRODUCER_IDENTITY {}", serde_json::json!({
-        "declarations":lowered.declarations().iter().enumerate().map(|(ordinal,d)| {
-            serde_json::json!([ordinal,d.kind(),d.raw_name(),
-                [d.range().start,d.range().end],[d.name_range().start,d.name_range().end],
-                d.cst_parent_kind(),d.cst_parent_index(),d.owner(),
-                directory.memberships()[ordinal].region()])
-        }).collect::<Vec<_>>()
-    }));
-    accepted(source, 1, declaration..declaration + name.len(),
-        &[reference..reference + name.len()]);
+    println!(
+        "KTLSP_PARAMETER_PRODUCER_IDENTITY {}",
+        serde_json::json!({
+            "declarations":lowered.declarations().iter().enumerate().map(|(ordinal,d)| {
+                serde_json::json!([ordinal,d.kind(),d.raw_name(),
+                    [d.range().start,d.range().end],[d.name_range().start,d.name_range().end],
+                    d.cst_parent_kind(),d.cst_parent_index(),d.owner(),
+                    directory.memberships()[ordinal].region()])
+            }).collect::<Vec<_>>()
+        })
+    );
+    accepted(
+        source,
+        1,
+        declaration..declaration + name.len(),
+        std::slice::from_ref(&(reference..reference + name.len())),
+    );
     for (index, node) in tree.elements().iter().enumerate() {
-        if node.kind == "REFERENCE_EXPRESSION" && node.parent.is_some_and(
-            |parent| tree.elements()[parent].kind == "USER_TYPE"
-        ) {
+        if node.kind == "REFERENCE_EXPRESSION"
+            && node
+                .parent
+                .is_some_and(|parent| tree.elements()[parent].kind == "USER_TYPE")
+        {
             assert_eq!(
-                local_value_occurrences(&directory, &result,
-                    LocalValueAnchor::ReferenceExpression(index), current).unwrap_err(),
+                local_value_occurrences(
+                    &directory,
+                    &result,
+                    LocalValueAnchor::ReferenceExpression(index),
+                    current
+                )
+                .unwrap_err(),
                 LocalBindingError::UnsupportedContext
             );
         }
@@ -451,8 +523,13 @@ fn parameter_ambiguity_and_unsupported_headers_never_publish_partial_bindings() 
         let lowered = lower_declarations(&result, current).unwrap();
         let directory = build_regions(&lowered, &result, current).unwrap();
         assert_eq!(
-            local_value_occurrences(&directory, &result,
-                LocalValueAnchor::Declaration(&lowered.declarations()[1]), current).unwrap_err(),
+            local_value_occurrences(
+                &directory,
+                &result,
+                LocalValueAnchor::Declaration(&lowered.declarations()[1]),
+                current
+            )
+            .unwrap_err(),
             LocalBindingError::AmbiguousLocal,
             "{source}"
         );
@@ -475,6 +552,9 @@ fn parameter_ambiguity_and_unsupported_headers_never_publish_partial_bindings() 
         "fun f(p: T, , q: Q) { val use = p }",
     ] {
         let result = parse(source);
-        assert!(lower_declarations(&result, result.snapshot()).is_err(), "{source}");
+        assert!(
+            lower_declarations(&result, result.snapshot()).is_err(),
+            "{source}"
+        );
     }
 }

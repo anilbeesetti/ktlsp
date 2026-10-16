@@ -86,6 +86,57 @@ fn unicode_categories_and_soft_keywords() {
 }
 
 #[test]
+fn mixed_identifier_runs_preserve_categories_boundaries_and_byte_spans() {
+    use TokenKind::*;
+    let source = "aZ_09éǅː名𐐀٢z,e\u{301}x;a²b as? as名? class class9 _";
+    let expected = [
+        (Identifier, "aZ_09éǅː名𐐀٢z"),
+        (Comma, ","),
+        (Identifier, "e"),
+        (Unknown, "\u{301}"),
+        (Identifier, "x"),
+        (Semicolon, ";"),
+        (Identifier, "a"),
+        (Unknown, "²"),
+        (Identifier, "b"),
+        (Whitespace, " "),
+        (Operator, "as?"),
+        (Whitespace, " "),
+        (Identifier, "as名"),
+        (Operator, "?"),
+        (Whitespace, " "),
+        (Keyword, "class"),
+        (Whitespace, " "),
+        (Identifier, "class9"),
+        (Whitespace, " "),
+        (Identifier, "_"),
+    ];
+    let result = lex(source).unwrap();
+    partition(source, &result);
+    assert_eq!(result.tokens.len(), expected.len());
+    let mut offset = 0;
+    let mut rejected_spans = Vec::new();
+    for (token, (kind, text)) in result.tokens.iter().zip(expected) {
+        let end = offset + text.len();
+        assert_eq!((token.kind, token.start, token.end), (kind, offset, end));
+        assert_eq!(&source[token.start..token.end], text);
+        if kind == Unknown {
+            rejected_spans.push((offset, end));
+        }
+        offset = end;
+    }
+    assert_eq!(offset, source.len());
+    assert_eq!(
+        result
+            .diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.start, diagnostic.end))
+            .collect::<Vec<_>>(),
+        rejected_spans
+    );
+}
+
+#[test]
 fn templates_are_opaque_including_nested_strings_comments_and_raw_strings() {
     let fixtures = [
         r#""${f("x", { 1 })}""#,

@@ -293,3 +293,164 @@ fn production_reference_initializer_preserves_declarations_and_regions() {
     assert_eq!(binding.target().range(), 10..19);
     assert_eq!(binding.target().name_range(), 14..15);
 }
+
+#[test]
+fn production_package_import_components_preserve_binding_and_origin() {
+    let _serial = functional::serial();
+    for newline in ["\n", "\r\n"] {
+        let source = [
+            "package p.`🦀.e\u{301}`;",
+            "import a.b",
+            "import c.d.*;",
+            "import e.`f.g` as `h.i`",
+            "import a.b",
+            "fun f() { val x = 1; val y = x }",
+            "",
+        ]
+        .join(newline);
+        let snapshot =
+            SourceSnapshot::new("headers", 7, FileKind::Source, source.as_str()).unwrap();
+        let parser = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
+        let result = parser
+            .parse_snapshot(&snapshot, &AtomicBool::new(false))
+            .unwrap();
+        let parsed = result.tree_for(&snapshot).unwrap();
+        let lowered = lower_declarations(&result, &snapshot).unwrap();
+        assert!(std::ptr::eq(lowered.snapshot(), result.snapshot()));
+        let package = lowered.package().unwrap();
+        assert_eq!(&source[package.range()], "package p.`🦀.e\u{301}`;");
+        assert_eq!(package.name().raw_spelling(), "p.`🦀.e\u{301}`");
+        assert_eq!(package.name().range(), 8..20);
+        let components = package.name().segments().collect::<Vec<_>>();
+        assert_eq!(
+            components
+                .iter()
+                .map(|s| (s.raw_spelling(), s.semantic_spelling(), s.range()))
+                .collect::<Vec<_>>(),
+            [("p", "p", 8..9), ("`🦀.e\u{301}`", "🦀.e\u{301}", 10..20)]
+        );
+        assert_eq!(
+            parsed.position(components[1].range().end).unwrap(),
+            ktlsp_text::Position {
+                line: 0,
+                character: 17
+            }
+        );
+        assert_eq!(lowered.imports().len(), 4);
+        let expected = [
+            ("import a.b", ["a", "b"], false, None),
+            ("import c.d.*;", ["c", "d"], true, None),
+            ("import e.`f.g` as `h.i`", ["e", "f.g"], false, Some("h.i")),
+            ("import a.b", ["a", "b"], false, None),
+        ];
+        let mut start = "package p.`🦀.e\u{301}`;".len() + newline.len();
+        for (directive, (raw, segments, on_demand, alias)) in lowered.imports().iter().zip(expected)
+        {
+            assert_eq!(directive.range(), start..start + raw.len());
+            assert_eq!(&source[directive.range()], raw);
+            assert_eq!(
+                directive
+                    .name()
+                    .segments()
+                    .map(|s| s.semantic_spelling())
+                    .collect::<Vec<_>>(),
+                segments
+            );
+            assert_eq!(directive.on_demand(), on_demand);
+            assert_eq!(directive.alias().map(|s| s.semantic_spelling()), alias);
+            if let Some(s) = directive.alias() {
+                assert_eq!(&source[s.range()], s.raw_spelling());
+                assert_eq!(
+                    s.raw_spelling().as_ptr(),
+                    parsed.source()[s.range()].as_ptr()
+                );
+            }
+            for component in directive.name().segments() {
+                assert_eq!(&source[component.range()], component.raw_spelling());
+                assert_eq!(
+                    component.raw_spelling().as_ptr(),
+                    parsed.source()[component.range()].as_ptr()
+                );
+            }
+            assert_eq!(
+                parsed.elements()[directive.cst_index()].kind,
+                "IMPORT_DIRECTIVE"
+            );
+            start += raw.len() + newline.len();
+        }
+        assert_eq!(
+            lowered
+                .declarations()
+                .iter()
+                .map(|d| (d.raw_name(), d.owner()))
+                .collect::<Vec<_>>(),
+            [("f", None), ("x", Some(0)), ("y", Some(0))]
+        );
+        let directory =
+            ktlsp_parser::structural_regions::build_regions(&lowered, &result, &snapshot).unwrap();
+        assert_eq!(directory.regions().len(), 2);
+        let reference_start = source.rfind("x }").unwrap();
+        let index = parsed
+            .elements()
+            .iter()
+            .position(|e| {
+                !e.token && e.kind == "REFERENCE_EXPRESSION" && e.start == reference_start
+            })
+            .unwrap();
+        let site =
+            ktlsp_parser::lowering::reference_site(&lowered, &result, &snapshot, index).unwrap();
+        assert!(std::ptr::eq(site.origin(), &lowered));
+        assert_eq!(site.range(), reference_start..reference_start + 1);
+        let binding =
+            ktlsp_parser::local_value_binding::bind_local_value(&directory, &site, &snapshot)
+                .unwrap();
+        assert!(std::ptr::eq(binding.target(), &lowered.declarations()[1]));
+        let other = parser
+            .parse_snapshot(&snapshot, &AtomicBool::new(false))
+            .unwrap();
+        assert!(matches!(
+            ktlsp_parser::lowering::reference_site(&lowered, &other, &snapshot, index),
+            Err(ktlsp_parser::lowering::ReferenceSiteError::InvalidOrigin)
+        ));
+        let stale = SourceSnapshot::new("headers", 8, FileKind::Source, source.as_str()).unwrap();
+        assert!(matches!(
+            lower_declarations(&result, &stale),
+            Err(ktlsp_parser::lowering::LoweringError::StaleSnapshot)
+        ));
+        if newline == "\r\n" {
+            assert!(parsed.position(source.find('\r').unwrap() + 1).is_err());
+        }
+    }
+    std::io::Write::write_all(
+        &mut std::io::stderr(),
+        b"PACKAGE_IMPORT_PRODUCTION_BINDING_PROOF\n",
+    )
+    .unwrap();
+}
+
+#[test]
+fn production_malformed_and_unsupported_header_spellings_refuse_whole_projection() {
+    let _serial = functional::serial();
+    let parser = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
+    for header in [
+        "package a..b",
+        "import a.",
+        "import a.* as b",
+        "import a as",
+        "import é",
+        "import _",
+    ] {
+        let source = format!("{header}\nfun f() {{ val x = 1; val y = x }}\n");
+        let snapshot = SourceSnapshot::new("bad-headers", 1, FileKind::Source, source).unwrap();
+        let result = parser
+            .parse_snapshot(&snapshot, &AtomicBool::new(false))
+            .unwrap();
+        assert!(
+            matches!(
+                lower_declarations(&result, &snapshot),
+                Err(ktlsp_parser::lowering::LoweringError::Unsupported { .. })
+            ),
+            "{header}"
+        );
+    }
+}

@@ -74,8 +74,7 @@ pub fn decode<'a>(
     code: &'a CodeBody<'_>,
     limits: Limits,
 ) -> Result<Vec<CodeTypeAnnotationAttribute<'a>>> {
-    if !crate::supported_class_version(class.major, class.minor)
-    {
+    if !crate::supported_class_version(class.major, class.minor) {
         return Err(Error::UnsupportedVersion {
             major: class.major,
             minor: class.minor,

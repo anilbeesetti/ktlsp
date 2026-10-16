@@ -549,6 +549,14 @@ fn modern_nonempty_nesting_keeps_encoded_relationships() {
         c.major = major;
         let decoded = nesting::decode(&c).unwrap();
         let row = &decoded.inner_classes.as_ref().unwrap()[0];
-        assert_eq!((row.inner.index, row.outer.unwrap().index, row.name_index, row.access_flags), (2, 4, Some(9), 0x800a));
+        assert_eq!(
+            (
+                row.inner.index,
+                row.outer.unwrap().index,
+                row.name_index,
+                row.access_flags
+            ),
+            (2, 4, Some(9), 0x800a)
+        );
     }
 }

@@ -753,6 +753,9 @@ fn modern_nonempty_parameter_annotations_preserve_encoded_positions() {
         let out = decode(&c).unwrap();
         assert_eq!(out.methods[0].parameters[0].parameters.len(), 2);
         assert!(out.methods[0].parameters[0].parameters[0].is_empty());
-        assert_eq!(out.methods[0].parameters[0].parameters[1][0].elements[0].value, Value::String(&[0, 0xd800, 97, 0xdc00]));
+        assert_eq!(
+            out.methods[0].parameters[0].parameters[1][0].elements[0].value,
+            Value::String(&[0, 0xd800, 97, 0xdc00])
+        );
     }
 }

@@ -419,8 +419,7 @@ pub fn decode_signatures_with_limits<'a>(
     class: &'a ClassFile<'_>,
     limits: Limits,
 ) -> Result<Signatures<'a>> {
-    if !crate::supported_class_version(class.major, class.minor)
-    {
+    if !crate::supported_class_version(class.major, class.minor) {
         return Err(Error::UnsupportedVersion {
             major: class.major,
             minor: class.minor,

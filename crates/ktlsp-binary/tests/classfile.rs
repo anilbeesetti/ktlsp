@@ -471,7 +471,11 @@ fn modern_late_framing_opaque_attributes_and_resource_boundaries() {
         assert_eq!(attr.as_ptr(), bytes[bytes.len() - 5..].as_ptr());
         // Includes the final member, its attribute header/payload and class attrs.
         for end in bytes.len() - 19..bytes.len() {
-            assert_eq!(parse_class(&bytes[..end]).unwrap_err(), Error::Truncated, "{major}: {end}");
+            assert_eq!(
+                parse_class(&bytes[..end]).unwrap_err(),
+                Error::Truncated,
+                "{major}: {end}"
+            );
         }
         let mut huge = bytes.clone();
         let at = huge.len() - 9;
@@ -479,18 +483,29 @@ fn modern_late_framing_opaque_attributes_and_resource_boundaries() {
         assert_eq!(parse_class(&huge).unwrap_err(), Error::Truncated);
         let mut extra = bytes.clone();
         extra.push(0);
-        assert_eq!(parse_class(&extra).unwrap_err(), Error::Malformed("trailing bytes"));
+        assert_eq!(
+            parse_class(&extra).unwrap_err(),
+            Error::Malformed("trailing bytes")
+        );
         let mut over = bytes;
         over.resize(MAX_BYTES + 1, 0);
         assert_eq!(parse_class(&over).unwrap_err(), Error::Limit("bytes"));
         let mut records = Vec::new();
         u2(&mut records, MAX_RECORDS as u16);
-        assert_eq!(parse_class(&at_version(Pool::base().file(&records), major)).unwrap_err(), Error::Limit("records"));
+        assert_eq!(
+            parse_class(&at_version(Pool::base().file(&records), major)).unwrap_err(),
+            Error::Limit("records")
+        );
         let mut pool = Pool::base();
         let name = pool.text(&vec![b'a'; 65535]);
         let desc = pool.text(b"I");
-        for _ in 0..1100 { pool.two(12, name, desc); }
-        assert_eq!(parse_class(&at_version(pool.file(&[0;8]), major)).unwrap_err(), Error::Limit("validation work"));
+        for _ in 0..1100 {
+            pool.two(12, name, desc);
+        }
+        assert_eq!(
+            parse_class(&at_version(pool.file(&[0; 8]), major)).unwrap_err(),
+            Error::Limit("validation work")
+        );
     }
 }
 
@@ -500,86 +515,167 @@ fn modern_constant_pool_and_descriptor_special_name_controls() {
         for tag in [0, 2, 13, 14, 21, 255] {
             let mut pool = Pool::base();
             pool.entry(tag, &[]);
-            assert_eq!(parse_class(&at_version(pool.file(&[0;8]), major)).unwrap_err(), Error::UnsupportedTag(tag));
+            assert_eq!(
+                parse_class(&at_version(pool.file(&[0; 8]), major)).unwrap_err(),
+                Error::UnsupportedTag(tag)
+            );
         }
-        for (tag, target) in [(7,0),(7,2),(8,0),(16,2),(19,2),(20,2)] {
-            let mut pool = Pool::base(); pool.one(tag,target);
-            assert!(parse_class(&at_version(pool.file(&[0;8]), major)).is_err());
+        for (tag, target) in [(7, 0), (7, 2), (8, 0), (16, 2), (19, 2), (20, 2)] {
+            let mut pool = Pool::base();
+            pool.one(tag, target);
+            assert!(parse_class(&at_version(pool.file(&[0; 8]), major)).is_err());
         }
-        for tag in [5,6] {
-            let mut pool = Pool::base(); pool.entry(tag,&[0;8]); pool.slots -= 1;
-            assert_eq!(parse_class(&at_version(pool.file(&[0;8]), major)).unwrap_err(), Error::Malformed("wide constant slot"));
+        for tag in [5, 6] {
+            let mut pool = Pool::base();
+            pool.entry(tag, &[0; 8]);
+            pool.slots -= 1;
+            assert_eq!(
+                parse_class(&at_version(pool.file(&[0; 8]), major)).unwrap_err(),
+                Error::Malformed("wide constant slot")
+            );
         }
-        for text in [&[0][..], &[0xc0,0x81], &[0xf0,0x90,0x80,0x80]] {
-            let mut pool = Pool::base(); pool.text(text);
-            assert_eq!(parse_class(&at_version(pool.file(&[0;8]), major)).unwrap_err(), Error::Malformed("modified UTF8"));
+        for text in [&[0][..], &[0xc0, 0x81], &[0xf0, 0x90, 0x80, 0x80]] {
+            let mut pool = Pool::base();
+            pool.text(text);
+            assert_eq!(
+                parse_class(&at_version(pool.file(&[0; 8]), major)).unwrap_err(),
+                Error::Malformed("modified UTF8")
+            );
         }
         let mut pool = Pool::base();
-        let utf = pool.text(&[0xc0,0x80,0xed,0xa0,0x80]);
-        let long = pool.entry(5,&[0;8]);
-        let bytes = at_version(pool.file(&[0;8]), major);
+        let utf = pool.text(&[0xc0, 0x80, 0xed, 0xa0, 0x80]);
+        let long = pool.entry(5, &[0; 8]);
+        let bytes = at_version(pool.file(&[0; 8]), major);
         let parsed = parse_class(&bytes).unwrap();
-        assert_eq!(parsed.utf16(utf).unwrap(), [0,0xd800]);
-        assert_eq!(parsed.constants[usize::from(long)+1], Constant::Unusable);
-        for (rank, ok) in [(255,true),(256,false)] {
-            let desc = [vec![b'[';rank], vec![b'I']].concat();
-            assert_eq!(parse_class(&at_version(member_file(&desc,false,1,b"f"),major)).is_ok(),ok);
+        assert_eq!(parsed.utf16(utf).unwrap(), [0, 0xd800]);
+        assert_eq!(parsed.constants[usize::from(long) + 1], Constant::Unusable);
+        for (rank, ok) in [(255, true), (256, false)] {
+            let desc = [vec![b'['; rank], vec![b'I']].concat();
+            assert_eq!(
+                parse_class(&at_version(member_file(&desc, false, 1, b"f"), major)).is_ok(),
+                ok
+            );
         }
-        for (slots, flags, ok) in [(254,1,true),(255,1,false),(255,9,true),(256,9,false)] {
-            let desc = [vec![b'('],vec![b'I';slots],b")V".to_vec()].concat();
-            assert_eq!(parse_class(&at_version(member_file(&desc,true,flags,b"m"),major)).is_ok(),ok);
-        }
-        for (longs, ints, flags, ok) in [(127,0,1,true),(127,1,1,false),(127,1,9,true),(128,0,9,false)] {
-            let desc = [vec![b'('],vec![b'J';longs],vec![b'I';ints],b")V".to_vec()].concat();
-            assert_eq!(parse_class(&at_version(member_file(&desc,true,flags,b"m"),major)).is_ok(),ok);
-        }
-        for (name,desc,flags,ok) in [
-            (b"<init>".as_slice(),b"()V".as_slice(),1,true),
-            (b"<init>",b"()I",1,false),(b"<clinit>",b"()V",8,true),
-            (b"<clinit>",b"(I)V",8,false),(b"<clinit>",b"()V",0,false),
-            (b"m",b"(Qpkg/C;)V",9,false),(b"m",b"(V)V",9,false),
+        for (slots, flags, ok) in [
+            (254, 1, true),
+            (255, 1, false),
+            (255, 9, true),
+            (256, 9, false),
         ] {
-            assert_eq!(parse_class(&at_version(member_file(desc,true,flags,name),major)).is_ok(),ok);
+            let desc = [vec![b'('], vec![b'I'; slots], b")V".to_vec()].concat();
+            assert_eq!(
+                parse_class(&at_version(member_file(&desc, true, flags, b"m"), major)).is_ok(),
+                ok
+            );
+        }
+        for (longs, ints, flags, ok) in [
+            (127, 0, 1, true),
+            (127, 1, 1, false),
+            (127, 1, 9, true),
+            (128, 0, 9, false),
+        ] {
+            let desc = [
+                vec![b'('],
+                vec![b'J'; longs],
+                vec![b'I'; ints],
+                b")V".to_vec(),
+            ]
+            .concat();
+            assert_eq!(
+                parse_class(&at_version(member_file(&desc, true, flags, b"m"), major)).is_ok(),
+                ok
+            );
+        }
+        for (name, desc, flags, ok) in [
+            (b"<init>".as_slice(), b"()V".as_slice(), 1, true),
+            (b"<init>", b"()I", 1, false),
+            (b"<clinit>", b"()V", 8, true),
+            (b"<clinit>", b"(I)V", 8, false),
+            (b"<clinit>", b"()V", 0, false),
+            (b"m", b"(Qpkg/C;)V", 9, false),
+            (b"m", b"(V)V", 9, false),
+        ] {
+            assert_eq!(
+                parse_class(&at_version(member_file(desc, true, flags, name), major)).is_ok(),
+                ok
+            );
         }
         for (tag, method_name, desc, kind, ok) in [
-            (10,b"<init>".as_slice(),b"()V".as_slice(),8,true),
-            (10,b"<init>",b"()V",6,false),(10,b"m",b"()V",8,false),
-            (11,b"<init>",b"()V",9,false),(10,b"<init>",b"()I",8,false),
-            (10,b"<clinit>",b"()V",6,false),(11,b"m",b"()V",6,true),
+            (10, b"<init>".as_slice(), b"()V".as_slice(), 8, true),
+            (10, b"<init>", b"()V", 6, false),
+            (10, b"m", b"()V", 8, false),
+            (11, b"<init>", b"()V", 9, false),
+            (10, b"<init>", b"()I", 8, false),
+            (10, b"<clinit>", b"()V", 6, false),
+            (11, b"m", b"()V", 6, true),
         ] {
             let mut pool = Pool::base();
-            let n = pool.text(method_name); let d = pool.text(desc);
-            let nat = pool.two(12,n,d); let target = pool.two(tag,2,nat);
-            let mut handle=vec![kind]; u2(&mut handle,target); pool.entry(15,&handle);
-            assert_eq!(parse_class(&at_version(pool.file(&[0;8]),major)).is_ok(),ok);
+            let n = pool.text(method_name);
+            let d = pool.text(desc);
+            let nat = pool.two(12, n, d);
+            let target = pool.two(tag, 2, nat);
+            let mut handle = vec![kind];
+            u2(&mut handle, target);
+            pool.entry(15, &handle);
+            assert_eq!(
+                parse_class(&at_version(pool.file(&[0; 8]), major)).is_ok(),
+                ok
+            );
         }
     }
 }
 
 #[test]
 fn tag_introduction_floors_and_interface_handle_boundary_are_unchanged() {
-    for (tag, floor) in [(15,51),(16,51),(18,51),(19,53),(20,53),(17,55)] {
-        for major in [floor-1,floor,67,68,69] {
-            let mut pool=Pool::base();
-            let n=pool.text(b"m"); let d=pool.text(if tag==17 { b"I" } else { b"()V" });
-            let nat=pool.two(12,n,d);
+    for (tag, floor) in [(15, 51), (16, 51), (18, 51), (19, 53), (20, 53), (17, 55)] {
+        for major in [floor - 1, floor, 67, 68, 69] {
+            let mut pool = Pool::base();
+            let n = pool.text(b"m");
+            let d = pool.text(if tag == 17 { b"I" } else { b"()V" });
+            let nat = pool.two(12, n, d);
             match tag {
-                15 => { let target=pool.two(10,2,nat); let mut h=vec![6];u2(&mut h,target);pool.entry(15,&h); }
-                16 => { pool.one(16,d); }
-                17|18 => { pool.two(tag,0,nat); }
-                19|20 => { pool.one(tag,n); }
+                15 => {
+                    let target = pool.two(10, 2, nat);
+                    let mut h = vec![6];
+                    u2(&mut h, target);
+                    pool.entry(15, &h);
+                }
+                16 => {
+                    pool.one(16, d);
+                }
+                17 | 18 => {
+                    pool.two(tag, 0, nat);
+                }
+                19 | 20 => {
+                    pool.one(tag, n);
+                }
                 _ => unreachable!(),
             }
-            let bytes=at_version(pool.file(&[0;8]),major);
-            if major<floor { assert_eq!(parse_class(&bytes).unwrap_err(),Error::Malformed("constant tag version")); }
-            else { assert!(parse_class(&bytes).is_ok(),"{tag}/{major}"); }
+            let bytes = at_version(pool.file(&[0; 8]), major);
+            if major < floor {
+                assert_eq!(
+                    parse_class(&bytes).unwrap_err(),
+                    Error::Malformed("constant tag version")
+                );
+            } else {
+                assert!(parse_class(&bytes).is_ok(), "{tag}/{major}");
+            }
         }
     }
-    for major in [51,52,68,69] {
-        for kind in [6,7] {
-            let mut pool=Pool::base();let n=pool.text(b"m");let d=pool.text(b"()V");let nat=pool.two(12,n,d);
-            let target=pool.two(11,2,nat);let mut h=vec![kind];u2(&mut h,target);pool.entry(15,&h);
-            assert_eq!(parse_class(&at_version(pool.file(&[0;8]),major)).is_ok(),major>=52);
+    for major in [51, 52, 68, 69] {
+        for kind in [6, 7] {
+            let mut pool = Pool::base();
+            let n = pool.text(b"m");
+            let d = pool.text(b"()V");
+            let nat = pool.two(12, n, d);
+            let target = pool.two(11, 2, nat);
+            let mut h = vec![kind];
+            u2(&mut h, target);
+            pool.entry(15, &h);
+            assert_eq!(
+                parse_class(&at_version(pool.file(&[0; 8]), major)).is_ok(),
+                major >= 52
+            );
         }
     }
 }

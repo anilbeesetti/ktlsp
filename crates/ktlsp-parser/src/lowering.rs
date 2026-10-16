@@ -1971,20 +1971,42 @@ mod tests {
             for name in [None, Some("Fresh")] {
                 let mut measured = ReferenceBudget::default();
                 let found = type_rename_with_budget(
-                    &directory, &result, anchor, result.snapshot(), name, &mut measured,
-                ).unwrap();
-                assert_eq!(found.occurrences().len(), usize::from(found.target().raw_name() == "T"));
-                let mut exact = ReferenceBudget { work: WORK - measured.work };
+                    &directory,
+                    &result,
+                    anchor,
+                    result.snapshot(),
+                    name,
+                    &mut measured,
+                )
+                .unwrap();
+                assert_eq!(
+                    found.occurrences().len(),
+                    usize::from(found.target().raw_name() == "T")
+                );
+                let mut exact = ReferenceBudget {
+                    work: WORK - measured.work,
+                };
                 type_rename_with_budget(
-                    &directory, &result, anchor, result.snapshot(), name, &mut exact,
-                ).unwrap();
+                    &directory,
+                    &result,
+                    anchor,
+                    result.snapshot(),
+                    name,
+                    &mut exact,
+                )
+                .unwrap();
                 assert_eq!(exact.work, WORK);
                 for work in [WORK - measured.work + 1, WORK - 1, usize::MAX] {
                     assert_eq!(
                         type_rename_with_budget(
-                            &directory, &result, anchor, result.snapshot(), name,
+                            &directory,
+                            &result,
+                            anchor,
+                            result.snapshot(),
+                            name,
                             &mut ReferenceBudget { work },
-                        ).unwrap_err(),
+                        )
+                        .unwrap_err(),
                         LocalBindingError::Resource,
                     );
                 }

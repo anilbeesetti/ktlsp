@@ -978,6 +978,14 @@ fn modern_authored_code_keeps_exact_tightened_limits() {
         let bodies = decode(&c, unlimited()).unwrap();
         assert_eq!(bodies[0].as_ref().unwrap().bytecode, [0xb1]);
         assert_eq!(bodies[0].as_ref().unwrap().raw.as_ptr(), raw.as_ptr());
-        cuts(&c, Limits { bytes: 13, records: 2, work: 22, owned_bytes: storage(1, 0, 0) });
+        cuts(
+            &c,
+            Limits {
+                bytes: 13,
+                records: 2,
+                work: 22,
+                owned_bytes: storage(1, 0, 0),
+            },
+        );
     }
 }

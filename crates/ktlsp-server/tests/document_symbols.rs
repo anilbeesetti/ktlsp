@@ -1537,11 +1537,15 @@ fn apply_original_rename(source: &str, response: &Value, uri: &str, version: i32
     }
     // Workspace edits use original coordinates; reverse order turns them into
     // the sequential native TextChange batch without inventing replacement text.
-    let changes = edits.iter().rev().map(|edit| ktlsp_text::TextChange {
-        range: Some(serde_json::from_value(edit["range"].clone()).unwrap()),
-        range_length: None,
-        text: edit["newText"].as_str().unwrap().to_owned(),
-    }).collect::<Vec<_>>();
+    let changes = edits
+        .iter()
+        .rev()
+        .map(|edit| ktlsp_text::TextChange {
+            range: Some(serde_json::from_value(edit["range"].clone()).unwrap()),
+            range_length: None,
+            text: edit["newText"].as_str().unwrap().to_owned(),
+        })
+        .collect::<Vec<_>>();
     let mut document = ktlsp_text::Document::new(version, source.to_owned()).unwrap();
     document.apply_changes(version + 1, &changes).unwrap();
     document.text().to_owned()
@@ -2618,14 +2622,23 @@ fn lexical_generic_definition_preserves_all_eight_paired_cli_consumers_and_edits
     );
     assert_eq!(reply("type-hover")["error"]["code"], -32803);
     assert!(reply("type-hover").get("result").is_none());
-    assert_eq!(reply("type-references")["result"], json!([
-        {"uri":URI,"range":references_range(source,type_t,1)},
-        {"uri":URI,"range":references_range(source,annotation_t,1)},
-    ]));
-    assert_eq!(reply("type-prepare")["result"],
-        json!({"range":references_range(source,type_t,1),"placeholder":"T"}));
-    assert_eq!(apply_original_rename(source, reply("type-rename"), URI, 7),
-        source.replacen("<T,", "<Fresh,", 1).replacen("p: T", "p: Fresh", 1));
+    assert_eq!(
+        reply("type-references")["result"],
+        json!([
+            {"uri":URI,"range":references_range(source,type_t,1)},
+            {"uri":URI,"range":references_range(source,annotation_t,1)},
+        ])
+    );
+    assert_eq!(
+        reply("type-prepare")["result"],
+        json!({"range":references_range(source,type_t,1),"placeholder":"T"})
+    );
+    assert_eq!(
+        apply_original_rename(source, reply("type-rename"), URI, 7),
+        source
+            .replacen("<T,", "<Fresh,", 1)
+            .replacen("p: T", "p: Fresh", 1)
+    );
     assert_eq!(reply("type-definition-method")["error"]["code"], -32601);
     let items = reply("completion")["result"]["items"].as_array().unwrap();
     assert_eq!(
@@ -2935,10 +2948,19 @@ fn type_parameter_versioned_rename_actual_cli_rebinds_types_values_and_local_cal
     let source = "// 😀\r\nimport elsewhere.T\r\nclass T {}\r\nfun <T, Spare> f(T:T,U:Int){ fun Fresh(){}; Fresh(); val before=T; val T:T=T; val after:T=T; val n:Int=U }\r\nfun <T> g(p:T){val other:T=p}\r\n";
     let declaration = source.find("<T").unwrap() + 1;
     let unused = source.find("Spare").unwrap();
-    let annotations = [source.find("T:T").unwrap() + 2, source.find("val T:T").unwrap() + 6, source.find("after:T").unwrap() + 6];
+    let annotations = [
+        source.find("T:T").unwrap() + 2,
+        source.find("val T:T").unwrap() + 6,
+        source.find("after:T").unwrap() + 6,
+    ];
     let parameter = source.find("T:T").unwrap();
     let local = source.find("val T:T").unwrap() + 4;
-    let values = [source.find("before=T").unwrap() + 7, source.find("T:T=T").unwrap() + 4, source.find("after:T=T").unwrap() + 8, source.find("n:Int=U").unwrap() + 6];
+    let values = [
+        source.find("before=T").unwrap() + 7,
+        source.find("T:T=T").unwrap() + 4,
+        source.find("after:T=T").unwrap() + 8,
+        source.find("n:Int=U").unwrap() + 6,
+    ];
     let init = json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{"capabilities":{
         "general":{"positionEncodings":["utf-8"]},
         "workspace":{"workspaceEdit":{"documentChanges":true}},
@@ -2957,7 +2979,11 @@ fn type_parameter_versioned_rename_actual_cli_rebinds_types_values_and_local_cal
                 messages.push(json!({"jsonrpc":"2.0","id":format!("type-{i}"),"method":"textDocument/definition","params":navigation_params(source,offset)}));
             }
         }
-        for (id, offset, include) in [("unused",unused,false),("unused-declaration",unused,true),("without-declaration",annotations[0],false)] {
+        for (id, offset, include) in [
+            ("unused", unused, false),
+            ("unused-declaration", unused, true),
+            ("without-declaration", annotations[0], false),
+        ] {
             messages.push(json!({"jsonrpc":"2.0","id":id,"method":"textDocument/references","params":references_params(source,offset,include)}));
         }
         for (i, offset) in values.into_iter().enumerate() {
@@ -2976,62 +3002,125 @@ fn type_parameter_versioned_rename_actual_cli_rebinds_types_values_and_local_cal
         ]);
         let replies = package.exchange(&messages);
         // TEMP_392: received actual packets BEFORE semantic assertions/unwraps.
-        eprintln!("TEMP_392_WIRE {}", json!({"phase":"original","name":name,"requests":messages,"responses":replies}));
-        assert!(replies.iter().filter_map(|r| r.get("id")).eq(messages.iter().filter_map(|r| r.get("id"))));
+        eprintln!(
+            "TEMP_392_WIRE {}",
+            json!({"phase":"original","name":name,"requests":messages,"responses":replies})
+        );
+        assert!(
+            replies
+                .iter()
+                .filter_map(|r| r.get("id"))
+                .eq(messages.iter().filter_map(|r| r.get("id")))
+        );
         let reply = |id: &str| replies.iter().find(|r| r["id"] == id).unwrap();
-        assert_eq!(reply("init")["result"]["capabilities"]["positionEncoding"], "utf-16");
-        let ranges = std::iter::once(declaration).chain(annotations).map(|offset| references_range(source,offset,1)).collect::<Vec<_>>();
-        let locations = ranges.iter().map(|range| json!({"uri":URI,"range":range})).collect::<Vec<_>>();
+        assert_eq!(
+            reply("init")["result"]["capabilities"]["positionEncoding"],
+            "utf-16"
+        );
+        let ranges = std::iter::once(declaration)
+            .chain(annotations)
+            .map(|offset| references_range(source, offset, 1))
+            .collect::<Vec<_>>();
+        let locations = ranges
+            .iter()
+            .map(|range| json!({"uri":URI,"range":range}))
+            .collect::<Vec<_>>();
         for (i, offset) in std::iter::once(declaration).chain(annotations).enumerate() {
             assert_eq!(reply(&format!("refs-{i}"))["result"], json!(locations));
-            assert_eq!(reply(&format!("prepare-{i}"))["result"],
-                json!({"range":references_range(source,offset,1),"placeholder":"T"}));
+            assert_eq!(
+                reply(&format!("prepare-{i}"))["result"],
+                json!({"range":references_range(source,offset,1),"placeholder":"T"})
+            );
             if i != 0 {
-                assert_eq!(reply(&format!("type-{i}"))["result"], json!({"uri":URI,"range":ranges[0]}));
+                assert_eq!(
+                    reply(&format!("type-{i}"))["result"],
+                    json!({"uri":URI,"range":ranges[0]})
+                );
             }
         }
         assert_eq!(reply("unused")["result"], json!([]));
-        assert_eq!(reply("unused-declaration")["result"], json!([{"uri":URI,"range":references_range(source,unused,5)}]));
-        assert_eq!(reply("unused-prepare")["result"], json!({"range":references_range(source,unused,5),"placeholder":"Spare"}));
-        assert_eq!(reply("unused-rename")["result"],json!({"documentChanges":[{
-            "textDocument":{"uri":URI,"version":7},
-            "edits":[{"range":references_range(source,unused,5),"newText":"UnusedFresh"}]
-        }]}));
-        assert_eq!(reply("without-declaration")["result"], json!(&locations[1..]));
-        assert_eq!(reply("highlights")["result"], json!(ranges.iter().enumerate().map(|(i, range)| json!({"range":range,"kind":if i==0 {3} else {2}})).collect::<Vec<_>>()));
-        for (i, target) in [parameter,parameter,local,source.find("U:Int").unwrap()].into_iter().enumerate() {
-            assert_eq!(reply(&format!("value-{i}"))["result"], json!({"uri":URI,"range":references_range(source,target,1)}));
+        assert_eq!(
+            reply("unused-declaration")["result"],
+            json!([{"uri":URI,"range":references_range(source,unused,5)}])
+        );
+        assert_eq!(
+            reply("unused-prepare")["result"],
+            json!({"range":references_range(source,unused,5),"placeholder":"Spare"})
+        );
+        assert_eq!(
+            reply("unused-rename")["result"],
+            json!({"documentChanges":[{
+                "textDocument":{"uri":URI,"version":7},
+                "edits":[{"range":references_range(source,unused,5),"newText":"UnusedFresh"}]
+            }]})
+        );
+        assert_eq!(
+            reply("without-declaration")["result"],
+            json!(&locations[1..])
+        );
+        assert_eq!(
+            reply("highlights")["result"],
+            json!(
+                ranges
+                    .iter()
+                    .enumerate()
+                    .map(|(i, range)| json!({"range":range,"kind":if i==0 {3} else {2}}))
+                    .collect::<Vec<_>>()
+            )
+        );
+        for (i, target) in [parameter, parameter, local, source.find("U:Int").unwrap()]
+            .into_iter()
+            .enumerate()
+        {
+            assert_eq!(
+                reply(&format!("value-{i}"))["result"],
+                json!({"uri":URI,"range":references_range(source,target,1)})
+            );
         }
-        assert_eq!(reply("callee")["result"], json!({"uri":URI,"range":references_range(source,source.find("Fresh()").unwrap(),5)}));
+        assert_eq!(
+            reply("callee")["result"],
+            json!({"uri":URI,"range":references_range(source,source.find("Fresh()").unwrap(),5)})
+        );
         for id in ["capture", "unused-capture"] {
             assert_eq!(reply(id)["error"]["code"], -32803);
             assert!(reply(id).get("result").is_none());
         }
         let edited = apply_original_rename(source, reply("rename"), URI, 7);
-        assert_eq!(reply("rename")["result"]["documentChanges"][0]["edits"],
-            json!(ranges.iter().map(|range| json!({"range":range,"newText":name})).collect::<Vec<_>>()));
-        assert_eq!(edited, source.replacen("<T,", &format!("<{name},"),1)
-            .replacen("T:T", &format!("T:{name}"),1)
-            .replacen("val T:T", &format!("val T:{name}"),1)
-            .replacen("after:T", &format!("after:{name}"),1));
+        assert_eq!(
+            reply("rename")["result"]["documentChanges"][0]["edits"],
+            json!(
+                ranges
+                    .iter()
+                    .map(|range| json!({"range":range,"newText":name}))
+                    .collect::<Vec<_>>()
+            )
+        );
+        assert_eq!(
+            edited,
+            source
+                .replacen("<T,", &format!("<{name},"), 1)
+                .replacen("T:T", &format!("T:{name}"), 1)
+                .replacen("val T:T", &format!("val T:{name}"), 1)
+                .replacen("after:T", &format!("after:{name}"), 1)
+        );
         let mut replay = vec![
             init.clone(),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
             json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":8,"text":edited}}}),
         ];
         let edited_annotations = [
-            edited.find(&format!("T:{name}")).unwrap()+2,
-            edited.find(&format!("val T:{name}")).unwrap()+6,
-            edited.find(&format!("after:{name}")).unwrap()+6,
+            edited.find(&format!("T:{name}")).unwrap() + 2,
+            edited.find(&format!("val T:{name}")).unwrap() + 6,
+            edited.find(&format!("after:{name}")).unwrap() + 6,
         ];
         for (i, offset) in edited_annotations.into_iter().enumerate() {
             replay.push(json!({"jsonrpc":"2.0","id":format!("type-{i}"),"method":"textDocument/definition","params":navigation_params(&edited,offset)}));
         }
         let edited_values = [
-            edited.find("before=T").unwrap()+7,
-            edited.find(&format!("val T:{name}=T")).unwrap()+format!("val T:{name}=").len(),
-            edited.find(&format!("after:{name}=T")).unwrap()+format!("after:{name}=").len(),
-            edited.find("n:Int=U").unwrap()+6,
+            edited.find("before=T").unwrap() + 7,
+            edited.find(&format!("val T:{name}=T")).unwrap() + format!("val T:{name}=").len(),
+            edited.find(&format!("after:{name}=T")).unwrap() + format!("after:{name}=").len(),
+            edited.find("n:Int=U").unwrap() + 6,
         ];
         for (i, offset) in edited_values.into_iter().enumerate() {
             replay.push(json!({"jsonrpc":"2.0","id":format!("value-{i}"),"method":"textDocument/definition","params":navigation_params(&edited,offset)}));
@@ -3044,19 +3133,47 @@ fn type_parameter_versioned_rename_actual_cli_rebinds_types_values_and_local_cal
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
         let rebound = package.exchange(&replay);
-        eprintln!("TEMP_392_WIRE {}", json!({"phase":"edited","name":name,"source":edited,"requests":replay,"responses":rebound}));
-        assert!(rebound.iter().filter_map(|r| r.get("id")).eq(replay.iter().filter_map(|r| r.get("id"))));
+        eprintln!(
+            "TEMP_392_WIRE {}",
+            json!({"phase":"edited","name":name,"source":edited,"requests":replay,"responses":rebound})
+        );
+        assert!(
+            rebound
+                .iter()
+                .filter_map(|r| r.get("id"))
+                .eq(replay.iter().filter_map(|r| r.get("id")))
+        );
         let reply = |id: &str| rebound.iter().find(|r| r["id"] == id).unwrap();
         for i in 0..3 {
-            assert_eq!(reply(&format!("type-{i}"))["result"], json!({"uri":URI,"range":references_range(&edited,declaration,name.len())}));
+            assert_eq!(
+                reply(&format!("type-{i}"))["result"],
+                json!({"uri":URI,"range":references_range(&edited,declaration,name.len())})
+            );
         }
-        for (i, target) in [edited.find(&format!("T:{name}")).unwrap(),edited.find(&format!("T:{name}")).unwrap(),edited.find(&format!("val T:{name}")).unwrap()+4,edited.find("U:Int").unwrap()].into_iter().enumerate() {
-            assert_eq!(reply(&format!("value-{i}"))["result"], json!({"uri":URI,"range":references_range(&edited,target,1)}));
+        for (i, target) in [
+            edited.find(&format!("T:{name}")).unwrap(),
+            edited.find(&format!("T:{name}")).unwrap(),
+            edited.find(&format!("val T:{name}")).unwrap() + 4,
+            edited.find("U:Int").unwrap(),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            assert_eq!(
+                reply(&format!("value-{i}"))["result"],
+                json!({"uri":URI,"range":references_range(&edited,target,1)})
+            );
         }
-        assert_eq!(reply("callee")["result"], json!({"uri":URI,"range":references_range(&edited,edited.find("Fresh()").unwrap(),5)}));
+        assert_eq!(
+            reply("callee")["result"],
+            json!({"uri":URI,"range":references_range(&edited,edited.find("Fresh()").unwrap(),5)})
+        );
         assert_eq!(reply("references")["result"], json!(std::iter::once(declaration).chain(edited_annotations)
             .map(|offset| json!({"uri":URI,"range":references_range(&edited,offset,name.len())})).collect::<Vec<_>>()));
-        assert_eq!(reply("rename-again")["result"]["documentChanges"][0]["textDocument"], json!({"uri":URI,"version":8}));
+        assert_eq!(
+            reply("rename-again")["result"]["documentChanges"][0]["textDocument"],
+            json!({"uri":URI,"version":8})
+        );
     }
 }
 
@@ -3065,7 +3182,11 @@ fn type_parameter_wire_quote_context_capture_growth_negotiation_and_reopen() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let mut session = running_rename();
     for (source, name, accepted) in [
-        ("// 😀\r\nfun <`🦀`, Spare> f(p:`🦀`){ val x:`🦀`=p }\r\n", "Fresh", true),
+        (
+            "// 😀\r\nfun <`🦀`, Spare> f(p:`🦀`){ val x:`🦀`=p }\r\n",
+            "Fresh",
+            true,
+        ),
         ("fun <`T`> f(p:`T`){}", "T", true),
         ("fun <`where`> f(p:`where`){}", "where", false),
         ("fun <`dynamic`> f(p:`dynamic`){}", "dynamic", false),
@@ -3075,41 +3196,85 @@ fn type_parameter_wire_quote_context_capture_growth_negotiation_and_reopen() {
         ("fun <Spare> f(p:Int){}", "Int", false),
     ] {
         open(&mut session, source);
-        let offset = source.find('<').unwrap()+1;
-        let reply = request(&mut session, "textDocument/rename", rename_params(source,offset,name));
+        let offset = source.find('<').unwrap() + 1;
+        let reply = request(
+            &mut session,
+            "textDocument/rename",
+            rename_params(source, offset, name),
+        );
         if accepted {
-            let edited = apply_original_rename(source,&reply,URI,1);
-            let token = if source.contains("🦀") { "`🦀`" } else { "`T`" };
-            assert_eq!(edited,source.replace(token,name));
+            let edited = apply_original_rename(source, &reply, URI, 1);
+            let token = if source.contains("🦀") {
+                "`🦀`"
+            } else {
+                "`T`"
+            };
+            assert_eq!(edited, source.replace(token, name));
         } else {
-            assert_eq!(reply["error"]["code"],-32803,"{reply}");
+            assert_eq!(reply["error"]["code"], -32803, "{reply}");
             assert!(reply.get("result").is_none());
         }
-        notify(&mut session,"textDocument/didClose",json!({"textDocument":{"uri":URI}}));
+        notify(
+            &mut session,
+            "textDocument/didClose",
+            json!({"textDocument":{"uri":URI}}),
+        );
     }
     let source = "fun <T> f(p:T){}";
-    open(&mut session,source);
-    let response = request(&mut session,"textDocument/rename",rename_params(source,5,&"A".repeat(33000)));
-    assert_eq!(response["error"]["code"],-32803);
+    open(&mut session, source);
+    let response = request(
+        &mut session,
+        "textDocument/rename",
+        rename_params(source, 5, &"A".repeat(33000)),
+    );
+    assert_eq!(response["error"]["code"], -32803);
     assert!(response.get("result").is_none());
-    assert_eq!(session.document(URI).unwrap().text(),source);
-    change(&mut session,2,source);
-    change(&mut session,2,"fun <Wrong> f(){}"); // rejected current-version change
-    let prepared = request(&mut session,"textDocument/prepareRename",navigation_params(source,5));
-    assert_eq!(prepared["result"],json!({"range":references_range(source,5,1),"placeholder":"T"}));
-    let renamed = request(&mut session,"textDocument/rename",rename_params(source,5,"Fresh"));
-    assert_eq!(renamed["result"]["documentChanges"][0]["textDocument"],json!({"uri":URI,"version":2}));
-    notify(&mut session,"textDocument/didClose",json!({"textDocument":{"uri":URI}}));
-    open(&mut session,source);
-    let reopened = request(&mut session,"textDocument/rename",rename_params(source,5,"Fresh"));
-    assert_eq!(reopened["result"]["documentChanges"][0]["textDocument"],json!({"uri":URI,"version":1}));
+    assert_eq!(session.document(URI).unwrap().text(), source);
+    change(&mut session, 2, source);
+    change(&mut session, 2, "fun <Wrong> f(){}"); // rejected current-version change
+    let prepared = request(
+        &mut session,
+        "textDocument/prepareRename",
+        navigation_params(source, 5),
+    );
+    assert_eq!(
+        prepared["result"],
+        json!({"range":references_range(source,5,1),"placeholder":"T"})
+    );
+    let renamed = request(
+        &mut session,
+        "textDocument/rename",
+        rename_params(source, 5, "Fresh"),
+    );
+    assert_eq!(
+        renamed["result"]["documentChanges"][0]["textDocument"],
+        json!({"uri":URI,"version":2})
+    );
+    notify(
+        &mut session,
+        "textDocument/didClose",
+        json!({"textDocument":{"uri":URI}}),
+    );
+    open(&mut session, source);
+    let reopened = request(
+        &mut session,
+        "textDocument/rename",
+        rename_params(source, 5, "Fresh"),
+    );
+    assert_eq!(
+        reopened["result"]["documentChanges"][0]["textDocument"],
+        json!({"uri":URI,"version":1})
+    );
     assert!(session.close().1);
     // Existing provider negotiation precedes all semantic roles, not a type-only
     // unversioned fallback. A real worker is configured but never admitted here.
     let mut unnegotiated = running(json!({}));
-    open(&mut unnegotiated,source);
-    for method in ["textDocument/prepareRename","textDocument/rename"] {
-        assert_eq!(request(&mut unnegotiated,method,rename_params(source,5,"Fresh"))["error"]["code"],-32601);
+    open(&mut unnegotiated, source);
+    for method in ["textDocument/prepareRename", "textDocument/rename"] {
+        assert_eq!(
+            request(&mut unnegotiated, method, rename_params(source, 5, "Fresh"))["error"]["code"],
+            -32601
+        );
     }
     assert!(unnegotiated.close().1);
 }
@@ -3118,13 +3283,23 @@ fn type_parameter_wire_quote_context_capture_growth_negotiation_and_reopen() {
 fn type_role_queries_keep_atomic_cancel_stale_incarnation_and_output_guards() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let source = "fun <T> f(p:T){val x:T=p}";
-    for method in ["textDocument/references", "textDocument/prepareRename", "textDocument/rename"] {
+    for method in [
+        "textDocument/references",
+        "textDocument/prepareRename",
+        "textDocument/rename",
+    ] {
         for action in ["cancel", "change", "reopen"] {
             let mut session = running_rename();
-            open(&mut session,source);
-            let mut params = references_params(source,5,true);
+            open(&mut session, source);
+            let mut params = references_params(source, 5, true);
             params["newName"] = json!("Fresh");
-            assert!(session.handle(json!({"jsonrpc":"2.0","id":"type-pending","method":method,"params":params})).is_empty());
+            assert!(
+                session
+                    .handle(
+                        json!({"jsonrpc":"2.0","id":"type-pending","method":method,"params":params})
+                    )
+                    .is_empty()
+            );
             let messages = match action {
                 "cancel" => session.handle(json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":"type-pending"}})),
                 "change" => session.handle(json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":URI,"version":2},"contentChanges":[{"text":source}]}})),
@@ -3134,25 +3309,37 @@ fn type_role_queries_keep_atomic_cancel_stale_incarnation_and_output_guards() {
                     replies
                 }
             };
-            assert_eq!(messages.len(),1,"{method}/{action}: {messages:?}");
-            assert_eq!(messages[0]["id"],"type-pending");
-            assert_eq!(messages[0]["error"]["code"],if action=="cancel" {-32800} else {-32801});
+            assert_eq!(messages.len(), 1, "{method}/{action}: {messages:?}");
+            assert_eq!(messages[0]["id"], "type-pending");
+            assert_eq!(
+                messages[0]["error"]["code"],
+                if action == "cancel" { -32800 } else { -32801 }
+            );
             assert!(messages[0].get("result").is_none());
             let (remaining, clean) = session.close();
-            assert!(clean,"{method}/{action}");
-            assert!(remaining.iter().all(|message| message["id"] != "type-pending"));
+            assert!(clean, "{method}/{action}");
+            assert!(
+                remaining
+                    .iter()
+                    .all(|message| message["id"] != "type-pending")
+            );
         }
     }
-    let long_uri = format!("untitled:{}","a".repeat(8000));
-    let source = format!("fun <T> f(){{{}}}",(0..24).map(|i|format!("val x{i}:T=1;")).collect::<String>());
+    let long_uri = format!("untitled:{}", "a".repeat(8000));
+    let source = format!(
+        "fun <T> f(){{{}}}",
+        (0..24)
+            .map(|i| format!("val x{i}:T=1;"))
+            .collect::<String>()
+    );
     let mut session = running_rename();
-    open_uri(&mut session,&long_uri,&source);
-    let mut params = references_params(&source,5,true);
+    open_uri(&mut session, &long_uri, &source);
+    let mut params = references_params(&source, 5, true);
     params["textDocument"]["uri"] = json!(long_uri);
-    let response = request(&mut session,"textDocument/references",params.clone());
-    assert_eq!(response["error"]["code"],-32803);
+    let response = request(&mut session, "textDocument/references", params.clone());
+    assert_eq!(response["error"]["code"], -32803);
     assert!(response.get("result").is_none());
-    let response = request(&mut session,"textDocument/documentHighlight",params);
-    assert_eq!(response["result"].as_array().unwrap().len(),25);
+    let response = request(&mut session, "textDocument/documentHighlight", params);
+    assert_eq!(response["result"].as_array().unwrap().len(), 25);
     assert!(session.close().1);
 }

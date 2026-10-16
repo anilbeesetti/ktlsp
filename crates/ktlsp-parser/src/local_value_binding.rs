@@ -636,12 +636,15 @@ fn type_annotation<'a>(
     for (ordinal, declaration) in directory.lowered().declarations().iter().enumerate() {
         b.charge(1)?;
         if declaration.cst_index() == annotated_index {
-            return Ok((ordinal, TypeParameterAnnotation {
-                annotated: declaration,
-                reference,
-                name_token,
-                reference_index: index,
-            }));
+            return Ok((
+                ordinal,
+                TypeParameterAnnotation {
+                    annotated: declaration,
+                    reference,
+                    name_token,
+                    reference_index: index,
+                },
+            ));
         }
     }
     Err(LocalBindingError::UnsupportedContext)
@@ -662,8 +665,11 @@ fn type_function<'a>(
 ) -> Result<TypeFunction<'a>> {
     let function_ordinal = function_ordinal.ok_or(LocalBindingError::UnsupportedContext)?;
     b.charge(1)?;
-    let function = directory.lowered().declarations()
-        .get(function_ordinal).ok_or(LocalBindingError::InvalidOrigin)?;
+    let function = directory
+        .lowered()
+        .declarations()
+        .get(function_ordinal)
+        .ok_or(LocalBindingError::InvalidOrigin)?;
     if function.incomplete() || !b.equal(function.kind(), "FUN")? {
         return Err(LocalBindingError::UnsupportedContext);
     }
@@ -685,7 +691,8 @@ fn type_function<'a>(
         selected_target: None,
         cursor: 0,
         b,
-    }.function(function, body.cst_index())?;
+    }
+    .function(function, body.cst_index())?;
     Ok(TypeFunction {
         ordinal: function_ordinal,
         function,
@@ -748,9 +755,12 @@ fn annotation_spelling<'a>(
     b: &mut ReferenceBudget,
 ) -> Result<&'a str> {
     b.charge(2)?;
-    let raw = parsed.source().get(annotation.range())
+    let raw = parsed
+        .source()
+        .get(annotation.range())
         .ok_or(LocalBindingError::UnsupportedContext)?;
-    b.spelling(raw)?.ok_or(LocalBindingError::UnsupportedSpelling)
+    b.spelling(raw)?
+        .ok_or(LocalBindingError::UnsupportedSpelling)
 }
 
 fn type_target<'a>(
@@ -847,8 +857,14 @@ pub fn type_parameter_occurrences<'a>(
     anchor: TypeParameterAnchor<'a>,
     current: &SourceSnapshot,
 ) -> Result<TypeParameterOccurrences<'a>> {
-    type_occurrences_with_budget(directory, result, anchor, current, None,
-        &mut ReferenceBudget::default())
+    type_occurrences_with_budget(
+        directory,
+        result,
+        anchor,
+        current,
+        None,
+        &mut ReferenceBudget::default(),
+    )
 }
 
 /// Prepare or rename an original function type parameter without capturing any
@@ -860,8 +876,14 @@ pub fn guarded_type_parameter_rename<'a>(
     current: &SourceSnapshot,
     new_name: Option<&str>,
 ) -> Result<TypeParameterOccurrences<'a>> {
-    type_rename_with_budget(directory, result, anchor, current, new_name,
-        &mut ReferenceBudget::default())
+    type_rename_with_budget(
+        directory,
+        result,
+        anchor,
+        current,
+        new_name,
+        &mut ReferenceBudget::default(),
+    )
 }
 
 pub(super) fn type_rename_with_budget<'a>(
@@ -883,20 +905,28 @@ pub(super) fn type_rename_with_budget<'a>(
 
 fn type_annotation_storage(count: usize) -> Result<()> {
     if count > MAX_OCCURRENCES
-        || count.checked_mul(std::mem::size_of::<TypeParameterAnnotation<'_>>())
-            .ok_or(LocalBindingError::Resource)? > OCCURRENCE_BYTES
+        || count
+            .checked_mul(std::mem::size_of::<TypeParameterAnnotation<'_>>())
+            .ok_or(LocalBindingError::Resource)?
+            > OCCURRENCE_BYTES
     {
         return Err(LocalBindingError::Resource);
     }
     Ok(())
 }
 
-fn rename_boundary(source: &str, range: std::ops::Range<usize>, b: &mut ReferenceBudget) -> Result<()> {
+fn rename_boundary(
+    source: &str,
+    range: std::ops::Range<usize>,
+    b: &mut ReferenceBudget,
+) -> Result<()> {
     b.charge(4)?;
     let bytes = source.as_bytes();
     let before = range.start.checked_sub(1).and_then(|i| bytes.get(i));
     let after = bytes.get(range.end);
-    if [before, after].into_iter().flatten()
+    if [before, after]
+        .into_iter()
+        .flatten()
         .any(|byte| byte.is_ascii_alphanumeric() || *byte == b'_' || !byte.is_ascii())
     {
         return Err(LocalBindingError::UnsupportedContext);
@@ -943,11 +973,13 @@ pub(super) fn type_occurrences_with_budget<'a>(
             (None, Some(type_annotation(directory, parsed, index, b)?))
         }
     };
-    let owner = declaration.map(|d| d.owner())
+    let owner = declaration
+        .map(|d| d.owner())
         .unwrap_or_else(|| selected_annotation.as_ref().unwrap().1.annotated.owner());
     let context = type_function(directory, parsed, owner, b)?;
     let spelling = if let Some(target) = declaration {
-        b.spelling(target.raw_name())?.ok_or(LocalBindingError::UnsupportedSpelling)?
+        b.spelling(target.raw_name())?
+            .ok_or(LocalBindingError::UnsupportedSpelling)?
     } else {
         let (ordinal, annotation) = selected_annotation.as_ref().unwrap();
         check_type_annotation(directory, parsed, *ordinal, annotation, &context, b)?;
@@ -965,7 +997,8 @@ pub(super) fn type_occurrences_with_budget<'a>(
     let mut count = 0usize;
     for index in context.function.cst_index()..node.subtree_end {
         let element = b.element(parsed, index)?;
-        if !element.token && b.equal(&element.kind, "REFERENCE_EXPRESSION")?
+        if !element.token
+            && b.equal(&element.kind, "REFERENCE_EXPRESSION")?
             && let Some(parent) = element.parent
         {
             let parent = b.element(parsed, parent)?;
@@ -977,12 +1010,15 @@ pub(super) fn type_occurrences_with_budget<'a>(
     type_annotation_storage(count)?;
     b.charge(count)?;
     let mut occurrences = Vec::new();
-    occurrences.try_reserve_exact(count).map_err(|_| LocalBindingError::Resource)?;
+    occurrences
+        .try_reserve_exact(count)
+        .map_err(|_| LocalBindingError::Resource)?;
     type_annotation_storage(occurrences.capacity())?;
     for (ordinal, annotated) in directory.lowered().declarations().iter().enumerate() {
         b.charge(1)?;
         if annotated.owner() != Some(context.ordinal)
-            || !(b.equal(annotated.kind(), "VALUE_PARAMETER")? || b.equal(annotated.kind(), "PROPERTY")?)
+            || !(b.equal(annotated.kind(), "VALUE_PARAMETER")?
+                || b.equal(annotated.kind(), "PROPERTY")?)
         {
             continue;
         }
@@ -992,11 +1028,15 @@ pub(super) fn type_occurrences_with_budget<'a>(
             if element.token || !b.equal(&element.kind, "REFERENCE_EXPRESSION")? {
                 continue;
             }
-            let parent = b.element(parsed, element.parent.ok_or(LocalBindingError::InvalidOrigin)?)?;
+            let parent = b.element(
+                parsed,
+                element.parent.ok_or(LocalBindingError::InvalidOrigin)?,
+            )?;
             if !b.equal(&parent.kind, "USER_TYPE")? {
                 continue;
             }
-            let selected = selected_annotation.as_ref()
+            let selected = selected_annotation
+                .as_ref()
                 .is_some_and(|(_, annotation)| annotation.reference_index == index);
             let annotation = if selected {
                 selected_annotation.take().unwrap().1
@@ -1005,13 +1045,25 @@ pub(super) fn type_occurrences_with_budget<'a>(
                 if original != annotated.cst_index() {
                     return Err(LocalBindingError::InvalidOrigin);
                 }
-                let annotation = TypeParameterAnnotation { annotated, reference, name_token, reference_index: index };
+                let annotation = TypeParameterAnnotation {
+                    annotated,
+                    reference,
+                    name_token,
+                    reference_index: index,
+                };
                 check_type_annotation(directory, parsed, ordinal, &annotation, &context, b)?;
                 annotation
             };
-            let name = if selected { spelling } else { annotation_spelling(parsed, &annotation, b)? };
+            let name = if selected {
+                spelling
+            } else {
+                annotation_spelling(parsed, &annotation, b)?
+            };
             let matched = b.equal(name, spelling)?;
-            if !matched && let Some(new_name) = new_name && b.equal(name, new_name)? {
+            if !matched
+                && let Some(new_name) = new_name
+                && b.equal(name, new_name)?
+            {
                 // An unedited simple name need not globally resolve to prove
                 // that adding our lexical binder would capture it.
                 return Err(LocalBindingError::AmbiguousTypeParameter);
@@ -1027,7 +1079,13 @@ pub(super) fn type_occurrences_with_budget<'a>(
     }
     // Final emission also shares the query budget; no successful prefix escapes.
     b.charge(4)?;
-    Ok(TypeParameterOccurrences { directory, target, function: context.function, body: context.body, occurrences })
+    Ok(TypeParameterOccurrences {
+        directory,
+        target,
+        function: context.function,
+        body: context.body,
+        occurrences,
+    })
 }
 
 /// Return the unique eligible preceding local val or same-function parameter.
@@ -1719,7 +1777,10 @@ mod occurrence_storage_tests {
         type_annotation_storage(0).unwrap();
         type_annotation_storage(MAX_OCCURRENCES).unwrap();
         for count in [MAX_OCCURRENCES + 1, usize::MAX] {
-            assert_eq!(type_annotation_storage(count), Err(LocalBindingError::Resource));
+            assert_eq!(
+                type_annotation_storage(count),
+                Err(LocalBindingError::Resource)
+            );
         }
     }
 }

@@ -100,13 +100,18 @@ impl<'b> Budget<'b> {
         }
     }
     pub(super) fn composed(budget: &'b mut super::string_table::Budget) -> Self {
-        Self { composite: Some(budget), ..Self::new(Limits::default()) }
+        Self {
+            composite: Some(budget),
+            ..Self::new(Limits::default())
+        }
     }
     fn push<T>(&mut self, values: &mut Vec<T>, value: T) -> Result<(), Error> {
         if let Some(budget) = &mut self.composite {
             return budget.push(values, value, 0).map_err(composite_error);
         }
-        values.try_reserve(1).map_err(|_| Error::Limit("metadata allocation"))?;
+        values
+            .try_reserve(1)
+            .map_err(|_| Error::Limit("metadata allocation"))?;
         values.push(value);
         Ok(())
     }

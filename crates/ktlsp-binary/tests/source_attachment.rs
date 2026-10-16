@@ -546,8 +546,18 @@ fn modern_authored_source_attachment_inherits_metadata_package_policy() {
         c.major = major;
         let name = cp(&mut c, "RuntimeInvisibleAnnotations");
         let bytes = metadata_attribute(&mut c, "source.pkg", 2);
-        c.attributes.push(Attribute { name, bytes: &bytes });
-        let artifact = verified(zip(&[(b"p/C.java", b"wrong"), (b"source/pkg/C.java", b"right")], 0, 0), None);
+        c.attributes.push(Attribute {
+            name,
+            bytes: &bytes,
+        });
+        let artifact = verified(
+            zip(
+                &[(b"p/C.java", b"wrong"), (b"source/pkg/C.java", b"right")],
+                0,
+                0,
+            ),
+            None,
+        );
         let index = index_zip_directory(&artifact).unwrap();
         let mut scratch = Vec::new();
         let result = attach(&c, &index, &mut scratch).unwrap();
@@ -560,12 +570,30 @@ fn source_attachment_public_model_version_matrix_and_earlier_error_order() {
     let artifact = verified(normal_zip(), None);
     let index = index_zip_directory(&artifact).unwrap();
     for (major, minor, supported) in [
-        (45, 0, true), (45, 1, true), (45, 2, true), (45, 3, true),
-        (46, 0, true), (55, 0, true), (67, 0, true), (68, 0, true), (69, 0, true),
-        (0, 0, false), (44, 0, false), (45, 4, false), (46, 1, false),
-        (55, 1, false), (67, 1, false), (68, 1, false), (69, 1, false),
-        (45, 65535, false), (55, 65535, false), (67, 65535, false),
-        (68, 65535, false), (69, 65535, false), (70, 0, false), (65535, 65535, false),
+        (45, 0, true),
+        (45, 1, true),
+        (45, 2, true),
+        (45, 3, true),
+        (46, 0, true),
+        (55, 0, true),
+        (67, 0, true),
+        (68, 0, true),
+        (69, 0, true),
+        (0, 0, false),
+        (44, 0, false),
+        (45, 4, false),
+        (46, 1, false),
+        (55, 1, false),
+        (67, 1, false),
+        (68, 1, false),
+        (69, 1, false),
+        (45, 65535, false),
+        (55, 65535, false),
+        (67, 65535, false),
+        (68, 65535, false),
+        (69, 65535, false),
+        (70, 0, false),
+        (65535, 65535, false),
     ] {
         let mut c = class();
         c.major = major;
@@ -574,16 +602,31 @@ fn source_attachment_public_model_version_matrix_and_earlier_error_order() {
         let result = attach(&c, &index, &mut scratch);
         if supported {
             let candidate = result.unwrap();
-            assert_eq!((candidate.ordinal, candidate.bytes), (0, b"source".as_slice()));
-            assert_eq!(candidate.bytes.as_ptr(), index.stored_payload(0).unwrap().as_ptr());
+            assert_eq!(
+                (candidate.ordinal, candidate.bytes),
+                (0, b"source".as_slice())
+            );
+            assert_eq!(
+                candidate.bytes.as_ptr(),
+                index.stored_payload(0).unwrap().as_ptr()
+            );
         } else {
-            assert_eq!(result.unwrap_err(), E::Class(Error::UnsupportedVersion { major, minor }));
+            assert_eq!(
+                result.unwrap_err(),
+                E::Class(Error::UnsupportedVersion { major, minor })
+            );
         }
         assert!(scratch.is_empty());
         // SourceFile framing and CP-size refusals precede the inherited version gate.
         c.attributes[0].bytes = &[];
-        assert_eq!(attach(&c, &index, &mut scratch).unwrap_err(), E::Class(Error::Malformed("SourceFile attribute")));
+        assert_eq!(
+            attach(&c, &index, &mut scratch).unwrap_err(),
+            E::Class(Error::Malformed("SourceFile attribute"))
+        );
         c.constants.clear();
-        assert_eq!(attach(&c, &index, &mut scratch).unwrap_err(), E::Class(Error::Malformed("source constant pool size")));
+        assert_eq!(
+            attach(&c, &index, &mut scratch).unwrap_err(),
+            E::Class(Error::Malformed("source constant pool size"))
+        );
     }
 }

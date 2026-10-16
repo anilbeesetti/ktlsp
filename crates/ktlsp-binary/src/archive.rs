@@ -67,30 +67,41 @@ pub fn parse_jimage_class<'s>(
     scratch: &'s mut Vec<u8>,
 ) -> Result<ClassFile<'s>, JimageClassError> {
     scratch.clear();
-    let name = resource.resource_mutf8().strip_suffix(b".class")
+    let name = resource
+        .resource_mutf8()
+        .strip_suffix(b".class")
         .filter(|name| !name.is_empty())
         .ok_or(JimageClassError::NotClassResource)?;
     // A returned ClassFile borrows payload bytes. A normal &mut cleanup guard
     // would retain an exclusive borrow across that return. This private guard
     // only touches the Vec on failure, after all later-declared class/payload
     // borrows have ceased. It is disarmed before any borrowed result escapes.
-    struct ClearOnFailure { scratch: *mut Vec<u8>, armed: bool }
+    struct ClearOnFailure {
+        scratch: *mut Vec<u8>,
+        armed: bool,
+    }
     impl Drop for ClearOnFailure {
         fn drop(&mut self) {
             if self.armed {
                 // SAFETY: constructed from this call's live exclusive scratch;
                 // on error no class or payload reference escapes, and locals
                 // holding them are dropped before this guard. Success disarms it.
-                unsafe { (*self.scratch).clear(); }
+                unsafe {
+                    (*self.scratch).clear();
+                }
             }
         }
     }
-    let mut cleanup = ClearOnFailure { scratch, armed: true };
+    let mut cleanup = ClearOnFailure {
+        scratch,
+        armed: true,
+    };
     // SAFETY: derive the sole payload reborrow from the saved pointer itself,
     // not a sibling reborrow of the original &mut (which could invalidate the
     // saved pointer's provenance). Caller scratch stays live for 's; cleanup
     // only writes after this borrow ceases on failure, never on success.
-    let payload = resource.payload(unsafe { &mut *cleanup.scratch })
+    let payload = resource
+        .payload(unsafe { &mut *cleanup.scratch })
         .map_err(JimageClassError::Payload)?;
     let class = parse_class(payload).map_err(JimageClassError::Class)?;
     let crate::Constant::Class(declared) = class.constants[usize::from(class.this_class)] else {
@@ -104,16 +115,28 @@ pub fn parse_jimage_class<'s>(
         let (encoded, len) = if (1..=127).contains(&unit) {
             ([unit as u8, 0, 0], 1)
         } else if unit < 2048 {
-            ([(0xc0 | (unit >> 6)) as u8, (0x80 | (unit & 63)) as u8, 0], 2)
+            (
+                [(0xc0 | (unit >> 6)) as u8, (0x80 | (unit & 63)) as u8, 0],
+                2,
+            )
         } else {
-            ([(0xe0 | (unit >> 12)) as u8, (0x80 | ((unit >> 6) & 63)) as u8, (0x80 | (unit & 63)) as u8], 3)
+            (
+                [
+                    (0xe0 | (unit >> 12)) as u8,
+                    (0x80 | ((unit >> 6) & 63)) as u8,
+                    (0x80 | (unit & 63)) as u8,
+                ],
+                3,
+            )
         };
         if name.get(at..at + len) != Some(&encoded[..len]) {
             return Err(JimageClassError::DeclaredName);
         }
         at += len;
     }
-    if at != name.len() { return Err(JimageClassError::DeclaredName); }
+    if at != name.len() {
+        return Err(JimageClassError::DeclaredName);
+    }
     cleanup.armed = false;
     Ok(class)
 }

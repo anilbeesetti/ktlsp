@@ -17,7 +17,8 @@ fn parse(source: &str) -> SnapshotResult {
 }
 
 fn parse_revision(source: &str, revision: i64) -> SnapshotResult {
-    let snapshot = SourceSnapshot::new("local-occurrences", revision, FileKind::Source, source).unwrap();
+    let snapshot =
+        SourceSnapshot::new("local-occurrences", revision, FileKind::Source, source).unwrap();
     Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker"))
         .unwrap()
         .parse_snapshot(&snapshot, &AtomicBool::new(false))
@@ -1385,16 +1386,29 @@ fn type_parameter_occurrences_preserve_original_type_value_and_callee_partitions
         let current = result.snapshot();
         let tree = result.tree_for(current).unwrap();
         // TEMP_392: actual already-produced source/CST before admission assertions.
-        eprintln!("TEMP_392_PRODUCER {}", serde_json::json!({
-            "phase":"original", "new_name":new_name, "document":current.document(),
-            "version":current.revision(), "source":tree.source(),
-            "elements":tree.elements(), "diagnostics":tree.diagnostics()
-        }));
+        eprintln!(
+            "TEMP_392_PRODUCER {}",
+            serde_json::json!({
+                "phase":"original", "new_name":new_name, "document":current.document(),
+                "version":current.revision(), "source":tree.source(),
+                "elements":tree.elements(), "diagnostics":tree.diagnostics()
+            })
+        );
         let lower = lower_declarations(&result, current).unwrap();
         let directory = build_regions(&lower, &result, current).unwrap();
         let type_start = original.find("<T").unwrap() + 1;
-        let target = lower.declarations().iter().find(|d| d.name_range().start == type_start).unwrap();
-        let found = type_parameter_occurrences(&directory, &result, TypeParameterAnchor::Declaration(target), current).unwrap();
+        let target = lower
+            .declarations()
+            .iter()
+            .find(|d| d.name_range().start == type_start)
+            .unwrap();
+        let found = type_parameter_occurrences(
+            &directory,
+            &result,
+            TypeParameterAnchor::Declaration(target),
+            current,
+        )
+        .unwrap();
         let expected = [
             original.find("T: T").unwrap() + 3,
             original.find("val T:T").unwrap() + 6,
@@ -1402,85 +1416,178 @@ fn type_parameter_occurrences_preserve_original_type_value_and_callee_partitions
         ];
         assert!(std::ptr::eq(found.target(), target));
         assert!(std::ptr::eq(found.directory(), &directory));
-        assert!(std::ptr::eq(found.function(), &lower.declarations()[target.owner().unwrap()]));
+        assert!(std::ptr::eq(
+            found.function(),
+            &lower.declarations()[target.owner().unwrap()]
+        ));
         assert_eq!(found.body().introducer(), target.owner());
         assert_eq!(target.cst_parent_kind(), "TYPE_PARAMETER_LIST");
-        assert_eq!(tree.elements()[target.cst_parent_index().unwrap()].parent, Some(found.function().cst_index()));
-        assert_eq!(found.occurrences().iter().map(|a| a.range()).collect::<Vec<_>>(),
-            expected.map(|start| start..start + 1));
+        assert_eq!(
+            tree.elements()[target.cst_parent_index().unwrap()].parent,
+            Some(found.function().cst_index())
+        );
+        assert_eq!(
+            found
+                .occurrences()
+                .iter()
+                .map(|a| a.range())
+                .collect::<Vec<_>>(),
+            expected.map(|start| start..start + 1)
+        );
         for annotation in found.occurrences() {
-            assert!(std::ptr::eq(annotation.reference(), &tree.elements()[annotation.reference_index()]));
-            assert!(std::ptr::eq(annotation.name_token(), &tree.elements()[annotation.reference_index() + 1]));
+            assert!(std::ptr::eq(
+                annotation.reference(),
+                &tree.elements()[annotation.reference_index()]
+            ));
+            assert!(std::ptr::eq(
+                annotation.name_token(),
+                &tree.elements()[annotation.reference_index() + 1]
+            ));
             assert_eq!(annotation.annotated().owner(), target.owner());
-            let by_use = type_parameter_occurrences(&directory, &result,
-                TypeParameterAnchor::AnnotationReference(annotation.reference_index()), current).unwrap();
+            let by_use = type_parameter_occurrences(
+                &directory,
+                &result,
+                TypeParameterAnchor::AnnotationReference(annotation.reference_index()),
+                current,
+            )
+            .unwrap();
             assert!(std::ptr::eq(by_use.target(), target));
-            assert_eq!(by_use.occurrences().iter().map(|a| a.range()).collect::<Vec<_>>(),
-                expected.map(|start| start..start + 1));
+            assert_eq!(
+                by_use
+                    .occurrences()
+                    .iter()
+                    .map(|a| a.range())
+                    .collect::<Vec<_>>(),
+                expected.map(|start| start..start + 1)
+            );
         }
-        let spare = lower.declarations().iter().find(|d| d.raw_name() == "Spare").unwrap();
-        let unused = type_parameter_occurrences(&directory, &result, TypeParameterAnchor::Declaration(spare), current).unwrap();
+        let spare = lower
+            .declarations()
+            .iter()
+            .find(|d| d.raw_name() == "Spare")
+            .unwrap();
+        let unused = type_parameter_occurrences(
+            &directory,
+            &result,
+            TypeParameterAnchor::Declaration(spare),
+            current,
+        )
+        .unwrap();
         assert!(unused.occurrences().is_empty());
         for declaration in [target, spare] {
-            assert_eq!(guarded_type_parameter_rename(&directory, &result,
-                TypeParameterAnchor::Declaration(declaration), current, Some("Int")).unwrap_err(),
-                LocalBindingError::AmbiguousTypeParameter);
+            assert_eq!(
+                guarded_type_parameter_rename(
+                    &directory,
+                    &result,
+                    TypeParameterAnchor::Declaration(declaration),
+                    current,
+                    Some("Int")
+                )
+                .unwrap_err(),
+                LocalBindingError::AmbiguousTypeParameter
+            );
         }
-        let renamed = guarded_type_parameter_rename(&directory, &result,
-            TypeParameterAnchor::Declaration(target), current, Some(new_name)).unwrap();
+        let renamed = guarded_type_parameter_rename(
+            &directory,
+            &result,
+            TypeParameterAnchor::Declaration(target),
+            current,
+            Some(new_name),
+        )
+        .unwrap();
         let mut edited = original.to_owned();
         for range in std::iter::once(target.name_range())
-            .chain(renamed.occurrences().iter().map(|a| a.range())).collect::<Vec<_>>().into_iter().rev()
+            .chain(renamed.occurrences().iter().map(|a| a.range()))
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
         {
             edited.replace_range(range, new_name);
         }
         let edited_result = parse_revision(&edited, 8);
         for (phase, actual) in [("original", original), ("edited", edited.as_str())] {
-            let rebound = if phase == "original" { &result } else { &edited_result };
+            let rebound = if phase == "original" {
+                &result
+            } else {
+                &edited_result
+            };
             let snapshot = rebound.snapshot();
             let tree = rebound.tree_for(snapshot).unwrap();
             // TEMP_392: records actual edited producer grammar for soft names too.
             if phase == "edited" {
-                eprintln!("TEMP_392_PRODUCER {}", serde_json::json!({
-                    "phase":phase, "new_name":new_name, "document":snapshot.document(),
-                    "version":snapshot.revision(), "source":tree.source(),
-                    "elements":tree.elements(), "diagnostics":tree.diagnostics()
-                }));
+                eprintln!(
+                    "TEMP_392_PRODUCER {}",
+                    serde_json::json!({
+                        "phase":phase, "new_name":new_name, "document":snapshot.document(),
+                        "version":snapshot.revision(), "source":tree.source(),
+                        "elements":tree.elements(), "diagnostics":tree.diagnostics()
+                    })
+                );
             }
-            assert!(tree.diagnostics().is_empty(), "{actual}: {:?}", tree.diagnostics());
+            assert!(
+                tree.diagnostics().is_empty(),
+                "{actual}: {:?}",
+                tree.diagnostics()
+            );
             let lower = lower_declarations(rebound, snapshot).unwrap();
             let directory = build_regions(&lower, rebound, snapshot).unwrap();
-            let ty = lower.declarations().iter().find(|d| d.name_range().start == type_start).unwrap();
+            let ty = lower
+                .declarations()
+                .iter()
+                .find(|d| d.name_range().start == type_start)
+                .unwrap();
             let mut type_names = Vec::new();
             let mut values = Vec::new();
             let mut callees = Vec::new();
-            for (index, node) in tree.elements().iter().enumerate().filter(|(_, e)| e.kind == "REFERENCE_EXPRESSION") {
+            for (index, node) in tree
+                .elements()
+                .iter()
+                .enumerate()
+                .filter(|(_, e)| e.kind == "REFERENCE_EXPRESSION")
+            {
                 let parent = &tree.elements()[node.parent.unwrap()];
-                if !matches!(parent.kind.as_str(), "USER_TYPE" | "CALL_EXPRESSION" | "PROPERTY") {
+                if !matches!(
+                    parent.kind.as_str(),
+                    "USER_TYPE" | "CALL_EXPRESSION" | "PROPERTY"
+                ) {
                     continue; // Imports are not same-function lexical occurrences.
                 }
                 if parent.kind == "USER_TYPE" {
                     let bound = bind_lexical_type_parameter(&directory, rebound, index, snapshot);
                     // TEMP_392: actual original associations before assertions.
-                    eprintln!("TEMP_392_IDENTITY {}", serde_json::json!({
-                        "phase":phase,"new_name":new_name,"role":"annotation","index":index,
-                        "range":[node.start,node.end],"binding":match &bound {
-                            Ok(b) => serde_json::json!({"annotated":b.annotated().cst_index(),
-                                "function":b.function().cst_index(),"body":b.body().cst_index(),
-                                "target":b.target().cst_index(),"owner":b.target().owner(),
-                                "list":b.target().cst_parent_index(),"name":b.target().name_range()}),
-                            Err(e) => serde_json::json!({"error":format!("{e:?}")}),
-                        }
-                    }));
+                    eprintln!(
+                        "TEMP_392_IDENTITY {}",
+                        serde_json::json!({
+                            "phase":phase,"new_name":new_name,"role":"annotation","index":index,
+                            "range":[node.start,node.end],"binding":match &bound {
+                                Ok(b) => serde_json::json!({"annotated":b.annotated().cst_index(),
+                                    "function":b.function().cst_index(),"body":b.body().cst_index(),
+                                    "target":b.target().cst_index(),"owner":b.target().owner(),
+                                    "list":b.target().cst_parent_index(),"name":b.target().name_range()}),
+                                Err(e) => serde_json::json!({"error":format!("{e:?}")}),
+                            }
+                        })
+                    );
                     let spelling = &actual[node.start..node.end];
                     type_names.push(spelling);
                     if spelling == "Int" {
-                        assert_eq!(bound.unwrap_err(), LocalBindingError::NoEligibleTypeParameter);
+                        assert_eq!(
+                            bound.unwrap_err(),
+                            LocalBindingError::NoEligibleTypeParameter
+                        );
                     } else {
                         let bound = bound.unwrap();
-                        if bound.function().cst_index() == ty.owner().map(|i| lower.declarations()[i].cst_index()).unwrap() {
+                        if bound.function().cst_index()
+                            == ty
+                                .owner()
+                                .map(|i| lower.declarations()[i].cst_index())
+                                .unwrap()
+                        {
                             assert!(std::ptr::eq(bound.target(), ty));
-                            assert_eq!(bound.target().raw_name(), if phase == "original" { "T" } else { new_name });
+                            assert_eq!(
+                                bound.target().raw_name(),
+                                if phase == "original" { "T" } else { new_name }
+                            );
                         } else {
                             assert_eq!(bound.target().raw_name(), "T");
                             assert!(!std::ptr::eq(bound.target(), ty));
@@ -1488,15 +1595,18 @@ fn type_parameter_occurrences_preserve_original_type_value_and_callee_partitions
                     }
                 } else if parent.kind == "CALL_EXPRESSION" {
                     let bound = bind_local_function_callee(&directory, rebound, index, snapshot);
-                    eprintln!("TEMP_392_IDENTITY {}", serde_json::json!({
-                        "phase":phase,"new_name":new_name,"role":"callee","index":index,
-                        "range":[node.start,node.end],"binding":match &bound {
-                            Ok(b) => serde_json::json!({"function":b.function().cst_index(),
-                                "body":b.body().cst_index(),"target":b.target().cst_index(),
-                                "owner":b.target().owner(),"name":b.target().name_range()}),
-                            Err(e) => serde_json::json!({"error":format!("{e:?}")}),
-                        }
-                    }));
+                    eprintln!(
+                        "TEMP_392_IDENTITY {}",
+                        serde_json::json!({
+                            "phase":phase,"new_name":new_name,"role":"callee","index":index,
+                            "range":[node.start,node.end],"binding":match &bound {
+                                Ok(b) => serde_json::json!({"function":b.function().cst_index(),
+                                    "body":b.body().cst_index(),"target":b.target().cst_index(),
+                                    "owner":b.target().owner(),"name":b.target().name_range()}),
+                                Err(e) => serde_json::json!({"error":format!("{e:?}")}),
+                            }
+                        })
+                    );
                     let bound = bound.unwrap();
                     assert_eq!(bound.target().kind(), "FUN");
                     assert_eq!(bound.target().raw_name(), "Fresh");
@@ -1504,61 +1614,173 @@ fn type_parameter_occurrences_preserve_original_type_value_and_callee_partitions
                 } else {
                     let site = reference_site(&lower, rebound, snapshot, index).unwrap();
                     let bound = bind_local_value(&directory, &site, snapshot);
-                    eprintln!("TEMP_392_IDENTITY {}", serde_json::json!({
-                        "phase":phase,"new_name":new_name,"role":"value","index":index,
-                        "range":[node.start,node.end],"binding":match &bound {
-                            Ok(b) => serde_json::json!({"annotated":site.containing_property().cst_index(),
-                                "function":site.function().cst_index(),"body":b.body().cst_index(),
-                                "target":b.target().cst_index(),"owner":b.target().owner(),
-                                "name":b.target().name_range()}),
-                            Err(e) => serde_json::json!({"error":format!("{e:?}")}),
-                        }
-                    }));
+                    eprintln!(
+                        "TEMP_392_IDENTITY {}",
+                        serde_json::json!({
+                            "phase":phase,"new_name":new_name,"role":"value","index":index,
+                            "range":[node.start,node.end],"binding":match &bound {
+                                Ok(b) => serde_json::json!({"annotated":site.containing_property().cst_index(),
+                                    "function":site.function().cst_index(),"body":b.body().cst_index(),
+                                    "target":b.target().cst_index(),"owner":b.target().owner(),
+                                    "name":b.target().name_range()}),
+                                Err(e) => serde_json::json!({"error":format!("{e:?}")}),
+                            }
+                        })
+                    );
                     let bound = bound.unwrap();
-                    assert_eq!(&actual[site.range()], if site.containing_property().raw_name() == "n" { "U" } else if site.containing_property().raw_name() == "other" { "p" } else { "T" });
-                    let ordinal = lower.declarations().iter().position(|d| std::ptr::eq(d, bound.target())).unwrap();
-                    values.push((site.containing_property().raw_name(), bound.target().kind(), bound.target().raw_name(), ordinal));
+                    assert_eq!(
+                        &actual[site.range()],
+                        if site.containing_property().raw_name() == "n" {
+                            "U"
+                        } else if site.containing_property().raw_name() == "other" {
+                            "p"
+                        } else {
+                            "T"
+                        }
+                    );
+                    let ordinal = lower
+                        .declarations()
+                        .iter()
+                        .position(|d| std::ptr::eq(d, bound.target()))
+                        .unwrap();
+                    values.push((
+                        site.containing_property().raw_name(),
+                        bound.target().kind(),
+                        bound.target().raw_name(),
+                        ordinal,
+                    ));
                 }
             }
             let name = if phase == "original" { "T" } else { new_name };
             assert_eq!(type_names, [name, "Int", name, name, "Int", "T", "T"]);
             assert_eq!(callees, [("f", "Fresh")]);
-            let parameter = lower.declarations().iter().position(|d| d.kind() == "VALUE_PARAMETER" && d.raw_name() == "T").unwrap();
-            let local = lower.declarations().iter().position(|d| d.kind() == "PROPERTY" && d.raw_name() == "T").unwrap();
-            assert_eq!(values.iter().map(|v| (v.0,v.1,v.2)).collect::<Vec<_>>(),
-                [("before","VALUE_PARAMETER","T"),("T","VALUE_PARAMETER","T"),("after","PROPERTY","T"),("n","VALUE_PARAMETER","U"),("other","VALUE_PARAMETER","p")]);
-            assert_eq!([values[0].3, values[1].3, values[2].3], [parameter, parameter, local]);
+            let parameter = lower
+                .declarations()
+                .iter()
+                .position(|d| d.kind() == "VALUE_PARAMETER" && d.raw_name() == "T")
+                .unwrap();
+            let local = lower
+                .declarations()
+                .iter()
+                .position(|d| d.kind() == "PROPERTY" && d.raw_name() == "T")
+                .unwrap();
+            assert_eq!(
+                values.iter().map(|v| (v.0, v.1, v.2)).collect::<Vec<_>>(),
+                [
+                    ("before", "VALUE_PARAMETER", "T"),
+                    ("T", "VALUE_PARAMETER", "T"),
+                    ("after", "PROPERTY", "T"),
+                    ("n", "VALUE_PARAMETER", "U"),
+                    ("other", "VALUE_PARAMETER", "p")
+                ]
+            );
+            assert_eq!(
+                [values[0].3, values[1].3, values[2].3],
+                [parameter, parameter, local]
+            );
         }
     }
 }
 
 #[test]
 fn type_parameter_rename_refuses_captures_duplicates_contextual_outputs_and_foreign_origins() {
-    use ktlsp_parser::local_value_binding::{TypeParameterAnchor, guarded_type_parameter_rename, type_parameter_occurrences};
+    use ktlsp_parser::local_value_binding::{
+        TypeParameterAnchor, guarded_type_parameter_rename, type_parameter_occurrences,
+    };
     let _serial = functional::serial();
     for (source, name, error) in [
-        ("fun <T, `T`> f() {}", "Fresh", LocalBindingError::AmbiguousTypeParameter),
-        ("fun <T, U, `T`> f(p:T) {}", "Fresh", LocalBindingError::AmbiguousTypeParameter),
-        ("fun <T, `U`> f(p:T) {}", "U", LocalBindingError::AmbiguousTypeParameter),
-        ("fun <T> f(p:U) {}", "U", LocalBindingError::AmbiguousTypeParameter),
-        ("fun <T> f() { val x:U=1 }", "U", LocalBindingError::AmbiguousTypeParameter),
-        ("fun <T> f(p:T) {}", "where", LocalBindingError::UnsupportedSpelling),
-        ("fun <T> f(p:T) {}", "dynamic", LocalBindingError::UnsupportedSpelling),
-        ("fun <T> f(p:T) {}", "suspend", LocalBindingError::UnsupportedSpelling),
-        ("fun <`where`> f(p:`where`) {}", "where", LocalBindingError::UnsupportedSpelling),
-        ("fun <`dynamic`> f(p:`dynamic`) {}", "dynamic", LocalBindingError::UnsupportedSpelling),
-        ("fun <`suspend`> f(p:`suspend`) {}", "suspend", LocalBindingError::UnsupportedSpelling),
-        ("fun <T> f(p:T) {}", "___", LocalBindingError::UnsupportedSpelling),
-        ("fun <T> f(p:T) {}", "`Fresh`", LocalBindingError::UnsupportedSpelling),
-        ("fun <T> f(p:T) {}", "🦀", LocalBindingError::UnsupportedSpelling),
+        (
+            "fun <T, `T`> f() {}",
+            "Fresh",
+            LocalBindingError::AmbiguousTypeParameter,
+        ),
+        (
+            "fun <T, U, `T`> f(p:T) {}",
+            "Fresh",
+            LocalBindingError::AmbiguousTypeParameter,
+        ),
+        (
+            "fun <T, `U`> f(p:T) {}",
+            "U",
+            LocalBindingError::AmbiguousTypeParameter,
+        ),
+        (
+            "fun <T> f(p:U) {}",
+            "U",
+            LocalBindingError::AmbiguousTypeParameter,
+        ),
+        (
+            "fun <T> f() { val x:U=1 }",
+            "U",
+            LocalBindingError::AmbiguousTypeParameter,
+        ),
+        (
+            "fun <T> f(p:T) {}",
+            "where",
+            LocalBindingError::UnsupportedSpelling,
+        ),
+        (
+            "fun <T> f(p:T) {}",
+            "dynamic",
+            LocalBindingError::UnsupportedSpelling,
+        ),
+        (
+            "fun <T> f(p:T) {}",
+            "suspend",
+            LocalBindingError::UnsupportedSpelling,
+        ),
+        (
+            "fun <`where`> f(p:`where`) {}",
+            "where",
+            LocalBindingError::UnsupportedSpelling,
+        ),
+        (
+            "fun <`dynamic`> f(p:`dynamic`) {}",
+            "dynamic",
+            LocalBindingError::UnsupportedSpelling,
+        ),
+        (
+            "fun <`suspend`> f(p:`suspend`) {}",
+            "suspend",
+            LocalBindingError::UnsupportedSpelling,
+        ),
+        (
+            "fun <T> f(p:T) {}",
+            "___",
+            LocalBindingError::UnsupportedSpelling,
+        ),
+        (
+            "fun <T> f(p:T) {}",
+            "`Fresh`",
+            LocalBindingError::UnsupportedSpelling,
+        ),
+        (
+            "fun <T> f(p:T) {}",
+            "🦀",
+            LocalBindingError::UnsupportedSpelling,
+        ),
     ] {
         let result = parse(source);
         let snapshot = result.snapshot();
         let lower = lower_declarations(&result, snapshot).unwrap();
         let directory = build_regions(&lower, &result, snapshot).unwrap();
-        let target = lower.declarations().iter().find(|d| d.kind() == "TYPE_PARAMETER").unwrap();
-        assert_eq!(guarded_type_parameter_rename(&directory, &result,
-            TypeParameterAnchor::Declaration(target), snapshot, Some(name)).unwrap_err(), error, "{source} -> {name}");
+        let target = lower
+            .declarations()
+            .iter()
+            .find(|d| d.kind() == "TYPE_PARAMETER")
+            .unwrap();
+        assert_eq!(
+            guarded_type_parameter_rename(
+                &directory,
+                &result,
+                TypeParameterAnchor::Declaration(target),
+                snapshot,
+                Some(name)
+            )
+            .unwrap_err(),
+            error,
+            "{source} -> {name}"
+        );
     }
     let source = "// 😀\r\nfun <`🦀`, Unused> f(p:`🦀`) { val x:`🦀`=p }\r\n";
     let result = parse(source);
@@ -1566,35 +1788,99 @@ fn type_parameter_rename_refuses_captures_duplicates_contextual_outputs_and_fore
     let lower = lower_declarations(&result, snapshot).unwrap();
     let directory = build_regions(&lower, &result, snapshot).unwrap();
     let target = &lower.declarations()[1];
-    let found = guarded_type_parameter_rename(&directory, &result,
-        TypeParameterAnchor::Declaration(target), snapshot, Some("Fresh")).unwrap();
+    let found = guarded_type_parameter_rename(
+        &directory,
+        &result,
+        TypeParameterAnchor::Declaration(target),
+        snapshot,
+        Some("Fresh"),
+    )
+    .unwrap();
     assert_eq!(found.target().semantic_spelling(), Some("🦀"));
     assert_eq!(found.occurrences().len(), 2);
     let foreign_result = parse(source);
     let foreign_lower = lower_declarations(&result, snapshot).unwrap();
-    assert_eq!(type_parameter_occurrences(&directory, &result,
-        TypeParameterAnchor::Declaration(&foreign_lower.declarations()[1]), snapshot).unwrap_err(), LocalBindingError::InvalidOrigin);
-    assert_eq!(type_parameter_occurrences(&directory, &foreign_result,
-        TypeParameterAnchor::Declaration(target), foreign_result.snapshot()).unwrap_err(), LocalBindingError::InvalidOrigin);
+    assert_eq!(
+        type_parameter_occurrences(
+            &directory,
+            &result,
+            TypeParameterAnchor::Declaration(&foreign_lower.declarations()[1]),
+            snapshot
+        )
+        .unwrap_err(),
+        LocalBindingError::InvalidOrigin
+    );
+    assert_eq!(
+        type_parameter_occurrences(
+            &directory,
+            &foreign_result,
+            TypeParameterAnchor::Declaration(target),
+            foreign_result.snapshot()
+        )
+        .unwrap_err(),
+        LocalBindingError::InvalidOrigin
+    );
     for stale in [
         SourceSnapshot::new(snapshot.document(), 8, FileKind::Source, source).unwrap(),
         SourceSnapshot::new("foreign", 7, FileKind::Source, source).unwrap(),
-        SourceSnapshot::new(snapshot.document(), 7, FileKind::Source, source.replace("Unused", "Spare")).unwrap(),
+        SourceSnapshot::new(
+            snapshot.document(),
+            7,
+            FileKind::Source,
+            source.replace("Unused", "Spare"),
+        )
+        .unwrap(),
     ] {
-        assert_eq!(type_parameter_occurrences(&directory, &result,
-            TypeParameterAnchor::Declaration(target), &stale).unwrap_err(), LocalBindingError::StaleSnapshot);
+        assert_eq!(
+            type_parameter_occurrences(
+                &directory,
+                &result,
+                TypeParameterAnchor::Declaration(target),
+                &stale
+            )
+            .unwrap_err(),
+            LocalBindingError::StaleSnapshot
+        );
     }
     let tree = result.tree_for(snapshot).unwrap();
-    for (index, e) in tree.elements().iter().enumerate().filter(|(_, e)| e.kind == "REFERENCE_EXPRESSION") {
+    for (index, e) in tree
+        .elements()
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| e.kind == "REFERENCE_EXPRESSION")
+    {
         if tree.elements()[e.parent.unwrap()].kind != "USER_TYPE" {
-            assert_eq!(type_parameter_occurrences(&directory, &result,
-                TypeParameterAnchor::AnnotationReference(index), snapshot).unwrap_err(), LocalBindingError::UnsupportedContext);
+            assert_eq!(
+                type_parameter_occurrences(
+                    &directory,
+                    &result,
+                    TypeParameterAnchor::AnnotationReference(index),
+                    snapshot
+                )
+                .unwrap_err(),
+                LocalBindingError::UnsupportedContext
+            );
         }
     }
     for index in [usize::MAX, tree.elements().len(), 0] {
-        assert!(type_parameter_occurrences(&directory, &result,
-            TypeParameterAnchor::AnnotationReference(index), snapshot).is_err());
+        assert!(
+            type_parameter_occurrences(
+                &directory,
+                &result,
+                TypeParameterAnchor::AnnotationReference(index),
+                snapshot
+            )
+            .is_err()
+        );
     }
-    assert_eq!(type_parameter_occurrences(&directory, &result,
-        TypeParameterAnchor::Declaration(&lower.declarations()[3]), snapshot).unwrap_err(), LocalBindingError::UnsupportedContext);
+    assert_eq!(
+        type_parameter_occurrences(
+            &directory,
+            &result,
+            TypeParameterAnchor::Declaration(&lower.declarations()[3]),
+            snapshot
+        )
+        .unwrap_err(),
+        LocalBindingError::UnsupportedContext
+    );
 }

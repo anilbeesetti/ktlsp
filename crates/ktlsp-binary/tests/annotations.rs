@@ -63,109 +63,109 @@ fn setup() -> (ClassFile<'static>, u16, u16, u16) {
 #[test]
 fn every_tag_exact_bits_utf16_order_and_contexts() {
     for major in [67, 68, 69] {
-    let (mut c, visible, ty, _) = setup();
-    c.major = major;
-    let invisible = text(&mut c, "RuntimeInvisibleAnnotations");
-    let int = add(&mut c, Constant::Integer(0xffff_ffff));
-    let float = add(&mut c, Constant::Float(0x7fc0_1234));
-    let long = add(&mut c, Constant::Long(0xffff_ffff_ffff_ffff));
-    add(&mut c, Constant::Unusable);
-    let double = add(&mut c, Constant::Double(0xfff8_0000_0000_1234));
-    add(&mut c, Constant::Unusable);
-    let string = add(&mut c, Constant::Utf8(vec![0, 0xd800, 0x61, 0xdc00]));
-    let enum_ty = text(&mut c, "Lexample/Enum;");
-    let enum_name = text(&mut c, "FIRST");
-    let void = text(&mut c, "V");
-    let mut enum_value = scalar(b'e', enum_ty);
-    u2(&mut enum_value, enum_name);
-    let mut nested = vec![b'@'];
-    u2(&mut nested, ty);
-    u2(&mut nested, 0);
-    let array = vec![b'[', 0, 2, b'I', (int >> 8) as u8, int as u8, b'[', 0, 0];
-    let values = vec![
-        scalar(b'B', int),
-        scalar(b'C', int),
-        scalar(b'D', double),
-        scalar(b'F', float),
-        scalar(b'I', int),
-        scalar(b'J', long),
-        scalar(b'S', int),
-        scalar(b'Z', int),
-        scalar(b's', string),
-        enum_value,
-        scalar(b'c', void),
-        nested,
-        array,
-    ];
-    let pairs: Vec<_> = values
-        .into_iter()
-        .enumerate()
-        .map(|(i, v)| (text(&mut c, &format!("v{i}")), v))
-        .collect();
-    let bytes = payload(ty, &pairs);
-    let empty = [0, 0];
-    c.attributes = vec![
-        Attribute {
+        let (mut c, visible, ty, _) = setup();
+        c.major = major;
+        let invisible = text(&mut c, "RuntimeInvisibleAnnotations");
+        let int = add(&mut c, Constant::Integer(0xffff_ffff));
+        let float = add(&mut c, Constant::Float(0x7fc0_1234));
+        let long = add(&mut c, Constant::Long(0xffff_ffff_ffff_ffff));
+        add(&mut c, Constant::Unusable);
+        let double = add(&mut c, Constant::Double(0xfff8_0000_0000_1234));
+        add(&mut c, Constant::Unusable);
+        let string = add(&mut c, Constant::Utf8(vec![0, 0xd800, 0x61, 0xdc00]));
+        let enum_ty = text(&mut c, "Lexample/Enum;");
+        let enum_name = text(&mut c, "FIRST");
+        let void = text(&mut c, "V");
+        let mut enum_value = scalar(b'e', enum_ty);
+        u2(&mut enum_value, enum_name);
+        let mut nested = vec![b'@'];
+        u2(&mut nested, ty);
+        u2(&mut nested, 0);
+        let array = vec![b'[', 0, 2, b'I', (int >> 8) as u8, int as u8, b'[', 0, 0];
+        let values = vec![
+            scalar(b'B', int),
+            scalar(b'C', int),
+            scalar(b'D', double),
+            scalar(b'F', float),
+            scalar(b'I', int),
+            scalar(b'J', long),
+            scalar(b'S', int),
+            scalar(b'Z', int),
+            scalar(b's', string),
+            enum_value,
+            scalar(b'c', void),
+            nested,
+            array,
+        ];
+        let pairs: Vec<_> = values
+            .into_iter()
+            .enumerate()
+            .map(|(i, v)| (text(&mut c, &format!("v{i}")), v))
+            .collect();
+        let bytes = payload(ty, &pairs);
+        let empty = [0, 0];
+        c.attributes = vec![
+            Attribute {
+                name: visible,
+                bytes: &bytes,
+            },
+            Attribute {
+                name: invisible,
+                bytes: &empty,
+            },
+        ];
+        c.fields = vec![
+            member(vec![Attribute {
+                name: invisible,
+                bytes: &bytes,
+            }]),
+            member(vec![]),
+        ];
+        c.methods = vec![member(vec![Attribute {
             name: visible,
             bytes: &bytes,
-        },
-        Attribute {
-            name: invisible,
-            bytes: &empty,
-        },
-    ];
-    c.fields = vec![
-        member(vec![Attribute {
-            name: invisible,
-            bytes: &bytes,
-        }]),
-        member(vec![]),
-    ];
-    c.methods = vec![member(vec![Attribute {
-        name: visible,
-        bytes: &bytes,
-    }])];
-    let decoded = decode(&c).unwrap();
-    assert_eq!(decoded.class.len(), 2);
-    assert_eq!(decoded.class[0].visibility, Visibility::RuntimeVisible);
-    assert_eq!(decoded.class[1].visibility, Visibility::RuntimeInvisible);
-    assert!(decoded.class[1].annotations.is_empty());
-    assert_eq!(decoded.fields.len(), 2);
-    assert!(decoded.fields[1].is_empty());
-    assert_eq!(
-        decoded.fields[0][0].visibility,
-        Visibility::RuntimeInvisible
-    );
-    assert_eq!(decoded.methods[0][0].visibility, Visibility::RuntimeVisible);
-    let a = &decoded.class[0].annotations[0];
-    assert_eq!(
-        a.descriptor,
-        "Lexample/Annotation;".encode_utf16().collect::<Vec<_>>()
-    );
-    let expected = [
-        Value::Byte(u32::MAX),
-        Value::Char(u32::MAX),
-        Value::Double(0xfff8_0000_0000_1234),
-        Value::Float(0x7fc0_1234),
-        Value::Int(u32::MAX),
-        Value::Long(u64::MAX),
-        Value::Short(u32::MAX),
-        Value::Boolean(u32::MAX),
-        Value::String(&[0, 0xd800, 0x61, 0xdc00]),
-    ];
-    for (element, expected) in a.elements.iter().zip(expected) {
-        assert_eq!(element.value, expected);
-    }
-    assert!(
-        matches!(&a.elements[9].value, Value::Enum { descriptor, name } if *descriptor == c.utf16(enum_ty).unwrap() && *name == c.utf16(enum_name).unwrap())
-    );
-    assert_eq!(a.elements[10].value, Value::Class(&[86]));
-    assert!(matches!(&a.elements[11].value, Value::Annotation(a) if a.elements.is_empty()));
-    assert_eq!(
-        a.elements[12].value,
-        Value::Array(vec![Value::Int(u32::MAX), Value::Array(vec![])])
-    );
-    assert_eq!(c.attributes[0].bytes, bytes);
+        }])];
+        let decoded = decode(&c).unwrap();
+        assert_eq!(decoded.class.len(), 2);
+        assert_eq!(decoded.class[0].visibility, Visibility::RuntimeVisible);
+        assert_eq!(decoded.class[1].visibility, Visibility::RuntimeInvisible);
+        assert!(decoded.class[1].annotations.is_empty());
+        assert_eq!(decoded.fields.len(), 2);
+        assert!(decoded.fields[1].is_empty());
+        assert_eq!(
+            decoded.fields[0][0].visibility,
+            Visibility::RuntimeInvisible
+        );
+        assert_eq!(decoded.methods[0][0].visibility, Visibility::RuntimeVisible);
+        let a = &decoded.class[0].annotations[0];
+        assert_eq!(
+            a.descriptor,
+            "Lexample/Annotation;".encode_utf16().collect::<Vec<_>>()
+        );
+        let expected = [
+            Value::Byte(u32::MAX),
+            Value::Char(u32::MAX),
+            Value::Double(0xfff8_0000_0000_1234),
+            Value::Float(0x7fc0_1234),
+            Value::Int(u32::MAX),
+            Value::Long(u64::MAX),
+            Value::Short(u32::MAX),
+            Value::Boolean(u32::MAX),
+            Value::String(&[0, 0xd800, 0x61, 0xdc00]),
+        ];
+        for (element, expected) in a.elements.iter().zip(expected) {
+            assert_eq!(element.value, expected);
+        }
+        assert!(
+            matches!(&a.elements[9].value, Value::Enum { descriptor, name } if *descriptor == c.utf16(enum_ty).unwrap() && *name == c.utf16(enum_name).unwrap())
+        );
+        assert_eq!(a.elements[10].value, Value::Class(&[86]));
+        assert!(matches!(&a.elements[11].value, Value::Annotation(a) if a.elements.is_empty()));
+        assert_eq!(
+            a.elements[12].value,
+            Value::Array(vec![Value::Int(u32::MAX), Value::Array(vec![])])
+        );
+        assert_eq!(c.attributes[0].bytes, bytes);
     }
 }
 

@@ -764,9 +764,15 @@ fn modern_nonempty_signatures_preserve_owner_contexts() {
         c.major = major;
         c.constants.push(Constant::Utf8(u("Ljava/lang/Object;")));
         c.constants.push(Constant::Utf8(u("()V")));
-        c.attributes.push(Attribute { name: 1, bytes: &[0, 3] });
+        c.attributes.push(Attribute {
+            name: 1,
+            bytes: &[0, 3],
+        });
         c.fields.push(member(vec![attr()]));
-        c.methods.push(member(vec![Attribute { name: 1, bytes: &[0, 4] }]));
+        c.methods.push(member(vec![Attribute {
+            name: 1,
+            bytes: &[0, 4],
+        }]));
         let got = decode_signatures(&c).unwrap();
         assert!(matches!(got.class, Some(Signature::Class(_))));
         assert!(matches!(got.fields[0], Some(Signature::Field(_))));

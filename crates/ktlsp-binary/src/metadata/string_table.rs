@@ -93,7 +93,10 @@ impl Budget {
         self.wire.work(count, 0)
     }
     pub(crate) fn allocation(&mut self, bytes: usize) -> Result<(), Error> {
-        self.owned = self.owned.checked_sub(bytes).ok_or(limit("owned_bytes", 0))?;
+        self.owned = self
+            .owned
+            .checked_sub(bytes)
+            .ok_or(limit("owned_bytes", 0))?;
         self.wire.work(bytes, 0)
     }
     pub(super) fn node(&mut self, depth: usize, offset: usize) -> Result<(), Error> {

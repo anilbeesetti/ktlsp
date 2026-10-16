@@ -81,7 +81,10 @@ fn charge(used: &mut usize, n: usize, max: usize, label: &'static str) -> Result
 }
 impl<'b> Budget<'b> {
     pub(crate) fn composed(budget: &'b mut crate::metadata::string_table::Budget) -> Self {
-        Self { composite: Some(budget), ..Self::default() }
+        Self {
+            composite: Some(budget),
+            ..Self::default()
+        }
     }
     pub(crate) fn nodes(&mut self, n: usize) -> Result<()> {
         charge(&mut self.nodes, n, MAX_RECORDS, "annotation nodes")?;
@@ -110,7 +113,9 @@ impl<'b> Budget<'b> {
         if let Some(budget) = &mut self.composite {
             return budget.push(values, value, 0).map_err(composite_error);
         }
-        values.try_reserve(1).map_err(|_| Error::Limit("annotation allocation"))?;
+        values
+            .try_reserve(1)
+            .map_err(|_| Error::Limit("annotation allocation"))?;
         values.push(value);
         Ok(())
     }
@@ -126,7 +131,10 @@ impl<'b> Budget<'b> {
         self.work(text.len())?;
         if let Some(budget) = &mut self.composite {
             // Prepay the downstream name/descriptor validation scans of CP text.
-            budget.wire.work(text.len() * 2, 0).map_err(composite_error)?;
+            budget
+                .wire
+                .work(text.len() * 2, 0)
+                .map_err(composite_error)?;
         }
         Ok(text)
     }
@@ -155,8 +163,7 @@ pub(crate) fn decode_with_budget<'a>(
     class: &'a ClassFile<'_>,
     budget: &mut Budget,
 ) -> Result<DeclarationAnnotations<'a>> {
-    if !crate::supported_class_version(class.major, class.minor)
-    {
+    if !crate::supported_class_version(class.major, class.minor) {
         return Err(Error::UnsupportedVersion {
             major: class.major,
             minor: class.minor,
@@ -225,10 +232,13 @@ fn attributes<'a>(
         if r.at != attr.bytes.len() {
             return Err(Error::Malformed("annotation trailing bytes"));
         }
-        budget.push(&mut out, AnnotationAttribute {
-            visibility,
-            annotations,
-        })?;
+        budget.push(
+            &mut out,
+            AnnotationAttribute {
+                visibility,
+                annotations,
+            },
+        )?;
     }
     Ok(out)
 }

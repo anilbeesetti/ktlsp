@@ -213,8 +213,11 @@ pub(crate) fn render(
         return render_target(tree.source(), snapshot, query, target, target.name_range());
     }
     if occurrence_query {
-        let annotation_anchor = reference.filter(|(_, expression)| expression.parent
-            .is_some_and(|parent| tree.elements()[parent].kind == "USER_TYPE"));
+        let annotation_anchor = reference.filter(|(_, expression)| {
+            expression
+                .parent
+                .is_some_and(|parent| tree.elements()[parent].kind == "USER_TYPE")
+        });
         let declaration_anchor = if reference.is_none() {
             let mut selected = lowered.declarations().iter().filter(|declaration| {
                 let range = declaration.name_range();
@@ -228,7 +231,8 @@ pub(crate) fn render(
         } else {
             None
         };
-        let anchor = annotation_anchor.map(|(index, _)| TypeParameterAnchor::AnnotationReference(index))
+        let anchor = annotation_anchor
+            .map(|(index, _)| TypeParameterAnchor::AnnotationReference(index))
             .or_else(|| declaration_anchor.map(TypeParameterAnchor::Declaration));
         if let Some(anchor) = anchor {
             // Positive type roles, never failed value-binding fallback. The
@@ -241,8 +245,12 @@ pub(crate) fn render(
                 guarded_type_parameter_rename(&directory, result, anchor, snapshot, name)
             } else {
                 type_parameter_occurrences(&directory, result, anchor, snapshot)
-            }.map_err(|_| UNSUPPORTED)?;
-            let ranges = found.occurrences().iter().map(|annotation| annotation.range());
+            }
+            .map_err(|_| UNSUPPORTED)?;
+            let ranges = found
+                .occurrences()
+                .iter()
+                .map(|annotation| annotation.range());
             return if rename_query {
                 render_rename(found.target(), ranges, snapshot, &query, offset)
             } else {
@@ -274,11 +282,22 @@ pub(crate) fn render(
             let occurrences =
                 guarded_local_value_rename(&directory, result, anchor, snapshot, new_name)
                     .map_err(|_| UNSUPPORTED)?;
-            return render_rename(occurrences.target(), occurrences.occurrences().iter().map(|site| site.range()), snapshot, &query, offset);
+            return render_rename(
+                occurrences.target(),
+                occurrences.occurrences().iter().map(|site| site.range()),
+                snapshot,
+                &query,
+                offset,
+            );
         }
         let occurrences = local_value_occurrences(&directory, result, anchor, snapshot)
             .map_err(|_| UNSUPPORTED)?;
-        return render_occurrences(occurrences.target(), occurrences.occurrences().iter().map(|site| site.range()), snapshot, &query);
+        return render_occurrences(
+            occurrences.target(),
+            occurrences.occurrences().iter().map(|site| site.range()),
+            snapshot,
+            &query,
+        );
     }
     let site = reference_site(
         &lowered,

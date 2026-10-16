@@ -1649,7 +1649,10 @@ fn modern_all_six_nonempty_method_type_targets() {
             c.methods[0].attributes = vec![attr(1, &bytes)];
             let out = decode(&c).unwrap();
             assert_eq!(out.methods[0][0].annotations[0].target_type, tag);
-            assert_eq!(out.methods[0][0].annotations[0].annotation.descriptor, c.utf16(3).unwrap());
+            assert_eq!(
+                out.methods[0][0].annotations[0].annotation.descriptor,
+                c.utf16(3).unwrap()
+            );
         }
     }
 }

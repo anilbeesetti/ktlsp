@@ -625,9 +625,37 @@ fn modern_authored_nonempty_code_type_annotations_and_tightened_bytes() {
         let bodies = code::decode(&c, code::Limits::default()).unwrap();
         let body = bodies[0].as_ref().unwrap();
         let out = decode(&c, body, Limits::default()).unwrap();
-        assert_eq!(out[0].annotations.iter().map(|a| a.target_type).collect::<Vec<_>>(), (0x40..=0x4b).collect::<Vec<_>>());
+        assert_eq!(
+            out[0]
+                .annotations
+                .iter()
+                .map(|a| a.target_type)
+                .collect::<Vec<_>>(),
+            (0x40..=0x4b).collect::<Vec<_>>()
+        );
         assert_eq!(out[0].raw.as_ptr(), body.attributes[0].bytes.as_ptr());
-        assert!(decode(&c, body, Limits { bytes: raw.len(), ..Limits::default() }).is_ok());
-        assert_eq!(decode(&c, body, Limits { bytes: raw.len()-1, ..Limits::default() }).unwrap_err(), Error::Limit("code type annotation bytes"));
+        assert!(
+            decode(
+                &c,
+                body,
+                Limits {
+                    bytes: raw.len(),
+                    ..Limits::default()
+                }
+            )
+            .is_ok()
+        );
+        assert_eq!(
+            decode(
+                &c,
+                body,
+                Limits {
+                    bytes: raw.len() - 1,
+                    ..Limits::default()
+                }
+            )
+            .unwrap_err(),
+            Error::Limit("code type annotation bytes")
+        );
     }
 }

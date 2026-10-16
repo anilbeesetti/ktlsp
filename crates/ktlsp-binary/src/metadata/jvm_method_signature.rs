@@ -72,10 +72,13 @@ pub fn decode(bytes: &[u8], limits: Limits) -> Result<MethodSignatureExtension<'
         owned_bytes: limits.owned_bytes,
         ..Default::default()
     });
-    let (signature, bodies) = scan_with_budget(bytes, &mut budget, |raw, span| {
-        SignatureBody { raw, span }
-    })?;
-    Ok(MethodSignatureExtension { raw: bytes, signature, bodies })
+    let (signature, bodies) =
+        scan_with_budget(bytes, &mut budget, |raw, span| SignatureBody { raw, span })?;
+    Ok(MethodSignatureExtension {
+        raw: bytes,
+        signature,
+        bodies,
+    })
 }
 
 // Share the scanner without retaining self-borrows in the owning method consumer.

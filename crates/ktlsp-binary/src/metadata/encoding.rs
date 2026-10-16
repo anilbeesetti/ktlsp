@@ -26,7 +26,8 @@ pub(super) fn decode(strings: &[&[u16]], budget: &mut Budget) -> Result<Vec<u8>,
     budget.work(count)?;
     budget.output(size)?;
     let mut out = Vec::new();
-    out.try_reserve_exact(size).map_err(|_| Error::Limit("metadata allocation"))?;
+    out.try_reserve_exact(size)
+        .map_err(|_| Error::Limit("metadata allocation"))?;
     let units = strings.iter().flat_map(|s| s.iter()).skip(skip);
     if direct {
         out.extend(units.map(|unit| *unit as u8));

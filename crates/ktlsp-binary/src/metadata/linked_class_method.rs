@@ -3,7 +3,10 @@ use super::{
     Outcome, class_context, class_header, class_id, constructor, function_header, header,
     jvm_method_signature, name_resolver, payload, string_table, wire,
 };
-use crate::{ClassFile, Constant, Member, annotations, descriptors::{MethodDescriptor, SlotContext}};
+use crate::{
+    ClassFile, Constant, Member, annotations,
+    descriptors::{MethodDescriptor, SlotContext},
+};
 use std::ops::Range;
 
 pub use super::package_member_names::Limits;
@@ -83,10 +86,16 @@ impl std::fmt::Display for Error {
 }
 impl std::error::Error for Error {}
 impl From<wire::Error> for Error {
-    fn from(error: wire::Error) -> Self { Self::Wire(error) }
+    fn from(error: wire::Error) -> Self {
+        Self::Wire(error)
+    }
 }
 
-fn text<'c>(class: &'c ClassFile<'_>, index: u16, budget: &mut string_table::Budget) -> Result<&'c [u16], Error> {
+fn text<'c>(
+    class: &'c ClassFile<'_>,
+    index: u16,
+    budget: &mut string_table::Budget,
+) -> Result<&'c [u16], Error> {
     budget.wire.work(1, 0)?;
     if index == 0 {
         return Err(Error::Model(crate::Error::Malformed("constant index zero")));
@@ -100,17 +109,25 @@ fn text<'c>(class: &'c ClassFile<'_>, index: u16, budget: &mut string_table::Bud
     Ok(text)
 }
 
-fn owner_matches(owner: &class_id::ClassId, actual: &[u16], budget: &mut string_table::Budget) -> Result<(), Error> {
+fn owner_matches(
+    owner: &class_id::ClassId,
+    actual: &[u16],
+    budget: &mut string_table::Budget,
+) -> Result<(), Error> {
     let package = owner.package_name();
     let relative = owner.relative_class_name();
-    budget.wire.work(4 * (package.len() + relative.len()) + actual.len() + 1, 0)?;
+    budget
+        .wire
+        .work(4 * (package.len() + relative.len()) + actual.len() + 1, 0)?;
     if owner.local || relative.is_empty() {
         return Err(Error::UnsupportedOwner);
     }
     // ClassId package separators and relative nested separators are different.
     // No reverse '$' guessing, flattened-FQ-name replacement or quoted/local mapping.
     for name in [package, relative] {
-        if name.is_empty() { continue; }
+        if name.is_empty() {
+            continue;
+        }
         for part in name.split(|unit| *unit == u16::from(b'.')) {
             crate::name_valid(part, false).map_err(|_| Error::UnsupportedOwner)?;
             if part.iter().any(|unit| [60, 62, 96].contains(unit)) {
@@ -118,9 +135,15 @@ fn owner_matches(owner: &class_id::ClassId, actual: &[u16], budget: &mut string_
             }
         }
     }
-    let mapped = package.iter().map(|unit| if *unit == 46 { 47 } else { *unit })
+    let mapped = package
+        .iter()
+        .map(|unit| if *unit == 46 { 47 } else { *unit })
         .chain((!package.is_empty()).then_some(47))
-        .chain(relative.iter().map(|unit| if *unit == 46 { 36 } else { *unit }));
+        .chain(
+            relative
+                .iter()
+                .map(|unit| if *unit == 46 { 36 } else { *unit }),
+        );
     if !mapped.eq(actual.iter().copied()) {
         return Err(Error::OwnerMismatch);
     }
@@ -150,40 +173,73 @@ pub fn decode<'c, 'data>(
     limits: Limits,
 ) -> Result<LinkedMethod<'c, 'data>, Error> {
     let mut budget = string_table::Budget::new(string_table::Limits {
-        bytes: limits.bytes, records: limits.records, nodes: limits.nodes,
-        depth: limits.depth, work: limits.work, owned_bytes: limits.owned_bytes,
+        bytes: limits.bytes,
+        records: limits.records,
+        nodes: limits.nodes,
+        depth: limits.depth,
+        work: limits.work,
+        owned_bytes: limits.owned_bytes,
     });
     decode_with_budget(class, ordinal, limits, &mut budget)
 }
 
 fn decode_with_budget<'c, 'data>(
-    class: &'c ClassFile<'data>, ordinal: usize, limits: Limits,
+    class: &'c ClassFile<'data>,
+    ordinal: usize,
+    limits: Limits,
     budget: &mut string_table::Budget,
 ) -> Result<LinkedMethod<'c, 'data>, Error> {
-    let annotations = annotations::decode_with_budget(class, &mut annotations::Budget::composed(budget))
-        .map_err(Error::Model)?;
+    let annotations =
+        annotations::decode_with_budget(class, &mut annotations::Budget::composed(budget))
+            .map_err(Error::Model)?;
     let metadata = header::decode_with_budget(&annotations, &mut header::Budget::composed(budget))
         .map_err(Error::Metadata)?;
-    let Outcome::Decoded { header, bytes } = metadata else { return Err(Error::UnsupportedContainer); };
-    if header.k != 1 { return Err(Error::UnsupportedContainer); }
+    let Outcome::Decoded { header, bytes } = metadata else {
+        return Err(Error::UnsupportedContainer);
+    };
+    if header.k != 1 {
+        return Err(Error::UnsupportedContainer);
+    }
     if header.d2.len() > limits.entries.min(crate::MAX_RECORDS) {
         return Err(Error::Model(crate::Error::Limit("entries")));
     }
     for value in &header.d2 {
         budget.wire.work(1, 0)?;
-        budget.input(value.len().checked_mul(2).ok_or(Error::Model(crate::Error::Limit("bytes")))?)?;
+        budget.input(
+            value
+                .len()
+                .checked_mul(2)
+                .ok_or(Error::Model(crate::Error::Limit("bytes")))?,
+        )?;
     }
     let framed = payload::decode_with_budget(&bytes, budget)?;
-    let mut resolver = class_context::resolver(&framed, &header.d2, limits, budget).map_err(Error::Context)?;
+    let mut resolver =
+        class_context::resolver(&framed, &header.d2, limits, budget).map_err(Error::Context)?;
     let class_span = framed.payload_span.clone();
     budget.node(1, class_span.start)?;
-    let class_header = class_header::decode_with_budget(framed.payload, &mut budget.wire)
-        .map_err(|mut error| { error.offset += class_span.start; Error::Class(error) })?;
-    let class_id = class_id::resolve_owner(class_header.fq_name, class_span.start, &mut resolver, budget)
-        .map_err(|error| match error { class_id::Error::Wire(error) => Error::Wire(error), class_id::Error::Name(error) => Error::Name(error) })?;
+    let class_header = class_header::decode_with_budget(framed.payload, &mut budget.wire).map_err(
+        |mut error| {
+            error.offset += class_span.start;
+            Error::Class(error)
+        },
+    )?;
+    let class_id = class_id::resolve_owner(
+        class_header.fq_name,
+        class_span.start,
+        &mut resolver,
+        budget,
+    )
+    .map_err(|error| match error {
+        class_id::Error::Wire(error) => Error::Wire(error),
+        class_id::Error::Name(error) => Error::Name(error),
+    })?;
     budget.wire.work(1, 0)?;
-    if class.this_class == 0 { return Err(Error::Model(crate::Error::Malformed("this_class"))); }
-    let Constant::Class(owner_index) = crate::constant(&class.constants, class.this_class).map_err(Error::Model)? else {
+    if class.this_class == 0 {
+        return Err(Error::Model(crate::Error::Malformed("this_class")));
+    }
+    let Constant::Class(owner_index) =
+        crate::constant(&class.constants, class.this_class).map_err(Error::Model)?
+    else {
         return Err(Error::Model(crate::Error::Malformed("this_class tag")));
     };
     let jvm_owner = text(class, *owner_index, budget)?;
@@ -195,7 +251,9 @@ fn decode_with_budget<'c, 'data>(
     while pos < bytes.len() {
         let field = wire::field(&bytes, &mut pos, bytes.len(), &mut budget.wire)?;
         budget.wire.work(1, field.span.start)?;
-        if current == ordinal { selected = Some(field); }
+        if current == ordinal {
+            selected = Some(field);
+        }
         current += 1;
     }
     let field = selected.ok_or(Error::MissingOrdinal)?;
@@ -208,26 +266,47 @@ fn decode_with_budget<'c, 'data>(
     budget.node(2, start)?;
     let (flags, old_flags, function_name) = match kind {
         Kind::Constructor => {
-            let parent = constructor::decode_with_budget(body, budget).map_err(|mut error| { error.offset += start; Error::Wire(error) })?;
+            let parent = constructor::decode_with_budget(body, budget).map_err(|mut error| {
+                error.offset += start;
+                Error::Wire(error)
+            })?;
             (parent.flags, None, None)
         }
         Kind::Function => {
-            let parent = function_header::decode_with_budget(body, &mut budget.wire)
-                .map_err(|mut error| { error.offset += start; Error::Function(error) })?;
+            let parent = function_header::decode_with_budget(body, &mut budget.wire).map_err(
+                |mut error| {
+                    error.offset += start;
+                    Error::Function(error)
+                },
+            )?;
             (parent.flags, parent.old_flags, Some(parent.name))
         }
     };
-    let (signature, extension_bodies) = jvm_method_signature::scan_with_budget(body, budget, |_, span| start + span.start..start + span.end)
-        .map_err(|mut error| { error.offset += start; Error::Wire(error) })?;
+    let (signature, extension_bodies) =
+        jvm_method_signature::scan_with_budget(body, budget, |_, span| {
+            start + span.start..start + span.end
+        })
+        .map_err(|mut error| {
+            error.offset += start;
+            Error::Wire(error)
+        })?;
     let signature = signature.ok_or(Error::MissingExplicitDescriptor)?;
     let descriptor_index = signature.desc.ok_or(Error::MissingExplicitDescriptor)?;
     let explicit_name = signature.name.or(function_name);
-    let resolved_name = explicit_name.map(|index| resolver.get_string_with_budget(index, budget)).transpose().map_err(Error::Name)?;
+    let resolved_name = explicit_name
+        .map(|index| resolver.get_string_with_budget(index, budget))
+        .transpose()
+        .map_err(Error::Name)?;
     const INIT: &[u16] = &[60, 105, 110, 105, 116, 62];
     let name = resolved_name.as_deref().unwrap_or(INIT);
-    let descriptor = resolver.get_string_with_budget(descriptor_index, budget).map_err(Error::Name)?;
+    let descriptor = resolver
+        .get_string_with_budget(descriptor_index, budget)
+        .map_err(Error::Name)?;
     budget.wire.work(name.len() + 2, start)?;
-    if match kind { Kind::Constructor => name != INIT, Kind::Function => crate::eq(name, "<init>") || crate::eq(name, "<clinit>") } {
+    if match kind {
+        Kind::Constructor => name != INIT,
+        Kind::Function => crate::eq(name, "<init>") || crate::eq(name, "<clinit>"),
+    } {
         return Err(Error::SpecialMethod);
     }
     let mut matched = None;
@@ -237,12 +316,23 @@ fn decode_with_budget<'c, 'data>(
         crate::name_valid(actual_name, true).map_err(Error::Model)?;
         let actual_descriptor = text(class, method.descriptor, budget)?;
         let is_static = method.access_flags & 8 != 0;
-        let context = if is_static || crate::eq(actual_name, "<clinit>") { SlotContext::WithoutReceiver } else { SlotContext::WithReceiver };
+        let context = if is_static || crate::eq(actual_name, "<clinit>") {
+            SlotContext::WithoutReceiver
+        } else {
+            SlotContext::WithReceiver
+        };
         let parsed = MethodDescriptor::parse(actual_descriptor, context).map_err(Error::Model)?;
-        budget.wire.work(actual_name.len().min(name.len()) + actual_descriptor.len().min(descriptor.len()) + 2, 0)?;
+        budget.wire.work(
+            actual_name.len().min(name.len()) + actual_descriptor.len().min(descriptor.len()) + 2,
+            0,
+        )?;
         if actual_name == name && actual_descriptor == descriptor {
-            if kind == Kind::Constructor && (is_static || parsed.result().is_some()) { return Err(Error::SpecialMethod); }
-            if matched.is_some() { return Err(Error::DuplicateMethod); }
+            if kind == Kind::Constructor && (is_static || parsed.result().is_some()) {
+                return Err(Error::SpecialMethod);
+            }
+            if matched.is_some() {
+                return Err(Error::DuplicateMethod);
+            }
             matched = Some((method_ordinal, method, actual_name, parsed));
         }
     }
@@ -250,6 +340,29 @@ fn decode_with_budget<'c, 'data>(
     let class_flags = class_header.flags;
     let class_fq_name = class_header.fq_name;
     let metadata_present = header.present;
-    let member = MetadataMember { kind, ordinal, span: field.span, body_span: start..start + body.len(), flags, old_flags, function_name, signature, extension_bodies };
-    Ok(LinkedMethod { method, method_ordinal, name, descriptor, jvm_owner, class_id, class_span, class_flags, class_fq_name, metadata_present, member, bytes })
+    let member = MetadataMember {
+        kind,
+        ordinal,
+        span: field.span,
+        body_span: start..start + body.len(),
+        flags,
+        old_flags,
+        function_name,
+        signature,
+        extension_bodies,
+    };
+    Ok(LinkedMethod {
+        method,
+        method_ordinal,
+        name,
+        descriptor,
+        jvm_owner,
+        class_id,
+        class_span,
+        class_flags,
+        class_fq_name,
+        metadata_present,
+        member,
+        bytes,
+    })
 }

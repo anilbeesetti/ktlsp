@@ -119,8 +119,7 @@ impl Budget {
 /// no partial output. Success establishes no opcode, stack, instruction-boundary,
 /// nested-attribute, Throwable, control-flow or JVM semantic verification.
 pub fn decode<'a>(class: &'a ClassFile<'_>, limits: Limits) -> Result<Vec<Option<CodeBody<'a>>>> {
-    if !crate::supported_class_version(class.major, class.minor)
-    {
+    if !crate::supported_class_version(class.major, class.minor) {
         return Err(Error::UnsupportedVersion {
             major: class.major,
             minor: class.minor,

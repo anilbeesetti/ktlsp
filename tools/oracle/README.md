@@ -72,6 +72,7 @@ The executable regression uses real production installation, final routing and d
 ### Change record
 
 - #321: fixed PR306's file-existence ownership gap and migrated external cancellation routing. Local macOS format and strict all-target Clippy passed; optional tests passed with 19 host, 1 peer-consumer, 9 recorder and 6 replay tests, plus two ignored subprocess helpers exercised by their parents. The first actual-path run exposed `clock_gettime(1)` failing on macOS; selecting Darwin's `CLOCK_MONOTONIC=6` fixed it while Linux retains `1`. Hosted checks and root integration are separate evidence, not implied by these local results.
+- #324 optional-tooling union: integrated the single verified main `2e408cfd8d65c68a9eede863e3f983a2db720d95` and PR300 `9318ffbe1ab97a386cf599ae49310e8c036616a6` with corrected PR306/323. At code head `04ccc2e78ad1a35ac42da873e75358d0da8ba44d`, independent functionality/adversarial integration reviews cleared, then local optional format, locked strict all-target Clippy and full synthetic tests passed once: 19 host, 1 peer-consumer, 6 PR174 validation, 9 recorder and 6 replay cases, with two ignored helpers exercised by parents. The existing executable smoke again removed the file-backed container for all seven installation failures; service cases proved dispatch only. This is reviewed/passing optional preparation, not aggregate hosted/exact-main proof or live execution admission.
 
 ## PR174 input validation (source only)
 

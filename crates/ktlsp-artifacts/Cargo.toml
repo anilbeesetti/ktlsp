@@ -5,5 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+serde.workspace = true
+serde_json.workspace = true
 sha2 = { version = "=0.10.9", default-features = false, features = ["std", "force-soft"] }
 miniz_oxide = { version = "=0.9.1", default-features = false }

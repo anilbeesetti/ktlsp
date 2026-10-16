@@ -1,34 +1,13 @@
 //! Finite, resolved nominal Package TypeAlias signatures; not alias expansion or linkage.
-use super::{Outcome, name_resolver, payload, string_table, wire};
+use super::{
+    Outcome,
+    class_id::{self, ClassId},
+    name_resolver, payload, string_table, wire,
+};
 use crate::{MAX_BYTES, MAX_RECORDS};
 use std::ops::Range;
 
 pub use super::package_member_names::Limits;
-
-/// Lossless Kotlin ClassId parts, sharing the resolver's one UTF-16 allocation.
-#[derive(Debug)]
-pub struct ClassId {
-    text: Vec<u16>,
-    package_end: usize,
-    relative_start: usize,
-    pub local: bool,
-}
-impl ClassId {
-    pub fn package_name(&self) -> &[u16] {
-        &self.text[..self.package_end]
-    }
-    pub fn relative_class_name(&self) -> &[u16] {
-        &self.text[self.relative_start..]
-    }
-}
-impl PartialEq for ClassId {
-    fn eq(&self, other: &Self) -> bool {
-        self.local == other.local
-            && self.package_name() == other.package_name()
-            && self.relative_class_name() == other.relative_class_name()
-    }
-}
-impl Eq for ClassId {}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct NominalType {
@@ -120,47 +99,12 @@ fn nominal(
         return Err(failure(offset, ErrorKind::UnsupportedType));
     }
     let index = class.ok_or(failure(start, ErrorKind::MissingClass))?;
-    let mut text = resolver
-        .get_string_with_budget(index, budget)
-        .map_err(|e| name_error(start, e))?;
-    let local = resolver
-        .is_local_class_name_with_budget(index, budget)
-        .map_err(|e| name_error(start, e))?;
-    // Kotlin ClassId.fromString: last slash BEFORE first backtick, not last slash overall.
-    // One bounded scan selects the package; one in-place pass preserves lone surrogates.
-    budget.wire.work(text.len(), start)?;
-    let mut split = None;
-    for (i, &unit) in text.iter().enumerate() {
-        if unit == u16::from(b'`') {
-            break;
-        }
-        if unit == u16::from(b'/') {
-            split = Some(i);
-        }
-    }
-    budget.wire.work(text.len(), start)?;
-    let relative_start = split.map_or(0, |i| i + 1);
-    let package_end = split.unwrap_or(0);
-    for unit in &mut text[..package_end] {
-        if *unit == u16::from(b'/') {
-            *unit = u16::from(b'.');
-        }
-    }
-    let mut write = relative_start;
-    for read in relative_start..text.len() {
-        if text[read] != u16::from(b'`') {
-            text[write] = text[read];
-            write += 1;
-        }
-    }
-    text.truncate(write);
+    let class_id = class_id::resolve(index, start, resolver, budget).map_err(|e| match e {
+        class_id::Error::Wire(e) => Error::from(e),
+        class_id::Error::Name(e) => name_error(start, e),
+    })?;
     Ok(NominalType {
-        class_id: ClassId {
-            text,
-            package_end,
-            relative_start,
-            local,
-        },
+        class_id,
         nullable: nullable.unwrap_or(false),
         nullable_presence: nullable,
     })

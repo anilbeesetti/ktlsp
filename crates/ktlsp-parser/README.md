@@ -16,8 +16,12 @@ stdin/stdout endpoint stays blocking. Input uses byte offsets and explicit write
 half-close for EOF, including best-effort half-close after a failed write. Each
 iteration attempts at most one 8 KiB read and one 8 KiB write, one pending
 half-close and one child-status poll. Cancellation precedes the original 500 ms
-deadline. Productive iterations continue; idle iterations sleep 2 ms. No Unix
-I/O threads or scoped joins remain. Non-Unix retains the pipe/scoped-thread path.
+deadline. Productive iterations continue; idle iterations wait for the unfinished
+read/write directions with one `poll` on the existing socket, requesting at most
+2 ms before another cancellation/deadline/child-status check. Completed writers
+are not watched for writability, and a fully finished exchange omits the socket
+while waiting for child status, avoiding writable/EOF busy loops. No Unix I/O
+threads or scoped joins remain. Non-Unix retains the pipe/scoped-thread path.
 
 The Unix pump samples reader errors before child status; allocation exit86 and
 other failed exits precede a remembered writer error. After successful child
@@ -79,10 +83,26 @@ exercises truncation by the consumer's 17-byte receive buffer. A separate
 4096-byte valid-prefix byte-slice regression preserves exact acknowledgement
 rejection without assuming the OS can transmit that datagram.
 
-The oversize cause is not established by those logs. The pump reads at most
-8 KiB per tick; an idle tick sleeps 2 ms, so repeated producer/readiness gaps
-could consume the unchanged 500 ms deadline before 4 MiB + 1 bytes arrive.
-This is a hypothesis, not a native-I/O fix or macOS reliability claim.
+The original logs did not establish the oversize cause. The later original
+changed-source release run
+[38868405795/job116866483405](https://github.com/anilbeesetti/ktlsp/actions/runs/38868405795/job/116866483405),
+at head `10c62efdbb109a3e8a097abd7133248f7b75526b`, recorded only 458,752 output
+bytes before selecting `Timeout` at 505.513 ms, with all eight input bytes sent
+and half-closed, no output EOF and no successful child exit observed. Repeated
+8 KiB progress/`WouldBlock` pairs were followed by roughly 18 ms idle gaps.
+The unconditional 2 ms sleep request was timer-throttling output draining on
+that observed host; the original strict `OutputLimit` assertion still failed.
+
+This repair replaces that sleep with readiness-driven `poll`, borrowing only
+the existing socket and retaining the per-tick I/O budgets and original clock.
+The positive wait is capped at 2 ms and rounds sub-millisecond remainders up to
+poll's integer-millisecond granularity; no deadline value is extended. Readiness,
+timeout, `EINTR` and hangup return to the ordinary control-first pump, without
+retrying the wait. Unexpected poll failure also checks cancellation/deadline
+before selecting `Io`. The direct Unix `libc = 0.2.190` OS-binding edge reuses
+the already audited locked package; it adds no C build or semantic engine.
+Changed-source hosted macOS release proof is still required; this source repair
+alone is not a macOS reliability claim.
 For ROOT-admitted **changed-source hosted** tests, set
 `KTLSP_NATIVE_IO_OBSERVE=1` and run the release workspace tests with `--nocapture`.
 Only the unit-test fault-worker command is observed; no product instrumentation

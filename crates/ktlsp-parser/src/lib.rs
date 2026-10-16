@@ -1402,7 +1402,10 @@ mod unix_io {
     use std::{
         io,
         net::Shutdown,
-        os::{fd::OwnedFd, unix::net::UnixStream},
+        os::{
+            fd::{AsRawFd, OwnedFd},
+            unix::net::UnixStream,
+        },
     };
 
     const CHUNK: usize = 8192;
@@ -1445,7 +1448,79 @@ mod unix_io {
             Ok(())
         }
     }
+    fn wait_timeout(remaining: Duration) -> Option<libc::c_int> {
+        if remaining.is_zero() {
+            return None;
+        }
+        // poll has millisecond granularity. Never spin with a zero timeout or
+        // request more than the existing 2 ms cancellation/status-check quantum.
+        Some(
+            remaining
+                .min(Duration::from_millis(2))
+                .as_nanos()
+                .div_ceil(1_000_000) as libc::c_int,
+        )
+    }
+
+    fn wait_ready(stream: &UnixStream, events: libc::c_short, deadline: Instant) -> io::Result<()> {
+        let Some(timeout) = wait_timeout(deadline.saturating_duration_since(Instant::now())) else {
+            return Ok(());
+        };
+        let mut descriptor = libc::pollfd {
+            // With no outstanding I/O, ignore socket EOF/HUP and wait only for
+            // the next bounded child-status/control check, rather than spin.
+            fd: if events == 0 { -1 } else { stream.as_raw_fd() },
+            events,
+            revents: 0,
+        };
+        // SAFETY: one initialized pollfd lives exclusively for this call; the
+        // borrowed UnixStream owns its fd throughout. poll retains no pointers.
+        let result = unsafe { libc::poll(&mut descriptor, 1, timeout) };
+        if result < 0 {
+            let error = io::Error::last_os_error();
+            if error.kind() != io::ErrorKind::Interrupted {
+                return Err(error);
+            }
+        } else if descriptor.revents & libc::POLLNVAL != 0 {
+            return Err(io::ErrorKind::InvalidInput.into());
+        }
+        // Readiness, timeout, EINTR and HUP are hints: the next ordinary pump
+        // tick checks cancellation/deadline first, then performs bounded I/O.
+        Ok(())
+    }
+
     impl Pump {
+        fn wait_events(&self) -> libc::c_short {
+            let mut events = 0;
+            if self.reader.is_none() {
+                events |= libc::POLLIN;
+            }
+            // An already-completed writer must not watch POLLOUT: sockets are
+            // commonly writable while we are waiting for child output.
+            if self.writer.is_none() || self.input_close.is_none() {
+                events |= libc::POLLOUT;
+            }
+            events
+        }
+
+        fn check_control(
+            &self,
+            deadline: Instant,
+            cancelled: &AtomicBool,
+            observer: Option<&mut DeadlineObserver>,
+        ) -> Result<(), ParserError> {
+            if let Err(error) = control(deadline, cancelled) {
+                if error == ParserError::Timeout
+                    && !self.exited
+                    && let Some(observer) = observer
+                {
+                    observer.select_deadline();
+                }
+                return Err(error);
+            }
+            Ok(())
+        }
+
         fn reserve_output_room(&mut self, additional: usize) -> Result<(), ParserError> {
             let needed = self
                 .output
@@ -1543,15 +1618,7 @@ mod unix_io {
             observer: Option<&mut DeadlineObserver>,
             status: impl FnOnce() -> io::Result<Option<std::process::ExitStatus>>,
         ) -> Result<Step, ParserError> {
-            if let Err(error) = control(deadline, cancelled) {
-                if error == ParserError::Timeout
-                    && !self.exited
-                    && let Some(observer) = observer
-                {
-                    observer.select_deadline();
-                }
-                return Err(error);
-            }
+            self.check_control(deadline, cancelled, observer)?;
             let mut progress = self.read(stream);
             if !self.exited {
                 if let Some(result) = self.reader {
@@ -1660,7 +1727,12 @@ mod unix_io {
                 }
                 match step? {
                     Step::Complete(bytes) => return Ok(bytes),
-                    Step::Pending(false) => thread::sleep(Duration::from_millis(2)),
+                    Step::Pending(false) => {
+                        if wait_ready(&stream, pump.wait_events(), deadline).is_err() {
+                            pump.check_control(deadline, cancelled, observer.as_deref_mut())?;
+                            return Err(ParserError::Io);
+                        }
+                    }
                     Step::Pending(true) => {}
                 }
             })()
@@ -1760,6 +1832,64 @@ mod unix_io {
                 Err(error) => error,
                 _ => panic!("expected rejected step"),
             }
+        }
+
+        #[test]
+        fn idle_wait_timeout_is_positive_bounded_and_skipped_after_expiry() {
+            assert_eq!(wait_timeout(Duration::ZERO), None);
+            for (remaining, timeout) in [
+                (Duration::from_nanos(1), 1),
+                (Duration::from_millis(1), 1),
+                (Duration::from_nanos(1_000_001), 2),
+                (Duration::from_millis(2), 2),
+                (TIMEOUT, 2),
+            ] {
+                assert_eq!(wait_timeout(remaining), Some(timeout));
+            }
+        }
+
+        #[test]
+        fn idle_readiness_watches_only_unfinished_io() {
+            let mut pump = Pump::default();
+            assert_eq!(pump.wait_events(), libc::POLLIN | libc::POLLOUT);
+            pump.writer = Some(Ok(()));
+            pump.input_close = Some(Ok(()));
+            // Watching the usually-writable socket here would busy-spin instead
+            // of waiting for the output that the reader actually needs.
+            assert_eq!(pump.wait_events(), libc::POLLIN);
+            pump.reader = Some(Ok(()));
+            // EOF is no longer useful readiness while we await child status.
+            assert_eq!(pump.wait_events(), 0);
+            pump.writer = Some(Err(ParserError::Io));
+            pump.input_close = None;
+            assert_eq!(pump.wait_events(), libc::POLLOUT);
+            pump.input_close = Some(Err(ParserError::Io));
+            assert_eq!(pump.wait_events(), 0);
+            pump.writer = None;
+            assert_eq!(pump.wait_events(), libc::POLLOUT);
+        }
+
+        #[test]
+        fn queued_socket_output_and_eof_resume_the_ordinary_bounded_reader() {
+            let (mut stream, mut peer) = UnixStream::pair().unwrap();
+            stream.set_nonblocking(true).unwrap();
+            let mut pump = Pump {
+                writer: Some(Ok(())),
+                input_close: Some(Ok(())),
+                ..Pump::default()
+            };
+            peer.write_all(b"ready").unwrap();
+            wait_ready(&stream, pump.wait_events(), Instant::now() + TIMEOUT).unwrap();
+            assert!(pump.read(&mut stream));
+            assert_eq!(pump.output, b"ready");
+            assert_eq!(pump.reader, None);
+            assert_eq!(pump.wait_events(), libc::POLLIN);
+            peer.shutdown(Shutdown::Write).unwrap();
+            wait_ready(&stream, pump.wait_events(), Instant::now() + TIMEOUT).unwrap();
+            assert!(pump.read(&mut stream));
+            assert_eq!(pump.reader, Some(Ok(())));
+            assert_eq!(pump.wait_events(), 0);
+            assert_eq!(pump.output, b"ready");
         }
 
         #[test]

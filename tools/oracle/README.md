@@ -155,18 +155,34 @@ these peers as official adapter/launcher/JVM observations. All ten cases in
 `CalibrationCase::ALL` are required, including the real boundary-denial
 syscalls and finite byte/inode exhaustion. The host joins peer identities to
 actual original `/proc` observations before opening the protected observer gate.
+Forced cases also require a protected `calibration-action.json` measuring the
+original live init/CID, actual deadline and wall-clock observation, followed by
+actual successful exact-CID kill, wait137 and stopped/no-OOM/no-restart raw
+cleanup receipts. Premature exit cannot certify timeout/kill mechanics, even
+when its independent container closure is legitimately confirmed. The peer's
+530s finite fallback remains within the shared watchdog and cannot replace the
+host's measured 300s timeout action.
 
-ROOT must run the workflow-step-cancel case in an actual runner-enforced
-`timeout-minutes: 1`, `continue-on-error: true` step, with the exact admitted
-`calibrationStep` name/number, followed by same-job `if: always()` collection.
+ROOT prepares/starts that case in a prior bootstrap step, then runs the fixed
+`await-calibration` mode with the admission directory returned by that original
+bootstrap in an actual runner-enforced `timeout-minutes: 1`,
+`continue-on-error: true` step. Its exact admitted `calibrationStep` name/number
+must match, followed by same-job `if: always()` collection. The wait helper is
+inside the runner step; the original root systemd supervisor must actually
+survive outside it and produce the later action/closure/export receipts.
 Self-kill, a custom timeout, exit130 or whole-job cancellation is not this
 case. The outside-step cleanup owner writes a root-owned `export` directory
 and immutable exact file/hash binding after teardown; missing files remain
 missing. UNKNOWN closure exports protected host facts only, not mutable child
-files. Ordinary disposal of owned calibration bulk copies happens only after
-confirmed closure, valid real peer observations, protected export and unchanged
-recorded mount IDs/topology. Failed/UNKNOWN and not-yet-authenticated
-cancellation cases are untouched; disposal errors preserve closure and block
+files. The same 60s cleanup unit reserves 12s for protected export and its
+outcome, measured against its actual systemd start; disposal is not performed
+inside that containment-critical unit. After export, ROOT runs the fixed
+`release-calibration` mode with that original admission directory to release
+only owned per-case bulk copies and the recorded ordinary state mount. This
+requires confirmed closure, valid real action/peer observations, protected
+export and unchanged recorded mount IDs/topology. Failed/UNKNOWN and
+not-yet-authenticated cancellation cases are untouched. Disposal errors or
+interruption leave blocking root latches; they preserve closure and forbid
 later launches. Original sealed staging, inventories, authority and raw exports
 are retained.
 
@@ -176,6 +192,8 @@ with `cases` containing the ten unique measured `{case,nonce}` locations, then:
 ```text
 ktlsp-oracle-pr174-host collect-calibration /etc/ktlsp-pr174/staging
 ```
+Collection has its own finite 60s evidence-only retrieval/hash budget; expired
+preparation windows remain expired and gain no new START permission.
 
 Collection requires all original same-job/boot/daemon/config receipts and
 authenticated original job-step data plus the exact named one-minute timeout

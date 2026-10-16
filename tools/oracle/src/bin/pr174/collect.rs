@@ -40,6 +40,8 @@ fn authenticate_step_cancellation(dir:&Path,a:&Admission,grant:&RootGrant,e:&mut
 }
 fn collect_calibration()->Result<Value> {
     let expected:RootGrant=load(Path::new(EXPECTED_GRANT))?;expected.validate_shape()?;
+    // Collection authenticates retained evidence only; it extends no original START/lifecycle permission.
+    let collection_end=mono_ms()?.checked_add(60000).ok_or("calibration collection deadline overflow")?;
     let locations:CalibrationCollection=load(&Path::new(STAGING).join("calibration-cases.json"))?;
     if locations.cases.len()!=CalibrationCase::ALL.len(){return Err("all ten actual calibration locations required".into());}
     let boot=String::from_utf8(read_file(Path::new("/proc/sys/kernel/random/boot_id"),128)?).map_err(|_|"boot encoding")?.trim().to_owned();
@@ -49,13 +51,15 @@ fn collect_calibration()->Result<Value> {
     for location in locations.cases {
         if !cases.insert(location.case)||!nonces.insert(location.nonce.clone())||!digest(&location.nonce){return Err("calibration locations duplicated/nonfinite".into());}
         let dir=directory(&Path::new(ROOT).join(&location.nonce).to_string_lossy())?;
-        let a:Admission=load(&dir.join("admission.json"))?;
+        let mut a:Admission=load(&dir.join("admission.json"))?;
+        a.preparation_deadline_ms=collection_end;
         let grant:RootGrant=load(&dir.join("root-authorization.json"))?;grant.validate_shape()?;
         let originally_expected:RootGrant=load(&dir.join("expected-grant.json"))?;grant.validate(&originally_expected)?;
         if grant.scope!=GrantScope::RustCalibration||grant.calibration_case!=Some(location.case)||a.scope!="PR174_RUST_CALIBRATION_ADMITTED"||a.boot_id!=boot||grant.source_head!=expected.source_head||grant.source_tree!=expected.source_tree||grant.workflow_sha256!=expected.workflow_sha256||grant.host_binary_sha256!=expected.host_binary_sha256||grant.peer_sha256!=expected.peer_sha256||grant.containment_template_sha256!=expected.containment_template_sha256||grant.image!=expected.image||grant.image_id!=expected.image_id||grant.host!=expected.host||a.run.run_id!=expected.run_id||a.run.job_id!=expected.job_id||a.run.suite_id!=expected.suite_id{return Err("actual calibration must be same original source/run/job/host/template/image".into());}
         if daemon_id.as_ref().is_some_and(|id|id!=&a.daemon_id){return Err("calibration daemon changed between cases".into());}daemon_id=Some(a.daemon_id.clone());
         let b=binding(&dir)?;let teardown:Value=load(&dir.join("teardown-receipt.json"))?;
         if teardown["teardown"]!="CONTAINER_TEARDOWN_CONFIRMED"||teardown["containerId"]!=b.container_id||teardown["nonce"]!=a.nonce{return Err("actual exact-CID calibration closure incomplete".into());}
+        require_actual_calibration_action(&dir,&a,&b,location.case)?;
         let observation=read_host_observation(&dir,location.case,&b.container_id)?;
         if observation["normalExit"]!=!location.case.forced(){return Err("calibration lifecycle outcome mismatch".into());}
         let peer:PeerReport=load(&dir.join("export/capture/calibration-peer.json"))?;peer_shape(&peer,location.case)?;validate_peer_case(&peer)?;

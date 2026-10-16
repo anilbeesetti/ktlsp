@@ -25,6 +25,22 @@ pub struct ExportBinding {
     pub files:Vec<ExportFile>,
 }
 
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(deny_unknown_fields,rename_all="camelCase")]
+pub struct CalibrationAction {
+    pub schema_version:u8,pub scope:String,pub case:CalibrationCase,pub nonce:String,pub container_id:String,
+    pub boot_id:String,pub daemon_id:String,pub init_pid:u32,pub init_starttime:u64,
+    pub armed_ms:u64,pub deadline_ms:u64,pub observed_ms:u64,pub observed_unix_ms:u64,pub original_running:bool,
+}
+impl CalibrationAction {
+    pub fn validate(&self)->Result<(),String> {
+        if self.schema_version!=1||self.scope!="PR174_RUST_CALIBRATION_ACTION"||!self.case.forced()||!digest(&self.nonce)||!digest(&self.container_id)||self.boot_id.is_empty()||self.daemon_id.is_empty()||self.init_pid<=1||self.init_starttime==0||!self.original_running||self.observed_unix_ms==0||self.armed_ms.checked_add(300000)!=Some(self.deadline_ms)||self.observed_ms<self.armed_ms||self.observed_ms>=self.armed_ms.saturating_add(540000)||(self.case==CalibrationCase::Kill&&self.observed_ms>=self.deadline_ms)||(self.case!=CalibrationCase::Kill&&self.observed_ms<self.deadline_ms) {
+            return Err("actual live original calibration action identity/deadline incomplete".into());
+        }
+        Ok(())
+    }
+}
+
 pub fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, String> {
     if bytes.len() > AUTHORITY_BYTES { return Err("authority byte limit".into()); }
     serde_json::from_slice(bytes).map_err(|e| format!("strict authority JSON: {e}"))

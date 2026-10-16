@@ -66,6 +66,7 @@ mod tests {
                 .unwrap(),
             parsed: Parsed {
                 source,
+                positions: std::sync::OnceLock::new(),
                 elements: vec![Element {
                     kind: "KT_FILE".into(),
                     start: 0,

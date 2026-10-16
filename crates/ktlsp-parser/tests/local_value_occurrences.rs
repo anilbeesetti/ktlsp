@@ -8,7 +8,7 @@ use ktlsp_parser::{
     lowering::{lower_declarations, reference_site},
     structural_regions::build_regions,
 };
-use std::{fmt::Write as _, io::Write, ops::Range, sync::atomic::AtomicBool};
+use std::{fmt::Write as _, ops::Range, sync::atomic::AtomicBool};
 
 fn parse(source: &str) -> SnapshotResult {
     let snapshot = SourceSnapshot::new("local-occurrences", 7, FileKind::Source, source).unwrap();
@@ -64,24 +64,6 @@ fn accepted(
         assert!(std::ptr::eq(binding.target(), target));
         assert!(std::ptr::eq(binding.body(), found.body()));
     }
-    // Direct writer output is visible in original hosted CI despite test capture.
-    // Retain actual source/CST/UTF-16 association, not merely a success marker.
-    let mut out = std::io::stdout().lock();
-    serde_json::to_writer(&mut out, &serde_json::json!({
-        "local_value_occurrences": {
-            "document": current.document(), "revision": current.revision(),
-            "kind": format!("{:?}", current.kind()), "source": source,
-            "target": {"cst": target.cst_index(), "raw": target.raw_name(), "range": target.name_range()},
-            "body_cst": found.body().cst_index(),
-            "occurrences": found.occurrences().iter().map(|s| serde_json::json!({
-                "cst": s.expression_index(), "token": s.token_index(), "range": s.range(),
-                "raw": s.raw_spelling(),
-                "utf16_start": ktlsp_text::offset_to_position(source, s.range().start).unwrap(),
-                "utf16_end": ktlsp_text::offset_to_position(source, s.range().end).unwrap(),
-            })).collect::<Vec<_>>()
-        }
-    })).unwrap();
-    writeln!(out).unwrap();
 }
 
 #[test]

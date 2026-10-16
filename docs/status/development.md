@@ -1753,3 +1753,76 @@ Full source/proof bytes and permanent assertions remain retained.
 edit readback, cache corpus behavior and comparable performance remain
 UNEXECUTED. Exact documentation-source recheck and OWN first original hosted
 CI remain required; native data proof never substitutes for parser/CLI proof.
+
+#### First original406 full CI and actual source readback
+
+The preceding UNEXECUTED statements describe earlier checkpoints. Exact first
+head a76f85cea447c54a6c9f0736d5a4d7d6a479b6e7/treecceb03198a5dd923ba9915ab37d643f9417f8747
+now passed its OWN ORIGINAL attempt1 workflows, with no retry or changed profile.
+Actual testmerge b81697f9ef8d96ff8b38912fa431c897b5044265 has that exact tree
+and ordered parents [3920ab7d22ce4d89023291f2801500e598e24bb0,a76f85ce].
+Native38978091403/job117232248174 passed1190=1158ordinary+32doc;
+platform38978091597 Mac117232248517 passed1188=1156+32 and
+Windows117232248669 passed1137=1105+32. Each has140result rows,
+0failed/3ignored/0measured/0filtered, plus22 SEPARATE protocol fault cases.
+All mandatory pinned format/lockedClippy/unfiltered workspace tests succeeded.
+Native raw296058bytes SHA256593aaf14feca7916396f4d2abdc340da0a09c6c5368bf620824db9ca40417134
+was completely read and independently authenticated by ROOT and its OWNER.
+
+ROOT authenticated both original18-member platform ZIPs, source-preflight,
+complete native/PowerShell byte policy, clean actual source/tree/parents and
+all recorded exits0. Mac artifact12079149578/54074bytes has
+SHA256682227237cf1c1923c4f4ee54228a43dc54dc611cf0ec6b832803802eb1513c6;
+Windows12080176746/49081bytes has
+SHA25659496e88cb8103160c83425615beea123fb233885ca0fd91cc252a289b7b7f77.
+Independent403 OWNER and ROOT each FULLY read all10 actual complete
+source/CST/declaration/projection packets plus ONE four-edit record PERHOST,
+not expected echoes or counts. Both serialized payloads112482bytes have
+SHA2569316f7f5de8d85347e98ea0061b7def43db7b9b5bc0b892aaf00843a9d4d9ab5.
+Every UTF8 boundary, lossless token partition, parent/subtree/child partition,
+declaration ordinal/owner, callee/label/value role, delimiter/comma and
+selected local parameter identity/order was checked, including Unicode/
+comments/CRLF/loneCR/duplicates/unknown names/mismatched arities.
+Both independently ACTUALLY applied original edits67..85→empty,
+60..66→fresh,24..46→empty,17..23→fresh in recorded descending order.
+The entire55byte result matched actual revision2:
+`fun outer(){ fun fresh(){}; val x=1; fresh(); val y=x }`.
+The actual selected original fresh declaration and x/y context remained.
+Pointer identity, stale refusal and value/callee rebinding are separately
+proved by successful assertion-bearing hosted tests, not JSON equality.
+Linux's raw log has NO positive403 capture packets; no Linux payload claim.
+Only AFTER both full reads ROOT removed temporary JSON writers/bookkeeping;
+every permanent assertion and actual edit application remains, including
+the post-rebinding selected-parameter query. Full proof stays retained under
+`/private/tmp/ktlsp-406-first-platform-38978091597/`.
+
+Independent404/405 owners and ROOT read complete ORIGINAL old/new Native
+raw logs and verified unchanged corpus/loops/real eight8MiB aggregate case.
+
+| Observed complete case/executable | Original401 seconds | First406 seconds |
+|---|---:|---:|
+| 64KiB longer-simple receiver case | 63.4100483 | 0.0325110 |
+| 64KiB qualified receiver case | 61.7083814 | 0.0359793 |
+| 64KiB nullable two-argument receiver case | 63.0678637 | 0.0354994 |
+| 64KiB two-argument receiver case | 55.1976965 | 0.0370442 |
+| Entire18-test Session executable | 82.97 | 3.13 |
+
+These are one hosted comparison's consecutive COMPLETE case-outcome
+timestamp intervals or executable summary, NOT isolated CPU timings,
+repeatability/RSS/reliability proof or platform-release equivalence.
+All four frozen source files/position loops are unchanged; expectation totals
+231567/262756/206112/142131 are SOURCE-DERIVED entries, not printed actual
+position counters. Successful exhaustive assertions/healthyfollowups remain.
+Session's8x8MiB/64MiB admission/rejection/version/release/reuse fixture is
+byte-identical and all18 pass; no bound/worker/deadline/cleanup was relaxed.
+Other provider executable time11.47→20.41s precludes blanket speedup claims.
+Whole Native job9m1s→2m50s is observational, not isolated attribution.
+395/377 historical causes remain UNKNOWN;96 quarantine remains unchanged.
+
+This is FIRST-SOURCE acceptance, not final-source or integration acceptance.
+Capture-free final source still requires exact independent full-union/
+affected reviews, strict compile and OWN ORIGINAL full hosted workflows,
+then a separate fresh strictly-readonly process0/parsed0 exclusive-base
+guard, ordinary expected-head merge, actual tree/soleparent and independent
+OWNER+ROOT original exact-main full CI before its lease can clear.
+No full signatures/applicability/type inference/tooling/oracle/full parity.

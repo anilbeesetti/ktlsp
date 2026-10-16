@@ -275,6 +275,10 @@ impl Session {
         }
     }
     fn document_symbols(&self, params: Option<&Value>) -> Result<Value, (i32, &'static str)> {
+        let provider = self
+            .symbol_provider
+            .as_ref()
+            .ok_or((-32601, "Method not found"))?;
         let map = params
             .ok_or((-32602, "document symbol params missing"))
             .and_then(|p| object(p).map_err(|e| (-32602, e)))?;
@@ -287,10 +291,6 @@ impl Session {
             .documents
             .get(uri)
             .ok_or((-32602, "document symbols refer to unopened document"))?;
-        let provider = self.symbol_provider.as_ref().ok_or((
-            -32803,
-            "document symbols require the installed matching parser worker",
-        ))?;
         if document.text().len() > ktlsp_parser::MAX_SOURCE_BYTES {
             return Err((
                 -32803,

@@ -321,7 +321,11 @@ fn provider_is_explicit_and_parser_failures_are_errors() {
             .is_none()
     );
     open(&mut session, "class C");
-    assert_eq!(outline(&mut session)["error"]["code"], -32803);
+    assert_eq!(outline(&mut session)["error"]["code"], -32601);
+    assert_eq!(
+        request(&mut session, "textDocument/documentSymbol", json!({}))["error"]["code"],
+        -32601
+    );
     assert!(Session::with_parser("relative-worker").is_err());
     assert!(Session::with_parser(worker().with_file_name("ktlsp-no-such-worker")).is_err());
     // A real but wrong executable fails the actual supervised parser protocol.
@@ -428,6 +432,6 @@ fn real_stdio_packaged_sibling_and_missing_worker_capabilities() {
     );
     assert_eq!(
         missing.iter().find(|m| m["id"] == 2).unwrap()["error"]["code"],
-        -32803
+        -32601
     );
 }

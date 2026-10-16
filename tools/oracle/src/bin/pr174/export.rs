@@ -24,7 +24,7 @@ fn protected_export_until(dir:&Path,end:u64)->Result<Value> {
     let output=dir.join("export");mkdir(&output,0o700)?;
     for name in ["capture","receipts","preflight"]{mkdir(&output.join(name),0o700)?;}
     let mut inventory=Vec::new();let mut total=0u64;
-    for (path,cap) in [("admission.json",16384),("root-authorization.json",16384),("expected-grant.json",16384),("calibration.json",16384),("workflow.yml",16384),("binding.json",16384),("process-identity.json",16384),("state-mount.json",16384),("calibration-action.json",16384),("teardown-receipt.json",16384),("armed.json",16384),("start-intent.json",16384),("start-result.json",16384),("cleanup-begun.json",16384),("bootstrap-receipt.json",131072),("preflight/identity.json",16384),("preflight/host-preflight.json",16384),("preflight/launch-authorization.json",16384),("receipts/observer.evidence",786432),("receipts/cleanup.evidence",262144)] {
+    for (path,cap) in [("admission.json",16384),("root-authorization.json",16384),("expected-grant.json",16384),("calibration.json",16384),("workflow.yml",16384),("binding.json",16384),("process-identity.json",16384),("state-mount.json",16384),("calibration-action.json",16384),("child-confinement-profile.json",16384),("teardown-receipt.json",16384),("armed.json",16384),("start-intent.json",16384),("start-result.json",16384),("cleanup-begun.json",16384),("bootstrap-receipt.json",131072),("preflight/identity.json",16384),("preflight/host-preflight.json",16384),("preflight/launch-authorization.json",16384),("receipts/observer.evidence",786432),("receipts/cleanup.evidence",262144)] {
         let source=dir.join(path);
         match fs::symlink_metadata(&source){Err(error)if error.kind()==ErrorKind::NotFound=>continue,Err(error)=>return Err(error.to_string()),Ok(_)=>{}}
         protected(&source,false)?;
@@ -33,7 +33,7 @@ fn protected_export_until(dir:&Path,end:u64)->Result<Value> {
         inventory.push(ProtectedExportFile{path:path.into(),bytes,sha256});
     }
     let calibration=a.scope=="PR174_RUST_CALIBRATION_ADMITTED";
-    let names:&[(&str,u64)]=if calibration {&[("calibration-ready.json",16384),("calibration-peer.json",16384)]}else{&[("manifest.json",8388608),("manifest.next",8388608),("metadata.json",8388608),("transcript.json",8388608),("client-intended.raw",8388608),("stdout.raw",8388608),("stderr.raw",65536)]};
+    let names:&[(&str,u64)]=if calibration {&[("calibration-ready.json",16384),("calibration-peer.json",16384)]}else{&[("manifest.json",8388608),("manifest.next",8388608),("metadata.json",8388608),("transcript.json",8388608),("child-confinement.json",16384),("client-intended.raw",8388608),("stdout.raw",8388608),("stderr.raw",65536)]};
     for (name,cap) in names {
         if !closed { break; } // Retain protected host facts even when mutable child output cannot safely be exported.
         match fs::symlink_metadata(dir.join("state/capture").join(name)){Err(error)if error.kind()==ErrorKind::NotFound=>continue,Err(error)=>return Err(error.to_string()),Ok(_)=>{}}

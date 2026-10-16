@@ -42,6 +42,77 @@ pub enum Outcome {
     AwaitingHostAction,
     Failed,
 }
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CustodyTarget { ClientIntended, Stdout, Stderr, Manifest, ReadyReport, Home, Config, System, Log, Tmp, Workspace }
+impl CustodyTarget {
+    pub const ALL: [Self; 5] = [Self::ClientIntended, Self::Stdout, Self::Stderr, Self::Manifest, Self::ReadyReport];
+    pub const WRITE_LEAVES: [Self; 6] = [Self::Home, Self::Config, Self::System, Self::Log, Self::Tmp, Self::Workspace];
+    pub fn filename(self) -> &'static str {
+        match self {
+            Self::ClientIntended => "client-intended.raw",
+            Self::Stdout => "stdout.raw",
+            Self::Stderr => "stderr.raw",
+            Self::Manifest => "manifest.json",
+            Self::ReadyReport => "calibration-ready.json",
+            Self::Home => "home",
+            Self::Config => "config",
+            Self::System => "system",
+            Self::Log => "log",
+            Self::Tmp => "tmp",
+            Self::Workspace => "workspace",
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CustodyAction {
+    Write, Truncate, Rename, Unlink, Hardlink, InheritedFd, ProcFd,
+    PidfdOpen, PidfdGetfd, PidfdSignal, Ptrace, ProcessVmWrite, Signal, AbstractUnix, PrivateWrite,
+}
+impl CustodyAction {
+    pub const FILE_ACTIONS: [Self; 5] = [Self::Write, Self::Truncate, Self::Rename, Self::Unlink, Self::Hardlink];
+}
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CustodyProbe {
+    pub action: CustodyAction,
+    pub target: Option<CustodyTarget>,
+    pub return_value: i64,
+    pub errno: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub readback: Option<u8>,
+}
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CustodyFile {
+    pub target: CustodyTarget,
+    pub device: u64,
+    pub inode: u64,
+    pub bytes: u64,
+    pub unchanged: bool,
+}
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CustodyRole { Direct, InheritedSetsid }
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CustodyChild {
+    pub role: CustodyRole,
+    pub original_process: ProcessIdentity,
+    pub recorder_pid: u32,
+    pub recorder_start_time_ticks: u64,
+    pub probes: Vec<CustodyProbe>,
+}
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CustodyReceipt {
+    pub confinement: crate::recorder::confinement::Receipt,
+    pub files: Vec<CustodyFile>,
+    pub memory_unchanged: bool,
+    pub children: Vec<CustodyChild>,
+}
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Report {
@@ -54,6 +125,7 @@ pub struct Report {
     pub observer_gate_observed: bool,
     pub probes: Vec<Probe>,
     pub exhaustion: Option<Exhaustion>,
+    pub custody: Option<CustodyReceipt>,
     pub first_failure: Option<String>,
     pub elapsed_ms: u64,
 }
@@ -145,8 +217,10 @@ impl Report {
         }
         if expected == Case::BoundaryDenials {
             self.validate_denials()?;
-        } else if !self.probes.is_empty() {
-            return Err("unexpected boundary probes outside boundary-denials".into());
+            self.custody.as_ref().ok_or("missing real parent-custody child cohort")?
+                .validate(&self.original_process)?;
+        } else if !self.probes.is_empty() || self.custody.is_some() {
+            return Err("unexpected boundary probes or custody cohort outside boundary-denials".into());
         }
         Ok(())
     }
@@ -217,9 +291,134 @@ impl Report {
     }
 }
 
+impl CustodyChild {
+    fn probe(&self, action: CustodyAction, target: Option<CustodyTarget>) -> Result<&CustodyProbe, String> {
+        let mut matching = self.probes.iter().filter(|probe| probe.action == action && probe.target == target);
+        let probe = matching.next().ok_or("missing custody syscall probe")?;
+        if matching.next().is_some() {
+            return Err("duplicate custody syscall probe".into());
+        }
+        let valid = match action {
+            CustodyAction::InheritedFd => probe.return_value == -1 && probe.errno == Some(9),
+            CustodyAction::PidfdOpen => (3..=i64::from(i32::MAX)).contains(&probe.return_value) && probe.errno.is_none(),
+            CustodyAction::PrivateWrite => probe.return_value == 1 && probe.errno.is_none() && probe.readback == Some(0x5a),
+            CustodyAction::Rename | CustodyAction::Hardlink =>
+                probe.return_value == -1 && (namespace_denied(probe.errno) || probe.errno == Some(18)),
+            _ => probe.return_value == -1 && namespace_denied(probe.errno),
+        };
+        if !valid || (action != CustodyAction::PrivateWrite && probe.readback.is_some()) {
+            return Err(format!("custody syscall {action:?}/{target:?} did not establish the required result"));
+        }
+        Ok(probe)
+    }
+    fn validate(&self, recorder: &ProcessIdentity) -> Result<(), String> {
+        self.original_process.validate()?;
+        if self.recorder_pid != recorder.pid || self.recorder_start_time_ticks != recorder.start_time_ticks
+            || self.original_process.pid == recorder.pid
+            || self.original_process.start_time_ticks < recorder.start_time_ticks
+            || self.original_process.executable_device != recorder.executable_device
+            || self.original_process.executable_inode != recorder.executable_inode
+            || self.probes.len() != 44 {
+            return Err("custody child original identity, target, or finite probe count mismatch".into());
+        }
+        for target in CustodyTarget::ALL {
+            for action in CustodyAction::FILE_ACTIONS { self.probe(action, Some(target))?; }
+            self.probe(CustodyAction::InheritedFd, Some(target))?;
+        }
+        for action in [CustodyAction::ProcFd, CustodyAction::PidfdGetfd] {
+            self.probe(action, Some(CustodyTarget::ClientIntended))?;
+        }
+        for action in [CustodyAction::PidfdOpen, CustodyAction::PidfdSignal, CustodyAction::Ptrace, CustodyAction::ProcessVmWrite, CustodyAction::Signal, CustodyAction::AbstractUnix] {
+            self.probe(action, None)?;
+        }
+        for leaf in CustodyTarget::WRITE_LEAVES { self.probe(CustodyAction::PrivateWrite, Some(leaf))?; }
+        Ok(())
+    }
+}
+impl CustodyReceipt {
+    fn validate(&self, recorder: &ProcessIdentity) -> Result<(), String> {
+        self.confinement.validate_enforced(recorder.pid)?;
+        if !self.memory_unchanged || self.files.len() != 5 || self.children.len() != 2 {
+            return Err("custody parent bytes changed or finite cohort incomplete".into());
+        }
+        for target in CustodyTarget::ALL {
+            let mut matching = self.files.iter().filter(|file| file.target == target);
+            let file = matching.next().ok_or("missing original custody file")?;
+            if matching.next().is_some() || !file.unchanged || file.device == 0 || file.inode == 0
+                || file.bytes == 0 || file.bytes > 16_384
+                || self.files.iter().any(|other| other.target != target && other.device == file.device && other.inode == file.inode) {
+                return Err("custody file original bytes or inode identity mismatch".into());
+            }
+        }
+        let direct = &self.children[0];
+        let inherited = &self.children[1];
+        direct.validate(recorder)?;
+        inherited.validate(recorder)?;
+        if direct.role != CustodyRole::Direct || inherited.role != CustodyRole::InheritedSetsid
+            || direct.original_process.parent_pid != recorder.pid
+            || direct.original_process.process_group != recorder.process_group
+            || direct.original_process.session != recorder.session
+            || inherited.original_process.parent_pid != direct.original_process.pid
+            || inherited.original_process.pid == direct.original_process.pid
+            || inherited.original_process.start_time_ticks < direct.original_process.start_time_ticks
+            || inherited.original_process.process_group != inherited.original_process.pid
+            || inherited.original_process.session != inherited.original_process.pid {
+            return Err("custody direct/fork/setsid relationship did not inherit the original domain".into());
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn synthetic_custody(parent: &ProcessIdentity) -> CustodyReceipt {
+        let mut children = Vec::new();
+        for (role, pid, parent_pid) in [(CustodyRole::Direct, 3, parent.pid), (CustodyRole::InheritedSetsid, 4, 3)] {
+            let inherited = role == CustodyRole::InheritedSetsid;
+            let mut child = CustodyChild {
+                role, recorder_pid: parent.pid, recorder_start_time_ticks: parent.start_time_ticks,
+                original_process: ProcessIdentity {
+                    pid, parent_pid, process_group: if inherited { pid } else { parent.process_group },
+                    session: if inherited { pid } else { parent.session }, start_time_ticks: parent.start_time_ticks + u64::from(pid),
+                    executable_device: parent.executable_device, executable_inode: parent.executable_inode,
+                },
+                probes: Vec::new(),
+            };
+            for target in CustodyTarget::ALL {
+                for action in CustodyAction::FILE_ACTIONS {
+                    child.probes.push(CustodyProbe { action, target: Some(target), return_value: -1, errno: Some(13), readback: None });
+                }
+                child.probes.push(CustodyProbe { action: CustodyAction::InheritedFd, target: Some(target), return_value: -1, errno: Some(9), readback: None });
+            }
+            for action in [CustodyAction::ProcFd, CustodyAction::PidfdGetfd] {
+                child.probes.push(CustodyProbe { action, target: Some(CustodyTarget::ClientIntended), return_value: -1, errno: Some(1), readback: None });
+            }
+            for action in [CustodyAction::PidfdOpen, CustodyAction::PidfdSignal, CustodyAction::Ptrace, CustodyAction::ProcessVmWrite, CustodyAction::Signal, CustodyAction::AbstractUnix] {
+                let (return_value, errno) = match action {
+                    CustodyAction::PidfdOpen => (5, None),
+                    _ => (-1, Some(1)),
+                };
+                child.probes.push(CustodyProbe { action, target: None, return_value, errno, readback: None });
+            }
+            for leaf in CustodyTarget::WRITE_LEAVES {
+                child.probes.push(CustodyProbe { action: CustodyAction::PrivateWrite, target: Some(leaf), return_value: 1, errno: None, readback: Some(0x5a) });
+            }
+            children.push(child);
+        }
+        CustodyReceipt {
+            // Explicit synthetic fixture: never a production or host receipt.
+            confinement: crate::recorder::confinement::Receipt {
+                schema_version: 1, profile: crate::recorder::confinement::profile(),
+                landlock_abi: Some(6), parent_pid: parent.pid, parent_dumpable: Some(0),
+                hook_outcome: "ENFORCED_BEFORE_EXEC".into(),
+            },
+            files: CustodyTarget::ALL.into_iter().enumerate().map(|(index, target)| CustodyFile {
+                target, device: 1, inode: 100 + index as u64, bytes: 64, unchanged: true,
+            }).collect(),
+            memory_unchanged: true, children,
+        }
+    }
 
     fn synthetic(case: Case) -> Report {
         let parent = ProcessIdentity {
@@ -230,7 +429,7 @@ mod tests {
             schema_version: 1, scope: "PR174_RUST_CALIBRATION_PEER".into(), case,
             outcome: if case.forced() { Outcome::AwaitingHostAction } else { Outcome::Completed },
             original_process: parent.clone(), children: Vec::new(), observer_gate_observed: true,
-            probes: Vec::new(), exhaustion: None, first_failure: None, elapsed_ms: 1,
+            probes: Vec::new(), exhaustion: None, custody: None, first_failure: None, elapsed_ms: 1,
         };
         if matches!(case, Case::SameGroup | Case::Setsid | Case::Setpgid) {
             let mut child = ProcessIdentity { pid: 3, parent_pid: 2, start_time_ticks: 11, ..parent };
@@ -267,6 +466,7 @@ mod tests {
                 for namespace in ["user", "mount", "pid", "network", "ipc", "uts", "cgroup"] {
                     deny(format!("unshare-{namespace}"), "unshare namespace");
                 }
+                report.custody = Some(synthetic_custody(&report.original_process));
             }
             _ => {}
         }
@@ -394,5 +594,155 @@ mod tests {
             exhaustion.files_created = 0;
             assert!(invalid.validate_case(case).is_err());
         }
+    }
+    #[test]
+    fn synthetic_custody_rejects_missing_unapplied_or_wrong_parent_policy() {
+        let report = synthetic(Case::BoundaryDenials);
+        let mut invalid = report.clone();
+        invalid.custody = None;
+        assert!(invalid.validate_case(Case::BoundaryDenials).is_err());
+        for outcome in ["NOT_RUN", "REFUSED_NO_OFFICIAL_EXEC"] {
+            let mut invalid = report.clone();
+            invalid.custody.as_mut().unwrap().confinement.hook_outcome = outcome.into();
+            assert!(invalid.validate_case(Case::BoundaryDenials).is_err());
+        }
+        let mut invalid = report.clone();
+        invalid.custody.as_mut().unwrap().confinement.parent_pid += 1;
+        assert!(invalid.validate_case(Case::BoundaryDenials).is_err());
+        let mut invalid = report.clone();
+        invalid.custody.as_mut().unwrap().confinement.landlock_abi = Some(5);
+        assert!(invalid.validate_case(Case::BoundaryDenials).is_err());
+        let mut invalid = report.clone();
+        invalid.custody.as_mut().unwrap().confinement.parent_dumpable = Some(1);
+        assert!(invalid.validate_case(Case::BoundaryDenials).is_err());
+        let mut invalid = report.clone();
+        invalid.custody.as_mut().unwrap().confinement.profile.scoped = 0;
+        assert!(invalid.validate_case(Case::BoundaryDenials).is_err());
+        let mut invalid = report.clone();
+        let custody = invalid.custody.as_mut().unwrap();
+        custody.files[0] = custody.files[1].clone();
+        assert!(invalid.validate_case(Case::BoundaryDenials).is_err());
+        let mut invalid = report;
+        invalid.case = Case::Normal;
+        invalid.probes.clear();
+        assert!(invalid.validate_case(Case::Normal).is_err());
+    }
+    #[test]
+    fn synthetic_custody_requires_original_bytes_and_genuine_fork_setsid_lineage() {
+        let report = synthetic(Case::BoundaryDenials);
+        let mut invalid = report.clone();
+        invalid.custody.as_mut().unwrap().memory_unchanged = false;
+        assert!(invalid.validate_case(Case::BoundaryDenials).is_err());
+        for index in 0..5 {
+            let mut invalid = report.clone();
+            invalid.custody.as_mut().unwrap().files[index].unchanged = false;
+            assert!(invalid.validate_case(Case::BoundaryDenials).is_err());
+        }
+        let mut invalid = report.clone();
+        invalid.custody.as_mut().unwrap().children[1].original_process.parent_pid = report.original_process.pid;
+        assert!(invalid.validate_case(Case::BoundaryDenials).is_err());
+        let mut invalid = report.clone();
+        invalid.custody.as_mut().unwrap().children[1].recorder_pid = 3; // Same-domain direct parent is not the protected recorder.
+        assert!(invalid.validate_case(Case::BoundaryDenials).is_err());
+        let mut invalid = report.clone();
+        invalid.custody.as_mut().unwrap().children[1].original_process.session = 1;
+        assert!(invalid.validate_case(Case::BoundaryDenials).is_err());
+        let mut invalid = report;
+        invalid.custody.as_mut().unwrap().children[1].recorder_start_time_ticks += 1;
+        assert!(invalid.validate_case(Case::BoundaryDenials).is_err());
+    }
+    #[test]
+    fn synthetic_custody_never_accepts_syscall_success_as_denial_or_failed_allowed_write() {
+        let report = synthetic(Case::BoundaryDenials);
+        for child_index in 0..2 {
+            let child = &report.custody.as_ref().unwrap().children[child_index];
+            assert_eq!(child.probes.len(), 44);
+            for probe_index in 0..child.probes.len() {
+                let mut invalid = report.clone();
+                let probe = &mut invalid.custody.as_mut().unwrap().children[child_index].probes[probe_index];
+                if matches!(probe.action, CustodyAction::PidfdOpen | CustodyAction::PrivateWrite) {
+                    probe.return_value = -1;
+                    probe.errno = Some(1);
+                } else {
+                    probe.return_value = 0;
+                    probe.errno = None;
+                }
+                assert!(invalid.validate_case(Case::BoundaryDenials).is_err());
+            }
+        }
+        let mut invalid = report.clone();
+        let child = &mut invalid.custody.as_mut().unwrap().children[0];
+        child.probes[0] = child.probes[1].clone();
+        assert!(invalid.validate_case(Case::BoundaryDenials).is_err());
+        assert!(serde_json::to_vec(&report).unwrap().len() <= 16_384);
+    }
+    #[test]
+    fn synthetic_each_production_leaf_requires_exact_success_and_actual_readback() {
+        let profile = crate::recorder::confinement::profile();
+        assert_eq!(CustodyTarget::WRITE_LEAVES.map(|leaf| leaf.filename()), profile.write_leaves.each_ref().map(String::as_str));
+        let report = synthetic(Case::BoundaryDenials);
+        for child_index in 0..2 {
+            for leaf in CustodyTarget::WRITE_LEAVES {
+                for readback in [None, Some(0)] {
+                    let mut invalid = report.clone();
+                    let probe = invalid.custody.as_mut().unwrap().children[child_index].probes.iter_mut()
+                        .find(|probe| probe.action == CustodyAction::PrivateWrite && probe.target == Some(leaf)).unwrap();
+                    probe.readback = readback;
+                    assert!(invalid.validate_case(Case::BoundaryDenials).is_err());
+                }
+                let mut invalid = report.clone();
+                invalid.custody.as_mut().unwrap().children[child_index].probes.retain(|probe| {
+                    probe.action != CustodyAction::PrivateWrite || probe.target != Some(leaf)
+                });
+                assert!(invalid.validate_case(Case::BoundaryDenials).is_err());
+            }
+        }
+        let mut invalid = report;
+        invalid.custody.as_mut().unwrap().children[0].probes[0].readback = Some(0x5a);
+        assert!(invalid.validate_case(Case::BoundaryDenials).is_err());
+    }
+    #[test]
+    fn synthetic_maximum_final_schema_stays_within_the_reserved_16384_bytes() {
+        let mut report = synthetic(Case::BoundaryDenials);
+        for (socket_name, connect_name, operation, errno) in [
+            ("egress-socket", "network-egress", "connect 203.0.113.1:443", 113),
+            ("daemon-socket-/run/docker.sock", "daemon-connect-/run/docker.sock", "connect fixed daemon socket", 13),
+            ("daemon-socket-/var/run/docker.sock", "daemon-connect-/var/run/docker.sock", "connect fixed daemon socket", 13),
+        ] {
+            let socket = report.probes.iter_mut().find(|probe| probe.name == socket_name).unwrap();
+            socket.return_value = i64::from(i32::MAX);
+            socket.errno = None;
+            report.probes.push(Probe { name: connect_name.into(), operation: operation.into(), return_value: -1, errno: Some(errno), accepted: true });
+        }
+        // Conservative maximum decimal widths, not real kernel observations.
+        report.original_process = ProcessIdentity {
+            pid: u32::MAX - 2, parent_pid: u32::MAX - 5, process_group: u32::MAX - 3, session: u32::MAX - 4,
+            start_time_ticks: u64::MAX - 2, executable_device: u64::MAX, executable_inode: u64::MAX,
+        };
+        report.elapsed_ms = 299_999;
+        let custody = report.custody.as_mut().unwrap();
+        custody.confinement.parent_pid = report.original_process.pid;
+        custody.confinement.landlock_abi = Some(u32::MAX);
+        for (index, file) in custody.files.iter_mut().enumerate() {
+            file.device = u64::MAX;
+            file.inode = u64::MAX - index as u64;
+            file.bytes = 16_384;
+        }
+        for (index, child) in custody.children.iter_mut().enumerate() {
+            let inherited = index == 1;
+            let pid = u32::MAX - 1 + index as u32;
+            child.original_process = ProcessIdentity {
+                pid, parent_pid: if inherited { u32::MAX - 1 } else { report.original_process.pid },
+                process_group: if inherited { pid } else { report.original_process.process_group },
+                session: if inherited { pid } else { report.original_process.session },
+                start_time_ticks: u64::MAX - 1 + index as u64, executable_device: u64::MAX, executable_inode: u64::MAX,
+            };
+            child.recorder_pid = report.original_process.pid;
+            child.recorder_start_time_ticks = report.original_process.start_time_ticks;
+            child.probes.iter_mut().find(|probe| probe.action == CustodyAction::PidfdOpen).unwrap().return_value = i64::from(i32::MAX);
+        }
+        assert_eq!(report.probes.len(), 34);
+        assert!(report.validate_case(Case::BoundaryDenials).is_ok());
+        assert!(serde_json::to_vec(&report).unwrap().len() <= 16_384);
     }
 }

@@ -4,6 +4,10 @@
 //! under the writable state mount as root:root, mode 0444, bytes `observed\n`.
 //! Reports are bounded self-observations; only the host can attest teardown,
 //! host namespace isolation, the actual kill, or authenticated step cancellation.
+//! Boundary custody uses the same production launcher before readiness. Its
+//! fixed child receives only a parent-owned memory address and fixed FD slots
+//! through bounded private stdio after the host gate, never a target PID/path.
+//! Actual fork+setsid descendants inherit that production restriction domain.
 #[cfg(any(target_os = "linux", test))]
 mod peer {
 use ktlsp_oracle_replay::calibration_peer::{
@@ -11,7 +15,10 @@ use ktlsp_oracle_replay::calibration_peer::{
     exhaustion_reached, mountpoint_denied, namespace_denied, permission_denied,
 };
 #[cfg(target_os = "linux")]
-use ktlsp_oracle_replay::calibration_peer::{Exhaustion, Probe};
+use ktlsp_oracle_replay::calibration_peer::{
+    CustodyAction, CustodyChild, CustodyFile, CustodyProbe, CustodyReceipt, CustodyRole,
+    CustodyTarget, Exhaustion, Probe,
+};
 
 fn parse_case(value: &str) -> Result<Case, String> {
     Case::ALL.into_iter().find(|case| case.as_str() == value)
@@ -24,10 +31,14 @@ fn descendant_case(case: Case) -> bool {
 enum Mode {
     Peer(Case),
     Descendant(Case),
+    CustodyChild,
 }
 fn arguments(args: &[String]) -> Result<Mode, String> {
     if args.len() != 2 {
         return Err("expected exactly --case CASE".into());
+    }
+    if args[0] == "--custody-child" && args[1] == "direct" {
+        return Ok(Mode::CustodyChild);
     }
     let case = parse_case(&args[1])?;
     match args[0].as_str() {
@@ -81,7 +92,7 @@ mod linux {
         ffi::{CString, c_char, c_int, c_ulong, c_void},
         fs::{self, File, OpenOptions},
         io::{Read, Seek, SeekFrom, Write},
-        os::{fd::{AsRawFd, FromRawFd, OwnedFd}, unix::fs::{MetadataExt, OpenOptionsExt}},
+        os::{fd::{AsRawFd, FromRawFd, OwnedFd}, unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt}},
         path::{Path, PathBuf},
         process::{Child, Command, Stdio},
         thread,
@@ -331,6 +342,339 @@ mod linux {
         }
         Ok(())
     }
+    use ktlsp_oracle_replay::recorder::confinement;
+    use serde::{Deserialize, Serialize};
+    use std::os::{linux::net::SocketAddrExt, unix::net::{SocketAddr, UnixListener, UnixStream}};
+    const CUSTODY_BYTES: usize = 10_240;
+    const CUSTODY_FD_BASE: i32 = 100;
+    const CUSTODY_ABSTRACT_SOCKET: &[u8] = b"ktlsp-pr174-calibration-parent";
+    #[derive(Deserialize, Serialize)]
+    #[serde(rename_all = "camelCase", deny_unknown_fields)]
+    struct CustodyStart {
+        schema_version: u8,
+        memory_address: u64,
+        evidence_fds: [i32; 5],
+        run: bool,
+    }
+    #[derive(Deserialize, Serialize)]
+    #[serde(rename_all = "camelCase", deny_unknown_fields)]
+    struct CustodyFrame {
+        children: Vec<CustodyChild>,
+        first_failure: Option<String>,
+    }
+    impl CustodyFrame {
+        fn from_result(result: Result<Vec<CustodyChild>, String>) -> Self {
+            match result {
+                Ok(children) => Self { children, first_failure: None },
+                Err(error) => Self { children: Vec::new(), first_failure: Some(error) },
+            }
+        }
+        fn decode(bytes: &[u8], exit: Option<bool>, count: usize) -> Result<Vec<CustodyChild>, String> {
+            let frame: Self = serde_json::from_slice(bytes).map_err(|e| format!("custody child JSON: {e}"))?;
+            if let Some(original) = frame.first_failure { return Err(original); }
+            if exit != Some(true) || frame.children.len() != count {
+                return Err("custody child lacked complete original exit-zero cohort".into());
+            }
+            Ok(frame.children)
+        }
+    }
+    #[repr(C)]
+    struct IoVector { base: *mut c_void, length: usize }
+    unsafe extern "C" {
+        fn getppid() -> c_int;
+        fn fork() -> c_int;
+        fn waitpid(pid: c_int, status: *mut c_int, options: c_int) -> c_int;
+        fn _exit(status: c_int) -> !;
+        fn fcntl(fd: c_int, command: c_int, ...) -> c_int;
+        fn syscall(number: std::ffi::c_long, ...) -> std::ffi::c_long;
+        fn ptrace(request: u32, ...) -> std::ffi::c_long;
+        fn process_vm_writev(pid: c_int, local: *const IoVector, local_count: c_ulong, remote: *const IoVector, remote_count: c_ulong, flags: c_ulong) -> isize;
+        fn kill(pid: c_int, signal: c_int) -> c_int;
+        fn truncate(path: *const c_char, length: i64) -> c_int;
+    }
+    fn stream_pair() -> Result<(UnixStream, UnixStream), String> {
+        let (a, b) = UnixStream::pair().map_err(|e| error("create bounded custody pipe", e))?;
+        a.set_nonblocking(true).map_err(|e| error("nonblocking custody pipe", e))?;
+        b.set_nonblocking(true).map_err(|e| error("nonblocking custody pipe", e))?;
+        Ok((a, b))
+    }
+    fn bounded_pipe_write(writer: &mut impl Write, bytes: &[u8]) -> Result<(), String> {
+        if bytes.len() > CUSTODY_BYTES { return Err("custody pipe output bound".into()); }
+        let started = Instant::now();
+        let mut written = 0;
+        while written < bytes.len() {
+            if started.elapsed() >= PHASE { return Err("custody pipe write deadline".into()); }
+            match writer.write(&bytes[written..]) {
+                Ok(0) => return Err("custody pipe write zero".into()),
+                Ok(count) => written += count,
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => thread::yield_now(),
+                Err(e) => return Err(error("write bounded custody pipe", e)),
+            }
+        }
+        Ok(())
+    }
+    fn bounded_pipe_read(reader: &mut impl Read, limit: usize, mut poll: impl FnMut() -> Result<Option<bool>, String>) -> Result<Vec<u8>, String> {
+        let started = Instant::now();
+        let mut bytes = Vec::new();
+        let mut eof = false;
+        let mut exit = None;
+        let mut buffer = [0u8; 1024];
+        while !eof || exit.is_none() {
+            if started.elapsed() >= PHASE { return Err("custody pipe/read-child deadline".into()); }
+            if !eof {
+                let remaining = (limit + 1 - bytes.len()).min(buffer.len());
+                match reader.read(&mut buffer[..remaining]) {
+                    Ok(0) => eof = true,
+                    Ok(count) => {
+                        bytes.extend_from_slice(&buffer[..count]);
+                        if bytes.len() > limit { return Err("custody pipe input overflow".into()); }
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                    Err(e) => return Err(error("read bounded custody pipe", e)),
+                }
+            }
+            if exit.is_none() { exit = poll()?; }
+            if exit == Some(false) { return Err("custody child exited nonzero".into()); }
+            thread::yield_now();
+        }
+        Ok(bytes)
+    }
+    struct CustodyEvidence {
+        target: CustodyTarget,
+        file: File,
+        before: Vec<u8>,
+        device: u64,
+        inode: u64,
+    }
+    struct CustodyPending {
+        child: Child,
+        input: UnixStream,
+        output: UnixStream,
+        receipt: confinement::Receipt,
+        files: Vec<CustodyEvidence>,
+        // High, fixed CLOEXEC duplicate slots avoid confusing post-exec pipe FD
+        // reuse with inherited raw-evidence descriptors in the finite audit.
+        descriptors: Vec<OwnedFd>,
+        marker: Box<[u8; 64]>,
+        _abstract_listener: UnixListener,
+    }
+    impl CustodyPending {
+        fn spawn() -> Result<Self, String> {
+            for leaf in confinement::profile().write_leaves {
+                fs::DirBuilder::new().mode(0o700).create(Path::new(CAPTURE).join(leaf))
+                    .map_err(|e| error("create production-profile private leaf", e))?;
+            }
+            let address = SocketAddr::from_abstract_name(CUSTODY_ABSTRACT_SOCKET).map_err(|e| error("fixed abstract custody address", e))?;
+            let abstract_listener = UnixListener::bind_addr(&address).map_err(|e| error("bind parent abstract custody endpoint", e))?;
+            let mut files = Vec::with_capacity(5);
+            let mut descriptors = Vec::with_capacity(5);
+            for (index, target) in CustodyTarget::ALL.into_iter().enumerate() {
+                let filename = if target == CustodyTarget::ReadyReport { ".calibration-ready.json.next" } else { target.filename() };
+                let mut file = OpenOptions::new().read(true).write(true).create_new(true).mode(0o600)
+                    .custom_flags(NOFOLLOW | NONBLOCK).open(Path::new(CAPTURE).join(filename))
+                    .map_err(|e| error("create calibration-only parent evidence target", e))?;
+                let before = if target == CustodyTarget::ReadyReport { Vec::new() } else {
+                    b"CALIBRATION-ONLY parent-owned denial target; not official protocol or manifest evidence\n".to_vec()
+                };
+                file.write_all(&before).map_err(|e| error("write calibration-only parent target", e))?;
+                let metadata = file.metadata().map_err(|e| error("parent target metadata", e))?;
+                let expected = CUSTODY_FD_BASE + index as i32;
+                let fd = unsafe { fcntl(file.as_raw_fd(), 1030, expected) }; // F_DUPFD_CLOEXEC.
+                if fd < 0 { return Err(error("reserve actual parent FD audit slot", std::io::Error::last_os_error())); }
+                let descriptor = unsafe { OwnedFd::from_raw_fd(fd) };
+                if fd != expected { return Err("fixed parent FD audit slots already occupied".into()); }
+                descriptors.push(descriptor);
+                files.push(CustodyEvidence { target, file, before, device: metadata.dev(), inode: metadata.ino() });
+            }
+            let (input, child_input) = stream_pair()?;
+            let (output, child_output) = stream_pair()?;
+            let mut command = Command::new(std::env::current_exe().map_err(|e| error("custody current executable", e))?);
+            command.args(["--custody-child", "direct"]).env_clear()
+                .stdin(Stdio::from(OwnedFd::from(child_input)))
+                .stdout(Stdio::from(OwnedFd::from(child_output))).stderr(Stdio::null());
+            // The single actual production launcher verifies nondumpable parent,
+            // exact policy/ABI, descriptor closure and child-only restrictions.
+            let (child, receipt) = confinement::spawn(&mut command, Path::new(CAPTURE))
+                .map_err(|failure| format!("production custody launcher refused: {}", failure.error))?;
+            receipt.validate_enforced(std::process::id())?;
+            Ok(Self { child, input, output, receipt, files, descriptors, marker: Box::new([0x53; 64]), _abstract_listener: abstract_listener })
+        }
+        fn publish_ready(&mut self, bytes: &[u8]) -> Result<(), String> {
+            let evidence = self.files.iter_mut().find(|file| file.target == CustodyTarget::ReadyReport).ok_or("reserved ready evidence missing")?;
+            evidence.file.write_all(bytes).map_err(|e| error("write protected parent readiness", e))?;
+            evidence.file.sync_all().map_err(|e| error("sync protected parent readiness", e))?;
+            fs::rename(Path::new(CAPTURE).join(".calibration-ready.json.next"), Path::new(CAPTURE).join("calibration-ready.json"))
+                .map_err(|e| error("publish protected parent readiness", e))?;
+            evidence.before = bytes.to_vec();
+            Ok(())
+        }
+        fn finish(mut self) -> Result<CustodyReceipt, String> {
+            let direct_original = identity(self.child.id())?;
+            let evidence_fds: [i32; 5] = std::array::from_fn(|index| self.descriptors[index].as_raw_fd());
+            let start = CustodyStart { schema_version: 1, memory_address: self.marker.as_ptr() as usize as u64, evidence_fds, run: true };
+            bounded_pipe_write(&mut self.input, &serde_json::to_vec(&start).map_err(|e| e.to_string())?)?;
+            drop(self.input); // EOF is the fixed private input frame boundary.
+            let mut child_exit = None;
+            let bytes = bounded_pipe_read(&mut self.output, CUSTODY_BYTES, || {
+                child_exit = self.child.try_wait().map(|status| status.map(|s| s.success())).map_err(|e| error("poll actual custody child", e))?;
+                Ok(child_exit.map(|_| true)) // Parse bounded original error frame even on nonzero exit.
+            })?;
+            let children = CustodyFrame::decode(&bytes, child_exit, 2)?;
+            if children.first().map(|child| &child.original_process) != Some(&direct_original) {
+                return Err("custody direct child did not match original measured /proc identity".into());
+            }
+            let mut files = Vec::with_capacity(5);
+            for evidence in &mut self.files {
+                let held = evidence.file.metadata().map_err(|e| error("read held custody target identity", e))?;
+                let named = fs::symlink_metadata(Path::new(CAPTURE).join(evidence.target.filename()));
+                evidence.file.seek(SeekFrom::Start(0)).map_err(|e| error("seek original custody target", e))?;
+                let mut after = Vec::new();
+                (&mut evidence.file).take(16_385).read_to_end(&mut after).map_err(|e| error("read original custody target bytes", e))?;
+                let unchanged = held.dev() == evidence.device && held.ino() == evidence.inode && held.nlink() == 1
+                    && after == evidence.before && named.is_ok_and(|m| m.is_file() && !m.file_type().is_symlink()
+                        && m.dev() == evidence.device && m.ino() == evidence.inode && m.nlink() == 1);
+                files.push(CustodyFile { target: evidence.target, device: evidence.device, inode: evidence.inode, bytes: evidence.before.len() as u64, unchanged });
+            }
+            Ok(CustodyReceipt { confinement: self.receipt, files, memory_unchanged: *self.marker == [0x53; 64], children })
+        }
+    }
+    fn custody_result(probes: &mut Vec<CustodyProbe>, action: CustodyAction, target: Option<CustodyTarget>, result: i64) {
+        let errno = if result < 0 { std::io::Error::last_os_error().raw_os_error() } else { None };
+        probes.push(CustodyProbe { action, target, return_value: result, errno, readback: None });
+    }
+    fn custody_io<T>(probes: &mut Vec<CustodyProbe>, action: CustodyAction, target: CustodyTarget, result: std::io::Result<T>) {
+        match result {
+            Ok(_) => probes.push(CustodyProbe { action, target: Some(target), return_value: 0, errno: None, readback: None }),
+            Err(e) => probes.push(CustodyProbe { action, target: Some(target), return_value: -1, errno: e.raw_os_error(), readback: None }),
+        }
+    }
+    fn custody_attacks(role: CustodyRole, recorder: u32, recorder_start: u64, start: &CustodyStart) -> Result<CustodyChild, String> {
+        let original_process = identity(std::process::id())?;
+        let mut probes = Vec::with_capacity(44);
+        for (index, target) in CustodyTarget::ALL.into_iter().enumerate() {
+            let result = unsafe { fcntl(start.evidence_fds[index], 1) }; // F_GETFD.
+            custody_result(&mut probes, CustodyAction::InheritedFd, Some(target), i64::from(result));
+        }
+        for target in CustodyTarget::ALL {
+            let path = Path::new(CAPTURE).join(target.filename());
+            match OpenOptions::new().write(true).custom_flags(NOFOLLOW | NONBLOCK).open(&path) {
+                Ok(mut file) => match file.write(&[0xa7]) {
+                    Ok(count) => probes.push(CustodyProbe { action: CustodyAction::Write, target: Some(target), return_value: count as i64, errno: None, readback: None }),
+                    Err(e) => probes.push(CustodyProbe { action: CustodyAction::Write, target: Some(target), return_value: -1, errno: e.raw_os_error(), readback: None }),
+                },
+                Err(e) => probes.push(CustodyProbe { action: CustodyAction::Write, target: Some(target), return_value: -1, errno: e.raw_os_error(), readback: None }),
+            }
+            let cpath = CString::new(path.as_os_str().as_encoded_bytes()).map_err(|_| "custody fixed path NUL")?;
+            let result = unsafe { truncate(cpath.as_ptr(), 0) };
+            custody_result(&mut probes, CustodyAction::Truncate, Some(target), i64::from(result));
+            let alternate = Path::new(CAPTURE).join("tmp").join(format!("calibration-custody-{:?}-{}", role, target.filename()));
+            custody_io(&mut probes, CustodyAction::Rename, target, fs::rename(&path, &alternate));
+            custody_io(&mut probes, CustodyAction::Unlink, target, fs::remove_file(&path));
+            custody_io(&mut probes, CustodyAction::Hardlink, target, fs::hard_link(&path, &alternate));
+        }
+        let raw_fd = start.evidence_fds[0];
+        custody_io(&mut probes, CustodyAction::ProcFd, CustodyTarget::ClientIntended,
+            OpenOptions::new().write(true).custom_flags(NONBLOCK).open(format!("/proc/{recorder}/fd/{raw_fd}")));
+        let pidfd = unsafe { syscall(434, recorder as c_int, 0u32) }; // pidfd_open.
+        custody_result(&mut probes, CustodyAction::PidfdOpen, None, pidfd as i64);
+        if pidfd < 0 { return Err(format!("actual recorder pidfd_open failed: return {pidfd}, errno {:?}", probes.last().and_then(|probe| probe.errno))); }
+        let pidfd = unsafe { OwnedFd::from_raw_fd(pidfd as c_int) };
+        let result = unsafe { syscall(438, pidfd.as_raw_fd(), raw_fd, 0u32) }; // pidfd_getfd.
+        custody_result(&mut probes, CustodyAction::PidfdGetfd, Some(CustodyTarget::ClientIntended), result as i64);
+        if result >= 0 { drop(unsafe { OwnedFd::from_raw_fd(result as c_int) }); }
+        let result = unsafe { syscall(424, pidfd.as_raw_fd(), 18 as c_int, std::ptr::null::<c_void>(), 0u32) }; // pidfd_send_signal SIGCONT.
+        custody_result(&mut probes, CustodyAction::PidfdSignal, None, result as i64);
+        let result = unsafe { ptrace(0x4206, recorder as c_int, std::ptr::null_mut::<c_void>(), std::ptr::null_mut::<c_void>()) }; // PTRACE_SEIZE, no stop.
+        custody_result(&mut probes, CustodyAction::Ptrace, None, result as i64);
+        let mut replacement = 0xa7u8;
+        let local = IoVector { base: (&mut replacement as *mut u8).cast(), length: 1 };
+        let remote = IoVector { base: start.memory_address as usize as *mut c_void, length: 1 };
+        let result = unsafe { process_vm_writev(recorder as c_int, &local, 1, &remote, 1, 0) };
+        custody_result(&mut probes, CustodyAction::ProcessVmWrite, None, result as i64);
+        let result = unsafe { kill(recorder as c_int, 18) }; // Actual SIGCONT: harmless to a running recorder if wrongly allowed.
+        custody_result(&mut probes, CustodyAction::Signal, None, i64::from(result));
+        #[repr(C)]
+        struct AbstractAddress { family: u16, path: [u8; 108] }
+        let fd = unsafe { socket(1, 1 | NONBLOCK | 0x80000, 0) };
+        if fd < 0 { return Err(error("abstract custody socket creation", std::io::Error::last_os_error())); }
+        let socket = unsafe { OwnedFd::from_raw_fd(fd) };
+        let mut address = AbstractAddress { family: 1, path: [0; 108] };
+        address.path[1..1 + CUSTODY_ABSTRACT_SOCKET.len()].copy_from_slice(CUSTODY_ABSTRACT_SOCKET);
+        let result = unsafe { connect(socket.as_raw_fd(), (&address as *const AbstractAddress).cast(), (3 + CUSTODY_ABSTRACT_SOCKET.len()) as u32) };
+        custody_result(&mut probes, CustodyAction::AbstractUnix, None, i64::from(result));
+        for (target, leaf) in CustodyTarget::WRITE_LEAVES.into_iter().zip(confinement::profile().write_leaves) {
+            if target.filename() != leaf { return Err("closed custody leaf enum differs from production profile".into()); }
+            let path = Path::new(CAPTURE).join(leaf).join(match role {
+                CustodyRole::Direct => "calibration-direct-write",
+                CustodyRole::InheritedSetsid => "calibration-inherited-write",
+            });
+            let mut file = OpenOptions::new().read(true).write(true).create_new(true).mode(0o600).custom_flags(NOFOLLOW | NONBLOCK)
+                .open(path).map_err(|e| error("allowed private-leaf create", e))?;
+            let result = file.write(&[0x5a]).map_err(|e| error("allowed private-leaf write", e))?;
+            file.seek(SeekFrom::Start(0)).map_err(|e| error("allowed private-leaf seek", e))?;
+            let mut readback = [0u8; 2];
+            if file.read(&mut readback).map_err(|e| error("allowed private-leaf read", e))? != 1 || readback[0] != 0x5a {
+                return Err("allowed private-leaf original readback mismatch".into());
+            }
+            probes.push(CustodyProbe {
+                action: CustodyAction::PrivateWrite, target: Some(target),
+                return_value: result as i64, errno: None, readback: Some(readback[0]),
+            });
+        }
+        Ok(CustodyChild { role, original_process, recorder_pid: recorder, recorder_start_time_ticks: recorder_start, probes })
+    }
+    fn custody_child_cohort() -> Result<Vec<CustodyChild>, String> {
+        let recorder = unsafe { getppid() };
+        if recorder < 2 { return Err("custody direct child has no original recorder parent".into()); }
+        let own = identity(std::process::id())?;
+        let raw = bounded_read(Path::new(&format!("/proc/{recorder}/stat")), 4096)?;
+        let recorder_identity = process_stat(std::str::from_utf8(&raw).map_err(|_| "recorder stat encoding")?, own.executable_device, own.executable_inode)?;
+        if recorder_identity.pid != recorder as u32 { return Err("custody original recorder stat PID mismatch".into()); }
+        let mut input = unsafe { File::from_raw_fd(0) };
+        let bytes = bounded_pipe_read(&mut input, 512, || Ok(Some(true)))?;
+        let start: CustodyStart = serde_json::from_slice(&bytes).map_err(|e| format!("fixed custody start frame: {e}"))?;
+        if start.schema_version != 1 || !start.run || start.memory_address == 0
+            || start.memory_address > usize::MAX as u64
+            || start.evidence_fds != std::array::from_fn(|index| CUSTODY_FD_BASE + index as i32) {
+            return Err("invalid fixed custody start frame".into());
+        }
+        let direct = custody_attacks(CustodyRole::Direct, recorder as u32, recorder_identity.start_time_ticks, &start)?;
+        let (mut reader, mut writer) = stream_pair()?;
+        let child = unsafe { fork() };
+        if child < 0 { return Err(error("actual inherited custody fork", std::io::Error::last_os_error())); }
+        if child == 0 {
+            drop(reader);
+            let result = (|| {
+                if unsafe { setsid() } < 0 { return Err(error("actual inherited custody setsid", std::io::Error::last_os_error())); }
+                Ok(vec![custody_attacks(CustodyRole::InheritedSetsid, recorder as u32, recorder_identity.start_time_ticks, &start)?])
+            })();
+            let succeeded = result.is_ok();
+            let frame = CustodyFrame::from_result(result);
+            let sent = serde_json::to_vec(&frame).map_err(|e| e.to_string()).and_then(|bytes| bounded_pipe_write(&mut writer, &bytes));
+            unsafe { _exit(if succeeded && sent.is_ok() { 0 } else { 1 }) }
+        }
+        drop(writer);
+        let mut child_exit = None;
+        let inherited = bounded_pipe_read(&mut reader, CUSTODY_BYTES, || {
+            let mut status = 0;
+            let result = unsafe { waitpid(child, &mut status, 1) }; // WNOHANG; never unbounded wait.
+            if result < 0 { return Err(error("poll inherited custody child", std::io::Error::last_os_error())); }
+            if result != 0 { child_exit = Some(status & 0x7f == 0 && status >> 8 == 0); }
+            Ok(child_exit.map(|_| true))
+        })?;
+        let mut inherited = CustodyFrame::decode(&inherited, child_exit, 1)?;
+        let inherited = inherited.pop().ok_or("missing inherited custody child")?;
+        if inherited.original_process.pid != child as u32 { return Err("actual fork custody PID mismatch".into()); }
+        Ok(vec![direct, inherited])
+    }
+    fn custody_child() -> Result<(), String> {
+        let frame = CustodyFrame::from_result(custody_child_cohort());
+        let mut output = unsafe { File::from_raw_fd(1) };
+        let bytes = serde_json::to_vec(&frame).map_err(|e| e.to_string())?;
+        bounded_pipe_write(&mut output, &bytes)?;
+        match frame.first_failure { Some(original) => Err(original), None => Ok(()) }
+    }
+
     fn exhaust(report: &mut Report, inode: bool) -> Result<(), String> {
         let started = Instant::now();
         let root = Path::new(CAPTURE).join("exhaustion");
@@ -389,7 +733,7 @@ mod linux {
             Err(e) => return Err(error("check fresh observer gate", e)),
             Ok(_) => return Err("observer gate already exists before peer readiness".into()),
         }
-        fs::create_dir(CAPTURE).map_err(|e| error("create exclusive capture directory", e))?;
+        fs::DirBuilder::new().mode(0o700).create(CAPTURE).map_err(|e| error("create exclusive capture directory", e))?;
         let mut output = ReservedReport::new()?;
         let mut report = Report {
             schema_version: 1,
@@ -401,18 +745,23 @@ mod linux {
             observer_gate_observed: false,
             probes: Vec::new(),
             exhaustion: None,
+            custody: None,
             first_failure: None,
             elapsed_ms: 0,
         };
         let mut child = None;
+        let mut custody = None;
         let run = (|| {
             if descendant_case(case) {
                 let (handle, identity) = spawn_descendant(case, &report.original_process)?;
                 child = Some(handle);
                 report.children.push(identity);
             }
+            if case == Case::BoundaryDenials { custody = Some(CustodyPending::spawn()?); }
             report.elapsed_ms = started.elapsed().as_millis() as u64;
-            publish_fresh("calibration-ready.json", &report_bytes(&report)?)?;
+            let ready = report_bytes(&report)?;
+            if let Some(pending) = &mut custody { pending.publish_ready(&ready)?; }
+            else { publish_fresh("calibration-ready.json", &ready)?; }
             observer_gate()?;
             report.observer_gate_observed = true;
             if let Some(child) = &mut child {
@@ -426,6 +775,7 @@ mod linux {
                 Case::InodeExhaustion => exhaust(&mut report, true)?,
                 _ => {}
             }
+            if let Some(pending) = custody.take() { report.custody = Some(pending.finish()?); }
             report.outcome = if case.forced() { Outcome::AwaitingHostAction } else { Outcome::Completed };
             report.elapsed_ms = started.elapsed().as_millis() as u64;
             report.validate_case(case)?;
@@ -461,6 +811,7 @@ mod linux {
         match mode {
             Mode::Peer(case) => peer(case),
             Mode::Descendant(case) => descendant(case),
+            Mode::CustodyChild => custody_child(),
         }
     }
 }
@@ -480,7 +831,7 @@ mod tests {
             schema_version: 1, scope: "PR174_RUST_CALIBRATION_PEER".into(), case: Case::Normal,
             outcome: Outcome::AwaitingObserver,
             original_process: ProcessIdentity { pid: 2, parent_pid: 1, process_group: 2, session: 2, start_time_ticks: 9, executable_device: 1, executable_inode: 2 },
-            children: Vec::new(), observer_gate_observed: false, probes: Vec::new(), exhaustion: None,
+            children: Vec::new(), observer_gate_observed: false, probes: Vec::new(), exhaustion: None, custody: None,
             first_failure: None, elapsed_ms: 0,
         }
     }
@@ -492,6 +843,8 @@ mod tests {
         for args in [vec![], vec!["--case"], vec!["--case", "normal", "extra"], vec!["--case=normal"], vec!["--case", "/bin/sh"], vec!["--output", "normal"], vec!["--descendant", "timeout"]] {
             assert!(arguments(&argv(&args)).is_err());
         }
+        assert_eq!(arguments(&argv(&["--custody-child", "direct"])), Ok(Mode::CustodyChild));
+        assert!(arguments(&argv(&["--custody-child", "setsid"])).is_err());
         assert_eq!(arguments(&argv(&["--descendant", "setsid"])), Ok(Mode::Descendant(Case::Setsid)));
     }
     #[test]

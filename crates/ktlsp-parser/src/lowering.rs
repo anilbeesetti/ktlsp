@@ -616,6 +616,8 @@ enum Tag {
     TypeParameter,
     Integer,
     Reference,
+    Call,
+    Arguments,
     TypeReference,
     Error,
 }
@@ -636,7 +638,7 @@ impl Tag {
     }
 }
 fn tag(text: &str, i: usize, b: &mut Budget) -> Result<Tag> {
-    const TAGS: [(&str, Tag); 16] = [
+    const TAGS: [(&str, Tag); 18] = [
         ("KT_FILE", Tag::Root),
         ("PACKAGE_DIRECTIVE", Tag::Package),
         ("IMPORT_LIST", Tag::Imports),
@@ -651,6 +653,8 @@ fn tag(text: &str, i: usize, b: &mut Budget) -> Result<Tag> {
         ("TYPE_PARAMETER", Tag::TypeParameter),
         ("INTEGER_CONSTANT", Tag::Integer),
         ("REFERENCE_EXPRESSION", Tag::Reference),
+        ("CALL_EXPRESSION", Tag::Call),
+        ("VALUE_ARGUMENT_LIST", Tag::Arguments),
         ("TYPE_REFERENCE", Tag::TypeReference),
         ("ERROR_ELEMENT", Tag::Error),
     ];
@@ -1176,7 +1180,9 @@ fn plain_child(f: &mut Frame<'_>, child: Tag, b: &mut Budget) -> Result<()> {
             plain_step(f, from, 4, b)
         }
         (Tag::Fun, Tag::Block) => plain_step(f, 3, 4, b),
-        (Tag::Block, Tag::Property) => plain_step(f, 1, 1, b),
+        (Tag::Block, Tag::Property | Tag::Fun | Tag::Call) => plain_step(f, 1, 1, b),
+        (Tag::Call, Tag::Reference) => plain_step(f, 0, 1, b),
+        (Tag::Call, Tag::Arguments) => plain_step(f, 1, 2, b),
         (Tag::Property, Tag::Integer | Tag::Reference) => plain_step(f, 3, 4, b),
         _ => {
             f.plain = u8::MAX;
@@ -1221,7 +1227,11 @@ fn close_frames<'a>(
             let complete = f.plain
                 == match f.tag {
                     Tag::Fun | Tag::Property => 4,
-                    Tag::Block | Tag::Parameters | Tag::TypeParameters => 2,
+                    Tag::Block
+                    | Tag::Parameters
+                    | Tag::TypeParameters
+                    | Tag::Call
+                    | Tag::Arguments => 2,
                     Tag::Integer | Tag::Reference => 1,
                     Tag::Parameter => 6,
                     Tag::TypeParameter => 2,
@@ -1260,7 +1270,9 @@ fn context(t: Tag, parent: Option<Frame<'_>>, i: usize) -> Result<()> {
         Tag::TypeParameters => p == Some(Tag::Fun),
         Tag::TypeParameter => p == Some(Tag::TypeParameters),
         Tag::Integer => matches!(p, Some(Tag::Fun | Tag::Property)),
-        Tag::Reference => p == Some(Tag::Property),
+        Tag::Reference => matches!(p, Some(Tag::Property | Tag::Call)),
+        Tag::Call => p == Some(Tag::Block),
+        Tag::Arguments => p == Some(Tag::Call),
         Tag::TypeReference => matches!(p, Some(Tag::Property | Tag::Parameter)),
         Tag::Error => p.is_some() && !matches!(p, Some(Tag::Package | Tag::Imports)),
     };
@@ -1426,6 +1438,17 @@ fn token<'a>(
                     _ => plain_step(&mut f, 1, 1, b)?,
                 }
                 allowed
+            }
+            Tag::Arguments => {
+                if b.equal(&e.kind, "LPAR")? && f.plain == 0 {
+                    plain_step(&mut f, 0, 1, b)?;
+                    true
+                } else if b.equal(&e.kind, "RPAR")? && f.plain == 1 {
+                    plain_step(&mut f, 1, 2, b)?;
+                    true
+                } else {
+                    false
+                }
             }
             Tag::Parameters | Tag::TypeParameters => {
                 let generic = f.tag == Tag::TypeParameters;
@@ -1650,7 +1673,7 @@ fn walk<'a>(
                     || frame(s, 0, b)?.tag != Tag::Root
                     || frame(s, 1, b)?.tag != Tag::Fun
                     || frame(s, 2, b)?.tag != Tag::Block
-                    || frame(s, 3, b)?.tag != Tag::Property
+                    || !matches!(frame(s, 3, b)?.tag, Tag::Property | Tag::Call)
                     || e.subtree_end != i + 2)
             {
                 return Err(unsupported(i));
@@ -1932,6 +1955,80 @@ mod tests {
                 )
                 .unwrap_err(),
                 LocalBindingError::Resource,
+            );
+        }
+    }
+
+    #[test]
+    fn local_callee_one_budget_covers_all_calls_and_competitors_exactly() {
+        use crate::{
+            local_value_binding::{LocalBindingError, callable_with_budget},
+            structural_regions::build_regions,
+        };
+        // Synthetic accounting only, never producer evidence.
+        let mut tree = Tree::new();
+        tree.header("outer");
+        tree.open("VALUE_PARAMETER_LIST");
+        tree.token("LPAR", "(");
+        tree.token("RPAR", ")");
+        tree.close();
+        tree.open("BLOCK");
+        tree.token("LBRACE", "{");
+        tree.header("target");
+        tree.open("VALUE_PARAMETER_LIST");
+        tree.token("LPAR", "(");
+        tree.token("RPAR", ")");
+        tree.close();
+        tree.open("BLOCK");
+        tree.token("LBRACE", "{");
+        tree.token("RBRACE", "}");
+        tree.close();
+        tree.close();
+        let mut selected = 0;
+        for n in 0..3 {
+            tree.token("SEMICOLON", ";");
+            tree.open("CALL_EXPRESSION");
+            tree.open("REFERENCE_EXPRESSION");
+            if n == 0 {
+                selected = tree.elements.len() - 1;
+            }
+            tree.token("IDENTIFIER", "target");
+            tree.close();
+            tree.open("VALUE_ARGUMENT_LIST");
+            tree.token("LPAR", "(");
+            tree.token("RPAR", ")");
+            tree.close();
+            tree.close();
+        }
+        let result = finish_body(tree);
+        let lower = lower(&result).unwrap();
+        let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
+        let mut measured = ReferenceBudget::default();
+        let binding = callable_with_budget(
+            &directory,
+            &result,
+            selected,
+            result.snapshot(),
+            &mut measured,
+        )
+        .unwrap();
+        assert!(std::ptr::eq(binding.target(), &lower.declarations()[1]));
+        let mut exact = ReferenceBudget {
+            work: WORK - measured.work,
+        };
+        callable_with_budget(&directory, &result, selected, result.snapshot(), &mut exact).unwrap();
+        assert_eq!(exact.work, WORK);
+        for work in [WORK - measured.work + 1, usize::MAX] {
+            assert_eq!(
+                callable_with_budget(
+                    &directory,
+                    &result,
+                    selected,
+                    result.snapshot(),
+                    &mut ReferenceBudget { work }
+                )
+                .unwrap_err(),
+                LocalBindingError::Resource
             );
         }
     }

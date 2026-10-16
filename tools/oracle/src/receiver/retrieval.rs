@@ -10,7 +10,8 @@ pub struct AuthenticatedArtifact {
     pub(super) files: Files,
     pub(super) artifact_id: u64,
     pub(super) archive_sha256: String,
-    pub(super) workflow_step_timeout: bool,
+    pub(super) timeout_completed_unix_ms: Option<u64>,
+    pub(super) admission_sha256: String,
 }
 
 #[cfg(unix)]
@@ -56,14 +57,15 @@ fn command(program: &str, args: &[&str], cap: usize) -> Result<Vec<u8>> {
 #[cfg(not(unix))]
 fn command(_: &str, _: &[&str], _: usize) -> Result<Vec<u8>> { Err("trusted fixed retrieval requires Unix".into()) }
 fn api(endpoint: &str, cap: usize) -> Result<Vec<u8>> {
-    command("/usr/bin/gh", &["api","--hostname","github.com","--method","GET","-H","Accept: application/vnd.github+json","-H","X-GitHub-Api-Version: 2022-11-28",endpoint],cap)
+    command("/usr/bin/gh", &["api","--hostname","github.com","--method","GET","-H","Accept: application/vnd.github+json","-H","X-GitHub-Api-Version: 2026-03-10",endpoint],cap)
 }
 fn api_json(endpoint: &str) -> Result<Value> { json_bytes(&api(endpoint,FILE_LIMIT)?) }
 
 /// The job API and attempt-specific job membership are independently authenticated;
 /// artifact names and uploader-supplied job/attempt metadata are never authority.
-pub fn retrieve(expected: &RootGrant, artifact_id: u64) -> Result<AuthenticatedArtifact> {
-    expected.validate_shape()?;
+pub fn retrieve(admission: &super::ReceiverAdmission, artifact_id: u64) -> Result<AuthenticatedArtifact> {
+    admission.validate()?;
+    let expected = &admission.grant;
     require(artifact_id > 0, "artifact ID required")?;
     let repo = "repos/anilbeesetti/ktlsp";
     let run = api_json(&format!("{repo}/actions/runs/{}",expected.run_id))?;
@@ -80,17 +82,17 @@ pub fn retrieve(expected: &RootGrant, artifact_id: u64) -> Result<AuthenticatedA
     let digest = hash(&zip);
     require(artifact["digest"] == format!("sha256:{digest}"), "artifact digest missing/mismatch")?;
     require(artifact["size_in_bytes"].as_u64() == Some(zip.len() as u64),"artifact original archive size mismatch")?;
-    let workflow_step_timeout = if let Some(step) = &expected.calibration_step {
-        let steps = job["steps"].as_array().ok_or("original job step records missing")?;
-        require(steps.iter().filter(|s|s["number"] == step.number).count() == 1 && steps.iter().any(|s|s["number"] == step.number && s["name"] == step.name && s["status"] == "completed" && s["conclusion"] == "success"),"admitted original timeout-step identity/conclusion mismatch")?;
-        let raw = api(&format!("{repo}/actions/jobs/{}/logs",expected.job_id),FILE_LIMIT)?;
-        let logs = std::str::from_utf8(&raw).map_err(|_|"original job logs encoding")?;
-        let marker = format!("##[error]The action '{}' has timed out after 1 minutes.",step.name);
-        require(logs.ends_with('\n') && logs.lines().any(|line| line.split_once(' ').is_some_and(|(timestamp,message)| timestamp.ends_with('Z') && timestamp.contains('T') && message == marker)),"authenticated original runner step-timeout log missing; whole-job cancellation is not calibration")?;
-        true
-    } else { false };
     let files = read_zip(&zip)?;
-    Ok(AuthenticatedArtifact {files,artifact_id,archive_sha256:digest,workflow_step_timeout})
+    let logs = api(&format!("{repo}/actions/jobs/{}/logs",expected.job_id),FILE_LIMIT)?;
+    let (position,_) = super::custody::step(&job,&admission.uploader_step.name,admission.uploader_step.number)?;
+    let step_logs = api(&format!("{repo}/actions/jobs/{}/steps/{position}/logs",expected.job_id),FILE_LIMIT)?;
+    super::custody::upload(admission,artifact_id,artifact["digest"].as_str().ok_or("artifact digest missing")?,&digest,&files,&job,&logs,&step_logs)?;
+    let timeout_completed_unix_ms = if let Some(step) = &expected.calibration_step {
+        let (position,_) = super::custody::step(&job,&step.name,step.number)?;
+        let step_logs = api(&format!("{repo}/actions/jobs/{}/steps/{position}/logs",expected.job_id),FILE_LIMIT)?;
+        Some(super::custody::timeout(&job,&step.name,step.number,&logs,&step_logs)?)
+    } else {None};
+    Ok(AuthenticatedArtifact {files,artifact_id,archive_sha256:digest,timeout_completed_unix_ms,admission_sha256:hash(&serde_json::to_vec(admission).map_err(|e|e.to_string())?)})
 }
 #[allow(clippy::too_many_arguments)]
 fn validate_facts(g: &RootGrant, artifact_id: u64, run: &Value, attempt: &Value, job: &Value, jobs: &Value, artifact: &Value, workflow: &Value, commit: &Value) -> Result<()> {
@@ -105,8 +107,8 @@ fn validate_facts(g: &RootGrant, artifact_id: u64, run: &Value, attempt: &Value,
     require(workflow["id"] == run["workflow_id"] && workflow["path"] == g.workflow_path && commit["sha"] == g.source_head && commit["tree"]["sha"] == g.source_tree, "authenticated workflow/tree mismatch")
 }
 
-fn u16le(b: &[u8], n: usize) -> Result<usize> { Ok(u16::from_le_bytes(b.get(n..n+2).ok_or("truncated ZIP")?.try_into().map_err(|_|"ZIP integer")?) as usize) }
-fn u32le(b: &[u8], n: usize) -> Result<usize> { Ok(u32::from_le_bytes(b.get(n..n+4).ok_or("truncated ZIP")?.try_into().map_err(|_|"ZIP integer")?) as usize) }
+fn u16le(b: &[u8], n: usize) -> Result<usize> { Ok(u16::from_le_bytes(b.get(n..n.checked_add(2).ok_or("ZIP offset overflow")?).ok_or("truncated ZIP")?.try_into().map_err(|_|"ZIP integer")?) as usize) }
+fn u32le(b: &[u8], n: usize) -> Result<usize> { Ok(u32::from_le_bytes(b.get(n..n.checked_add(4).ok_or("ZIP offset overflow")?).ok_or("truncated ZIP")?.try_into().map_err(|_|"ZIP integer")?) as usize) }
 pub fn safe_name(name: &str) -> bool {
     !name.is_empty() && name.len() <= 160 && !name.starts_with('/') && name.split('/').all(|s| !s.is_empty() && !s.starts_with('-') && s != "." && s != "..") && name.bytes().all(|b| b.is_ascii_alphanumeric() || b"/_-.".contains(&b))
 }
@@ -135,6 +137,7 @@ pub fn read_zip(zip: &[u8]) -> Result<Files> {
         let comment = u16le(zip,pos+32)?;
         let mode = u32le(zip,pos+38)? >> 16;
         let local = u32le(zip,pos+42)?;
+        require(local < central,"ZIP local offset outside bounded payload")?;
         let next = pos.checked_add(46+name_len+extra+comment).ok_or("ZIP offset overflow")?;
         let name = std::str::from_utf8(zip.get(pos+46..pos+46+name_len).ok_or("ZIP name bounds")?).map_err(|_|"ZIP name UTF8")?;
         require(u16le(zip,pos+6)? <= 20 && u32le(zip,pos+38)? & 0x10 == 0,"ZIP64/version/directory refusal")?;

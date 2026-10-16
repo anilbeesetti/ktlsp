@@ -93,6 +93,7 @@ version = "0.1.0"
 dependencies = [
  "flate2",
  "ktlsp-protocol",
+ "ktlsp-text",
  "serde",
  "serde_json",
  "sha2",
@@ -101,6 +102,13 @@ dependencies = [
 [[package]]
 name = "ktlsp-protocol"
 version = "0.1.0"
+
+[[package]]
+name = "ktlsp-text"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "libc"

@@ -67,6 +67,11 @@ fn synthetic_symbols_and_null_are_data_consistency_not_evidence() {
 }
 #[test]
 fn adverse_shape_utf16_caps_offsets_eof_and_original_exit_refuse() {
+    for name in ["", " \t", "\n\r", "\u{2003}"] {
+        let mut invalid = document_symbol();
+        invalid["name"] = json!(name);
+        assert!(receiver::transport(&fixture(json!([invalid])),true).is_err(),"name {name:?}");
+    }
     for symbol in [
         json!({"name":"x","kind":0}),
         json!({"name":"x","kind":1,"range":null,"selectionRange":null}),
@@ -152,6 +157,9 @@ fn actual_adapter_export_receiver_evidence_replay_smoke_is_nonofficial() {
     for name in ["manifest.json","metadata.json","transcript.json","client-intended.raw","stdout.raw","stderr.raw"] { f.insert(format!("capture/{name}"),std::fs::read(cleanup.0.join(name)).unwrap()); }
     assert!(!receiver::transport(&f,false).unwrap().useful_symbols);
     assert!(receiver::transport(&f,true).is_err());
+    let received = std::process::Command::new(env!("CARGO_BIN_EXE_ktlsp-oracle-receive")).arg("--synthetic").arg(&cleanup.0).output().unwrap();
+    assert!(received.status.success(),"{}",String::from_utf8_lossy(&received.stderr));
+    assert_eq!(serde_json::from_slice::<Value>(&received.stdout).unwrap()["officialSuccess"],false);
     let evidence = Evidence::load(&cleanup.0).unwrap();
     assert_eq!(replay(&evidence,&command,Limits::default()).unwrap()["outcome"],"match");
 }

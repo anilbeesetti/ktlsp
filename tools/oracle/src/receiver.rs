@@ -10,6 +10,8 @@ use std::{collections::BTreeMap, io::Cursor};
 pub mod retrieval;
 #[path = "receiver/verdict.rs"]
 pub mod verdict;
+#[path = "receiver/custody.rs"]
+mod custody;
 
 pub type Result<T, E = String> = std::result::Result<T, E>;
 pub type Files = BTreeMap<String, Vec<u8>>;
@@ -17,6 +19,36 @@ pub const FILE_LIMIT: usize = 8 * 1024 * 1024;
 pub const BUNDLE_LIMIT: usize = 32 * 1024 * 1024;
 pub const FILE_COUNT: usize = 48;
 pub const ARCHIVE_SHA256: &str = "ab8ca4455dc2fc5fe1a24db2bccc46c104254d2c465155c4251ee65df8f3f7cc";
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct UploaderStep { pub name: String, pub number: u32 }
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ReceiverAdmission {
+    pub schema_version: u8,
+    pub scope: String,
+    pub grant: crate::authority::RootGrant,
+    pub uploader_step: UploaderStep,
+}
+impl ReceiverAdmission {
+    pub fn validate(&self) -> Result<()> {
+        self.grant.validate_shape()?;
+        require(self.schema_version == 1 && self.scope == "PR174_RECEIVER_ADMISSION" && self.uploader_step.number > 0 && !self.uploader_step.name.trim().is_empty() && self.uploader_step.name.len() <= 256 && !self.uploader_step.name.chars().any(char::is_control),"independent ROOT receiver/uploader-step admission malformed")
+    }
+}
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ProtectedUploadReceipt {
+    pub schema_version: u8, pub scope: String, pub repository: String,
+    pub run_id: u64, pub job_id: u64, pub suite_id: u64, pub attempt: u8,
+    pub source_head: String, pub source_tree: String, pub workflow_sha256: String,
+    pub artifact_id: u64, pub artifact_api_digest: String,
+    pub download_zip_sha256: Option<String>, pub export_binding_sha256: String,
+    pub nonce: String, pub container_id: String, pub root_grant_sha256: String,
+    pub uploader_step: UploaderStep,
+}
+pub const UPLOAD_PREFIX: &str = "KTLSP_PR174_PROTECTED_UPLOAD ";
 
 pub fn hash(bytes: &[u8]) -> String { format!("{:x}", Sha256::digest(bytes)) }
 pub fn require(ok: bool, reason: &str) -> Result<()> {
@@ -146,7 +178,7 @@ fn valid_range(v: &Value, text: &str) -> Result<ktlsp_text::Range> {
 fn symbol(v: &Value, text: &str, uri: &str, parent: Option<ktlsp_text::Range>, budget: &mut usize, depth: usize, flat: bool) -> Result<()> {
     require(*budget > 0 && depth <= 32, "symbol node/depth limit")?;
     *budget -= 1;
-    require(v["name"].as_str().is_some_and(|s| !s.is_empty()) && v["kind"].as_u64().is_some_and(|k| (1..=26).contains(&k)), "invalid symbol name/kind")?;
+    require(v["name"].as_str().is_some_and(|s| !s.trim().is_empty()) && v["kind"].as_u64().is_some_and(|k| (1..=26).contains(&k)), "invalid symbol name/kind")?;
     if let Some(tags) = v.get("tags") { require(array(tags)?.iter().all(|t| t == 1), "invalid symbol tag")?; }
     if let Some(deprecated) = v.get("deprecated") { require(deprecated.is_boolean(), "invalid deprecated flag")?; }
     if flat {

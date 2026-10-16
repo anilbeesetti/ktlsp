@@ -1,28 +1,11 @@
 use super::{file, hash, json_bytes, require, transport, Files, Result, FILE_COUNT};
 use super::retrieval::{AuthenticatedArtifact, safe_name};
 use crate::authority::{self, CalibrationReport, GrantScope, RootGrant};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct OriginalRun {
-    pub repository: String, pub event: String, pub attempt: u8,
-    pub run_id: u64, pub job_id: u64, pub suite_id: u64,
-    pub source_head: String, pub source_tree: String,
-}
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ExportFile { pub path: String, pub bytes: u64, pub sha256: String }
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ExportBinding {
-    pub schema_version: u8, pub scope: String, pub run: OriginalRun,
-    pub nonce: String, pub container_id: String, pub boot_id: String, pub daemon_id: String,
-    pub image: String, pub image_id: String, pub root_authorization_sha256: String,
-    pub calibration_sha256: String, pub workflow_sha256: String, pub files: Vec<ExportFile>,
-}
+pub use crate::authority::{OriginalRun,ExportFile,ExportBinding};
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Gate { pub passed: bool, pub reason: String }
@@ -42,8 +25,9 @@ pub struct Verdict {
 
 /// Only fixed authenticated retrieval constructs AuthenticatedArtifact in production.
 /// Expected grants are separate ROOT input, never loaded from the received artifact.
-pub fn evaluate(a: &AuthenticatedArtifact, expected: &RootGrant, calibrations: &[(RootGrant,AuthenticatedArtifact)]) -> Verdict {
-    let bound = provenance(&a.files,expected);
+pub fn evaluate(a: &AuthenticatedArtifact, admission: &super::ReceiverAdmission, calibrations: &[(super::ReceiverAdmission,AuthenticatedArtifact)]) -> Verdict {
+    let expected = &admission.grant;
+    let bound = authenticated_provenance(a,admission);
     let provenance = Gate::from(bound.as_ref().map(|_|()).map_err(Clone::clone));
     let checked_transport = transport(&a.files,true);
     let useful_symbols = checked_transport.as_ref().is_ok_and(|t| t.useful_symbols);
@@ -236,19 +220,39 @@ pub fn teardown(files: &Files, b: &ExportBinding, normal_required: bool) -> Resu
     let clock = json_bytes(file(files,"cleanup-begun.json")?)?;
     let armed = json_bytes(file(files,"armed.json")?)?;
     let first = clock["firstMs"].as_u64().ok_or("cleanup original clock missing")?;
-    let end = clock["endMs"].as_u64().ok_or("cleanup deadline missing")?;
+    let original_end = clock["endMs"].as_u64().ok_or("cleanup deadline missing")?;
     let armed_ms = armed["armedMs"].as_u64().ok_or("arm clock missing")?;
     let outer = armed_ms.checked_add(600000).ok_or("arm deadline overflow")?;
-    require(clock["nonce"] == b.nonce && clock["containerId"] == b.container_id && clock["bootId"] == b.boot_id && first >= armed_ms && end == first.checked_add(60000).ok_or("cleanup deadline overflow")?.min(outer) && first <= end && armed["finalDeadlineMs"].as_u64() == Some(outer) && receipt["endMs"].as_u64() == Some(end),"original finite teardown deadline mismatch")?;
+    require(clock["nonce"] == b.nonce && clock["containerId"] == b.container_id && clock["bootId"] == b.boot_id && first >= armed_ms && original_end == first.checked_add(60000).ok_or("cleanup deadline overflow")?.min(outer) && armed["finalDeadlineMs"].as_u64() == Some(outer),"original finite cleanup clock mismatch")?;
+    let expected_args = json!(["show","--property=ExecMainStartTimestampMonotonic",format!("ktlsp-pr174-{}-cleanup.service",b.nonce)]);
+    let mut starts = records.iter().filter(|r|r["kind"] == "command" && r["program"] == binding["systemctl"] && r["args"] == expected_args);
+    let start = String::from_utf8(command_output(starts.next().ok_or("actual cleanup service start measurement absent")?)?).map_err(|_|"cleanup start encoding")?;
+    require(starts.next().is_none() && start.ends_with('\n') && start.lines().count() == 1,"cleanup service start duplicated/truncated")?;
+    let value = start.trim_end_matches('\n').strip_prefix("ExecMainStartTimestampMonotonic=").ok_or("cleanup service timestamp property absent")?;
+    let usec = match value.parse::<u64>() {Ok(n)=>n,Err(_)=>authority::systemctl_usec(value)?};
+    let service_start = usec/1000;
+    require(service_start > 0 && service_start <= first,"cleanup service start not original monotonic instant")?;
+    let service_end = original_end.min(service_start.checked_add(60000).ok_or("cleanup service deadline overflow")?);
+    let end = service_end.checked_sub(12000).ok_or("cleanup export reserve underflow")?;
+    let mut budgets = records.iter().filter(|r|r["kind"] == "cleanup-export-budget");
+    let budget = budgets.next().ok_or("actual surviving export budget absent")?;
+    require(budgets.next().is_none() && first <= end && budget["teardownEndMs"].as_u64() == Some(end) && budget["serviceEndMs"].as_u64() == Some(service_end) && budget["exportEndMs"].as_u64() == service_end.checked_sub(2000) && receipt["endMs"].as_u64() == Some(service_end),"actual cleanup service/export deadline mismatch")?;
     let intent = json_bytes(file(files,"start-intent.json")?)?;
     let result = json_bytes(file(files,"start-result.json")?)?;
     require(intent["containerId"] == b.container_id && intent["nonce"] == b.nonce && intent["bootId"] == b.boot_id && result["containerId"] == b.container_id && result["complete"] == true,"original START not settled")?;
     let mut stages = BTreeSet::new();
     let mut stopped = false; let mut waited = false; let mut removed = false; let mut listed = false; let mut typed_absence = false;
     let mut daemon_before = false; let mut daemon_after = false; let mut supervisor_inactive = false;
+    let mut wait_exit = None;
+    let mut forced_kill = false;
     for r in &records {
         if matches!(r["kind"].as_str(),Some("original-init-closure"|"original-cgroup-closure")) {
             require(r["observedMs"].as_u64().is_some_and(|ms| first <= ms && ms <= end),"closure missing/outside original cleanup deadline")?;
+            match r["stage"].as_str() {
+                Some("pre-removal"|"supervisor-stopped") => require(!removed,"pre-removal proof after removal")?,
+                Some("post-removal") => require(removed,"post-removal proof before removal")?,
+                _ => return Err("unknown original closure stage".into()),
+            }
         }
         if r["kind"] == "original-init-closure" {
             let stage = r["stage"].as_str().ok_or("closure stage absent")?;
@@ -269,25 +273,29 @@ pub fn teardown(files: &Files, b: &ExportBinding, normal_required: bool) -> Resu
             supervisor_inactive = matches!(raw.as_str(),"ActiveState=inactive\n"|"ActiveState=failed\n");
         }
         if normal_required { require(!docker_args(r,&["kill","--signal=KILL",&b.container_id]) && !docker_args(r,&["rm","--force",&b.container_id]),"forced original container termination/removal")?; }
+        if !normal_required && docker_args(r,&["kill","--signal=KILL",&b.container_id]) {
+            require(!forced_kill && String::from_utf8(command_output(r)?).map_err(|_|"forced kill output encoding")?.trim() == b.container_id,"actual exact-CID calibration kill missing/duplicated")?;
+            forced_kill = true;
+        }
         if docker_args(r,&["container","inspect",&b.container_id]) {
             let output = command_output(r)?;
             let v = json_bytes(&output)?;
             let v = v.as_array().filter(|v|v.len()==1).and_then(|v|v.first()).ok_or("inspect identity ambiguous")?;
             require(v["Id"] == b.container_id,"foreign inspected CID")?;
             if v["State"]["Running"] == false && v["State"]["Restarting"] == false && v["State"]["Dead"] == false && v["State"]["Pid"] == 0 {
-                require(!normal_required || (v["State"]["ExitCode"] == 0 && v["State"]["OOMKilled"] == false && v["RestartCount"] == 0),"original exit nonzero/OOM/restart")?;
-                stopped = true;
+                require(v["State"]["ExitCode"] == if normal_required {0}else{137} && v["State"]["OOMKilled"] == false && v["RestartCount"] == 0,"original exit/OOM/restart mismatch")?;
+                stopped = waited && v["State"]["ExitCode"].as_i64() == wait_exit;
             }
         } else if docker_args(r,&["wait",&b.container_id]) {
             let raw = command_output(r)?;
             let code = std::str::from_utf8(&raw).map_err(|_|"wait encoding")?.trim().parse::<i32>().map_err(|_|"invalid wait exit")?;
-            require(!normal_required || code == 0,"original wait exit nonzero")?; waited = true;
+            require(if normal_required {code == 0} else {forced_kill && code == 137},"original normal/forced wait exit mismatch")?; waited = true; wait_exit = Some(i64::from(code)); stopped = false;
         } else if docker_args(r,&["rm",&b.container_id]) {
-            require(stopped && waited && stages.contains("init-pre-removal") && stages.contains("cgroup-pre-removal"),"removal before original stopped/closure/wait")?;
+            require(stopped && waited && supervisor_inactive && daemon_before && stages.contains("supervisor-stopped") && stages.contains("init-pre-removal") && stages.contains("cgroup-pre-removal"),"removal before original stopped/closure/wait/supervisor/daemon proof")?;
             require(String::from_utf8(command_output(r)?).map_err(|_|"rm encoding")?.trim() == b.container_id,"original ordinary rm not confirmed")?; removed = true;
         } else if docker_args(r,&["container","ls","--all","--no-trunc","--format","{{json .ID}}"] ) {
             let raw = command_output(r)?;
-            require(removed && (raw.is_empty() || raw.ends_with(b"\n")),"absence before rm/partial list")?;
+            require(removed && daemon_after && (raw.is_empty() || raw.ends_with(b"\n")),"absence before healthy post-rm daemon proof/partial list")?;
             let mut ids = BTreeSet::new();
             for line in raw.split(|b|*b==b'\n').filter(|l|!l.is_empty()) {
                 let id = json_bytes(line)?;
@@ -308,14 +316,15 @@ pub fn teardown(files: &Files, b: &ExportBinding, normal_required: bool) -> Resu
     }
     require(stopped && waited && removed && listed && typed_absence && daemon_before && daemon_after && supervisor_inactive && ["init-pre-removal","init-post-removal","cgroup-pre-removal","cgroup-post-removal","supervisor-stopped"].iter().all(|s|stages.contains(*s)),"incomplete original daemon/init/cgroup/removal closure")
 }
-fn calibration(files: &Files, expected: &RootGrant, supplied: &[(RootGrant,AuthenticatedArtifact)]) -> Result<()> {
+fn calibration(files: &Files, expected: &RootGrant, supplied: &[(super::ReceiverAdmission,AuthenticatedArtifact)]) -> Result<()> {
     let report: CalibrationReport = authority::decode(file(files,"calibration.json")?)?;
     report.validate(expected)?;
     require(supplied.len() == report.cases.len(),"missing authenticated original calibration artifacts/grants")?;
     let mut seen = BTreeSet::new();
-    for (grant,artifact) in supplied {
+    for (admission,artifact) in supplied {
+        let grant = &admission.grant;
         require(grant.scope == GrantScope::RustCalibration && seen.insert(grant.calibration_case),"duplicate/unscoped calibration grant")?;
-        let b = provenance(&artifact.files,grant)?;
+        let b = authenticated_provenance(artifact,admission)?;
         let case = report.cases.iter().find(|c| Some(c.case) == grant.calibration_case).ok_or("unreported calibration case")?;
         require(case.run_id == grant.run_id && case.job_id == grant.job_id && case.suite_id == grant.suite_id && case.attempt == grant.attempt && case.nonce == b.nonce && case.container_id == b.container_id && hash(file(&artifact.files,"receipts/observer.evidence")?) == case.observation_sha256 && hash(file(&artifact.files,"teardown-receipt.json")?) == case.teardown_sha256 && hash(file(&artifact.files,"export-binding.json")?) == case.export_sha256,"calibration original job/raw/export mismatch")?;
         require(grant.source_head == expected.source_head && grant.source_tree == expected.source_tree && grant.workflow_sha256 == expected.workflow_sha256 && grant.host_binary_sha256 == expected.host_binary_sha256 && grant.peer_sha256 == expected.peer_sha256 && grant.containment_template_sha256 == expected.containment_template_sha256 && grant.image == expected.image && grant.image_id == expected.image_id && grant.host == expected.host && b.boot_id == report.boot_id && b.daemon_id == report.daemon_id,"calibration same original host/image/config mismatch")?;
@@ -333,7 +342,7 @@ fn calibration(files: &Files, expected: &RootGrant, supplied: &[(RootGrant,Authe
         let serialized = serde_json::to_value(&peer).map_err(|e|e.to_string())?;
         require(observations.iter().any(|r|r["kind"] == "calibration-peer-observation" && r["report"] == serialized),"protected host did not retain actual peer report")?;
         calibration_processes(&artifact.files,&b,&peer,&observations)?;
-        require(case.case != authority::CalibrationCase::WorkflowStepCancel || artifact.workflow_step_timeout,"missing authenticated original runner step-timeout proof")?;
+        if case.case.forced() { forced_calibration_action(&artifact.files,&b,case.case,&observations,artifact.timeout_completed_unix_ms)?; }
     }
     Ok(())
 }
@@ -368,3 +377,29 @@ fn calibration_processes(files: &Files,b: &ExportBinding,peer: &crate::calibrati
 #[cfg(test)]
 #[path = "receipt_tests.rs"]
 mod receipt_tests;
+
+fn authenticated_provenance(a: &AuthenticatedArtifact,admission: &super::ReceiverAdmission) -> Result<ExportBinding> {
+    admission.validate()?;
+    require(a.admission_sha256 == hash(&serde_json::to_vec(admission).map_err(|e|e.to_string())?),"artifact authenticated for a different independent ROOT receiver/uploader admission")?;
+    provenance(&a.files,&admission.grant)
+}
+
+fn forced_calibration_action(files: &Files,b: &ExportBinding,case: authority::CalibrationCase,observations: &[Value],timeout_completed_ms: Option<u64>) -> Result<()> {
+    let action: authority::CalibrationAction = authority::decode(file(files,"calibration-action.json")?)?;
+    action.validate()?;
+    let identity = json_bytes(file(files,"process-identity.json")?)?;
+    let armed = json_bytes(file(files,"armed.json")?)?;
+    let clock = json_bytes(file(files,"cleanup-begun.json")?)?;
+    require(action.case == case && action.nonce == b.nonce && action.container_id == b.container_id && action.boot_id == b.boot_id && action.daemon_id == b.daemon_id && Some(action.init_pid as u64) == identity["initPid"].as_u64() && Some(action.init_starttime) == identity["initStart"].as_u64() && Some(action.armed_ms) == armed["armedMs"].as_u64() && clock["firstMs"].as_u64().is_some_and(|ms| ms >= action.observed_ms),"calibration actual action original binding/clock mismatch")?;
+    if case == authority::CalibrationCase::WorkflowStepCancel {
+        require(timeout_completed_ms.is_some_and(|ms| action.observed_unix_ms >= ms),"outside-step supervisor survival not observed after authenticated original step cancellation")?;
+    }
+    let serialized = serde_json::to_value(&action).map_err(|e|e.to_string())?;
+    let mut records = observations.iter().filter(|r|r["kind"] == "calibration-action");
+    let raw = records.next().ok_or("actual original calibration action observation absent")?;
+    require(records.next().is_none() && raw["action"] == serialized,"calibration action missing/duplicated/substituted")?;
+    let stat = original_stat(&text_hex(&raw["originalStatHex"])?)?;
+    let state = &raw["actualContainerState"];
+    require(stat == (action.init_pid as u64,action.init_starttime) && state["Running"] == true && state["Restarting"] == false && state["Dead"] == false && state["OOMKilled"] == false && state["Pid"] == action.init_pid && raw["restartCount"] == 0,"calibration action did not observe original live init/noOOM/noRestart")?;
+    Ok(())
+}

@@ -12,15 +12,17 @@ After ROOT separately admits the exact reviewed producer/workflow/source and
 actual original jobs, the receiver operator provides **independent ROOT grants**:
 
 ```text
-ktlsp-oracle-receive ROOT-expected-grant.json ARTIFACT_ID ROOT-calibrations.json
+ktlsp-oracle-receive ROOT-receiver-admission.json ARTIFACT_ID ROOT-calibrations.json
 ```
 
-`ROOT-calibrations.json` is an array of ten objects `{ "grant": <RootGrant>,
-"artifactId": <positive integer> }`, one per independently admitted calibration
-case. `RootGrant` and `CalibrationReport` are the shared `authority` module's
-strict schemas, not receiver-defined aliases. An expected grant obtained from
-inside the artifact is not independent authority. The receiver never executes
-an artifact-provided program, URL or command line.
+The first file is strict `ReceiverAdmission`: `{schemaVersion:1,
+scope:"PR174_RECEIVER_ADMISSION",grant:<RootGrant>,uploaderStep:{name,number}}`.
+`ROOT-calibrations.json` is an array of ten objects `{ "admission":
+<ReceiverAdmission>, "artifactId": <positive integer> }`, one per independently
+admitted calibration case. `RootGrant`, `CalibrationReport` and `ExportBinding`
+are the shared `authority` module's strict schemas, not receiver-owned copies.
+An expected grant or uploader step obtained inside the artifact is not independent
+authority. No artifact-provided program, URL or command line is executed.
 
 Original retrieval uses root-owned, non-symlink `/usr/bin/gh`, `GH_TOKEN`, and
 fixed GET endpoints on `github.com` for this repository. It independently joins
@@ -28,10 +30,18 @@ the completed original run/attempt, numeric original job and attempt-specific
 job membership, head/tree/suite/workflow, exact workflow bytes and immutable
 artifact ID/digest. More than 100 original jobs refuses instead of silently
 accepting a partial page. Artifact names are irrelevant. GitHub's artifact API
-has no job/attempt proof: the required separate join is the original-job API
-facts **and** the protected export binding produced by the reviewed original
-workflow outside the child-writable capture. GitHub transport authentication
-alone cannot prove which process authored arbitrary self-declared metadata.
+has no job/attempt proof: matching self-declared binding fields and job membership
+alone are insufficient. The receiver requires an independently ROOT-admitted
+original post-upload step and exactly one strict receipt for the **target artifact
+ID** in authenticated original **job logs and that exact step's logs**. Its
+timestamp and serialized bytes must match; the timestamp must lie inside the
+step's actual API interval at its reported second precision. Distinct receipts
+for other artifacts/steps are allowed, so the same-job ten-case cohort works.
+The [current GitHub step-log API](https://docs.github.com/en/rest/actions/workflow-jobs#download-step-logs-for-a-workflow-run-job)
+takes the zero-based position, derived from authenticated ordered, unique
+job-step records; ROOT still binds the step name and numeric API identity.
+An unavailable endpoint, absent/truncated/duplicate-target/wrong-step receipt
+refuses.
 
 Cancellation calibration is a runner-enforced one-minute **step** timeout in the
 same completed original job/VM, with independently admitted step name/number,
@@ -42,6 +52,20 @@ Protected workflow custody includes not echoing untrusted child output as
 runner diagnostic lines. No source-to-binary cryptographic attestation is
 claimed: reviewed workflow and protected original-job OS-root custody remain
 explicit assumptions.
+
+The fixed ROOT-owned post-upload step emits one compact serialized line per artifact:
+`KTLSP_PR174_PROTECTED_UPLOAD ` followed by `ProtectedUploadReceipt` JSON:
+`schemaVersion:1`, `scope:"PR174_PROTECTED_UPLOAD"`, repository/runId/jobId/suiteId/
+attempt/sourceHead/sourceTree/workflowSha256, artifactId, artifactApiDigest,
+optional downloadZipSha256, exportBindingSha256, nonce/containerId,
+rootGrantSha256 and uploaderStep `{name,number}`. `rootGrantSha256` hashes actual
+`root-authorization.json` bytes, not an invented canonicalized document.
+The receiver independently downloads and hashes the ZIP; equality with the
+authenticated API's SHA-256 digest is **observed and required**, never assumed.
+An optional workflow-claimed download hash is checked separately. ROOT owns the
+real original upload/receipt wiring; a caller-authored receipt or a copied log
+file is never accepted through the authenticated retrieval constructor.
+The reviewed workflow must not echo child-controlled bytes into protected logs.
 
 ## Protected export contract
 

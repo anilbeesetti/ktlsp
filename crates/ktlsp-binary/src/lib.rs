@@ -8,6 +8,7 @@ pub mod class_path;
 pub mod class_type_annotations;
 pub mod code;
 pub mod code_type_annotations;
+pub mod descriptors;
 pub mod line_number_table;
 pub mod metadata;
 pub mod method_type_annotations;
@@ -459,66 +460,17 @@ fn validate_pool(cp: &[Constant], major: u16, work: &mut usize) -> Result<()> {
     }
     Ok(())
 }
-fn field_type(s: &[u16], at: &mut usize) -> Result<usize> {
-    let start = *at;
-    while s.get(*at) == Some(&91) {
-        *at += 1;
-    }
-    let arrays = *at - start;
-    if arrays > 255 {
-        return Err(Error::Malformed("array depth"));
-    }
-    let c = *s.get(*at).ok_or(Error::Malformed("descriptor"))?;
-    *at += 1;
-    let slots = match c {
-        66 | 67 | 70 | 73 | 83 | 90 => 1,
-        68 | 74 => 2,
-        76 => {
-            let begin = *at;
-            while s.get(*at).is_some_and(|c| *c != 59) {
-                *at += 1;
-            }
-            if s.get(*at) != Some(&59) {
-                return Err(Error::Malformed("object descriptor"));
-            }
-            internal_name(&s[begin..*at])?;
-            *at += 1;
-            1
-        }
-        _ => return Err(Error::Malformed("descriptor type")),
-    };
-    Ok(if arrays > 0 { 1 } else { slots })
-}
 fn descriptor_valid(s: &[u16], method: bool, receiver: bool) -> Result<()> {
-    let mut at = 0;
     if method {
-        if s.first() != Some(&40) {
-            return Err(Error::Malformed("method descriptor"));
-        }
-        at += 1;
-        let mut slots = usize::from(receiver);
-        while s.get(at).is_some_and(|c| *c != 41) {
-            slots += field_type(s, &mut at)?;
-            if slots > 255 {
-                return Err(Error::Malformed("parameter slots"));
-            }
-        }
-        if s.get(at) != Some(&41) {
-            return Err(Error::Malformed("method descriptor"));
-        }
-        at += 1;
-        if s.get(at) == Some(&86) {
-            at += 1;
+        let context = if receiver {
+            descriptors::SlotContext::WithReceiver
         } else {
-            field_type(s, &mut at)?;
-        }
+            descriptors::SlotContext::WithoutReceiver
+        };
+        descriptors::MethodDescriptor::parse(s, context).map(|_| ())
     } else {
-        field_type(s, &mut at)?;
+        descriptors::FieldDescriptor::parse(s).map(|_| ())
     }
-    if at != s.len() {
-        return Err(Error::Malformed("descriptor trailing data"));
-    }
-    Ok(())
 }
 fn mutf8(bytes: &[u8]) -> Result<Vec<u16>> {
     let mut out = Vec::new();

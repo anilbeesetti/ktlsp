@@ -242,6 +242,231 @@ fn semantic_spelling(raw: &str) -> Option<&str> {
     }
 }
 
+/// An authenticated whole-initializer occurrence, not a reusable symbol identity.
+#[derive(Debug)]
+pub struct ReferenceSite<'a> {
+    origin: &'a LoweredDeclarations<'a>,
+    result: &'a SnapshotResult,
+    expression_index: usize,
+    token_index: usize,
+    expression: &'a Element,
+    raw_spelling: &'a str,
+    containing_property: &'a Declaration<'a>,
+    body_index: usize,
+    function: &'a Declaration<'a>,
+}
+impl<'a> ReferenceSite<'a> {
+    pub fn origin(&self) -> &'a LoweredDeclarations<'a> {
+        self.origin
+    }
+    pub fn expression_index(&self) -> usize {
+        self.expression_index
+    }
+    pub fn token_index(&self) -> usize {
+        self.token_index
+    }
+    pub fn range(&self) -> Range<usize> {
+        self.expression.start..self.expression.end
+    }
+    pub fn raw_spelling(&self) -> &'a str {
+        self.raw_spelling
+    }
+    pub fn semantic_spelling(&self) -> Option<&'a str> {
+        semantic_spelling(self.raw_spelling)
+    }
+    pub fn containing_property(&self) -> &'a Declaration<'a> {
+        self.containing_property
+    }
+    pub fn body_index(&self) -> usize {
+        self.body_index
+    }
+    pub fn function(&self) -> &'a Declaration<'a> {
+        self.function
+    }
+    pub(crate) fn tree(
+        &self,
+        current: &SourceSnapshot,
+        budget: &mut ReferenceBudget,
+    ) -> std::result::Result<&'a Parsed, ReferenceSiteError> {
+        authenticated_tree(self.origin, self.result, current, budget)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReferenceSiteError {
+    InvalidOrigin,
+    StaleSnapshot,
+    UnsupportedContext,
+    Resource,
+}
+impl std::fmt::Display for ReferenceSiteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "reference site rejected request: {self:?}")
+    }
+}
+impl std::error::Error for ReferenceSiteError {}
+
+/// Shared by authentication, body validation and candidate comparison in one query.
+#[derive(Default)]
+pub(crate) struct ReferenceBudget {
+    work: usize,
+}
+impl ReferenceBudget {
+    pub(crate) fn charge(&mut self, amount: usize) -> std::result::Result<(), ReferenceSiteError> {
+        self.work = self
+            .work
+            .checked_add(amount)
+            .ok_or(ReferenceSiteError::Resource)?;
+        if self.work > WORK {
+            return Err(ReferenceSiteError::Resource);
+        }
+        Ok(())
+    }
+    pub(crate) fn element<'a>(
+        &mut self,
+        parsed: &'a Parsed,
+        index: usize,
+    ) -> std::result::Result<&'a Element, ReferenceSiteError> {
+        self.charge(1)?;
+        parsed
+            .elements()
+            .get(index)
+            .ok_or(ReferenceSiteError::UnsupportedContext)
+    }
+    pub(crate) fn equal(
+        &mut self,
+        a: &str,
+        b: &str,
+    ) -> std::result::Result<bool, ReferenceSiteError> {
+        self.charge(a.len())?;
+        self.charge(b.len())?;
+        Ok(a == b)
+    }
+    pub(crate) fn spelling<'a>(
+        &mut self,
+        raw: &'a str,
+    ) -> std::result::Result<Option<&'a str>, ReferenceSiteError> {
+        // Bound the byte scan, boundary checks and every hard-keyword arm in the
+        // shared helper, not only the final semantic-name equality comparison.
+        let work = raw
+            .len()
+            .checked_mul(40)
+            .and_then(|n| n.checked_add(64))
+            .ok_or(ReferenceSiteError::Resource)?;
+        self.charge(work)?;
+        Ok(semantic_spelling(raw))
+    }
+}
+
+fn authenticated_tree<'a>(
+    lowered: &'a LoweredDeclarations<'a>,
+    result: &'a SnapshotResult,
+    current: &SourceSnapshot,
+    budget: &mut ReferenceBudget,
+) -> std::result::Result<&'a Parsed, ReferenceSiteError> {
+    if !std::ptr::eq(lowered.snapshot, result.snapshot()) {
+        return Err(ReferenceSiteError::InvalidOrigin);
+    }
+    if current.document().len() > DOCUMENT || current.source().len() > SOURCE {
+        return Err(ReferenceSiteError::Resource);
+    }
+    for n in [
+        current.document().len(),
+        result.snapshot().document().len(),
+        current.source().len(),
+        result.snapshot().source().len(),
+        4,
+    ] {
+        budget.charge(n)?;
+    }
+    let parsed = result
+        .tree_for(current)
+        .map_err(|_| ReferenceSiteError::StaleSnapshot)?;
+    if !std::ptr::eq(lowered.parsed, parsed) {
+        return Err(ReferenceSiteError::InvalidOrigin);
+    }
+    Ok(parsed)
+}
+
+/// Authenticate an original expression selector against its producer and current snapshot.
+/// Recheck the authoritative document under its synchronization before publication.
+pub fn reference_site<'a>(
+    lowered: &'a LoweredDeclarations<'a>,
+    result: &'a SnapshotResult,
+    current: &SourceSnapshot,
+    expression_index: usize,
+) -> std::result::Result<ReferenceSite<'a>, ReferenceSiteError> {
+    let mut budget = ReferenceBudget::default();
+    let parsed = authenticated_tree(lowered, result, current, &mut budget)?;
+    let expression = budget.element(parsed, expression_index)?;
+    let token_index = expression_index
+        .checked_add(1)
+        .ok_or(ReferenceSiteError::Resource)?;
+    let token = budget.element(parsed, token_index)?;
+    if expression.token
+        || !budget.equal(&expression.kind, "REFERENCE_EXPRESSION")?
+        || !token.token
+        || !budget.equal(&token.kind, "IDENTIFIER")?
+        || token.parent != Some(expression_index)
+        || expression.subtree_end
+            != token_index
+                .checked_add(1)
+                .ok_or(ReferenceSiteError::Resource)?
+        || token.start != expression.start
+        || token.end != expression.end
+        || expression.start >= expression.end
+    {
+        return Err(ReferenceSiteError::UnsupportedContext);
+    }
+    let property_index = expression
+        .parent
+        .ok_or(ReferenceSiteError::UnsupportedContext)?;
+    let property = budget.element(parsed, property_index)?;
+    let body_index = property
+        .parent
+        .ok_or(ReferenceSiteError::UnsupportedContext)?;
+    let body = budget.element(parsed, body_index)?;
+    let function_index = body.parent.ok_or(ReferenceSiteError::UnsupportedContext)?;
+    let function = budget.element(parsed, function_index)?;
+    if property.token
+        || body.token
+        || function.token
+        || !budget.equal(&property.kind, "PROPERTY")?
+        || !budget.equal(&body.kind, "BLOCK")?
+        || !budget.equal(&function.kind, "FUN")?
+        || function.parent != Some(0)
+    {
+        return Err(ReferenceSiteError::UnsupportedContext);
+    }
+    let mut containing_property = None;
+    let mut enclosing_function = None;
+    for declaration in lowered.declarations() {
+        budget.charge(1)?;
+        if declaration.cst_index == property_index {
+            containing_property = Some(declaration);
+        }
+        if declaration.cst_index == function_index {
+            enclosing_function = Some(declaration);
+        }
+    }
+    budget.charge(5)?;
+    let raw_spelling = parsed
+        .source()
+        .get(expression.start..expression.end)
+        .ok_or(ReferenceSiteError::UnsupportedContext)?;
+    Ok(ReferenceSite {
+        origin: lowered,
+        result,
+        expression_index,
+        token_index,
+        expression,
+        raw_spelling,
+        containing_property: containing_property.ok_or(ReferenceSiteError::UnsupportedContext)?,
+        body_index,
+        function: enclosing_function.ok_or(ReferenceSiteError::UnsupportedContext)?,
+    })
+}
+
 #[derive(Debug)]
 pub struct LoweredSyntaxError<'a> {
     cst_index: usize,
@@ -1077,6 +1302,308 @@ mod tests {
         let mut tree = reference_body();
         local_val(&mut tree, "REFERENCE_EXPRESSION");
         finish_body(tree)
+    }
+
+    fn binding_fixture(bodies: &[&[(&str, Option<&str>)]]) -> SnapshotResult {
+        let mut tree = Tree::new();
+        for body in bodies {
+            tree.header("f");
+            tree.open("VALUE_PARAMETER_LIST");
+            tree.token("LPAR", "(");
+            tree.token("RPAR", ")");
+            tree.close();
+            tree.open("BLOCK");
+            tree.token("LBRACE", "{");
+            for &(name, reference) in *body {
+                tree.open("PROPERTY");
+                tree.token("VAL_KEYWORD", "val");
+                tree.token("WHITE_SPACE", " ");
+                tree.token("IDENTIFIER", name);
+                tree.token("EQ", "=");
+                tree.open(if reference.is_some() {
+                    "REFERENCE_EXPRESSION"
+                } else {
+                    "INTEGER_CONSTANT"
+                });
+                tree.token(
+                    if reference.is_some() {
+                        "IDENTIFIER"
+                    } else {
+                        "INTEGER_LITERAL"
+                    },
+                    reference.unwrap_or("1"),
+                );
+                tree.close();
+                tree.close();
+                tree.token("SEMICOLON", ";");
+            }
+            tree.token("RBRACE", "}");
+            tree.close();
+            tree.close();
+        }
+        tree.finish()
+    }
+
+    fn reference_indices(result: &SnapshotResult) -> Vec<usize> {
+        result
+            .parsed
+            .elements
+            .iter()
+            .enumerate()
+            .filter_map(|(i, e)| (e.kind == "REFERENCE_EXPRESSION").then_some(i))
+            .collect()
+    }
+
+    #[test]
+    fn authenticated_sites_and_bindings_preserve_original_borrows_without_chasing() {
+        use crate::{local_value_binding::bind_local_value, structural_regions::build_regions};
+        for (name, reference) in [("x", "x"), ("`x`", "x"), ("x", "`x`"), ("`🦀`", "`🦀`")] {
+            let result =
+                binding_fixture(&[&[(name, None), ("y", Some(reference)), ("z", Some("y"))]]);
+            let lower = lower(&result).unwrap();
+            let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
+            let indices = reference_indices(&result);
+            for (offset, &index) in indices.iter().enumerate() {
+                let site = reference_site(&lower, &result, result.snapshot(), index).unwrap();
+                assert!(std::ptr::eq(site.origin(), &lower));
+                assert_eq!(site.expression_index(), index);
+                assert_eq!(site.token_index(), index + 1);
+                assert_eq!(
+                    site.range(),
+                    result.parsed.elements[index].start..result.parsed.elements[index].end
+                );
+                assert_eq!(
+                    site.raw_spelling().as_ptr(),
+                    result.parsed.source()[site.range()].as_ptr()
+                );
+                assert!(std::ptr::eq(site.function(), &lower.declarations()[0]));
+                assert!(std::ptr::eq(
+                    site.containing_property(),
+                    &lower.declarations()[offset + 2]
+                ));
+                let binding = bind_local_value(&directory, &site, result.snapshot()).unwrap();
+                assert!(std::ptr::eq(binding.site(), &site));
+                assert!(std::ptr::eq(binding.body(), &directory.regions()[1]));
+                assert!(std::ptr::eq(
+                    binding.target(),
+                    &lower.declarations()[offset + 1]
+                ));
+                assert_eq!(
+                    binding.target().semantic_spelling(),
+                    site.semantic_spelling()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn reference_selector_rejects_tokens_names_boundaries_and_independent_origins() {
+        let result = binding_fixture(&[&[("x", None), ("y", Some("x"))]]);
+        let lower = lower(&result).unwrap();
+        let index = reference_indices(&result)[0];
+        for selector in (0..result.parsed.elements.len()).chain([usize::MAX]) {
+            if selector != index {
+                assert!(
+                    reference_site(&lower, &result, result.snapshot(), selector).is_err(),
+                    "{selector}"
+                );
+            }
+        }
+        let other = binding_fixture(&[&[("x", None), ("y", Some("x"))]]);
+        assert_eq!(
+            reference_site(&lower, &other, other.snapshot(), index).unwrap_err(),
+            ReferenceSiteError::InvalidOrigin
+        );
+        // Even an internally inconsistent producer association cannot authenticate.
+        let forged = LoweredDeclarations {
+            snapshot: result.snapshot(),
+            parsed: &other.parsed,
+            declarations: vec![],
+            errors: vec![],
+        };
+        assert_eq!(
+            reference_site(&forged, &result, result.snapshot(), index).unwrap_err(),
+            ReferenceSiteError::InvalidOrigin
+        );
+    }
+
+    #[test]
+    fn reference_and_binding_staleness_and_directory_origin_are_separate_refusals() {
+        use crate::{
+            local_value_binding::{LocalBindingError, bind_local_value},
+            structural_regions::build_regions,
+        };
+        let result = binding_fixture(&[&[("x", None), ("y", Some("x"))]]);
+        let lower = lower(&result).unwrap();
+        let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
+        let index = reference_indices(&result)[0];
+        let site = reference_site(&lower, &result, result.snapshot(), index).unwrap();
+        for current in [
+            SourceSnapshot::new("other", 1, FileKind::Source, result.snapshot().source()).unwrap(),
+            SourceSnapshot::new("synthetic", 2, FileKind::Source, result.snapshot().source())
+                .unwrap(),
+            SourceSnapshot::new("synthetic", 1, FileKind::Script, result.snapshot().source())
+                .unwrap(),
+            SourceSnapshot::new("synthetic", 1, FileKind::Source, "changed").unwrap(),
+        ] {
+            assert_eq!(
+                reference_site(&lower, &result, &current, index).unwrap_err(),
+                ReferenceSiteError::StaleSnapshot
+            );
+            assert_eq!(
+                bind_local_value(&directory, &site, &current).unwrap_err(),
+                LocalBindingError::StaleSnapshot
+            );
+        }
+        let second_lower = lower_declarations(&result, result.snapshot()).unwrap();
+        let second_directory = build_regions(&second_lower, &result, result.snapshot()).unwrap();
+        assert_eq!(
+            bind_local_value(&second_directory, &site, result.snapshot()).unwrap_err(),
+            LocalBindingError::InvalidOrigin
+        );
+        let other = binding_fixture(&[&[("x", None), ("y", Some("x"))]]);
+        let other_lower = lower_declarations(&other, other.snapshot()).unwrap();
+        let other_directory = build_regions(&other_lower, &other, other.snapshot()).unwrap();
+        assert_eq!(
+            bind_local_value(&other_directory, &site, result.snapshot()).unwrap_err(),
+            LocalBindingError::InvalidOrigin
+        );
+    }
+
+    #[test]
+    fn local_binding_rejects_self_forward_complete_body_duplicates_and_unsupported_names() {
+        use crate::{
+            local_value_binding::{LocalBindingError, bind_local_value},
+            structural_regions::build_regions,
+        };
+        type Case<'a> = (&'a [(&'a str, Option<&'a str>)], LocalBindingError);
+        let cases: &[Case<'_>] = &[
+            (&[("x", Some("x"))], LocalBindingError::NoEligibleLocal),
+            (
+                &[("y", Some("x")), ("x", None)],
+                LocalBindingError::NoEligibleLocal,
+            ),
+            (
+                &[("x", None), ("x", Some("x"))],
+                LocalBindingError::AmbiguousLocal,
+            ),
+            (
+                &[("x", None), ("y", Some("x")), ("x", None)],
+                LocalBindingError::AmbiguousLocal,
+            ),
+            (
+                &[("x", None), ("y", Some("x")), ("`x`", None)],
+                LocalBindingError::AmbiguousLocal,
+            ),
+            (
+                &[("x", None), ("x", None), ("y", Some("x"))],
+                LocalBindingError::AmbiguousLocal,
+            ),
+            (
+                &[("λ", None), ("y", Some("x"))],
+                LocalBindingError::UnsupportedSpelling,
+            ),
+            (
+                &[("x", None), ("y", Some("x")), ("λ", None)],
+                LocalBindingError::UnsupportedSpelling,
+            ),
+            (
+                &[("x", None), ("y", Some("λ"))],
+                LocalBindingError::UnsupportedSpelling,
+            ),
+            (
+                &[("``", None), ("y", Some("``"))],
+                LocalBindingError::UnsupportedSpelling,
+            ),
+        ];
+        for &(body, expected) in cases {
+            let result = binding_fixture(&[body]);
+            let lower = lower(&result).unwrap();
+            let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
+            let index = reference_indices(&result)[0];
+            let site = reference_site(&lower, &result, result.snapshot(), index).unwrap();
+            assert_eq!(
+                bind_local_value(&directory, &site, result.snapshot()).unwrap_err(),
+                expected,
+                "{body:?}"
+            );
+        }
+        // Another function's x (or duplicate x) is not an eligible same-body local.
+        let result = binding_fixture(&[&[("x", None), ("x", None)], &[("y", Some("x"))]]);
+        let lower = lower(&result).unwrap();
+        let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
+        let site = reference_site(
+            &lower,
+            &result,
+            result.snapshot(),
+            reference_indices(&result)[0],
+        )
+        .unwrap();
+        assert_eq!(
+            bind_local_value(&directory, &site, result.snapshot()).unwrap_err(),
+            LocalBindingError::NoEligibleLocal
+        );
+    }
+
+    #[test]
+    fn binding_query_budget_is_shared_exact_bounded_and_linear() {
+        use crate::{
+            local_value_binding::{LocalBindingError, bind_with_budget},
+            structural_regions::build_regions,
+        };
+        let mut work = Vec::new();
+        for count in [16, 32, 64] {
+            let names: Vec<_> = (0..count).map(|i| format!("x{i}")).collect();
+            let mut body: Vec<_> = names.iter().map(|name| (name.as_str(), None)).collect();
+            body.push(("y", Some("x0")));
+            let result = binding_fixture(&[&body]);
+            let lower = lower(&result).unwrap();
+            let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
+            let site = reference_site(
+                &lower,
+                &result,
+                result.snapshot(),
+                reference_indices(&result)[0],
+            )
+            .unwrap();
+            let mut b = ReferenceBudget::default();
+            bind_with_budget(&directory, &site, result.snapshot(), &mut b).unwrap();
+            work.push(b.work);
+            let mut exact = ReferenceBudget {
+                work: WORK - b.work,
+            };
+            bind_with_budget(&directory, &site, result.snapshot(), &mut exact).unwrap();
+            assert_eq!(exact.work, WORK);
+            let mut over = ReferenceBudget {
+                work: WORK - b.work + 1,
+            };
+            assert_eq!(
+                bind_with_budget(&directory, &site, result.snapshot(), &mut over).unwrap_err(),
+                LocalBindingError::Resource
+            );
+            let mut overflow = ReferenceBudget { work: usize::MAX };
+            assert_eq!(
+                bind_with_budget(&directory, &site, result.snapshot(), &mut overflow).unwrap_err(),
+                LocalBindingError::Resource
+            );
+        }
+        assert!(work[2] - work[1] < 3 * (work[1] - work[0]));
+        let result = binding_fixture(&[&[("x", None), ("y", Some("x"))]]);
+        let mut lower = lower(&result).unwrap();
+        lower.declarations[0].incomplete = true;
+        let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
+        let site = reference_site(
+            &lower,
+            &result,
+            result.snapshot(),
+            reference_indices(&result)[0],
+        )
+        .unwrap();
+        assert_eq!(
+            crate::local_value_binding::bind_local_value(&directory, &site, result.snapshot())
+                .unwrap_err(),
+            LocalBindingError::UnsupportedContext
+        );
     }
 
     fn structure(result: &SnapshotResult) -> Result<Counts> {

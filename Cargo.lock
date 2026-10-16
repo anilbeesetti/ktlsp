@@ -90,6 +90,8 @@ dependencies = [
 name = "ktlsp-import"
 version = "0.1.0"
 dependencies = [
+ "ktlsp-artifacts",
+ "ktlsp-binary",
  "ktlsp-project",
  "quick-xml",
  "serde",

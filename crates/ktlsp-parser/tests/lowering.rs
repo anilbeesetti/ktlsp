@@ -421,7 +421,11 @@ fn production_package_import_components_preserve_binding_and_origin() {
             assert!(parsed.position(source.find('\r').unwrap() + 1).is_err());
         }
     }
-    eprintln!("PACKAGE_IMPORT_PRODUCTION_BINDING_PROOF");
+    std::io::Write::write_all(
+        &mut std::io::stderr(),
+        b"PACKAGE_IMPORT_PRODUCTION_BINDING_PROOF\n",
+    )
+    .unwrap();
 }
 
 #[test]

@@ -1,6 +1,8 @@
 //! Bounded classfile structure reader; attribute contents are deliberately opaque.
 
 pub mod annotation_extensions;
+pub mod archive;
+pub use archive::{ZipClassError, parse_zip_class};
 pub mod annotations;
 pub mod class_type_annotations;
 pub mod code;

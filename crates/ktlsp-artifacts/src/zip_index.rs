@@ -3,6 +3,9 @@ use crate::{MAX_ARTIFACT_BYTES, VerifiedArtifact};
 #[path = "zip_stored.rs"]
 mod zip_stored;
 pub use zip_stored::ZipStoredError;
+#[path = "zip_deflated.rs"]
+mod zip_deflated;
+pub use zip_deflated::ZipDeflateError;
 
 const MAX_DIRECTORY: usize = 8 * 1024 * 1024;
 const MAX_ENTRIES: usize = 16_384;

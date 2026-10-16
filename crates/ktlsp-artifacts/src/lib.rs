@@ -6,7 +6,8 @@ pub use integrity::{ExpectedDigestOrigin, IntegrityError, VerifiedArtifact, veri
 
 mod zip_index;
 pub use zip_index::{
-    ZipDirectoryEntry, ZipDirectoryIndex, ZipIndexError, ZipStoredError, index_zip_directory,
+    ZipDeflateError, ZipDirectoryEntry, ZipDirectoryIndex, ZipIndexError, ZipStoredError,
+    index_zip_directory,
 };
 
 use std::collections::HashSet;

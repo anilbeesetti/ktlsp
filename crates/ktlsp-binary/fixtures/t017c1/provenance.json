@@ -2,6 +2,8 @@
   "artifact": "org.apache.commons:commons-lang3:3.17.0",
   "origin": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-lang3/3.17.0/commons-lang3-3.17.0.jar",
   "archive_sha256": "6ee731df5c8e5a2976a1ca023b6bb320ea8d3539fbe64c8a1d5cb765127c33b4",
+  "archive_fixture": "commons-lang3-3.17.0.jar.bin",
+  "archive_retained": "2026-10-16; downloaded unchanged from origin above; SHA-256 matched archive_sha256; no Java or extraction required by archive consumer tests",
   "license": "Apache-2.0; bundled LICENSE.txt and NOTICE.txt unchanged",
   "compiler": "Manifest Build-Jdk-Spec: 17; precise compiler version unknown; class major 52",
   "obtained": "2026-10-12; downloaded/extracted as data only; no JVM/compiler executed",

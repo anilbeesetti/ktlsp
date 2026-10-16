@@ -663,7 +663,8 @@ fn actual_packaged_stdio_navigation_negotiation_and_existing_providers() {
         let definition = replies.iter().find(|r| r["id"] == "definition").unwrap();
         assert_eq!(
             definition["result"],
-            json!({"uri":URI,"range":span(source, "`x😀`")})
+            json!({"uri":URI,"range":span(source, "`x😀`")}),
+            "profile={profile}; selected definition reply={definition}"
         );
         let hover = replies.iter().find(|r| r["id"] == u64::MAX).unwrap();
         if let Some(kind) = expected_kind {

@@ -599,11 +599,28 @@ fn actual_packaged_stdio_navigation_negotiation_and_existing_providers() {
     let source =
         "// 😀\r\nclass Combined { val item = 1 }\r\nfun f() { val `x😀` = 1; val y = `x😀` }";
     let assert_ids = |replies: &[Value]| {
-        let expected = [json!(1), json!("definition"), json!(u64::MAX), json!(4), json!(5), json!(6)];
-        assert_eq!(replies.len(), expected.len(), "no unsolicited/push output: {replies:?}");
+        let expected = [
+            json!(1),
+            json!("definition"),
+            json!(u64::MAX),
+            json!(4),
+            json!(5),
+            json!(6),
+        ];
+        assert_eq!(
+            replies.len(),
+            expected.len(),
+            "no unsolicited/push output: {replies:?}"
+        );
         for id in expected {
-            assert_eq!(replies.iter().filter(|reply| reply.get("id") == Some(&id)).count(), 1,
-                "each original request ID exactly once: {id}: {replies:?}");
+            assert_eq!(
+                replies
+                    .iter()
+                    .filter(|reply| reply.get("id") == Some(&id))
+                    .count(),
+                1,
+                "each original request ID exactly once: {id}: {replies:?}"
+            );
         }
     };
     for (profile, expected_kind) in [

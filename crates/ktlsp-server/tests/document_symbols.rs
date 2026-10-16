@@ -393,22 +393,9 @@ fn exchange_directory(directory: &Path, messages: &[Value]) -> Vec<Value> {
         .unwrap();
     let mut input = child.stdin.take().unwrap();
     let mut reader = std::io::BufReader::new(child.stdout.take().unwrap());
-    // TEMP397: retain complete original hosted packets until ROOT and OWNER
-    // directly inspect the producer/CLI evidence; never print expected echoes.
-    let capture397 = messages.iter().any(|message| {
-        message["id"]
-            .as_str()
-            .is_some_and(|id| id.starts_with("TEMP397-"))
-    });
     let mut responses: Vec<Value> = Vec::new();
     for message in messages {
         let payload = serde_json::to_vec(message).unwrap();
-        if capture397 {
-            eprintln!(
-                "TEMP397 ACTUAL CLI REQUEST {}",
-                String::from_utf8_lossy(&payload)
-            );
-        }
         ktlsp_protocol::write_frame(&mut input, &payload).unwrap();
         input.flush().unwrap();
         // Requests really finish before later edits/shutdown. Bulk-writing
@@ -416,12 +403,6 @@ fn exchange_directory(directory: &Path, messages: &[Value]) -> Vec<Value> {
         if let Some(id) = message.get("id") {
             loop {
                 let frame = ktlsp_protocol::read_frame(&mut reader).unwrap().unwrap();
-                if capture397 {
-                    eprintln!(
-                        "TEMP397 ACTUAL CLI RESPONSE {}",
-                        String::from_utf8_lossy(&frame)
-                    );
-                }
                 let response: Value = serde_json::from_slice(&frame).unwrap();
                 let matched = response.get("id") == Some(id);
                 responses.push(response);
@@ -433,12 +414,6 @@ fn exchange_directory(directory: &Path, messages: &[Value]) -> Vec<Value> {
     }
     drop(input);
     while let Some(frame) = ktlsp_protocol::read_frame(&mut reader).unwrap() {
-        if capture397 {
-            eprintln!(
-                "TEMP397 ACTUAL CLI RESPONSE {}",
-                String::from_utf8_lossy(&frame)
-            );
-        }
         responses.push(serde_json::from_slice(&frame).unwrap());
     }
     let output = child.wait_with_output().unwrap();
@@ -3437,7 +3412,7 @@ fn documentation_paired_cli_applies_utf16_doc_name_prefix_move_remove_and_reopen
         (json!({"contentFormat":["plaintext","markdown"]}), false),
     ] {
         let mut messages = vec![
-            json!({"jsonrpc":"2.0","id":"TEMP397-init","method":"initialize","params":{"capabilities":{"textDocument":{"hover":profile}}}}),
+            json!({"jsonrpc":"2.0","id":"documentation-init","method":"initialize","params":{"capabilities":{"textDocument":{"hover":profile}}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
             json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":initial}}}),
         ];
@@ -3587,7 +3562,7 @@ fn documentation_paired_cli_applies_utf16_doc_name_prefix_move_remove_and_reopen
             missing
                 .iter()
                 .filter(|response| response.get("id").is_some()
-                    && response["id"] != "TEMP397-init"
+                    && response["id"] != "documentation-init"
                     && response["id"] != "stop")
                 .all(|response| response["error"]["code"] == -32601)
         );
@@ -3606,7 +3581,7 @@ fn documentation_paired_cli_literal_security_dynamic_fences_and_semantic_refusal
         (json!({"contentFormat":["plaintext","markdown"]}), false),
     ] {
         let messages = [
-            json!({"jsonrpc":"2.0","id":"TEMP397-security","method":"initialize","params":{"capabilities":{"textDocument":{"hover":profile}}}}),
+            json!({"jsonrpc":"2.0","id":"documentation-security","method":"initialize","params":{"capabilities":{"textDocument":{"hover":profile}}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
             json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
             json!({"jsonrpc":"2.0","id":u64::MAX,"method":"textDocument/hover","params":navigation_params(source,source.find("safe").unwrap())}),
@@ -3662,7 +3637,7 @@ fn documentation_paired_cli_literal_security_dynamic_fences_and_semantic_refusal
     ];
     for (source, needle) in cases {
         let messages = [
-            json!({"jsonrpc":"2.0","id":"TEMP397-refusal","method":"initialize","params":{"capabilities":{"textDocument":{"hover":{"contentFormat":["markdown"]}}}}}),
+            json!({"jsonrpc":"2.0","id":"documentation-refusal","method":"initialize","params":{"capabilities":{"textDocument":{"hover":{"contentFormat":["markdown"]}}}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
             json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
             json!({"jsonrpc":"2.0","id":"refuse","method":"textDocument/hover","params":navigation_params(source,source.rfind(needle).unwrap())}),
@@ -3691,7 +3666,7 @@ fn documentation_profiles_keep_disabled_clients_and_legacy_docless_fence_accepta
         json!({"contentFormat":["unknown"]}),
     ] {
         let messages = [
-            json!({"jsonrpc":"2.0","id":"TEMP397-disabled","method":"initialize","params":{"capabilities":{"textDocument":{"hover":profile}}}}),
+            json!({"jsonrpc":"2.0","id":"documentation-disabled","method":"initialize","params":{"capabilities":{"textDocument":{"hover":profile}}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
             json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
             json!({"jsonrpc":"2.0","id":"disabled","method":"textDocument/hover","params":navigation_params(source,source.find("target").unwrap())}),
@@ -3714,7 +3689,7 @@ fn documentation_profiles_keep_disabled_clients_and_legacy_docless_fence_accepta
     }
     let source = format!("val /*{}*/ target=1", "`".repeat(45000));
     let messages = [
-        json!({"jsonrpc":"2.0","id":"TEMP397-docless","method":"initialize","params":{"capabilities":{"textDocument":{"hover":{"contentFormat":["markdown"]}}}}}),
+        json!({"jsonrpc":"2.0","id":"documentation-docless","method":"initialize","params":{"capabilities":{"textDocument":{"hover":{"contentFormat":["markdown"]}}}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
         json!({"jsonrpc":"2.0","id":"docless","method":"textDocument/hover","params":navigation_params(&source,source.find("target").unwrap())}),
@@ -3749,7 +3724,7 @@ fn documentation_eligibility_preserves_many_comment_docless_hover() {
     let source = format!("{}fun named() {{}}", "//x\n".repeat(3000));
     let name = source.find("named").unwrap();
     let messages = [
-        json!({"jsonrpc":"2.0","id":"TEMP397-comments","method":"initialize","params":{"capabilities":{"textDocument":{"hover":{"contentFormat":["markdown"]}}}}}),
+        json!({"jsonrpc":"2.0","id":"documentation-comments","method":"initialize","params":{"capabilities":{"textDocument":{"hover":{"contentFormat":["markdown"]}}}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
         json!({"jsonrpc":"2.0","id":"comments","method":"textDocument/hover","params":navigation_params(&source,name)}),
@@ -3853,7 +3828,7 @@ fn documentation_paired_cli_preserves_paragraphs_original_line_endings_and_name_
         let source = format!("/** earlier */{newline}{doc}{suffix}{newline}");
         let name = source.find("`same😀`").unwrap();
         let mut messages = vec![
-            json!({"jsonrpc":"2.0","id":"TEMP397-lines","method":"initialize","params":{"capabilities":{"textDocument":{"hover":{"contentFormat":["markdown"]}}}}}),
+            json!({"jsonrpc":"2.0","id":"documentation-lines","method":"initialize","params":{"capabilities":{"textDocument":{"hover":{"contentFormat":["markdown"]}}}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
             json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
             json!({"jsonrpc":"2.0","id":"name","method":"textDocument/hover","params":navigation_params(&source,name)}),
@@ -3898,7 +3873,7 @@ fn documentation_paired_cli_complete_output_accounts_real_large_ids_without_losi
     let accepted_id = "a".repeat(100000);
     let refused_id = "\"".repeat(175000);
     let messages = [
-        json!({"jsonrpc":"2.0","id":"TEMP397-id-output","method":"initialize","params":{"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":"documentation-id-output","method":"initialize","params":{"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
         json!({"jsonrpc":"2.0","id":accepted_id,"method":"textDocument/hover","params":navigation_params(source,source.find("target").unwrap())}),
@@ -3982,7 +3957,7 @@ fn documentation_paired_cli_selects_original_class_property_parameter_and_nested
             name.len()
         };
         let messages = [
-            json!({"jsonrpc":"2.0","id":"TEMP397-kinds","method":"initialize","params":{"capabilities":{"textDocument":{"hover":{"contentFormat":["plaintext"]}}}}}),
+            json!({"jsonrpc":"2.0","id":"documentation-kinds","method":"initialize","params":{"capabilities":{"textDocument":{"hover":{"contentFormat":["plaintext"]}}}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
             json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
             json!({"jsonrpc":"2.0","id":"name","method":"textDocument/hover","params":navigation_params(source,start)}),

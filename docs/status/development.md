@@ -1551,3 +1551,51 @@ an unverified newer renamed API. Checked exhaustion/nonreuse and local-counter
 regressions remain intact; the test conditional is equivalent. Exact changed
 source rechecks and strict compilation remain required; no397 runtime ran.
 
+
+#### Original397 hosted source and complete actual-payload acceptance
+
+Reviewed first head12eb80b205770182909f7ce02bc8043ba4a56158/tree79e4eec96dfd3951e8c41538bff736c91a1c7ff5
+passed its OWN original attempt1 Native38969812481/job117205143580 and
+platform38969812508/macOS117205143483/Windows117205143768. Actual
+test mergec3c633cfd5fd3fa8aed1d5b40fbed6a588d46658 has the same tree and
+ordered parents[verifiedbc5c6760,12eb80b2]. Complete raw logs, original
+artifact digests, source preflight, clean checkout, mandatory steps and zero
+command exits were authenticated. Linux passed1174=1142ordinary+32doc,
+Mac1172=1140+32, Windows1121=1089+32; each138 result rows,0failed,
+3ignored,0measured,0filtered. Parser doctests have separate2+7 result rows;
+both count. These totals already include docs, not the separate22 fault cases.
+
+ROOT and independent source/consumer owners read ALL actual payloads from
+both original platform logs:38 complete producer CSTs,325 requests and251
+responses PER HOST, not merely expected values/counts/green checks. Original
+UTF8 leaf partitions, parent/subtree ownership, diagnostics, direct attached
+comments and refusal syntax were inspected. Pointer/stamp identity is not
+serialized; its refusal is evidenced separately by successful hosted assertions.
+
+Both readers independently actually applied36 ranged UTF16 edits per host.
+Prose/name/prefix edits, movement to second's original owner, removal,
+close/reopenversion1 under a fresh incarnation and exact returned name ranges
+follow those sources. Old docless owners retain the legacy whole-tree refusal
+while another declaration owns documentation; removing the final comment
+restores exact legacy source, never stale prose. ROOT checked all184 actual
+hover replies and all25 distinct successful prose/source-suffix/fence values.
+LF/CRLF/loneCR, astral/combining text, paragraph whitespace, distinct
+class/property/parameter/local/nested names and last-attached docs survive.
+Literal HTML/entities/schemes/backslashes are safe plaintext or punctuation-
+escaped Markdown; a four-backtick body gets a five-backtick fence.
+All14 semantic/link/code/tag/prefix refusal fixtures per host return-32803,
+never raw fallback; disabled/missing-worker requests return-32601.
+Actual100000-character ID success and175000-quote ID refusal retain exact
+IDs once; the unchanged45000-backtick docless source retains its full45001
+fence. The3000-comment docless regression returns its complete original source.
+
+Only AFTER those independent complete reads did ROOT remove temporary CST/
+wire writers and their capture-only activation/ID bookkeeping. Production,
+source/identity/resource/cancellation/publication guards, waits, full actual
+edit application and all meaningful assertions remain. Common README now
+states finite prose-only behavior and refusals. This cleanup/documentation
+source still requires its OWN exact union reviews, strict compile and original
+full hosted CI; first-head acceptance is NOT final-head or main acceptance.
+No local parser/server/Session/worker/peer runtime, JVM, oracle, dependency,
+Cargo/lock/workflow/vendor change, unchanged CI retry or relaxed bound occurred.
+397 is not yet delivered;395/377 causes remain unknown,96 and full parity open.

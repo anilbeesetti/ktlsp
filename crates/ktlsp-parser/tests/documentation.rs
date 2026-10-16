@@ -11,21 +11,10 @@ use std::sync::atomic::AtomicBool;
 fn parse(source: &str) -> SnapshotResult {
     let snapshot =
         SourceSnapshot::new("file:///documentation.kt", 1, FileKind::Source, source).unwrap();
-    let result = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker"))
+    Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker"))
         .unwrap()
         .parse_snapshot(&snapshot, &AtomicBool::new(false))
-        .unwrap();
-    let tree = result.tree_for(&snapshot).unwrap();
-    // TEMP397: retain until ROOT and independent OWNER read original hosted CST.
-    eprintln!(
-        "TEMP397_PRODUCER {}",
-        serde_json::json!({
-            "document":snapshot.document(), "version":snapshot.revision(),
-            "source":tree.source(), "elements":tree.elements(),
-            "diagnostics":tree.diagnostics()
-        })
-    );
-    result
+        .unwrap()
 }
 
 fn accepted(source: &str, name: &str, expected: &str, doc_spelling: &str) {

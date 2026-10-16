@@ -1872,7 +1872,10 @@ mod tests {
     #[test]
     fn lexical_annotation_budget_covers_authentication_body_and_entire_list() {
         use crate::{
-            local_value_binding::{LocalBindingError, type_parameter_with_budget},
+            local_value_binding::{
+                LocalBindingError, TypeParameterAnchor, type_parameter_with_budget,
+                type_rename_with_budget,
+            },
             structural_regions::build_regions,
         };
         // Synthetic accounting only; producer/consumer acceptance uses the worker.
@@ -1956,6 +1959,36 @@ mod tests {
                 .unwrap_err(),
                 LocalBindingError::Resource,
             );
+        }
+        // The type consumer retains one budget through original anchor, ONCE
+        // whole-body validation, the full list/annotation pass and final output.
+        // Exact/one-unit-late failures cannot expose an occurrence/edit prefix.
+        for anchor in [
+            TypeParameterAnchor::Declaration(&lower.declarations()[1]),
+            TypeParameterAnchor::AnnotationReference(reference),
+            TypeParameterAnchor::Declaration(&lower.declarations()[2]),
+        ] {
+            for name in [None, Some("Fresh")] {
+                let mut measured = ReferenceBudget::default();
+                let found = type_rename_with_budget(
+                    &directory, &result, anchor, result.snapshot(), name, &mut measured,
+                ).unwrap();
+                assert_eq!(found.occurrences().len(), usize::from(found.target().raw_name() == "T"));
+                let mut exact = ReferenceBudget { work: WORK - measured.work };
+                type_rename_with_budget(
+                    &directory, &result, anchor, result.snapshot(), name, &mut exact,
+                ).unwrap();
+                assert_eq!(exact.work, WORK);
+                for work in [WORK - measured.work + 1, WORK - 1, usize::MAX] {
+                    assert_eq!(
+                        type_rename_with_budget(
+                            &directory, &result, anchor, result.snapshot(), name,
+                            &mut ReferenceBudget { work },
+                        ).unwrap_err(),
+                        LocalBindingError::Resource,
+                    );
+                }
+            }
         }
     }
 

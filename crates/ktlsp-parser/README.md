@@ -455,8 +455,31 @@ types, stable cross-revision symbols or a new server capability.
   and read original CST/name/owner associations and paired-CLI edit rebinding.
   Temporary observation writers/bookkeeping were removed afterward; all
   original semantic assertions remain. Cleanup-source CI/main are separate
-  gates. No official equivalence, typeDefinition, type-parameter hover/
-  references/rename or generic inference is established; #96/full parity stay open.
+  gates. That historical evidence does not establish official equivalence,
+  typeDefinition, type-parameter hover or generic inference; #96/full parity stay open.
+- `local_value_binding::type_parameter_occurrences` and
+  `guarded_type_parameter_rename` accept positive `TypeParameterAnchor` roles:
+  an original function `TYPE_PARAMETER` declaration (even unused), or an
+  authenticated simple parameter/direct-local annotation reference. Returned
+  `TypeParameterAnnotation` records retain original annotated declaration,
+  reference/name-token identities and source order; no value site is fabricated.
+  The existing definition query shares private ancestry/function/list helpers.
+  Each query authenticates its original tree and completes body/callee validation
+  once under one 2,097,152-unit budget, including the complete type list, **all**
+  same-function annotations, borrowed-record reservation/capacity and emission.
+  Matching semantic duplicates, stale/foreign origins and exhaustion fail atomically.
+  Rename checks both edited and unedited annotation identities: another type
+  parameter or any unrelated simple annotation with the new spelling refuses
+  capture, including header parameters and unused targets. Value names and proved
+  local function/callee names are separate namespaces, not automatic collisions.
+  Output remains bare ASCII with existing spelling/boundary limits; native
+  contextual outputs `where`, `dynamic` and `suspend` refuse before same-name quote
+  removal. `out`/`reified` edited-producer/rebinding regressions are included, not
+  blanket-classified as invalid modifiers. Storage remains at most 1,024 records
+  and 131,072 requested/retained bytes, measured using the actual annotation width.
+  This is finite same-function lexical refactoring, not full type resolution,
+  type hover/typeDefinition, workspace rename or official equivalence. New hosted
+  producer/wire observations and checks remain ROOT-gated; no local runtime ran.
 - `local_value_binding::visible_local_values(directory, result, initializer_index,
   current_snapshot)` authenticates an existing whole-identifier initializer
   reference without requiring its spelling to bind. The owned result retains

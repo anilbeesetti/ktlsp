@@ -526,11 +526,67 @@ pub(super) fn type_parameter_with_budget<'a>(
     current: &SourceSnapshot,
     b: &mut ReferenceBudget,
 ) -> Result<LexicalTypeParameterBinding<'a>> {
-    let lowered = directory.lowered();
-    if !std::ptr::eq(directory.snapshot(), lowered.snapshot()) {
+    let parsed = type_tree(directory, result, current, b)?;
+    let (ordinal, annotation) = type_annotation(directory, parsed, index, b)?;
+    let context = type_function(directory, parsed, annotation.annotated.owner(), b)?;
+    check_type_annotation(directory, parsed, ordinal, &annotation, &context, b)?;
+    let spelling = annotation_spelling(parsed, &annotation, b)?;
+    let target = type_target(directory, parsed, &context, spelling, None, b)?;
+    Ok(LexicalTypeParameterBinding {
+        annotated: annotation.annotated,
+        function: context.function,
+        body: context.body,
+        reference: annotation.reference,
+        name_token: annotation.name_token,
+        target,
+    })
+}
+
+fn type_tree<'a>(
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    current: &SourceSnapshot,
+    b: &mut ReferenceBudget,
+) -> Result<&'a Parsed> {
+    if !std::ptr::eq(directory.snapshot(), directory.lowered().snapshot()) {
         return Err(LocalBindingError::InvalidOrigin);
     }
-    let parsed = authenticated_tree(lowered, result, current, b)?;
+    Ok(authenticated_tree(directory.lowered(), result, current, b)?)
+}
+
+/// An original simple annotation, never an initializer or callee ReferenceSite.
+#[derive(Debug)]
+pub struct TypeParameterAnnotation<'a> {
+    annotated: &'a Declaration<'a>,
+    reference: &'a Element,
+    name_token: &'a Element,
+    reference_index: usize,
+}
+impl<'a> TypeParameterAnnotation<'a> {
+    pub fn annotated(&self) -> &'a Declaration<'a> {
+        self.annotated
+    }
+    pub fn reference(&self) -> &'a Element {
+        self.reference
+    }
+    pub fn name_token(&self) -> &'a Element {
+        self.name_token
+    }
+    pub fn reference_index(&self) -> usize {
+        self.reference_index
+    }
+    pub fn range(&self) -> std::ops::Range<usize> {
+        self.reference.start..self.reference.end
+    }
+}
+
+// The lowerer owns the grammar. These helpers only authenticate original
+// ancestry/membership and separate that work from ONCE complete-body validation.
+fn annotation_parts<'a>(
+    parsed: &'a Parsed,
+    index: usize,
+    b: &mut ReferenceBudget,
+) -> Result<(usize, &'a Element, &'a Element)> {
     let reference = b.element(parsed, index)?;
     let token_index = index.checked_add(1).ok_or(LocalBindingError::Resource)?;
     let token = b.element(parsed, token_index)?;
@@ -567,25 +623,48 @@ pub(super) fn type_parameter_with_budget<'a>(
     {
         return Err(LocalBindingError::UnsupportedContext);
     }
-    // The authenticated lowerer proved the complete simple annotation grammar;
-    // select its original ancestry rather than introducing a second type grammar.
-    let mut annotated = None;
-    for (ordinal, declaration) in lowered.declarations().iter().enumerate() {
+    Ok((annotated_index, reference, token))
+}
+
+fn type_annotation<'a>(
+    directory: &'a RegionDirectory<'a>,
+    parsed: &'a Parsed,
+    index: usize,
+    b: &mut ReferenceBudget,
+) -> Result<(usize, TypeParameterAnnotation<'a>)> {
+    let (annotated_index, reference, name_token) = annotation_parts(parsed, index, b)?;
+    for (ordinal, declaration) in directory.lowered().declarations().iter().enumerate() {
         b.charge(1)?;
         if declaration.cst_index() == annotated_index {
-            annotated = Some((ordinal, declaration));
+            return Ok((ordinal, TypeParameterAnnotation {
+                annotated: declaration,
+                reference,
+                name_token,
+                reference_index: index,
+            }));
         }
     }
-    let (ordinal, annotated) = annotated.ok_or(LocalBindingError::UnsupportedContext)?;
-    let function_ordinal = annotated
-        .owner()
-        .ok_or(LocalBindingError::UnsupportedContext)?;
+    Err(LocalBindingError::UnsupportedContext)
+}
+
+struct TypeFunction<'a> {
+    ordinal: usize,
+    function: &'a Declaration<'a>,
+    body_ordinal: usize,
+    body: &'a Region<'a>,
+}
+
+fn type_function<'a>(
+    directory: &'a RegionDirectory<'a>,
+    parsed: &'a Parsed,
+    function_ordinal: Option<usize>,
+    b: &mut ReferenceBudget,
+) -> Result<TypeFunction<'a>> {
+    let function_ordinal = function_ordinal.ok_or(LocalBindingError::UnsupportedContext)?;
     b.charge(1)?;
-    let function = lowered
-        .declarations()
-        .get(function_ordinal)
-        .ok_or(LocalBindingError::InvalidOrigin)?;
-    if annotated.incomplete() || function.incomplete() || !b.equal(function.kind(), "FUN")? {
+    let function = directory.lowered().declarations()
+        .get(function_ordinal).ok_or(LocalBindingError::InvalidOrigin)?;
+    if function.incomplete() || !b.equal(function.kind(), "FUN")? {
         return Err(LocalBindingError::UnsupportedContext);
     }
     let mut body = None;
@@ -599,6 +678,34 @@ pub(super) fn type_parameter_with_budget<'a>(
         }
     }
     let (body_ordinal, body) = body.ok_or(LocalBindingError::UnsupportedContext)?;
+    BodyCheck {
+        parsed,
+        directory,
+        selected: None,
+        selected_target: None,
+        cursor: 0,
+        b,
+    }.function(function, body.cst_index())?;
+    Ok(TypeFunction {
+        ordinal: function_ordinal,
+        function,
+        body_ordinal,
+        body,
+    })
+}
+
+fn check_type_annotation(
+    directory: &RegionDirectory<'_>,
+    parsed: &Parsed,
+    ordinal: usize,
+    annotation: &TypeParameterAnnotation<'_>,
+    context: &TypeFunction<'_>,
+    b: &mut ReferenceBudget,
+) -> Result<()> {
+    let annotated = annotation.annotated;
+    if annotated.incomplete() || annotated.owner() != Some(context.ordinal) {
+        return Err(LocalBindingError::UnsupportedContext);
+    }
     let parameter = b.equal(annotated.kind(), "VALUE_PARAMETER")?;
     let parent_index = annotated
         .cst_parent_index()
@@ -608,20 +715,20 @@ pub(super) fn type_parameter_with_budget<'a>(
     let expected_region = if parameter {
         if parent.token
             || !b.equal(&parent.kind, "VALUE_PARAMETER_LIST")?
-            || parent.parent != Some(function.cst_index())
+            || parent.parent != Some(context.function.cst_index())
         {
             return Err(LocalBindingError::UnsupportedContext);
         }
         directory
             .memberships()
-            .get(function_ordinal)
+            .get(context.ordinal)
             .ok_or(LocalBindingError::InvalidOrigin)?
             .region()
     } else {
-        if !b.equal(annotated.kind(), "PROPERTY")? || parent_index != body.cst_index() {
+        if !b.equal(annotated.kind(), "PROPERTY")? || parent_index != context.body.cst_index() {
             return Err(LocalBindingError::UnsupportedContext);
         }
-        body_ordinal
+        context.body_ordinal
     };
     if directory
         .memberships()
@@ -632,28 +739,34 @@ pub(super) fn type_parameter_with_budget<'a>(
     {
         return Err(LocalBindingError::UnsupportedContext);
     }
-    BodyCheck {
-        parsed,
-        directory,
-        selected: None,
-        selected_target: None,
-        cursor: 0,
-        b,
-    }
-    .function(function, body.cst_index())?;
-    b.charge(5)?;
-    let raw = parsed
-        .source()
-        .get(token.start..token.end)
+    Ok(())
+}
+
+fn annotation_spelling<'a>(
+    parsed: &'a Parsed,
+    annotation: &TypeParameterAnnotation<'_>,
+    b: &mut ReferenceBudget,
+) -> Result<&'a str> {
+    b.charge(2)?;
+    let raw = parsed.source().get(annotation.range())
         .ok_or(LocalBindingError::UnsupportedContext)?;
-    let spelling = b
-        .spelling(raw)?
-        .ok_or(LocalBindingError::UnsupportedSpelling)?;
+    b.spelling(raw)?.ok_or(LocalBindingError::UnsupportedSpelling)
+}
+
+fn type_target<'a>(
+    directory: &'a RegionDirectory<'a>,
+    parsed: &'a Parsed,
+    context: &TypeFunction<'a>,
+    spelling: &str,
+    new_name: Option<&str>,
+    b: &mut ReferenceBudget,
+) -> Result<&'a Declaration<'a>> {
     let mut target = None;
     let mut duplicate = false;
-    for declaration in lowered.declarations() {
+    let mut conflict = false;
+    for declaration in directory.lowered().declarations() {
         b.charge(1)?;
-        if declaration.owner() != Some(function_ordinal)
+        if declaration.owner() != Some(context.ordinal)
             || !b.equal(declaration.kind(), "TYPE_PARAMETER")?
         {
             continue;
@@ -667,7 +780,7 @@ pub(super) fn type_parameter_with_budget<'a>(
         if declaration.incomplete()
             || list.token
             || !b.equal(&list.kind, "TYPE_PARAMETER_LIST")?
-            || list.parent != Some(function.cst_index())
+            || list.parent != Some(context.function.cst_index())
         {
             return Err(LocalBindingError::UnsupportedContext);
         }
@@ -677,18 +790,244 @@ pub(super) fn type_parameter_with_budget<'a>(
         if b.equal(name, spelling)? && target.replace(declaration).is_some() {
             duplicate = true;
         }
+        if let Some(new_spelling) = new_name
+            && b.equal(name, new_spelling)?
+            && !b.equal(name, spelling)?
+        {
+            conflict = true;
+        }
     }
     if duplicate {
         return Err(LocalBindingError::AmbiguousTypeParameter);
     }
-    Ok(LexicalTypeParameterBinding {
-        annotated,
-        function,
-        body,
-        reference,
-        name_token: token,
-        target: target.ok_or(LocalBindingError::NoEligibleTypeParameter)?,
-    })
+    if conflict {
+        return Err(LocalBindingError::AmbiguousTypeParameter);
+    }
+    target.ok_or(LocalBindingError::NoEligibleTypeParameter)
+}
+
+/// Positive type-role anchors; value initializers and callees are not fallbacks.
+#[derive(Debug, Clone, Copy)]
+pub enum TypeParameterAnchor<'a> {
+    Declaration(&'a Declaration<'a>),
+    AnnotationReference(usize),
+}
+
+#[derive(Debug)]
+pub struct TypeParameterOccurrences<'a> {
+    directory: &'a RegionDirectory<'a>,
+    target: &'a Declaration<'a>,
+    function: &'a Declaration<'a>,
+    body: &'a Region<'a>,
+    occurrences: Vec<TypeParameterAnnotation<'a>>,
+}
+impl<'a> TypeParameterOccurrences<'a> {
+    pub fn directory(&self) -> &'a RegionDirectory<'a> {
+        self.directory
+    }
+    pub fn target(&self) -> &'a Declaration<'a> {
+        self.target
+    }
+    pub fn function(&self) -> &'a Declaration<'a> {
+        self.function
+    }
+    pub fn body(&self) -> &'a Region<'a> {
+        self.body
+    }
+    /// Original bound simple annotations in source order, excluding declaration.
+    pub fn occurrences(&self) -> &[TypeParameterAnnotation<'a>] {
+        &self.occurrences
+    }
+}
+
+/// Collect the complete same-function lexical type partition under one budget.
+pub fn type_parameter_occurrences<'a>(
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    anchor: TypeParameterAnchor<'a>,
+    current: &SourceSnapshot,
+) -> Result<TypeParameterOccurrences<'a>> {
+    type_occurrences_with_budget(directory, result, anchor, current, None,
+        &mut ReferenceBudget::default())
+}
+
+/// Prepare or rename an original function type parameter without capturing any
+/// unedited annotation. Values and proved local functions are separate namespaces.
+pub fn guarded_type_parameter_rename<'a>(
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    anchor: TypeParameterAnchor<'a>,
+    current: &SourceSnapshot,
+    new_name: Option<&str>,
+) -> Result<TypeParameterOccurrences<'a>> {
+    type_rename_with_budget(directory, result, anchor, current, new_name,
+        &mut ReferenceBudget::default())
+}
+
+pub(super) fn type_rename_with_budget<'a>(
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    anchor: TypeParameterAnchor<'a>,
+    current: &SourceSnapshot,
+    new_name: Option<&str>,
+    b: &mut ReferenceBudget,
+) -> Result<TypeParameterOccurrences<'a>> {
+    let found = type_occurrences_with_budget(directory, result, anchor, current, new_name, b)?;
+    rename_boundary(current.source(), found.target.name_range(), b)?;
+    for annotation in &found.occurrences {
+        rename_boundary(current.source(), annotation.range(), b)?;
+    }
+    b.charge(4)?;
+    Ok(found)
+}
+
+fn type_annotation_storage(count: usize) -> Result<()> {
+    if count > MAX_OCCURRENCES
+        || count.checked_mul(std::mem::size_of::<TypeParameterAnnotation<'_>>())
+            .ok_or(LocalBindingError::Resource)? > OCCURRENCE_BYTES
+    {
+        return Err(LocalBindingError::Resource);
+    }
+    Ok(())
+}
+
+fn rename_boundary(source: &str, range: std::ops::Range<usize>, b: &mut ReferenceBudget) -> Result<()> {
+    b.charge(4)?;
+    let bytes = source.as_bytes();
+    let before = range.start.checked_sub(1).and_then(|i| bytes.get(i));
+    let after = bytes.get(range.end);
+    if [before, after].into_iter().flatten()
+        .any(|byte| byte.is_ascii_alphanumeric() || *byte == b'_' || !byte.is_ascii())
+    {
+        return Err(LocalBindingError::UnsupportedContext);
+    }
+    Ok(())
+}
+
+pub(super) fn type_occurrences_with_budget<'a>(
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    anchor: TypeParameterAnchor<'a>,
+    current: &SourceSnapshot,
+    new_name: Option<&str>,
+    b: &mut ReferenceBudget,
+) -> Result<TypeParameterOccurrences<'a>> {
+    if let Some(name) = new_name {
+        b.spelling(name)?;
+        // Native output admission for BOTH declaration and USER_TYPE positions:
+        // where is generic recovery, dynamic is DYNAMIC_TYPE, suspend a type
+        // modifier. Other soft names (including out/reified) remain identifiers
+        // before our admitted delimiters. Check BEFORE same-name quote removal.
+        b.charge(19)?;
+        if !valid_local_rename_name(name) || matches!(name, "where" | "dynamic" | "suspend") {
+            return Err(LocalBindingError::UnsupportedSpelling);
+        }
+    }
+    let parsed = type_tree(directory, result, current, b)?;
+    let (declaration, mut selected_annotation) = match anchor {
+        TypeParameterAnchor::Declaration(target) => {
+            let mut ordinal = None;
+            for (i, original) in directory.lowered().declarations().iter().enumerate() {
+                b.charge(1)?;
+                if std::ptr::eq(original, target) {
+                    ordinal = Some(i);
+                }
+            }
+            ordinal.ok_or(LocalBindingError::InvalidOrigin)?;
+            if !b.equal(target.kind(), "TYPE_PARAMETER")? {
+                return Err(LocalBindingError::UnsupportedContext);
+            }
+            (Some(target), None)
+        }
+        TypeParameterAnchor::AnnotationReference(index) => {
+            (None, Some(type_annotation(directory, parsed, index, b)?))
+        }
+    };
+    let owner = declaration.map(|d| d.owner())
+        .unwrap_or_else(|| selected_annotation.as_ref().unwrap().1.annotated.owner());
+    let context = type_function(directory, parsed, owner, b)?;
+    let spelling = if let Some(target) = declaration {
+        b.spelling(target.raw_name())?.ok_or(LocalBindingError::UnsupportedSpelling)?
+    } else {
+        let (ordinal, annotation) = selected_annotation.as_ref().unwrap();
+        check_type_annotation(directory, parsed, *ordinal, annotation, &context, b)?;
+        annotation_spelling(parsed, annotation, b)?
+    };
+    // Complete list scan once: selected original identity, semantic duplicates
+    // (including later quoted equivalents), and hypothetical type collisions.
+    let target = type_target(directory, parsed, &context, spelling, new_name, b)?;
+    if declaration.is_some_and(|original| !std::ptr::eq(original, target)) {
+        return Err(LocalBindingError::InvalidOrigin);
+    }
+    // Count ALL annotations before reserving actual borrowed annotation records,
+    // including parameters before the body and unrelated external-like types.
+    let node = b.element(parsed, context.function.cst_index())?;
+    let mut count = 0usize;
+    for index in context.function.cst_index()..node.subtree_end {
+        let element = b.element(parsed, index)?;
+        if !element.token && b.equal(&element.kind, "REFERENCE_EXPRESSION")?
+            && let Some(parent) = element.parent
+        {
+            let parent = b.element(parsed, parent)?;
+            if b.equal(&parent.kind, "USER_TYPE")? {
+                count = count.checked_add(1).ok_or(LocalBindingError::Resource)?;
+            }
+        }
+    }
+    type_annotation_storage(count)?;
+    b.charge(count)?;
+    let mut occurrences = Vec::new();
+    occurrences.try_reserve_exact(count).map_err(|_| LocalBindingError::Resource)?;
+    type_annotation_storage(occurrences.capacity())?;
+    for (ordinal, annotated) in directory.lowered().declarations().iter().enumerate() {
+        b.charge(1)?;
+        if annotated.owner() != Some(context.ordinal)
+            || !(b.equal(annotated.kind(), "VALUE_PARAMETER")? || b.equal(annotated.kind(), "PROPERTY")?)
+        {
+            continue;
+        }
+        let node = b.element(parsed, annotated.cst_index())?;
+        for index in annotated.cst_index()..node.subtree_end {
+            let element = b.element(parsed, index)?;
+            if element.token || !b.equal(&element.kind, "REFERENCE_EXPRESSION")? {
+                continue;
+            }
+            let parent = b.element(parsed, element.parent.ok_or(LocalBindingError::InvalidOrigin)?)?;
+            if !b.equal(&parent.kind, "USER_TYPE")? {
+                continue;
+            }
+            let selected = selected_annotation.as_ref()
+                .is_some_and(|(_, annotation)| annotation.reference_index == index);
+            let annotation = if selected {
+                selected_annotation.take().unwrap().1
+            } else {
+                let (original, reference, name_token) = annotation_parts(parsed, index, b)?;
+                if original != annotated.cst_index() {
+                    return Err(LocalBindingError::InvalidOrigin);
+                }
+                let annotation = TypeParameterAnnotation { annotated, reference, name_token, reference_index: index };
+                check_type_annotation(directory, parsed, ordinal, &annotation, &context, b)?;
+                annotation
+            };
+            let name = if selected { spelling } else { annotation_spelling(parsed, &annotation, b)? };
+            let matched = b.equal(name, spelling)?;
+            if !matched && let Some(new_name) = new_name && b.equal(name, new_name)? {
+                // An unedited simple name need not globally resolve to prove
+                // that adding our lexical binder would capture it.
+                return Err(LocalBindingError::AmbiguousTypeParameter);
+            }
+            if matched {
+                b.charge(1)?;
+                if occurrences.len() >= count {
+                    return Err(LocalBindingError::Resource);
+                }
+                occurrences.push(annotation);
+            }
+        }
+    }
+    // Final emission also shares the query budget; no successful prefix escapes.
+    b.charge(4)?;
+    Ok(TypeParameterOccurrences { directory, target, function: context.function, body: context.body, occurrences })
 }
 
 /// Return the unique eligible preceding local val or same-function parameter.
@@ -1114,20 +1453,9 @@ pub(super) fn rename_with_budget<'a>(
     for range in std::iter::once(found.target.name_range())
         .chain(found.occurrences.iter().map(|site| site.range()))
     {
-        b.charge(4)?;
-        let bytes = current.source().as_bytes();
-        let before = range.start.checked_sub(1).and_then(|i| bytes.get(i));
-        let after = bytes.get(range.end);
-        if [before, after]
-            .into_iter()
-            .flatten()
-            .any(|byte| byte.is_ascii_alphanumeric() || *byte == b'_' || !byte.is_ascii())
-        {
-            // Removing quotes from val`x` would produce valfresh, not a
-            // declaration. Check every original boundary even for preparation
-            // and unchanged semantic spelling; never add unrequested trivia.
-            return Err(LocalBindingError::UnsupportedContext);
-        }
+        // Removing quotes from val`x` would produce valfresh. Preparation and
+        // unchanged semantic names must also preserve every original boundary.
+        rename_boundary(current.source(), range, b)?;
     }
     let Some(new_name) = new_name else {
         return Ok(found);
@@ -1388,6 +1716,11 @@ mod occurrence_storage_tests {
             occurrence_storage(usize::MAX),
             Err(LocalBindingError::Resource)
         );
+        type_annotation_storage(0).unwrap();
+        type_annotation_storage(MAX_OCCURRENCES).unwrap();
+        for count in [MAX_OCCURRENCES + 1, usize::MAX] {
+            assert_eq!(type_annotation_storage(count), Err(LocalBindingError::Resource));
+        }
     }
 }
 

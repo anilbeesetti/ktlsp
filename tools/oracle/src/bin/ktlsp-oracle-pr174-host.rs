@@ -79,8 +79,15 @@ mod host {
         ),
     ];
     type Result<T> = std::result::Result<T, String>;
+    include!("pr174/bootstrap.rs");
+    include!("pr174/calibration.rs");
+    include!("pr174/original.rs");
+    include!("pr174/export.rs");
+    include!("pr174/collect.rs");
+    include!("pr174/storage.rs");
+    mod materializer { include!("pr174/materializer.rs"); }
 
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Serialize)]
     #[serde(deny_unknown_fields, rename_all = "camelCase")]
     struct Admission {
         schema_version: u8,
@@ -113,7 +120,7 @@ mod host {
         source_head: String,
         source_tree: String,
     }
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Serialize)]
     #[serde(deny_unknown_fields, rename_all = "camelCase")]
     struct Tools {
         docker: PathBuf,
@@ -624,7 +631,7 @@ mod host {
         protected(&std::env::current_exe().map_err(|e| e.to_string())?, false)?;
         let r = &a.run;
         if a.schema_version != 1
-            || a.scope != "PR174_HOST_EXECUTION_ADMITTED"
+            || !matches!(a.scope.as_str(), "PR174_HOST_EXECUTION_ADMITTED" | "PR174_RUST_CALIBRATION_ADMITTED")
             || a.contract_sha256 != CONTRACT
             || a.nonce != dir.file_name().and_then(|s| s.to_str()).unwrap_or("")
             || r.repository != "anilbeesetti/ktlsp"
@@ -701,14 +708,8 @@ mod host {
         }
         Ok(a)
     }
-    fn hash_file(e: &mut Evidence, a: &Admission, p: &Path, expected: &str) -> Result<()> {
-        let b = e.checked(
-            &a.tools.sha256sum,
-            &["--".into(), p.to_str().ok_or("hash path encoding")?.into()],
-            a.preparation_deadline_ms,
-        )?;
-        let s = std::str::from_utf8(&b).map_err(|_| "SHA256 output encoding")?;
-        if s.split_whitespace().next() != Some(expected) || !digest(expected) {
+    fn hash_file(_e: &mut Evidence, a: &Admission, p: &Path, expected: &str) -> Result<()> {
+        if !digest(expected) || sha_path(p, a.preparation_deadline_ms)? != expected {
             return Err("materialized SHA256 mismatch".into());
         }
         Ok(())
@@ -810,7 +811,8 @@ mod host {
         let mp = dir.join("inputs/extraction-manifest.json");
         protected(&mp, false)?;
         hash_file(e, a, &mp, &a.extraction_manifest_sha256)?;
-        let manifest: Materialization = parse(&read_file(&mp, e.available() / 4)?)?;
+        // Streamed preparation inventory is bounded separately; it is not persisted host observation evidence.
+        let manifest: Materialization = parse(&read_file(&mp, 262_144)?)?;
         if manifest.entries.len() > 1120 {
             return Err("extraction inventory limit".into());
         }
@@ -940,48 +942,7 @@ mod host {
         core_policy(e)?;
         attest_mounts(dir, None, e)?;
         input_pins(dir, a, e)?;
-        let token = String::from_utf8(read_file(&dir.join("github.token"), 4096)?)
-            .map_err(|_| "credential encoding")?;
-        let token = token.trim();
-        if token.is_empty() || token.bytes().any(|b| b.is_ascii_control()) {
-            return Err("credential input unavailable".into());
-        }
-        let prefix = "repos/anilbeesetti/ktlsp";
-        let run: Value = parse(&gh(
-            e,
-            a,
-            token,
-            format!("{prefix}/actions/runs/{}", a.run.run_id),
-            false,
-        )?)?;
-        let job: Value = parse(&gh(
-            e,
-            a,
-            token,
-            format!("{prefix}/actions/jobs/{}", a.run.job_id),
-            false,
-        )?)?;
-        let commit: Value = parse(&gh(
-            e,
-            a,
-            token,
-            format!("{prefix}/git/commits/{}", a.run.source_head),
-            false,
-        )?)?;
-        api_identity(&run, &job, &commit, &a.run)?;
-        let workflow = gh(
-            e,
-            a,
-            token,
-            format!(
-                "{prefix}/contents/.github/workflows/t045-pr174-official-symbols.yml?ref={}",
-                a.run.source_head
-            ),
-            true,
-        )?;
-        if workflow != read_file(&dir.join("workflow.yml"), INPUT_BYTES)? {
-            return Err("original API workflow bytes differ".into());
-        }
+        authenticate_original(dir, a, e)?;
         daemon(e, &a.tools.docker, a.preparation_deadline_ms, &a.daemon_id)?;
         let image: Value = parse(&e.checked(
             &a.tools.docker,
@@ -1003,7 +964,7 @@ mod host {
         {
             return Err("pinned image identity/volumes".into());
         }
-        e.append(&json!({"kind":"original-host","bootId":a.boot_id,"supervisorCgroup":cg,"osReleaseHex":raw_hex(&read_file(Path::new("/etc/os-release"),INPUT_BYTES)?),"kernelHex":raw_hex(&read_file(Path::new("/proc/sys/kernel/osrelease"),1024)?),"apiAuthenticated":true,"authority":"reviewed ROOT/bootstrap custody; receiver independently verifies original artifacts"}),false)?;
+        e.append(&json!({"kind":"original-host","bootId":a.boot_id,"supervisorCgroup":cg,"osReleaseHex":raw_hex(&os_release()?),"kernelHex":raw_hex(&read_file(Path::new("/proc/sys/kernel/osrelease"),1024)?),"apiAuthenticated":true,"authority":"reviewed ROOT/bootstrap custody; receiver independently verifies original artifacts"}),false)?;
         Ok(cg.into())
     }
     fn empty(v: &Value) -> bool {
@@ -1082,6 +1043,7 @@ mod host {
         for p in ["fixture", "distribution", "tool", "preflight"] {
             mkdir(&state.join(p), 0o755)?;
         }
+        side_json(e, &dir.join("state-mount.json"), &state_mount_identity(dir)?)?;
         Ok(())
     }
 
@@ -1244,10 +1206,10 @@ mod host {
         }
         v.extend([
             "--entrypoint".into(),
-            format!("{INNER}/tool/ktlsp-oracle-official-pr174"),
+            entrypoint(a),
             a.image.clone(),
         ]);
-        v.extend(adapter_argv());
+        v.extend(entry_arguments(dir, a)?);
         Ok(v)
     }
     fn one_inspect(b: &[u8]) -> Result<Value> {
@@ -1267,9 +1229,9 @@ mod host {
         if v["Id"] != cid
             || v["Image"] != a.image_id
             || c["User"] != "65532:65532"
-            || v["Path"] != format!("{INNER}/tool/ktlsp-oracle-official-pr174")
-            || v["Args"] != json!(adapter_argv())
-            || c["Entrypoint"] != json!([format!("{INNER}/tool/ktlsp-oracle-official-pr174")])
+            || v["Path"] != entrypoint(a)
+            || v["Args"] != json!(entry_arguments(dir, a)?)
+            || c["Entrypoint"] != json!([entrypoint(a)])
             || c["Env"] != json!(environment())
             || !empty(&c["Volumes"])
             || c["Healthcheck"]["Test"] != json!(["NONE"])
@@ -2118,7 +2080,7 @@ mod host {
                 return Err("process exec/ancestry changed during observation".into());
             }
             if previous.is_none() || mapped {
-                e.append(&json!({"kind":"original-process","hostPid":pid,"starttime":stamp.1,"namespace":ns,"statHex":raw_hex(&stat),"cmdlineHex":raw_hex(&cmdline),"ancestry":parents,"statusHex":raw_hex(&status),"limitsHex":raw_hex(&limits),"cgroupHex":raw_hex(&cg),"mapsHex":raw_hex(&maps),"pinnedLibjvmMapped":mapped}),false)?;
+                e.append(&json!({"kind":"original-process","role":if recorder {"recorder"}else{"launcher"},"hostPid":pid,"starttime":stamp.1,"namespace":ns,"statHex":raw_hex(&stat),"cmdlineHex":raw_hex(&cmdline),"ancestry":parents,"statusHex":raw_hex(&status),"limitsHex":raw_hex(&limits),"cgroupHex":raw_hex(&cg),"mapsHex":raw_hex(&maps),"pinnedLibjvmMapped":mapped,"exeDevice":exe.0,"exeInode":exe.1,"sealedExecutableDevice":if recorder {adapter.dev()}else{launcher.dev()},"sealedExecutableInode":if recorder {adapter.ino()}else{launcher.ino()},"sealedJvmDevice":jvm.dev(),"sealedJvmInode":jvm.ino(),"namespaceJvmDevice":if mapped {Some(jvm.dev())}else{None},"namespaceJvmInode":if mapped {Some(jvm.ino())}else{None}}),false)?;
             }
             if recorder {
                 seen.recorder = Some(stamp);
@@ -2676,6 +2638,23 @@ mod host {
                 None,
             );
         }
+        drop(e);
+        // The unique outside-step cleanup owner also preserves the protected export after runner-step loss.
+        // Export failure never rewrites the original teardown result.
+        let export = protected_export(dir);
+        match export {
+            Err(error) => {
+                let bytes = serde_json::to_vec(&json!({"scope":"PR174_EXPORT_FAILURE","error":error,"officialCaptureSuccess":false})).map_err(|e|e.to_string())?;
+                if bytes.len() <= 2048 { let _ = make_file(&dir.join("export-failure.json"), &bytes, 0o400); }
+            },
+            Ok(_) => if let Err(error) = release_calibration_preparation(dir) {
+                let bytes = serde_json::to_vec(&json!({"scope":"PR174_PREPARATION_RELEASE_FAILURE","nonce":b.nonce,"error":error,"containerClosureUnchanged":true,"nextLaunchAllowed":false})).map_err(|e|e.to_string())?;
+                if bytes.len() <= 2048 {
+                    let _ = make_file(&dir.join("preparation-release-failure.json"), &bytes, 0o400);
+                    let _ = make_file(&Path::new(ROOT).join("preparation-disposal-failed"), &bytes, 0o400);
+                }
+            },
+        }
         Ok(result)
     }
     fn contain_container<C>(
@@ -2979,7 +2958,10 @@ mod host {
     }
     fn supervise(dir: &Path) -> Result<Value> {
         let a = admission(dir)?;
+        root_authority(dir, &a)?;
         let mut e = Evidence::preflight();
+        e.limit = OBSERVER_BYTES - 131_072 - 16_384 - 8_192
+            - if calibration_case(dir, &a)? == Some(CalibrationCase::WorkflowStepCancel) {131_072}else{0};
         let mut cg = String::new();
         let mut stamp = None;
         let mut known: Option<Binding> = None;
@@ -3082,7 +3064,10 @@ mod host {
                     &cid,
                     true,
                 ),
-                CaptureStep::Seal => seal_handoff(dir, &a, &cid, &mut e),
+                CaptureStep::Seal => {
+                    if calibration_case(dir, &a)?.is_some() { seal_calibration(dir, &a, &cid, &mut e) }
+                    else { seal_handoff(dir, &a, &cid, &mut e) }
+                },
                 CaptureStep::Arm => {
                     if a.preparation_deadline_ms
                         < mono_ms()?
@@ -3140,7 +3125,10 @@ mod host {
                     }
                     Ok(())
                 }
-                CaptureStep::Observe => observe(dir, &a, b, &mut e),
+                CaptureStep::Observe => {
+                    if let Some(case) = calibration_case(dir, &a)? { observe_calibration(dir, &a, b, &mut e, case) }
+                    else { observe(dir, &a, b, &mut e) }
+                },
                 _ => Err("invalid lifecycle phase".into()),
             }
         });
@@ -3163,8 +3151,14 @@ mod host {
             return Err("protected host execution requires OS root".into());
         }
         let argv: Vec<_> = std::env::args().skip(1).collect();
+        if argv.as_slice() == ["bootstrap", STAGING] {
+            return bootstrap();
+        }
+        if argv.as_slice() == ["collect-calibration", STAGING] {
+            return collect_calibration();
+        }
         if argv.len() != 2 {
-            return Err("usage: ktlsp-oracle-pr174-host supervise|cleanup|request-cleanup /run/ktlsp-pr174/NONCE".into());
+            return Err("usage: ktlsp-oracle-pr174-host bootstrap /etc/ktlsp-pr174/staging | supervise|calibrate|export|cleanup|request-cleanup /run/ktlsp-pr174/NONCE".into());
         }
         let dir = directory(&argv[1])?;
         entry_mode(&argv[0], &dir)
@@ -3172,7 +3166,14 @@ mod host {
     // The caller has already validated OS root and the protected nonce directory.
     fn entry_mode(mode: &str, dir: &Path) -> Result<Value> {
         match mode {
-            "supervise" => supervise(dir),
+            "supervise" | "calibrate" => {
+                let a = admission(dir)?;
+                if (mode == "calibrate") != (a.scope == "PR174_RUST_CALIBRATION_ADMITTED") {
+                    return Err("official and Rust-only calibration entry scopes differ".into());
+                }
+                supervise(dir)
+            },
+            "export" => protected_export(dir),
             "cleanup" => {
                 let b = binding(dir)?;
                 let expected = format!("0::/system.slice/{}.service", unit(&b.nonce, "cleanup"));

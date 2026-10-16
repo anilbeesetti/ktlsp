@@ -39,9 +39,14 @@ fn fixture(source: bool) -> PathBuf {
         } else {
             "commons-lang3-3.17.0.jar.bin"
         })
+        .components()
+        .collect()
 }
 fn source() -> PathBuf {
-    project().join("docs/specs/reference-binding-acceptance/same-block.kt")
+    project()
+        .join("docs/specs/reference-binding-acceptance/same-block.kt")
+        .components()
+        .collect()
 }
 fn genuine(source: bool) -> VerifiedArtifact {
     let bytes = if source { SOURCES } else { JAR };
@@ -70,9 +75,19 @@ fn genuine(source: bool) -> VerifiedArtifact {
     )
     .unwrap()
 }
+fn import_path(path: &Path) -> String {
+    format!(
+        "<WORKSPACE>/{}",
+        path.strip_prefix(project())
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .replace(std::path::MAIN_SEPARATOR, "/")
+    )
+}
 fn library(name: &str, binaries: &[PathBuf]) -> Value {
-    let mut roots: Vec<_> = binaries.iter().map(|path| json!({"path": path})).collect();
-    roots.push(json!({"path": fixture(true), "type":"SOURCES"}));
+    let mut roots: Vec<_> = binaries.iter().map(|path| json!({"path": import_path(path)})).collect();
+    roots.push(json!({"path": import_path(&fixture(true)), "type":"SOURCES"}));
     json!({"name":name,"type":null,"roots":roots})
 }
 fn edge(name: &str) -> Value {
@@ -116,6 +131,13 @@ fn genuine_class_owner_identity_and_owning_library_source_composition() {
         ],
         vec![library("commons", &[fixture(false)])],
     ));
+    // Imported JSON uses admitted forward slashes, while the query and retained
+    // provenance use normalized host-native PathBufs, including Windows '\\'.
+    #[cfg(windows)]
+    {
+        assert!(source().to_str().unwrap().contains('\\'));
+        assert!(binary.provenance().artifact_path.to_str().unwrap().contains('\\'));
+    }
     // Public mutable sidecars are not authority for ownership, order, or paths.
     workspace.modules.clear();
     workspace.libraries.clear();
@@ -224,8 +246,10 @@ fn owner_and_dependency_order_control_visibility_precedence_and_complete_absence
         .unwrap();
         assert_eq!(absent.owner.module.id, "app");
         assert!(absent.class.is_none());
-        let isolated =
-            project().join("tools/oracle/fixtures/official-pr174-symbols/declarations.kt");
+        let isolated: PathBuf = project()
+            .join("tools/oracle/fixtures/official-pr174-symbols/declarations.kt")
+            .components()
+            .collect();
         let absent =
             select_class(&workspace, &isolated, BUILDER, 8, &bindings, &mut scratch).unwrap();
         assert_eq!(absent.owner.module.id, "isolated");
@@ -326,12 +350,18 @@ fn owner_policy_rejects_test_unowned_and_every_unsupported_edge_before_match() {
         vec![library("commons", &[fixture(false)])],
     );
     let workspace = import(base.clone());
-    let test = project().join("docs/specs/lowering-acceptance/declarations.kt");
+    let test: PathBuf = project()
+        .join("docs/specs/lowering-acceptance/declarations.kt")
+        .components()
+        .collect();
     assert!(matches!(
         select_class(&workspace, &test, BUILDER, 8, &bindings, &mut Vec::new()),
         Err(Error::TestSource)
     ));
-    let outside = project().join("docs/specs/reference-binding-acceptance-extra/No.kt");
+    let outside: PathBuf = project()
+        .join("docs/specs/reference-binding-acceptance-extra/No.kt")
+        .components()
+        .collect();
     assert!(matches!(
         select_class(&workspace, &outside, BUILDER, 8, &bindings, &mut Vec::new()),
         Err(Error::UnownedSource)
@@ -735,4 +765,15 @@ fn selected_source_only_library_refuses_unbound_archive_but_unrelated_libraries_
             .is_none()
         );
     }
+}
+
+#[cfg(not(windows))]
+#[test]
+fn unix_foreign_backslash_source_path_is_not_admitted_as_a_native_separator() {
+    let workspace = import(model(Vec::new(), Vec::new()));
+    let foreign = project().join(r"docs\specs\reference-binding-acceptance\same-block.kt");
+    assert!(matches!(
+        select_class(&workspace, &foreign, BUILDER, 8, &[], &mut Vec::new()),
+        Err(Error::InvalidSourcePath)
+    ));
 }

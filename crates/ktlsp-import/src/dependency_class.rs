@@ -117,7 +117,8 @@ fn normalized(path: &Path) -> bool {
         return false;
     };
     if text.len() > crate::MAX_EXPANDED_PATH_BYTES
-        || text.contains(['\0', '\\', '<'])
+        || text.contains(['\0', '<'])
+        || (!cfg!(windows) && text.contains('\\'))
         || text.contains("://")
         || !path.is_absolute()
         || path

@@ -138,7 +138,10 @@ provenance), and existing classpath origin/entry/rank/decoded identity.
 Ownership and ordering come only from the private validated immutable v2
 projection, not mutable public importer sidecars. Paths must be absolute UTF-8,
 lexically normalized host paths under declared source roots, not content-root
-boundaries. This is **not symlink-safe physical ownership**. Only production
+boundaries. Native Windows separators are accepted in query/provenance PathBufs;
+foreign backslashes on Unix are refused. Imported JSON still uses the importer's
+forward-slash/`<WORKSPACE>/` contract; that spelling is not a restriction on
+normalized native output paths. This is **not symlink-safe physical ownership**. Only production
 owners with direct COMPILE-library edges are admitted; test owners, module
 edges, other scopes, explicit/inherited SDK edges and SDK archives refuse.
 ModuleSource placement is irrelevant only because this selects a **dependency

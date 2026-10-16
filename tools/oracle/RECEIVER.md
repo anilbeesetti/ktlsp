@@ -53,6 +53,18 @@ runner diagnostic lines. No source-to-binary cryptographic attestation is
 claimed: reviewed workflow and protected original-job OS-root custody remain
 explicit assumptions.
 
+Producer/collector callers can reuse
+`receiver::validate_step_timeout(&RootGrant, &Value, job_logs, step_logs) -> Result<u64>`
+for the exact granted cancellation step and its completion Unix milliseconds.
+This is bounded data validation, **not authentication by itself**: callers must
+independently retrieve the original authenticated APIs and both log streams.
+It binds job/run/attempt/head and rejects whole-job cancellation/failure.
+The [runner's accepted outcome/conclusion contract](https://raw.githubusercontent.com/actions/runner/main/docs/adrs/0274-step-outcome-and-conclusion.md)
+distinguishes pre-continuation `outcome=failure` from final/API `conclusion=success`.
+The [timeout implementation](https://raw.githubusercontent.com/actions/runner/main/src/Runner.Worker/StepsRunner.cs)
+applies `continue-on-error` before completing the step; the helper does not
+reinterpret a failed/canceled API conclusion as this required continued timeout.
+
 The fixed ROOT-owned post-upload step emits one compact serialized line per artifact:
 `KTLSP_PR174_PROTECTED_UPLOAD ` followed by `ProtectedUploadReceipt` JSON:
 `schemaVersion:1`, `scope:"PR174_PROTECTED_UPLOAD"`, repository/runId/jobId/suiteId/

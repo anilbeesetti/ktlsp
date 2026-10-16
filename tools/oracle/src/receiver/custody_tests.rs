@@ -59,3 +59,23 @@ fn original_timestamp_conversion_keeps_real_step_and_action_order() {
     assert!(unix_ms("2000-02-29T00:00:00Z").is_ok());
     for invalid in ["1969-12-31T23:59:59Z","2001-02-29T00:00:00Z","2026-13-01T00:00:00Z","2026-10-16T24:00:00Z","2026-10-16T00:00:00.Z"] {assert!(unix_ms(invalid).is_err(),"{invalid}");}
 }
+
+#[test]
+fn shared_timeout_helper_binds_original_job_and_continued_timeout_conclusion() {
+    let (mut admission,_,mut job,_)=fixture();
+    let grant=&mut admission.grant;
+    grant.calibration_case=Some(crate::authority::CalibrationCase::WorkflowStepCancel);
+    grant.calibration_step=Some(crate::authority::CalibrationStep{name:admission.uploader_step.name.clone(),number:2});
+    job["id"]=json!(grant.job_id);job["run_id"]=json!(grant.run_id);job["run_attempt"]=json!(grant.attempt);job["head_sha"]=json!(grant.source_head);job["status"]=json!("in_progress");job["conclusion"]=Value::Null;
+    let logs=format!("2026-10-16T00:00:15.123Z ##[error]The action '{}' has timed out after 1 minutes.\n",admission.uploader_step.name).into_bytes();
+    assert_eq!(crate::receiver::validate_step_timeout(grant,&job,&logs,&logs).unwrap(),unix_ms("2026-10-16T00:00:20Z").unwrap());
+    for (field,value) in [("id",json!(99)),("run_id",json!(99)),("run_attempt",json!(2)),("head_sha",json!("9".repeat(40))),("status",json!("cancelled")),("conclusion",json!("failure"))] {
+        let mut wrong=job.clone();wrong[field]=value;assert!(crate::receiver::validate_step_timeout(grant,&wrong,&logs,&logs).is_err(),"{field}");
+    }
+    for conclusion in ["failure","cancelled","skipped"] {
+        let mut wrong=job.clone();wrong["steps"][1]["conclusion"]=json!(conclusion);
+        assert!(crate::receiver::validate_step_timeout(grant,&wrong,&logs,&logs).is_err());
+    }
+    let mut missing=job;missing.as_object_mut().unwrap().remove("conclusion");
+    assert!(crate::receiver::validate_step_timeout(grant,&missing,&logs,&logs).is_err());
+}

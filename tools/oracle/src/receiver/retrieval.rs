@@ -90,7 +90,7 @@ pub fn retrieve(admission: &super::ReceiverAdmission, artifact_id: u64) -> Resul
     let timeout_completed_unix_ms = if let Some(step) = &expected.calibration_step {
         let (position,_) = super::custody::step(&job,&step.name,step.number)?;
         let step_logs = api(&format!("{repo}/actions/jobs/{}/steps/{position}/logs",expected.job_id),FILE_LIMIT)?;
-        Some(super::custody::timeout(&job,&step.name,step.number,&logs,&step_logs)?)
+        Some(super::validate_step_timeout(expected,&job,&logs,&step_logs)?)
     } else {None};
     Ok(AuthenticatedArtifact {files,artifact_id,archive_sha256:digest,timeout_completed_unix_ms,admission_sha256:hash(&serde_json::to_vec(admission).map_err(|e|e.to_string())?)})
 }

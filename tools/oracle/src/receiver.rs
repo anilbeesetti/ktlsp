@@ -50,6 +50,24 @@ pub struct ProtectedUploadReceipt {
 }
 pub const UPLOAD_PREFIX: &str = "KTLSP_PR174_PROTECTED_UPLOAD ";
 
+/// Validate original step-timeout data and return the API completion time in Unix ms.
+/// The caller must independently authenticate original job and exact step-log retrieval;
+/// passing matching caller-authored JSON/logs is not GitHub provenance or ROOT authority.
+/// A genuine continued timeout has outcome=failure but final/API conclusion=success.
+pub fn validate_step_timeout(
+    grant: &crate::authority::RootGrant,
+    job: &Value,
+    job_logs: &[u8],
+    step_logs: &[u8],
+) -> Result<u64> {
+    grant.validate_shape()?;
+    require(grant.scope == crate::authority::GrantScope::RustCalibration && grant.calibration_case == Some(crate::authority::CalibrationCase::WorkflowStepCancel),"timeout helper requires the independently admitted finite cancellation calibration grant")?;
+    require(job["id"] == grant.job_id && job["run_id"] == grant.run_id && job["run_attempt"] == grant.attempt && job["head_sha"] == grant.source_head,"timeout data is not the original admitted job/attempt/head")?;
+    require((job["status"] == "in_progress" && job.get("conclusion") == Some(&Value::Null)) || (job["status"] == "completed" && job["conclusion"] == "success"),"whole-job cancellation/failure or absent job state is not step-timeout calibration")?;
+    let step = grant.calibration_step.as_ref().ok_or("independent original cancellation-step identity missing")?;
+    custody::timeout(job,&step.name,step.number,job_logs,step_logs)
+}
+
 pub fn hash(bytes: &[u8]) -> String { format!("{:x}", Sha256::digest(bytes)) }
 pub fn require(ok: bool, reason: &str) -> Result<()> {
     if ok { Ok(()) } else { Err(reason.into()) }

@@ -566,6 +566,9 @@ fn actual_packaged_stdio_navigation_negotiation_and_existing_providers() {
         (json!({"contentFormat":["unknown"]}), None),
         (json!({"contentFormat":[]}), None),
         (json!({"contentFormat":false}), None),
+        (json!({"contentFormat":[false,"markdown"]}), None),
+        (json!(false), None),
+        (Value::Null, None),
     ] {
         let params = navigation_params(source, source.rfind("`x😀`").unwrap() + 1);
         let messages = [

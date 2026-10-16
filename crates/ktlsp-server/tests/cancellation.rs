@@ -502,7 +502,7 @@ fn navigation_uses_shared_wire_ids_cancellation_and_snapshot_guards() {
             ("edit", change(2, "new")),
             ("reopen", notify("textDocument/didClose", json!({"textDocument":{"uri":URI}}))),
         ] {
-            let token = format!("{token}-{suffix}");
+            let token = format!("{token}{suffix}");
             let mut session = package.session(&token);
             assert!(session.handle(navigation(json!("stale"))).is_empty());
             package.started(&token);

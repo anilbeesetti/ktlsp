@@ -12,10 +12,18 @@ pub(crate) enum HoverFormat {
 }
 impl HoverFormat {
     pub(crate) fn negotiate(capabilities: &Value) -> Option<Self> {
-        let Some(formats) = capabilities.pointer("/textDocument/hover/contentFormat") else {
+        let Some(hover) = capabilities.get("textDocument").and_then(|text| text.get("hover")) else {
             return Some(Self::Plaintext);
         };
-        formats.as_array()?.iter().find_map(|format| match format.as_str() {
+        let hover = hover.as_object()?;
+        let Some(formats) = hover.get("contentFormat") else {
+            return Some(Self::Plaintext);
+        };
+        let formats = formats.as_array()?;
+        if !formats.iter().all(Value::is_string) {
+            return None;
+        }
+        formats.iter().find_map(|format| match format.as_str() {
             Some("plaintext") => Some(Self::Plaintext),
             Some("markdown") => Some(Self::Markdown),
             _ => None,

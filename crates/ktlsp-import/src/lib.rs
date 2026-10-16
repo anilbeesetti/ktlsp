@@ -264,20 +264,25 @@ pub fn from_json(
     let modules = parsed
         .modules
         .into_iter()
-        .map(|module| ImportedModule {
-            name: module.name,
-            content_roots: module.content_roots,
-            dependencies: module
-                .dependencies
-                .into_iter()
-                .map(|edge| match edge {
-                    v2::Dependency::Module(edge) => Dependency::Module(edge),
-                    v2::Dependency::Library { library, .. } => Dependency::Library(library),
-                    v2::Dependency::ModuleSource => Dependency::ModuleSource,
-                })
-                .collect(),
+        .map(|module| {
+            Ok(ImportedModule {
+                name: module.name,
+                content_roots: module.content_roots,
+                dependencies: module
+                    .dependencies
+                    .into_iter()
+                    .map(|edge| match edge {
+                        v2::Dependency::Module(edge) => Ok(Dependency::Module(edge)),
+                        v2::Dependency::Library { library, .. } => Ok(Dependency::Library(library)),
+                        v2::Dependency::ModuleSource => Ok(Dependency::ModuleSource),
+                        v2::Dependency::Sdk { .. } | v2::Dependency::InheritedSdk => {
+                            Err(schema("", "SDK edges cannot enter a v1 projection"))
+                        }
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, ImportError>>()?;
     Ok(ImportedWorkspace {
         project,
         modules,
@@ -313,7 +318,19 @@ fn parse_workspace(
     }
     let mut workspace = object(json::parse(bytes)?, "")?;
     let mut reports = Reports::default();
-    for key in ["sdks", "kotlinSettings", "javaSettings"] {
+    let sdks = if use_v2 {
+        v2::parse_sdks(&mut workspace, &mut reports)?
+    } else {
+        reports.neutral(
+            &mut workspace,
+            "sdks",
+            json!([]),
+            "",
+            "SDK catalog requires v2",
+        );
+        Vec::new()
+    };
+    for key in ["kotlinSettings", "javaSettings"] {
         reports.neutral(
             &mut workspace,
             key,
@@ -419,6 +436,16 @@ fn parse_workspace(
                     }
                 }
                 "moduleSource" => dependencies.push(v2::Dependency::ModuleSource),
+                "sdk" if use_v2 => {
+                    let name: String = required(&mut d, "name", &p)?;
+                    let kind: String = required(&mut d, "kind", &p)?;
+                    native_edges.push(json!({"type":"sdk","name":name,"kind":kind}));
+                    dependencies.push(v2::Dependency::Sdk { name, kind });
+                }
+                "inheritedSdk" if use_v2 => {
+                    native_edges.push(json!({"type":"inheritedSdk"}));
+                    dependencies.push(v2::Dependency::InheritedSdk);
+                }
                 _ => reports.add(
                     field_path(&p, "type"),
                     "unsupported dependency variant (including SDK bindings)",
@@ -573,7 +600,10 @@ fn parse_workspace(
             truncated: reports.truncated,
         });
     }
-    let manifest = json!({"schemaVersion": if use_v2 { 2 } else { 1 }, "modules": native_modules, "libraries": native_libraries});
+    let mut manifest = json!({"schemaVersion": if use_v2 { 2 } else { 1 }, "modules": native_modules, "libraries": native_libraries});
+    if !sdks.is_empty() {
+        manifest["sdks"] = json!(sdks);
+    }
     Ok(ParsedWorkspace {
         manifest,
         modules,
@@ -582,109 +612,7 @@ fn parse_workspace(
 }
 
 /// Additive ordered scoped/exported import API; the original v1 API stays strict.
-pub mod v2 {
-    use super::{
-        ContentRoot, DependencyScope, ImportError, ImportedLibrary, MAX_BYTES, ModuleDependency,
-    };
-    use std::{fmt, io, path::Path};
-
-    #[derive(Debug)]
-    pub struct ImportedWorkspace {
-        project: ktlsp_project::v2::ProjectModel,
-        pub modules: Vec<ImportedModule>,
-        pub libraries: Vec<ImportedLibrary>,
-    }
-    impl ImportedWorkspace {
-        /// Validated v2 projection; moduleSource placement remains in the sidecar.
-        pub fn project_projection(&self) -> &ktlsp_project::v2::ProjectModel {
-            &self.project
-        }
-    }
-    #[derive(Debug, PartialEq, Eq)]
-    pub struct ImportedModule {
-        pub name: String,
-        pub content_roots: Vec<ContentRoot>,
-        pub dependencies: Vec<Dependency>,
-    }
-    #[derive(Debug, PartialEq, Eq)]
-    pub enum Dependency {
-        Module(ModuleDependency),
-        Library {
-            library: String,
-            scope: DependencyScope,
-            exported: bool,
-        },
-        ModuleSource,
-    }
-    #[derive(Debug)]
-    pub enum Error {
-        Import(ImportError),
-        Project(ktlsp_project::v2::Error),
-    }
-    impl fmt::Display for Error {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            match self {
-                Self::Import(error) => error.fmt(f),
-                Self::Project(error) => write!(f, "incompatible workspace project: {error}"),
-            }
-        }
-    }
-    impl std::error::Error for Error {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-            match self {
-                Self::Import(error) => Some(error),
-                Self::Project(error) => Some(error),
-            }
-        }
-    }
-
-    /// Data-only, unversioned official input; no implicit fallback to the v1 API.
-    pub fn from_json(
-        project_directory: impl AsRef<Path>,
-        bytes: &[u8],
-    ) -> Result<ImportedWorkspace, Error> {
-        let base = project_directory.as_ref();
-        let parsed = super::parse_workspace(base, bytes, true).map_err(Error::Import)?;
-        let mut output = Projection {
-            bytes: Vec::new(),
-            exceeded: false,
-        };
-        if let Err(error) = serde_json::to_writer(&mut output, &parsed.manifest) {
-            return Err(Error::Import(if output.exceeded {
-                ImportError::BudgetExceeded("projection bytes")
-            } else {
-                ImportError::Json(error)
-            }));
-        }
-        let project = ktlsp_project::v2::from_json(base.join("workspace.json"), &output.bytes)
-            .map_err(Error::Project)?;
-        Ok(ImportedWorkspace {
-            project,
-            modules: parsed.modules,
-            libraries: parsed.libraries,
-        })
-    }
-
-    struct Projection {
-        bytes: Vec<u8>,
-        exceeded: bool,
-    }
-    impl io::Write for Projection {
-        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-            if self.bytes.len().saturating_add(bytes.len()) > MAX_BYTES {
-                self.exceeded = true;
-                return Err(io::Error::other(
-                    "workspace projection byte budget exceeded",
-                ));
-            }
-            self.bytes.extend_from_slice(bytes);
-            Ok(bytes.len())
-        }
-        fn flush(&mut self) -> io::Result<()> {
-            Ok(())
-        }
-    }
-}
+pub mod v2;
 
 #[cfg(test)]
 mod tests {

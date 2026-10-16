@@ -37,6 +37,8 @@ pub enum Budget {
     ArchivePaths,
     CallerPathBytes,
     ExpandedPathBytes,
+    Sdks,
+    SdkRoots,
 }
 
 #[derive(Debug)]
@@ -589,6 +591,9 @@ enum Context {
     Dependencies,
     SourceRoots,
     Archives,
+    Sdks,
+    Sdk,
+    SdkRoots,
     Other,
 }
 
@@ -599,6 +604,8 @@ struct Counts {
     dependencies: usize,
     roots: usize,
     archives: usize,
+    sdks: usize,
+    sdk_roots: usize,
     exceeded: Option<(Budget, usize)>,
 }
 impl Counts {
@@ -613,6 +620,8 @@ impl Counts {
             ),
             Context::SourceRoots => (&mut self.roots, Budget::SourceRoots, MAX_SOURCE_ROOTS),
             Context::Archives => (&mut self.archives, Budget::ArchivePaths, MAX_ARCHIVE_PATHS),
+            Context::Sdks => (&mut self.sdks, Budget::Sdks, v2::MAX_SDKS),
+            Context::SdkRoots => (&mut self.sdk_roots, Budget::SdkRoots, v2::MAX_SDK_ROOTS),
             _ => return true,
         };
         *count += 1;
@@ -661,6 +670,7 @@ impl<'de> Visitor<'de> for Scan<'_> {
         let child = match self.context {
             Context::Modules => Context::Module,
             Context::Libraries => Context::Library,
+            Context::Sdks => Context::Sdk,
             _ => Context::Other,
         };
         // Count before deserializing each item, including the first excess item.
@@ -679,6 +689,8 @@ impl<'de> Visitor<'de> for Scan<'_> {
             let context = match (self.context, key.as_str()) {
                 (Context::Manifest, "modules") => Context::Modules,
                 (Context::Manifest, "libraries") => Context::Libraries,
+                (Context::Manifest, "sdks") => Context::Sdks,
+                (Context::Sdk, "roots") => Context::SdkRoots,
                 (Context::Manifest, "sdkArchives") | (Context::Library, "binaries" | "sources") => {
                     Context::Archives
                 }

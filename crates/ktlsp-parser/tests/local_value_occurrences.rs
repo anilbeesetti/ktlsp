@@ -1325,20 +1325,19 @@ fn mixed_callees_keep_parameter_shadow_and_self_initializer_partitions() {
     let source = "fun f(p: Int){ fun target(){}; val before=p; val p=p; target(); val after=p; val unused=1 }";
     let parameter = source.find("p:").unwrap();
     let local = source.find("val p").unwrap() + 4;
+    let before = source.find("before=p").unwrap() + 7;
+    let after = source.find("after=p").unwrap() + 6;
     accepted(
         source,
         1,
         parameter..parameter + 1,
-        &[
-            source.find("before=p").unwrap() + 7..source.find("before=p").unwrap() + 8,
-            local + 2..local + 3,
-        ],
+        &[before..before + 1, local + 2..local + 3],
     );
     accepted(
         source,
         4,
         local..local + 1,
-        &[source.find("after=p").unwrap() + 6..source.find("after=p").unwrap() + 7],
+        std::slice::from_ref(&(after..after + 1)),
     );
 }
 

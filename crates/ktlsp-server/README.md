@@ -255,8 +255,9 @@ no public-query reset, recursive body validation or copied declaration is used.
 Before-declaration calls, competing semantic names, richer arguments/type/lambda
 or qualified/postfix shapes, nonempty local bodies and unsupported local headers
 fail atomically rather than pretending globally unresolved. This adds callee
-definition, not function hover/rename/references, general overload/invoke,
-signature help or official equivalence. First genuine producer/paired-CLI proof
+definition, not callee hover/references, function rename, general overload/invoke,
+signature help or official equivalence; declaration-name source hover is unchanged.
+First genuine producer/paired-CLI proof
 is still required before source review becomes runtime evidence.
 
 ## Finite local definition and declaration hover

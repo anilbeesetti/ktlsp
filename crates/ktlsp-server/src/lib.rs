@@ -464,9 +464,8 @@ impl Session {
                         start < token_end && token_start < end
                     })
                 {
-                    let edit_start =
-                        ktlsp_text::offset_to_position(document.text(), token_start)
-                            .map_err(|_| (-32803, "invalid structural closer range"))?;
+                    let edit_start = ktlsp_text::offset_to_position(document.text(), token_start)
+                        .map_err(|_| (-32803, "invalid structural closer range"))?;
                     // The authenticated closer is one ASCII code unit, not a newline.
                     let edit_end = ktlsp_text::Position {
                         line: edit_start.line,
@@ -1132,14 +1131,14 @@ fn code_action_context(value: &Value) -> Result<bool, &'static str> {
         if let Some(description) = diagnostic.get("codeDescription") {
             uri_value(required(object(description)?, "href")?)?;
         }
-        if let Some(tags) = diagnostic.get("tags") {
-            if !tags.as_array().is_some_and(|values| {
+        if let Some(tags) = diagnostic.get("tags")
+            && !tags.as_array().is_some_and(|values| {
                 values
                     .iter()
                     .all(|value| matches!(value.as_u64(), Some(1 | 2)))
-            }) {
-                return Err("invalid diagnostic tags");
-            }
+            })
+        {
+            return Err("invalid diagnostic tags");
         }
         if let Some(related) = diagnostic.get("relatedInformation") {
             for info in related

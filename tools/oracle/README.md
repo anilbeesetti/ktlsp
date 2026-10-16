@@ -50,3 +50,25 @@ The initial incomplete manifest exists before launch. Final manifest records scr
 Supervision is explicitly Linux/macOS-only (other platforms fail before creating output or launching). Each child starts its own process group. All return paths attempt SIGKILL on that group, including after direct-child exit; normal completion also kills any same-group descendant that closed its pipes. Cleanup drains within its own deadline and observes/reaps the direct child without blocking. Descendants that escape into another group/session are outside containment, and grandchildren are reaped by their OS parent/init. Tests independently observe a descendant heartbeat stopping and pipe EOF after group termination. No claim of a general process sandbox or Windows support is made.
 
 **Official live execution remains blocked.** This child ran synthetic Rust peers only. A later separately admitted gate must authenticate publisher archive checksum/provenance, validate launcher-specific containment (including escaped groups), review isolation/arguments and admit actual official capture. An existing local official installation does not authorize this recorder to launch it. T045 remains open; no new official diagnostic or feature-parity evidence is produced here.
+
+## Optional PR174 host cleanup ownership (#321)
+
+`ktlsp-oracle-pr174-host` is a Linux-only, root-custody controller; its presence does not authorize provisioning, dispatch or official execution. The official adapter and separately admitted original-job/containment prerequisites remain required. macOS runs synthetic tests only.
+
+Cleanup service ownership transfers only after exclusive unit creation, daemon reload and policy readback succeed. A failed installation retains direct prearm cleanup of the exact known container, even when a partial or preexisting unit file remains; unrelated files are never overwritten or removed. Direct cleanup remains forbidden after watchdog/START ownership. Failed file writes retain cancellation tombstones so persistence failure cannot reopen START.
+
+The supervisor records a protected `cleanup-service-ready` marker bound to nonce, full container ID and boot identity. External `request-cleanup` always latches cancellation, but starts the service only after validating that marker; before transfer it returns `CLEANUP_LATCHED` without starting any unit. If marker publication fails after verified installation, the supervisor retains service ownership in memory and requests its usable service before returning the capture error.
+
+Run the complete optional workspace to build the standalone Rust command peer and expose the deterministic smoke output:
+
+```sh
+cargo fmt --manifest-path tools/oracle/Cargo.toml -- --check
+cargo clippy --locked --manifest-path tools/oracle/Cargo.toml --all-targets -- -D warnings
+cargo test --locked --manifest-path tools/oracle/Cargo.toml -- --nocapture
+```
+
+The executable regression uses real production installation, final routing and direct cleanup against file-backed Rust command peers, not Docker/systemd or echo scripts. Write, sync, reload, readback-command, readback-policy, preexisting-file and symlink failures each return failure and remove the synthetic exact-CID container, reporting `owner=DirectPrearm containerPresent=false`. Successful installation and marker-publication failure select `owner=Service`, with dispatch recorded but no claimed service execution. A test-only custody callback permits valid/malformed marker paths without OS root; production always enforces protected custody. Receipts remain `UNKNOWN` and `officialCaptureSuccess=false`; this is not containment, fresh official capture, abrupt-death recovery or protection against privileged concurrent mutation.
+
+### Change record
+
+- #321: fixed PR306's file-existence ownership gap and migrated external cancellation routing. Local macOS format and strict all-target Clippy passed; optional tests passed with 19 host, 1 peer-consumer, 9 recorder and 6 replay tests, plus two ignored subprocess helpers exercised by their parents. The first actual-path run exposed `clock_gettime(1)` failing on macOS; selecting Darwin's `CLOCK_MONOTONIC=6` fixed it while Linux retains `1`. Hosted checks and root integration are separate evidence, not implied by these local results.

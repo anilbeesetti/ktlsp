@@ -311,8 +311,12 @@ mod host {
             fn clock_gettime(clock: i32, ts: *mut Timespec) -> i32;
         }
         let mut ts = Timespec { sec: 0, nsec: 0 };
-        // Linux host mode only; persisted clock agrees with systemd's monotonic timers.
-        if unsafe { clock_gettime(1, &mut ts) } != 0
+        // Linux host mode agrees with systemd; macOS only runs synthetic peers.
+        #[cfg(target_os = "macos")]
+        const CLOCK_MONOTONIC: i32 = 6;
+        #[cfg(not(target_os = "macos"))]
+        const CLOCK_MONOTONIC: i32 = 1;
+        if unsafe { clock_gettime(CLOCK_MONOTONIC, &mut ts) } != 0
             || ts.sec < 0
             || !(0..1_000_000_000).contains(&ts.nsec)
         {
@@ -593,15 +597,24 @@ mod host {
         a.iter().map(|s| (*s).into()).collect()
     }
     fn make_file(p: &Path, b: &[u8], mode: u32) -> Result<()> {
+        make_file_with(p, b, mode, |f, bytes| {
+            f.write_all(bytes).and_then(|()| f.sync_all())
+        })
+    }
+    fn make_file_with(
+        p: &Path,
+        b: &[u8],
+        mode: u32,
+        write: impl FnOnce(&mut File, &[u8]) -> std::io::Result<()>,
+    ) -> Result<()> {
         let mut f = OpenOptions::new()
             .write(true)
             .create_new(true)
             .mode(mode)
             .open(p)
             .map_err(|e| e.to_string())?;
-        f.write_all(b)
-            .and_then(|()| f.sync_all())
-            .map_err(|e| e.to_string())
+        // Failed writes remain tombstones: removing a cancellation latch could permit START.
+        write(&mut f, b).map_err(|e| e.to_string())
     }
     fn unit(nonce: &str, role: &str) -> String {
         format!("ktlsp-pr174-{nonce}-{role}")
@@ -1438,6 +1451,25 @@ mod host {
         Path::new("/run/systemd/system").join(format!("{}.{}", unit(nonce, "cleanup"), suffix))
     }
     fn install_cleanup(dir: &Path, a: &Admission, e: &mut Evidence) -> Result<()> {
+        install_cleanup_at(
+            dir,
+            &a.nonce,
+            &service_path(&a.nonce, "service"),
+            &a.tools.systemctl,
+            a.preparation_deadline_ms,
+            e,
+            |e, path, bytes| side(e, path, bytes, 0o600, false),
+        )
+    }
+    fn install_cleanup_at(
+        dir: &Path,
+        nonce: &str,
+        path: &Path,
+        systemctl: &Path,
+        end: u64,
+        e: &mut Evidence,
+        write: impl FnOnce(&mut Evidence, &Path, &[u8]) -> Result<()>,
+    ) -> Result<()> {
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
         let exe = exe.to_str().ok_or("service executable path")?;
         if !exe
@@ -1448,23 +1480,13 @@ mod host {
         }
         let text = format!(
             "[Unit]\nDescription=Bounded PR174 cleanup {}\nStartLimitIntervalSec=600s\nStartLimitBurst=1\n[Service]\nType=oneshot\nRemainAfterExit=yes\nUser=root\nGroup=root\nExecStart={exe} cleanup {}\nKillMode=control-group\nTimeoutStartSec=60s\nTimeoutStopSec=1s\nEnvironment=PATH=/usr/bin:/bin LANG=C.UTF-8 LC_ALL=C.UTF-8\nUnsetEnvironment=RUNNER_TRACKING_ID GH_TOKEN GITHUB_TOKEN JAVA_HOME JDK_HOME LD_LIBRARY_PATH\n",
-            a.nonce,
+            nonce,
             dir.display()
         );
-        side(
-            e,
-            &service_path(&a.nonce, "service"),
-            text.as_bytes(),
-            0o600,
-            false,
-        )?;
-        e.checked(
-            &a.tools.systemctl,
-            &args(&["daemon-reload"]),
-            a.preparation_deadline_ms,
-        )?;
+        write(e, path, text.as_bytes())?;
+        e.checked(systemctl, &args(&["daemon-reload"]), end)?;
         let shown = e.checked(
-            &a.tools.systemctl,
+            systemctl,
             &args(&[
                 "show",
                 "--property=FragmentPath",
@@ -1474,9 +1496,9 @@ mod host {
                 "--property=StartLimitBurst",
                 "--property=StartLimitIntervalUSec",
                 "--property=DropInPaths",
-                &format!("{}.service", unit(&a.nonce, "cleanup")),
+                &format!("{}.service", unit(nonce, "cleanup")),
             ]),
-            a.preparation_deadline_ms,
+            end,
         )?;
         let p = properties(&shown)?;
         if p.get("User").map(String::as_str) != Some("root")
@@ -1487,12 +1509,7 @@ mod host {
                 .and_then(|v| systemctl_usec(v).ok())
                 != Some(600_000_000)
             || p.get("DropInPaths").map(String::as_str) != Some("")
-            || p.get("FragmentPath")
-                != Some(
-                    &service_path(&a.nonce, "service")
-                        .to_string_lossy()
-                        .into_owned(),
-                )
+            || p.get("FragmentPath") != Some(&path.to_string_lossy().into_owned())
         {
             return Err("cleanup service policy not installed as expected".into());
         }
@@ -1653,6 +1670,59 @@ mod host {
             end,
         )?;
         Ok(())
+    }
+    fn cleanup_service_identity(b: &Binding) -> String {
+        format!("{}:{}:{}\n", b.nonce, b.container_id, b.boot_id)
+    }
+    fn publish_cleanup_service(dir: &Path, b: &Binding, e: &mut Evidence) -> Result<()> {
+        side(
+            e,
+            &dir.join("cleanup-service-ready"),
+            cleanup_service_identity(b).as_bytes(),
+            0o600,
+            false,
+        )
+    }
+    fn request_cleanup_external(dir: &Path, b: &Binding) -> Result<bool> {
+        request_cleanup_external_with(dir, b, |path| protected(path, false))
+    }
+    fn request_cleanup_external_with(
+        dir: &Path,
+        b: &Binding,
+        custody: impl FnOnce(&Path) -> Result<()>,
+    ) -> Result<bool> {
+        let latch = if dir.join("cleanup-requested").exists() {
+            Ok(())
+        } else {
+            make_file(&dir.join("cleanup-requested"), b"", 0o600)
+        };
+        let mut dispatched = false;
+        dispatch_despite_latch_error(latch, || {
+            let path = dir.join("cleanup-service-ready");
+            match fs::symlink_metadata(&path) {
+                Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
+                Err(error) => return Err(error.to_string()),
+                Ok(_) => {}
+            }
+            custody(&path)?;
+            if read_file(&path, INPUT_BYTES)? != cleanup_service_identity(b).as_bytes() {
+                return Err("cleanup service ownership marker mismatch".into());
+            }
+            let mut c = Command::new(&b.systemctl);
+            c.args(args(&[
+                "start",
+                "--no-block",
+                &format!("{}.service", unit(&b.nonce, "cleanup")),
+            ]))
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin");
+            if !bounded_command(c, 0, deadline(lifecycle_end(b, mono_ms()?)?)?)?.ok() {
+                return Err("cleanup request incomplete; closure UNKNOWN".into());
+            }
+            dispatched = true;
+            Ok(())
+        })?;
+        Ok(dispatched)
     }
     fn process_start(b: &[u8]) -> Result<(u32, u64)> {
         let s = std::str::from_utf8(b).map_err(|_| "proc stat encoding")?;
@@ -2487,10 +2557,10 @@ mod host {
             facts.observer_stopped = inactive && empty;
         } else {
             if b.armed_ms.is_some()
-                || dir.join("start-intent.json").exists()
-                || service_path(&b.nonce, "service").exists()
+                || dir.join("armed.json").try_exists().unwrap_or(true)
+                || dir.join("start-intent.json").try_exists().unwrap_or(true)
             {
-                return Err("direct cleanup after service ownership/START forbidden".into());
+                return Err("direct cleanup after watchdog ownership/START forbidden".into());
             }
             facts.observer_stopped = true;
         }
@@ -2880,12 +2950,33 @@ mod host {
             CleanupOwner::DirectPrearm
         }
     }
+    fn finish_supervision(
+        run: Result<()>,
+        dir: &Path,
+        known: Option<&Binding>,
+        cleanup_ready: bool,
+        e: &mut Evidence,
+    ) -> Result<()> {
+        let cleanup = match cleanup_owner(known.is_some(), cleanup_ready) {
+            CleanupOwner::None => Ok(()),
+            CleanupOwner::Service => {
+                let b = known.ok_or("cleanup CID missing")?;
+                request_cleanup(dir, b, e, lifecycle_end(b, mono_ms()?)?)
+            }
+            CleanupOwner::DirectPrearm => {
+                cleanup_bound(dir, known.ok_or("cleanup CID missing")?, true).map(|_| ())
+            }
+        };
+        run?;
+        cleanup
+    }
     fn supervise(dir: &Path) -> Result<Value> {
         let a = admission(dir)?;
         let mut e = Evidence::preflight();
         let mut cg = String::new();
         let mut stamp = None;
         let mut known: Option<Binding> = None;
+        let mut cleanup_ready = false;
         let run = capture_steps(|step| {
             match step {
                 CaptureStep::Preflight => {
@@ -2895,6 +2986,7 @@ mod host {
                         "receipts",
                         "binding.json",
                         "cleanup-requested",
+                        "cleanup-service-ready",
                         "start-intent.json",
                         "teardown-receipt.json",
                     ] {
@@ -2971,7 +3063,11 @@ mod host {
                 .ok_or("original CID missing before lifecycle action")?;
             let cid = b.container_id.clone();
             match step {
-                CaptureStep::InstallCleanup => install_cleanup(dir, &a, &mut e),
+                CaptureStep::InstallCleanup => {
+                    install_cleanup(dir, &a, &mut e)?;
+                    cleanup_ready = true;
+                    publish_cleanup_service(dir, b, &mut e)
+                }
                 CaptureStep::Inspect => config(
                     &inspect(&mut e, &a.tools.docker, &cid, a.preparation_deadline_ms)?,
                     dir,
@@ -3042,17 +3138,7 @@ mod host {
             }
         });
         let _=e.append(&json!({"kind":"supervisor-final","captureError":run.as_ref().err(),"containerId":known.as_ref().map(|b|&b.container_id),"officialCaptureSuccess":false,"closure":"UNKNOWN until independent cleanup receipt"}),true);
-        match cleanup_owner(known.is_some(), service_path(&a.nonce, "service").exists()) {
-            CleanupOwner::None => {}
-            CleanupOwner::Service => {
-                let b = known.as_ref().ok_or("cleanup CID missing")?;
-                request_cleanup(dir, b, &mut e, lifecycle_end(b, mono_ms()?)?)?;
-            }
-            CleanupOwner::DirectPrearm => {
-                let _ = cleanup_bound(dir, known.as_ref().ok_or("cleanup CID missing")?, true);
-            }
-        }
-        run?;
+        finish_supervision(run, dir, known.as_ref(), cleanup_ready, &mut e)?;
         Ok(
             json!({"status":"CLEANUP_REQUESTED","officialCaptureSuccess":false,"receiverReviewRequired":true}),
         )
@@ -3097,26 +3183,8 @@ mod host {
 
             "request-cleanup" => {
                 let b = binding(&dir)?;
-                let latch = if dir.join("cleanup-requested").exists() {
-                    Ok(())
-                } else {
-                    make_file(&dir.join("cleanup-requested"), b"", 0o600)
-                };
-                dispatch_despite_latch_error(latch, || {
-                    let mut c = Command::new(&b.systemctl);
-                    c.args(args(&[
-                        "start",
-                        "--no-block",
-                        &format!("{}.service", unit(&b.nonce, "cleanup")),
-                    ]))
-                    .env_clear()
-                    .env("PATH", "/usr/bin:/bin");
-                    if !bounded_command(c, 0, deadline(lifecycle_end(&b, mono_ms()?)?)?)?.ok() {
-                        return Err("cleanup request incomplete; closure UNKNOWN".into());
-                    }
-                    Ok(())
-                })?;
-                Ok(json!({"status":"CLEANUP_REQUESTED"}))
+                let dispatched = request_cleanup_external(&dir, &b)?;
+                Ok(json!({"status":if dispatched {"CLEANUP_REQUESTED"} else {"CLEANUP_LATCHED"}}))
             }
             _ => Err("unknown fixed host mode".into()),
         }
@@ -3259,6 +3327,211 @@ mod host {
             assert!(!digest(&"0".repeat(64)));
             assert!(!hex(&"G".repeat(64), 64));
             assert!(!safe_absolute(Path::new("/run/../escape")));
+        }
+        #[test]
+        fn failed_file_writes_preserve_cancellation_and_unrelated_paths() {
+            let temp = Temp::new();
+            let path = temp.0.join("cleanup-requested");
+            for partial in [false, true] {
+                assert!(
+                    make_file_with(&path, b"cancel", 0o600, |f, _| {
+                        if partial {
+                            f.write_all(b"part")?;
+                        }
+                        Err(std::io::Error::other("injected write/sync failure"))
+                    })
+                    .is_err()
+                );
+                assert!(path.exists());
+                let mut dispatched = false;
+                assert!(
+                    dispatch_despite_latch_error(Err("failed persistence".into()), || {
+                        dispatched = true;
+                        Err("failed dispatch".into())
+                    })
+                    .is_err()
+                );
+                assert!(dispatched);
+                assert!(start_allowed(&temp.0, &binding_fixture(), 2000).is_err());
+                fs::remove_file(&path).unwrap();
+            }
+            make_file(&path, b"preexisting", 0o600).unwrap();
+            assert!(make_file(&path, b"replacement", 0o600).is_err());
+            assert_eq!(fs::read(&path).unwrap(), b"preexisting");
+            fs::remove_file(&path).unwrap();
+            fs::write(temp.0.join("unrelated"), b"unrelated").unwrap();
+            std::os::unix::fs::symlink(temp.0.join("unrelated"), &path).unwrap();
+            assert!(make_file(&path, b"replacement", 0o600).is_err());
+            assert_eq!(fs::read(&path).unwrap(), b"unrelated");
+        }
+        #[test]
+        fn actual_direct_cleanup_rejects_watchdog_or_start_ownership() {
+            for marker in ["binding-armed", "armed.json", "start-intent.json"] {
+                let temp = Temp::new();
+                fs::create_dir(temp.0.join("receipts")).unwrap();
+                let mut b = binding_fixture();
+                b.preparation_deadline_ms = mono_ms().unwrap() + 120_000;
+                if marker != "binding-armed" {
+                    b.armed_ms = None;
+                    fs::write(temp.0.join(marker), b"partial").unwrap();
+                }
+                assert!(
+                    cleanup_bound(&temp.0, &b, true)
+                        .unwrap_err()
+                        .contains("forbidden")
+                );
+                assert!(!temp.0.join("teardown-receipt.json").exists());
+            }
+        }
+        #[test]
+        fn executable_install_faults_route_actual_direct_cleanup() {
+            // Full optional-workspace cargo test builds its integration-test binary peers.
+            let peer = std::env::current_exe()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .join("host-cleanup-test-peer");
+            assert!(
+                peer.is_file(),
+                "build the optional workspace binaries before this filtered test"
+            );
+            for fault in [
+                "write",
+                "sync",
+                "reload",
+                "readback-command",
+                "readback-policy",
+                "preexisting",
+                "symlink",
+                "marker-write",
+                "ready",
+            ] {
+                let temp = Temp::new();
+                for program in ["systemctl", "docker", "curl"] {
+                    fs::copy(&peer, temp.0.join(program)).unwrap();
+                }
+                fs::create_dir(temp.0.join("receipts")).unwrap();
+                fs::write(temp.0.join("fault"), fault).unwrap();
+                let mut b = binding_fixture();
+                b.armed_ms = None;
+                b.preparation_deadline_ms = mono_ms().unwrap() + 120_000;
+                b.docker = temp.0.join("docker");
+                b.systemctl = temp.0.join("systemctl");
+                b.curl = temp.0.join("curl");
+                fs::write(temp.0.join("cid"), &b.container_id).unwrap();
+                fs::write(temp.0.join("container"), b"created").unwrap();
+                let path = temp.0.join("cleanup.service");
+                if fault == "preexisting" {
+                    fs::write(&path, b"unrelated unit").unwrap();
+                }
+                if fault == "symlink" {
+                    fs::write(temp.0.join("unrelated.service"), b"unrelated unit").unwrap();
+                    std::os::unix::fs::symlink(temp.0.join("unrelated.service"), &path).unwrap();
+                }
+                let mut e = Evidence::preflight();
+                let installed = install_cleanup_at(
+                    &temp.0,
+                    &b.nonce,
+                    &path,
+                    &b.systemctl,
+                    b.preparation_deadline_ms,
+                    &mut e,
+                    |e, path, bytes| {
+                        if matches!(fault, "write" | "sync") {
+                            make_file_with(path, bytes, 0o600, |f, bytes| {
+                                f.write_all(if fault == "write" {
+                                    &bytes[..16]
+                                } else {
+                                    bytes
+                                })?;
+                                Err(std::io::Error::other("injected write/sync failure"))
+                            })
+                        } else {
+                            side(e, path, bytes, 0o600, false)
+                        }
+                    },
+                );
+                let ready = installed.is_ok();
+                assert_eq!(
+                    ready,
+                    matches!(fault, "ready" | "marker-write"),
+                    "{fault}: {installed:?}"
+                );
+                assert!(!request_cleanup_external(&temp.0, &b).unwrap());
+                assert!(!temp.0.join("service-requested").exists());
+                let run = if ready {
+                    if fault == "marker-write" {
+                        fs::write(temp.0.join("cleanup-service-ready"), b"partial").unwrap();
+                    }
+                    let published = publish_cleanup_service(&temp.0, &b, &mut e);
+                    if fault == "ready" {
+                        assert!(request_cleanup_external_with(&temp.0, &b, |_| Ok(())).unwrap());
+                    } else {
+                        assert!(published.is_err());
+                        assert!(
+                            request_cleanup_external_with(&temp.0, &b, |_| Ok(()))
+                                .unwrap_err()
+                                .contains("marker mismatch")
+                        );
+                        assert!(!temp.0.join("service-requested").exists());
+                    }
+                    published
+                } else {
+                    installed
+                };
+                let finished = finish_supervision(run, &temp.0, Some(&b), ready, &mut e);
+                assert_eq!(finished.is_ok(), fault == "ready", "{fault}: {finished:?}");
+                let commands = fs::read_to_string(temp.0.join("commands")).unwrap();
+                let calls: Vec<Value> = commands
+                    .lines()
+                    .map(|s| serde_json::from_str(s).unwrap())
+                    .collect();
+                if ready {
+                    assert!(temp.0.join("service-requested").is_file());
+                    assert!(temp.0.join("container").is_file());
+                    assert!(!calls.iter().any(|c| c["program"] == "docker"));
+                } else {
+                    assert!(!temp.0.join("container").exists(), "{fault}: {commands}");
+                    assert!(!temp.0.join("service-requested").exists());
+                    assert!(
+                        calls.iter().any(|c| c["program"] == "docker"
+                            && c["args"] == json!(["rm", b.container_id]))
+                    );
+                    let receipt: Value = serde_json::from_slice(
+                        &fs::read(temp.0.join("teardown-receipt.json")).unwrap(),
+                    )
+                    .unwrap();
+                    assert_eq!(receipt["directPrearm"], true);
+                    assert_eq!(receipt["teardown"], "UNKNOWN");
+                    assert_eq!(receipt["officialCaptureSuccess"], false);
+                }
+                if matches!(fault, "preexisting" | "symlink") {
+                    assert_eq!(fs::read(&path).unwrap(), b"unrelated unit");
+                }
+                assert!(path.is_file());
+                println!(
+                    "synthetic install fault={fault} owner={:?} containerPresent={} officialCaptureSuccess=false",
+                    cleanup_owner(true, ready),
+                    temp.0.join("container").exists()
+                );
+            }
+        }
+        #[test]
+        fn external_cleanup_rejects_partial_or_unrelated_ownership_markers() {
+            for bytes in [b"".as_slice(), b"partial", b"unrelated:container:boot\n"] {
+                let temp = Temp::new();
+                let b = binding_fixture();
+                fs::write(temp.0.join("cleanup-service-ready"), bytes).unwrap();
+                assert!(
+                    request_cleanup_external_with(&temp.0, &b, |_| Ok(()))
+                        .unwrap_err()
+                        .contains("marker mismatch")
+                );
+                assert!(temp.0.join("cleanup-requested").exists());
+                assert!(start_allowed(&temp.0, &b, 2000).is_err());
+            }
         }
         #[test]
         fn aggregate_evidence_and_side_writes_do_not_reset_or_borrow() {

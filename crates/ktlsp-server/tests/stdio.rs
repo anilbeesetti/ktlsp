@@ -86,7 +86,7 @@ fn native_subprocess_lifecycle_unicode_changes_and_stdout_cleanliness() {
     messages.push(notification("textDocument/didChange", json!({"textDocument":{"uri":"untitled:unicode","version":1},"contentChanges":[{"range":{"start":{"line":0,"character":1},"end":{"line":0,"character":3}},"rangeLength":2,"text":"水"}]})));
     messages.push(request(
         json!(u64::MAX),
-        "textDocument/completion",
+        "completionItem/resolve",
         json!({}),
     ));
     messages.extend(end());

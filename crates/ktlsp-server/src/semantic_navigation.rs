@@ -3,7 +3,7 @@ use ktlsp_parser::{
     SnapshotResult, SourceSnapshot,
     local_value_binding::{
         LocalValueAnchor, LocalValueOccurrences, bind_local_value, guarded_local_value_rename,
-        local_value_occurrences,
+        local_value_occurrences, visible_local_values,
     },
     lowering::{lower_declarations, reference_site},
     structural_regions::build_regions,
@@ -100,6 +100,9 @@ pub(crate) enum Query {
         offset: usize,
         new_name: String,
     },
+    Completion {
+        offset: usize,
+    },
 }
 
 pub(crate) fn render(
@@ -114,14 +117,29 @@ pub(crate) fn render(
         | Query::References { offset, .. }
         | Query::Highlights { offset }
         | Query::PrepareRename { offset }
-        | Query::Rename { offset, .. } => *offset,
+        | Query::Rename { offset, .. }
+        | Query::Completion { offset } => *offset,
     };
     let mut references = tree.elements().iter().enumerate().filter(|(_, e)| {
-        !e.token && e.kind == "REFERENCE_EXPRESSION" && e.start <= offset && offset < e.end
+        !e.token
+            && e.kind == "REFERENCE_EXPRESSION"
+            && e.start <= offset
+            && (offset < e.end || matches!(query, Query::Completion { .. }) && offset == e.end)
     });
     let reference = references.next();
     if references.next().is_some() {
         return Err(UNSUPPORTED);
+    }
+    if matches!(query, Query::Completion { .. }) {
+        let (index, _) =
+            reference.ok_or("completion requires an existing whole-initializer identifier")?;
+        let lowered = lower_declarations(result, snapshot).map_err(|_| UNSUPPORTED)?;
+        let directory = build_regions(&lowered, result, snapshot).map_err(|_| UNSUPPORTED)?;
+        // One semantic query authenticates the original site and every candidate,
+        // without binding the unresolved prefix or resetting a per-item budget.
+        let visible = visible_local_values(&directory, result, index, snapshot)
+            .map_err(|_| "completion requires supported unambiguous finite local visibility")?;
+        return render_completion(&visible, snapshot.source(), offset);
     }
     let rename_query = matches!(query, Query::PrepareRename { .. } | Query::Rename { .. });
     let occurrence_query =
@@ -213,7 +231,8 @@ pub(crate) fn render(
         Query::References { .. }
         | Query::Highlights { .. }
         | Query::PrepareRename { .. }
-        | Query::Rename { .. } => unreachable!("rendered above"),
+        | Query::Rename { .. }
+        | Query::Completion { .. } => unreachable!("rendered above"),
     };
     render_target(tree.source(), snapshot, query, target, bytes)
 }
@@ -254,7 +273,8 @@ fn render_target(
         Query::References { .. }
         | Query::Highlights { .. }
         | Query::PrepareRename { .. }
-        | Query::Rename { .. } => unreachable!("rendered above"),
+        | Query::Rename { .. }
+        | Query::Completion { .. } => unreachable!("rendered above"),
     }
 }
 
@@ -417,4 +437,69 @@ mod rename_limits {
         assert!(rename_output_size(0, 0, 1025, 1, 200000).is_err());
         assert!(rename_output_size(0, 0, usize::MAX, usize::MAX, usize::MAX).is_err());
     }
+}
+
+fn render_completion(
+    visible: &ktlsp_parser::local_value_binding::VisibleLocalValues<'_>,
+    source: &str,
+    offset: usize,
+) -> Result<Value, &'static str> {
+    const LIMIT: &str = "local completion rendered output limit exceeded";
+    let bytes = visible.site().range();
+    let raw = visible.site().raw_spelling();
+    let relative = offset.checked_sub(bytes.start).ok_or(UNSUPPORTED)?;
+    let prefix = if raw.starts_with('`') {
+        // The semantic query authenticated a complete quoted token. Exclude the
+        // opening quote and, at token END, its closing quote; never validate a
+        // partial prefix as a complete Kotlin name.
+        raw.get(1.min(relative)..relative.min(raw.len() - 1))
+    } else {
+        raw.get(..relative)
+    }
+    .ok_or(UNSUPPORTED)?;
+    let positions = crate::structure::positions(source, &[bytes.start, bytes.end]);
+    let range = Range {
+        start: positions[0],
+        end: positions[1],
+    };
+    if range.start.line != range.end.line {
+        return Err(UNSUPPORTED);
+    }
+    let mut work = prefix.len();
+    let mut rendered = 64usize;
+    // Preflight ALL candidates before allocating repeated JSON strings. Charge
+    // both passes' spelling validation/prefix comparison against one 128 KiB
+    // rendering-work ceiling, separate from the kernel's shared semantic budget.
+    for target in visible.values() {
+        let raw = target.raw_name();
+        work = work
+            .checked_add(2 * (raw.len() + prefix.len().min(raw.len())))
+            .filter(|work| *work <= 131_072)
+            .ok_or(LIMIT)?;
+        let spelling = target.semantic_spelling().ok_or(UNSUPPORTED)?;
+        if spelling.starts_with(prefix) {
+            // Conservative JSON escaping (six bytes per input byte), both raw
+            // copies, semantic filter and the shared numeric range per item.
+            rendered = rendered
+                .checked_add(256 + 6 * (2 * raw.len() + spelling.len()))
+                .filter(|size| *size <= 1024 * 1024)
+                .ok_or(LIMIT)?;
+        }
+    }
+    let items = visible
+        .values()
+        .iter()
+        .filter_map(|target| {
+            let spelling = target.semantic_spelling()?;
+            spelling.starts_with(prefix).then(|| {
+                json!({
+                    "label":target.raw_name(),
+                    "filterText":spelling,
+                    "kind":6,
+                    "textEdit":{"range":range,"newText":target.raw_name()}
+                })
+            })
+        })
+        .collect::<Vec<_>>();
+    Ok(json!({"isIncomplete":true,"items":items}))
 }

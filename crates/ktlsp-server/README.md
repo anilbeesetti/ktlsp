@@ -108,6 +108,57 @@ diagnostics. These are authored checks, not a claim of execution: no local
 server/parser runtime is authorized under #96. Original hosted proof and final
 composition remain separately ROOT-admitted; full official parity remains open.
 
+## Eager finite local completion (#382)
+
+With the trusted matching worker, `textDocument/completion` advertises only
+`completionProvider: {resolveProvider: false}`, independently of hover format
+negotiation. Missing workers omit that capability and return `-32601`.
+Completion uses the existing eight-job asynchronous parser pipeline, admission,
+cancellation, cleanup and exact incarnation/version/content publication guards;
+there is no new parser, source repair, source copy, pool or cache.
+
+The admitted site is a **nonempty existing whole-initializer identifier** in a
+complete ordinary named top-level block function. Bare and complete backtick
+tokens accept a caret inside or at their end; the original token start or just
+after its opening backtick permits an empty prefix. No initializer hole,
+unfinished quote, standalone expression, member/call/type/global context or
+damaged body is invented. These unsupported contexts return `-32803`, not an
+empty list. Strict invalid/split UTF-16 and unopened-document positions return
+`-32602`; navigation's existing half-open endpoints are unchanged.
+
+Exactly one `visible_local_values` query authenticates the original reference
+and same-function parameters/preceding immutable locals under its shared
+2,097,152-work and 1,024-value/131,072-byte storage ceilings. Local shadowing,
+parameter fallback in self-initializers, sibling isolation and visible-name
+ambiguity (including later duplicates) retain the producer API's atomic policy.
+Only the original token text before the caret is matched, case-sensitively and
+without normalization, against semantic spelling; opening/closing backticks are
+excluded separately. Output remains in original declaration order.
+
+The eager `CompletionList` has `isIncomplete: true`: further typing recomputes
+and replaces this finite list, not full Kotlin candidate completeness or
+official relevance ranking. A successfully authenticated universe with no
+prefix matches may return `items: []`. Each item has the original raw `label`,
+semantic `filterText`, Variable kind (`6`, including `val`) and a plain
+single-line `textEdit` replacing the **entire original token** with the target's
+raw spelling, including its original quotes. One UTF-16 sweep computes the
+shared replacement range. Before repeated JSON allocation, both rendering
+passes are bounded by a 131,072-byte spelling/prefix-work ceiling and a
+conservative 1 MiB escaped-output ceiling; exhaustion refuses the whole list.
+
+Real-worker regressions apply returned edits in memory and query the actual
+resulting source's definition, including suffix/quote replacement, CRLF,
+astral names, empty prefixes, parameter/local shadowing and atomic refusals.
+Paired CLI coverage also retains exact string/u64 IDs, missing-worker and
+hover-independent behavior; controlled failing peers cover cancellation and
+edit/close/reopen guards, never fabricated successful CST. A temporary bounded
+direct wire/applied-source/rebinding capture is retained for ROOT's first
+hosted readback; no local runtime or hosted execution is claimed here.
+
+No completion resolve, imports, snippets, commands, item data, dot triggers,
+type inference, damaged-syntax recovery or full/official completion parity is
+implemented or advertised. Type annotations remain retained syntax only.
+
 ## Finite local definition and declaration hover
 
 Over open Kotlin documents, a strict UTF-16 position selects an actual original value `REFERENCE_EXPRESSION` containing that position (end-exclusive). The existing declaration lowerer, structural-region directory, authenticated `ReferenceSite` and `bind_local_value` prove a unique eligible preceding direct immutable local `val` or same-function ordinary parameter. Only ordinary named top-level block functions with complete plain integer/whole-identifier local initializers and simple syntax-only parameter/local annotations are eligible. Definition returns the original target **name** range and same URI. Hover returns the original target **declaration text** (`p: T` for a parameter) and original reference range: no invented types, initializer chasing or inferred global unresolvedness.

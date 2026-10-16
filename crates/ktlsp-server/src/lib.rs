@@ -297,6 +297,7 @@ impl Session {
                 | "textDocument/documentHighlight"
                 | "textDocument/prepareRename"
                 | "textDocument/rename"
+                | "textDocument/completion"
         ) && self.state == State::Running
         {
             return match self.start_parser(id.clone(), method, params) {
@@ -366,6 +367,7 @@ impl Session {
                 result["capabilities"]["definitionProvider"] = json!(true);
                 result["capabilities"]["referencesProvider"] = json!(true);
                 result["capabilities"]["documentHighlightProvider"] = json!(true);
+                result["capabilities"]["completionProvider"] = json!({"resolveProvider":false});
                 if self.hover_format.is_some() {
                     result["capabilities"]["hoverProvider"] = json!(true);
                 }
@@ -547,6 +549,7 @@ impl Session {
                         new_name: name.to_owned(),
                     }
                 }
+                "textDocument/completion" => semantic_navigation::Query::Completion { offset },
                 "textDocument/hover" => semantic_navigation::Query::Hover {
                     offset,
                     format: self.hover_format.expect("hover format checked"),

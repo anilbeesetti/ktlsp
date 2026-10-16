@@ -1,12 +1,47 @@
-# Native server syntax providers (T006)
+# Native server syntax providers
 
-`ktlsp` supports bounded stdio lifecycle, open-document synchronization and `textDocument/foldingRange`. Initialization advertises UTF-16, incremental sync and folding only. `textDocument/publishDiagnostics` reports **lexical/structural** checks, not Kotlin compiler diagnostics; no pull diagnostic provider or document-symbol provider is advertised.
+`ktlsp` supports bounded stdio lifecycle, open-document synchronization, `textDocument/foldingRange` and a bounded syntactic `textDocument/documentSymbol` provider when its trusted matching parser worker is installed. Initialization advertises UTF-16, incremental sync and folding; document symbols are conditional on worker availability. `textDocument/publishDiagnostics` reports **lexical/structural** checks, not Kotlin compiler diagnostics; no pull diagnostic provider is advertised.
+
+## Build and distribute both executables
+
+```sh
+cargo build --locked --release -p ktlsp-server -p ktlsp-parser --bins
+./target/release/ktlsp
+```
+
+Install **both** `ktlsp` and `ktlsp-parser-worker` from that same build into the same trusted directory (with `.exe` suffixes on Windows). The default CLI discovers the worker only beside its own executable, checking that the sibling is a regular executable file on Unix. There is no PATH, current-directory or environment-selected worker fallback. Installation trust and matching build identity are the distributor's responsibility; this is not a sandbox, signature check or version-authentication protocol.
+
+Without that sibling, synchronization/folding/lexical diagnostics remain available, `documentSymbolProvider` is omitted and document-symbol requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. A configured worker that subsequently fails is a request failure, not a fabricated outline. No JVM/JDK, Kotlin compiler or C parser is required.
+
+## Folding and push diagnostics
 
 Folding recognizes matched multiline `{}`, `()`, `[]`, block-comment tokens, raw-string tokens and groups of consecutive whole-line `//` comments. Comment groups need at least two adjacent physical lines with only space/tab/form-feed indentation before `//`; blank lines, code, inline comments and opaque tokens separate groups. Their ranges start at the first slash and end after the last comment's content, including trailing spaces but excluding its terminator. LF, CRLF, lone CR and EOF are supported. Strings/templates, characters, backtick identifiers and comments remain opaque to delimiter matching. The complete opaque raw-string/comment token may fold; nested template expressions/comment interiors do not create outer-file folds. Single-line ranges are omitted. Unterminated multiline comments/raw strings can fold to their token end while their lexical diagnostic remains visible. Imports, declarations and semantic structure are outside this declared subset.
 
 On a mismatched closer, report it and discard/diagnose all pending openers. This conservative recovery cannot create crossing delimiter folds; complete valid pairs encountered later can still fold. Unmatched closers and remaining openers produce structural diagnostics. Accepted open/change notifications publish replacement diagnostics (including empty arrays); close clears them. Rejected/stale/invalid edits publish nothing and preserve the current document. Include document versions only when `publishDiagnostics.versionSupport` is true; close clearing omits version.
 
 Missing/closed-document folding requests return invalid params (`-32602`), without reading disk. Malformed request params/client folding capabilities also return invalid params. Analysis exhaustion leaves an accepted document version intact, replaces stale diagnostics with one explicit `analysis-limit` warning, and fails folding with RequestFailed (`-32803`). Subsequent edits can recover normally.
+
+## Bounded syntactic document symbols
+
+Requests read only open Kotlin document text, never disk. Each request creates an immutable URI/version/source snapshot, calls the supervised `Parser::parse_snapshot`, rechecks the current revision/content and projects the validated original-byte CST. No parser result or symbol outline is cached across requests, edits or close/reopen. The existing synchronous read loop remains synchronous; the provider does not pretend to implement cancellation or concurrent stale-result suppression.
+
+Only direct declaration-name structure proves emitted names. Supported producer shapes include named classes/interfaces/objects/enums, functions/methods, properties, typealiases, enum entries, explicit `constructor` keywords and `val`/`var` primary-constructor properties, including nested/local declarations. The outline uses nearest emitted enclosing declarations, not resolved scopes or semantic identities. Unicode and backtick spelling are preserved verbatim. A declaration range is its complete producer CST extent, including any bound leading comment; its selection range is its original name token. Implicit unnamed constructors, ordinary parameters/type parameters and anonymous expressions have no invented names. A missing function name in a top-level/member declaration is rejected, not treated as an anonymous expression.
+
+Clients advertising `hierarchicalDocumentSymbolSupport: true` receive `DocumentSymbol[]` with `range`, `selectionRange` and `children`; other clients receive flat `SymbolInformation[]` with URI/range and nearest emitted `containerName`. `symbolKind.valueSet` is respected. Without it, the original kinds 1–18 are used: object falls back to Class, enum entry to Enum, and a typealias uses Class without implying a resolved target. If neither the intended kind nor its compatible fallback is supported, the request fails instead of emitting an unsupported client kind.
+
+Incomplete/error trees, unsupported declaration shapes (including destructuring and unnamed companion objects), parser coverage/resource/process failures and outline ceilings reject the **whole** request with RequestFailed (`-32803`), never partial/truncated success. A valid empty/comment-only file can return `[]`. Missing/closed documents or malformed request parameters return invalid params (`-32602`) when the provider is configured. Parsing uses the existing conservative **source-mode** grammar, not a complete script/grammar implementation. Comments/string mentions never become declarations. There is no completion, navigation, type, refactoring or official document-symbol parity claim.
+
+### Independent limits
+
+- Synchronization still accepts up to **8 MiB** per document; document symbols accept only the parser's **64 KiB** original/normalized UTF-8 source ceiling. Larger open documents remain synchronized and usable by lexical providers, but symbol requests explicitly fail.
+- Existing parser limits stay unchanged: **500 ms** supervised exchange deadline, **16,384** flat CST elements, CST depth **128**, **4 MiB** worker reply, and **64 MiB cumulative allocation requests in the worker**. The server does not move that allocator into its own process or run the grammar in-process. OS spawn/termination/reaping and scheduling are not hard real-time bounds; allocation requests do not measure RSS or stack. See [parser supervision and residual limits](../ktlsp-parser/README.md).
+- Outline output is capped at **1,024 symbols**, **32 emitted declaration levels** and a **1 MiB conservative rendered-size budget**, including worst-case escaping and repeated flat-client URI/container names. The CST traversal/direct-child scans are bounded by the validated element ceiling; output endpoints share the existing sorted UTF-16 sweep. JSON hierarchy construction is bottom-up, without recursive CST walking or subtree copies.
+
+### Hosted native evidence
+
+At source head `fbed703712e04c2c6b1f3a222de3cd8cc029f26a`, [original Linux Native Rust CI](https://github.com/anilbeesetti/ktlsp/actions/runs/38843829593/job/116789694423) checked PR merge `1ff6c236d4ae0f0bac655883184ce28e159eba52` against base `a009cdfc8d075d9aef4b4cab9fb790835db22e4c` with pinned Rust 1.99.0. Format, locked workspace/all-target Clippy and locked workspace tests passed, including all **eight** new actual-worker consumer tests. The packaged stdio test copied both real binaries into one temporary directory, removed Java-related environment variables and emptied PATH. A temporary direct-Write observation recorded the actual decoded native wire reply: `documentSymbolProvider: true`, class `Outer` (kind 5, range `0:0–0:31`, selection `0:6–0:11`) enclosing method `inner` (kind 6, range `0:14–0:29`, selection `0:18–0:23`). The same permanent test verified that a server-only package omits the capability and returns `-32601`. The observation line was then removed; the regression remains.
+
+The consumer suite also exercised hierarchical/flat kinds, original Unicode/CRLF/backtick ranges and containment, explicit constructors/local declarations, changed/stale versions, close/reopen, empty/incomplete/unsupported input, parser-process failure, exact and exceeded source/symbol/depth limits and flat rendered-output exhaustion. Two independent source reviews covered functionality and adversarial/crash boundaries; their declaration-context, comment-range and absent-provider routing findings were fixed and source-rechecked. This is bounded native Linux behavior, not a fresh official comparison, release packaging certification, performance evidence or Darwin/Windows reliability proof. **#96 remains open; no local parser runtime was rerun.**
 
 ## Bounds and complexity
 

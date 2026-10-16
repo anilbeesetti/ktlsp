@@ -2,14 +2,17 @@
 //! providers. Semantic analysis and project import remain unsupported.
 
 mod cache;
+mod document_symbols;
 mod structure;
 mod uri;
+use ktlsp_parser::{FileKind, ParserError, SourceSnapshot};
 use ktlsp_protocol::{read_frame, write_frame};
 use ktlsp_text::{Document, MAX_CHANGES, TextChange};
 use serde_json::{Map, Number, Value, json};
 use std::{
     collections::HashMap,
     io::{BufRead, Write},
+    path::Path,
 };
 
 pub const MAX_OPEN_DOCUMENTS: usize = 128;
@@ -63,6 +66,8 @@ pub struct Session {
     open_bytes: usize,
     errors: Vec<String>,
     configuration: Configuration,
+    symbol_provider: Option<document_symbols::Provider>,
+    symbol_client: document_symbols::Client,
     exit_code: Option<i32>,
 }
 impl Default for Session {
@@ -107,8 +112,18 @@ impl Session {
             open_bytes: 0,
             errors: Vec::new(),
             configuration: Configuration::default(),
+            symbol_provider: None,
+            symbol_client: document_symbols::Client::default(),
             exit_code: None,
         }
+    }
+    /// Enable syntactic document symbols using a trusted, matching installed worker.
+    /// The caller, not document content, chooses this absolute executable path.
+    pub fn with_parser(worker: impl AsRef<Path>) -> Result<Self, ParserError> {
+        let provider = document_symbols::Provider::new(worker.as_ref())?;
+        let mut session = Self::new();
+        session.symbol_provider = Some(provider);
+        Ok(session)
     }
     pub fn state(&self) -> State {
         self.state
@@ -210,11 +225,20 @@ impl Session {
                 return Err((-32600, "initialize may only be called once"));
             }
             let configuration = parse_initialize(params).map_err(|e| (-32602, e))?;
+            let symbol_client = document_symbols::Client::parse(
+                params
+                    .and_then(|p| p.get("capabilities"))
+                    .expect("validated capabilities"),
+            )
+            .map_err(|e| (-32602, e))?;
+            self.symbol_client = symbol_client;
             self.configuration = configuration;
             self.state = State::Initializing;
-            return Ok(
-                json!({"capabilities":{"positionEncoding":"utf-16", "foldingRangeProvider":true, "textDocumentSync":{"openClose":true,"change":2,"save":false}}, "serverInfo":{"name":"ktlsp","version":env!("CARGO_PKG_VERSION")}}),
-            );
+            let mut result = json!({"capabilities":{"positionEncoding":"utf-16", "foldingRangeProvider":true, "textDocumentSync":{"openClose":true,"change":2,"save":false}}, "serverInfo":{"name":"ktlsp","version":env!("CARGO_PKG_VERSION")}});
+            if self.symbol_provider.is_some() {
+                result["capabilities"]["documentSymbolProvider"] = json!(true);
+            }
+            return Ok(result);
         }
         if self.state != State::Running {
             return Err((-32002, "Server not initialized"));
@@ -225,6 +249,7 @@ impl Session {
                 self.state = State::Shutdown;
                 Ok(Value::Null)
             }
+            "textDocument/documentSymbol" => self.document_symbols(params),
             "textDocument/foldingRange" => {
                 let map = params
                     .ok_or((-32602, "folding params missing"))
@@ -248,6 +273,53 @@ impl Session {
             }
             _ => Err((-32601, "Method not found")),
         }
+    }
+    fn document_symbols(&self, params: Option<&Value>) -> Result<Value, (i32, &'static str)> {
+        let provider = self
+            .symbol_provider
+            .as_ref()
+            .ok_or((-32601, "Method not found"))?;
+        let map = params
+            .ok_or((-32602, "document symbol params missing"))
+            .and_then(|p| object(p).map_err(|e| (-32602, e)))?;
+        let uri = required(map, "textDocument")
+            .and_then(object)
+            .and_then(|d| required(d, "uri"))
+            .and_then(uri_value)
+            .map_err(|e| (-32602, e))?;
+        let document = self
+            .documents
+            .get(uri)
+            .ok_or((-32602, "document symbols refer to unopened document"))?;
+        if document.text().len() > ktlsp_parser::MAX_SOURCE_BYTES {
+            return Err((
+                -32803,
+                "document symbols exceed the parser's 64 KiB source limit",
+            ));
+        }
+        let snapshot = SourceSnapshot::new(
+            uri,
+            i64::from(document.version()),
+            FileKind::Source,
+            document.text(),
+        )
+        .map_err(|_| (-32803, "document symbol snapshot exceeds parser limits"))?;
+        let parsed = provider.parse(&snapshot).map_err(|e| (-32803, e))?;
+        // No result survives this synchronous request, including close/reopen.
+        // Recheck the authoritative revision/content before publishing byte ranges.
+        let current = self
+            .documents
+            .get(uri)
+            .filter(|current| {
+                i64::from(current.version()) == snapshot.revision()
+                    && current.text() == snapshot.source()
+            })
+            .ok_or((-32803, "document symbol snapshot is stale"))?;
+        let tree = parsed
+            .tree_for(&snapshot)
+            .map_err(|_| (-32803, "document symbol snapshot is stale"))?;
+        debug_assert_eq!(tree.source(), current.text());
+        document_symbols::render(tree, &self.symbol_client, uri).map_err(|e| (-32803, e))
     }
     fn notification(&mut self, method: &str, params: Option<&Value>) -> Vec<Value> {
         if method == "exit" {
@@ -520,7 +592,20 @@ fn parse_initialize(params: Option<&Value>) -> Result<Configuration, &'static st
 /// complete invalid JSON payloads produce recoverable parse-error responses.
 /// Logs go exclusively to `errors`. EOF succeeds only after shutdown.
 pub fn run<R: BufRead, W: Write, E: Write>(reader: &mut R, writer: &mut W, errors: &mut E) -> i32 {
-    let mut session = Session::new();
+    // Resolve only beside this executable, never PATH, cwd, or an environment
+    // override. Distribution must install the worker from the same build here.
+    let mut session = std::env::current_exe()
+        .ok()
+        .and_then(|executable| {
+            executable.parent().map(|parent| {
+                parent.join(format!(
+                    "ktlsp-parser-worker{}",
+                    std::env::consts::EXE_SUFFIX
+                ))
+            })
+        })
+        .and_then(|worker| Session::with_parser(worker).ok())
+        .unwrap_or_default();
     loop {
         let payload = match read_frame(reader) {
             Ok(Some(payload)) => payload,

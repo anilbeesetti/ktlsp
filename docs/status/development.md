@@ -1540,3 +1540,14 @@ producer or assertion. All TEMP397 writers remain until ROOT+OWNER read
 actual hosted payloads. Exact corrected-union rechecks are required before
 oncefmt/strict compile and original full hosted verification.
 
+Both independent full-union and affected-component post-format static
+rechecks cleared5a9e3a25006e68757e3d79692941d61d0874efac/tree6af864969468348a4bb7f6297bcb7a22d527585e.
+ROOT's first strict locked workspace/all-target Clippy with --keep-going
+then exited101: Rust1.99 deprecated AtomicUsize::fetch_update and reported
+one collapsible test conditional. ROOT preserved declared Rust1.90 support
+and reused the existing worker-allocator checked relaxed-CAS retry pattern
+for nonwrapping stamp allocation, rather than suppressing warnings or adopting
+an unverified newer renamed API. Checked exhaustion/nonreuse and local-counter
+regressions remain intact; the test conditional is equivalent. Exact changed
+source rechecks and strict compilation remain required; no397 runtime ran.
+

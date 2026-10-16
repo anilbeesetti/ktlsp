@@ -37,11 +37,14 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 // declaration identity. No allocation, registry or counter reset is involved.
 static NEXT_OPERATION: AtomicUsize = AtomicUsize::new(1);
 fn next_operation(counter: &AtomicUsize) -> Result<usize> {
-    counter
-        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |next| {
-            next.checked_add(1)
-        })
-        .map_err(|_| Error::InvalidOrigin)
+    let mut current = counter.load(Ordering::Relaxed);
+    loop {
+        let next = current.checked_add(1).ok_or(Error::InvalidOrigin)?;
+        match counter.compare_exchange_weak(current, next, Ordering::Relaxed, Ordering::Relaxed) {
+            Ok(_) => return Ok(current),
+            Err(actual) => current = actual,
+        }
+    }
 }
 
 /// Monotonic work and allocation counters shared with the actual lowerer.
@@ -758,10 +761,10 @@ mod tests {
             if leaf.subtree_end >= 6 {
                 leaf.subtree_end += 2;
             }
-            if let Some(parent) = &mut leaf.parent {
-                if *parent >= 6 {
-                    *parent += 2;
-                }
+            if let Some(parent) = &mut leaf.parent
+                && *parent >= 6
+            {
+                *parent += 2;
             }
         }
         result.parsed.elements[5].end = 4;

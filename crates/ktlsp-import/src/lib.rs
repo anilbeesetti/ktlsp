@@ -777,23 +777,3 @@ pub mod v2 {
         Ok(sdks)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn v2_intermediate_manifest_matches_frozen_literal() {
-        let parsed = parse_workspace(
-            Path::new("/ktlsp/t021"),
-            include_bytes!("../tests/fixtures/scoped-exported.json"),
-            true,
-        )
-        .unwrap();
-        let expected: Value = serde_json::from_slice(include_bytes!(
-            "../tests/fixtures/scoped-exported-projection.json"
-        ))
-        .unwrap();
-        assert_eq!(parsed.manifest, expected);
-    }
-}

@@ -68,8 +68,8 @@ wraps the respective importer or project errors and exposes their error source.
 The stricter importer byte/node/depth/caller/path/report limits above remain.
 V2 additionally caps its intermediate compact native manifest at 2 MiB, counting
 actual escaped JSON bytes **before extending** the serialized buffer; excess is
-`Import(BudgetExceeded("projection bytes"))`. Intermediate keys/default omissions
-are frozen in the [literal projection fixture](tests/fixtures/scoped-exported-projection.json).
+`Import(BudgetExceeded("projection bytes"))`. The intermediate manifest is private
+implementation data; its key layout and default omissions are not a public contract.
 The delivered v2 loader then applies its collection, 8 MiB prejoin and separate
 2 MiB normalized-output limits. An exact intermediate limit can therefore pass
 serialization and still fail normalized output. Early Schema/path errors can

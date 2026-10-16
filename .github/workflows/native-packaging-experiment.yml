@@ -66,6 +66,13 @@ jobs:
             "CARGO_TARGET_DIR=$env:RUNNER_TEMP/native-package-target"
           ) | Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8
       - uses: actions/checkout@v4
+        # Match the shared preflight and final packaging cleanliness check.
+        env:
+          GIT_CONFIG_COUNT: '2'
+          GIT_CONFIG_KEY_0: core.autocrlf
+          GIT_CONFIG_VALUE_0: 'false'
+          GIT_CONFIG_KEY_1: core.eol
+          GIT_CONFIG_VALUE_1: lf
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -75,8 +82,8 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $evidence = "$env:RUNNER_TEMP/native-package-evidence"
-          # #329: preserve bounded raw stdout/stderr, exits and actual guard
-          # operands before rejecting. This is not a source-dirt/CRLF fix.
+          # #329: retain bounded original PowerShell facts and complementary raw
+          # queries; persist the same byte policy used by the initial checkout.
           & ./tools/ci/native-source-preflight.ps1 -EvidenceDirectory $evidence
           rustup toolchain install 1.99.0 --profile minimal --component rustfmt --component clippy 2>&1 | Tee-Object "$evidence/toolchain-install.txt"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

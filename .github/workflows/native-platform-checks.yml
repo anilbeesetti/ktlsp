@@ -79,6 +79,14 @@ jobs:
             "CARGO_TARGET_DIR=$env:RUNNER_TEMP/native-platform-target"
           ) | Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8
       - uses: actions/checkout@v4
+        # Use one byte policy from the first materialization, not only on a
+        # later checkout-index call. The shared preflight persists it locally.
+        env:
+          GIT_CONFIG_COUNT: '2'
+          GIT_CONFIG_KEY_0: core.autocrlf
+          GIT_CONFIG_VALUE_0: 'false'
+          GIT_CONFIG_KEY_1: core.eol
+          GIT_CONFIG_VALUE_1: lf
         with:
           ref: ${{ github.sha }}
           fetch-depth: 2

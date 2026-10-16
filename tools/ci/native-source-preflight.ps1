@@ -21,12 +21,27 @@ $facts = [ordered]@{
     command_timeout_ms = 30000
     commands = [ordered]@{}
     powershell_commands = [ordered]@{}
+    byte_policy = @{
+        autocrlf = 'false'
+        eol = 'lf'
+        scope = 'Fixed checkout-step command configuration, then repository-local configuration for every later Git command'
+        historical_cause = 'The old artifact proves dirty paths, not their byte/config cause'
+        samples = @(
+            'crates/ktlsp-artifacts/tests/fixtures/zip_stored/cases.rs'
+            'crates/ktlsp-binary/Cargo.toml'
+            'tools/ci/native-source-preflight.ps1'
+        )
+    }
 }
 $record = Join-Path $EvidenceDirectory 'source-preflight.json'
 function Save-Facts {
     $facts | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $record -Encoding utf8NoBOM
 }
-function Invoke-PowerShellFact([ValidateSet('checkout', 'head', 'tree', 'status')] [string] $Name) {
+function Invoke-PowerShellFact(
+    [ValidateSet('checkout', 'head', 'tree', 'status', 'config-before', 'config-after',
+        'set-autocrlf', 'set-eol', 'get-autocrlf', 'get-eol', 'sample-index-before', 'sample-index-after',
+        'sample-raw-before', 'sample-raw-after')] [string] $Name
+) {
     $output = [System.Collections.Generic.List[string]]::new()
     $errors = [System.Collections.Generic.List[string]]::new()
     $sizes = [long[]]@(0, 0)
@@ -37,6 +52,17 @@ function Invoke-PowerShellFact([ValidateSet('checkout', 'head', 'tree', 'status'
             'head' { @('rev-parse', 'HEAD') }
             'tree' { @('rev-parse', 'HEAD^{tree}') }
             'status' { @('status', '--porcelain=v1', '--untracked-files=all') }
+            { $_ -cin @('config-before', 'config-after') } { @('config', '--show-origin', '--get-regexp', '^core\.(autocrlf|eol|safecrlf|filemode)$') }
+            'set-autocrlf' { @('config', '--local', 'core.autocrlf', 'false') }
+            'set-eol' { @('config', '--local', 'core.eol', 'lf') }
+            'get-autocrlf' { @('config', '--get', 'core.autocrlf') }
+            'get-eol' { @('config', '--get', 'core.eol') }
+            { $_ -cin @('sample-index-before', 'sample-index-after') } {
+                @('ls-files', '--stage', '--eol', '--') + $facts.byte_policy.samples
+            }
+            { $_ -cin @('sample-raw-before', 'sample-raw-after') } {
+                @('hash-object', '--no-filters', '--') + $facts.byte_policy.samples
+            }
         })
         stdout = $output
         rendered_errors = $errors
@@ -58,6 +84,17 @@ function Invoke-PowerShellFact([ValidateSet('checkout', 'head', 'tree', 'status'
                 'head' { git rev-parse HEAD }
                 'tree' { git rev-parse 'HEAD^{tree}' }
                 'status' { git status --porcelain=v1 --untracked-files=all }
+                { $_ -cin @('config-before', 'config-after') } { git config --show-origin --get-regexp '^core\.(autocrlf|eol|safecrlf|filemode)$' }
+                'set-autocrlf' { git config --local core.autocrlf false }
+                'set-eol' { git config --local core.eol lf }
+                'get-autocrlf' { git config --get core.autocrlf }
+                'get-eol' { git config --get core.eol }
+                { $_ -cin @('sample-index-before', 'sample-index-after') } {
+                    git ls-files --stage --eol -- crates/ktlsp-artifacts/tests/fixtures/zip_stored/cases.rs crates/ktlsp-binary/Cargo.toml tools/ci/native-source-preflight.ps1
+                }
+                { $_ -cin @('sample-raw-before', 'sample-raw-after') } {
+                    git hash-object --no-filters -- crates/ktlsp-artifacts/tests/fixtures/zip_stored/cases.rs crates/ktlsp-binary/Cargo.toml tools/ci/native-source-preflight.ps1
+                }
             }
             # Only normal native completion confirms this command's exit.
             $script:nativeCode = $LASTEXITCODE
@@ -88,9 +125,11 @@ function Invoke-PowerShellFact([ValidateSet('checkout', 'head', 'tree', 'status'
         $command.native_completion_confirmed = ($script:nativeCompleted -and -not $command.overflow)
         $command.stdout_text_budget_bytes_including_separators = $sizes[0]
         $command.error_text_budget_bytes_including_separators = $sizes[1]
+        $command.expected_absent_config = ($Name -ceq 'config-before' -and
+            $command.exit_code -eq 1 -and $output.Count -eq 0 -and $errors.Count -eq 0)
         Save-Facts
     }
-    if ($command.exit_code -ne 0 -or $null -ne $command.exception -or $command.overflow) {
+    if (($command.exit_code -ne 0 -and -not $command.expected_absent_config) -or $null -ne $command.exception -or $command.overflow) {
         throw "Original PowerShell source command $Name failed or exceeded retained evidence bounds"
     }
     $output.ToArray()
@@ -182,7 +221,35 @@ function Invoke-SourceFact([ValidateSet('head', 'tree', 'status')] [string] $Nam
 }
 Save-Facts
 try {
+    # Capture only allowlisted configuration and fixed, tracked sample metadata.
+    # hash-object --no-filters hashes raw worktree bytes with Git's blob framing;
+    # ls-files supplies their indexed object IDs, modes, and index/worktree EOLs.
+    # No global config/environment dump, source-content upload, or dirty exclusion.
+    $facts.byte_policy.before = @{
+        config = @(Invoke-PowerShellFact 'config-before')
+        index_mode_eol = @(Invoke-PowerShellFact 'sample-index-before')
+        raw_worktree_blob_ids = @(Invoke-PowerShellFact 'sample-raw-before')
+    }
+    Save-Facts
+    # checkout-index may skip stat-matching files even with --force. The callers
+    # therefore use this LF policy on the FIRST checkout as well, rather than
+    # relying on a later command-only override to rematerialize converted bytes.
+    Invoke-PowerShellFact 'set-autocrlf'
+    Invoke-PowerShellFact 'set-eol'
+    $facts.byte_policy.effective_config = @(Invoke-PowerShellFact 'config-after')
+    $autocrlf = @(Invoke-PowerShellFact 'get-autocrlf')
+    $eol = @(Invoke-PowerShellFact 'get-eol')
+    $facts.byte_policy.effective_values = @{ autocrlf = $autocrlf; eol = $eol }
+    Save-Facts
+    if ($autocrlf.Count -ne 1 -or $autocrlf[0] -cne 'false' -or $eol.Count -ne 1 -or $eol[0] -cne 'lf') {
+        throw 'Effective Git byte policy differs from the first-checkout policy'
+    }
     Invoke-PowerShellFact 'checkout'
+    $facts.byte_policy.after = @{
+        index_mode_eol = @(Invoke-PowerShellFact 'sample-index-after')
+        raw_worktree_blob_ids = @(Invoke-PowerShellFact 'sample-raw-after')
+    }
+    Save-Facts
     $head = Invoke-PowerShellFact 'head'
     $tree = Invoke-PowerShellFact 'tree'
     $status = @(Invoke-PowerShellFact 'status')

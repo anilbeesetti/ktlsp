@@ -567,6 +567,7 @@ fn actual_packaged_stdio_navigation_negotiation_and_existing_providers() {
         (json!({"contentFormat":[]}), None),
         (json!({"contentFormat":false}), None),
         (json!({"contentFormat":[false,"markdown"]}), None),
+        (json!({"contentFormat":["plaintext",null]}), None),
         (json!(false), None),
         (Value::Null, None),
     ] {

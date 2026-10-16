@@ -117,6 +117,54 @@ Transport completion never sets `officialAcceptance`: runtime attestation,
 actual container closure, symbol validation and authenticated receiver acceptance
 remain separate prerequisites.
 
+### Recorder evidence-writer boundary
+
+Mode0700 directories and mode0600 files do **not** establish evidence authorship
+against a JVM sharing UID65532. The official route therefore uses the same
+`recorder::confinement::spawn()` launcher as the finite Rust denial peers:
+
+- Linux amd64 Landlock ABI **at least 6** is required. Unsupported/disabled ABI,
+  rule, setup or enforcement failure refuses official execution; there is no
+  reduced policy or best-effort fallback.
+- Only the child's `home`, `config`, `system`, `log`, `tmp` and `workspace`
+  leaves beneath the fresh capture directory allow content mutation. Writes,
+  truncation, removal, links and renames of capture evidence/root or other
+  paths are denied. Device creation/ioctls are not granted.
+- Child-only pre-exec enforcement sets no-new-privileges, filesystem rules and
+  SIGNAL/ABSTRACT_UNIX_SOCKET scopes. All descendants inherit the immutable
+  restriction, including fork/exec/setsid descendants.
+- The recorder sets and verifies `PR_SET_DUMPABLE=0` before launch. Existing
+  evidence descriptors are close-on-exec; the child hook additionally marks all
+  nonstdio descriptors close-on-exec. Only the fresh stdin/stdout/stderr pipes
+  cross exec. Parent procfd/memory, ptrace, pidfd and process-memory-write access
+  must not provide a bypass.
+
+`confinement::profile()` supplies one strict policy schema;
+`prepare_parent()` supplies measured ABI/dumpability with `NOT_RUN` for the
+calibration-ready gate, and the real `spawn()` reuses that preparation.
+`Receipt::validate_enforced(expected_parent_pid)` is the common receipt check.
+The initial official manifest records the required profile and `NOT_RUN`.
+After launch, `child-confinement.json`, manifest `childConfinement`, and export
+metadata `childConfinement` carry the same actual ABI, parent PID/dumpability and
+`ENFORCED_BEFORE_EXEC` receipt. That outcome is set only after successful spawn.
+Failure receipts never imply a launched or confined official child.
+
+The host must measure ABI independently and seal this exact profile into
+`containmentTemplateSha256`; the receiver joins the parent PID to its original
+process observations and requires authenticated denial-calibration evidence.
+Small hosted Rust-peer denial mechanics are **not** same-configuration container
+calibration, privileged/JVM runtime admission or official acceptance.
+
+This independently authored Rust hook uses the published
+[Linux v6.12 UAPI](https://raw.githubusercontent.com/torvalds/linux/v6.12/include/uapi/linux/landlock.h)
+and [Landlock semantics](https://raw.githubusercontent.com/torvalds/linux/v6.12/Documentation/userspace-api/landlock.rst),
+not copied GPL sample implementation. ABI6 does not restrict chmod/chown,
+xattrs or timestamps; those operations cannot grant denied content writes, but
+metadata denial-of-service remains a failed observation, never a clean-closure
+or official-success claim. Trusted OS root remains outside this child boundary.
+
+### Directional export and provenance
+
 The recorder now retains `chronology` directional `{direction,frameIndex}` raw
 references at full OS client-byte acceptance and actual server-frame decode,
 without cloning message bodies. `transcript.json` is serialized in that order

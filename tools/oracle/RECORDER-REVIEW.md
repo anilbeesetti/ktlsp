@@ -1,6 +1,49 @@
 # T045c / #91 recorder review evidence
 
-## #331 protected adapter source
+## #331 evidence-authorship security amendment
+
+Receiver security review confirmed a HIGH after the finite adapter head
+`96ec64fc5ea7a1d2d7868096afa5188c829179f4`: recorder and official workload both
+use UID65532, so mode0600 files under mode0700 capture are not an authorship
+boundary. Postclosure root hashing could seal workload-overwritten protocol or
+child-exit records. That finding blocks adapter/receiver integration; a generic
+runtime HOLD or another digest is not a fix. The prior head/tree
+`5eb4c01498bba7464aad6665c12f35beb6cddbec` and its original passing PR runs
+`38859716197` (optional Linux57/macOS55 ordinary cases) and `38859716117`
+(native) remain finite historical facts, not security clearance.
+
+ROOT approved one child-only Linux Landlock ABI>=6 launcher with fixed
+filesystem-write leaves, SIGNAL/ABSTRACT_UNIX_SOCKET scopes, parent nondumpability
+and nonstdio close-on-exec enforcement. The official CLI, authorization producer,
+UID65532, direct ELF argv, environment and read-only input custody stay fixed.
+No additional dependency, policy override or unsupported-kernel downgrade exists.
+The independently authored Rust UAPI implementation and public strict profile/
+receipt live in `src/recorder/confinement.rs`; the real recorder, native mechanics
+peer and finite calibration peer reuse its `spawn()` boundary. `prepare_parent()`
+provides measured ABI/dumpability before a calibration-ready gate, without an
+exec claim. Only successful exec produces `ENFORCED_BEFORE_EXEC`.
+
+Initial official manifests record the required profile with unmeasured/null
+facts and `NOT_RUN`. Measured `child-confinement.json`, manifest and exported
+metadata must agree. Official export validates the enforced receipt for the
+actual recorder PID before creating consumer files. Missing, refused, unsupported,
+wrong-parent, wrong-profile or dumpable-parent data is refused. Actual hosted
+Rust same-UID probes require denied evidence writes/truncation/removal/links/
+renames, procfd/memory, pidfd descriptor/signal, ptrace/process-memory and parent
+signal/abstract-socket bypasses, while six normal private leaves remain writable.
+An exec/setsid descendant must retain the same restrictions; no nonstdio evidence
+descriptor may survive exec. Unsupported platforms prove refusal only, never
+actual denial mechanics.
+
+ABI6 does not deny chmod/chown/xattr/timestamp metadata operations. Such actions
+cannot grant content writes denied by the Landlock domain, but metadata
+denial-of-service remains a failed observation. Actual original-host ABI/profile,
+sealed containment-template binding, same-configuration denial calibration,
+runtime/closure proof and authenticated receiver checks still precede official
+acceptance. Source review and small native mechanics do not admit privileged,
+container or JVM execution.
+
+## #331 prior finite protected adapter source
 
 This source adds the fixed PR174 entrypoint and private official configuration
 inside the existing recorder; it does not authorize an official launch.

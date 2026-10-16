@@ -8,6 +8,7 @@ use std::{collections::BTreeSet, path::Path};
 #[path = "recorder/official.rs"]
 mod official;
 pub use official::record_pr174;
+pub mod confinement;
 
 enum CaptureContext {
     Synthetic,
@@ -29,7 +30,7 @@ impl CaptureContext {
         }
     }
 
-    fn requires_export(&self) -> bool {
+    fn is_official(&self) -> bool {
         match self {
             Self::Synthetic => false,
             #[cfg(any(all(target_os = "linux", target_arch = "x86_64"), test))]
@@ -88,6 +89,11 @@ impl CaptureContext {
                 report["authorization"] = authorization.clone();
                 report["environment"] = json!({
                     "PATH":"/usr/bin:/bin","LANG":"C.UTF-8","LC_ALL":"C.UTF-8"
+                });
+                report["childConfinement"] = json!({
+                    "schemaVersion":1,"profile":confinement::profile(),
+                    "landlockAbi":null,"parentPid":std::process::id(),
+                    "parentDumpable":null,"hookOutcome":"NOT_RUN"
                 });
                 report
             }
@@ -608,6 +614,11 @@ mod platform {
             .mode(0o600)
             .open(path)
     }
+    fn save_confinement(directory: &Path, receipt: &Value) -> io::Result<()> {
+        let mut output = file(&directory.join("child-confinement.json"))?;
+        serde_json::to_writer(&mut output, receipt)?;
+        output.flush()
+    }
     fn save(directory: &Path, report: &Value) -> io::Result<()> {
         let temporary = directory.join("manifest.next");
         let mut output = OpenOptions::new()
@@ -747,6 +758,10 @@ mod platform {
         };
         for name in ["home", "config", "system", "log", "tmp", "workspace"] {
             fs::create_dir(directory.join(name)).map_err(|e| e.to_string())?;
+            if context.is_official() {
+                fs::set_permissions(directory.join(name), fs::Permissions::from_mode(0o700))
+                    .map_err(|e| e.to_string())?;
+            }
         }
         let mut child_command = Command::new(&command[0]);
         child_command
@@ -765,13 +780,31 @@ mod platform {
             .stderr(Stdio::piped())
             .process_group(0);
         context.configure_command(&mut child_command);
-        let child = child_command.spawn().map_err(|e| format!("spawn: {e}"))?;
+        let (child, confinement_receipt) = if context.is_official() {
+            match confinement::spawn(&mut child_command, directory) {
+                Ok((child, receipt)) => (child, Some(receipt)),
+                Err(failure) => {
+                    report["childConfinement"] = serde_json::to_value(failure.receipt)
+                        .map_err(|e| e.to_string())?;
+                    if let Err(storage) = save_confinement(directory, &report["childConfinement"]) {
+                        return Err(format!("{}; confinement receipt storage: {storage}", failure.error));
+                    }
+                    return Err(failure.error);
+                }
+            }
+        } else {
+            (child_command.spawn().map_err(|e| format!("spawn: {e}"))?, None)
+        };
         let pgid = i32::try_from(child.id()).map_err(|e| e.to_string())?;
         let mut group = Group {
             child,
             pgid,
             killed: false,
         };
+        if let Some(receipt) = confinement_receipt {
+            report["childConfinement"] = serde_json::to_value(receipt).map_err(|e| e.to_string())?;
+            save_confinement(directory, &report["childConfinement"]).map_err(|e| e.to_string())?;
+        }
         let mut input = group.child.stdin.take();
         let mut output = group.child.stdout.take().unwrap();
         let mut errors = group.child.stderr.take().unwrap();
@@ -973,7 +1006,7 @@ mod platform {
         };
         let transport_complete = failure.is_none() && cleanup_error.is_none() && script_done;
         let exported = if transport_complete {
-            export(directory, &transcript, context, status.as_ref())
+            export(directory, &transcript, context, status.as_ref(), report.get("childConfinement"))
         } else {
             Err(format!(
                 "consumer export withheld: {}",
@@ -991,7 +1024,7 @@ mod platform {
                 "complete":false,"records":chronology.len(),"bytes":0,"failureReason":error
             }),
         };
-        if context.requires_export()
+        if context.is_official()
             && let Err(error) = exported
         {
             failure.get_or_insert(error);
@@ -1030,6 +1063,7 @@ mod platform {
         transcript: &Transcript<'_>,
         context: &CaptureContext,
         status: Option<&std::process::ExitStatus>,
+        confinement_receipt: Option<&Value>,
     ) -> Result<usize, String> {
         let returncode = status
             .and_then(|status| {
@@ -1038,13 +1072,20 @@ mod platform {
                     .or_else(|| status.signal().map(|signal| -signal))
             })
             .ok_or("export requires observed child returncode")?;
+        let mut evidence_metadata = context.metadata(returncode);
+        if context.is_official() {
+            let receipt = confinement_receipt.ok_or("official export requires child confinement")?;
+            let typed = confinement::Receipt::deserialize(receipt).map_err(|e| e.to_string())?;
+            typed.validate_enforced(std::process::id())?;
+            evidence_metadata["childConfinement"] = receipt.clone();
+        }
         let temporary = directory.join("transcript.next");
         let result = (|| {
             let mut output = file(&temporary).map_err(|e| format!("transcript export: {e}"))?;
             let bytes = write_transcript(&mut output, transcript)?;
             let mut metadata = file(&directory.join("metadata.json"))
                 .map_err(|e| format!("metadata export: {e}"))?;
-            serde_json::to_writer(&mut metadata, &context.metadata(returncode))
+            serde_json::to_writer(&mut metadata, &evidence_metadata)
                 .map_err(|e| format!("metadata export: {e}"))?;
             metadata
                 .flush()
@@ -1057,6 +1098,51 @@ mod platform {
             let _ = fs::remove_file(&temporary);
         }
         result
+    }
+
+    #[test]
+    fn official_export_refuses_missing_unenforced_or_mismatched_custody() {
+        // Fabricated receipts are refusal inputs only, never runtime evidence.
+        let root = std::env::temp_dir().join(format!("ktlsp-custody-export-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        let context = CaptureContext::Official {
+            identity: json!({"test":"not official evidence"}),
+            authorization: json!({"test":"not authorization"}),
+        };
+        let script = [json!({"jsonrpc":"2.0","method":"exit"})];
+        let chronology = [RawReference { direction:"client", frame_index:0 }];
+        let transcript = Transcript { chronology:&chronology, script:&script, decoded:&[] };
+        let baseline = json!({
+            "schemaVersion":1,"profile":confinement::profile(),
+            "landlockAbi":6,"parentPid":std::process::id(),"parentDumpable":0,
+            "hookOutcome":"ENFORCED_BEFORE_EXEC"
+        });
+        let mut receipts = vec![None];
+        for (pointer, value) in [
+            ("/schemaVersion", json!(2)),
+            ("/landlockAbi", json!(null)),
+            ("/landlockAbi", json!(5)),
+            ("/parentPid", json!(0)),
+            ("/parentDumpable", json!(1)),
+            ("/hookOutcome", json!("NOT_RUN")),
+            ("/hookOutcome", json!("REFUSED_NO_OFFICIAL_EXEC")),
+            ("/profile/allowedAccessFs", json!(0xffff)),
+        ] {
+            let mut changed = baseline.clone();
+            *changed.pointer_mut(pointer).unwrap() = value;
+            receipts.push(Some(changed));
+        }
+        for (index, receipt) in receipts.iter().enumerate() {
+            let directory = root.join(index.to_string());
+            fs::create_dir(&directory).unwrap();
+            assert!(export(&directory, &transcript, &context,
+                Some(&std::process::ExitStatus::from_raw(0)), receipt.as_ref()).is_err());
+            assert!(!directory.join("transcript.json").exists());
+            assert!(!directory.join("transcript.next").exists());
+            assert!(!directory.join("metadata.json").exists());
+            assert!(crate::Evidence::load(&directory).is_err());
+        }
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -1113,6 +1199,7 @@ mod platform {
                 },
                 &CaptureContext::Synthetic,
                 Some(&std::process::ExitStatus::from_raw(0)),
+                None,
             );
             if extra == 0 {
                 // Same filesystem, valid sequential evidence, exactly at the
@@ -1308,6 +1395,13 @@ mod tests {
         let report = context.initial_manifest(CaptureLimits::default());
         assert_eq!(report["identity"], json!({"identity":"frozen"}));
         assert_eq!(report["authorization"], json!({"authorization":"bound"}));
+        let initial: confinement::Receipt = serde_json::from_value(report["childConfinement"].clone()).unwrap();
+        assert_eq!(initial.profile, confinement::profile());
+        assert_eq!(initial.parent_pid, std::process::id());
+        assert_eq!(initial.landlock_abi, None);
+        assert_eq!(initial.parent_dumpable, None);
+        assert_eq!(initial.hook_outcome, "NOT_RUN");
+        assert!(initial.validate_enforced(std::process::id()).is_err());
         assert_eq!(
             report["environment"],
             json!({

@@ -24,6 +24,8 @@ jobs:
       RUSTC_WRAPPER: ''
       RUSTC_WORKSPACE_WRAPPER: ''
       RUSTC_BOOTSTRAP: ''
+      # Temporary ROOT-admitted original declaration-hover wire capture.
+      KTLSP_DECLARATION_HOVER_PROOF_DIR: ${{ runner.temp }}/native-platform-evidence/declaration-hover
     steps:
       - name: Record and admit immutable actual PR merge source
         env:

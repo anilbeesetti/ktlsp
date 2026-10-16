@@ -109,7 +109,7 @@ fn reads_members_interfaces_and_borrowed_attributes() {
     assert_eq!(c.fields[0].access_flags, 1);
     assert_eq!(c.fields[0].attributes[0].bytes, [0, 255, 1]);
     assert_eq!(c.methods[0].name, m);
-    assert_eq!(c.attributes[0].bytes, []);
+    assert!(c.attributes[0].bytes.is_empty());
     assert_eq!(
         c.utf16(fd).unwrap(),
         "[[Ljava/lang/String;".encode_utf16().collect::<Vec<_>>()

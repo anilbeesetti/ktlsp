@@ -16,29 +16,6 @@ fn read_host_observation(dir:&Path,case:CalibrationCase,cid:&str)->Result<Value>
     }
     found.ok_or("real host calibration observation absent".into())
 }
-fn authenticate_step_cancellation(dir:&Path,a:&Admission,grant:&RootGrant,e:&mut Evidence)->Result<()> {
-    let step=grant.calibration_step.as_ref().ok_or("ROOT cancellation step identity absent")?;
-    let token=String::from_utf8(read_file(&dir.join("github.token"),4096)?).map_err(|_|"credential encoding")?;
-    let token=token.trim();if token.is_empty()||token.bytes().any(|b|b.is_ascii_control()){return Err("original cancellation API credential".into());}
-    let job:Value=parse(&gh(e,a,token,format!("repos/anilbeesetti/ktlsp/actions/jobs/{}",a.run.job_id),false)?)?;
-    if job["id"]!=a.run.job_id||job["run_id"]!=a.run.run_id||job["head_sha"]!=a.run.source_head||job["run_attempt"]!=1{return Err("authenticated cancellation original job identity".into());}
-    let steps=job["steps"].as_array().ok_or("authenticated original workflow steps unavailable")?;
-    if steps.iter().filter(|candidate|candidate["name"]==step.name).count()!=1{return Err("ambiguous original cancellation-step name; cannot attribute named runner cause".into());}
-    let matches=steps.iter().filter(|s|s["number"]==step.number&&s["name"]==step.name).collect::<Vec<_>>();
-    if matches.len()!=1||matches[0]["status"]!="completed"||!matches[0]["conclusion"].as_str().is_some_and(|s|matches!(s,"success"|"failure"|"cancelled")){return Err("actual runner-enforced cancellation step outcome unavailable".into());}
-    // Authenticated original job logs are required, not exit130, an arbitrary marker or a peer claim.
-    // GitHub may withhold logs until job completion. Preserve UNKNOWN; never run official on that absence.
-    let logs=gh(e,a,token,format!("repos/anilbeesetti/ktlsp/actions/jobs/{}/logs",a.run.job_id),true)?;
-    let text=std::str::from_utf8(&logs).map_err(|_|"runner original job logs encoding")?;
-    // actions/runner StepsRunner.RunStepAsync emits this exact named-step message only
-    // for the step cancellation token expiring while the whole-job token is not cancelled.
-    let marker=format!("##[error]The action '{}' has timed out after 1 minutes.",step.name);
-    if !text.lines().any(|line|line.contains(&marker)) {
-        return Err("runner-generated original step timeout/cancel cause cannot be authenticated; original export retained UNKNOWN".into());
-    }
-    // Retain exact API/log bytes in capped collector evidence; receiver re-retrieves and joins independently.
-    e.append(&json!({"kind":"authenticated-workflow-step-cancellation","runId":a.run.run_id,"jobId":a.run.job_id,"attempt":1,"stepNumber":step.number,"stepName":step.name,"jobSha256":sha_bytes(&serde_json::to_vec(&job).map_err(|e|e.to_string())?),"logsSha256":sha_bytes(&logs),"wholeJobCancellationIsNotCalibration":true}),false)
-}
 fn collect_calibration()->Result<Value> {
     let expected:RootGrant=load(Path::new(EXPECTED_GRANT))?;expected.validate_shape()?;
     // Collection authenticates retained evidence only; it extends no original START/lifecycle permission.
@@ -67,7 +44,7 @@ fn collect_calibration()->Result<Value> {
         if !peer.observer_gate_observed || peer.outcome!=(if location.case.forced(){PeerOutcome::AwaitingHostAction}else{PeerOutcome::Completed}){return Err("calibration original peer mechanics incomplete".into());}
         if location.case==CalibrationCase::WorkflowStepCancel {
             cancellation_output=Some(dir.clone());
-            let result=authenticate_step_cancellation(&dir,&a,&grant,&mut evidence);
+            let result=workflow_authenticate_step_timeout(&dir,&a,&grant,&mut evidence);
             let bytes=serde_json::to_vec(&json!({"scope":"PR174_CALIBRATION_CANCELLATION_AUTHENTICATION","error":result.as_ref().err(),"evidenceHex":raw_hex(&evidence.pending),"officialCaptureSuccess":false})).map_err(|e|e.to_string())?;
             make_file(&dir.join("cancellation-authentication.json"),&bytes,0o400)?;
             result?;

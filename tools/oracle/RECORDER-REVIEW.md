@@ -1,5 +1,186 @@
 # T045c / #91 recorder review evidence
 
+## #331 evidence-authorship security amendment
+
+Receiver security review confirmed a HIGH after the finite adapter head
+`96ec64fc5ea7a1d2d7868096afa5188c829179f4`: recorder and official workload both
+use UID65532, so mode0600 files under mode0700 capture are not an authorship
+boundary. Postclosure root hashing could seal workload-overwritten protocol or
+child-exit records. That finding blocks adapter/receiver integration; a generic
+runtime HOLD or another digest is not a fix. The prior head/tree
+`5eb4c01498bba7464aad6665c12f35beb6cddbec` and its original passing PR runs
+`38859716197` (optional Linux57/macOS55 ordinary cases) and `38859716117`
+(native) remain finite historical facts, not security clearance.
+
+ROOT approved one child-only Linux Landlock ABI>=6 launcher with fixed
+filesystem-write leaves, SIGNAL/ABSTRACT_UNIX_SOCKET scopes, parent nondumpability
+and nonstdio close-on-exec enforcement. The official CLI, authorization producer,
+UID65532, direct ELF argv, environment and read-only input custody stay fixed.
+No additional dependency, policy override or unsupported-kernel downgrade exists.
+The independently authored Rust UAPI implementation and public strict profile/
+receipt live in `src/recorder/confinement.rs`; the real recorder, native mechanics
+peer and finite calibration peer reuse its `spawn()` boundary. `prepare_parent()`
+provides measured ABI/dumpability before a calibration-ready gate, without an
+exec claim. Only successful exec produces `ENFORCED_BEFORE_EXEC`.
+
+Initial official manifests record the required profile with unmeasured/null
+facts and `NOT_RUN`. Measured `child-confinement.json`, manifest and exported
+metadata must agree. Official export validates the enforced receipt for the
+actual recorder PID before creating consumer files. Missing, refused, unsupported,
+wrong-parent, wrong-profile or dumpable-parent data is refused. Actual hosted
+Rust same-UID probes require denied evidence writes/truncation/removal/links/
+renames, procfd/memory, pidfd descriptor/signal, ptrace/process-memory and parent
+signal/abstract-socket bypasses, while six normal private leaves remain writable.
+An exec/setsid descendant must retain the same restrictions; no nonstdio evidence
+descriptor may survive exec. Unsupported platforms prove refusal only, never
+actual denial mechanics.
+
+ABI6 does not deny chmod/chown/xattr/timestamp metadata operations. Such actions
+cannot grant content writes denied by the Landlock domain, but metadata
+denial-of-service remains a failed observation. Actual original-host ABI/profile,
+sealed containment-template binding, same-configuration denial calibration,
+runtime/closure proof and authenticated receiver checks still precede official
+acceptance. Source review and small native mechanics do not admit privileged,
+container or JVM execution.
+
+The two retained independent reviewers cleared the security implementation and
+fresh-stdio FD-smuggling regression. ROOT's additional security specialist
+cleared frozen source `e3f5ecfc306f01a4e5d72405ebea162afd67212c`, tree
+`ba0a1cc237b3099224c77b9c6ea1333097b8bc65`, for source semantics under the
+stated unprivileged private-container assumptions. No enforcement/runtime claim
+or independent clean-working-tree attestation follows from those source reads.
+The verified incoming main `bb6a75f61fd467c9b090210a369c7e1d225713d5` was
+composed once before this freeze.
+
+After source reviews, formatting completed; strict Clippy found that the
+288-byte `SpawnFailure` made both public result error variants too large.
+Only those failure variants are now boxed, preserving the receipt, original
+error and success-path layout without lint suppression or post-fork allocation.
+Both retained reviewers and ROOT's security specialist rechecked ownership/error
+preservation clear; ROOT independently matched the clean `438f4fa` candidate.
+The next strict Clippy attempt reached two constant platform assertions in the
+mechanics integration test; ordinary tests still had not started. Replacing them
+with explicit unsupported-platform branching preserves mandatory actual ABI>=6,
+enforcement and every denial probe on Linux, and refusal-only assertions on
+macOS. All three reviewers rechecked that source correction clear, without
+executing checks. Neither diagnostic was suppressed.
+
+The corrected `fc48aac560d6258884d4529f133a32f2831d936d` source passed optional
+format checking, strict locked all-target Clippy and the complete optional
+suite on macOS: 61 ordinary cases plus both isolated helper invocations.
+The confinement driver reported `ABI=None`, refusal, no child entry and no
+exercised denials; this is unsupported-platform refusal evidence only. The
+Rust synthetic recorder-to-`Evidence::load`/replay smoke also passed and remains
+explicitly nonofficial. A hosted Linux result must positively exercise ABI>=6,
+`ENFORCED`, same-UID direct-child and detached-exec-descendant denials; setup
+refusal cannot satisfy that test. Neither result substitutes for protected
+same-image calibration or an admitted official launch and authenticated receiver.
+
+## #331 prior finite protected adapter source
+
+This source adds the fixed PR174 entrypoint and private official configuration
+inside the existing recorder; it does not authorize an official launch.
+Authorization consumes the host producer's flattened `originalRun` projection
+and actual preflight-byte SHA-256, while PR300 validation still supplies strict
+pins/schemas and exact embedded fixture bytes. The optional package reuses the
+existing audited exact SHA2 graph and retained artifacts-crate notices.
+
+ROOT's producer-compatible custody interpretation permits only the exact
+UID/GID65532 mode0755 INNER tmpfs ancestor, with distinct root-owned read-only
+private mounts at the four input roots and read-only image-root coverage above
+it. Held-descriptor openat traversal and fdinfo/mountinfo identity checks reject
+symlink, hidden/nested mount, type, link-count, ownership and digest substitution.
+This is not independent run authentication: original host START and an
+authenticated receiver remain mandatory. Separate hosted calibration must
+prove the child cannot rename/remove/unmount/bind-over those roots or enter an
+effective alternate mount namespace; no such runtime proof is claimed here.
+
+Chronology is recorded at complete client OS-byte acceptance and server decode,
+with references to retained raw frame tables. Borrowed directional export has
+the existing Evidence consumer's 8 MiB/1,024-record ceilings. Incomplete/error/
+budget/storage observations never become official acceptance. Synthetic peer
+mechanics regressions use the real executable recorder→Evidence→replay path and
+explicit nonofficial metadata. Linux custody tests require no official child,
+Docker, systemd or mount mutation. Source-review and exercised-check receipts
+are recorded separately on the source PR, not inferred from historical results.
+
+Independent source review found three correctness edges: a matching response
+could be decoded before the request was fully accepted; a malformed raw tail
+could leave a replayable valid prefix; and applying the combined consumer count
+inside transport changed synthetic limits. The recorder now fails premature
+responses without changing actual chronology, withholds consumer files after
+failed transport, and checks combined budgets at export only. Synthetic
+`complete` remains transport-only, with separate `export.complete`; official
+capture additionally requires export. Permanent Rust-peer regressions retain
+each case's raw/acceptance/error facts. Independent functionality and adversarial
+source rechecks cleared all three fixes with no remaining findings.
+
+After those reviews, optional formatting and locked strict all-target Clippy
+passed locally on macOS. The first full test attempt found a new assertion typo:
+`bad-frame-tail` emits `malformed-tail`, not another peer mode's `raw-tail`.
+Both reviewers source-rechecked the exact-byte correction, with no production
+or limit change. The corrected full optional suite passed: **55 ordinary cases**
+(7 library, 20 host, 1 host-peer consumer, 12 PR174, 9 recorder, 6 replay), plus
+two ignored helpers actually exercised by their parents. Executable synthetic
+Rust peer → recorder export → Evidence load → replay passed, including notification
+placement, errors/nonzero exits, record/byte ceilings and premature responses.
+No parser, JVM, Docker or systemd launch occurred. The two Linux-only custody
+regressions and Linux compilation are hosted-check requirements, not local facts.
+
+Original PR338 head `266843824194cf5826f86bdcd97cf152add07982` hosted run
+`38857754048` passed Linux compilation, both custody regressions and all 12 PR174
+mechanics cases, then failed the historical recorder test's incidental primary
+error wording assertion. The actual retained observation was incomplete capture,
+71 intended/0 accepted client bytes, child exit0, exact 23-byte partial stdout
+and a BrokenPipe first failure. It is retained as a failure, not retried unchanged.
+The optional macOS leg was cancelled by matrix fail-fast; it was not a Mac
+product-test failure. Separate native PR run `38857754012` passed.
+
+ROOT rejected changing production error precedence to satisfy wording. The
+correction deletes that needle assertion and instead requires exact emitted raw
+bytes, offsets/counters, client persisted/accepted bounds, observed exit and
+cleanup, incomplete capture and absent consumer export. Malformed-frame peers
+emit their bounded frame+tail in one pipe write so a userspace buffering race
+cannot leave an un-emitted tail. Recorder production semantics and all existing
+limits/deadlines remain unchanged; an uncommitted post-failure decoding proposal
+was removed rather than shipped.
+Both independent reviewers cleared the test/fixture correction. Its first strict
+Clippy attempt caught the fixture's ABI-compatible but noncanonical `write`
+pointer spelling; the declaration now uses `*const c_void` with an explicit
+pointer cast, without lint suppression. Both reviewers rechecked that correction.
+Final corrected-source optional format check, strict locked all-target Clippy
+and full synthetic suite passed locally: the same 55 ordinary cases plus two
+actually exercised ignored helpers, with no production/limit change.
+
+At corrected head `076b3a1d77ccc3ae23326258f49c35affada61e3`, original hosted
+optional run `38859058554` passed Ubuntu completely. macOS failed the new
+aggregate-byte-budget subprocess test because capture was incomplete; its
+assertion did not print the failure reason, so the log does not establish that
+reason. No unchanged rerun or deadline inflation was used. The 4 MiB request/
+echo fixture coupled a serialization-budget assertion to large-pipe scheduling.
+It is replaced with a deterministic real exporter → filesystem → Evidence
+consumer test: valid sequential evidence exactly at 8 MiB is accepted with
+verified returned count/file length; adding only one ASCII byte on the same
+filesystem publishes no consumer files and is refused. Each direction remains
+individually below 8 MiB. The unused echo peer is removed. Actual small Rust-peer
+recorder → Evidence → replay smoke and the live record-count boundary remain.
+Production transport/limits remain unchanged. Current ordinary-case distribution
+is 8 library, 20 host, 1 host-peer consumer, 11 PR174, 9 recorder and 6 replay
+on macOS; Linux additionally has the two custody cases.
+Both source reviewers cleared the exact boundary replacement. Its local format/
+strict Clippy and boundary/PR174 cases passed, but the strengthened failure test
+then exposed another new assumption: it required a successful group-kill flag
+on every failed observation. The actual flag was false; the assertion did not
+print the accompanying cleanup error. The test now checks truthful consistency:
+a null cleanup error requires the successful flag; otherwise an explicit
+nonempty cleanup error is required. Incomplete/forced/raw/EOF/exit/no-export
+checks remain, and no clean-closure or suppressed-error claim is made.
+Both independent reviewers rechecked the cleanup-fact correction clear. Final
+corrected-source optional formatting, strict locked all-target Clippy and the
+complete synthetic suite passed locally: 55 ordinary cases plus the two
+actually exercised ignored helpers. All original failed observations above
+remain separate evidence, not erased by this changed-source pass.
+
 ## Historical PR300 source-review checkpoint
 
 PR174 source preparation adds a working input-consistency validator.

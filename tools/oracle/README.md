@@ -77,16 +77,118 @@ The executable regression uses real production installation, final routing and d
 - #324 optional-tooling union: integrated the single verified main `2e408cfd8d65c68a9eede863e3f983a2db720d95` and PR300 `9318ffbe1ab97a386cf599ae49310e8c036616a6` with corrected PR306/323. At code head `04ccc2e78ad1a35ac42da873e75358d0da8ba44d`, independent functionality/adversarial integration reviews cleared, then local optional format, locked strict all-target Clippy and full synthetic tests passed once: 19 host, 1 peer-consumer, 6 PR174 validation, 9 recorder and 6 replay cases, with two ignored helpers exercised by parents. The existing executable smoke again removed the file-backed container for all seven installation failures; service cases proved dispatch only. This is reviewed/passing optional preparation, not aggregate hosted/exact-main proof or live execution admission.
 - #324 early-cancellation correction: ROOT's union review found that the real CLI previously loaded the binding before reaching the latch helper. Code head `eec10ebbd486858bf9d5bc17370158c948e10b60` corrects that boundary. After three independent changed-path source rechecks, optional format, locked strict all-target Clippy and the full synthetic suite passed once: 20 host, 1 peer-consumer, 6 PR174 validation, 9 recorder and 6 replay cases. A real Rust subprocess invokes the shared post-admission CLI dispatcher for missing binding during preflight/preparation/CREATE, existing invalid binding, preexisting cancellation bytes and a dangling cancellation symlink; all six `EARLY_CANCEL_SMOKE` observations report `startAllowed=false`, `serviceDispatched=false` and `officialCaptureSuccess=false`. The subprocess bypasses OS-root/nonce-directory admission only; production admission is unchanged. The existing installation-failure smoke also passed. No pre-fix runtime execution, actual service launch or containment proof is claimed.
 
-## PR174 input validation (source only)
+## Protected PR174 adapter (#331; source-only HOLD)
 
-`recorder::validate_pr174_inputs(identity_path, preflight_path, fixture_directory)`
-checks bounded proposed-run and preflight data for the two unchanged
-[PR174 fixtures](fixtures/official-pr174-symbols/README.md). Consistent inputs
-return `Ok(())`; invalid inputs return an error. It creates no evidence and
-spawns no process. This success is data validation, never launch authorization.
-No official CLI or recording path is delivered.
+`ktlsp-oracle-official-pr174` now consumes the existing protected host handoff.
+Production accepts **only**, in this order:
 
-Both JSON inputs are regular, nonsymlink files limited to 16 KiB; source/script
+```text
+--identity /tmp/ktlsp-t045-pr174-host/preflight/identity.json
+--preflight /tmp/ktlsp-t045-pr174-host/preflight/host-preflight.json
+--authorization /tmp/ktlsp-t045-pr174-host/preflight/launch-authorization.json
+--fixture-directory /tmp/ktlsp-t045-pr174-host/fixture
+```
+
+There is no arbitrary executable, output, synthetic override or authorization
+policy argument. The entrypoint requires Linux amd64 UID65532, held-descriptor
+nonsymlink opens, root-owned regular single-link inputs, exact read-only private
+input mounts and a read-only image root. The sole writable ancestry exception is
+the producer's exact UID/GID65532 mode0755 bounded tmpfs at the fixed host root;
+`/tmp` is root-owned/sticky and covered by the read-only image root. Mount IDs
+come from held-descriptor fdinfo and are checked against bounded mountinfo.
+Unexpected nested mounts, substituted mount IDs, stale output, mutable input
+mounts, changed files, oversized inputs and digest mismatches refuse launch.
+
+The strict authorization schema matches the host producer: `identity` is its
+flattened `originalRun`, not the identity wrapper. It binds the actual raw
+preflight-byte SHA-256, ROOT authorization digest, contract, boot/daemon and exact
+authority text. This is protected-handoff **consistency**, not independent proof
+of GitHub origin or permission. Matching copied files are never original-job
+authentication. The eight launch-critical distribution files are size/hash
+checked through held descriptors, including the fixed ELF launcher and bundled
+JVM; the host remains responsible for archive/extraction inventory verification.
+The shell wrapper is inspected only, never executed.
+
+Only the pinned launcher argv can reach the shared recorder. Official scope,
+identity, provenance and unverified runtime/containment/receiver verdicts exist
+in the **initial** manifest before spawn. Environment is cleared, private roots
+retained, and only fixed PATH `/usr/bin:/bin`, LANG/LC_ALL `C.UTF-8` added.
+Transport completion never sets `officialAcceptance`: runtime attestation,
+actual container closure, symbol validation and authenticated receiver acceptance
+remain separate prerequisites.
+
+### Recorder evidence-writer boundary
+
+Mode0700 directories and mode0600 files do **not** establish evidence authorship
+against a JVM sharing UID65532. The official route therefore uses the same
+`recorder::confinement::spawn()` launcher as the finite Rust denial peers:
+
+- Linux amd64 Landlock ABI **at least 6** is required. Unsupported/disabled ABI,
+  rule, setup or enforcement failure refuses official execution; there is no
+  reduced policy or best-effort fallback.
+- Only the child's `home`, `config`, `system`, `log`, `tmp` and `workspace`
+  leaves beneath the fresh capture directory allow content mutation. Writes,
+  truncation, removal, links and renames of capture evidence/root or other
+  paths are denied. Device creation/ioctls are not granted.
+- Child-only pre-exec enforcement sets no-new-privileges, filesystem rules and
+  SIGNAL/ABSTRACT_UNIX_SOCKET scopes. All descendants inherit the immutable
+  restriction, including fork/exec/setsid descendants.
+- The recorder sets and verifies `PR_SET_DUMPABLE=0` before launch. Existing
+  evidence descriptors are close-on-exec; the child hook additionally marks all
+  nonstdio descriptors close-on-exec. Only the fresh stdin/stdout/stderr pipes
+  cross exec. Parent procfd/memory, ptrace, pidfd and process-memory-write access
+  must not provide a bypass.
+
+`confinement::profile()` supplies one strict policy schema;
+`prepare_parent()` supplies measured ABI/dumpability with `NOT_RUN` for the
+calibration-ready gate, and the real `spawn()` reuses that preparation.
+`Receipt::validate_enforced(expected_parent_pid)` is the common receipt check.
+The initial official manifest records the required profile and `NOT_RUN`.
+After launch, `child-confinement.json`, manifest `childConfinement`, and export
+metadata `childConfinement` carry the same actual ABI, parent PID/dumpability and
+`ENFORCED_BEFORE_EXEC` receipt. That outcome is set only after successful spawn.
+Failure receipts never imply a launched or confined official child.
+
+The host must measure ABI independently and seal this exact profile into
+`containmentTemplateSha256`; the receiver joins the parent PID to its original
+process observations and requires authenticated denial-calibration evidence.
+Small hosted Rust-peer denial mechanics are **not** same-configuration container
+calibration, privileged/JVM runtime admission or official acceptance.
+
+This independently authored Rust hook uses the published
+[Linux v6.12 UAPI](https://raw.githubusercontent.com/torvalds/linux/v6.12/include/uapi/linux/landlock.h)
+and [Landlock semantics](https://raw.githubusercontent.com/torvalds/linux/v6.12/Documentation/userspace-api/landlock.rst),
+not copied GPL sample implementation. ABI6 does not restrict chmod/chown,
+xattrs or timestamps; those operations cannot grant denied content writes, but
+metadata denial-of-service remains a failed observation, never a clean-closure
+or official-success claim. Trusted OS root remains outside this child boundary.
+
+### Directional export and provenance
+
+The recorder now retains `chronology` directional `{direction,frameIndex}` raw
+references at full OS client-byte acceptance and actual server-frame decode,
+without cloning message bodies. `transcript.json` is serialized in that order
+as `{direction,message}` records, and `metadata.json` includes integer returncode
+and provenance for existing `Evidence::load`/replay. Combined transcript count is
+at most 1,024 and serialized bytes at most 8 MiB. Failed transport withholds
+consumer-ready files entirely, so replay cannot lose a known malformed tail.
+Overflow or storage failure cannot report successful export, and official
+capture requires export success. Retained raw prefixes/references stay inspectable.
+Synthetic `complete` preserves its existing transport-only meaning; separate
+`export.complete` reports stricter consumer budgets without changing synthetic
+script/stdout limits. No missing exit status is invented. Synthetic API, CLI,
+environment and limits retain their meaning; exports explicitly use
+`release:synthetic-only`, zero digest and `archive:none`, never official evidence.
+
+The optional manifest/lock reuses ROOT-approved exact `sha2=0.10.9`,
+`default-features=false`, `std,force-soft` only. Its locked transitive versions
+and checksums match the existing [dependency audit](../../crates/ktlsp-artifacts/INTEGRITY.md).
+Original upstream [license notices](../../crates/ktlsp-artifacts/notices/) remain
+retained and must accompany any later isolated tool packaging; no handwritten
+crypto or new native/default dependency edge is introduced.
+
+Identity, preflight and authorization are each limited to 16 KiB and must be
+regular nonsymlink files; source/script
 files must exactly match embedded bytes, including UTF-8/newlines. The proposed
 identity schema pins the preparation contract and source baseline, repository,
 workflow-dispatch attempt 1 and finite original-run identifiers. Preflight must
@@ -98,12 +200,15 @@ This checks data consistency only. Matching supplied hashes do not authenticate
 the publisher, actual executable bytes, run, permissions or authorization. The
 validator supplies no trusted host handoff, effective isolation, runtime attestation
 or actual teardown evidence. The separate optional controller source above does
-not establish those live facts. A live recording entrypoint still requires a
-separately admitted official adapter/bootstrap, execution admission, containment
-calibration and independent review. Existing `record()` and `--synthetic-only`
-retain their scope, environment, limits and raw/error/cleanup behavior. No
-dependency, workflow, product or native default-test graph changes accompany
-this source preparation.
+not establish those live facts. **Actual launch remains HOLD** pending separate
+exact-source ROOT admission, a protected authenticated original-job bootstrap,
+immutable image/workflow/locale/dependency inventory, same-configuration hosted
+containment calibration, and an authenticated receiver. Calibration must prove
+the unprivileged child cannot rename/remove/unmount/bind-over the protected input
+roots or enter an effective alternate mount namespace. No local parser, JVM,
+Docker, systemd, G2 provisioning or candidate dispatch is admitted by this source.
+Permanent Rust-peer tests exercise validation, custody, order, export/error/budget
+and `Evidence::load` → replay mechanics only, explicitly **nonofficial**.
 
 ## Protected bootstrap and Rust-only calibration (#335, source only)
 

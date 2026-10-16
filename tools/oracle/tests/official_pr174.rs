@@ -243,3 +243,337 @@ fn script_embeds_exact_unchanged_source_and_peer_recording_stays_synthetic() {
         assert!(report.get("officialCaptureSuccess").is_none());
     }
 }
+
+#[test]
+fn production_official_cli_refuses_arbitrary_inputs_and_command_without_launch() {
+    for args in [
+        vec![],
+        vec!["--synthetic-only"],
+        vec!["--identity", "/tmp/caller.json"],
+        vec!["--command", env!("CARGO_BIN_EXE_record-test-peer")],
+        vec!["--output", "/tmp/caller-capture"],
+    ] {
+        let result = std::process::Command::new(env!("CARGO_BIN_EXE_ktlsp-oracle-official-pr174"))
+            .args(args)
+            .output()
+            .unwrap();
+        assert_eq!(result.status.code(), Some(2));
+        assert!(result.stdout.is_empty());
+        assert!(
+            String::from_utf8(result.stderr)
+                .unwrap()
+                .contains("four fixed protected-host argument pairs")
+        );
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+mod synthetic_adapter_mechanics {
+    use super::*;
+    use ktlsp_oracle_replay::{Evidence, Limits, replay};
+    use ktlsp_protocol::read_frame;
+    use std::io::Cursor;
+
+    // These executable peer captures exercise the adapter, not the official distribution.
+    struct Directory(PathBuf);
+    impl Drop for Directory {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn command(mode: &str) -> Vec<String> {
+        vec![env!("CARGO_BIN_EXE_record-test-peer").into(), mode.into()]
+    }
+
+    fn limits() -> CaptureLimits {
+        CaptureLimits {
+            phase_ms: 5000,
+            session_ms: 20_000,
+            cleanup_ms: 500,
+            ..CaptureLimits::default()
+        }
+    }
+
+    fn script() -> Vec<Value> {
+        vec![
+            json!({"jsonrpc":"2.0","id":"😀","method":"shutdown"}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]
+    }
+
+    fn load_json(directory: &Directory, name: &str) -> Value {
+        serde_json::from_slice(&fs::read(directory.0.join(name)).unwrap()).unwrap()
+    }
+
+    fn capture(mode: &str, script: &[Value], limits: CaptureLimits) -> (Directory, Value) {
+        eprintln!("SYNTHETIC / NONOFFICIAL adapter-mechanics smoke: {mode}");
+        let directory = Directory(std::env::temp_dir().join(format!(
+            "ktlsp-pr174-synthetic-adapter-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        )));
+        let report = record(script, &command(mode), &directory.0, limits).unwrap();
+        assert_eq!(load_json(&directory, "manifest.json"), report);
+        assert_eq!(
+            report["scope"],
+            "synthetic-only; official live execution blocked"
+        );
+        assert_eq!(report["officialAcceptance"], false);
+        assert_ne!(report["officialCaptureSuccess"], true);
+        (directory, report)
+    }
+
+    fn assert_nonofficial_metadata(directory: &Directory, returncode: i64) {
+        let metadata = load_json(directory, "metadata.json");
+        assert_eq!(metadata["release"], "synthetic-only");
+        assert_eq!(metadata["sha256"], "0".repeat(64));
+        assert_eq!(metadata["returncode"], returncode);
+        assert_eq!(
+            metadata["scope"],
+            "synthetic-only; official live execution blocked"
+        );
+        assert_eq!(metadata["officialAcceptance"], false);
+        assert_eq!(metadata["provenance"]["archive"], "none");
+        for field in ["runtime", "containment", "receiver"] {
+            assert_eq!(metadata[field], "unverified");
+        }
+    }
+
+    fn assert_rawrefs(directory: &Directory, report: &Value, script: &[Value]) -> Value {
+        let transcript = load_json(directory, "transcript.json");
+        let records = transcript.as_array().unwrap();
+        let chronology = report["chronology"].as_array().unwrap();
+        assert_eq!(records.len(), chronology.len());
+        assert_eq!(report["export"]["records"], records.len());
+        assert_eq!(
+            report["export"]["bytes"],
+            fs::metadata(directory.0.join("transcript.json"))
+                .unwrap()
+                .len()
+        );
+        let client_raw = fs::read(directory.0.join("client-intended.raw")).unwrap();
+        let server_raw = fs::read(directory.0.join("stdout.raw")).unwrap();
+        let mut counts = [0usize; 2];
+        let mut offsets = [0usize; 2];
+        for (record, rawref) in records.iter().zip(chronology) {
+            assert_eq!(record["direction"], rawref["direction"]);
+            let client = record["direction"] == "client";
+            let direction = if client { 0 } else { 1 };
+            let index = rawref["frameIndex"].as_u64().unwrap() as usize;
+            assert_eq!(index, counts[direction]);
+            let frame = &report[if client {
+                "clientFrames"
+            } else {
+                "stdoutFrames"
+            }][index];
+            let start = frame["start"].as_u64().unwrap() as usize;
+            let end = frame["end"].as_u64().unwrap() as usize;
+            assert_eq!(start, offsets[direction]);
+            let raw = if client { &client_raw } else { &server_raw };
+            let mut reader = Cursor::new(&raw[start..end]);
+            let payload = read_frame(&mut reader).unwrap().unwrap();
+            assert_eq!(reader.position() as usize, end - start);
+            assert_eq!(
+                serde_json::from_slice::<Value>(&payload).unwrap(),
+                record["message"]
+            );
+            if client {
+                assert_eq!(frame["acceptedBytes"], frame["intendedLength"]);
+                assert_eq!(frame["persistedBytes"], frame["intendedLength"]);
+                assert_eq!(record["message"], script[index]);
+            } else {
+                assert_eq!(record["message"], frame["message"]);
+            }
+            counts[direction] += 1;
+            offsets[direction] = end;
+        }
+        assert_eq!(counts[0], script.len());
+        assert_eq!(offsets, [client_raw.len(), server_raw.len()]);
+        transcript
+    }
+
+    #[test]
+    fn synthetic_nonofficial_peer_export_load_and_replay_preserve_chronology_and_status() {
+        let script = script();
+        for mode in ["notices", "exit-burst", "nonzero", "error"] {
+            let (directory, report) = capture(mode, &script, limits());
+            assert_eq!(report["complete"], true, "{report}");
+            assert_eq!(report["export"]["complete"], true);
+            let returncode = if mode == "nonzero" { 7 } else { 0 };
+            assert_eq!(report["exit"]["code"], returncode);
+            assert_nonofficial_metadata(&directory, returncode);
+            let transcript = assert_rawrefs(&directory, &report, &script);
+            if mode == "notices" {
+                assert_eq!(transcript.as_array().unwrap().len(), 103);
+                assert_eq!(transcript[0]["message"], script[0]);
+                for index in 1..=100 {
+                    assert_eq!(transcript[index]["direction"], "server");
+                    assert_eq!(transcript[index]["message"]["method"], "notice");
+                }
+                assert_eq!(transcript[101]["message"]["id"], "😀");
+                assert_eq!(transcript[102]["message"], script[1]);
+            } else if mode == "exit-burst" {
+                assert_eq!(transcript.as_array().unwrap().len(), 103);
+                assert_eq!(transcript[1]["message"]["id"], "😀");
+                assert_eq!(transcript[2]["message"], script[1]);
+                for index in 3..103 {
+                    assert_eq!(transcript[index]["direction"], "server");
+                    assert_eq!(transcript[index]["message"]["method"], "notice");
+                }
+            } else if mode == "error" {
+                assert_eq!(transcript[1]["message"]["error"]["code"], -32603);
+                assert!(transcript[1]["message"].get("result").is_none());
+                assert!(
+                    fs::read_to_string(directory.0.join("stderr.raw"))
+                        .unwrap()
+                        .contains("SYNTHETIC / NONOFFICIAL")
+                );
+            }
+            let evidence = Evidence::load(&directory.0).unwrap();
+            let replayed = replay(&evidence, &command(mode), Limits::default()).unwrap();
+            assert_eq!(replayed["outcome"], "match", "{replayed}");
+            assert_eq!(replayed["exit"]["actual"], returncode);
+            assert_eq!(replayed["officialMetadata"]["officialAcceptance"], false);
+            assert_eq!(replayed["officialMetadata"]["release"], "synthetic-only");
+            if mode == "nonzero" {
+                let mismatch = replay(&evidence, &command("match"), Limits::default()).unwrap();
+                assert_eq!(mismatch["outcome"], "mismatch");
+                assert_eq!(mismatch["exit"]["expected"], 7);
+                assert_eq!(mismatch["exit"]["actual"], 0);
+                assert_eq!(mismatch["exit"]["matches"], false);
+                assert_eq!(mismatch["responses"][0]["matches"], true);
+            }
+        }
+    }
+
+    #[test]
+    fn premature_response_is_retained_but_cannot_complete_or_reorder_client_acceptance() {
+        let script = vec![
+            json!({"jsonrpc":"2.0","id":1,"method":"shutdown","params":{"large":"x".repeat(2 * 1024 * 1024)}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ];
+        let (directory, report) = capture("premature-response", &script, limits());
+        assert_eq!(report["complete"], false);
+        assert!(
+            report["failureReason"]
+                .as_str()
+                .unwrap()
+                .contains("response before client frame fully accepted"),
+            "{report}"
+        );
+        let frame = &report["clientFrames"][0];
+        assert!(
+            frame["acceptedBytes"].as_u64().unwrap() < frame["intendedLength"].as_u64().unwrap()
+        );
+        assert_eq!(
+            report["chronology"],
+            json!([{"direction":"server","frameIndex":0}])
+        );
+        assert_eq!(report["stdoutFrames"][0]["message"]["result"], Value::Null);
+        assert!(!fs::read(directory.0.join("stdout.raw")).unwrap().is_empty());
+        assert!(Evidence::load(&directory.0).is_err());
+    }
+
+    #[test]
+    fn combined_directional_record_limit_is_consumer_compatible_and_fails_closed() {
+        let mut boundary: Vec<Value> = (0..511)
+            .map(|id| json!({"jsonrpc":"2.0","id":id,"method":"shutdown"}))
+            .collect();
+        boundary.push(json!({"jsonrpc":"2.0","method":"initialized"}));
+        boundary.push(json!({"jsonrpc":"2.0","method":"exit"}));
+        let (directory, report) = capture("match", &boundary, limits());
+        assert_eq!(report["complete"], true, "{report}");
+        assert_eq!(report["export"]["complete"], true);
+        assert_eq!(
+            assert_rawrefs(&directory, &report, &boundary)
+                .as_array()
+                .unwrap()
+                .len(),
+            1024
+        );
+        let evidence = Evidence::load(&directory.0).unwrap();
+        assert_eq!(
+            replay(&evidence, &command("match"), Limits::default()).unwrap()["outcome"],
+            "match"
+        );
+
+        boundary[511] = json!({"jsonrpc":"2.0","id":511,"method":"shutdown"});
+        let (directory, report) = capture("match", &boundary, limits());
+        assert_export_failure(&directory, &report, "transcript record limit");
+        assert_eq!(report["chronology"].as_array().unwrap().len(), 1025);
+        assert_eq!(report["clientFrames"].as_array().unwrap().len(), 513);
+        assert_eq!(report["stdoutFrames"].as_array().unwrap().len(), 512);
+        assert_eq!(report["exit"]["observed"], true);
+    }
+
+    fn assert_export_failure(directory: &Directory, report: &Value, reason: &str) {
+        // Synthetic `complete` retains its original transport meaning. Consumer
+        // export has separate, stricter combined budgets and cannot claim success.
+        assert_eq!(report["complete"], true);
+        assert_eq!(report["failureReason"], Value::Null);
+        assert_eq!(report["export"]["complete"], false);
+        assert!(
+            report["export"]["failureReason"]
+                .as_str()
+                .unwrap()
+                .contains(reason)
+        );
+        assert!(!directory.0.join("transcript.json").exists());
+        assert!(Evidence::load(&directory.0).is_err());
+        assert!(
+            !fs::read(directory.0.join("client-intended.raw"))
+                .unwrap()
+                .is_empty()
+        );
+        assert!(!fs::read(directory.0.join("stdout.raw")).unwrap().is_empty());
+    }
+
+    #[test]
+    fn unaccepted_client_intent_and_protocol_failure_never_become_success() {
+        let mut script = script();
+        script[0]["params"] = json!({"text":"x".repeat(100_000)});
+        let (directory, report) = capture(
+            "no-read",
+            &script,
+            CaptureLimits {
+                phase_ms: 200,
+                session_ms: 1000,
+                ..limits()
+            },
+        );
+        assert_eq!(report["complete"], false);
+        assert_eq!(report["scriptCompleted"], false);
+        let frame = &report["clientFrames"][0];
+        assert!(
+            frame["acceptedBytes"].as_u64().unwrap() < frame["intendedLength"].as_u64().unwrap()
+        );
+        assert_eq!(frame["persistedBytes"], frame["intendedLength"]);
+        assert!(report["chronology"].as_array().unwrap().is_empty());
+        assert!(Evidence::load(&directory.0).is_err());
+        assert_eq!(report["exit"]["observed"], true);
+
+        let (directory, report) = capture("bad-frame-tail", &self::script(), limits());
+        assert_eq!(report["complete"], false);
+        assert!(
+            report["failureReason"]
+                .as_str()
+                .unwrap()
+                .contains("Content-Length")
+        );
+        assert!(
+            fs::read(directory.0.join("stdout.raw"))
+                .unwrap()
+                .ends_with(b"malformed-tail")
+        );
+        assert!(Evidence::load(&directory.0).is_err());
+        assert_eq!(report["exit"]["observed"], true);
+        let (directory, report) = capture("exit-burst-bad", &self::script(), limits());
+        assert_eq!(report["complete"], false);
+        assert_eq!(report["export"]["complete"], false);
+        assert!(!directory.0.join("transcript.json").exists());
+        assert!(!directory.0.join("metadata.json").exists());
+        assert!(report["stdoutFrames"].as_array().unwrap().len() > 1);
+        assert!(Evidence::load(&directory.0).is_err());
+    }
+}

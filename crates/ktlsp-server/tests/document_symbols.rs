@@ -1923,7 +1923,7 @@ fn completion_actual_paired_cli_application_rebinding_and_hover_independence() {
     ];
     let package = Package::new(true);
     let replies = package.exchange(&messages);
-    assert_eq!(replies.len(), 6, "{replies:?}");
+    assert_eq!(replies.len(), messages.iter().filter(|message| message.get("id").is_some()).count(), "{replies:?}");
     assert!(replies.iter().all(|reply| reply.get("method").is_none()));
     assert!(replies.iter().filter_map(|reply| reply.get("id")).eq(messages.iter().filter_map(|message| message.get("id"))));
     let caps = &replies[0]["result"]["capabilities"];

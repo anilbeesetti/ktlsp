@@ -193,6 +193,26 @@ guarded integration and independent original exact-main proof remain mandatory.
 
 Over open Kotlin documents, a strict UTF-16 position selects an actual original value `REFERENCE_EXPRESSION` containing that position (end-exclusive). The existing declaration lowerer, structural-region directory, authenticated `ReferenceSite` and `bind_local_value` prove a unique eligible preceding direct immutable local `val` or same-function ordinary parameter. Only ordinary named top-level block functions with complete plain integer/whole-identifier local initializers and simple syntax-only parameter/local annotations are eligible. Definition returns the original target **name** range and same URI. Hover returns the original target **declaration text** (`p: T` for a parameter) and original reference range: no invented types, initializer chasing or inferred global unresolvedness.
 
+Definition additionally accepts an authenticated simple parameter/local annotation
+inside an admitted ordinary top-level block function with one nonempty leading
+unbounded/unmodified type-parameter list. The annotation-only lexical query
+returns the unique original same-function `TYPE_PARAMETER` name range and URI.
+Multiple parameters, supported bare/backtick spellings, trivia and a real trailing
+comma retain original identity; matching duplicate spellings refuse even when
+the duplicate is later in the list. Outer classes, imports/aliases, other functions
+and values are not candidates or fallbacks. Bounds/variance/reified/annotations,
+where clauses, malformed/empty/post-name/second lists, receivers/context,
+explicit returns, expression bodies, members/local functions and richer annotation
+syntax remain unsupported. Bare `T` does not imply semantic non-nullability.
+All eight existing parser-backed consumers retain their original value/body
+contracts on this generic body. Type parameters stay out of value completion,
+occurrences and rename edits; annotation references stay outside value partitions.
+No typeDefinition method/capability, type-parameter hover/references/rename,
+generic inference or full Kotlin type resolution is added. New production/paired
+CLI tests and bounded temporary first-observation capture are authored, not
+runtime evidence until separately admitted hosted execution. #96/full parity and
+unknown official runtime behavior remain unchanged.
+
 Hover also accepts the unique original half-open **name-token** range of a complete lowered `CLASS`, `FUN`, `PROPERTY` or ordinary `VALUE_PARAMETER`, returning that declaration's exact original source and its name range through the same negotiated renderer. Same-spelled declarations at different positions remain distinct, including parameter/local shadows; no binder or inferred type identity is needed for a declaration's own name. Definition on those names remains null. Keywords, whitespace, braces, name ends and EOF remain null; incomplete selected declarations and unsupported whole-tree lowering fail explicitly, without syntactic-symbol fallback. Unsupported reference lookup never falls back to an enclosing declaration. This is declaration-source hover, not KDoc, type resolution or full official hover parity.
 
 At first changed-diagnostic union source `2c940228bb4af10f76020503ce007dbd1cfa8b44`, [original platform run38907884039](https://github.com/anilbeesetti/ktlsp/actions/runs/38907884039), attempt 1, passed pinned format, strict locked Clippy and full release workspace tests on macOS/job116995986538 (**992 standard/doctest passes**) and Windows/job116995986522 (**939 passes**), each with zero failures, three ignored tests and 22 separately reported worker protocol fault cases. Actual checkout `0d1c4c35e5351a738e95d39ea209d4359acb2dc1` has ordered parents `[594cc51cb4f1994b5e4e896e3a3c171b0ff3bcf4,2c940228bb4af10f76020503ce007dbd1cfa8b44]` and tree `9ac8b5af275e357ba81153bb633651cc4b078823`. ROOT and the hover owner independently authenticated original API/checkout identities and directly read all six captured default/Markdown/plaintext paired-CLI payloads. Both hosts returned seven exact original IDs once each, including integer `18446744073709551615`, with no unsolicited pushes. Declaration-name ranges were class `1:6..1:10`, property `4:3..4:11`, function `5:4..5:8`, parameter `5:9..5:17` and local shadow `6:5..6:13`; contents preserved original CRLF/non-BMP source and the class's bound leading comment. Markdown preference skipped the unknown format and fenced the hostile four-backtick property comment with five backticks; plaintext-first and absent-format profiles returned plaintext.
@@ -266,10 +286,11 @@ runtime observation is not attributed to an unexecuted cleanup head.
 
 Ordinary parameters require positive name/colon/simple-type shape, comma separation
 and at most one trailing comma after a real parameter. Missing/richer types,
-defaults, vararg/modifiers/annotations, receivers/context/generics/explicit returns,
+defaults, vararg/modifiers/annotations, receivers/context/explicit returns,
 expression bodies, members/constructors/lambdas/nesting/destructuring and relevant
-recovery remain refused. Type names are retained syntax, never resolved builtin
-identities. Queried-name duplicates are checked separately in parameter/local
+recovery remain refused. The leading unbounded function-type-parameter list
+described above is the only generic header extension. Type names otherwise remain
+retained syntax, never resolved builtin identities. Queried-name duplicates are checked separately in parameter/local
 scopes; a unique preceding local wins, otherwise its same-function parameter.
 Before-shadow and `val p=p` initializer reads bind the parameter; later reads bind
 the local. References/highlights exclude valid same-body sites bound to the other

@@ -2485,3 +2485,237 @@ fn completion_actual_paired_cli_application_rebinding_and_hover_independence() {
     assert_eq!(missing[1]["error"]["code"], -32601);
     assert_eq!(missing[1]["id"], json!(u64::MAX));
 }
+
+#[test]
+fn lexical_generic_definition_preserves_all_eight_paired_cli_consumers_and_edits() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    // Source-derived expectations; producer parentage/ranges are not invented.
+    let source = "// 😀\r\nimport elsewhere.T\r\nclass T {}\r\nfun <T, `U🦀`,> f(p: T) {\r\n val x: `U🦀` = p\r\n val use = x\r\n}\r\nfun <T> g(p: T) { val other = p }\r\n";
+    let type_t = source.find("<T").unwrap() + 1;
+    let type_u = source.find("`U🦀`").unwrap();
+    let parameter = source.find("p: T").unwrap();
+    let annotation_t = parameter + 3;
+    let local = source.find("val x").unwrap() + 4;
+    let annotation_u = source.find(": `U🦀`").unwrap() + 2;
+    let parameter_use = source.find("= p").unwrap() + 2;
+    let local_use = source.find("= x").unwrap() + 2;
+    let other_type = source.rfind("<T").unwrap() + 1;
+    let other_annotation = source.rfind("p: T").unwrap() + 3;
+    let init = json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{"capabilities":{
+        "general":{"positionEncodings":["utf-8"]},
+        "workspace":{"workspaceEdit":{"documentChanges":true}},
+        "textDocument":{"documentSymbol":{"hierarchicalDocumentSymbolSupport":true},"rename":{"prepareSupport":true},"hover":{"contentFormat":["plaintext"]},"diagnostic":{}}
+    }}});
+    let messages = [
+        init.clone(),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":7,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":"annotation-t","method":"textDocument/definition","params":navigation_params(source,annotation_t)}),
+        json!({"jsonrpc":"2.0","id":"annotation-u","method":"textDocument/definition","params":navigation_params(source,annotation_u)}),
+        json!({"jsonrpc":"2.0","id":"other-type","method":"textDocument/definition","params":navigation_params(source,other_annotation)}),
+        json!({"jsonrpc":"2.0","id":"value-p","method":"textDocument/definition","params":navigation_params(source,parameter_use)}),
+        json!({"jsonrpc":"2.0","id":"value-x","method":"textDocument/definition","params":navigation_params(source,local_use)}),
+        json!({"jsonrpc":"2.0","id":"hover","method":"textDocument/hover","params":navigation_params(source,local_use)}),
+        json!({"jsonrpc":"2.0","id":"references","method":"textDocument/references","params":references_params(source,local_use,true)}),
+        json!({"jsonrpc":"2.0","id":"parameter-references","method":"textDocument/references","params":references_params(source,parameter,true)}),
+        json!({"jsonrpc":"2.0","id":"highlights","method":"textDocument/documentHighlight","params":navigation_params(source,local_use)}),
+        json!({"jsonrpc":"2.0","id":"symbols","method":"textDocument/documentSymbol","params":{"textDocument":{"uri":URI}}}),
+        json!({"jsonrpc":"2.0","id":"completion","method":"textDocument/completion","params":navigation_params(source,local_use)}),
+        json!({"jsonrpc":"2.0","id":"prepare","method":"textDocument/prepareRename","params":navigation_params(source,local_use)}),
+        json!({"jsonrpc":"2.0","id":"rename","method":"textDocument/rename","params":rename_params(source,local_use,"T")}),
+        json!({"jsonrpc":"2.0","id":"type-hover","method":"textDocument/hover","params":navigation_params(source,annotation_t)}),
+        json!({"jsonrpc":"2.0","id":"type-references","method":"textDocument/references","params":references_params(source,type_t,true)}),
+        json!({"jsonrpc":"2.0","id":"type-prepare","method":"textDocument/prepareRename","params":navigation_params(source,type_t)}),
+        json!({"jsonrpc":"2.0","id":"type-rename","method":"textDocument/rename","params":rename_params(source,annotation_t,"Fresh")}),
+        json!({"jsonrpc":"2.0","id":"type-definition-method","method":"textDocument/typeDefinition","params":navigation_params(source,annotation_t)}),
+        json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ];
+    let package = Package::new(true);
+    let replies = package.exchange(&messages);
+    assert!(
+        replies
+            .iter()
+            .filter_map(|r| r.get("id"))
+            .eq(messages.iter().filter_map(|m| m.get("id"))),
+        "{replies:?}"
+    );
+    let reply = |id: &str| replies.iter().find(|r| r["id"] == id).unwrap();
+    let capabilities = &reply("init")["result"]["capabilities"];
+    assert_eq!(capabilities["positionEncoding"], "utf-16");
+    assert!(capabilities.get("typeDefinitionProvider").is_none());
+    for (id, start, len) in [
+        ("annotation-t", type_t, 1),
+        ("annotation-u", type_u, "`U🦀`".len()),
+        ("other-type", other_type, 1),
+        ("value-p", parameter, 1),
+        ("value-x", local, 1),
+    ] {
+        assert_eq!(
+            reply(id)["result"],
+            json!({"uri":URI,"range":references_range(source,start,len)}),
+            "{id}: {:?}",
+            reply(id)
+        );
+    }
+    assert_eq!(
+        reply("hover")["result"],
+        json!({
+            "contents":{"kind":"plaintext","value":"val x: `U🦀` = p"},
+            "range":references_range(source,local_use,1),
+        })
+    );
+    assert_eq!(
+        reply("references")["result"],
+        json!([
+            {"uri":URI,"range":references_range(source,local,1)},
+            {"uri":URI,"range":references_range(source,local_use,1)},
+        ])
+    );
+    assert_eq!(
+        reply("parameter-references")["result"],
+        json!([
+            {"uri":URI,"range":references_range(source,parameter,1)},
+            {"uri":URI,"range":references_range(source,parameter_use,1)},
+        ])
+    );
+    assert_eq!(
+        reply("highlights")["result"],
+        json!([
+            {"range":references_range(source,local,1),"kind":3},
+            {"range":references_range(source,local_use,1),"kind":2},
+        ])
+    );
+    let symbols = reply("symbols")["result"].as_array().unwrap();
+    assert_eq!(
+        symbols
+            .iter()
+            .map(|s| s["name"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        ["T", "f", "g"]
+    );
+    assert_eq!(
+        symbols[1]["children"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s["name"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        ["x", "use"]
+    );
+    assert_eq!(
+        symbols[1]["children"][0]["selectionRange"],
+        references_range(source, local, 1)
+    );
+    assert_eq!(
+        reply("prepare")["result"],
+        json!({"range":references_range(source,local_use,1),"placeholder":"x"})
+    );
+    for id in [
+        "type-hover",
+        "type-references",
+        "type-prepare",
+        "type-rename",
+    ] {
+        assert_eq!(reply(id)["error"]["code"], -32803, "{:?}", reply(id));
+        assert!(reply(id).get("result").is_none());
+    }
+    assert_eq!(reply("type-definition-method")["error"]["code"], -32601);
+    let items = reply("completion")["result"]["items"].as_array().unwrap();
+    assert_eq!(
+        items
+            .iter()
+            .map(|item| item["label"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        ["p", "x"]
+    );
+    let (completed, completed_use) = apply_completion(source, &items[0], local_use);
+    assert_eq!(completed, source.replacen("= x", "= p", 1));
+    let renamed = apply_original_rename(source, reply("rename"), URI, 7);
+    assert_eq!(
+        renamed,
+        source
+            .replacen("val x:", "val T:", 1)
+            .replacen("= x", "= T", 1)
+    );
+    // Both real edits are applied and fed to the paired CLI. Type annotations,
+    // the generic list and the unrelated function retain their original bytes.
+    let mut rebound_wire = Vec::new();
+    for (text, use_start, target, len) in [
+        (&completed, completed_use, parameter, 1),
+        (&renamed, renamed.find("= T").unwrap() + 2, local, 1),
+    ] {
+        let rebound_messages = [
+            init.clone(),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":8,"text":text}}}),
+            json!({"jsonrpc":"2.0","id":"rebound-value","method":"textDocument/definition","params":navigation_params(text,use_start)}),
+            json!({"jsonrpc":"2.0","id":"preserved-type","method":"textDocument/definition","params":navigation_params(text,annotation_t)}),
+            json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ];
+        let rebound = package.exchange(&rebound_messages);
+        assert_eq!(rebound.len(), 4, "{rebound:?}");
+        assert_eq!(rebound[1]["id"], "rebound-value");
+        assert_eq!(
+            rebound[1]["result"],
+            json!({"uri":URI,"range":references_range(text,target,len)})
+        );
+        assert_eq!(rebound[2]["id"], "preserved-type");
+        assert_eq!(
+            rebound[2]["result"],
+            json!({"uri":URI,"range":references_range(text,type_t,1)})
+        );
+        rebound_wire.push(json!({"requests":rebound_messages,"responses":rebound}));
+    }
+    // TEMP #386: bounded actual wire/edit observation, no instrumentation parse.
+    let capture = json!({
+        "source":source,"requests":messages,"responses":replies,
+        "completed":completed,"renamed":renamed,"rebound_wire":rebound_wire,
+    });
+    let capture = serde_json::to_string(&capture).unwrap();
+    assert!(capture.len() < 65536);
+    eprintln!("TEMP_386_PAIRED_CLI {capture}");
+}
+
+#[test]
+fn generic_annotation_definition_is_lexical_unique_and_definition_only() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = running_rename();
+    for (source, accepted) in [
+        (
+            "import elsewhere.T\nimport elsewhere.X as T\nclass T {}\nfun <`T`> f(p: T) { val x: `T` = p }",
+            true,
+        ),
+        ("fun <T, `T`> f(p: T) {}", false),
+        ("fun <T, U, `T`> f(p: T) {}", false),
+        ("class T {}\nfun <U> f(p: T) {}", false),
+        ("fun <T> f() {}\nfun <U> g(p: T) {}", false),
+        ("fun <T: Any> f(p: T) {}", false),
+        ("fun <T> f(p: T): T {}", false),
+    ] {
+        open(&mut session, source);
+        let annotation = source.find("p: T").unwrap() + 3;
+        let response = request(
+            &mut session,
+            "textDocument/definition",
+            navigation_params(source, annotation),
+        );
+        if accepted {
+            let target = source.find("`T`").unwrap();
+            assert_eq!(
+                response["result"],
+                json!({"uri":URI,"range":references_range(source,target,3)})
+            );
+        } else {
+            assert_eq!(response["error"]["code"], -32803, "{source}: {response}");
+            assert!(response.get("result").is_none());
+        }
+        notify(
+            &mut session,
+            "textDocument/didClose",
+            json!({"textDocument":{"uri":URI}}),
+        );
+    }
+    assert!(session.close().1);
+}

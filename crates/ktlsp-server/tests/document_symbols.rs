@@ -902,20 +902,12 @@ fn typed_local_navigation_and_references_compose_over_paired_stdio() {
         json!({"jsonrpc":"2.0","method":"exit"}),
     ];
     let replies = Package::new(true).exchange(&messages);
-    let _ = std::io::stdout().lock().write_all(
-        format!(
-            "TYPED_REFERENCES_UNION_DIRECT_WIRE {}\n",
-            json!({"source":source,"requests":messages,"responses":replies})
-        )
-        .as_bytes(),
-    );
     assert!(replies.iter().all(|reply| reply.get("id").is_some()));
-    assert_eq!(
-        replies.iter().map(|reply| &reply["id"]).collect::<Vec<_>>(),
-        messages
+    assert!(
+        replies
             .iter()
-            .filter_map(|message| message.get("id"))
-            .collect::<Vec<_>>(),
+            .map(|reply| &reply["id"])
+            .eq(messages.iter().filter_map(|message| message.get("id"))),
         "original IDs exactly once; no duplicate or push output: {replies:?}"
     );
     let caps = &replies[0]["result"]["capabilities"];
@@ -1234,10 +1226,6 @@ fn references_revisions_reopen_process_failure_and_rendered_uri_budget() {
     params["textDocument"]["uri"] = json!(long_uri);
     let response = request(&mut session, "textDocument/references", params.clone());
     assert_eq!(response["error"]["code"], -32803, "{response}");
-    assert_eq!(
-        response["error"]["message"],
-        "local occurrence rendered output limit exceeded"
-    );
     assert!(response.get("result").is_none());
     // Highlight ranges do not repeat URIs and remain usable on the same snapshot.
     let response = request(&mut session, "textDocument/documentHighlight", params);

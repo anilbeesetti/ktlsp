@@ -57,6 +57,30 @@ Actual direct decoded paired CLI JSON advertised both providers despite incompat
 
 ROOT independently fetched and authenticated that original job's checkout/API identities and actual direct JSON before accepting the proof. Only the temporary observation writer was then removed; permanent payload/ID assertions remain. Both affected source reviews recheck this writer-only cleanup and receipt. No cleanup runtime retest or tested-cleanup-head claim is implied; final composed source/CI and integration remain ROOT-owned.
 
+At composed source `507526e20fe37be13d8ac5fdf8c35b0db743031f`,
+[original #368 Native run38887526600/job116928807682](https://github.com/anilbeesetti/ktlsp/actions/runs/38887526600/job/116928807682),
+attempt 1, passed pinned format, strict locked workspace/all-target Clippy and
+**967 workspace results plus 22 separate protocol fault cases**. Actual checkout
+`02be84f46622477fdc56ae923a5bd5d1d4c4c437` has ordered parents
+`[abe98694226c86fced3aed31691b8f0945a565e0,507526e20fe37be13d8ac5fdf8c35b0db743031f]`
+and tree `96cd63b2b9d6fce9d24b75e0ed399bf1957a0bbb`.
+
+ROOT independently authenticated the original API/log identities and actual
+paired-stdio JSON. Typed definition selected original UTF-16 `3:5–3:10`;
+plaintext hover retained ``val `x😀`: Long = 1`` at use `4:14–4:19` with exact
+u64-maximum ID. References and Write/Read highlights contained only those two
+value locations, not the identical spelling in a later type-name annotation.
+An untyped target remained navigable from a typed-containing val; pull remained
+full and empty without pushes. This proves the composed finite native surface,
+not type resolution, compiler diagnostics, workspace references or official parity.
+
+After that direct readback, ROOT removed the temporary observation writer and
+an incidental error-message wording assertion; error-code/atomic refusal and all
+payload/ID assertions remain. ID comparison now uses iterator equality without
+two temporary vectors. Cleanup, later incoming-main composition and final
+integration require their own source reviews and original CI; the preceding
+runtime observation is not attributed to an unexecuted cleanup head.
+
 
 
 

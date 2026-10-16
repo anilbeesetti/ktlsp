@@ -147,7 +147,12 @@ jobs:
         env:
           KTLSP_NATIVE_IO_OBSERVE: '1'
         run: |
-          cargo +1.99.0 test --locked --release --workspace --no-fail-fast -- --nocapture 2>&1 | Tee-Object "$env:RUNNER_TEMP/native-platform-evidence/workspace-tests.txt"
+          if ($IsWindows) {
+            # Temporary #377 diagnostic: match the failed packaging command exactly.
+            cargo +1.99.0 test --locked --release --workspace 2>&1 | Tee-Object "$env:RUNNER_TEMP/native-platform-evidence/workspace-tests.txt"
+          } else {
+            cargo +1.99.0 test --locked --release --workspace --no-fail-fast -- --nocapture 2>&1 | Tee-Object "$env:RUNNER_TEMP/native-platform-evidence/workspace-tests.txt"
+          }
           $code = $LASTEXITCODE
           "exit_code=$code" | Set-Content "$env:RUNNER_TEMP/native-platform-evidence/workspace-tests-exit.txt"
           if ($code -ne 0) { exit $code }

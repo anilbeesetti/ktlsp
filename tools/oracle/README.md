@@ -455,6 +455,7 @@ workflow-cancel-start
 workflow-cancel-wait
 workflow-finish CASE
 workflow-receipt CASE ARTIFACT_ID
+workflow-disposal-snapshot
 workflow-collect
 workflow-official CALIBRATION_REPORT_ARTIFACT_ID
 ```
@@ -506,6 +507,23 @@ the API-discovered currently running named step, actual artifact ID, raw grant
 and export-binding hashes, nonce/CID and original identities. Child bytes are
 never echoed into trusted job/step logs. Upload precedes receipt publication;
 ordinary owned-input release occurs only afterward and never clears evidence.
+
+Post-receipt release facts cannot be inserted into an already uploaded case
+artifact. After the ordinary receipt steps, an `always()` native
+`workflow-disposal-snapshot` step and separate `pr174-disposal` upload preserve
+them even if a receipt/release failed or was interrupted and cohort collection
+therefore skips. The root-owned readable `/etc/ktlsp-pr174/uploads/disposal`
+snapshot starts with an entered/UNKNOWN fact and reads only fixed protected
+case records (including unpublished `.next` records), actual recorded nonce
+admission scopes, each nonce's `preparation-release.json` and
+`preparation-release-failure.json`, and the protected global
+`preparation-disposal-in-progress` / `preparation-disposal-failed` latches.
+Release outcomes and latch contents are copied byte-for-byte with original
+sizes/hashes; missing, untrusted or unavailable paths remain explicit facts or
+UNKNOWN. A ten-second native copy deadline fits the unchanged bounded runner
+step. No credential or mutable child file is included. The diagnostic mode never
+clears a latch, retries disposal, changes an old artifact, infers closure from
+absence, issues an authority receipt or authorizes later START.
 
 `workflow-collect` requires all ten actual same-host exports, genuine completed
 STEP timeout proof from authenticated original job **and exact step** logs,

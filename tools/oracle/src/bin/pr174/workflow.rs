@@ -842,6 +842,88 @@ fn wf_official(calibration_artifact_id: u64) -> Result<Value> {
     wf_start_case(None)?;
     wf_finish("official")
 }
+fn wf_disposal_fact(source: &Path, target: &Path, cap: u64, end: u64) -> Value {
+    let observed=(|| -> Result<Value> {
+        wf_require(mono_ms()?<end,"post-receipt diagnostic deadline exhausted; UNKNOWN")?;
+        match fs::symlink_metadata(source) {
+            Err(error) if error.kind()==ErrorKind::NotFound=>return Ok(json!({"status":"NOT_PRESENT"})),
+            Err(error)=>return Err(error.to_string()),
+            Ok(_)=>{},
+        }
+        copy_sealed(source,target,cap,0o444,end)?;
+        let bytes=fs::metadata(target).map_err(|error|error.to_string())?.len();
+        Ok(json!({"status":"RETAINED","bytes":bytes,"sha256":sha_path(target,end)?}))
+    })();
+    match observed {
+        Ok(value)=>value,
+        Err(error)=>json!({"status":"UNKNOWN","error":error}),
+    }
+}
+fn wf_disposal_snapshot() -> Result<Value> {
+    protected(Path::new(WF_ROOT),true)?;
+    let output=Path::new(WF_ROOT).join("uploads/disposal");
+    mkdir(&output,0o755)?;
+    let started=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|_|"disposal diagnostic clock before epoch")?.as_millis();
+    make_file(&output.join("snapshot-start.json"),&wf_json(&json!({"schemaVersion":1,
+        "scope":"PR174_POST_RECEIPT_DISPOSAL_DIAGNOSTICS","status":"IN_PROGRESS_UNKNOWN",
+        "observedUnixMs":started,"authority":"NONE; read-only diagnostics never clear latches or authorize START"}))?,0o444)?;
+    let end=mono_ms()?.checked_add(10000).ok_or("post-receipt diagnostic deadline")?;
+    let mut globals=Vec::new();
+    for name in ["preparation-disposal-in-progress","preparation-disposal-failed"] {
+        globals.push(json!({"path":name,"observation":wf_disposal_fact(&Path::new(ROOT).join(name),&output.join(name),2048,end)}));
+    }
+    let cases=Path::new(WF_ROOT).join("cases");
+    let cases_custody=protected(&cases,true);
+    let root_custody=protected(Path::new(ROOT),true);
+    mkdir(&output.join("scopes"),0o755)?;
+    let mut scopes=Vec::new();
+    let mut unknown=cases_custody.is_err()||root_custody.is_err()
+        ||globals.iter().any(|fact|fact["observation"]["status"]=="UNKNOWN");
+    for name in CalibrationCase::ALL.into_iter().map(CalibrationCase::as_str).chain(std::iter::once("official")) {
+        let target=output.join("scopes").join(name);mkdir(&target,0o755)?;
+        let record_path=wf_case_path(name);
+        let record=wf_disposal_fact(&record_path,&target.join("case-record.json"),INPUT_BYTES as u64,end);
+        let pending=wf_disposal_fact(&record_path.with_extension("next"),&target.join("case-record.next"),INPUT_BYTES as u64,end);
+        if record["status"]=="NOT_PRESENT"&&pending["status"]=="NOT_PRESENT" {continue;}
+        let observed=(|| -> Result<(WorkflowCase,PathBuf,String)> {
+            wf_require(record["status"]=="RETAINED","published case record unavailable; UNKNOWN")?;
+            let record:WorkflowCase=load(&record_path)?;
+            wf_require(record.case==wf_case_name(name)?&&digest(&record.nonce),"recorded nonce scope is incomplete/mismatched; UNKNOWN")?;
+            let dir=directory(&Path::new(ROOT).join(&record.nonce).to_string_lossy())?;
+            let admission:Admission=load(&dir.join("admission.json"))?;
+            wf_require(admission.nonce==record.nonce&&calibration_case(&dir,&admission)?==record.case
+                && matches!(admission.scope.as_str(),"PR174_RUST_CALIBRATION_ADMITTED"|"PR174_HOST_EXECUTION_ADMITTED")
+                && (admission.scope=="PR174_RUST_CALIBRATION_ADMITTED")==record.case.is_some(),
+                "recorded nonce admission scope is unavailable/mismatched; UNKNOWN")?;
+            Ok((record,dir,admission.scope))
+        })();
+        match observed {
+            Ok((recorded,dir,scope))=>{
+                let released=wf_disposal_fact(&dir.join("preparation-release.json"),&target.join("preparation-release.json"),2048,end);
+                let failed=wf_disposal_fact(&dir.join("preparation-release-failure.json"),&target.join("preparation-release-failure.json"),2048,end);
+                unknown|=record["status"]=="UNKNOWN"||pending["status"]=="UNKNOWN"
+                    ||released["status"]=="UNKNOWN"||failed["status"]=="UNKNOWN";
+                scopes.push(json!({"case":name,"nonce":recorded.nonce,"scope":scope,
+                    "caseRecord":record,"unpublishedCaseRecord":pending,
+                    "release":released,"releaseFailure":failed,
+                    "disposalVerdict":"NOT_INFERRED; inspect actual protected facts"}));
+            },
+            Err(error)=>{
+                unknown=true;
+                scopes.push(json!({"case":name,"status":"UNKNOWN","error":error,
+                    "caseRecord":record,"unpublishedCaseRecord":pending}));
+            },
+        }
+    }
+    let bytes=wf_json(&json!({"schemaVersion":1,"scope":"PR174_POST_RECEIPT_DISPOSAL_DIAGNOSTICS",
+        "status":if unknown{"UNKNOWN"}else{"OBSERVED"},"casesCustodyError":cases_custody.err(),
+        "nonceRootCustodyError":root_custody.err(),"globals":globals,"recordedScopes":scopes,
+        "authority":"NONE; snapshots neither mutate case artifacts nor authorize cleanup, disposal or START"}))?;
+    wf_require(bytes.len()<=131072,"bounded disposal index exceeded; initial UNKNOWN and actual copied facts retained")?;
+    make_file(&output.join("snapshot-result.json"),&bytes,0o444)?;
+    if unknown {return Err("post-receipt disposal diagnostic UNKNOWN; actual protected evidence retained for always upload".into());}
+    Ok(json!({"status":"PROTECTED_DISPOSAL_DIAGNOSTICS_RETAINED","path":output,"authority":"NONE"}))
+}
 fn workflow_entry(argv: &[String]) -> Result<Value> {
     match argv {
         [mode] if mode == "workflow-prepare" => wf_prepare(),
@@ -874,6 +956,7 @@ fn workflow_entry(argv: &[String]) -> Result<Value> {
         },
         [mode,name] if mode == "workflow-finish" => {wf_case_name(name)?;wf_finish(name)},
         [mode,name,id] if mode == "workflow-receipt" => {wf_case_name(name)?;wf_receipt(name,wf_positive(id)?)},
+        [mode] if mode == "workflow-disposal-snapshot" => wf_disposal_snapshot(),
         [mode] if mode == "workflow-collect" => wf_collect(),
         [mode,id] if mode == "workflow-official" => wf_official(wf_positive(id)?),
         _=>Err("unknown workflow creator mode/arity; fixed original workflow commands only".into()),
@@ -1027,6 +1110,26 @@ mod workflow_source_tests {
         assert_eq!(result["collectionError"],json!(collected.as_ref().err()));
         assert!(result["collectionResult"].is_null());
         assert!(!dir.join("collected-calibration.json").exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn synthetic_disposal_diagnostics_do_not_fabricate_missing_or_unprotected_facts() {
+        let unique=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let dir=std::env::temp_dir().join(format!("ktlsp-workflow-disposal-{}-{unique}",std::process::id()));
+        fs::create_dir(&dir).unwrap();
+        let target=dir.join("snapshot");let unsafe_parent=dir.join("unprotected");
+        fs::create_dir(&unsafe_parent).unwrap();
+        fs::set_permissions(&unsafe_parent,fs::Permissions::from_mode(0o777)).unwrap();
+        let missing=unsafe_parent.join("missing");
+        let end=mono_ms().unwrap()+10000;
+        let absent=wf_disposal_fact(&missing,&target,2048,end);
+        assert_eq!(absent["status"],"NOT_PRESENT");
+        assert!(absent["sha256"].is_null());
+        make_file(&missing,b"actual synthetic latch bytes\n",0o600).unwrap();
+        let unavailable=wf_disposal_fact(&missing,&target,2048,end);
+        assert_eq!(unavailable["status"],"UNKNOWN"); // World-writable temp ancestry is never protected.
+        assert_eq!(fs::read(&missing).unwrap(),b"actual synthetic latch bytes\n");
+        assert!(!target.exists());
         fs::remove_dir_all(dir).unwrap();
     }
 }

@@ -3,23 +3,23 @@ on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Admitted immutable main SHA (40 lowercase hex)
+        description: Admitted main SHA
         type: string
         required: true
       source_comment:
-        description: Predesignated owner source comment ID
+        description: Owner source approval ID
         type: string
         required: true
       calibration_comment:
-        description: Predesignated owner proposal approval comment ID
+        description: Owner calibration approval ID
         type: string
         required: true
       official_comment:
-        description: Predesignated distinct owner official comment ID
+        description: Owner official approval ID
         type: string
         required: true
       official:
-        description: Separately approve official execution after calibration
+        description: Request separate official phase
         type: boolean
         required: true
         default: false
@@ -135,9 +135,7 @@ jobs:
       - name: PR174 receipt normal
         if: ${{ always() && steps.upload_normal.outputs.artifact-id != '' }}
         timeout-minutes: 3
-        env:
-          CASE: normal
-          ARTIFACT_ID: ${{ steps.upload_normal.outputs.artifact-id }}
+        env: {CASE: normal, ARTIFACT_ID: '${{ steps.upload_normal.outputs.artifact-id }}'}
         run: &receipt sudo "$PR174_HOST" workflow-receipt "$CASE" "$ARTIFACT_ID"
       - id: case_same_group
         timeout-minutes: 12
@@ -155,9 +153,7 @@ jobs:
       - name: PR174 receipt same-group
         if: ${{ always() && steps.upload_same_group.outputs.artifact-id != '' }}
         timeout-minutes: 3
-        env:
-          CASE: same-group
-          ARTIFACT_ID: ${{ steps.upload_same_group.outputs.artifact-id }}
+        env: {CASE: same-group, ARTIFACT_ID: '${{ steps.upload_same_group.outputs.artifact-id }}'}
         run: *receipt
       - id: case_setsid
         timeout-minutes: 12
@@ -175,9 +171,7 @@ jobs:
       - name: PR174 receipt setsid
         if: ${{ always() && steps.upload_setsid.outputs.artifact-id != '' }}
         timeout-minutes: 3
-        env:
-          CASE: setsid
-          ARTIFACT_ID: ${{ steps.upload_setsid.outputs.artifact-id }}
+        env: {CASE: setsid, ARTIFACT_ID: '${{ steps.upload_setsid.outputs.artifact-id }}'}
         run: *receipt
       - id: case_setpgid
         timeout-minutes: 12
@@ -195,9 +189,7 @@ jobs:
       - name: PR174 receipt setpgid
         if: ${{ always() && steps.upload_setpgid.outputs.artifact-id != '' }}
         timeout-minutes: 3
-        env:
-          CASE: setpgid
-          ARTIFACT_ID: ${{ steps.upload_setpgid.outputs.artifact-id }}
+        env: {CASE: setpgid, ARTIFACT_ID: '${{ steps.upload_setpgid.outputs.artifact-id }}'}
         run: *receipt
       - id: case_timeout
         timeout-minutes: 12
@@ -215,9 +207,7 @@ jobs:
       - name: PR174 receipt timeout
         if: ${{ always() && steps.upload_timeout.outputs.artifact-id != '' }}
         timeout-minutes: 3
-        env:
-          CASE: timeout
-          ARTIFACT_ID: ${{ steps.upload_timeout.outputs.artifact-id }}
+        env: {CASE: timeout, ARTIFACT_ID: '${{ steps.upload_timeout.outputs.artifact-id }}'}
         run: *receipt
       - id: case_kill
         timeout-minutes: 12
@@ -235,9 +225,7 @@ jobs:
       - name: PR174 receipt kill
         if: ${{ always() && steps.upload_kill.outputs.artifact-id != '' }}
         timeout-minutes: 3
-        env:
-          CASE: kill
-          ARTIFACT_ID: ${{ steps.upload_kill.outputs.artifact-id }}
+        env: {CASE: kill, ARTIFACT_ID: '${{ steps.upload_kill.outputs.artifact-id }}'}
         run: *receipt
       - id: case_storage
         timeout-minutes: 12
@@ -255,9 +243,7 @@ jobs:
       - name: PR174 receipt storage-exhaustion
         if: ${{ always() && steps.upload_storage.outputs.artifact-id != '' }}
         timeout-minutes: 3
-        env:
-          CASE: storage-exhaustion
-          ARTIFACT_ID: ${{ steps.upload_storage.outputs.artifact-id }}
+        env: {CASE: storage-exhaustion, ARTIFACT_ID: '${{ steps.upload_storage.outputs.artifact-id }}'}
         run: *receipt
       - id: case_inode
         timeout-minutes: 12
@@ -275,9 +261,7 @@ jobs:
       - name: PR174 receipt inode-exhaustion
         if: ${{ always() && steps.upload_inode.outputs.artifact-id != '' }}
         timeout-minutes: 3
-        env:
-          CASE: inode-exhaustion
-          ARTIFACT_ID: ${{ steps.upload_inode.outputs.artifact-id }}
+        env: {CASE: inode-exhaustion, ARTIFACT_ID: '${{ steps.upload_inode.outputs.artifact-id }}'}
         run: *receipt
       - id: case_boundary
         timeout-minutes: 12
@@ -295,10 +279,16 @@ jobs:
       - name: PR174 receipt boundary-denials
         if: ${{ always() && steps.upload_boundary.outputs.artifact-id != '' }}
         timeout-minutes: 3
-        env:
-          CASE: boundary-denials
-          ARTIFACT_ID: ${{ steps.upload_boundary.outputs.artifact-id }}
+        env: {CASE: boundary-denials, ARTIFACT_ID: '${{ steps.upload_boundary.outputs.artifact-id }}'}
         run: *receipt
+      - id: disposal
+        if: ${{ always() && steps.case_normal.outcome != 'skipped' }}
+        timeout-minutes: 1
+        run: sudo "$PR174_HOST" workflow-disposal-snapshot
+      - if: ${{ always() && steps.disposal.outcome != 'skipped' }}
+        uses: *upload
+        timeout-minutes: 3
+        with: {name: pr174-disposal, path: /etc/ktlsp-pr174/uploads/disposal, compression-level: 0, if-no-files-found: error, include-hidden-files: true}
 
       - id: cancel_start
         timeout-minutes: 12
@@ -320,9 +310,7 @@ jobs:
       - name: PR174 receipt workflow-step-cancel
         if: ${{ always() && steps.upload_cancel.outputs.artifact-id != '' }}
         timeout-minutes: 3
-        env:
-          CASE: workflow-step-cancel
-          ARTIFACT_ID: ${{ steps.upload_cancel.outputs.artifact-id }}
+        env: {CASE: workflow-step-cancel, ARTIFACT_ID: '${{ steps.upload_cancel.outputs.artifact-id }}'}
         run: *receipt
       - name: Authenticate protected cohort and runner timeout
         id: collect
@@ -356,7 +344,5 @@ jobs:
       - name: PR174 receipt official
         if: ${{ always() && steps.upload_official.outputs.artifact-id != '' }}
         timeout-minutes: 3
-        env:
-          CASE: official
-          ARTIFACT_ID: ${{ steps.upload_official.outputs.artifact-id }}
+        env: {CASE: official, ARTIFACT_ID: '${{ steps.upload_official.outputs.artifact-id }}'}
         run: *receipt

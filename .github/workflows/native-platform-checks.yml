@@ -147,7 +147,7 @@ jobs:
         env:
           KTLSP_NATIVE_IO_OBSERVE: '1'
         run: |
-          cargo +1.99.0 test --locked --release --workspace -- --nocapture 2>&1 | Tee-Object "$env:RUNNER_TEMP/native-platform-evidence/workspace-tests.txt"
+          cargo +1.99.0 test --locked --release --workspace --no-fail-fast -- --nocapture 2>&1 | Tee-Object "$env:RUNNER_TEMP/native-platform-evidence/workspace-tests.txt"
           $code = $LASTEXITCODE
           "exit_code=$code" | Set-Content "$env:RUNNER_TEMP/native-platform-evidence/workspace-tests-exit.txt"
           if ($code -ne 0) { exit $code }

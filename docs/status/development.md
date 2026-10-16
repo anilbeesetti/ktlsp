@@ -800,3 +800,99 @@ original full hosted CI, separate fresh read-only guard/expected-head merge and
 independent OWNER+ROOT original exact-main acceptance are still required.
 No local parser/server/worker/peer runtime, official oracle, Windows archive,
 #377 root-cause/repair, first-party-license or full-parity acceptance is claimed.
+
+### PR385 guarded integration and independent original exact-main acceptance
+
+Final reviewed head `4ab6c4ec8515138e82872ac260aa306b9ffea5c5`, tree
+`16d3751b4568e8b3884451edb0c7d7cb8878203d`, retained27 files and two independent
+full-union source clearances after capture-only cleanup. Original final attempt1
+Native38922768142/job117046594931 passed1035+22; platform38922768150
+macOS117046597601 passed1033+22 and Windows117046598260 passed980+22.
+Each complete census has130 rows/0failed/3ignored/0filtered. Actual tested merge
+98dd95783a3a3b7448c02e9c9424d2ada572bc5d had the reviewed tree and ordered
+parents `[f5f8a409dea209d44f9a9abe11c0becdf20f658e,4ab6c4ec8515138e82872ac260aa306b9ffea5c5]`.
+
+ROOT inspected process0 plus complete parsedexit0 from a separate fresh strictly
+read-only guard matching exact exclusive main/head/base/tree/27scope/config,
+clean reviewed local identity,3 successful checks,0 statuses and both original
+full workflows/platform jobs. A separate ordinary expected-head squash produced
+040dbba580d908c649c7256405687e2044e4cec2 with exactly that tree and sole parentf5.
+The lease stayed held until independent reviewed-source OWNER and ROOT each
+authenticated original push/main38924305113/job117051828194attempt1: actual040
+checkout, Rust1.99 format/strict locked workspace-all-target Clippy/full workspace,
+1035passed/0failed/3ignored/0filtered in130rows plus22 separate fault cases.
+Lease385 then CLEARED. #379–383 are delivered finite consumers; original/user
+worktrees are preserved. This verified040 is the one incoming base for386/387.
+
+### First actual Windows extracted archive; concrete373 gap complete
+
+After exact-main acceptance, ROOT separately admitted ONE changed-production-source
+manual run38926477362attempt1 at040/tree16d. A separate fresh read-only dispatch
+guard checked source/tree/soleparent/workflows/lock/clean local identity and zero
+prior dispatches on that source; the separate dispatch had no arbitrary inputs.
+Packaging workflow85809207c6f886db4839bb9b57cbbf42c57078a2 and current lock
+3cb69c3e3bd0df512f36cd3b9b751d27687244a2 remain authenticated original pins.
+
+Linux117059202754 passed1035+22, macOS117059202895 passed1033+22 and
+Windows117059202465 passed980+22, each full unfiltered release workspace with
+130rows/0failed/3ignored/0filtered, then explicit extracted smoke1passed/0failed
+with32 filtered. Filtering is supplementary after the complete suite.
+Source/format/strict compile/build/stripping/stage/verification/smoke/evidence
+and package upload steps all succeeded. Independent Unix/Windows owners and
+ROOT each authenticated actual artifacts, not just the successful step labels.
+
+Actual TAR SHA256, package/evidence artifact IDs:
+- Linux600e1859a1497304d641ee4f7d26c2d7deedb881bc8c34b025113f8c00b6b4eb,
+  12057186477/12057695351.
+- macOSdf05271d64017bedf762e07784ac202f7ada8b00b253bed1e5304942d3682875,
+  12057530978/12057536051.
+- Windows8b08d3bc0b7b8b0679dfbcbb8093fbc25542308d1a7eb375915ab1be946e019c,
+  12056364455/12057925057.
+
+All six ZIP API digests/sizes match; outer sidecars checked before TAR contents.
+Each actual TAR has52 regular files/51 complete checksums/31 notice-provenance
+files/22 dependencies. All15 shared embedded evidence files match separate bytes;
+embedded lock/workflow match immutable source, six retained notices match source,
+all31 notices match across hosts and cover16 registry dependencies. Exact provenance
+inventory and both native ELF64x86_64/Mach-O64ARM64/PE32+AMD64 headers are verified.
+
+ROOT directly read original actual CLI/environment/retention facts and the full
+19-message/16-reply parameter-shadow wire. Original raw wire bytes are identical
+on all3 hosts:6624 bytes, SHA256
+6e1569c6345ff3b16eb2dbac73f77882e8b398e47f7884e5c0ee0c9d647805db.
+Actual extracted siblings ran help/version/stdio with exit0, empty stderr/PATH,
+Java homes absent and borrowed directories retained. Exact u64/string IDs,
+CRLF/astral ranges, parameter/self-initializer/local-shadow and unused/sibling
+partitions, annotation refusal and full empty pull/no pushes remain intact.
+Receipt is separate-only; downloaded executables were not run locally. Windows
+canonical verbatim drive prefix versus PowerShell ordinary path is explicit;
+remaining path and actual child filenames agree.
+
+Public complete receipt373comment6219465863;46comment6219466522;
+330comment6219467087. #373 closed for its finite concrete evidence gap. Original
+f5 failure/no Windows TAR and its Timeout reply remain immutable; success on
+changed source proves neither phase/cause nor repair of377. #377 stays open,
+with observation comment6219504937. Experimental14-day artifacts, #96/B3/#46,
+first-party-license and official/full-parity release gates remain held.
+
+### Current lexical and binary generic identity source
+
+Isolated386 sourceb8d89a484c0b1f91a5fc41aa7fe868dee7d47b3f and387
+source22c027bdc89c6e44b7aabd0392ca3a19ba970412 both derive from verified040,
+with independent functionality/adversarial exact-head reviews and formatting
+rechecks. ROOT composed without conflicts as a8fc738591bfd452df0572c43e9dcdb034a56d3d,
+tree79e3555fa2115bc766db031c8014bf64470a75d8. Two full15-file union reviews cleared
+before pinned format check/strict locked workspace-all-target Clippy passed.
+Complete native binary data suite passed481 cases across52 suites; no parser,
+server, worker or peer-supervision runtime ran locally.
+
+An actual throwaway native public-API executable read genuine Pair.class through
+class reader→annotations→Metadata→resolved Class properties. It observed original
+owner kotlin.Pair d1[47..285], localfalse; first→original A(id0,ordinal0,
+declaration54..60,Type238..240), second→B(id1,ordinal1,declaration62..68,
+Type263..265). Raw pointers borrow those original d1 spans; nullable marking is
+absent, not inferred non-nullness. The example source was removed after proof.
+Source386 FIRST genuine producer/paired-CLI capture and all new-source hosted
+platform/full-workspace acceptance remain unobserved; TEMP writers await ROOT's
+direct first-outcome read. Final docs/source reviews, CI, guarded integration and
+independent original-main acceptance remain required. Full parity is not achieved.

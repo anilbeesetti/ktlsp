@@ -1,8 +1,8 @@
 # Native server providers
 
-`ktlsp` supports bounded stdio lifecycle, document synchronization, folding, negotiated lexical semantic-token full/range transport, parser-backed syntactic symbols, finite local definition/hover/references/highlights, eager local-value completion, and guarded local-val prepare/rename. Initialization advertises only the implemented negotiated providers.
+`ktlsp` supports bounded stdio lifecycle, document synchronization, folding, one negotiated authoritative structural quickfix, negotiated lexical semantic-token full/range transport, parser-backed syntactic symbols, finite local definition/hover/references/highlights, eager local-value completion, and guarded local-val prepare/rename. Initialization advertises only the implemented negotiated providers.
 
-Parser-backed capabilities require the trusted matching worker. Hover also requires a compatible content format; rename requires versioned `documentChanges`, with preparation advertised only when supported by the client. Lexical tokens need compatible token capabilities but no worker. Clients advertising `textDocument.diagnostic` negotiate lexical/structural pull reports instead of legacy push diagnostics. Neither diagnostics nor lexical token categories provide Kotlin compiler analysis or full semantic coloring.
+Parser-backed capabilities require the trusted matching worker. Hover also requires a compatible content format; rename requires versioned `documentChanges`, with preparation advertised only when supported by the client. Lexical tokens need compatible token capabilities but no worker. The structural quickfix also needs no worker, but requires code-action literal support and versioned `documentChanges`. Clients advertising `textDocument.diagnostic` negotiate lexical/structural pull reports instead of legacy push diagnostics. Neither diagnostics, structural quickfix nor lexical token categories provide Kotlin compiler analysis or full semantic coloring.
 
 ## Build and distribute both executables
 
@@ -13,7 +13,7 @@ cargo build --locked --release -p ktlsp-server -p ktlsp-parser --bins
 
 Install **both** `ktlsp` and `ktlsp-parser-worker` from that same build into the same trusted directory (with `.exe` suffixes on Windows). The default CLI discovers the worker only beside its own executable, checking that the sibling is a regular executable file on Unix. There is no PATH, current-directory or environment-selected worker fallback. Installation trust and matching build identity are the distributor's responsibility; this is not a sandbox, signature check or version-authentication protocol.
 
-Without that sibling, synchronization/folding/lexical diagnostics and compatible lexical semantic tokens remain available, `documentSymbolProvider`/`definitionProvider`/`hoverProvider`/`referencesProvider`/`documentHighlightProvider`/`completionProvider`/`renameProvider` are omitted and their requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. A configured worker that subsequently fails is a request failure, not a fabricated outline or binding. No JVM/JDK, Kotlin compiler or C parser is required.
+Without that sibling, synchronization/folding/lexical diagnostics, compatible lexical semantic tokens and the negotiated structural quickfix remain available, `documentSymbolProvider`/`definitionProvider`/`hoverProvider`/`referencesProvider`/`documentHighlightProvider`/`completionProvider`/`renameProvider` are omitted and their requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. A configured worker that subsequently fails is a request failure, not a fabricated outline or binding. No JVM/JDK, Kotlin compiler or C parser is required.
 
 ## Optional extracted-archive smoke (#373)
 
@@ -59,6 +59,46 @@ Folding recognizes matched multiline `{}`, `()`, `[]`, block-comment tokens, raw
 On a mismatched closer, report it and discard/diagnose all pending openers. This conservative recovery cannot create crossing delimiter folds; complete valid pairs encountered later can still fold. Unmatched closers and remaining openers produce structural diagnostics. For legacy clients, accepted open/change notifications publish replacement diagnostics (including empty arrays); close clears them. Negotiated pull clients receive no duplicate push notifications. Rejected/stale/invalid edits preserve the current document. Push diagnostics include document versions only when `publishDiagnostics.versionSupport` is true; close clearing omits version.
 
 Missing/closed-document folding requests return invalid params (`-32602`), without reading disk. Malformed request params/client folding capabilities also return invalid params. Analysis exhaustion leaves an accepted document version intact, replaces stale diagnostics with one explicit `analysis-limit` warning, and fails folding with RequestFailed (`-32803`). Subsequent edits can recover normally.
+
+## Authoritative trailing-closer quickfix (#391)
+
+With valid `textDocument.codeAction.codeActionLiteralSupport` and
+`workspace.workspaceEdit.documentChanges: true`, initialization advertises
+`codeActionProvider: {codeActionKinds: ["quickfix"], resolveProvider: false}`.
+The client's kind value set is advisory, not an eligibility whitelist.
+Absent negotiation omits the provider and returns MethodNotFound (`-32601`).
+There is no Command fallback, resolve, applyEdit, fix-all or import action.
+
+`textDocument/codeAction` reads the same current-document raw Analysis cache as
+folding and lexical diagnostics. It offers one eager deletion only when the
+complete analysis has exactly one unmatched-closing-delimiter diagnostic,
+that original token is `)`, `]` or `}`, and only existing lexer-whitespace tokens
+follow it. The final non-whitespace endpoint is retained in the existing token
+sweep: no second lexer, parser, cache, source copy or pending job is added.
+Mismatch recovery that also diagnosed pending openers, lexical/multiple/suppressed
+diagnostics, non-whitespace suffixes and version `i32::MAX` cannot authorize it.
+This finite lexical policy is not a compiler repair or official action equivalence.
+
+Request URI/context/diagnostic shapes and both current UTF-16 range endpoints
+are validated. Missing/closed documents, reversed/out-of-bounds/surrogate-interior
+ranges and malformed parameters return `-32602`; analysis exhaustion is `-32803`,
+never successful empty output. Client diagnostics are not edit authority:
+empty or stale supplied diagnostics cannot hide or manufacture a current candidate.
+Nonempty ranges must half-open-overlap the token; an empty caret may touch either
+token boundary. Absent `context.only`, `"quickfix"` or its empty ancestor permits;
+`[]`, unrelated kinds or child-only kinds exclude. Both valid trigger kinds are
+accepted without broadening eligibility.
+
+The action contains one `WorkspaceEdit.documentChanges` edit at the exact open
+URI/current integer version, deleting only that one original ASCII token.
+Nothing is applied by returning it. Accepted `didChange` commits and invalidates
+analysis; rejected/stale changes retain current state, and close/reopen invalidates
+the cache. As with rename, an already delivered URI/version literal retained by
+a client across an identical-version reopen has no stronger incarnation guarantee.
+Provider and real-stdio regressions apply the actual returned edit, then require
+the exact version-8 text, fresh empty diagnostics and no remaining action.
+First original hosted observation remains separate from source review.
+
 
 ## Lexical semantic-token transport (#380)
 
@@ -191,6 +231,34 @@ This is finite source-specific native execution, not official equivalence, Windo
 packaging acceptance or an explanation/repair of #377. Final cleanup-source CI,
 guarded integration and independent original exact-main proof remain mandatory.
 
+## Proved lexical local-call definition (#389)
+
+Definition on an authenticated direct standalone empty-call callee can return
+its unique original preceding same-block local `FUN` name. The local function
+must have a complete ordinary nongeneric zero-parameter header and empty body.
+Every call in the admitted outer function must be proved by the same rules;
+unknown invokable values or skipped bodies cannot silently lose value occurrences.
+The nearest proved applicable local function precedes unknown package/import
+candidates; no project-wide closed-world or zero-arity overload guess is made.
+
+Supported mixed bodies retain ordinary parameters, immutable locals, these
+empty local declarations/calls and restricted generic outer headers.
+Existing value definition/hover/references/highlights/completion/rename and
+integer-default queries keep original value/shadow partitions; annotation
+definitions retain their original lexical typeparameter targets. Local functions
+and call callees do not become value completion/rename/occurrence candidates.
+Fresh value rename preserves call identity; a relevant local-function new-name
+conflict, including a conservative future declaration conflict, refuses.
+
+All origin/header/body/call/competitor work shares the existing semantic budget;
+no public-query reset, recursive body validation or copied declaration is used.
+Before-declaration calls, competing semantic names, richer arguments/type/lambda
+or qualified/postfix shapes, nonempty local bodies and unsupported local headers
+fail atomically rather than pretending globally unresolved. This adds callee
+definition, not function hover/rename/references, general overload/invoke,
+signature help or official equivalence. First genuine producer/paired-CLI proof
+is still required before source review becomes runtime evidence.
+
 ## Finite local definition and declaration hover
 
 Over open Kotlin documents, a strict UTF-16 position selects an actual original value `REFERENCE_EXPRESSION` containing that position (end-exclusive). The existing declaration lowerer, structural-region directory, authenticated `ReferenceSite` and `bind_local_value` prove a unique eligible preceding direct immutable local `val` or same-function ordinary parameter. Only ordinary named top-level block functions with complete plain integer/whole-identifier local initializers and simple syntax-only parameter/local annotations are eligible. Definition returns the original target **name** range and same URI. Hover returns the original target **declaration text** (`p: T` for a parameter) and original reference range: no invented types, initializer chasing or inferred global unresolvedness.
@@ -204,16 +272,18 @@ comma retain original identity; matching duplicate spellings refuse even when
 the duplicate is later in the list. Outer classes, imports/aliases, other functions
 and values are not candidates or fallbacks. Bounds/variance/reified/annotations,
 where clauses, malformed/empty/post-name/second lists, receivers/context,
-explicit returns, expression bodies, members/local functions and richer annotation
-syntax remain unsupported. Bare `T` does not imply semantic non-nullability.
+explicit returns, expression bodies, generic member/local function headers and
+richer annotation syntax remain unsupported. Bare `T` does not imply semantic non-nullability.
 All eight existing parser-backed consumers retain their original value/body
 contracts on this generic body. Type parameters stay out of value completion,
 occurrences and rename edits; annotation references stay outside value partitions.
 No typeDefinition method/capability, type-parameter hover/references/rename,
 generic inference or full Kotlin type resolution is added. First original hosted
-producer/paired-CLI behavior is recorded below; cleanup-source CI and guarded
-main acceptance remain separate. #96/full parity and unknown official runtime
-behavior remain unchanged.
+producer/paired-CLI behavior is recorded below. Capture-free reviewed b5f6128
+passed final original native/platform CI, then guarded PR388 produced c4c7c6d,
+exact reviewed treeba361/soleparent040. Independent OWNER+ROOT authenticated
+original exact-main38933481416/job117083027573:1052passed+22faultcases.
+These finite proofs do not establish full parity or unknown official runtime behavior.
 
 At first source `1f118a4efe990f044759e1162bcd2b0361df4991`, original attempt1
 Native38930044366/job117071397551 passed1052+22; platform38930044300
@@ -437,9 +507,9 @@ letters/digits/underscores, excluding hard keywords and all-underscore names.
 Quoted or Unicode existing targets may become these supported names; new names
 are never autoquoted or normalized. Invalid names/URI/UTF-16/unopened-document
 requests return `-32602`. Unsupported bodies, parameters, ambiguous targets,
-same-function new-name parameter/local conflicts (including future declarations),
-potential new-name capture, semantic-work/storage exhaustion, source growth past
-64 KiB or escaped output past 1 MiB fail atomically with `-32803`. Quote removal
+same-function new-name parameter/local/function conflicts (including conservative
+future declarations), potential new-name capture, semantic-work/storage exhaustion,
+source growth past64 KiB or escaped output past1 MiB fail atomically. Quote removal
 with unchanged semantic spelling preserves existing shadow partitions.
 Unsafe lexical quote removal (such as an adjacent `val` keyword and quoted name)
 is refused even by preparation, rather than merging tokens in the edited source.

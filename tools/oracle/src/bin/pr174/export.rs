@@ -46,6 +46,38 @@ fn protected_export_until(dir:&Path,end:u64)->Result<Value> {
     let binding=ProtectedExportBinding{schema_version:1,scope:"PR174_PROTECTED_EXPORT".into(),run:a.run,nonce:a.nonce,container_id:b.container_id,boot_id:a.boot_id,daemon_id:a.daemon_id,image:a.image,image_id:a.image_id,root_authorization_sha256:a.root_authorization_sha256,calibration_sha256:a.calibration_sha256,workflow_sha256:a.workflow_sha256,files:inventory};
     let bytes=serde_json::to_vec(&binding).map_err(|e|e.to_string())?;
     if bytes.len()>INPUT_BYTES{return Err("protected export binding cap".into());}
-    make_file(&output.join("export-binding.json"),&bytes,0o400)?;
+    publish_export_binding(&output,&bytes)?;
     Ok(json!({"status":"PROTECTED_EXPORT_AVAILABLE","directory":output,"bindingSha256":sha_bytes(&bytes),"originalClosureConfirmed":closed,"officialCaptureSuccess":false,"originalWorkflowArtifactCustody":"receiver must authenticate original run/job/attempt; artifact name alone not authority"}))
+}
+
+fn publish_export_binding(output:&Path,bytes:&[u8])->Result<()> {
+    let next=output.join("export-binding.next");
+    make_file(&next,bytes,0o400)?;
+    wf_link_readiness_file(&next,&output.join("export-binding.json"))
+}
+
+#[cfg(test)]
+mod export_source_tests {
+    use super::*;
+
+    #[test]
+    fn synthetic_export_readiness_requires_complete_exclusive_publication() {
+        let dir=std::env::temp_dir().join(format!("ktlsp-export-publication-synthetic-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir(&dir).unwrap();
+        let next=dir.join("export-binding.next");
+        let published=dir.join("export-binding.json");
+        make_file(&next,b"{",0o400).unwrap();
+        assert!(publish_export_binding(&dir,b"{\"complete\":true}").is_err());
+        assert!(!published.exists());
+        assert_eq!(fs::read(&next).unwrap(),b"{");
+        fs::remove_file(&next).unwrap();
+        publish_export_binding(&dir,b"{\"complete\":true}").unwrap();
+        assert_eq!(fs::read(&published).unwrap(),b"{\"complete\":true}");
+        assert_eq!(fs::metadata(&published).unwrap().nlink(),1);
+        assert!(!next.exists());
+        assert!(publish_export_binding(&dir,b"{\"replacement\":true}").is_err());
+        assert_eq!(fs::read(&published).unwrap(),b"{\"complete\":true}");
+        assert_eq!(fs::read(&next).unwrap(),b"{\"replacement\":true}");
+        fs::remove_dir_all(dir).unwrap();
+    }
 }

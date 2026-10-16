@@ -36,10 +36,19 @@ fn await_calibration(dir:&Path)->Result<Value> {
     if calibration_case(dir,&a)?.is_none(){return Err("await route is finite Rust-calibration-only".into());}
     let end=mono_ms()?.checked_add(600000).ok_or("calibration await overflow")?.min(a.preparation_deadline_ms);
     loop {
-        if dir.join("export/export-binding.json").try_exists().map_err(|e|e.to_string())? {
-            let binding:ktlsp_oracle_replay::authority::ExportBinding=load(&dir.join("export/export-binding.json"))?;
-            if binding.nonce!=a.nonce{return Err("calibration await export nonce mismatch".into());}
-            return Ok(json!({"status":"CALIBRATION_EXPORT_AVAILABLE","directory":dir.join("export"),"officialCaptureSuccess":false}));
+        let path=dir.join("export/export-binding.json");
+        match fs::symlink_metadata(&path) {
+            Ok(metadata) => {
+                if !metadata.is_file() || !matches!(metadata.nlink(),1|2){return Err("calibration export readiness file/link custody".into());}
+                if metadata.nlink()==1 {
+                    let binding:ktlsp_oracle_replay::authority::ExportBinding=load(&path)?;
+                    if binding.nonce!=a.nonce{return Err("calibration await export nonce mismatch".into());}
+                    return Ok(json!({"status":"CALIBRATION_EXPORT_AVAILABLE","directory":dir.join("export"),"officialCaptureSuccess":false}));
+                }
+                // A completed inode is linked but its private publication name is not yet removed.
+            }
+            Err(error) if error.kind()==ErrorKind::NotFound => {}
+            Err(error) => return Err(error.to_string()),
         }
         if mono_ms()?>=end{return Err("original calibration export not available within finite outer budget".into());}
         std::thread::yield_now();

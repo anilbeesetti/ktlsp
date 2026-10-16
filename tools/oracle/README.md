@@ -515,3 +515,10 @@ remain real runtime prerequisites, not results established by this source.
 Change record: #352 adds only the optional manual workflow/native producer and
 unchanged pinned inventory data. No dispatch, privileged host/container/JVM
 execution, official evidence or native/default dependency change is implied.
+
+Protected export completion uses an exclusively created, fully written and
+synced `export-binding.next`, then the shared atomic no-replace hard-link
+publication primitive. Consumers wait for publication to finish under their
+existing deadline; malformed JSON is still an error, not retried. Failed
+temporary writes and preexisting final bindings are preserved. Cancellation,
+START-intent and prearm existence tombstones retain their original semantics.

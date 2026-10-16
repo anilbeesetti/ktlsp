@@ -2,6 +2,7 @@
 //! The complete result includes ordered import metadata; its v1 projection alone
 //! does not preserve content-root boundaries, source types or classpath order.
 
+pub mod dependency_class;
 mod json;
 pub mod maven;
 

@@ -429,10 +429,8 @@ fn retained_prefix_paths_share_exact_prejoin_budget_and_preserve_resolution() {
 
     let small_caller = Path::new(r"\\server\share\dir\m");
     let v1 = parse(small_caller, &value).unwrap();
-    assert_eq!(
-        v1.sdk_archives[0],
-        small_caller.parent().unwrap().join("/a")
-    );
+    // Rooted-only input retains the UNC share, not the caller's directory.
+    assert_eq!(v1.sdk_archives[0], Path::new(r"\\server\share\a"));
     value["schemaVersion"] = json!(2);
     let v2 = v2::from_json(small_caller, &serde_json::to_vec(&value).unwrap()).unwrap();
     assert_eq!(v1.sdk_archives, v2.sdk_archives);

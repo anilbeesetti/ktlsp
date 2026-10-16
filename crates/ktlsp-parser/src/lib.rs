@@ -230,21 +230,51 @@ pub struct DeadlineEvidence {
     pub receipt: DeadlineReceipt,
 }
 
+/// Request-owned datagram pair. The inert peer alias keeps the receive queue
+/// connected through post-cleanup validation, even after the child closes fd2.
+/// Only the child writes receipts; the retained peer is never used for I/O.
+#[cfg(unix)]
+struct ObservationChannel {
+    receiver: std::os::unix::net::UnixDatagram,
+    peer: std::os::unix::net::UnixDatagram,
+}
+#[cfg(unix)]
+impl ObservationChannel {
+    fn pair() -> std::io::Result<Self> {
+        let (receiver, peer) = std::os::unix::net::UnixDatagram::pair()?;
+        receiver.set_nonblocking(true)?;
+        peer.set_nonblocking(true)?;
+        Ok(Self { receiver, peer })
+    }
+    fn new(command: &mut Command) -> std::io::Result<Self> {
+        use std::os::fd::OwnedFd;
+        let channel = Self::pair()?;
+        command.stderr(Stdio::from(OwnedFd::from(channel.peer.try_clone()?)));
+        Ok(channel)
+    }
+    fn recv(&self, bytes: &mut [u8]) -> std::io::Result<usize> {
+        self.receiver.recv(bytes)
+    }
+    fn send(&self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.receiver.send(bytes)
+    }
+}
+
 #[cfg(unix)]
 struct DeadlineObserver {
-    socket: std::os::unix::net::UnixDatagram,
+    socket: ObservationChannel,
     evidence: DeadlineEvidence,
+}
+
+#[cfg(unix)]
+fn is_deadline_ack(bytes: &[u8]) -> bool {
+    bytes == b"KTLSP-EOF-v1!!!!"
 }
 #[cfg(unix)]
 impl DeadlineObserver {
     fn new(command: &mut Command) -> std::io::Result<Self> {
-        use std::os::{fd::OwnedFd, unix::net::UnixDatagram};
-        let (socket, worker) = UnixDatagram::pair()?;
-        socket.set_nonblocking(true)?;
-        worker.set_nonblocking(true)?;
-        command
-            .arg("--observe-deadline-eof-v1")
-            .stderr(Stdio::from(OwnedFd::from(worker)));
+        let socket = ObservationChannel::new(command)?;
+        command.arg("--observe-deadline-eof-v1");
         Ok(Self {
             socket,
             evidence: DeadlineEvidence::default(),
@@ -268,8 +298,8 @@ impl DeadlineObserver {
         let mut bytes = [0; 17];
         self.evidence.receipt = match self.socket.recv(&mut bytes) {
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => DeadlineReceipt::Missing,
-            Ok(16)
-                if bytes[..16] == *b"KTLSP-EOF-v1!!!!"
+            Ok(count)
+                if is_deadline_ack(&bytes[..count])
                     && self.evidence.deadline_selected
                     && self.evidence.decision_send == Some(Ok(16)) =>
             {
@@ -420,17 +450,12 @@ pub enum GenericCopyEvidence {
     Complete(GenericCopyRecord),
 }
 #[cfg(unix)]
-struct GenericCopyObserver(std::os::unix::net::UnixDatagram);
+struct GenericCopyObserver(ObservationChannel);
 #[cfg(unix)]
 impl GenericCopyObserver {
     fn new(command: &mut Command) -> std::io::Result<Self> {
-        use std::os::{fd::OwnedFd, unix::net::UnixDatagram};
-        let (socket, worker) = UnixDatagram::pair()?;
-        socket.set_nonblocking(true)?;
-        worker.set_nonblocking(true)?;
-        command
-            .arg("--observe-generic-copy-v1")
-            .stderr(Stdio::from(OwnedFd::from(worker)));
+        let socket = ObservationChannel::new(command)?;
+        command.arg("--observe-generic-copy-v1");
         Ok(Self(socket))
     }
     fn finish(self, source: &str) -> GenericCopyEvidence {
@@ -710,10 +735,10 @@ mod admission {
     use std::{
         panic::catch_unwind,
         sync::{
-            Mutex, MutexGuard, Once, TryLockError,
+            Mutex, MutexGuard, Once, OnceLock, TryLockError,
             atomic::{AtomicU8, Ordering::SeqCst},
         },
-        thread::JoinHandle,
+        thread::{JoinHandle, Thread},
     };
     const N: usize = 8;
     const B: Duration = Duration::from_millis(20);
@@ -733,6 +758,7 @@ mod admission {
         child: Option<Child>,
         attempted: bool,
         reaped: bool,
+        owner: Option<Thread>,
     }
     fn valid_confirmation(attempted: bool, has_child: bool, reaped: bool) -> bool {
         attempted && has_child && reaped
@@ -749,6 +775,7 @@ mod admission {
                     child: None,
                     attempted: false,
                     reaped: false,
+                    owner: None,
                 }),
             }
         }
@@ -756,7 +783,40 @@ mod admission {
     static SLOTS: [Slot; N] = [const { Slot::new() }; N];
     static INIT: Once = Once::new();
     static SINGLETON: AtomicU8 = AtomicU8::new(NOT_STARTED);
-    static HANDLE: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
+    static HANDLE: OnceLock<JoinHandle<()>> = OnceLock::new();
+
+    fn wake_reaper() {
+        if let Some(handle) = HANDLE.get() {
+            handle.thread().unpark();
+        }
+    }
+
+    fn wake_owner(owner: Option<Thread>) {
+        if let Some(owner) = owner {
+            owner.unpark();
+        }
+    }
+
+    fn wake_waiting_owners(slots: &[Slot; N]) {
+        for slot in slots {
+            if !matches!(slot.state.load(SeqCst), WAITING | CONFIRMED) {
+                continue;
+            }
+            let data = match slot.data.try_lock() {
+                Ok(data) => data,
+                Err(TryLockError::Poisoned(error)) => error.into_inner(),
+                Err(TryLockError::WouldBlock) => continue,
+            };
+            // Recheck under the metadata guard: the slot may have been reused.
+            let owner = if matches!(slot.state.load(SeqCst), WAITING | CONFIRMED) {
+                data.owner.clone()
+            } else {
+                None
+            };
+            drop(data);
+            wake_owner(owner);
+        }
+    }
 
     pub(super) struct Lease<'a> {
         slot: &'a Slot,
@@ -782,13 +842,14 @@ mod admission {
                 {
                     continue;
                 }
-                let guard = match slot.data.try_lock() {
+                let mut guard = match slot.data.try_lock() {
                     Ok(guard) => guard,
                     Err(_) => {
                         slot.state.store(FAILED, SeqCst);
                         return Err(ParserError::Io);
                     }
                 };
+                guard.owner = Some(thread::current());
                 let lease = Self {
                     slot,
                     guard: Some(guard),
@@ -858,11 +919,15 @@ mod admission {
             let origin = Instant::now(); // E1 origin, before WAITING publication.
             self.slot.state.store(WAITING, SeqCst);
             drop(self.guard.take());
+            // Unlock first: an early wake must never find our metadata guard busy.
+            wake_reaper();
             loop {
-                let due_before = origin.elapsed() >= B;
+                let elapsed_before = origin.elapsed();
+                let due_before = elapsed_before >= B;
                 let state = self.slot.state.load(SeqCst);
                 let dead = SINGLETON.load(SeqCst) == DEAD;
-                let due_after = origin.elapsed() >= B; // E1 decision clock.
+                let elapsed_after = origin.elapsed();
+                let due_after = elapsed_after >= B; // E1 decision clock.
                 if let Some(cleanup) = observation(state, dead, due_before, due_after) {
                     return if cleanup == Cleanup::Confirmed {
                         self.accept_confirmation()
@@ -873,7 +938,9 @@ mod admission {
                         cleanup
                     };
                 }
-                thread::sleep(POLL);
+                // An unpark before this call leaves a token; every return rechecks
+                // ownership/death and both original clocks, including spurious wakes.
+                thread::park_timeout(POLL.min(B.saturating_sub(elapsed_after)));
             }
         }
         fn accept_confirmation(&mut self) -> Cleanup {
@@ -942,6 +1009,9 @@ mod admission {
             // Caller lexical resources have already dropped before this lease.
             self.armed = false; // No destructor can touch a reused slot after publish.
             if self.slot.state.load(SeqCst) == FAILED {
+                if let Some(data) = self.guard.as_mut() {
+                    data.owner = None;
+                }
                 drop(self.guard.take()); // Preserve the pin and static Child/metadata.
                 return;
             }
@@ -949,6 +1019,7 @@ mod admission {
                 let releasable =
                     valid_confirmation(data.attempted, data.child.is_some(), data.reaped)
                         || (!data.attempted && data.child.is_none() && !data.reaped);
+                data.owner = None;
                 if releasable {
                     data.child = None; // Child is either absent or confirmed reaped.
                     data.reaped = false;
@@ -963,9 +1034,13 @@ mod admission {
                     };
                     drop(data);
                     self.slot.state.store(state, SeqCst);
+                    if state == ABANDONED {
+                        wake_reaper();
+                    }
                 }
             } else {
                 abandon(&self.slot.state); // Final invocation access; never FREE.
+                wake_reaper();
             }
         }
     }
@@ -975,6 +1050,7 @@ mod admission {
         fn drop(&mut self) {
             if self.0 {
                 SINGLETON.store(DEAD, SeqCst);
+                wake_waiting_owners(&SLOTS);
             }
         }
     }
@@ -982,10 +1058,15 @@ mod admission {
     impl Drop for ReaperDeath {
         fn drop(&mut self) {
             SINGLETON.store(DEAD, SeqCst);
+            wake_waiting_owners(&SLOTS);
         }
     }
     fn start_reaper() -> Result<(), ParserError> {
-        initialize(&INIT, &SINGLETON, start_reaper_once)
+        let result = initialize(&INIT, &SINGLETON, start_reaper_once);
+        if result.is_err() {
+            wake_waiting_owners(&SLOTS);
+        }
+        result
     }
     fn initialize(
         init: &Once,
@@ -1022,16 +1103,15 @@ mod admission {
         SINGLETON
             .compare_exchange(NOT_STARTED, STARTING, SeqCst, SeqCst)
             .map_err(|_| ParserError::Io)?;
-        let mut retained = HANDLE.try_lock().map_err(|_| ParserError::Io)?;
-        if retained.is_some() {
+        if HANDLE.get().is_some() {
             return Err(ParserError::Io);
         }
         let handle = thread::Builder::new()
             .stack_size(256 * 1024)
             .spawn(reaper)
             .map_err(|_| ParserError::Io)?;
-        *retained = Some(handle); // Only this Once initializer can create/retain one.
-        drop(retained);
+        HANDLE.set(handle).map_err(|_| ParserError::Io)?;
+        // Only this Once initializer can create/retain the one reaper.
         SINGLETON
             .compare_exchange(STARTING, READY, SeqCst, SeqCst)
             .map_err(|_| ParserError::Io)?;
@@ -1048,7 +1128,7 @@ mod admission {
             for slot in &SLOTS {
                 reap_slot(slot);
             }
-            thread::sleep(POLL);
+            thread::park_timeout(POLL);
         }
     }
     fn reap_slot(slot: &Slot) {
@@ -1059,23 +1139,23 @@ mod admission {
         let mut data = match slot.data.try_lock() {
             Ok(data) => data,
             Err(TryLockError::WouldBlock) => return,
-            Err(TryLockError::Poisoned(_)) => {
-                slot.state.store(FAILED, SeqCst);
+            Err(TryLockError::Poisoned(error)) => {
+                fail_slot(slot, error.into_inner());
                 return;
             }
         };
         if !data.attempted || data.child.is_none() {
-            slot.state.store(FAILED, SeqCst);
+            fail_slot(slot, data);
             return;
         }
         if !data.reaped {
             let Some(child) = data.child.as_mut() else {
-                slot.state.store(FAILED, SeqCst);
+                fail_slot(slot, data);
                 return;
             };
             let _ = child.kill(); // One call; this can block the only reaper forever.
             if child.wait().is_err() {
-                slot.state.store(FAILED, SeqCst);
+                fail_slot(slot, data);
                 return;
             }
             data.reaped = true;
@@ -1084,15 +1164,32 @@ mod admission {
             data.child = None; // Confirmed reaped AND caller resources already gone.
             data.reaped = false;
             data.attempted = false;
+            data.owner = None;
             drop(data);
             slot.state.store(FREE, SeqCst); // Last access for that old invocation.
         } else {
+            // Capture this generation's owner before releasing the metadata.
+            let owner = data.owner.clone();
             drop(data);
-            // If caller won abandonment, the next sweep reclaims this confirmed Child.
-            let _ = slot
+            // A notified owner can immediately try_lock; publish only after unlock.
+            if slot
                 .state
-                .compare_exchange(WAITING, CONFIRMED, SeqCst, SeqCst);
+                .compare_exchange(WAITING, CONFIRMED, SeqCst, SeqCst)
+                .is_ok()
+            {
+                wake_owner(owner);
+            } else {
+                // Caller won abandonment; reclaim its already-reaped Child next sweep.
+                wake_reaper();
+            }
         }
+    }
+
+    fn fail_slot(slot: &Slot, data: MutexGuard<'_, Data>) {
+        let owner = data.owner.clone();
+        drop(data);
+        slot.state.store(FAILED, SeqCst);
+        wake_owner(owner);
     }
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1118,6 +1215,66 @@ mod admission {
     #[cfg(test)]
     mod finite_state_checks {
         use super::*;
+
+        #[test]
+        fn terminal_notifications_retain_tokens_and_release_metadata() {
+            for reaper_dead in [false, true] {
+                let slots = std::array::from_fn(|_| Slot::new());
+                let mut lease = Lease::reserve_on(&slots).unwrap();
+                let slot = lease.slot;
+                drop(lease.guard.take());
+                slot.state.store(WAITING, SeqCst);
+                // Consume any unrelated token before testing notify-before-park.
+                thread::park_timeout(Duration::ZERO);
+                if reaper_dead {
+                    wake_waiting_owners(&slots);
+                    // A wakeup cannot manufacture a same-child confirmation.
+                    assert_eq!(slot.state.load(SeqCst), WAITING);
+                } else {
+                    // Missing child metadata is a real failure, never closure proof.
+                    reap_slot(slot);
+                    assert_eq!(slot.state.load(SeqCst), FAILED);
+                }
+                let origin = Instant::now();
+                thread::park_timeout(Duration::from_secs(1));
+                assert!(
+                    origin.elapsed() < Duration::from_millis(500),
+                    "the original owner's pre-park notification must be retained"
+                );
+                assert!(slot.data.try_lock().is_ok());
+                assert_eq!(
+                    observation(slot.state.load(SeqCst), reaper_dead, false, false),
+                    Some(Cleanup::Failed)
+                );
+            }
+        }
+
+        #[test]
+        fn waiting_owner_can_lock_metadata_as_soon_as_failure_is_published() {
+            let slots = std::array::from_fn(|_| Slot::new());
+            let mut lease = Lease::reserve_on(&slots).unwrap();
+            let slot = lease.slot;
+            drop(lease.guard.take());
+            slot.state.store(WAITING, SeqCst);
+            thread::scope(|scope| {
+                let reaper = scope.spawn(|| reap_slot(slot));
+                let deadline = Instant::now() + Duration::from_secs(1);
+                while slot.state.load(SeqCst) == WAITING {
+                    let remaining = deadline.saturating_duration_since(Instant::now());
+                    assert!(
+                        !remaining.is_zero(),
+                        "terminal notification was not observed"
+                    );
+                    thread::park_timeout(remaining.min(POLL));
+                }
+                let state = slot.state.load(SeqCst);
+                let unlocked = slot.data.try_lock().is_ok();
+                reaper.join().unwrap();
+                assert_eq!(state, FAILED);
+                assert!(unlocked, "terminal publication must follow metadata unlock");
+            });
+        }
+
         #[test]
         fn valid_same_child_reap_confirms_after_unrelated_reaper_death() {
             for dead in [false, true] {
@@ -1440,7 +1597,10 @@ mod unix_io {
     use std::{
         io,
         net::Shutdown,
-        os::{fd::OwnedFd, unix::net::UnixStream},
+        os::{
+            fd::{AsRawFd, OwnedFd},
+            unix::net::UnixStream,
+        },
     };
 
     const CHUNK: usize = 8192;
@@ -1483,7 +1643,79 @@ mod unix_io {
             Ok(())
         }
     }
+    fn wait_timeout(remaining: Duration) -> Option<libc::c_int> {
+        if remaining.is_zero() {
+            return None;
+        }
+        // poll has millisecond granularity. Never spin with a zero timeout or
+        // request more than the existing 2 ms cancellation/status-check quantum.
+        Some(
+            remaining
+                .min(Duration::from_millis(2))
+                .as_nanos()
+                .div_ceil(1_000_000) as libc::c_int,
+        )
+    }
+
+    fn wait_ready(stream: &UnixStream, events: libc::c_short, deadline: Instant) -> io::Result<()> {
+        let Some(timeout) = wait_timeout(deadline.saturating_duration_since(Instant::now())) else {
+            return Ok(());
+        };
+        let mut descriptor = libc::pollfd {
+            // With no outstanding I/O, ignore socket EOF/HUP and wait only for
+            // the next bounded child-status/control check, rather than spin.
+            fd: if events == 0 { -1 } else { stream.as_raw_fd() },
+            events,
+            revents: 0,
+        };
+        // SAFETY: one initialized pollfd lives exclusively for this call; the
+        // borrowed UnixStream owns its fd throughout. poll retains no pointers.
+        let result = unsafe { libc::poll(&mut descriptor, 1, timeout) };
+        if result < 0 {
+            let error = io::Error::last_os_error();
+            if error.kind() != io::ErrorKind::Interrupted {
+                return Err(error);
+            }
+        } else if descriptor.revents & libc::POLLNVAL != 0 {
+            return Err(io::ErrorKind::InvalidInput.into());
+        }
+        // Readiness, timeout, EINTR and HUP are hints: the next ordinary pump
+        // tick checks cancellation/deadline first, then performs bounded I/O.
+        Ok(())
+    }
+
     impl Pump {
+        fn wait_events(&self) -> libc::c_short {
+            let mut events = 0;
+            if self.reader.is_none() {
+                events |= libc::POLLIN;
+            }
+            // An already-completed writer must not watch POLLOUT: sockets are
+            // commonly writable while we are waiting for child output.
+            if self.writer.is_none() || self.input_close.is_none() {
+                events |= libc::POLLOUT;
+            }
+            events
+        }
+
+        fn check_control(
+            &self,
+            deadline: Instant,
+            cancelled: &AtomicBool,
+            observer: Option<&mut DeadlineObserver>,
+        ) -> Result<(), ParserError> {
+            if let Err(error) = control(deadline, cancelled) {
+                if error == ParserError::Timeout
+                    && !self.exited
+                    && let Some(observer) = observer
+                {
+                    observer.select_deadline();
+                }
+                return Err(error);
+            }
+            Ok(())
+        }
+
         fn reserve_output_room(&mut self, additional: usize) -> Result<(), ParserError> {
             let needed = self
                 .output
@@ -1581,15 +1813,7 @@ mod unix_io {
             observer: Option<&mut DeadlineObserver>,
             status: impl FnOnce() -> io::Result<Option<std::process::ExitStatus>>,
         ) -> Result<Step, ParserError> {
-            if let Err(error) = control(deadline, cancelled) {
-                if error == ParserError::Timeout
-                    && !self.exited
-                    && let Some(observer) = observer
-                {
-                    observer.select_deadline();
-                }
-                return Err(error);
-            }
+            self.check_control(deadline, cancelled, observer)?;
             let mut progress = self.read(stream);
             if !self.exited {
                 if let Some(result) = self.reader {
@@ -1642,8 +1866,27 @@ mod unix_io {
             .stdin(Stdio::from(OwnedFd::from(child_stream)))
             .stdout(Stdio::from(OwnedFd::from(child_output)))
             .env_clear();
+        #[cfg(test)]
+        let mut observation = if observer.is_none() {
+            native_io_observation::Observation::requested(&mut command, deadline)
+        } else {
+            None
+        };
         cleanup.1 = false;
-        lease.spawn(&mut command)?;
+        let spawned = lease.spawn(&mut command);
+        #[cfg(not(test))]
+        spawned?;
+        #[cfg(test)]
+        if let Some(observation) = &mut observation {
+            observation.spawned(spawned);
+        }
+        #[cfg(test)]
+        if let Err(error) = spawned {
+            if let Some(observation) = observation {
+                observation.finish(&Err(error), cleanup.0, std::io::stderr().lock());
+            }
+            return Err(error);
+        }
         drop(command);
         let result = {
             // Close the parent endpoint before cleanup on both return and unwind.
@@ -1657,16 +1900,50 @@ mod unix_io {
                     cancelled,
                     observer.as_deref_mut(),
                     || lease.status(),
-                )?;
-                match step {
+                );
+                #[cfg(test)]
+                if let Some(observation) = &mut observation {
+                    use native_io_observation::{Decision, Sample};
+                    observation.tick(Sample {
+                        read_bytes: match &step {
+                            Ok(Step::Complete(bytes)) => bytes.len(),
+                            _ => pump.output.len(),
+                        },
+                        written_bytes: pump.offset,
+                        reader: pump.reader,
+                        writer: pump.writer,
+                        input_close: pump.input_close,
+                        exited: pump.exited,
+                        decision: match &step {
+                            Ok(Step::Pending(progress)) => Decision::Pending(*progress),
+                            Ok(Step::Complete(_)) => Decision::Complete,
+                            Err(error) => Decision::Error(*error),
+                        },
+                    });
+                }
+                match step? {
                     Step::Complete(bytes) => return Ok(bytes),
-                    Step::Pending(false) => thread::sleep(Duration::from_millis(2)),
+                    Step::Pending(false) => {
+                        if wait_ready(&stream, pump.wait_events(), deadline).is_err() {
+                            pump.check_control(deadline, cancelled, observer.as_deref_mut())?;
+                            return Err(ParserError::Io);
+                        }
+                    }
                     Step::Pending(true) => {}
                 }
             })()
         };
         cleanup.0 = lease.cleanup();
         cleanup.1 = cleanup.0 == admission::Cleanup::Confirmed;
+        #[cfg(test)]
+        {
+            let result = admission::select_result(result, cleanup.0);
+            if let Some(observation) = observation {
+                observation.finish(&result, cleanup.0, std::io::stderr().lock());
+            }
+            result
+        }
+        #[cfg(not(test))]
         admission::select_result(result, cleanup.0)
     }
 
@@ -1752,6 +2029,64 @@ mod unix_io {
                 Err(error) => error,
                 _ => panic!("expected rejected step"),
             }
+        }
+
+        #[test]
+        fn idle_wait_timeout_is_positive_bounded_and_skipped_after_expiry() {
+            assert_eq!(wait_timeout(Duration::ZERO), None);
+            for (remaining, timeout) in [
+                (Duration::from_nanos(1), 1),
+                (Duration::from_millis(1), 1),
+                (Duration::from_nanos(1_000_001), 2),
+                (Duration::from_millis(2), 2),
+                (TIMEOUT, 2),
+            ] {
+                assert_eq!(wait_timeout(remaining), Some(timeout));
+            }
+        }
+
+        #[test]
+        fn idle_readiness_watches_only_unfinished_io() {
+            let mut pump = Pump::default();
+            assert_eq!(pump.wait_events(), libc::POLLIN | libc::POLLOUT);
+            pump.writer = Some(Ok(()));
+            pump.input_close = Some(Ok(()));
+            // Watching the usually-writable socket here would busy-spin instead
+            // of waiting for the output that the reader actually needs.
+            assert_eq!(pump.wait_events(), libc::POLLIN);
+            pump.reader = Some(Ok(()));
+            // EOF is no longer useful readiness while we await child status.
+            assert_eq!(pump.wait_events(), 0);
+            pump.writer = Some(Err(ParserError::Io));
+            pump.input_close = None;
+            assert_eq!(pump.wait_events(), libc::POLLOUT);
+            pump.input_close = Some(Err(ParserError::Io));
+            assert_eq!(pump.wait_events(), 0);
+            pump.writer = None;
+            assert_eq!(pump.wait_events(), libc::POLLOUT);
+        }
+
+        #[test]
+        fn queued_socket_output_and_eof_resume_the_ordinary_bounded_reader() {
+            let (mut stream, mut peer) = UnixStream::pair().unwrap();
+            stream.set_nonblocking(true).unwrap();
+            let mut pump = Pump {
+                writer: Some(Ok(())),
+                input_close: Some(Ok(())),
+                ..Pump::default()
+            };
+            peer.write_all(b"ready").unwrap();
+            wait_ready(&stream, pump.wait_events(), Instant::now() + TIMEOUT).unwrap();
+            assert!(pump.read(&mut stream));
+            assert_eq!(pump.output, b"ready");
+            assert_eq!(pump.reader, None);
+            assert_eq!(pump.wait_events(), libc::POLLIN);
+            peer.shutdown(Shutdown::Write).unwrap();
+            wait_ready(&stream, pump.wait_events(), Instant::now() + TIMEOUT).unwrap();
+            assert!(pump.read(&mut stream));
+            assert_eq!(pump.reader, Some(Ok(())));
+            assert_eq!(pump.wait_events(), 0);
+            assert_eq!(pump.output, b"ready");
         }
 
         #[test]
@@ -1975,9 +2310,8 @@ mod unix_io {
         fn controls_precede_readiness_and_only_running_deadline_sends() {
             for exited in [false, true] {
                 for cancel in [false, true] {
-                    let (socket, peer) = std::os::unix::net::UnixDatagram::pair().unwrap();
-                    socket.set_nonblocking(true).unwrap();
-                    peer.set_nonblocking(true).unwrap();
+                    let socket = ObservationChannel::pair().unwrap();
+                    let peer = socket.peer.try_clone().unwrap();
                     let mut observer = DeadlineObserver {
                         socket,
                         evidence: DeadlineEvidence::default(),
@@ -2077,9 +2411,8 @@ mod unix_io {
                             .writes
                             .push_back(Err(io::ErrorKind::BrokenPipe.into()));
                     }
-                    let (socket, peer) = std::os::unix::net::UnixDatagram::pair().unwrap();
-                    socket.set_nonblocking(true).unwrap();
-                    peer.set_nonblocking(true).unwrap();
+                    let socket = ObservationChannel::pair().unwrap();
+                    let peer = socket.peer.try_clone().unwrap();
                     let mut observer = DeadlineObserver {
                         socket,
                         evidence: DeadlineEvidence::default(),
@@ -2144,6 +2477,9 @@ mod unix_io {
         }
     }
 }
+
+#[cfg(all(test, unix))]
+mod native_io_observation;
 
 #[cfg(not(unix))]
 fn supervise_piped(
@@ -2482,7 +2818,6 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn generic_copy_wire_is_bounded_and_rejects_invalid_or_duplicate_records() {
-        use std::os::unix::net::UnixDatagram;
         let source = "class C<T fun f() = 1";
         let record = GenericCopyRecord {
             status: 1,
@@ -2543,13 +2878,13 @@ mod tests {
             assert_eq!(GenericCopyRecord::from_bytes(packet, source), None);
         }
         for duplicate in [false, true] {
-            let (parent, worker) = UnixDatagram::pair().unwrap();
-            parent.set_nonblocking(true).unwrap();
-            worker.set_nonblocking(true).unwrap();
+            let parent = ObservationChannel::pair().unwrap();
+            let worker = parent.peer.try_clone().unwrap();
             worker.send(&bytes).unwrap();
             if duplicate {
                 worker.send(b"").unwrap();
             }
+            drop(worker); // Model child exit before record and sentinel reads.
             let evidence = GenericCopyObserver(parent).finish(source);
             assert_eq!(
                 evidence,
@@ -2560,16 +2895,16 @@ mod tests {
                 }
             );
         }
-        let (parent, _worker) = UnixDatagram::pair().unwrap();
-        parent.set_nonblocking(true).unwrap();
+        let parent = ObservationChannel::pair().unwrap();
         assert_eq!(
             GenericCopyObserver(parent).finish(source),
             GenericCopyEvidence::Missing
         );
         for packet in [b"".as_slice(), &bytes[..63], &[0; 65]] {
-            let (parent, worker) = UnixDatagram::pair().unwrap();
-            parent.set_nonblocking(true).unwrap();
+            let parent = ObservationChannel::pair().unwrap();
+            let worker = parent.peer.try_clone().unwrap();
             worker.send(packet).unwrap();
+            drop(worker);
             assert_eq!(
                 GenericCopyObserver(parent).finish(source),
                 GenericCopyEvidence::Invalid
@@ -2980,10 +3315,14 @@ mod tests {
     #[test]
     #[ignore = "subprocess fault fixture"]
     fn fault_worker() {
+        #[cfg(unix)]
+        native_io_observation::child_stage(1);
         let mut source = String::new();
         // The no-read fixture consumes one byte, then leaves the remaining input unread.
         let mut first = [0u8; 1];
         std::io::stdin().read_exact(&mut first).unwrap();
+        #[cfg(unix)]
+        native_io_observation::child_stage(2);
         if first[0] == b'x' {
             loop {
                 thread::sleep(Duration::from_secs(1));
@@ -2991,14 +3330,19 @@ mod tests {
         }
         source.push(first[0] as char);
         std::io::stdin().read_to_string(&mut source).unwrap();
+        #[cfg(unix)]
+        native_io_observation::child_stage(3);
         match source.as_str() {
             "hang" => loop {
                 thread::sleep(Duration::from_secs(1));
             },
             "oversize" => {
-                std::io::stdout()
-                    .write_all(&vec![b'x'; MAX_OUTPUT_BYTES + 1])
-                    .unwrap();
+                let output = vec![b'x'; MAX_OUTPUT_BYTES + 1];
+                #[cfg(unix)]
+                native_io_observation::child_stage(4);
+                std::io::stdout().write_all(&output).unwrap();
+                #[cfg(unix)]
+                native_io_observation::child_stage(5);
             }
             "crash" => std::process::abort(),
             "exit-failure" => std::process::exit(1),
@@ -3012,12 +3356,42 @@ mod tests {
 #[cfg(all(test, unix))]
 mod deadline_tests {
     use super::*;
-    use std::os::unix::net::UnixDatagram;
+
+    #[test]
+    fn observation_channel_remains_live_after_external_worker_aliases_close() {
+        let mut command = Command::new("unused-test-fixture");
+        let channel = ObservationChannel::new(&mut command).unwrap();
+        let worker = channel.peer.try_clone().unwrap();
+        worker.send(b"receipt").unwrap();
+        drop(worker);
+        drop(command);
+        let mut bytes = [0; 17];
+        assert_eq!(channel.recv(&mut bytes).unwrap(), 7);
+        assert_eq!(&bytes[..7], b"receipt");
+        assert_eq!(
+            channel.recv(&mut bytes).unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock
+        );
+    }
+
+    #[test]
+    fn observation_channel_and_child_alias_are_close_on_exec() {
+        use std::os::fd::AsRawFd;
+        let channel = ObservationChannel::pair().unwrap();
+        let child_alias = channel.peer.try_clone().unwrap();
+        for descriptor in [&channel.receiver, &channel.peer, &child_alias] {
+            // SAFETY: F_GETFD only reads flags for this live, borrowed descriptor.
+            let flags = unsafe { libc::fcntl(descriptor.as_raw_fd(), libc::F_GETFD) };
+            assert!(flags >= 0);
+            assert_ne!(flags & libc::FD_CLOEXEC, 0);
+        }
+    }
 
     #[test]
     fn deadline_receipts_require_exact_challenge_ack_and_empty_sentinel() {
         for (packets, selected, sent, expected) in [
             (vec![], true, Some(Ok(16)), DeadlineReceipt::Missing),
+            (vec![], false, None, DeadlineReceipt::Missing),
             (
                 vec![b"KTLSP-EOF-v1!!!!".to_vec()],
                 true,
@@ -3051,7 +3425,9 @@ mod deadline_tests {
                 DeadlineReceipt::Invalid,
             ),
             (
-                vec![vec![b'X'; 4096]],
+                // Exercise receive-buffer truncation with a transmittable datagram:
+                // Darwin's default Unix datagram send limit can be below 4096.
+                vec![b"KTLSP-EOF-v1!!!!xx".to_vec()],
                 true,
                 Some(Ok(16)),
                 DeadlineReceipt::Invalid,
@@ -3069,12 +3445,12 @@ mod deadline_tests {
                 DeadlineReceipt::Invalid,
             ),
         ] {
-            let (socket, worker) = UnixDatagram::pair().unwrap();
-            socket.set_nonblocking(true).unwrap();
-            worker.set_nonblocking(true).unwrap();
+            let socket = ObservationChannel::pair().unwrap();
+            let worker = socket.peer.try_clone().unwrap();
             for packet in packets {
                 worker.send(&packet).unwrap();
             }
+            drop(worker); // Model child exit before both strict receive checks.
             let observer = DeadlineObserver {
                 socket,
                 evidence: DeadlineEvidence {
@@ -3088,10 +3464,18 @@ mod deadline_tests {
     }
 
     #[test]
+    fn oversized_ack_bytes_are_rejected_independently_of_datagram_send_limits() {
+        let mut bytes = vec![b'x'; 4096];
+        bytes[..16].copy_from_slice(b"KTLSP-EOF-v1!!!!");
+        assert!(!is_deadline_ack(&bytes));
+        assert!(!is_deadline_ack(&bytes[..17]));
+        assert!(is_deadline_ack(&bytes[..16]));
+    }
+
+    #[test]
     fn failed_decision_send_is_not_a_witness() {
-        let (socket, worker) = UnixDatagram::pair().unwrap();
-        socket.set_nonblocking(true).unwrap();
-        drop(worker);
+        let socket = ObservationChannel::pair().unwrap();
+        socket.receiver.shutdown(std::net::Shutdown::Write).unwrap();
         let mut observer = DeadlineObserver {
             socket,
             evidence: DeadlineEvidence::default(),

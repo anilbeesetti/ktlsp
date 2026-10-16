@@ -1,0 +1,165 @@
+# Publish only after ROOT composes reviewed CHANGED Mac source; never use this
+# workflow to retry the known unchanged Mac failure. No manual dispatch inputs.
+# #329 diagnostics do not resolve historical W1/W2/W3 or certify Windows support.
+name: Native platform checks
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  native-platform:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      CARGO_TERM_COLOR: never
+      RUSTFLAGS: ''
+      CARGO_ENCODED_RUSTFLAGS: ''
+      RUSTC_WRAPPER: ''
+      RUSTC_WORKSPACE_WRAPPER: ''
+      RUSTC_BOOTSTRAP: ''
+    steps:
+      - name: Record and admit immutable actual PR merge source
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_REF: ${{ github.ref }}
+          PR_MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_NUMBER: ${{ github.event.number }}
+          EVENT_NAME: ${{ github.event_name }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $evidence = "$env:RUNNER_TEMP/native-platform-evidence"
+          New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+          @{
+            source_sha = $env:SOURCE_SHA
+            source_ref = $env:SOURCE_REF
+            pr_merge_sha = $env:PR_MERGE_SHA
+            pr_merge_sha_present = -not [string]::IsNullOrEmpty($env:PR_MERGE_SHA)
+            pr_head_sha = $env:PR_HEAD_SHA
+            pr_base_sha = $env:PR_BASE_SHA
+            pr_number = $env:PR_NUMBER
+            event_name = $env:EVENT_NAME
+            workflow_sha = $env:WORKFLOW_SHA
+            workflow_ref = $env:WORKFLOW_REF
+            repository = $env:REPOSITORY
+            run_id = '${{ github.run_id }}'
+            run_attempt = '${{ github.run_attempt }}'
+            runner_os = '${{ runner.os }}'
+            runner_arch = '${{ runner.arch }}'
+            image_os = $env:ImageOS
+            image_version = $env:ImageVersion
+            os_description = [System.Runtime.InteropServices.RuntimeInformation]::OSDescription
+            powershell = $PSVersionTable.PSVersion.ToString()
+          } | ConvertTo-Json | Set-Content "$evidence/identity.json" -Encoding utf8NoBOM
+          # The payload merge_commit_sha is observational: it may be absent or
+          # stale while GitHub has already selected a newer immutable test merge.
+          if ($env:EVENT_NAME -cne 'pull_request' -or
+              $env:SOURCE_SHA -cnotmatch '^[0-9a-f]{40}$' -or
+              $env:PR_NUMBER -cnotmatch '^[1-9][0-9]*$' -or
+              $env:SOURCE_REF -cne "refs/pull/$env:PR_NUMBER/merge" -or
+              $env:PR_HEAD_SHA -cnotmatch '^[0-9a-f]{40}$' -or
+              $env:PR_BASE_SHA -cnotmatch '^[0-9a-f]{40}$' -or
+              $env:WORKFLOW_SHA -cne $env:SOURCE_SHA -or
+              $env:WORKFLOW_REF -cne "$env:REPOSITORY/.github/workflows/native-platform-checks.yml@refs/pull/$env:PR_NUMBER/merge") {
+            throw 'Only the immutable actual PR merge SHA and its workflow are admitted'
+          }
+          @(
+            "CARGO_HOME=$env:RUNNER_TEMP/native-platform-cargo"
+            "CARGO_TARGET_DIR=$env:RUNNER_TEMP/native-platform-target"
+          ) | Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8
+      - uses: actions/checkout@v4
+        # Use one byte policy from the first materialization, not only on a
+        # later checkout-index call. The shared preflight persists it locally.
+        env:
+          GIT_CONFIG_COUNT: '2'
+          GIT_CONFIG_KEY_0: core.autocrlf
+          GIT_CONFIG_VALUE_0: 'false'
+          GIT_CONFIG_KEY_1: core.eol
+          GIT_CONFIG_VALUE_1: lf
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Retain exact source preflight before fail-closed rejection
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          & ./tools/ci/native-source-preflight.ps1 -EvidenceDirectory "$env:RUNNER_TEMP/native-platform-evidence"
+      - name: Verify actual merge parents against original event identities
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $facts = @{
+            source_sha = $env:SOURCE_SHA
+            expected_base = $env:PR_BASE_SHA
+            expected_head = $env:PR_HEAD_SHA
+            stdout = @()
+            exit_code = $null
+            exception = $null
+          }
+          try {
+            $facts.stdout = @(git show --no-patch '--format=%P' $env:SOURCE_SHA)
+            $facts.exit_code = $LASTEXITCODE
+          } catch {
+            $facts.exception = $_.ToString()
+          }
+          $facts | ConvertTo-Json | Set-Content "$env:RUNNER_TEMP/native-platform-evidence/merge-parents.json" -Encoding utf8NoBOM
+          if ($null -ne $facts.exception -or $facts.exit_code -ne 0 -or
+              $facts.stdout.Count -ne 1 -or
+              $facts.stdout[0] -cne "$env:PR_BASE_SHA $env:PR_HEAD_SHA") {
+            throw 'Actual immutable merge parents do not match the original event base/head'
+          }
+      - name: Install and record pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.99.0 --profile minimal --component rustfmt --component clippy 2>&1 | Tee-Object "$env:RUNNER_TEMP/native-platform-evidence/toolchain-install.txt"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustc +1.99.0 -vV 2>&1 | Tee-Object "$env:RUNNER_TEMP/native-platform-evidence/rustc.txt"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo +1.99.0 -Vv 2>&1 | Tee-Object "$env:RUNNER_TEMP/native-platform-evidence/cargo.txt"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Format
+        run: |
+          cargo +1.99.0 fmt --all -- --check 2>&1 | Tee-Object "$env:RUNNER_TEMP/native-platform-evidence/format.txt"
+          $code = $LASTEXITCODE
+          "exit_code=$code" | Set-Content "$env:RUNNER_TEMP/native-platform-evidence/format-exit.txt"
+          exit $code
+      - name: Strict locked workspace Clippy
+        run: |
+          cargo +1.99.0 clippy --locked --workspace --all-targets -- -D warnings 2>&1 | Tee-Object "$env:RUNNER_TEMP/native-platform-evidence/clippy.txt"
+          $code = $LASTEXITCODE
+          "exit_code=$code" | Set-Content "$env:RUNNER_TEMP/native-platform-evidence/clippy-exit.txt"
+          exit $code
+      - name: Full locked release workspace tests
+        env:
+          KTLSP_NATIVE_IO_OBSERVE: '1'
+        run: |
+          cargo +1.99.0 test --locked --release --workspace --no-fail-fast -- --nocapture 2>&1 | Tee-Object "$env:RUNNER_TEMP/native-platform-evidence/workspace-tests.txt"
+          $code = $LASTEXITCODE
+          "exit_code=$code" | Set-Content "$env:RUNNER_TEMP/native-platform-evidence/workspace-tests-exit.txt"
+          if ($code -ne 0) { exit $code }
+          # Cargo previously returned zero after a build-child stripping abort.
+          if (Select-String -Path "$env:RUNNER_TEMP/native-platform-evidence/clippy.txt", "$env:RUNNER_TEMP/native-platform-evidence/workspace-tests.txt" -Pattern 'rust-objcopy|libLLVM|SIGABRT|signal: 6|failed to strip|stripping.*failed' -Quiet) {
+            throw 'Native build/test child failure requires investigation'
+          }
+      - name: Preserve native platform evidence, including early failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-platform-evidence-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/native-platform-evidence/
+          if-no-files-found: error
+          retention-days: 14

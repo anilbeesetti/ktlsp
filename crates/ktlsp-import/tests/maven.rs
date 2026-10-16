@@ -1,6 +1,6 @@
 use ktlsp_import::maven::{self, Error, Pom};
 use ktlsp_project::{DependencyScope, SourceRootKind};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 const SIMPLE: &str = "<project><modelVersion>4.0.0</modelVersion><groupId>org.example</groupId><artifactId>app</artifactId><version>1.0</version></project>";
 fn base() -> PathBuf {
@@ -563,7 +563,7 @@ fn byte_event_depth_and_path_limits_are_checked() {
         ))),
         Err(Error::Budget("path bytes"))
     ));
-    let huge_base = Path::new("/").join(&long);
+    let huge_base = base().join(&long);
     assert!(matches!(
         maven::from_poms(
             huge_base,

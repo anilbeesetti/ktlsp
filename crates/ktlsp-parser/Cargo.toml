@@ -11,6 +11,9 @@ ktlsp-text = { path = "../ktlsp-text" }
 serde.workspace = true
 serde_json.workspace = true
 
+[target.'cfg(unix)'.dependencies]
+libc = { version = "=0.2.190", default-features = false, features = ["std"] }
+
 [[test]]
 name = "worker_protocol"
 harness = false

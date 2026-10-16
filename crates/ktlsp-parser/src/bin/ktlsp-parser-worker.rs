@@ -464,6 +464,34 @@ mod tests {
         assert!(CALLS.with(std::cell::Cell::get) > calls);
     }
     #[cfg(unix)]
+    fn is_datagram_backpressure(error: &std::io::Error) -> bool {
+        error.kind() == std::io::ErrorKind::WouldBlock
+            // Darwin reports a full nonblocking Unix datagram queue as ENOBUFS,
+            // not EAGAIN. This classification belongs only to the fill fixture.
+            || (cfg!(target_vendor = "apple") && error.raw_os_error() == Some(libc::ENOBUFS))
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn datagram_backpressure_classification_keeps_other_errors_fatal() {
+        assert!(is_datagram_backpressure(
+            &std::io::ErrorKind::WouldBlock.into()
+        ));
+        assert_eq!(
+            is_datagram_backpressure(&std::io::Error::from_raw_os_error(libc::ENOBUFS)),
+            cfg!(target_vendor = "apple")
+        );
+        for code in [libc::EINTR, libc::EBADF, libc::EMSGSIZE, libc::ECONNRESET] {
+            assert!(!is_datagram_backpressure(
+                &std::io::Error::from_raw_os_error(code)
+            ));
+        }
+        assert!(!is_datagram_backpressure(&std::io::Error::other(
+            "not a queue error"
+        )));
+    }
+
+    #[cfg(unix)]
     #[test]
     fn checkpoint_is_sampled_and_disarms_before_one_ack_attempt() {
         use std::os::unix::net::UnixDatagram;
@@ -476,6 +504,10 @@ mod tests {
             let (parent, socket) = UnixDatagram::pair().unwrap();
             parent.set_nonblocking(true).unwrap();
             socket.set_nonblocking(true).unwrap();
+            // Keep the channel live after disarm drops its observer-owned alias.
+            // Production likewise retains the original stderr fd until exit.
+            // An empty live queue, not peer-close errno, proves no extra ACK.
+            let _worker_endpoint = socket.try_clone().unwrap();
             DEADLINE_OBSERVER.with(|(disabled, state)| {
                 disabled.set(false);
                 *state.borrow_mut() = Some((socket, 0));
@@ -537,12 +569,17 @@ mod tests {
             let (parent, socket) = UnixDatagram::pair().unwrap();
             parent.set_nonblocking(true).unwrap();
             socket.set_nonblocking(true).unwrap();
+            let _worker_endpoint = socket.try_clone().unwrap();
+            let mut queued = 0;
             if !peer_lost {
                 let mut full = false;
                 for _ in 0..4096 {
                     match socket.send(b"synthetic-noise") {
-                        Ok(_) => {}
-                        Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        Ok(count) => {
+                            assert_eq!(count, b"synthetic-noise".len());
+                            queued += 1;
+                        }
+                        Err(e) if is_datagram_backpressure(&e) => {
                             full = true;
                             break;
                         }
@@ -550,15 +587,39 @@ mod tests {
                     }
                 }
                 assert!(full, "finite synthetic queue did not backpressure");
+                assert!(queued > 0, "fixture must queue noise before backpressure");
             }
             parent.send(b"KTLSP-DUE-v1!!!!").unwrap();
-            if peer_lost {
+            let parent = if peer_lost {
                 drop(parent);
-            }
+                None
+            } else {
+                Some(parent)
+            };
             DEADLINE_OBSERVER.with(|(disabled, state)| {
                 disabled.set(false);
                 *state.borrow_mut() = Some((socket, 0));
             });
+            for _ in 0..1024 {
+                deadline_checkpoint();
+            }
+            DEADLINE_OBSERVER.with(|(disabled, state)| {
+                assert!(disabled.get());
+                assert!(state.borrow().is_none());
+            });
+            if let Some(parent) = &parent {
+                let mut bytes = [0; 17];
+                for _ in 0..queued {
+                    let count = parent.recv(&mut bytes).unwrap();
+                    assert_eq!(&bytes[..count], b"synthetic-noise");
+                }
+                assert_eq!(
+                    parent.recv(&mut bytes).unwrap_err().kind(),
+                    std::io::ErrorKind::WouldBlock
+                );
+            }
+            // Once capacity returns, an accidentally armed retry would now
+            // become observable. Disarm must prevent a late ACK as well.
             for _ in 0..2048 {
                 deadline_checkpoint();
             }
@@ -566,6 +627,12 @@ mod tests {
                 assert!(disabled.get());
                 assert!(state.borrow().is_none());
             });
+            if let Some(parent) = &parent {
+                assert_eq!(
+                    parent.recv(&mut [0; 17]).unwrap_err().kind(),
+                    std::io::ErrorKind::WouldBlock
+                );
+            }
         }
     }
     #[test]

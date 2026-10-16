@@ -303,7 +303,6 @@ fn malformed_supported_fields_report_exact_schema_pointers() {
 #[test]
 fn rich_edges_do_not_admit_other_unsupported_semantics() {
     for (pointer, replacement) in [
-        ("/sdks", json!([{"name":"JDK"}])),
         ("/kotlinSettings", json!([{}])),
         ("/javaSettings", json!([{}])),
         ("/externalSystem", json!("GRADLE")),
@@ -351,21 +350,23 @@ fn rich_edges_do_not_admit_other_unsupported_semantics() {
             unsupported(value, pointer);
         }
     }
-    for variant in ["sdk", "inheritedSdk", "future"] {
+    {
         let mut value = fixture();
         value["modules"][0]["dependencies"]
             .as_array_mut()
             .unwrap()
-            .push(json!({"type":variant}));
+            .push(json!({"type":"future"}));
         unsupported(value, "/modules/0/dependencies/12/type");
     }
     let mut value = fixture();
-    value["sdks"] = json!([{}]);
     value["modules"][0]["dependencies"][0]["scope"] = Value::Null;
     assert!(
         matches!(import(value), Err(v2::Error::Import(ImportError::Schema { path, .. })) if path == "/modules/0/dependencies/0/scope")
     );
-    for key in ["sdks", "kotlinSettings", "javaSettings"] {
+    assert!(
+        matches!(import(json!({"sdks":null})), Err(v2::Error::Import(ImportError::Schema { path, .. })) if path == "/sdks")
+    );
+    for key in ["kotlinSettings", "javaSettings"] {
         unsupported(json!({key:null}), &format!("/{key}"));
         assert!(import(json!({key:[]})).is_ok());
     }

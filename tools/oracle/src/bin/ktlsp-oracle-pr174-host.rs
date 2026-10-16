@@ -1540,61 +1540,6 @@ mod host {
         }
         Ok(m)
     }
-    fn systemctl_usec(s: &str) -> Result<u64> {
-        if s.is_empty() || s.len() > 128 {
-            return Err("systemctl timespan length".into());
-        }
-        let mut total = 0_u64;
-        let mut previous = u64::MAX;
-        for (index, part) in s.split(' ').enumerate() {
-            if index >= 6 {
-                return Err("systemctl timespan unit count".into());
-            }
-            let (number, factor) = [
-                ("us", 1_u64),
-                ("µs", 1),
-                ("ms", 1000),
-                ("s", 1_000_000),
-                ("min", 60_000_000),
-                ("h", 3_600_000_000),
-                ("d", 86_400_000_000),
-            ]
-            .into_iter()
-            .find_map(|(unit, factor)| part.strip_suffix(unit).map(|n| (n, factor)))
-            .ok_or("unsupported systemctl timespan unit")?;
-            if factor >= previous {
-                return Err("repeated/unordered systemctl timespan unit".into());
-            }
-            previous = factor;
-            let (whole, fraction) = number.split_once('.').unwrap_or((number, ""));
-            if whole.is_empty()
-                || !whole.bytes().all(|b| b.is_ascii_digit())
-                || fraction.len() > 6
-                || !fraction.bytes().all(|b| b.is_ascii_digit())
-                || (number.contains('.') && fraction.is_empty())
-            {
-                return Err("malformed systemctl timespan number".into());
-            }
-            let whole = whole.parse::<u64>().map_err(|_| "timespan overflow")?;
-            let mut value = whole.checked_mul(factor).ok_or("timespan overflow")?;
-            if !fraction.is_empty() {
-                let digits = fraction.parse::<u64>().map_err(|_| "timespan fraction")?;
-                let divisor = 10_u64.pow(fraction.len() as u32);
-                let scaled = digits.checked_mul(factor).ok_or("timespan overflow")?;
-                if scaled % divisor != 0 {
-                    return Err("submicrosecond systemctl timespan".into());
-                }
-                value = value
-                    .checked_add(scaled / divisor)
-                    .ok_or("timespan overflow")?;
-            }
-            total = total.checked_add(value).ok_or("timespan overflow")?;
-        }
-        if total == 0 {
-            return Err("zero systemctl timespan".into());
-        }
-        Ok(total)
-    }
     fn watchdog_within_bound(trigger_us: u64, armed_ms: u64, now_ms: u64) -> bool {
         let upper = armed_ms
             .checked_add(540_000)

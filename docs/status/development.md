@@ -1714,3 +1714,42 @@ reviews precede once-only formatting/strict compile/native data+lexer smoke
 and ORIGINAL full unchanged-profile hosted CI. Actual source/CST/edit packets
 still require independent OWNER+ROOT full readback before writer cleanup.
 All new checks/runtime/performance comparisons remain UNEXECUTED.
+
+#### Exact first19-source static, native data and real API verification
+
+Both independent complete19-file reviews and all six affected component
+functionality/adversarial rechecks cleared51db6f91c31ec93a91d28c61dc8723c9aeefcb31/tree4bd4048b559bf56c8d9046bdbefce97d9b52e16d.
+ROOT oncefmt exited0; both complete-union and all affected exact formatted
+rechecks then cleared347463e0cada6e33b1acaed25660bfc6d18fd89f/treecab6dff1184de764dd991ff5c22d97e279232c4a.
+Strict pinned locked workspace/alltargets Clippy --keep-going -Dwarnings
+exited0 on that source. Native BINARY DATA ONLY suite passed529cases across
+57result rows,0failed/ignored/measured/filtered; no local parser/server test ran.
+
+ROOT ACTUALLY compiled and ran two standalone public native Rust consumers
+against Cargo-reported same-source rlibs, bothcompile/run0 with emptyerr.
+Genuine Pair2983bytes ->class->annotations->same retainedMetadata Outcome
+gave d1285/owner47..285; copy151..198 first171..179/type177..179 ->
+originalClassdeclaration54..60/ID0/ordinal0 and second181..189/type187..189 ->
+62..68/ID1/ordinal1, bothOUT/nullableNone/rawflagsSome2/defaulttrue.
+Equals200..220/other208..216/type212..216 yielded REAL resolver-derived
+kotlin/Any localfalse, nullableSomeTrue despite rawd2index22empty.
+WrongALLClassordinal3 actually refusedNotFunction at60. SameOutcome raw
+pointer+byte identity assertions passed for owner/functions/values/Types/
+declarations. The throwaway does not separately print declarationA/Bspellings
+or outerfields; the permanent genuine API test covers those additional facts.
+
+The purelexical string-data consumer returned15 exact original tokens across
+35bytes with originalUnicodecategory transitions, keywords/as?, combining/
+OtherNumber boundaries; actual printed diagnostics27..29 and32..34 were
+independently read. MAX8388608bytes yielded oneIdentifier0..8388608,
+0diagnostics;8388609 correctly refusedSourceTooLarge. Its one localARMdebug
+96054083ns observation is NOT comparative speedup/Session timing evidence.
+This lexical primitive is not the Kotlin parser; no local Session/worker/peer
+or JVM/oracle ran. ROOT+independent owners read COMPLETE actual sources,
+commands and outputs before ONLY two throwaway Rust sources were removed.
+Full source/proof bytes and permanent assertions remain retained.
+
+402/403/404/405 hosted fullDEBUG+platform execution, actual403CST/projection/
+edit readback, cache corpus behavior and comparable performance remain
+UNEXECUTED. Exact documentation-source recheck and OWN first original hosted
+CI remain required; native data proof never substitutes for parser/CLI proof.

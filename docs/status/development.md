@@ -559,3 +559,25 @@ line mapping or server navigation. Two independent code/adversarial union review
 cleared the composed source; final aggregate hosted CI and guarded integration
 remain separate gates. Native-only/T004 boundaries, #96 and full parity remain.
 
+## Verified native product union and next consumers #330
+
+Guarded PR359 delivered `9dfbea4df035ffdc5d4c62e293d0974eee0fd504`,
+tree `8b9cac4bb512b14cd3c01bce527d2d0142cd009b`, sole parent
+`bb6a75f61fd467c9b090210a369c7e1d225713d5`. Two independent full-union
+reviews cleared its exact 43-file source; ROOT exercised actual native data APIs
+and 648 pure-data/protocol checks without local parser runtime.
+[Original exact-main CI38877144851/job116894807060](https://github.com/anilbeesetti/ktlsp/actions/runs/38877144851/job/116894807060)
+passed 949 workspace tests plus 22 separate worker-protocol fault cases.
+[Original exact-main optional38877144953](https://github.com/anilbeesetti/ktlsp/actions/runs/38877144953)
+passed both hosts. OWNER and ROOT independently authenticated original attempt-1
+push/main APIs/logs, actual exact checkout, tree/sole parent, unchanged workflows
+and mandatory steps before clearing the exclusive base lease.
+
+This one verified incoming main now receives #357's bounded authenticated
+same-body local occurrences and #358's shared allocation-free borrowed JVM
+descriptor structure. Their component receipts and direct consumer observations
+remain separate from final combined CI and guarded integration. Occurrences
+are not workspace references; descriptors are not generics/nullability/linkage
+or semantic Java symbols. No new server capability or full-parity promotion
+follows. #96, broader parser recovery and full semantic/official parity remain open.
+

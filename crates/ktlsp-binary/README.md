@@ -53,10 +53,17 @@ No server capability or public feature-parity claim changes.
 classfiles from `fixtures/t017c1` through the public API, plus malformed, void,
 slot/rank/input boundaries and borrowed-pointer identity. Existing
 `provenance.json`, LICENSE and NOTICE remain authoritative and unchanged.
-The separate native pure-data consumer is reproducible with
-`cargo run --locked -p ktlsp-binary --example descriptor_smoke`; it reads the
-retained Builder classfile and checks borrowed fields, parameters, return/void,
-primitive/array structure and explicit malformed-input failure without Java.
+A separate native pure-data consumer on the composed source observed the retained
+Builder's four fields, seven methods and four parameters, checked original borrowed
+UTF-16 identity, primitive/array/void structure and explicit malformed-input failure.
+Its temporary runner was removed after observation; permanent API regressions remain.
+Original source `f7d63b099e9901da2419f656d3d510a8dc1d394b` passed
+[attempt-1 native CI38876243449/job116891884122](https://github.com/anilbeesetti/ktlsp/actions/runs/38876243449/job/116891884122):
+895 workspace passes at synthetic checkout `8344379420d4236ea7e931fb4651b55df487e8aa`,
+tree `fb3b5d869fe9ba6a24bcb232087fdc8b8de16ddf`, ordered parents
+`[bb6a75f61fd467c9b090210a369c7e1d225713d5,f7d63b099e9901da2419f656d3d510a8dc1d394b]`.
+ROOT independently authenticated those original identities and unchanged workflow.
+These are component/consumer observations, not final aggregate CI or parity evidence.
 
 ## Selected archive classfiles
 

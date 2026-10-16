@@ -502,8 +502,8 @@ impl<'a> LexicalTypeParameterBinding<'a> {
     }
 }
 
-/// Resolve only an authenticated simple annotation to one same-function type
-/// parameter. Outer declarations, imports and values are never candidates.
+/// Resolve an authenticated simple annotation in a closed ordinary outer type
+/// namespace. Imports, builtin spellings and value names are never candidates.
 pub fn bind_lexical_type_parameter<'a>(
     directory: &'a RegionDirectory<'a>,
     result: &'a SnapshotResult,
@@ -663,14 +663,25 @@ fn type_function<'a>(
     function_ordinal: Option<usize>,
     b: &mut ReferenceBudget,
 ) -> Result<TypeFunction<'a>> {
-    let function_ordinal = function_ordinal.ok_or(LocalBindingError::UnsupportedContext)?;
+    let immediate_ordinal = function_ordinal.ok_or(LocalBindingError::UnsupportedContext)?;
+    b.charge(1)?;
+    let immediate = directory
+        .lowered()
+        .declarations()
+        .get(immediate_ordinal)
+        .ok_or(LocalBindingError::InvalidOrigin)?;
+    if immediate.incomplete() || !b.equal(immediate.kind(), "FUN")? {
+        return Err(LocalBindingError::UnsupportedContext);
+    }
+    // Exactly one authenticated direct-local link, never an ancestor search.
+    let function_ordinal = immediate.owner().unwrap_or(immediate_ordinal);
     b.charge(1)?;
     let function = directory
         .lowered()
         .declarations()
         .get(function_ordinal)
         .ok_or(LocalBindingError::InvalidOrigin)?;
-    if function.incomplete() || !b.equal(function.kind(), "FUN")? {
+    if function.incomplete() || function.owner().is_some() || !b.equal(function.kind(), "FUN")? {
         return Err(LocalBindingError::UnsupportedContext);
     }
     let mut body = None;
@@ -684,15 +695,19 @@ fn type_function<'a>(
         }
     }
     let (body_ordinal, body) = body.ok_or(LocalBindingError::UnsupportedContext)?;
-    BodyCheck {
-        parsed,
-        directory,
-        selected: None,
-        selected_target: None,
-        cursor: 0,
-        b,
+    crate::call_syntax::validate_type_namespace(
+        directory.lowered(), parsed, function, body.cst_index(), b,
+    )?;
+    if immediate.owner().is_some() {
+        let node = b.element(parsed, immediate.cst_index())?;
+        b.charge(1)?;
+        if node.parent != Some(body.cst_index())
+            || directory.memberships().get(immediate_ordinal)
+                .ok_or(LocalBindingError::InvalidOrigin)?.region() != body_ordinal
+        {
+            return Err(LocalBindingError::UnsupportedContext);
+        }
     }
-    .function(function, body.cst_index())?;
     Ok(TypeFunction {
         ordinal: function_ordinal,
         function,
@@ -710,7 +725,7 @@ fn check_type_annotation(
     b: &mut ReferenceBudget,
 ) -> Result<()> {
     let annotated = annotation.annotated;
-    if annotated.incomplete() || annotated.owner() != Some(context.ordinal) {
+    if annotated.incomplete() {
         return Err(LocalBindingError::UnsupportedContext);
     }
     let parameter = b.equal(annotated.kind(), "VALUE_PARAMETER")?;
@@ -720,19 +735,36 @@ fn check_type_annotation(
     let parent = b.element(parsed, parent_index)?;
     b.charge(2)?;
     let expected_region = if parameter {
+        let owner_ordinal = annotated.owner().ok_or(LocalBindingError::UnsupportedContext)?;
+        b.charge(1)?;
+        let owner = directory.lowered().declarations().get(owner_ordinal)
+            .ok_or(LocalBindingError::InvalidOrigin)?;
+        if owner_ordinal != context.ordinal {
+            let node = b.element(parsed, owner.cst_index())?;
+            b.charge(1)?;
+            if owner.incomplete() || !b.equal(owner.kind(), "FUN")?
+                || owner.owner() != Some(context.ordinal)
+                || node.parent != Some(context.body.cst_index())
+                || directory.memberships().get(owner_ordinal)
+                    .ok_or(LocalBindingError::InvalidOrigin)?.region() != context.body_ordinal
+            {
+                return Err(LocalBindingError::UnsupportedContext);
+            }
+        }
         if parent.token
             || !b.equal(&parent.kind, "VALUE_PARAMETER_LIST")?
-            || parent.parent != Some(context.function.cst_index())
+            || parent.parent != Some(owner.cst_index())
         {
             return Err(LocalBindingError::UnsupportedContext);
         }
         directory
             .memberships()
-            .get(context.ordinal)
+            .get(owner_ordinal)
             .ok_or(LocalBindingError::InvalidOrigin)?
             .region()
     } else {
-        if !b.equal(annotated.kind(), "PROPERTY")? || parent_index != context.body.cst_index() {
+        if annotated.owner() != Some(context.ordinal)
+            || !b.equal(annotated.kind(), "PROPERTY")? || parent_index != context.body.cst_index() {
             return Err(LocalBindingError::UnsupportedContext);
         }
         context.body_ordinal
@@ -1016,7 +1048,8 @@ pub(super) fn type_occurrences_with_budget<'a>(
     type_annotation_storage(occurrences.capacity())?;
     for (ordinal, annotated) in directory.lowered().declarations().iter().enumerate() {
         b.charge(1)?;
-        if annotated.owner() != Some(context.ordinal)
+        if annotated.cst_index() <= context.function.cst_index()
+            || annotated.cst_index() >= node.subtree_end
             || !(b.equal(annotated.kind(), "VALUE_PARAMETER")?
                 || b.equal(annotated.kind(), "PROPERTY")?)
         {

@@ -701,7 +701,9 @@ fn wf_finish(name: &str) -> Result<Value> {
                     for (file, cap) in [("bootstrap-receipt.json",4096),("bootstrap/observer.evidence",126976),
                         ("admission.json",16384),("root-authorization.json",16384),("expected-grant.json",16384),
                         ("calibration.json",16384),("workflow.yml",16384),("binding.json",16384),
-                        ("teardown-receipt.json",16384),("receipts/observer.evidence",786432),("receipts/cleanup.evidence",262144)] {
+                        ("teardown-receipt.json",16384),("receipts/observer.evidence",786432),
+                        ("receipts/cleanup.evidence",262144),("preflight-failure.evidence",OBSERVER_BYTES as u64),
+                        ("export-failure.json",TERMINAL_BYTES as u64)] {
                         let source = dir.join(file);let dest = target.join(file);
                         if source.try_exists().map_err(|e| e.to_string())? && !dest.try_exists().map_err(|e| e.to_string())? {
                             copy_sealed(&source, &dest, cap, 0o444, end)?;

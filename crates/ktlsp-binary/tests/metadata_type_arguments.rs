@@ -740,7 +740,7 @@ fn both_levels_share_retained_capacity_growth() {
         assert_eq!(out.arguments.len(), k);
         for (i, selected) in out.arguments.iter().enumerate() {
             assert_eq!(selected.span, 2 * i + 2..2 * i + 2);
-            assert_eq!(selected.argument.raw, []);
+            assert!(selected.argument.raw.is_empty());
             assert_eq!(
                 (selected.argument.projection, selected.argument.type_id),
                 (None, None)
@@ -795,7 +795,7 @@ fn both_levels_share_retained_capacity_growth() {
         assert_eq!(out.arguments[0].argument.inline_types.len(), j);
         for (i, inline) in out.arguments[0].argument.inline_types.iter().enumerate() {
             assert_eq!(inline.span, 2 * i + 2..2 * i + 2);
-            assert_eq!(inline.raw, []);
+            assert!(inline.raw.is_empty());
         }
         error(
             &bytes,

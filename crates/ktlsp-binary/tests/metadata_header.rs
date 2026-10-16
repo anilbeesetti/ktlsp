@@ -148,10 +148,10 @@ fn supported_kinds_and_explicit_unsupported_preserve_input() {
 
 #[test]
 fn independent_byte_vectors_markers_multipart_and_unicode() {
-    assert_eq!(bytes(&[]), []);
-    assert_eq!(bytes(&[&[]]), []);
-    assert_eq!(bytes(&[&[0]]), []);
-    assert_eq!(bytes(&[&[0xffff]]), []);
+    assert!(bytes(&[]).is_empty());
+    assert!(bytes(&[&[]]).is_empty());
+    assert!(bytes(&[&[0]]).is_empty());
+    assert!(bytes(&[&[0xffff]]).is_empty());
     assert_eq!(
         bytes(&[&[0, 0, 1, 127, 128, 255, 256, 0xd800, 0xdcff, 0xffff]]),
         [0, 1, 127, 128, 255, 0, 0, 255, 255]

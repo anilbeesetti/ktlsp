@@ -354,3 +354,44 @@ depth ceilings are used: selected fixed leaves follow the existing depth2 rule.
 Property/alias contracts remain unchanged. No general generic reconstruction,
 substitution, bounds/type-table interpretation, source/module linkage, server
 integration or official Kotlin LSP parity is claimed; #96 remains open.
+
+## Same-model JVM method identity (#394)
+
+`metadata::linked_class_method::decode(&class, all_class_field_ordinal, limits)`
+extracts that supplied ClassFile model's own original class annotations and
+Metadata, admits kind1/mv2.3.0, completes Class framing, selects one original
+Constructor(field8) or Function(field9), and joins its effective JVM identity to
+exactly one original `&class.methods[method_ordinal]`. The public mutable model
+is the authority, **not proof of a parse or retained archive bytes**. Consumed
+model counts, CP tags/indices, UTF16 sizes, annotations and descriptors are
+revalidated; foreign caller-authored Header/Outcome objects are not inputs.
+
+Extension100 occurrences merge in encounter order with last recognized scalar
+wins and signed resolver indices. An explicit descriptor is mandatory. A present
+extension name wins; an absent name uses required Function.name or literal
+`<init>` for constructors, following pinned Kotlin
+[`JvmProtoBufUtil.kt` lines79–125](https://github.com/JetBrains/kotlin/blob/d57eb4a26ed01ab03cf195da686c8047032ff16f/core/metadata.jvm/src/org/jetbrains/kotlin/metadata/jvm/deserialization/JvmProtoBufUtil.kt#L79-L125).
+Absence is not index0; omitted descriptors are not inferred. All original methods,
+including bridges and overloads, participate in full lossless UTF16
+name+descriptor uniqueness, including return type. Zero/duplicate tuples refuse.
+Constructors require nonstatic `<init>` and void; ordinary Functions cannot bind
+`<init>`/`<clinit>`. Actual access flags determine descriptor receiver slots;
+metadata formal counts are not asserted equal to JVM arity.
+
+The result borrows the original Member and actual CP name/descriptor/owner, and
+owns one decoded-d1 buffer plus necessary lossless ClassId and metadata identity/
+spans. `this_class` is resolved through typed Class→Utf8. Owner mapping converts
+ClassId package dots to `/` and relative nested dots to `$` separately; local,
+quoted or otherwise unproved mappings refuse. No reverse-dollar or flattened-name
+guess establishes ownership.
+
+One monotonic schema/wire/name/work/capacity allowance also covers annotation and
+header decoding, d1+d2, complete framing, extension merging, owner/tuple comparison
+and native descriptor parsing. `Limits.bytes` includes visited original attribute
+payloads, decoded d1 and d2 UTF16 bytes; requested capacities exclude allocator
+surplus/churn and RSS. Existing raw/property/alias/selected-return APIs retain
+their separate contracts. Permanent pure-data checks cover genuine Pair Class
+constructor ordinal5→method0/CP8,9 and copy ordinal9→method6/CP50,51; these tests
+are source coverage, not an execution receipt. ROOT's separate public-API smoke
+and native-data admission remain required. No JVM/compiler, parser/server runtime,
+general Kotlin linkage/overload engine or official Kotlin LSP parity is claimed.

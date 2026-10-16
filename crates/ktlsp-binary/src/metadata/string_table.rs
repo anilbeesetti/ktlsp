@@ -66,22 +66,36 @@ fn limit(label: &'static str, offset: usize) -> Error {
         kind: ErrorKind::Limit(label),
     }
 }
-pub(super) struct Budget {
-    pub(super) wire: wire::Budget,
+pub(crate) struct Budget {
+    pub(crate) wire: wire::Budget,
     nodes: usize,
     depth: usize,
     pub(super) owned: usize,
+    input: usize,
 }
 impl Budget {
-    pub(super) fn new(limits: Limits) -> Self {
+    pub(crate) fn new(limits: Limits) -> Self {
         Self {
             wire: wire::Budget::new(limits.records, limits.work),
             nodes: limits.nodes.min(MAX_RECORDS),
             depth: limits.depth.min(2),
             owned: limits.owned_bytes.min(MAX_BYTES),
+            input: limits.bytes.min(MAX_BYTES),
         }
     }
 
+    pub(crate) fn input(&mut self, bytes: usize) -> Result<(), Error> {
+        self.input = self.input.checked_sub(bytes).ok_or(limit("bytes", 0))?;
+        Ok(())
+    }
+    pub(crate) fn nodes(&mut self, count: usize) -> Result<(), Error> {
+        self.nodes = self.nodes.checked_sub(count).ok_or(limit("nodes", 0))?;
+        self.wire.work(count, 0)
+    }
+    pub(crate) fn allocation(&mut self, bytes: usize) -> Result<(), Error> {
+        self.owned = self.owned.checked_sub(bytes).ok_or(limit("owned_bytes", 0))?;
+        self.wire.work(bytes, 0)
+    }
     pub(super) fn node(&mut self, depth: usize, offset: usize) -> Result<(), Error> {
         if depth > self.depth {
             return Err(limit("depth", offset));
@@ -89,7 +103,7 @@ impl Budget {
         self.nodes = self.nodes.checked_sub(1).ok_or(limit("nodes", offset))?;
         self.wire.work(1, offset)
     }
-    pub(super) fn push<T>(
+    pub(crate) fn push<T>(
         &mut self,
         values: &mut Vec<T>,
         value: T,

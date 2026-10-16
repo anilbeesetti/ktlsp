@@ -4,6 +4,7 @@ pub mod declaration_name_index;
 pub mod integer_initializer_types;
 pub mod local_value_binding;
 pub mod lowering;
+pub mod documentation;
 pub mod position_regions;
 pub mod structural_regions;
 

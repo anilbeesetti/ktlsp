@@ -6,8 +6,8 @@ trusted absolute path. Build both with `cargo build --locked -p ktlsp-parser`.
 returns a checked flat CST with original byte spans and syntax diagnostics, or a
 named rejection. Source is never replaced with parser-generated text. The server
 consumes the validated CST for its bounded syntactic document-symbol provider
-(see [server limits](../ktlsp-server/README.md)); the finite declaration consumers
-below are library-only. This is not full grammar, recovery, HIR, formatter or
+(see [server limits](../ktlsp-server/README.md)); declaration-name documentation
+also has the finite source-owned operation below. This is not full grammar, recovery, HIR, formatter or
 official Kotlin LSP parity.
 
 Each call starts one Rust worker. On Unix, the parent transfers input and drains
@@ -293,6 +293,64 @@ It incorporates verified incoming main `2e408cfd8d65c68a9eede863e3f983a2db720d95
 without changing its product providers, native dependencies or workflow isolation.
 This is finite syntax/structure admission, not full scopes, binding, navigation,
 types, stable cross-revision symbols or a new server capability.
+
+### Source-owned declaration documentation (#397)
+
+`documentation::candidate` only checks an original direct declaration-name token
+for a producer-attached leading `DOC_COMMENT`; it is not a documentation result.
+No candidate keeps the existing docless lowerer/rendering path unchanged.
+For a positive candidate, `documentation::lower` and `select` use one opaque
+`Budget` through the original lowerer structure/count/emit passes, authentication,
+exact name selection, prefix/comment validation, decoding and caller rendering.
+The returned `Attached` borrows the caller-owned original `LoweredDeclarations`
+and `Declaration`; equal source from another result/lowering is not authority.
+Original declaration identity, owners, names, ranges and incompleteness remain
+unchanged. Presentation uses `doc.end..declaration.end`, without repeating KDoc.
+Contiguous prose borrows original source; only decoration-discontiguous prose
+receives fallibly allocated decoded storage.
+
+Admission is documentation-operation-only: one direct leading KDoc before the
+core header, optionally followed by one direct plain modifier list with at most
+one visibility (`public/private/protected/internal`) and one finality (`final/open`)
+modifier. A modifier list without that declaration's own KDoc still refuses.
+Earlier unowned container KDocs are explicitly validated but never promoted;
+body, annotation, modifier and ancestor documentation cannot supply prose.
+Blank lines and intervening ordinary comments do not override producer ownership.
+Existing public `lower_declarations`, value BodyCheck, type and callee proofs
+remain strict; documented use-site hover and annotations remain unsupported.
+
+The finite prose form is one default `KDOC_SECTION`: `KDOC_TEXT`, `WHITE_SPACE`
+and literal `KDOC_LPAR/KDOC_RPAR`, with producer `KDOC_START`, `KDOC_END` and
+`KDOC_LEADING_ASTERISK` decoration removed. All other content bytes, indentation,
+paragraphs, Unicode and original LF/CRLF/lone-CR endings are retained, including
+delimiter-adjacent spaces. Empty/whitespace-only prose, tags, lexical links,
+bracketed external/reference/image syntax, backticks, tilde fences, code leaves,
+nested comment delimiters, errors and unsupported/ambiguous shapes refuse the
+whole operation, never raw/empty/enclosing fallback. This is not Markdown or KDoc
+semantic interpretation, inheritance, tag-derived parameter docs or official parity.
+
+One existing 2,097,152-unit work counter and 131,072-byte requested/actual retained
+capacity counters cover lowerer output plus decoded and rendered source-owned
+strings, monotonically, with no per-phase reset/refund. Original 64 KiB source,
+element and depth limits remain. Caller `reserve_string` only accepts a fresh
+zero-capacity string and reserves once fallibly, charging actual capacity and
+dropping an over-capacity allocation on refusal; implicit later growth is forbidden.
+`work`, `storage` and `output` extend the same counters through escaping, fences,
+UTF-16 and the complete escaped success response, at most 1 MiB including request
+identity/envelope. This is an upper bound, not a guarantee that every 1 MiB response
+fits the tighter managed storage/work ceilings. The borrowed cancellation observer
+uses the caller's existing token and creates no new deadline. Existing fixed-shape
+JSON/map/envelope allocation, allocator overhead, borrowed inputs, whole-process
+heap/RSS and transport OOM remain inherited exclusions, not fallible-storage claims.
+
+`tests/documentation.rs` retains original-worker source/CST writers before
+assertions for ROOT-hosted ownership, token partition, ranges, line endings,
+prefix/refusal and identity evidence; unit tests cover exact/late budget,
+preexisting and actual capacity, overflow and cancellation boundaries.
+These new checks have not been executed locally; actual hosted producer/wire
+evidence and integration verification remain ROOT-gated under #96.
+
+### Existing finite declaration consumers
 
 - `lowering::lower_declarations` borrows declarations and existing syntax errors
   from a validated source snapshot, preserving original byte/name spans, CST

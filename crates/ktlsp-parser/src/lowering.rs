@@ -49,6 +49,7 @@ pub enum LoweringError {
     InvalidCst { element: Option<usize> },
     Unsupported { element: usize },
     Allocation,
+    Cancelled,
 }
 type Result<T> = std::result::Result<T, LoweringError>;
 impl std::fmt::Display for LoweringError {
@@ -80,10 +81,12 @@ fn bytes(count: usize, width: usize, limit: LoweringLimit) -> Result<usize> {
     count.checked_mul(width).ok_or(LoweringError::Limit(limit))
 }
 #[derive(Default)]
-struct Budget {
+pub(crate) struct Budget<'c> {
     work: usize,
     requested: usize,
     retained: usize,
+    pub(crate) documentation: bool,
+    pub(crate) cancelled: Option<&'c dyn Fn() -> bool>,
     #[cfg(test)]
     reservations: usize,
     #[cfg(test)]
@@ -93,8 +96,14 @@ struct Budget {
     #[cfg(test)]
     emitted: usize,
 }
-impl Budget {
-    fn work(&mut self, n: usize) -> Result<()> {
+impl Budget<'_> {
+    pub(crate) fn documentation(cancelled: &dyn Fn() -> bool) -> Budget<'_> {
+        Budget { documentation: true, cancelled: Some(cancelled), ..Default::default() }
+    }
+    pub(crate) fn work(&mut self, n: usize) -> Result<()> {
+        if self.cancelled.is_some_and(|cancelled| cancelled()) {
+            return Err(LoweringError::Cancelled);
+        }
         add(&mut self.work, n, WORK, LoweringLimit::Work)
     }
     fn equal(&mut self, a: &str, b: &str) -> Result<bool> {
@@ -108,6 +117,14 @@ impl Budget {
             self.work(choice.len())?;
         }
         Ok(choices.contains(&text))
+    }
+    pub(crate) fn storage(&mut self, requested: usize, retained: usize) -> Result<()> {
+        add(&mut self.requested, requested, REQUESTED, LoweringLimit::RequestedHeap)?;
+        add(&mut self.retained, retained, RETAINED, LoweringLimit::RetainedCapacity)
+    }
+    #[cfg(test)]
+    pub(crate) fn usage(&self) -> (usize, usize, usize) {
+        (self.work, self.requested, self.retained)
     }
     #[cfg(test)]
     fn reservation_count(&mut self, count: usize) -> Result<usize> {
@@ -130,6 +147,7 @@ pub struct LoweredDeclarations<'a> {
     errors: Vec<LoweredSyntaxError<'a>>,
     package: Option<PackageDirective<'a>>,
     imports: Vec<ImportDirective<'a>>,
+    pub(crate) documentation_operation: Option<usize>,
 }
 impl<'a> LoweredDeclarations<'a> {
     pub fn snapshot(&self) -> &SourceSnapshot {
@@ -146,6 +164,9 @@ impl<'a> LoweredDeclarations<'a> {
     }
     pub fn imports(&self) -> &[ImportDirective<'a>] {
         &self.imports
+    }
+    pub(crate) fn parsed(&self) -> &'a Parsed {
+        self.parsed
     }
 }
 
@@ -686,6 +707,8 @@ struct Frame<'a> {
     plain: u8,
     reference: bool,
     annotated: bool,
+    documented: bool,
+    modified: bool,
 }
 impl Frame<'_> {
     const EMPTY: Self = Self {
@@ -704,6 +727,8 @@ impl Frame<'_> {
         plain: 0,
         reference: false,
         annotated: false,
+        documented: false,
+        modified: false,
     };
 }
 const _: () = assert!(size_of::<Frame<'static>>() <= 128);
@@ -752,7 +777,7 @@ pub fn lower_declarations<'a>(
     lower_with_budget(result, current, &mut Budget::default())
 }
 
-fn lower_with_budget<'a>(
+pub(crate) fn lower_with_budget<'a>(
     result: &'a SnapshotResult,
     current: &SourceSnapshot,
     b: &mut Budget,
@@ -798,6 +823,7 @@ fn lower_with_budget<'a>(
     let mut out = LoweredDeclarations {
         snapshot,
         parsed,
+        documentation_operation: None,
         declarations: Vec::new(),
         errors: Vec::new(),
         package: None,
@@ -1585,6 +1611,38 @@ fn walk<'a>(
                 put_frame(s, depth - 1, f, b)?;
             }
             continue;
+        }
+        // Documentation admission is local to this operation and only before
+        // the selected declaration's core. Structure already validated every
+        // original descendant; count and emit both validate the finite prefix.
+        if pass != Pass::Structure && b.documentation {
+            let prefix = b.one_of(&e.kind, &["DOC_COMMENT", "MODIFIER_LIST"])?;
+            if prefix {
+                let mut f = parent.ok_or(unsupported(i))?;
+                let doc = b.equal(&e.kind, "DOC_COMMENT")?;
+                // Consecutive KDocs can leave an earlier comment owned by a
+                // container. Validate it explicitly but never attach/promote it.
+                if doc && matches!(f.tag, Tag::Root | Tag::ClassBody | Tag::Block) {
+                    crate::documentation::validate_prefix(p, i, b)?;
+                    skip_until = e.subtree_end;
+                    continue;
+                }
+                if !f.tag.selected()
+                    || f.name
+                    || (f.core && !matches!(f.tag, Tag::Parameter | Tag::TypeParameter))
+                    || (doc && (f.documented || f.modified))
+                    || (!doc && f.modified)
+                    || (!doc && !f.documented)
+                {
+                    return Err(unsupported(i));
+                }
+                crate::documentation::validate_prefix(p, i, b)?;
+                f.documented |= doc;
+                f.modified |= !doc;
+                put_frame(s, depth - 1, f, b)?;
+                skip_until = e.subtree_end;
+                continue;
+            }
         }
         let t = if pass == Pass::Structure {
             Tag::Root
@@ -2467,6 +2525,7 @@ mod tests {
         let forged = LoweredDeclarations {
             snapshot: result.snapshot(),
             parsed: &other.parsed,
+            documentation_operation: None,
             declarations: vec![],
             errors: vec![],
             package: None,
@@ -2877,6 +2936,7 @@ mod tests {
         let mut out = LoweredDeclarations {
             snapshot: result.snapshot(),
             parsed: &result.parsed,
+            documentation_operation: None,
             declarations: vec![],
             errors: vec![],
             package: None,

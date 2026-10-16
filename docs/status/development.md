@@ -1506,3 +1506,37 @@ and untouched body/type/value/callee proofs remain required. Two independent
 static review slots per component are granted. Implementation is INPROGRESS;
 no397 format/build/test/runtime/hosted acceptance or parity is claimed.
 
+#### First complete397 composition and static compatibility correction
+
+Parser componente960a1fbaaf92bc6a5f7a58f6d963ebb5cec7708/tree8350ffbe33ca1900fc5e4d74d843a1129a41495b
+and consumerce2af77375d981ecf326b9546df81bb7ef335c16/tree22aea023b74b0d98d21200d52373bc3af3b16f4e
+each completed both independent static reviews and exact changed-source
+rechecks. ROOT directly read all four review histories and composed them
+without conflicts at e63b1db8c98ee9833256af86061501a6dfc5549f/tree52b3d944e0af14f4c9da39eec6d5e9d292ff6dc4.
+No397 formatter/compiler/test/runtime/hosted execution had occurred.
+
+The independent full11-file functionality review cleared that source; its
+separate full-union adversarial review identified a source-proven P2:
+3000 original leading `//x` comments plus `fun named() {}` were supported by
+the old docless lowerer, but the new eligibility-only scan charged the full
+sixteen-comparison/256-fixed-check documentation visit per trivia leaf and
+exhausted before reaching the old path. This was static source evidence,
+not a locally executed parser/server reproduction.
+
+ROOT traced all shared candidate/access callers and separated eligibility's
+actual closed six-comparison/literal-byte/fixed-check precharge from complete
+documentation validation. The same monotonic counter/cancellation and original
+parent/subtree checks remain; positive candidates STILL require unchanged full
+lowerer/selection/documentation validation. No error is swallowed, no lowered
+limit is raised and no failed-binding/docless fallback was introduced.
+New original-worker and real packaged-CLI regression source checks the
+many-comment declaration's exact original range/name and complete legacy
+Markdown response. They remain UNEXECUTED pending the required static gates.
+
+The temporary producer writer now uses the existing structured JSON capture
+convention for complete actual source/snapshot/CST/diagnostics, not a second
+Rust-debug evidence parser. This changes only observation format, not any
+producer or assertion. All TEMP397 writers remain until ROOT+OWNER read
+actual hosted payloads. Exact corrected-union rechecks are required before
+oncefmt/strict compile and original full hosted verification.
+

@@ -10,7 +10,11 @@ fn parse(source: &str) -> SnapshotResult {
         .parse_snapshot(&snapshot, &AtomicBool::new(false)).unwrap();
     let tree = result.tree_for(&snapshot).unwrap();
     // TEMP397: retain until ROOT and independent OWNER read original hosted CST.
-    eprintln!("TEMP397 FULL ORIGINAL SOURCE {source:?}\nFULL ORIGINAL CST {:#?}\nFULL DIAGNOSTICS {:#?}", tree.elements(), tree.diagnostics());
+    eprintln!("TEMP397_PRODUCER {}", serde_json::json!({
+        "document":snapshot.document(), "version":snapshot.revision(),
+        "source":tree.source(), "elements":tree.elements(),
+        "diagnostics":tree.diagnostics()
+    }));
     result
 }
 
@@ -107,6 +111,25 @@ fn docless_ordinary_trailing_and_value_role_boundaries_stay_strict() {
             assert!(documentation::select(&lower, &result, result.snapshot(), source.rfind('x').unwrap(), &mut budget).is_err());
         }
     }
+}
+
+#[test]
+fn many_original_leading_comments_remain_eligible_for_legacy_docless_hover() {
+    let _serial = functional::serial();
+    let source = format!("{}fun named() {{}}", "//x\n".repeat(3000));
+    let result = parse(&source);
+    let current = result.snapshot();
+    let tree = result.tree_for(current).unwrap();
+    let old = lower_declarations(&result, current).unwrap();
+    let declaration = old.declarations().iter().find(|d| d.raw_name() == "named").unwrap();
+    assert_eq!(declaration.kind(), "FUN");
+    assert_eq!(declaration.range(), 0..source.len());
+    assert_eq!(declaration.name_range(), 12004..12009);
+    let name_token = tree.elements().iter().position(|e| {
+        e.token && e.kind == "IDENTIFIER" && (e.start..e.end) == declaration.name_range()
+    }).unwrap();
+    let mut budget = Budget::new(&|| false);
+    assert!(!documentation::candidate(tree, name_token, &mut budget).unwrap());
 }
 
 #[test]

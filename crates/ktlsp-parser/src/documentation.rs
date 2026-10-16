@@ -76,18 +76,18 @@ impl<'c> Budget<'c> {
 /// False keeps the old docless operation unchanged; true still requires
 /// `lower` and `select` under this same budget, never a raw-source fallback.
 pub fn candidate(parsed: &Parsed, name_token_index: usize, budget: &mut Budget<'_>) -> Result<bool> {
-    let name = get(parsed, name_token_index, &mut budget.inner)?;
+    let name = candidate_element(parsed, name_token_index, &mut budget.inner)?;
     budget.work(name.kind.len())?;
     if !name.token || name.kind != "IDENTIFIER" { return Err(Error::Unsupported); }
     let index = name.parent.ok_or(Error::Unsupported)?;
-    let declaration = get(parsed, index, &mut budget.inner)?;
+    let declaration = candidate_element(parsed, index, &mut budget.inner)?;
     budget.work(declaration.kind.len())?;
     if declaration.token || !matches!(declaration.kind.as_str(), "CLASS" | "FUN" | "PROPERTY" | "VALUE_PARAMETER" | "TYPE_PARAMETER") {
         return Err(Error::Unsupported);
     }
     let mut cursor = index.checked_add(1).ok_or(Error::InvalidOrigin)?;
     while cursor < name_token_index {
-        let child = get(parsed, cursor, &mut budget.inner)?;
+        let child = candidate_element(parsed, cursor, &mut budget.inner)?;
         budget.work(child.kind.len())?;
         if child.parent != Some(index) || child.subtree_end <= cursor || child.subtree_end > declaration.subtree_end {
             return Err(Error::InvalidOrigin);
@@ -215,6 +215,18 @@ pub fn select<'a>(lowered: &'a LoweredDeclarations<'a>, result: &'a SnapshotResu
     if !content || prose.len() != length { return Err(Error::Unsupported); }
     Ok(Attached { declaration, documentation: Some(range), prose: Some(Cow::Owned(prose)) })
 }
+// Eligibility performs at most six kind comparisons (literal bytes <=64) and
+// twelve fixed checks, not the full sixteen-comparison documentation visit.
+// In particular, ordinary leading trivia must reach the legacy docless path.
+fn candidate_element<'a>(parsed: &'a Parsed, index: usize, budget: &mut lowering::Budget<'_>) -> std::result::Result<&'a Element, LoweringError> {
+    budget.work(1)?;
+    let element = parsed.elements().get(index).ok_or(LoweringError::InvalidCst { element: Some(index) })?;
+    let work = element.kind.len().checked_mul(6).and_then(|n| n.checked_add(76))
+        .ok_or(LoweringError::Limit(lowering::LoweringLimit::Work))?;
+    budget.work(work)?;
+    Ok(element)
+}
+
 
 fn get<'a>(parsed: &'a Parsed, index: usize, budget: &mut lowering::Budget<'_>) -> std::result::Result<&'a Element, LoweringError> {
     budget.work(1)?;

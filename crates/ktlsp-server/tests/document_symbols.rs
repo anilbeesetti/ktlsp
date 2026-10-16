@@ -3572,6 +3572,27 @@ fn documentation_profiles_keep_disabled_clients_and_legacy_docless_fence_accepta
 }
 
 #[test]
+fn documentation_eligibility_preserves_many_comment_docless_hover() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let package = Package::new(true);
+    let source = format!("{}fun named() {{}}", "//x\n".repeat(3000));
+    let name = source.find("named").unwrap();
+    let messages = [
+        json!({"jsonrpc":"2.0","id":"TEMP397-comments","method":"initialize","params":{"capabilities":{"textDocument":{"hover":{"contentFormat":["markdown"]}}}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":"comments","method":"textDocument/hover","params":navigation_params(&source,name)}),
+        json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ];
+    let replies = package.exchange(&messages);
+    let response = replies.iter().find(|r| r["id"] == "comments").unwrap();
+    assert_eq!(response["result"]["contents"]["kind"], "markdown");
+    assert_eq!(response["result"]["contents"]["value"], format!("```kotlin\n{source}\n```"));
+    assert_eq!(response["result"]["range"], references_range(&source,name,5));
+}
+
+#[test]
 fn documentation_hover_keeps_cancel_edit_reopen_and_rejected_edit_publication_guards() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let source = "/** original 😀 */\r\nfun `target😀`() {}";

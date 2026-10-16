@@ -362,6 +362,12 @@ not permission to dispatch or evidence that its platform prerequisites hold.
 The job token has only `contents:read` and `actions:read`; it cannot post ROOT
 approval. Independent repository-owner comments are authenticated through the
 GitHub API by numeric owner identity as well as login and owner association.
+The fixed read-only GraphQL `IssueComment` query also binds the current body
+and its last editor in one authenticated response: an edited approval requires
+the same numeric owner editor identity. A non-owner repository writer editing
+an owner-authored comment therefore cannot supply approval. REST/GraphQL body
+disagreement, missing editor history or unavailable GraphQL refuses. See
+[GitHub's editor/body schema](https://docs.github.com/en/graphql/reference/issues#issuecomment).
 Matching two caller-authored grants, a shape validator, a supplied hash or a
 source approval never authorizes a calibration child or official JVM.
 
@@ -462,7 +468,11 @@ original closure or failed/incomplete ordinary owned-input disposal.
 
 The nine ordinary finite cases each have their own protected artifact and
 unique fixed `PR174 receipt CASE` step. Cancellation preparation first proves
-the actual original peer is active. Only then does the independently named
+the actual original peer and outside-step supervisor are active. Readiness is
+a protected host-root `calibration-observer-ready.json` receipt, not a marker
+under the UID65532-owned state mount. The preparation and timed commands both
+join original live init/service PID-start identities, exact CID/daemon, armed
+clock and a finite one-minute reserve. Only then does the independently named
 `PR174 runner timeout calibration` step run a finite foreground wait, with
 runner `timeout-minutes:1` and `continue-on-error:true`. Following `always`
 collection waits for the real outside-step action and closure. It never emits
@@ -482,6 +492,10 @@ ordinary owned-input release occurs only afterward and never clears evidence.
 STEP timeout proof from authenticated original job **and exact step** logs,
 and a later protected outside-step live-original action. It uses the canonical
 receiver timeout validator, not a report boolean or whole-job cancellation.
+The original API job and both original log streams share the existing 64,000-byte
+collector work budget; typed facts and their actual byte hashes are retained
+within its unchanged evidence cap. Overflow or the fixed original deadline
+refuses. The final receiver independently retrieves the original streams again.
 The outer job may still be running. Missing API/logs/custody/closure yields
 UNKNOWN and no official START. The final receiver separately requires the
 completed successful original outer run/job and independently admitted upload

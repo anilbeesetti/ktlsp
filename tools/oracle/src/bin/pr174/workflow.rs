@@ -38,8 +38,12 @@ struct WorkflowProposal {
 struct WorkflowApproval {
     schema_version: u8, scope: String, run: OriginalRun,
     proposal_sha256: String, proposal_artifact_id: u64, proposal_artifact_api_digest: String,
+    #[serde(deserialize_with = "wf_nullable")]
     calibration_sha256: Option<String>,
-    calibration_artifact_id: Option<u64>, calibration_artifact_api_digest: Option<String>,
+    #[serde(deserialize_with = "wf_nullable")]
+    calibration_artifact_id: Option<u64>,
+    #[serde(deserialize_with = "wf_nullable")]
+    calibration_artifact_api_digest: Option<String>,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -56,6 +60,16 @@ struct WorkflowCase {
 struct WorkflowCalibrationArtifact {
     artifact_id: u64, api_digest: String, calibration_sha256: String,
 }
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct WorkflowCancellationReady {
+    schema_version: u8, scope: String, case: CalibrationCase, nonce: String, container_id: String,
+    boot_id: String, daemon_id: String, init_pid: u32, init_starttime: u64,
+    supervisor_pid: u32, supervisor_starttime: u64, armed_ms: u64, observed_ms: u64,
+}
+fn wf_nullable<'de, T: Deserialize<'de>, D: serde::Deserializer<'de>>(deserializer: D) -> std::result::Result<Option<T>, D::Error> {
+    Option::<T>::deserialize(deserializer)
+}
 
 fn wf_require(ok: bool, reason: &str) -> Result<()> {
     if ok { Ok(()) } else { Err(reason.into()) }
@@ -64,7 +78,7 @@ fn wf_json<T: Serialize>(value: &T) -> Result<Vec<u8>> {
     serde_json::to_vec(value).map_err(|e| e.to_string())
 }
 fn wf_positive(value: &str) -> Result<u64> {
-    let number = value.parse().map_err(|_| "positive numeric original identity required")?;
+    let number: u64 = value.parse().map_err(|_| "positive numeric original identity required")?;
     wf_require(number > 0 && number.to_string() == value, "canonical positive numeric identity")?;
     Ok(number)
 }
@@ -107,14 +121,18 @@ fn wf_token() -> Result<String> {
 fn wf_api(token: &str, endpoint: &str, raw: bool, cap: usize) -> Result<Vec<u8>> {
     wf_api_before(token, endpoint, raw, cap, Instant::now() + Duration::from_secs(30))
 }
-fn wf_api_before(token: &str, endpoint: &str, raw: bool, cap: usize, end: Instant) -> Result<Vec<u8>> {
+fn wf_gh_command(token: &str) -> Result<Command> {
     protected(Path::new("/usr/bin/gh"), false)?;
     let mut command = Command::new("/usr/bin/gh");
     command.env_clear().env("PATH", "/usr/bin:/bin").env("LANG", "C.UTF-8")
-        .env("GH_TOKEN", token).env("GH_HOST", "github.com").env("GH_PROMPT_DISABLED", "1")
-        .args(["api", "--hostname", "github.com", "--method", "GET", "--header",
-            if raw { "Accept: application/vnd.github.raw+json" } else { "Accept: application/vnd.github+json" },
-            "--header", "X-GitHub-Api-Version: 2026-03-10", endpoint]);
+        .env("GH_TOKEN", token).env("GH_HOST", "github.com").env("GH_PROMPT_DISABLED", "1");
+    Ok(command)
+}
+fn wf_api_before(token: &str, endpoint: &str, raw: bool, cap: usize, end: Instant) -> Result<Vec<u8>> {
+    let mut command = wf_gh_command(token)?;
+    command.args(["api", "--hostname", "github.com", "--method", "GET", "--header",
+        if raw { "Accept: application/vnd.github.raw+json" } else { "Accept: application/vnd.github+json" },
+        "--header", "X-GitHub-Api-Version: 2026-03-10", endpoint]);
     let output = bounded_command(command, cap, end.min(Instant::now() + Duration::from_secs(30)))?;
     wf_require(output.ok(), "authenticated GitHub API unavailable/incomplete; UNKNOWN, no START")?;
     Ok(output.stdout)
@@ -131,9 +149,35 @@ fn wf_owner_comment(token: &str, id: u64, end: Instant) -> Result<Vec<u8>> {
         && comment["user"]["login"] == repo["owner"]["login"]
         && comment["user"]["type"] == "User" && comment["author_association"] == "OWNER",
         "approval must be an independently authenticated repository-owner comment")?;
-    let body = comment["body"].as_str().ok_or("owner comment body unavailable")?.as_bytes();
-    wf_require(!body.is_empty() && body.len() <= INPUT_BYTES, "strict bounded owner approval body")?;
+    let node_id = comment["node_id"].as_str().filter(|id| !id.is_empty() && id.len() <= 256).ok_or("original comment node identity unavailable")?;
+    const QUERY: &str = "query($id: ID!) { node(id: $id) { __typename ... on IssueComment { fullDatabaseId body lastEditedAt author { login ... on User { databaseId } } editor { login ... on User { databaseId } } } } }";
+    let mut command = wf_gh_command(token)?;
+    command.args(["api", "--hostname", "github.com", "--method", "POST", "graphql",
+        "-f", &format!("query={QUERY}"), "-f", &format!("id={node_id}")]);
+    let output = bounded_command(command, 262144, end.min(Instant::now() + Duration::from_secs(30)))?;
+    wf_require(output.ok(), "current approval editor API unavailable; UNKNOWN, no START")?;
+    let graph: Value = parse(&output.stdout)?;
+    let body = wf_comment_body(&repo["owner"], &comment, &graph)?.as_bytes();
     Ok(body.to_vec())
+}
+fn wf_comment_body<'a>(owner: &Value, comment: &Value, graph: &'a Value) -> Result<&'a str> {
+    let owner_id = owner["id"].as_u64().filter(|id| *id > 0).ok_or("repository owner numeric identity unavailable")?;
+    let node = &graph["data"]["node"];
+    wf_require(!graph.get("errors").is_some_and(|errors| !errors.is_null())
+        && node["__typename"] == "IssueComment"
+        && node["fullDatabaseId"].as_u64().or_else(|| node["fullDatabaseId"].as_str().and_then(|id| wf_positive(id).ok()))
+            .is_some_and(|id| comment["id"] == id)
+        && node["author"]["databaseId"] == owner_id && node["author"]["login"] == owner["login"],
+        "current approval body/author identity unavailable")?;
+    let untouched = node.get("lastEditedAt").is_some_and(Value::is_null)
+        && node.get("editor").is_some_and(Value::is_null);
+    let owner_edited = node["lastEditedAt"].as_str().is_some_and(|time| !time.is_empty())
+        && node["editor"]["databaseId"] == owner_id && node["editor"]["login"] == owner["login"];
+    wf_require(untouched || owner_edited, "current approval body was not authored/edited by the independent repository owner")?;
+    let body = node["body"].as_str().ok_or("current owner approval body unavailable")?;
+    wf_require(!body.is_empty() && body.len() <= INPUT_BYTES && comment["body"] == body,
+        "strict bounded approval body changed between authenticated author/editor snapshots")?;
+    Ok(body)
 }
 fn wf_original(token: &str, request: &WorkflowRequest) -> Result<(OriginalRun, Value)> {
     let run = wf_api_json(token, &format!("repos/anilbeesetti/ktlsp/actions/runs/{}", request.run_id))?;
@@ -174,7 +218,7 @@ fn wf_validate_source(admission: &WorkflowSourceAdmission, original: &OriginalRu
         && admission.calibration_comment == request.calibration_comment && admission.official_comment == request.official_comment
         && admission.measured_future_facts.len() == 6
         && ["boot", "daemon", "host", "image-config", "native-binaries", "tools"].iter()
-            .all(|fact| admission.measured_future_facts.iter().any(|value| value == fact)),
+            .all(|fact| admission.measured_future_facts.iter().any(|value| value.as_str() == *fact)),
         "independent source admission does not authorize these measured preparation facts")
 }
 fn workflow_source(argv: &[String]) -> Result<Value> {
@@ -209,17 +253,69 @@ fn wf_docker(argv: &[&str], cap: usize, end: u64) -> Result<Vec<u8>> {
     wf_require(output.ok(), "actual pinned image/daemon measurement unavailable")?;
     Ok(output.stdout)
 }
+fn workflow_publish_calibration_ready(dir: &Path, a: &Admission, b: &Binding, identity: &ProcessIdentity, case: CalibrationCase, e: &mut Evidence) -> Result<()> {
+    if case != CalibrationCase::WorkflowStepCancel {return Ok(());}
+    let end = mono_ms()?.checked_add(10000).ok_or("readiness measurement deadline")?;
+    let actual = inspect(e, &a.tools.docker, &b.container_id, end)?;
+    wf_require(actual["State"]["Running"] == true && actual["State"]["Pid"] == identity.init_pid
+        && actual["State"]["OOMKilled"] == false && actual["RestartCount"] == 0
+        && process_start(&read_file(&Path::new("/proc").join(identity.init_pid.to_string()).join("stat"),4096)?)? == (identity.init_pid, identity.init_start),
+        "actual original cancellation peer lost before protected readiness publication")?;
+    let (supervisor_pid, supervisor_starttime) = process_start(&read_file(Path::new("/proc/self/stat"),4096)?)?;
+    wf_require(std::str::from_utf8(&read_file(Path::new("/proc/self/cgroup"),4096)?).map_err(|_| "supervisor cgroup encoding")?.trim()
+        == format!("0::{}",b.supervisor_cgroup), "readiness publisher is not the original outside-step supervisor")?;
+    let ready = WorkflowCancellationReady {schema_version:1,scope:"PR174_ORIGINAL_CANCELLATION_PEER_READY".into(),
+        case,nonce:a.nonce.clone(),container_id:b.container_id.clone(),boot_id:a.boot_id.clone(),daemon_id:a.daemon_id.clone(),
+        init_pid:identity.init_pid,init_starttime:identity.init_start,supervisor_pid,supervisor_starttime,
+        armed_ms:b.armed_ms.ok_or("unarmed original cancellation case")?,observed_ms:mono_ms()?};
+    side_json(e,&dir.join("calibration-observer-ready.json"),&ready)
+}
+fn wf_verify_cancellation_ready(dir: &Path) -> Result<()> {
+    let ready:WorkflowCancellationReady=load(&dir.join("calibration-observer-ready.json"))?;
+    let a:Admission=load(&dir.join("admission.json"))?;let b=binding(dir)?;
+    let identity:ProcessIdentity=load(&dir.join("process-identity.json"))?;
+    let now=mono_ms()?;let end=now.checked_add(10000).ok_or("cancellation readiness deadline")?;
+    wf_require(ready.schema_version==1&&ready.scope=="PR174_ORIGINAL_CANCELLATION_PEER_READY"
+        && ready.case==CalibrationCase::WorkflowStepCancel&&calibration_case(dir,&a)?==Some(ready.case)
+        && ready.nonce==a.nonce&&ready.nonce==b.nonce&&ready.container_id==b.container_id
+        && ready.boot_id==a.boot_id&&ready.daemon_id==a.daemon_id
+        && ready.init_pid==identity.init_pid&&ready.init_starttime==identity.init_start
+        && Some(ready.armed_ms)==b.armed_ms&&ready.observed_ms>=ready.armed_ms&&ready.observed_ms<=now
+        && ready.armed_ms.checked_add(300000).is_some_and(|deadline| now.checked_add(90000).is_some_and(|reserve|reserve<deadline)),
+        "protected cancellation readiness lacks original identities/one-minute active-peer reserve")?;
+    let mut evidence=Evidence::preflight();
+    daemon(&mut evidence,&a.tools.docker,end,&a.daemon_id)?;
+    let actual=inspect(&mut evidence,&a.tools.docker,&b.container_id,end)?;
+    wf_require(actual["State"]["Running"]==true&&actual["State"]["Pid"]==ready.init_pid
+        && actual["State"]["OOMKilled"]==false&&actual["RestartCount"]==0
+        && process_start(&read_file(&Path::new("/proc").join(ready.init_pid.to_string()).join("stat"),4096)?)?==(ready.init_pid,ready.init_starttime),
+        "original admitted cancellation peer is not actually active")?;
+    let state=properties(&evidence.checked(&a.tools.systemctl,&args(&["show","--property=ActiveState","--property=MainPID","--property=ControlGroup",
+        &format!("{}.service",unit(&a.nonce,"supervisor"))]),end)?)?;
+    wf_require(state.get("ActiveState").map(String::as_str)==Some("active")
+        && state.get("MainPID")==Some(&ready.supervisor_pid.to_string())
+        && state.get("ControlGroup")==Some(&b.supervisor_cgroup)
+        && process_start(&read_file(&Path::new("/proc").join(ready.supervisor_pid.to_string()).join("stat"),4096)?)?==(ready.supervisor_pid,ready.supervisor_starttime),
+        "original outside-step supervisor is not actually active")?;
+    Ok(())
+}
 fn workflow_authenticate_step_timeout(dir: &Path, a: &Admission, grant: &RootGrant, e: &mut Evidence) -> Result<()> {
     let token = String::from_utf8(read_file(&dir.join("github.token"), 4096)?).map_err(|_| "credential encoding")?;
     wf_require(!token.is_empty() && !token.bytes().any(|b| b.is_ascii_control()), "original cancellation credential unavailable")?;
-    let job_bytes = gh(e, a, &token, format!("repos/anilbeesetti/ktlsp/actions/jobs/{}", a.run.job_id), false)?;
+    let end = Instant::now() + Duration::from_millis(a.preparation_deadline_ms.checked_sub(mono_ms()?).filter(|remaining| *remaining > 0).ok_or("original collection deadline")?);
+    // Keep the existing 64KiB collector budget; raw authenticated inputs share it instead of
+    // spending it twice on hex command envelopes. Only authenticated facts/hashes are persisted.
+    let budget = e.available().min(64000);
+    let job_bytes = wf_api_before(&token, &format!("repos/anilbeesetti/ktlsp/actions/jobs/{}", a.run.job_id), false, budget, end)?;
     let job: Value = parse(&job_bytes)?;
     let step = grant.calibration_step.as_ref().ok_or("independent cancellation step absent")?;
     let steps = job["steps"].as_array().ok_or("authenticated original steps unavailable")?;
     let position = steps.iter().position(|candidate| candidate["number"] == step.number && candidate["name"] == step.name)
         .ok_or("actual original cancellation-step identity absent")?;
-    let logs = gh(e, a, &token, format!("repos/anilbeesetti/ktlsp/actions/jobs/{}/logs", a.run.job_id), true)?;
-    let step_logs = gh(e, a, &token, format!("repos/anilbeesetti/ktlsp/actions/jobs/{}/steps/{position}/logs", a.run.job_id), true)?;
+    let logs = wf_api_before(&token, &format!("repos/anilbeesetti/ktlsp/actions/jobs/{}/logs", a.run.job_id), true,
+        budget.saturating_sub(job_bytes.len()), end)?;
+    let step_logs = wf_api_before(&token, &format!("repos/anilbeesetti/ktlsp/actions/jobs/{}/steps/{position}/logs", a.run.job_id), true,
+        budget.saturating_sub(job_bytes.len()).saturating_sub(logs.len()), end)?;
     let completed = ktlsp_oracle_replay::receiver::validate_step_timeout(grant, &job, &logs, &step_logs)?;
     let action: ktlsp_oracle_replay::authority::CalibrationAction = load(&dir.join("calibration-action.json"))?;
     action.validate()?;
@@ -568,6 +664,32 @@ fn wf_finish(name: &str) -> Result<Value> {
                         copy_sealed(&source, &target.join(file), INPUT_BYTES as u64, 0o444, end)?;
                     }
                 }
+                let original_dir = (|| -> Result<PathBuf> {
+                    let record: WorkflowCase = load(&wf_case_path(name))?;
+                    let nonce = if digest(&record.nonce) {record.nonce} else {
+                        let grant: RootGrant = load(&Path::new(WF_ROOT).join("grants").join(format!("{name}.json")))?;
+                        let claim = grant_claim(&grant)?;
+                        protected(&claim, false)?;
+                        String::from_utf8(read_file(&claim, 128)?).map_err(|_| "claim encoding")?
+                            .strip_suffix('\n').filter(|nonce| digest(nonce)).ok_or("no original nonce claim")?.into()
+                    };
+                    directory(&Path::new(ROOT).join(nonce).to_string_lossy())
+                })();
+                if let Ok(dir) = original_dir {
+                    for subdir in ["bootstrap", "receipts"] {
+                        let path = target.join(subdir);
+                        if !path.try_exists().map_err(|e| e.to_string())? {mkdir(&path, 0o755)?;}
+                    }
+                    for (file, cap) in [("bootstrap-receipt.json",4096),("bootstrap/observer.evidence",126976),
+                        ("admission.json",16384),("root-authorization.json",16384),("expected-grant.json",16384),
+                        ("calibration.json",16384),("workflow.yml",16384),("binding.json",16384),
+                        ("teardown-receipt.json",16384),("receipts/observer.evidence",786432),("receipts/cleanup.evidence",262144)] {
+                        let source = dir.join(file);let dest = target.join(file);
+                        if source.try_exists().map_err(|e| e.to_string())? && !dest.try_exists().map_err(|e| e.to_string())? {
+                            copy_sealed(&source, &dest, cap, 0o444, end)?;
+                        }
+                    }
+                }
             }
         }
     }
@@ -657,12 +779,8 @@ fn workflow_entry(argv: &[String]) -> Result<Value> {
             let dir=wf_start_case(Some(CalibrationCase::WorkflowStepCancel))?;
             let end=Instant::now()+Duration::from_secs(120);
             loop {
-                if dir.join("state/calibration-observer-ready").try_exists().map_err(|e|e.to_string())? {
-                    let a:Admission=load(&dir.join("admission.json"))?;
-                    let b=binding(&dir)?;
-                    let process:ProcessIdentity=load(&dir.join("process-identity.json"))?;
-                    let raw=read_file(&Path::new("/proc").join(process.init_pid.to_string()).join("stat"),4096)?;
-                    wf_require(process_start(&raw)?==(process.init_pid,process.init_start)&&b.nonce==a.nonce,"original cancellation peer not active")?;
+                if dir.join("calibration-observer-ready.json").try_exists().map_err(|e|e.to_string())? {
+                    wf_verify_cancellation_ready(&dir)?;
                     return Ok(json!({"status":"ORIGINAL_CANCELLATION_PEER_ACTIVE"}));
                 }
                 wf_require(Instant::now()<end,"actual original cancellation peer did not become active")?;
@@ -671,7 +789,7 @@ fn workflow_entry(argv: &[String]) -> Result<Value> {
         },
         [mode] if mode == "workflow-cancel-wait" => {
             let dir=wf_case_dir("workflow-step-cancel")?;
-            protected(&dir.join("state/calibration-observer-ready"),false)?;
+            wf_verify_cancellation_ready(&dir)?;
             // Only the actual runner timeout may interrupt this foreground finite wait.
             // A successful return is a failed cancellation experiment, never a timeout marker.
             let end=Instant::now()+Duration::from_secs(600);
@@ -715,6 +833,9 @@ mod workflow_source_tests {
             proposal_artifact_api_digest:artifact.api_digest.clone(),calibration_sha256:None,
             calibration_artifact_id:None,calibration_artifact_api_digest:None};
         assert!(wf_validate_approval(&approval,"PR174_MEASURED_CALIBRATION_ADMISSION",&original,&artifact,None).is_ok());
+        let mut missing = serde_json::to_value(&approval).unwrap();
+        missing.as_object_mut().unwrap().remove("calibrationSha256");
+        assert!(parse::<WorkflowApproval>(&wf_json(&missing).unwrap()).is_err());
         assert!(wf_validate_approval(&approval,"PR174_SEPARATE_OFFICIAL_ADMISSION",&original,&artifact,None).is_err());
         approval.proposal_artifact_id=15;
         assert!(wf_validate_approval(&approval,"PR174_MEASURED_CALIBRATION_ADMISSION",&original,&artifact,None).is_err());
@@ -744,5 +865,24 @@ mod workflow_source_tests {
         assert!(wf_validate_source(&admission,&original,&request,workflow).is_err());
         admission.measured_future_facts[0]="boot".into();admission.official_comment=22;
         assert!(wf_validate_source(&admission,&original,&request,workflow).is_err());
+    }
+    #[test]
+    fn synthetic_owner_authorship_does_not_authorize_nonowner_edits() {
+        let owner=json!({"id":17,"login":"owner"});
+        let comment=json!({"id":31,"node_id":"opaque-comment-id","body":"approved bytes"});
+        let mut graph=json!({"data":{"node":{"__typename":"IssueComment","fullDatabaseId":"31",
+            "body":"approved bytes","author":{"databaseId":17,"login":"owner"},
+            "lastEditedAt":null,"editor":null}}});
+        assert_eq!(wf_comment_body(&owner,&comment,&graph).unwrap(),"approved bytes");
+        graph["data"]["node"]["lastEditedAt"]=json!("2026-10-16T12:00:00Z");
+        graph["data"]["node"]["editor"]=json!({"databaseId":18,"login":"writer"});
+        assert!(wf_comment_body(&owner,&comment,&graph).is_err());
+        graph["data"]["node"]["editor"]=json!({"databaseId":17,"login":"owner"});
+        assert!(wf_comment_body(&owner,&comment,&graph).is_ok());
+        graph["data"]["node"]["body"]=json!("different bytes");
+        assert!(wf_comment_body(&owner,&comment,&graph).is_err());
+        graph["data"]["node"]["body"]=json!("approved bytes");
+        graph["data"]["node"].as_object_mut().unwrap().remove("lastEditedAt");
+        assert!(wf_comment_body(&owner,&comment,&graph).is_err());
     }
 }

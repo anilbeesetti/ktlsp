@@ -1,6 +1,7 @@
 //! Bounded Kotlin Metadata header/d1, raw wire, StringTableTypes and JVM names.
 //! Includes finite Package alias and Class-owned parameter-reference consumers.
 
+pub mod class_context;
 pub mod class_constructors;
 pub mod class_header;
 pub mod class_id;
@@ -23,6 +24,7 @@ pub mod payload;
 pub mod property_header;
 pub mod property_types;
 pub mod resolved_alias_signature;
+pub mod resolved_class_function_return;
 pub mod resolved_class_properties;
 pub mod string_table;
 pub mod type_alias;

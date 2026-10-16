@@ -197,6 +197,42 @@ types, stable cross-revision symbols or a new server capability.
   This is library-only and is not complete references, nested/outer lookup,
   parameter/receiver/import/overload resolution, types, stable cross-revision
   identity, official navigation evidence or a new server capability.
+- `local_value_binding::local_value_occurrences` authenticates one original
+  declaration against the identical directory/lowerer/result, including unused
+  targets, and returns that borrowed target/body plus original authenticated
+  whole-initializer sites in source order. Only references which the existing
+  binder assigns to the identical target are included; self/forward and unrelated
+  names do not become references. Query-name duplicates refuse even unused
+  targets; unrelated duplicates do not make this target ambiguous. The entire
+  ordinary function and every candidate spelling must be admitted.
+  All authentication, snapshot/name comparisons, scanning, binding and emission
+  share one checked 2,097,152-unit work budget, without per-candidate resets.
+  Before allocation, a count pass bounds storage to 1,024 sites / 131,072 bytes;
+  reservation failures or excessive returned capacity refuse the whole query.
+  Borrowed source/producer objects are not copied. Repeated binding and
+  authentication scans are quadratic in admitted input, including snapshot bytes;
+  large otherwise valid bodies can therefore return `Resource`, never a partial
+  publishable result. This is a library prerequisite, not a references provider,
+  full Kotlin resolution, official navigation equivalence or capability change.
+  Permanent `tests/local_value_occurrences.rs` assertions use the production
+  parser. At component source `12298d8a2b8ff835593f283f07370b1480a92155`,
+  [original attempt-1 Linux CI38876375538/job116892312858](https://github.com/anilbeesetti/ktlsp/actions/runs/38876375538/job/116892312858)
+  passed pinned format, locked all-target Clippy and full workspace tests.
+  Actual checkout `20ca840932deb5948fc17991021d4cb2033f6a77` had tree
+  `43c20d6922879daf8d623db273e6fa33aa84c6fd` and ordered parents
+  `[bb6a75f61fd467c9b090210a369c7e1d225713d5,12298d8a2b8ff835593f283f07370b1480a92155]`.
+  Owner and Root independently read all eight actual production JSON payloads:
+  original `x` name14..15 had exactly sites29..30/51..52 amid unrelated repeated
+  names; unused targets stayed empty; the separate function had only111..112;
+  quoted `x` sites were31..32/42..45; quoted crab site34..40 was UTF-16
+  (0,32)..(0,36); mixed forward/self/after had only49..50, with self-only and
+  forward-only empty. All three production occurrence tests and the exact-budget/
+  storage assertions passed. The temporary direct observation writer is removed;
+  permanent behavioral assertions remain. This receipt covers that component
+  source only, not the cleanup head, a composed integration, aggregate test counts,
+  official equivalence or Darwin reliability. No local parser/runtime/tests ran;
+  #96 remains OPEN/UNKNOWN. See child #357 under #330 (T027/#27) and the
+  [component receipt](https://github.com/anilbeesetti/ktlsp/pull/361#issuecomment-6211943713).
 
 These consumers retain immutable producer association and require a synchronized
 current-document recheck before publication. Document/revision/kind/source

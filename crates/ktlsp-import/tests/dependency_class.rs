@@ -831,7 +831,7 @@ fn genuine_minimal_jcl_source_owner_uses_explicit_java24_java25_release() {
         (25, include_bytes!("../../ktlsp-binary/fixtures/modern-class-versions/jclMin25.jar.bin").as_slice(), "8eb40b1a47696cf92b4a83a70fd07c885bea858a5dd907edc962ed48b74585da"),
     ] {
         assert_eq!(format!("{:x}", Sha256::digest(bytes)), expected);
-        let path = project().join(format!("crates/ktlsp-binary/fixtures/modern-class-versions/jclMin{release}.jar.bin"));
+        let path: PathBuf = project().join(format!("crates/ktlsp-binary/fixtures/modern-class-versions/jclMin{release}.jar.bin")).components().collect();
         let artifact = verify_sha256(Artifact {
             bytes: bytes.to_vec(),
             provenance: Provenance {

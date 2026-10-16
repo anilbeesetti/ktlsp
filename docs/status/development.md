@@ -1826,3 +1826,99 @@ then a separate fresh strictly-readonly process0/parsed0 exclusive-base
 guard, ordinary expected-head merge, actual tree/soleparent and independent
 OWNER+ROOT original exact-main full CI before its lease can clear.
 No full signatures/applicability/type inference/tooling/oracle/full parity.
+
+#### Verified406 capture-free integration and original exact-main acceptance
+
+The previous pending final-source gates are now fulfilled for PR406, not for
+future heads. Capture-free875980c6b4a8bf4f82e78c55b14159c47c79e0e7/tree4cc4e6dbc28a4f4492a8569cd8929d48f62a4e8b
+removed ONLY temporary403 JSON writers/imports/calls/edit-report bookkeeping
+after BOTH complete actual read gates. All assertions, four original edits,
+real reparse/rebinding and post-binding parameter query remain.
+One component-README stale writer/source-only/filtered-rerun paragraph was
+then corrected; final head eefd06d5b2002d5aa8fe13929712631714149de8 has
+tree4c66e332adf5102f995c8c8a5ab7c346b359dcf0 and complete19-file scope.
+Both independent FULL19 functionality/adversarial reviews and both affected
+403 exact documentation-source rechecks are CURRENT CLEAR. Final pinned
+format-check and strict locked workspace/all-target Clippy exited0; no
+local Kotlin parser/server/Session/worker/peer ran.
+
+Its OWN original final attempt1 Native38979650322/job117237244640 and
+platform38979650359/Mac117237244765/Win117237244477 passed unchanged
+mandatory checks. Actual testmergefb6aa7170d34577c1d330162034ea5e5b97c7dc1
+has exact4c66e33tree and ordered parents [3920ab7d,eefd06d5].
+
+| Original final source job | Passes | Ordinary + doctests | Result rows |
+|---|---:|---:|---:|
+| Native117237244640 | 1190 | 1158 + 32 | 140 |
+| Mac117237244765 | 1188 | 1156 + 32 | 140 |
+| Windows117237244477 | 1137 | 1105 + 32 | 140 |
+
+Each0failed/3ignored/0measured/0filtered plus22 SEPARATE protocol fault
+cases and healthy followups. ROOT and independent OWNER fully read all
+original raw lines, every18-member ZIP, clean source/native+PowerShell
+preflight/byte policies/exits and complete retained toolchain/Clippy/test
+outputs. OWNER's own fresh authenticated raw/ZIP downloads match:
+Native296027bytes SHA298e242033bcc5a73982468cc4f679a374c3ac21341c9280d7feebb9d816fe2d;
+Mac405941 SHA8bd224264aad14e5fdd891315ffff3430576518345c82a8986418aee028351ef;
+Windows364649 SHAdcec45dfee23be860b616d970542dc768301fd58c9117ff4fa99ce8c9ea61385.
+Mac artifact12080362094/47690bytes has
+SHAc8d1a99aafdb29e6a907d252b3f690ad8e596de4f1d10f9a9e0791c93c45f652;
+Windows12080781793/42759 has
+SHA0afd1c50540ddeccfe999c66381a4efd9cec179344a7c9db7ae99709f5f0fa63.
+The stale observational event merge field was not substituted for the
+actual checked-out source, workflow SHA, tree and ordered-parent witnesses.
+No new capture after cleanup is claimed; first-source actual403 proof stays
+separate. Platform command remained locked/release/workspace/no-fail-fast/
+nocapture; Native remained full locked debug workspace.
+
+ROOT declared integration clear and held exclusive3920ab7d base through a
+SEPARATE strictly-readonly fresh guard: process0 AND parsedexit0, exact
+remote main/head/base/tree/full19scope/config4/check3/status0/originaltwo
+workflows/threejobs/allmandatory/artifactcustody/clean reviewed identity.
+Only then a SEPARATE ordinary expected-head squash merged
+[PR406](https://github.com/anilbeesetti/ktlsp/pull/406), without admin,
+force-push or branch deletion. Actual main608437dc64007bdfecd472cfb97a646242fec41b
+has EXACT reviewed4c66e332adf5102f995c8c8a5ab7c346b359dcf0tree and SOLE
+parent3920ab7d22ce4d89023291f2801500e598e24bb0, independently API-verified.
+
+Original exact-main38980985939/job117241549331 attempt1/push/main passed
+all pinned mandatory format/strictClippy/fullworkspace checks:
+1190=1158ordinary+32doc/140rows,0failed3ignored0measured0filtered,
+plus22 SEPARATE protocol fault cases. ROOT and independent OWNER each
+fully read all3211 raw lines and authenticated exact full608 checkout/
+workflow/executor/tree/soleparent; OWNER's own fresh authenticated log
+matches294956bytes SHA40c5ae2b377469c5ac97e642478c7ef4c0cf9732b47b9dbc4f1b085dc756f580.
+ONLY THEN lease406 CLEARED;402/403/404/405 are closed/completed.
+Full custody is retained in `/private/tmp/ktlsp-406-final-platform-38979650359/`.
+B3 remains INCONCLUSIVE/HOLD;96/395/377 historical limits remain unchanged.
+No full signatures/inference/applicability/library/provider/official parity.
+
+#### Next source and metadata scope wave407/408
+
+ROOT admitted TWO genuinely independent implementation owners from SAME
+verified608437dc64007bdfecd472cfb97a646242fec41b main only after lease406
+cleared:407 original outer type-parameter binding across direct-local
+parameter annotations/complete occurrences/guarded rename, and408 original
+selected Function-local metadata declarations with own-before-Class ID
+and immediate-own-only NAME lookup. Each has two separate static review
+slots; ROOT retains common docs/Cargo/admission/union reviews/hosted CI.
+The new code is IN FLIGHT and UNVERIFIED; no new capability is claimed.
+
+408's genuine prerequisite is NOW an actual native data observation, not
+source-inferred metadata: unchanged kotlin-stdlib2.3.20 Result$Companion
+class1682bytes SHAf12235d29decd00f18cdd1b1ef75b5c0d0bfdc6b3c27259224784c293f4cf9ad,
+archive1804720 SHA0ae12504a5040ebaf37703908483420d1a5624dd1d93f357665f8c77c848a01e.
+SameOutcome supportedmv2.3.0/d1126 ownerkotlin/Result.Companion/body29..126.
+Success ALLClassordinal4/body51..86 retains ownTbody65..69/ID1/name6 and
+value71..77/Type75..77/raw4806: classifier9 NAME6, NOT classifier7 ID1.
+Failure5 owns a distinct Tbody102..106 but its value is nominal Throwable.
+Existing public composed API actually refuses UnsupportedTypeParameters;
+raw inspection's separate fresh budgets are NOT new aggregate acceptance.
+ROOT read all117 actual standalone source/42 output lines, commands/exits0/
+emptyerr, original bytes/hashes and sameOutcome pointer assertions.
+Child outer spans are unobserved; genuine Function-local ID-leaf remains
+GAP. ROOT explicitly admitted NAME, never silently reinterpreted its index.
+Full original observation stays `/private/tmp/ktlsp-next-function-local-data/`.
+No implementation smoke for407/408 has run; unchanged96 quarantine,
+original full producer/CLI/edit readback and final-source/main gates apply.
+

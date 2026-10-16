@@ -451,10 +451,9 @@ fn parse_initialize(params: Option<&Value>) -> Result<Configuration, &'static st
             let encodings = encodings
                 .as_array()
                 .ok_or("positionEncodings must be an array")?;
-            if !encodings.iter().all(Value::is_string)
-                || !encodings.iter().any(|e| e.as_str() == Some("utf-16"))
-            {
-                return Err("client must support utf-16 positions");
+            // LSP 3.17 makes UTF-16 mandatory even when omitted from this list.
+            if !encodings.iter().all(Value::is_string) {
+                return Err("positionEncodings entries must be strings");
             }
         }
     }

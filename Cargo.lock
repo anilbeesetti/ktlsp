@@ -110,6 +110,7 @@ version = "0.1.0"
 name = "ktlsp-server"
 version = "0.1.0"
 dependencies = [
+ "ktlsp-parser",
  "ktlsp-protocol",
  "ktlsp-syntax",
  "ktlsp-text",

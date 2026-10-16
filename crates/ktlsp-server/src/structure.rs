@@ -98,7 +98,7 @@ impl Analysis {
 }
 
 // Sorted byte boundaries come only from lossless tokens and lexical diagnostics.
-fn positions(text: &str, offsets: &[usize]) -> Vec<Position> {
+pub(crate) fn positions(text: &str, offsets: &[usize]) -> Vec<Position> {
     let mut result = Vec::with_capacity(offsets.len());
     let mut byte = 0;
     let mut position = Position {

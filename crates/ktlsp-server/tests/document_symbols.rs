@@ -561,7 +561,7 @@ fn actual_local_binding_definition_hover_ranges_and_refusals() {
         (4, "fun f() { val x = 1; val x = 2; val y = x }"),
         (5, "fun f() { var x = 1; val y = x }"),
         (6, "fun f(arg: Int) { val x = 1; val y = x }"),
-        (7, "fun f() { val x: Int = 1; val y = x }"),
+        (7, "fun f() { val x: Int? = 1; val y = x }"),
         (8, "fun f() { val x = 1; val y = x + 1 }"),
         (9, "val x = 1; val y = x"),
         (10, "fun f() { val x = x }"),
@@ -1225,4 +1225,69 @@ fn references_revisions_reopen_process_failure_and_rendered_uri_budget() {
     let response = request(&mut session, "textDocument/documentHighlight", params);
     assert_eq!(response["result"].as_array().unwrap().len(), 25);
     assert!(session.close().1);
+}
+
+#[test]
+fn typed_local_original_definition_hover_and_annotation_refusals() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let mut session = running(json!({}));
+    let source = "// 😀\r\nclass Int {}\r\nfun f() {\r\n val `x 😀`: `Long` = 1\r\n val y: Int = `x 😀`\r\n val z = y\r\n}";
+    open(&mut session, source);
+    for (needle, declaration, value) in [
+        ("`x 😀`", "`x 😀`", "val `x 😀`: `Long` = 1"),
+        ("y", "y", "val y: Int = `x 😀`"),
+    ] {
+        let reference = source.rfind(needle).unwrap();
+        let params = navigation_params(source, reference);
+        let definition = request(&mut session, "textDocument/definition", params.clone());
+        assert_eq!(
+            definition["result"],
+            json!({"uri":URI,"range":span(source, declaration)})
+        );
+        let hover = request(&mut session, "textDocument/hover", params);
+        assert_eq!(
+            hover["result"],
+            json!({
+                "contents":{"kind":"plaintext","value":value},
+                "range":{
+                    "start":offset_to_position(source, reference).unwrap(),
+                    "end":offset_to_position(source, reference + needle.len()).unwrap()
+                }
+            })
+        );
+    }
+    for annotation in ["`Long`", "Int ="] {
+        let response = request(
+            &mut session,
+            "textDocument/definition",
+            navigation_params(source, source.find(annotation).unwrap()),
+        );
+        assert_eq!(response["error"]["code"], -32803, "{response}");
+    }
+    for (index, annotation) in [
+        "pkg.Int",
+        "Int?",
+        "List<Int>",
+        "@A Int",
+        "(Int)",
+        "() -> Int",
+        "Int & Any",
+        "dynamic",
+        "",
+        ": Int",
+        "Int: Long",
+        "= Int",
+    ]
+    .iter()
+    .enumerate()
+    {
+        let source = format!("fun f() {{ val x: {annotation} = 1; val y = x }}");
+        change(&mut session, index as i32 + 2, &source);
+        let params = navigation_params(&source, source.rfind("= x").unwrap() + 2);
+        for method in ["textDocument/definition", "textDocument/hover"] {
+            let response = request(&mut session, method, params.clone());
+            assert_eq!(response["error"]["code"], -32803, "{source}: {response}");
+            assert!(response.get("result").is_none());
+        }
+    }
 }

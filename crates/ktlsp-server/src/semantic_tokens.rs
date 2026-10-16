@@ -89,7 +89,8 @@ impl Client {
     }
 
     pub(crate) fn options(&self) -> Value {
-        let mut options = json!({"legend":{"tokenTypes":self.types[..self.type_count],"tokenModifiers":[]}});
+        let mut options =
+            json!({"legend":{"tokenTypes":self.types[..self.type_count],"tokenModifiers":[]}});
         if self.full {
             options["full"] = json!(true);
         }

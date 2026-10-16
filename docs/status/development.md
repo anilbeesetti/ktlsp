@@ -1439,3 +1439,70 @@ The capture-free final source needs its OWN exact reviews and ORIGINAL full
 CI before a fresh guarded merge; this first candidate is not merge authority.
 395/377's historical failure attribution,96 and full-parity limits remain.
 
+#### Delivered400: independently verified native product union
+
+[PR400](https://github.com/anilbeesetti/ktlsp/pull/400) delivered392/394/396/
+398/399; all five issues are closed/completed. Final capture-free reviewed
+head48d0ba30a6e67b75a94bec19612cf9a010b4712c/tree2bf0c6c2b4207b4ab02ff2a19db399479fd50c53
+received two exact independent full91-file reviews and both affected392
+cleanup rechecks. Its own strict locked all-target Clippy passed.
+
+Its OWN original attempt1 Native38962522944 and platform38962523114 passed.
+Actual tested mergeb8802a526728909051684b1a8671952ec7af6f7c has exact reviewed
+tree2bf0c6c2b4207b4ab02ff2a19db399479fd50c53 and ordered parents[6a621285,48d0ba30].
+ROOT and independent OWNER read every complete original job log and both
+complete evidence ZIPs, reauthenticated fresh APIs and source/clean-worktree/
+parent/byte-policy/exit records, and independently recounted results.
+
+| Original final CI | Job | Ordinary passed | Doctests passed | Total | Result rows | Failed | Ignored | Filtered |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+|Native38962522944|117180875356|1119|32|1151|137|0|3|0|
+|Platform38962523114 macOS|117180876508|1117|32|1149|137|0|3|0|
+|Platform38962523114 Windows|117180876770|1066|32|1098|137|0|3|0|
+|Original exact-main38963953331|117185661349|1119|32|1151|137|0|3|0|
+
+The separate actual22-case worker-protocol success is NOT another22 doctests.
+Final macOS artifact12073596578:46841 bytes/SHA-256
+1d02b7e8c96a73b198b567907a03d2c2d610a1508d887ea42656818c45a26d3a;
+Windows12072944345:41817 bytes/SHA-256
+4ca9c14344acdec5ce46cf87fa824d94a4492e0042f80295e27483e2a0ddb5f7.
+Both actual original ZIP digests match API metadata. No TEMP_392 output
+remains in final logs; meaningful original product assertions passed again.
+
+Fresh integration guards ran in a separate STRICTLY READ-ONLY call:
+process0 AND valid parsed0, exact main/head/base/tree, complete91 scope/
+config4/checks3/statuses0, original workflows and mandatory jobs, and clean
+local reviewed identity. ROOT explicitly inspected all matching facts before
+a SEPARATE ordinary expected-head squash. Actual mainbc5c6760b596721d4f627cc1d89c579be20c406c
+has exact reviewed tree2bf0c6c2b4207b4ab02ff2a19db399479fd50c53 and SOLEPARENT
+6a62128542955a6c0c75154716de238bf589041d. ROOT and independent OWNER both
+verified actual source APIs, not only the requested head.
+
+The exclusive base lease remained ACTIVE through original push/main
+attempt1 run38963953331/job117185661349, actual fullbc5 checkout and all
+mandatory pinned format/Clippy/unfiltered workspace steps. ROOT and OWNER
+independently read the SAME complete289159-byte original raw log, SHA-256
+f7fae15441fb6853a4f931305d4f3a7fdfd70c29d4f70ebffbe8aa9635bf3b4b,
+fresh run/jobs/main/tree/sole-parent APIs and complete137-row census above.
+Only then ROOT CLEARED lease400. This is the new verified incoming main.
+Monitor TCP resets only resumed the SAME original runs; CI never reran.
+
+All old/user/component/delivered worktrees remain preserved. No Cargo/lock/
+dependency/workflow/vendor/JVM/C-analysis/parser-runtime boundary changed.
+395/377 remain historically unattributed;96, official-custody, effective
+tooling, formatting, SDK/release and full Kotlin LSP parity limits remain.
+
+### Source-owned prose KDoc hover397: next independent native lanes
+
+ROOT created isolated parser-source, server-consumer and root-integration
+branches from the SAME independently verifiedbc5c6760 incoming main.
+SourceKernel owns original prefix/KDoc admission and explicit single-budget
+authentication/decoding; HoverConsumer owns negotiated literal/escaped
+rendering, existing publication/cancellation preservation and actual edited
+CLI regression source. Common docs/config/publication/CI remain ROOT-owned.
+The saved397 contract and completed primary/native source research are
+reused, not restarted. Actual producer ownership—not comment proximity—
+and untouched body/type/value/callee proofs remain required. Two independent
+static review slots per component are granted. Implementation is INPROGRESS;
+no397 format/build/test/runtime/hosted acceptance or parity is claimed.
+

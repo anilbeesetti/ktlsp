@@ -3,7 +3,7 @@ use ktlsp_protocol::{read_frame, write_frame};
 use serde_json::{Value, json};
 use std::{
     env, fs,
-    io::{self, Write},
+    io::{self, Read, Write},
     process::{Command, Stdio},
     thread,
     time::{Duration, Instant},
@@ -38,6 +38,20 @@ fn descendant() {
 }
 fn main() {
     let mode = env::args().nth(1).unwrap();
+    if mode == "echo" || mode == "error" {
+        eprintln!("SYNTHETIC / NONOFFICIAL Rust peer: adapter mechanics only");
+    }
+    if mode == "premature-response" {
+        eprintln!("SYNTHETIC / NONOFFICIAL premature response peer");
+        io::stdin().read_exact(&mut [0]).unwrap();
+        write_frame(
+            &mut io::stdout(),
+            br#"{"jsonrpc":"2.0","id":1,"result":null}"#,
+        )
+        .unwrap();
+        io::stdout().flush().unwrap();
+        stall();
+    }
     if mode == "heartbeat" || mode == "heartbeat-silent" {
         if mode == "heartbeat-silent" {
             #[cfg(unix)]
@@ -149,6 +163,10 @@ fn main() {
         if let Some(id) = message.get("id") {
             let reply = if mode == "server-request" {
                 json!({"jsonrpc":"2.0","id":9,"method":"workspace/configuration"})
+            } else if mode == "echo" {
+                json!({"jsonrpc":"2.0","id":id,"result":message["params"]["text"]})
+            } else if mode == "error" {
+                json!({"jsonrpc":"2.0","id":id,"error":{"code":-32603,"message":"synthetic peer error"}})
             } else {
                 json!({"jsonrpc":"2.0","id":id,"result":"😀"})
             };

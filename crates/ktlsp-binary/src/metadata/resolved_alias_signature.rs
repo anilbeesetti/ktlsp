@@ -6,7 +6,7 @@ use std::ops::Range;
 pub use super::package_member_names::Limits;
 
 /// Lossless Kotlin ClassId parts, sharing the resolver's one UTF-16 allocation.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct ClassId {
     text: Vec<u16>,
     package_end: usize,
@@ -17,6 +17,14 @@ impl ClassId {
     pub fn package_name(&self) -> &[u16] { &self.text[..self.package_end] }
     pub fn relative_class_name(&self) -> &[u16] { &self.text[self.relative_start..] }
 }
+impl PartialEq for ClassId {
+    fn eq(&self, other: &Self) -> bool {
+        self.local == other.local
+            && self.package_name() == other.package_name()
+            && self.relative_class_name() == other.relative_class_name()
+    }
+}
+impl Eq for ClassId {}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct NominalType {

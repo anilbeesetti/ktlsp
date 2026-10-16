@@ -285,7 +285,11 @@ impl Session {
         }
         if matches!(
             method,
-            "textDocument/documentSymbol" | "textDocument/definition" | "textDocument/hover"
+            "textDocument/documentSymbol"
+                | "textDocument/definition"
+                | "textDocument/hover"
+                | "textDocument/references"
+                | "textDocument/documentHighlight"
         ) && self.state == State::Running
         {
             return match self.start_parser(id.clone(), method, params) {
@@ -338,6 +342,8 @@ impl Session {
             if self.parser_provider.is_some() {
                 result["capabilities"]["documentSymbolProvider"] = json!(true);
                 result["capabilities"]["definitionProvider"] = json!(true);
+                result["capabilities"]["referencesProvider"] = json!(true);
+                result["capabilities"]["documentHighlightProvider"] = json!(true);
                 if self.hover_format.is_some() {
                     result["capabilities"]["hoverProvider"] = json!(true);
                 }
@@ -437,13 +443,30 @@ impl Session {
                 })?;
             let offset = ktlsp_text::position_to_offset(document.text(), position)
                 .map_err(|_| (-32602, "invalid UTF-16 position"))?;
-            Some(if method == "textDocument/definition" {
-                semantic_navigation::Query::Definition { offset }
-            } else {
-                semantic_navigation::Query::Hover {
+            Some(match method {
+                "textDocument/definition" => semantic_navigation::Query::Definition { offset },
+                "textDocument/references" => {
+                    let include_declaration = required(map, "context")
+                        .and_then(object)
+                        .and_then(|context| required(context, "includeDeclaration"))
+                        .and_then(|value| {
+                            value
+                                .as_bool()
+                                .ok_or("includeDeclaration must be a boolean")
+                        })
+                        .map_err(|e| (-32602, e))?;
+                    semantic_navigation::Query::References {
+                        offset,
+                        include_declaration,
+                    }
+                }
+                "textDocument/documentHighlight" => {
+                    semantic_navigation::Query::Highlights { offset }
+                }
+                _ => semantic_navigation::Query::Hover {
                     offset,
                     format: self.hover_format.expect("hover format checked"),
-                }
+                },
             })
         };
         if document.text().len() > ktlsp_parser::MAX_SOURCE_BYTES {

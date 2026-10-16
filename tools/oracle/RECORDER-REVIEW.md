@@ -76,6 +76,35 @@ Final corrected-source optional format check, strict locked all-target Clippy
 and full synthetic suite passed locally: the same 55 ordinary cases plus two
 actually exercised ignored helpers, with no production/limit change.
 
+At corrected head `076b3a1d77ccc3ae23326258f49c35affada61e3`, original hosted
+optional run `38859058554` passed Ubuntu completely. macOS failed the new
+aggregate-byte-budget subprocess test because capture was incomplete; its
+assertion did not print the failure reason, so the log does not establish that
+reason. No unchanged rerun or deadline inflation was used. The 4 MiB request/
+echo fixture coupled a serialization-budget assertion to large-pipe scheduling.
+It is replaced with a deterministic real exporter → filesystem → Evidence
+consumer test: valid sequential evidence exactly at 8 MiB is accepted with
+verified returned count/file length; adding only one ASCII byte on the same
+filesystem publishes no consumer files and is refused. Each direction remains
+individually below 8 MiB. The unused echo peer is removed. Actual small Rust-peer
+recorder → Evidence → replay smoke and the live record-count boundary remain.
+Production transport/limits remain unchanged. Current ordinary-case distribution
+is 8 library, 20 host, 1 host-peer consumer, 11 PR174, 9 recorder and 6 replay
+on macOS; Linux additionally has the two custody cases.
+Both source reviewers cleared the exact boundary replacement. Its local format/
+strict Clippy and boundary/PR174 cases passed, but the strengthened failure test
+then exposed another new assumption: it required a successful group-kill flag
+on every failed observation. The actual flag was false; the assertion did not
+print the accompanying cleanup error. The test now checks truthful consistency:
+a null cleanup error requires the successful flag; otherwise an explicit
+nonempty cleanup error is required. Incomplete/forced/raw/EOF/exit/no-export
+checks remain, and no clean-closure or suppressed-error claim is made.
+Both independent reviewers rechecked the cleanup-fact correction clear. Final
+corrected-source optional formatting, strict locked all-target Clippy and the
+complete synthetic suite passed locally: 55 ordinary cases plus the two
+actually exercised ignored helpers. All original failed observations above
+remain separate evidence, not erased by this changed-source pass.
+
 ## Historical PR300 source-review checkpoint
 
 PR174 source preparation adds a working input-consistency validator.

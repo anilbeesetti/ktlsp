@@ -530,22 +530,6 @@ mod synthetic_adapter_mechanics {
     }
 
     #[test]
-    fn aggregate_transcript_bytes_fail_even_when_both_raw_streams_fit() {
-        let mut script = script();
-        script[0]["params"] = json!({"text":"x".repeat(4 * 1024 * 1024 + 1024)});
-        let (directory, report) = capture("echo", &script, limits());
-        assert_export_failure(&directory, &report, "transcript byte limit");
-        for name in ["client-intended.raw", "stdout.raw"] {
-            let bytes = fs::metadata(directory.0.join(name)).unwrap().len();
-            assert!(bytes > 4 * 1024 * 1024);
-            assert!(bytes < 8 * 1024 * 1024);
-        }
-        assert_eq!(report["chronology"].as_array().unwrap().len(), 3);
-        assert_eq!(report["scriptCompleted"], true);
-        assert_eq!(report["exit"]["code"], 0);
-    }
-
-    #[test]
     fn unaccepted_client_intent_and_protocol_failure_never_become_success() {
         let mut script = script();
         script[0]["params"] = json!({"text":"x".repeat(100_000)});

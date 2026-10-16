@@ -60,6 +60,9 @@ EOF, fatal framing or broken output cancel jobs and attempt bounded cleanup. EOF
 - At most **8 retained parser jobs per Session**, no waiting-job queue, and **8 owned parser thread handles process-wide**, shared across symbols/definition/hover, with unfinished handles retained globally until joined. Capacity exhaustion returns RequestFailed (`-32803`) before copying source or spawning more work. These limits do not replace or weaken the parser's existing eight global Unix supervision reservations.
 - Snapshot text is copied once into immutable shared storage; worker and owner share that snapshot. Each job has one bounded single-result channel, at most one rendered response, and one cancellation flag. A cancelled job releases its ID immediately but not its storage/admission slot before completion.
 - The incremental decoder retains at most one 8 KiB header and one 16 MiB payload plus the CLI's bounded read buffer. There is no accumulated input-frame queue or reader-thread lifetime to join.
+- Idle pending-input polls back off for 1 ms, so an immediately nonblocking
+  library reader cannot keep an otherwise idle session busy-spinning. The wait
+  does not change parser deadlines or claim an OS scheduling bound.
 
 Hosted cancellation regressions use a compiled controlled **failing Rust peer** through the real Parser supervisor and packaged stdio. They check active-work cancellation, exact string/u64 IDs, wrong/invalid IDs, duplicate IDs, ID reuse, committed versus rejected edits, identical close/reopen, shutdown/exit/EOF and resource recovery. This is cancellation-mechanics coverage, not a fabricated successful CST or official oracle evidence; actual symbol/range assertions remain in the real matching-worker suite. No local parser/supervision runtime is authorized under #96.
 

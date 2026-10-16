@@ -959,7 +959,10 @@ pub fn run<R: BufRead, W: Write, E: Write>(reader: &mut R, writer: &mut W, error
                 Ok(message) => session.handle(message),
                 Err(_) => vec![response_error(Value::Null, -32700, "Parse error")],
             },
-            Ok(Poll::Pending) => Vec::new(),
+            Ok(Poll::Pending) => {
+                thread::sleep(Duration::from_millis(1));
+                Vec::new()
+            }
             Ok(Poll::Ready(None)) => break i32::from(session.state != State::Shutdown),
             Err(error) => {
                 let _ = writeln!(errors, "ktlsp: {error}");
@@ -1019,5 +1022,34 @@ mod cleanup_tests {
             !session.close().1,
             "later calls must not invent closure proof"
         );
+    }
+
+    #[test]
+    fn idle_would_block_input_has_bounded_poll_rate() {
+        struct IdleInput(usize);
+        impl std::io::Read for IdleInput {
+            fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+                if buffer.is_empty() {
+                    return Ok(0);
+                }
+                self.fill_buf().map(|bytes| bytes.len())
+            }
+        }
+        impl BufRead for IdleInput {
+            fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+                if self.0 == 0 {
+                    return Ok(&[]);
+                }
+                self.0 -= 1;
+                Err(std::io::ErrorKind::WouldBlock.into())
+            }
+            fn consume(&mut self, count: usize) {
+                assert_eq!(count, 0);
+            }
+        }
+        let started = Instant::now();
+        assert_eq!(run(&mut IdleInput(16), &mut Vec::new(), &mut Vec::new()), 1);
+        // At most 4,000 idle probes/second, not an exact scheduler interval.
+        assert!(started.elapsed() >= Duration::from_millis(4));
     }
 }

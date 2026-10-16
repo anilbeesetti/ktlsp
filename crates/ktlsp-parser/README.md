@@ -117,7 +117,26 @@ types, stable cross-revision symbols or a new server capability.
 - `lowering::lower_declarations` borrows declarations and existing syntax errors
   from a validated source snapshot, preserving original byte/name spans, CST
   parents, result-local owners and incompleteness. Unsupported syntax rejects
-  the whole operation; package/import nodes are admitted only when empty.
+  the whole operation, including malformed/error-bearing package/import headers.
+  #346 adds borrowed `package()` / ordered `imports()` projections from the pinned
+  producer's validated preamble shapes. Qualified names retain original CST index,
+  raw spelling/range and ordered `segments()`; segment dots inside backticks stay
+  inside that component. Supported semantic spellings reuse the declaration helper
+  unchanged, without Unicode normalization; unsupported spellings reject atomically.
+  Imports distinguish named vs `on_demand()` and expose a separate optional alias.
+  Duplicate import records remain in source order; this is not compiler duplicate-
+  import checking. Headers are neither declarations nor resolved symbols, and do
+  not change declaration ordinals, structural regions or local-reference binding.
+  Empty producer package/import nodes remain supported. File annotations, modifiers
+  and other unsupported header shapes remain refused; NativeSourceFile admission
+  is unchanged. Projection uses the existing shared 2,097,152-work-unit and
+  131,072-byte requested/retained-capacity budgets, with at most 1,024 total nonempty
+  package/import directives and 1,024 total name/alias components, checked before
+  reservation/emission. Qualified components borrow CST/source with no component
+  allocation or recursive traversal. Production-parser fixture tests cover LF/CRLF,
+  UTF-16 positions, backtick dots, named/star/alias/duplicate imports and the actual
+  authenticated f/x/y binding consumer. Hosted execution is required under #96;
+  this source change alone is not hosted proof or package/import resolution.
 - Reference-bearing functions require an ordinary top-level zero-parameter
   function with an ordered brace body of plain immutable untyped local `val`s,
   whose initializers are integer constants or whole bare-identifier reference

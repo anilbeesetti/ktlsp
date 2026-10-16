@@ -142,3 +142,16 @@ No semantic server capability is promoted. User-facing features remain stdio/lif
 
 This does not alter the frozen whole matrix or eebb349 assessment above. Syntactic outlines are not resolved symbols; selected classfile consumption is not JAR-to-symbol/server-library integration; lexical diagnostics are not compiler diagnostics. Full official parity, semantic providers, broader parser recovery, #96/Darwin, general Windows/macOS packaging and fresh official capture remain pending or unverified.
 
+## Bounded semantic source after verified continuation
+
+PR328's verified continuation is recorded separately in the
+[development ledger](development.md#verified-continuation-and-next-semantic-source-330).
+On that exact incoming main, #333/PR334 supplies library-only authenticated
+whole-initializer reference occurrences and a unique preceding direct immutable
+local target within one supported ordinary function body. Original supervised
+consumer evidence and refusal/budget boundaries are recorded in the
+[parser contract](../../crates/ktlsp-parser/README.md#bounded-semantic-prerequisites-320).
+This source is awaiting root integration gates; it is not full scopes/imports,
+types, cross-file resolution, official navigation evidence or an advertised
+semantic server capability. The historical matrix and cutoffs above are unchanged.
+

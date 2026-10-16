@@ -13,7 +13,8 @@ const INVALID_RANGE: (i32, &str) = (-32602, "invalid UTF-16 semantic token range
 
 #[derive(Debug)]
 pub(crate) struct Client {
-    types: Vec<&'static str>,
+    types: [&'static str; 5],
+    type_count: usize,
     indices: [Option<u32>; 5],
     full: bool,
     range: bool,
@@ -71,22 +72,24 @@ impl Client {
             return None;
         }
         let mut client = Self {
-            types: Vec::new(),
+            types: TYPES,
+            type_count: 0,
             indices: [None; 5],
             full,
             range,
         };
         for (category, name) in TYPES.into_iter().enumerate() {
             if supported.iter().any(|value| value == name) {
-                client.indices[category] = Some(client.types.len() as u32);
-                client.types.push(name);
+                client.indices[category] = Some(client.type_count as u32);
+                client.types[client.type_count] = name;
+                client.type_count += 1;
             }
         }
-        (!client.types.is_empty()).then_some(client)
+        (client.type_count != 0).then_some(client)
     }
 
     pub(crate) fn options(&self) -> Value {
-        let mut options = json!({"legend":{"tokenTypes":self.types,"tokenModifiers":[]}});
+        let mut options = json!({"legend":{"tokenTypes":self.types[..self.type_count],"tokenModifiers":[]}});
         if self.full {
             options["full"] = json!(true);
         }

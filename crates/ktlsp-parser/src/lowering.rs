@@ -706,7 +706,7 @@ fn token<'a>(
             || !b.one_of(&e.kind, &["EQ", "SEMICOLON"])?
         {
             return Err(unsupported(i));
-        } else if b.equal(&e.kind, "EQ")? {
+        } else if f.tag == Tag::Property && b.equal(&e.kind, "EQ")? {
             plain_step(&mut f, 2, 3, b)?;
         } else {
             f.plain = u8::MAX;
@@ -1743,10 +1743,13 @@ mod tests {
 
     #[test]
     fn reference_ordering_and_repeated_bodies_refuse_without_rescans() {
-        for change in 0..7 {
+        for change in 0..8 {
             let mut tree = Tree::new();
             tree.header("f");
-            for _ in 0..if change == 0 {
+            if change == 7 {
+                tree.token("EQ", "="); // cannot stand in for the function's parameter list
+            }
+            for _ in 0..if change == 0 || change == 7 {
                 0
             } else if change == 1 {
                 2

@@ -292,15 +292,4 @@ fn production_reference_initializer_preserves_declarations_and_regions() {
     assert_eq!(binding.target().cst_index(), 14);
     assert_eq!(binding.target().range(), 10..19);
     assert_eq!(binding.target().name_range(), 14..15);
-    // Temporary hosted proof marker: root removes only this Write after observation.
-    std::io::Write::write_all(
-        &mut std::io::stderr(),
-        format!(
-            "LOCAL_VALUE_BINDING_ACTUAL occurrence={:?} target={:?} name={:?} target_original={} body_original={} site_original={}\n",
-            binding.site().range(), binding.target().range(), binding.target().name_range(),
-            std::ptr::eq(binding.target(), &lower.declarations()[1]),
-            std::ptr::eq(binding.body(), &directory.regions()[1]),
-            std::ptr::eq(binding.site(), &site),
-        ).as_bytes(),
-    ).unwrap();
 }

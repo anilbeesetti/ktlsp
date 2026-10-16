@@ -170,6 +170,19 @@ incremental bounds, not whole-process allocation, RSS, stack or time guarantees.
 The raw-name index may scan quadratically within its charged work limit;
 ancestor queries use fixed storage and position queries allocate nothing.
 
+At #333 source head `a22b54619f6996e03cceee56362453a9b846d574`,
+[original attempt-1 Linux CI38857165917/job116831130221](https://github.com/anilbeesetti/ktlsp/actions/runs/38857165917/job/116831130221)
+passed pinned format, locked workspace Clippy and all 890 workspace tests.
+Its synthetic checkout `78dc92de87802132f3451d51c44c7e4b4a58ec47` has
+ordered parents `[a52f9518ff1532c25aff8fc1bdb1c566a05526b4,a22b54619f6996e03cceee56362453a9b846d574]`
+and tree `6b32ab3c8b3a04052cdf8e7ba01ee03a3b8a7fd3`.
+ROOT independently authenticated the original API/log and observed occurrence
+`29..30` binding to declaration `10..19`, name `14..15`, with original target,
+body and site pointer associations all true. The temporary direct-`Write` marker
+was then removed; its production assertions remain. This is bounded library
+consumer proof, not official navigation or Mac/Windows reliability acceptance.
+Final reviewed integration-head CI and guarded merge are separate gates.
+
 At source head `b94e6ded912d72c700be9f3e8d09ab923c4fb5a3`,
 [original attempt-1 Linux CI38850851404/job116811504205](https://github.com/anilbeesetti/ktlsp/actions/runs/38850851404/job/116811504205)
 checked synthetic merge `fad71a4c94b9e154ce90503f24cae5d39d27b7db`,

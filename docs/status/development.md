@@ -512,3 +512,25 @@ Selected packaging source [PR327/#325](https://github.com/anilbeesetti/ktlsp/pul
 
 Final aggregate hosted CI/merge and any separately admitted packaging dispatch evidence are recorded on [issue324](https://github.com/anilbeesetti/ktlsp/issues/324) and its linked aggregate PR, separately from these source observations. Native-only default analysis/build/tests and T004 data-only remain; #96, broader parser recovery, full semantics and official parity remain open.
 
+## Verified continuation and next semantic source #330
+
+PR328 delivered exact main `a52f9518ff1532c25aff8fc1bdb1c566a05526b4`,
+tree `ce2b8975e3e907c964fede46bae5f3aa5db705bd`, sole parent
+`2e408cfd8d65c68a9eede863e3f983a2db720d95`. Original attempt-1
+[native CI38853318546/job116819150797](https://github.com/anilbeesetti/ktlsp/actions/runs/38853318546/job/116819150797)
+passed 885 workspace tests plus 22 separate worker-fault cases.
+[Optional CI38853318577](https://github.com/anilbeesetti/ktlsp/actions/runs/38853318577)
+passed all 42 ordinary tests on each Linux/macOS leg. Independent OWNER+ROOT
+checks covered the exact squash tree/sole parent and original runs; its exclusive
+integration lease was cleared. Superseded source PRs were closed, not discarded.
+
+That verified SHA is the incoming base for #330. #333/PR334 adds authenticated
+whole-initializer reference sites and same-body preceding local-value binding,
+without advertising a semantic server provider. ROOT authenticated its original
+hosted production consumer and removed only the temporary observation marker;
+the [parser receipt and finite limits](../../crates/ktlsp-parser/README.md#bounded-semantic-prerequisites-320)
+retain the exact source/merge/tree and actual pointer-association evidence.
+Root integration reviews, final original hosted CI and a fresh guarded merge
+remain separate gates for this new source. Full T009/T026/T027, types,
+cross-file/module identity, #96 and official/platform parity remain unverified.
+

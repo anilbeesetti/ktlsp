@@ -320,17 +320,22 @@ types, stable cross-revision symbols or a new server capability.
   UTF-16 positions, backtick dots, named/star/alias/duplicate imports and the actual
   authenticated f/x/y binding consumer. Hosted execution is required under #96;
   this source change alone is not hosted proof or package/import resolution.
-- Reference- or parameter-bearing functions require an ordinary named top-level
+- Reference-, parameter- or leading-type-parameter-bearing functions require an ordinary named top-level
   function with an ordered brace body of plain immutable local `val`s, optionally
   annotated with one simple (bare or backtick) type-name, whose initializers are
   integer constants or whole-identifier reference subtrees. Ordinary parameters
   require exactly a name, colon and the same simple type-name shape, separated
   by commas with one optional trailing comma after a real parameter. Positive
-  complete shape is mandatory even when the parser reports no diagnostics.
-  Missing/reordered/repeated syntax, defaults, vararg, modifiers/annotations,
-  richer types, receivers/context/generics/explicit returns, expression bodies,
-  members/constructors/lambdas/nesting/destructuring and relevant recovery remain
-  refused. This is syntax admission, not resolved type or declaration visibility.
+  complete shape is mandatory even when the parser reports no diagnostics or
+  ordinary value references. One nonempty leading `<T, U,>` list is admitted:
+  unmodified supported bare/backtick identifiers, supported header/list trivia
+  and one optional real trailing comma. Bounds, variance, reified, annotations,
+  where clauses, empty/malformed/post-name/second lists remain refused, as do
+  missing/reordered/repeated syntax, defaults, vararg, richer types,
+  receivers/context/explicit returns, expression bodies,
+  members/constructors/lambdas/nesting/destructuring and relevant recovery.
+  This is syntax admission, not generic inference or semantic non-nullability:
+  unbounded `T` has implicit bound `Any?`, despite having no nullable syntax.
 - `Declaration::semantic_spelling` separately supports ASCII bare names and
   nonempty backtick bodies without backticks, CR/LF or NUL, borrowing unchanged
   bytes without normalization; unsupported names return `None`, not an identity.
@@ -338,10 +343,11 @@ types, stable cross-revision symbols or a new server capability.
   and snapshot result, then supplies file/class-body/function-body regions and
   ordered declaration memberships. Equal bytes from an independent parse do
   not establish origin. Regions and declaration owners are not Kotlin scopes.
-  Original `VALUE_PARAMETER` declarations retain their original parameter-list
-  parent and enclosing function owner ordinal. Header parameters remain file
-  structural members; locals remain block members. No property, `val` text or
-  body membership is fabricated, and raw name indices are not visibility rules.
+  Original `VALUE_PARAMETER` and `TYPE_PARAMETER` declarations retain their
+  original parameter-list parent and enclosing function owner ordinal. Header
+  parameters remain file structural members, not file-visible bindings; locals
+  remain block members. No property, `val` text or body membership is fabricated,
+  and raw name indices are not visibility rules.
 - `declaration_name_index` groups exact **raw** spellings within an identical
   borrowed region, retaining duplicates and result-local declaration ordinals.
   `ancestor_candidates` returns all such groups along structural ancestors,
@@ -358,8 +364,9 @@ types, stable cross-revision symbols or a new server capability.
   `ReferenceSite::semantic_spelling` reuses the declaration spelling helper.
   Annotation `TYPE_REFERENCE(USER_TYPE(REFERENCE_EXPRESSION(IDENTIFIER)))`
   subtrees are authenticated retained syntax, not local value occurrences or
-  successful reference sites; their names are not resolved, even when a class or
-  import shares a builtin spelling. Qualified, nullable, generic, annotated,
+  successful reference sites. Only the separate annotation-only lexical query
+  below resolves a same-function type parameter; builtin/class/import names
+  remain unresolved. Qualified, nullable, generic, annotated,
   parenthesized, function, intersection and dynamic types remain refused, as do
   malformed/reordered annotations. Binder consumers reuse the lowerer's shape,
   not a second type grammar. Explicitly typed integer-initializer query targets
@@ -401,6 +408,23 @@ types, stable cross-revision symbols or a new server capability.
   validation and compared bytes. Binding allocates nothing and is nonrecursive.
   This is not complete nested/outer/member/receiver/import/overload resolution,
   types, stable cross-revision identity or official navigation equivalence.
+- `local_value_binding::bind_lexical_type_parameter(directory, result,
+  annotation_reference_index, current)` authenticates original snapshot/tree
+  association, exact reference/token/USER_TYPE/TYPE_REFERENCE/parameter-or-local
+  ancestry, enclosing function and complete admitted body. It scans the entire
+  same-function type-parameter list under ONE existing 2,097,152-unit reference
+  budget, including spelling/comparison work after the first match. A unique
+  semantic spelling returns original borrowed annotated declaration, function,
+  body, reference/name token and `TYPE_PARAMETER` target. Matching duplicates
+  (including later `T`/backtick-T), no match, foreign/stale snapshots, unsupported
+  context/spelling and exhaustion refuse atomically. No values, other functions,
+  outer classes, package names or imports are fallback candidates. This query
+  allocates nothing; value completion/occurrences/rename remain value-only.
+  Production and paired-CLI regressions are authored but unexercised until
+  separately admitted original hosted CI; temporary bounded capture uses only
+  the results already parsed by those fixtures. No official equivalence,
+  typeDefinition, type-parameter hover/references/rename or generic inference is
+  established; #96 and full parity remain open.
 - `local_value_binding::visible_local_values(directory, result, initializer_index,
   current_snapshot)` authenticates an existing whole-identifier initializer
   reference without requiring its spelling to bind. The owned result retains

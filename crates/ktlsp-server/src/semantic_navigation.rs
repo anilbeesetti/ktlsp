@@ -2,8 +2,8 @@
 use ktlsp_parser::{
     SnapshotResult, SourceSnapshot,
     local_value_binding::{
-        LocalValueAnchor, LocalValueOccurrences, bind_local_value, guarded_local_value_rename,
-        local_value_occurrences, visible_local_values,
+        LocalValueAnchor, LocalValueOccurrences, bind_lexical_type_parameter, bind_local_value,
+        guarded_local_value_rename, local_value_occurrences, visible_local_values,
     },
     lowering::{lower_declarations, reference_site},
     structural_regions::build_regions,
@@ -186,6 +186,16 @@ pub(crate) fn render(
         return render_target(tree.source(), snapshot, query, target, target.name_range());
     }
     let directory = build_regions(&lowered, result, snapshot).map_err(|_| UNSUPPORTED)?;
+    if matches!(query, Query::Definition { .. })
+        && let Some((index, expression)) = reference
+        && expression.parent.is_some_and(|parent| tree.elements()[parent].kind == "USER_TYPE")
+    {
+        // Annotation role is selected positively, never as a failed-value fallback.
+        let binding = bind_lexical_type_parameter(&directory, result, index, snapshot)
+            .map_err(|_| UNSUPPORTED)?;
+        let target = binding.target();
+        return render_target(tree.source(), snapshot, query, target, target.name_range());
+    }
     if occurrence_query {
         let anchor = if let Some((index, _)) = reference {
             LocalValueAnchor::ReferenceExpression(index)

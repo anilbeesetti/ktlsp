@@ -612,6 +612,8 @@ enum Tag {
     Block,
     Parameters,
     Parameter,
+    TypeParameters,
+    TypeParameter,
     Integer,
     Reference,
     TypeReference,
@@ -621,7 +623,7 @@ impl Tag {
     fn selected(self) -> bool {
         matches!(
             self,
-            Self::Class | Self::Fun | Self::Property | Self::Parameter
+            Self::Class | Self::Fun | Self::Property | Self::Parameter | Self::TypeParameter
         )
     }
     fn keyword(self) -> Option<&'static str> {
@@ -634,7 +636,7 @@ impl Tag {
     }
 }
 fn tag(text: &str, i: usize, b: &mut Budget) -> Result<Tag> {
-    const TAGS: [(&str, Tag); 14] = [
+    const TAGS: [(&str, Tag); 16] = [
         ("KT_FILE", Tag::Root),
         ("PACKAGE_DIRECTIVE", Tag::Package),
         ("IMPORT_LIST", Tag::Imports),
@@ -645,6 +647,8 @@ fn tag(text: &str, i: usize, b: &mut Budget) -> Result<Tag> {
         ("BLOCK", Tag::Block),
         ("VALUE_PARAMETER_LIST", Tag::Parameters),
         ("VALUE_PARAMETER", Tag::Parameter),
+        ("TYPE_PARAMETER_LIST", Tag::TypeParameters),
+        ("TYPE_PARAMETER", Tag::TypeParameter),
         ("INTEGER_CONSTANT", Tag::Integer),
         ("REFERENCE_EXPRESSION", Tag::Reference),
         ("TYPE_REFERENCE", Tag::TypeReference),
@@ -1162,8 +1166,9 @@ fn plain_step(f: &mut Frame<'_>, from: u8, to: u8, b: &mut Budget) -> Result<()>
 fn plain_child(f: &mut Frame<'_>, child: Tag, b: &mut Budget) -> Result<()> {
     b.work(1)?;
     match (f.tag, child) {
+        (Tag::Fun, Tag::TypeParameters) => plain_step(f, 1, 7, b),
         (Tag::Fun, Tag::Parameters) => plain_step(f, 2, 3, b),
-        (Tag::Parameters, Tag::Parameter) => {
+        (Tag::Parameters, Tag::Parameter) | (Tag::TypeParameters, Tag::TypeParameter) => {
             if !matches!(f.plain, 1 | 3) {
                 return Err(unsupported(f.index));
             }
@@ -1216,9 +1221,10 @@ fn close_frames<'a>(
             let complete = f.plain
                 == match f.tag {
                     Tag::Fun | Tag::Property => 4,
-                    Tag::Block | Tag::Parameters => 2,
+                    Tag::Block | Tag::Parameters | Tag::TypeParameters => 2,
                     Tag::Integer | Tag::Reference => 1,
                     Tag::Parameter => 6,
+                    Tag::TypeParameter => 2,
                     _ => u8::MAX,
                 }
                 && f.plain != u8::MAX;
@@ -1251,6 +1257,8 @@ fn context(t: Tag, parent: Option<Frame<'_>>, i: usize) -> Result<()> {
         Tag::ClassBody => p == Some(Tag::Class),
         Tag::Block | Tag::Parameters => p == Some(Tag::Fun),
         Tag::Parameter => p == Some(Tag::Parameters),
+        Tag::TypeParameters => p == Some(Tag::Fun),
+        Tag::TypeParameter => p == Some(Tag::TypeParameters),
         Tag::Integer => matches!(p, Some(Tag::Fun | Tag::Property)),
         Tag::Reference => p == Some(Tag::Property),
         Tag::TypeReference => matches!(p, Some(Tag::Property | Tag::Parameter)),
@@ -1294,6 +1302,42 @@ fn mark_error<'a>(
     Ok(Some(ordinal))
 }
 
+fn emit_declaration<'a>(
+    p: &'a Parsed,
+    name: &'a Element,
+    i: usize,
+    f: &mut Frame<'a>,
+    b: &mut Budget,
+    out: &mut LoweredDeclarations<'a>,
+) -> Result<()> {
+    let ordinal = f.ordinal.ok_or(invalid(i))?;
+    let node = f.node.ok_or(invalid(i))?;
+    let parent = element(p, node.parent.ok_or(invalid(i))?, b)?;
+    b.work(5)?;
+    let raw_name = p.source().get(name.start..name.end).ok_or(invalid(i))?;
+    if out.declarations.len() != ordinal
+        || out.declarations.len() >= out.declarations.capacity()
+    {
+        return Err(invalid(i));
+    }
+    b.work(2)?;
+    out.declarations.push(Declaration {
+        cst_index: f.index,
+        node,
+        name,
+        raw_name,
+        parent,
+        owner: f.outer_owner,
+        incomplete: f.owned_error,
+    });
+    #[cfg(test)]
+    {
+        b.emitted += 1;
+    }
+    f.emitted = true;
+    Ok(())
+}
+
 fn token<'a>(
     p: &'a Parsed,
     e: &'a Element,
@@ -1333,34 +1377,20 @@ fn token<'a>(
                 return Err(unsupported(i));
             }
             f.name = true;
-            plain_step(&mut f, 1, 2, b)?;
-            if pass == Pass::Emit {
-                let ordinal = f.ordinal.ok_or(invalid(i))?;
-                let node = f.node.ok_or(invalid(i))?;
-                let parent_index = node.parent.ok_or(invalid(i))?;
-                let parent = element(p, parent_index, b)?;
-                b.work(5)?; // slice access plus worst-case UTF-8 boundary byte/access checks
-                let raw_name = p.source().get(e.start..e.end).ok_or(invalid(i))?;
-                if out.declarations.len() != ordinal
-                    || out.declarations.len() >= out.declarations.capacity()
-                {
-                    return Err(invalid(i));
+            let from = if f.tag == Tag::Fun && f.plain == 7 { 7 } else { 1 };
+            plain_step(&mut f, from, 2, b)?;
+            if f.tag == Tag::TypeParameter {
+                b.work(5)?;
+                let raw = p.source().get(e.start..e.end).ok_or(invalid(i))?;
+                let work = raw.len().checked_mul(40).and_then(|n| n.checked_add(64))
+                    .ok_or(LoweringError::Limit(LoweringLimit::Work))?;
+                b.work(work)?;
+                if semantic_spelling(raw).is_none() {
+                    return Err(unsupported(i));
                 }
-                b.work(2)?; // record emission plus output slot write; push must not grow
-                out.declarations.push(Declaration {
-                    cst_index: f.index,
-                    node,
-                    name: e,
-                    raw_name,
-                    parent,
-                    owner: f.outer_owner,
-                    incomplete: f.owned_error,
-                });
-                #[cfg(test)]
-                {
-                    b.emitted += 1;
-                }
-                f.emitted = true;
+            }
+            if pass == Pass::Emit && !f.emitted {
+                emit_declaration(p, e, i, &mut f, b, out)?;
             }
         } else if !matches!(f.tag, Tag::Fun | Tag::Property | Tag::Parameter)
             || !((f.tag != Tag::Parameter && b.one_of(&e.kind, &["EQ", "SEMICOLON"])?)
@@ -1392,12 +1422,14 @@ fn token<'a>(
                 }
                 allowed
             }
-            Tag::Parameters => {
-                if !b.one_of(&e.kind, &["LPAR", "RPAR", "COMMA"])? {
+            Tag::Parameters | Tag::TypeParameters => {
+                let generic = f.tag == Tag::TypeParameters;
+                let (open, close) = if generic { ("LT", "GT") } else { ("LPAR", "RPAR") };
+                if !b.one_of(&e.kind, &[open, close, "COMMA"])? {
                     return Err(unsupported(i));
                 }
                 match e.kind.as_str() {
-                    "LPAR" if f.plain == 0 => {
+                    kind if kind == open && f.plain == 0 => {
                         plain_step(&mut f, 0, 1, b)?;
                         true
                     }
@@ -1405,7 +1437,8 @@ fn token<'a>(
                         plain_step(&mut f, 4, 3, b)?;
                         true
                     }
-                    "RPAR" if matches!(f.plain, 1 | 3 | 4) => {
+                    kind if kind == close
+                        && (matches!(f.plain, 3 | 4) || !generic && f.plain == 1) => {
                         let from = f.plain;
                         plain_step(&mut f, from, 2, b)?;
                         true
@@ -1467,7 +1500,7 @@ fn walk<'a>(
             }
             cap(e.kind.len(), KIND_BYTES, LoweringLimit::KindBytes)?;
         }
-        let parent = if depth == 0 {
+        let mut parent = if depth == 0 {
             None
         } else {
             Some(frame(s, depth - 1, b)?)
@@ -1527,6 +1560,28 @@ fn walk<'a>(
         };
         if pass != Pass::Structure {
             context(t, parent, i)?;
+            if t == Tag::TypeParameters
+                && (depth != 2
+                    || frame(s, 0, b)?.tag != Tag::Root
+                    || frame(s, 1, b)?.tag != Tag::Fun
+                    || frame(s, 1, b)?.plain != 1)
+            {
+                return Err(unsupported(i));
+            }
+            if t == Tag::TypeParameters && pass == Pass::Emit {
+                // Count already authenticated the complete header. Preserve
+                // declaration preorder even though the function's original name
+                // follows its leading type-parameter declarations in the CST.
+                let mut function = parent.ok_or(invalid(i))?;
+                let node = function.node.ok_or(invalid(i))?;
+                let mut cursor = e.subtree_end;
+                let (name_i, name) = header_expect(p, &mut cursor, node.subtree_end, b)?;
+                if !name.token || !b.equal(&name.kind, "IDENTIFIER")? {
+                    return Err(unsupported(name_i));
+                }
+                emit_declaration(p, name, name_i, &mut function, b, out)?;
+                parent = Some(function);
+            }
             if t == Tag::Parameter
                 && (depth != 3
                     || frame(s, 0, b)?.tag != Tag::Root
@@ -1668,9 +1723,9 @@ fn walk<'a>(
                 owner_frame,
                 ordinal,
                 outer_owner,
-                core: t == Tag::Parameter,
-                plain: if t == Tag::Parameter { 1 } else { 0 },
-                reference: matches!(t, Tag::Reference | Tag::Parameter),
+                core: matches!(t, Tag::Parameter | Tag::TypeParameter),
+                plain: if matches!(t, Tag::Parameter | Tag::TypeParameter) { 1 } else { 0 },
+                reference: matches!(t, Tag::Reference | Tag::Parameter | Tag::TypeParameters),
                 ..Frame::EMPTY
             },
             b,
@@ -1775,6 +1830,78 @@ mod tests {
     }
     fn lower(result: &SnapshotResult) -> Result<LoweredDeclarations<'_>> {
         lower_declarations(result, result.snapshot())
+    }
+
+    #[test]
+    fn lexical_annotation_budget_covers_authentication_body_and_entire_list() {
+        use crate::{
+            local_value_binding::{LocalBindingError, type_parameter_with_budget},
+            structural_regions::build_regions,
+        };
+        // Synthetic accounting only; producer/consumer acceptance uses the worker.
+        let mut tree = Tree::new();
+        tree.open("FUN");
+        tree.token("FUN_KEYWORD", "fun");
+        tree.token("WHITE_SPACE", " ");
+        tree.open("TYPE_PARAMETER_LIST");
+        tree.token("LT", "<");
+        for (n, name) in ["T", "U", "V"].into_iter().enumerate() {
+            if n != 0 { tree.token("COMMA", ","); }
+            tree.open("TYPE_PARAMETER");
+            tree.token("IDENTIFIER", name);
+            tree.close();
+        }
+        tree.token("GT", ">");
+        tree.close();
+        tree.token("WHITE_SPACE", " ");
+        tree.token("IDENTIFIER", "f");
+        tree.open("VALUE_PARAMETER_LIST");
+        tree.token("LPAR", "(");
+        tree.token("RPAR", ")");
+        tree.close();
+        tree.open("BLOCK");
+        tree.token("LBRACE", "{");
+        tree.open("PROPERTY");
+        tree.token("VAL_KEYWORD", "val");
+        tree.token("WHITE_SPACE", " ");
+        tree.token("IDENTIFIER", "x");
+        tree.token("COLON", ":");
+        tree.open("TYPE_REFERENCE");
+        tree.open("USER_TYPE");
+        tree.open("REFERENCE_EXPRESSION");
+        let reference = tree.elements.len() - 1;
+        tree.token("IDENTIFIER", "T");
+        tree.close();
+        tree.close();
+        tree.close();
+        tree.token("EQ", "=");
+        tree.open("INTEGER_CONSTANT");
+        tree.token("INTEGER_LITERAL", "1");
+        tree.close();
+        tree.close();
+        let result = finish_body(tree);
+        let lower = lower(&result).unwrap();
+        let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
+        let mut measured = ReferenceBudget::default();
+        let binding = type_parameter_with_budget(
+            &directory, &result, reference, result.snapshot(), &mut measured,
+        ).unwrap();
+        assert!(std::ptr::eq(binding.target(), &lower.declarations()[1]));
+        assert!(std::ptr::eq(binding.annotated(), &lower.declarations()[4]));
+        let mut exact = ReferenceBudget { work: WORK - measured.work };
+        type_parameter_with_budget(
+            &directory, &result, reference, result.snapshot(), &mut exact,
+        ).unwrap();
+        assert_eq!(exact.work, WORK);
+        for work in [WORK - measured.work + 1, usize::MAX] {
+            assert_eq!(
+                type_parameter_with_budget(
+                    &directory, &result, reference, result.snapshot(),
+                    &mut ReferenceBudget { work },
+                ).unwrap_err(),
+                LocalBindingError::Resource,
+            );
+        }
     }
 
     fn import(tree: &mut Tree, name: &str) {

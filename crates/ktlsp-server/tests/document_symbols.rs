@@ -374,16 +374,25 @@ impl Package {
         Self(directory)
     }
     fn exchange(&self, messages: &[Value]) -> Vec<Value> {
-        exchange_directory(&self.0, messages)
+        exchange_directory(&self.0, messages, false)
     }
 }
 // This directory is borrowed: only Package owns cleanup of its exclusive creation.
-fn exchange_directory(directory: &Path, messages: &[Value]) -> Vec<Value> {
+fn exchange_directory(
+    directory: &Path,
+    messages: &[Value],
+    windows_timeout_proof: bool,
+) -> Vec<Value> {
     let mut child = Command::new(directory.join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX)))
         .arg("--stdio")
         .env("PATH", "")
         .env_remove("JAVA_HOME")
         .env_remove("JDK_HOME")
+        // Temporary #377 proof is enabled only by the negotiation fixture.
+        .env(
+            "KTLSP_WINDOWS_TIMEOUT_PHASE_PROOF",
+            if windows_timeout_proof { "1" } else { "" },
+        )
         .current_dir(directory)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -418,7 +427,7 @@ fn exchange_directory(directory: &Path, messages: &[Value]) -> Vec<Value> {
     assert!(output.status.success(), "{:?}", output.status);
     assert!(
         output.stderr.is_empty(),
-        "{}",
+        "stderr={}; replies={responses:?}",
         String::from_utf8_lossy(&output.stderr)
     );
     responses
@@ -654,7 +663,7 @@ fn actual_packaged_stdio_navigation_negotiation_and_existing_providers() {
             json!({"jsonrpc":"2.0","id":6,"method":"shutdown"}),
             json!({"jsonrpc":"2.0","method":"exit"}),
         ];
-        let replies = Package::new(true).exchange(&messages);
+        let replies = exchange_directory(&Package::new(true).0, &messages, true);
         assert_ids(&replies);
         let caps = &replies[0]["result"]["capabilities"];
         assert_eq!(caps["positionEncoding"], "utf-16");
@@ -988,7 +997,7 @@ fn parameter_shadowing_exchange(directory: &Path) -> Value {
         json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
         json!({"jsonrpc":"2.0","method":"exit"}),
     ];
-    let replies = exchange_directory(directory, &messages);
+    let replies = exchange_directory(directory, &messages, false);
     assert!(replies.iter().all(|reply| reply.get("id").is_some()));
     assert!(
         replies

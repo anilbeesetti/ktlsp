@@ -2,7 +2,7 @@
 
 pub mod annotation_extensions;
 pub mod archive;
-pub use archive::{ZipClassError, parse_zip_class};
+pub use archive::{JimageClassError, ZipClassError, parse_jimage_class, parse_zip_class};
 pub mod annotations;
 pub mod class_path;
 pub mod class_type_annotations;

@@ -99,6 +99,15 @@ No extraction, network or Java is used. Payload flags, local placeholders,
 descriptors and independent compressed/decoded/work ceilings are specified in
 [the artifacts payload contract](../ktlsp-artifacts/ZIP_STORED.md).
 
+`parse_jimage_class(&resource, &mut scratch)` consumes one private origin-bound
+`ktlsp-artifacts::JimageResource`, preserving whole-image authority rather than
+constructing a second verified class artifact. It invokes the existing class
+reader and compares declared `this_class` with the selected module-relative
+MUTF-8 `.class` path losslessly, including surrogate units. All failure paths
+clear scratch. Stored attributes borrow the original image; decoded attributes
+borrow scratch. [JImage format/budget/fixture details](../ktlsp-artifacts/JIMAGE.md)
+remain separate from SDK selection, classpath/module semantics and server parity.
+
 `tests/archive.rs` includes the unchanged genuine Commons Lang 3.17.0 JAR in
 `fixtures/t017c1/commons-lang3-3.17.0.jar.bin`. Existing `provenance.json` records
 the source URL, archive SHA-256 and extracted member hashes; bundled Apache

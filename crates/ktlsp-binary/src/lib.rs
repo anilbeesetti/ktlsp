@@ -11,6 +11,7 @@ pub mod line_number_table;
 pub mod metadata;
 pub mod method_type_annotations;
 pub mod nesting;
+pub mod source_attachment;
 pub mod type_annotations;
 
 use std::fmt;

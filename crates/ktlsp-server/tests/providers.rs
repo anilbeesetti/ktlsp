@@ -491,10 +491,20 @@ fn token_capabilities(requests: Value) -> Value {
 }
 fn token_session(capabilities: Value) -> (Session, Value) {
     let mut session = Session::new(); // No worker: lexical tokens must remain usable.
-    let reply = request(&mut session, "initialize", json!({"capabilities":capabilities}));
-    assert_eq!(reply["result"]["capabilities"]["foldingRangeProvider"], true);
+    let reply = request(
+        &mut session,
+        "initialize",
+        json!({"capabilities":capabilities}),
+    );
+    assert_eq!(
+        reply["result"]["capabilities"]["foldingRangeProvider"],
+        true
+    );
     notify(&mut session, "initialized", json!({}));
-    (session, reply["result"]["capabilities"]["semanticTokensProvider"].clone())
+    (
+        session,
+        reply["result"]["capabilities"]["semanticTokensProvider"].clone(),
+    )
 }
 fn tokens(session: &mut Session, range: Option<Value>) -> Value {
     let mut params = json!({"textDocument":{"uri":URI}});
@@ -510,61 +520,130 @@ fn token_range(start: (u32, u32), end: (u32, u32)) -> Value {
     json!({"start":{"line":start.0,"character":start.1},"end":{"line":end.0,"character":end.1}})
 }
 fn decoded_tokens(reply: &Value, options: &Value) -> Vec<(u64, u64, u64, String)> {
-    let data = reply["result"]["data"].as_array().expect("successful token data");
+    let data = reply["result"]["data"]
+        .as_array()
+        .expect("successful token data");
     assert!(reply["result"].get("resultId").is_none());
     assert_eq!(data.len() % 5, 0);
     let mut line = 0;
     let mut column = 0;
     let mut previous_end = (0, 0);
-    data.as_chunks::<5>().0.iter().map(|token| {
-        let delta = token[0].as_u64().unwrap();
-        line += delta;
-        column = if delta == 0 { column + token[1].as_u64().unwrap() } else { token[1].as_u64().unwrap() };
-        let length = token[2].as_u64().unwrap();
-        assert!(length > 0);
-        assert!((line, column) >= previous_end);
-        previous_end = (line, column + length);
-        assert_eq!(token[4], 0);
-        let kind = options["legend"]["tokenTypes"][token[3].as_u64().unwrap() as usize].as_str().unwrap().to_owned();
-        (line, column, length, kind)
-    }).collect()
+    data.as_chunks::<5>()
+        .0
+        .iter()
+        .map(|token| {
+            let delta = token[0].as_u64().unwrap();
+            line += delta;
+            column = if delta == 0 {
+                column + token[1].as_u64().unwrap()
+            } else {
+                token[1].as_u64().unwrap()
+            };
+            let length = token[2].as_u64().unwrap();
+            assert!(length > 0);
+            assert!((line, column) >= previous_end);
+            previous_end = (line, column + length);
+            assert_eq!(token[4], 0);
+            let kind = options["legend"]["tokenTypes"][token[3].as_u64().unwrap() as usize]
+                .as_str()
+                .unwrap()
+                .to_owned();
+            (line, column, length, kind)
+        })
+        .collect()
 }
 fn expected_tokens(tokens: &[(u64, u64, u64, &str)]) -> Vec<(u64, u64, u64, String)> {
-    tokens.iter().map(|&(line, column, length, kind)| (line, column, length, kind.into())).collect()
+    tokens
+        .iter()
+        .map(|&(line, column, length, kind)| (line, column, length, kind.into()))
+        .collect()
 }
 
 #[test]
 fn semantic_tokens_decode_real_lexer_categories_and_opaque_templates() {
-    let (mut session, options) = token_session(token_capabilities(json!({"full":true,"range":true})));
-    open(&mut session, "#!/bin/kt\nval `x😀` = 12 + \"${f(\"x\", { 1 })}\" //😀\n'a' id . , : ; §");
-    assert_eq!(decoded_tokens(&tokens(&mut session, None), &options), expected_tokens(&[
-        (0,0,9,"comment"), (1,0,3,"keyword"), (1,10,1,"operator"),
-        (1,12,2,"number"), (1,15,1,"operator"), (1,17,18,"string"),
-        (1,36,4,"comment"), (2,0,3,"string"),
-    ]));
+    let (mut session, options) =
+        token_session(token_capabilities(json!({"full":true,"range":true})));
+    open(
+        &mut session,
+        "#!/bin/kt\nval `x😀` = 12 + \"${f(\"x\", { 1 })}\" //😀\n'a' id . , : ; §",
+    );
+    assert_eq!(
+        decoded_tokens(&tokens(&mut session, None), &options),
+        expected_tokens(&[
+            (0, 0, 9, "comment"),
+            (1, 0, 3, "keyword"),
+            (1, 10, 1, "operator"),
+            (1, 12, 2, "number"),
+            (1, 15, 1, "operator"),
+            (1, 17, 18, "string"),
+            (1, 36, 4, "comment"),
+            (2, 0, 3, "string"),
+        ])
+    );
     assert_eq!(options["legend"]["tokenModifiers"], json!([]));
-    assert_eq!(tokens(&mut session, Some(token_range((1, 13), (1, 14))))["result"]["data"], json!([1,13,1,3,0]));
+    assert_eq!(
+        tokens(&mut session, Some(token_range((1, 13), (1, 14))))["result"]["data"],
+        json!([1, 13, 1, 3, 0])
+    );
 }
 
 #[test]
 fn semantic_tokens_split_mixed_terminators_and_clip_utf16_ranges() {
     let (mut session, options) = token_session(token_capabilities(json!({"full":{},"range":{}})));
     open(&mut session, "/*😀\r\n\rx\nz*/\n\"\"\"a😀\rb\r\nc\n\"\"\"");
-    assert_eq!(decoded_tokens(&tokens(&mut session, None), &options), expected_tokens(&[
-        (0,0,4,"comment"), (2,0,1,"comment"), (3,0,3,"comment"),
-        (4,0,6,"string"), (5,0,1,"string"), (6,0,1,"string"), (7,0,3,"string"),
-    ]));
-    assert_eq!(decoded_tokens(&tokens(&mut session, Some(token_range((0,2),(3,1)))), &options), expected_tokens(&[
-        (0,2,2,"comment"), (2,0,1,"comment"), (3,0,1,"comment"),
-    ]));
-    assert_eq!(decoded_tokens(&tokens(&mut session, Some(token_range((4,4),(7,2)))), &options), expected_tokens(&[
-        (4,4,2,"string"), (5,0,1,"string"), (6,0,1,"string"), (7,0,2,"string"),
-    ]));
-    for range in [token_range((0,3),(0,4)), token_range((4,5),(7,0)), token_range((8,0),(8,0)), token_range((0,5),(1,0)), token_range((3,1),(0,0))] {
+    assert_eq!(
+        decoded_tokens(&tokens(&mut session, None), &options),
+        expected_tokens(&[
+            (0, 0, 4, "comment"),
+            (2, 0, 1, "comment"),
+            (3, 0, 3, "comment"),
+            (4, 0, 6, "string"),
+            (5, 0, 1, "string"),
+            (6, 0, 1, "string"),
+            (7, 0, 3, "string"),
+        ])
+    );
+    assert_eq!(
+        decoded_tokens(
+            &tokens(&mut session, Some(token_range((0, 2), (3, 1)))),
+            &options
+        ),
+        expected_tokens(&[
+            (0, 2, 2, "comment"),
+            (2, 0, 1, "comment"),
+            (3, 0, 1, "comment"),
+        ])
+    );
+    assert_eq!(
+        decoded_tokens(
+            &tokens(&mut session, Some(token_range((4, 4), (7, 2)))),
+            &options
+        ),
+        expected_tokens(&[
+            (4, 4, 2, "string"),
+            (5, 0, 1, "string"),
+            (6, 0, 1, "string"),
+            (7, 0, 2, "string"),
+        ])
+    );
+    for range in [
+        token_range((0, 3), (0, 4)),
+        token_range((4, 5), (7, 0)),
+        token_range((8, 0), (8, 0)),
+        token_range((0, 5), (1, 0)),
+        token_range((3, 1), (0, 0)),
+    ] {
         assert_eq!(tokens(&mut session, Some(range))["error"]["code"], -32602);
     }
-    for range in [token_range((0,2),(0,2)), token_range((1,0),(1,0)), token_range((7,3),(7,3))] {
-        assert_eq!(tokens(&mut session, Some(range))["result"], json!({"data":[]}));
+    for range in [
+        token_range((0, 2), (0, 2)),
+        token_range((1, 0), (1, 0)),
+        token_range((7, 3), (7, 3)),
+    ] {
+        assert_eq!(
+            tokens(&mut session, Some(range))["result"],
+            json!({"data":[]})
+        );
     }
 }
 
@@ -576,20 +655,37 @@ fn semantic_token_negotiation_gates_each_request_and_intersects_types() {
         (json!({"full":{"delta":true},"range":true}), true, true),
     ] {
         let mut capabilities = token_capabilities(requests);
-        capabilities["textDocument"]["semanticTokens"]["tokenTypes"] = json!(["variable","number","string"]);
+        capabilities["textDocument"]["semanticTokens"]["tokenTypes"] =
+            json!(["variable", "number", "string"]);
         let (mut session, options) = token_session(capabilities);
         open(&mut session, "val name = 1 + \"x\"");
         for (is_range, enabled) in [(false, full), (true, range)] {
-            let reply = tokens(&mut session, is_range.then(|| token_range((0,0),(0,18))));
+            let reply = tokens(&mut session, is_range.then(|| token_range((0, 0), (0, 18))));
             if enabled {
-                assert_eq!(decoded_tokens(&reply, &options), expected_tokens(&[(0,11,1,"number"),(0,15,3,"string")]));
+                assert_eq!(
+                    decoded_tokens(&reply, &options),
+                    expected_tokens(&[(0, 11, 1, "number"), (0, 15, 3, "string")])
+                );
             } else {
                 assert_eq!(reply["error"]["code"], -32601);
             }
         }
-        assert_eq!(options["full"], if full { json!(true) } else { Value::Null });
-        assert_eq!(options["range"], if range { json!(true) } else { Value::Null });
-        assert_eq!(request(&mut session, "textDocument/semanticTokens/full/delta", json!({}))["error"]["code"], -32601);
+        assert_eq!(
+            options["full"],
+            if full { json!(true) } else { Value::Null }
+        );
+        assert_eq!(
+            options["range"],
+            if range { json!(true) } else { Value::Null }
+        );
+        assert_eq!(
+            request(
+                &mut session,
+                "textDocument/semanticTokens/full/delta",
+                json!({})
+            )["error"]["code"],
+            -32601
+        );
         assert!(session.pending_requests() == 0);
     }
 }
@@ -599,10 +695,31 @@ fn malformed_or_incompatible_semantic_capabilities_only_disable_tokens() {
     let valid = token_capabilities(json!({"full":true}));
     let mut profiles = vec![json!({}), json!({"textDocument":{"semanticTokens":true}})];
     for (key, values) in [
-        ("formats", vec![json!([]), json!(["absolute"]), json!(["relative",1]), Value::Null]),
-        ("tokenTypes", vec![json!(["variable"]), json!(["number",1]), Value::Null]),
+        (
+            "formats",
+            vec![
+                json!([]),
+                json!(["absolute"]),
+                json!(["relative", 1]),
+                Value::Null,
+            ],
+        ),
+        (
+            "tokenTypes",
+            vec![json!(["variable"]), json!(["number", 1]), Value::Null],
+        ),
         ("tokenModifiers", vec![json!([1]), Value::Null]),
-        ("requests", vec![json!({}), json!({"full":false}), json!({"full":1}), json!({"range":[]}), json!({"full":{"delta":1}}), json!({"full":true,"range":null})]),
+        (
+            "requests",
+            vec![
+                json!({}),
+                json!({"full":false}),
+                json!({"full":1}),
+                json!({"range":[]}),
+                json!({"full":{"delta":1}}),
+                json!({"full":true,"range":null}),
+            ],
+        ),
         ("multilineTokenSupport", vec![json!(1)]),
     ] {
         for value in values {
@@ -617,29 +734,54 @@ fn malformed_or_incompatible_semantic_capabilities_only_disable_tokens() {
         open(&mut session, "{\n}");
         assert_eq!(folding(&mut session)["result"].as_array().unwrap().len(), 1);
         assert_eq!(tokens(&mut session, None)["error"]["code"], -32601);
-        assert_eq!(tokens(&mut session, Some(token_range((0,0),(1,1))))["error"]["code"], -32601);
+        assert_eq!(
+            tokens(&mut session, Some(token_range((0, 0), (1, 1))))["error"]["code"],
+            -32601
+        );
     }
 }
 
 #[test]
 fn semantic_tokens_track_committed_edits_and_retain_rejected_version() {
-    let (mut session, options) = token_session(token_capabilities(json!({"full":true,"range":true})));
+    let (mut session, options) =
+        token_session(token_capabilities(json!({"full":true,"range":true})));
     open(&mut session, "val x = \"😀\"");
     let before = tokens(&mut session, None);
-    assert_eq!(decoded_tokens(&before, &options), expected_tokens(&[(0,0,3,"keyword"),(0,6,1,"operator"),(0,8,4,"string")]));
+    assert_eq!(
+        decoded_tokens(&before, &options),
+        expected_tokens(&[
+            (0, 0, 3, "keyword"),
+            (0, 6, 1, "operator"),
+            (0, 8, 4, "string")
+        ])
+    );
     // The first change would succeed; the split-surrogate second change rolls both back.
-    notify(&mut session, "textDocument/didChange", json!({"textDocument":{"uri":URI,"version":2},"contentChanges":[
-        {"range":token_range((0,0),(0,3)),"text":"var"},
-        {"range":token_range((0,10),(0,11)),"text":"x"}
-    ]}));
+    notify(
+        &mut session,
+        "textDocument/didChange",
+        json!({"textDocument":{"uri":URI,"version":2},"contentChanges":[
+            {"range":token_range((0,0),(0,3)),"text":"var"},
+            {"range":token_range((0,10),(0,11)),"text":"x"}
+        ]}),
+    );
     assert_eq!(session.document(URI).unwrap().version(), 1);
     assert_eq!(tokens(&mut session, None), before);
     assert!(session.drain_errors().len() == 1);
     change(&mut session, 2, "\n//😀\r\n42");
-    assert_eq!(decoded_tokens(&tokens(&mut session, None), &options), expected_tokens(&[(1,0,4,"comment"),(2,0,2,"number")]));
+    assert_eq!(
+        decoded_tokens(&tokens(&mut session, None), &options),
+        expected_tokens(&[(1, 0, 4, "comment"), (2, 0, 2, "number")])
+    );
     change(&mut session, 2, "false");
-    assert_eq!(decoded_tokens(&tokens(&mut session, None), &options), expected_tokens(&[(1,0,4,"comment"),(2,0,2,"number")]));
-    notify(&mut session, "textDocument/didClose", json!({"textDocument":{"uri":URI}}));
+    assert_eq!(
+        decoded_tokens(&tokens(&mut session, None), &options),
+        expected_tokens(&[(1, 0, 4, "comment"), (2, 0, 2, "number")])
+    );
+    notify(
+        &mut session,
+        "textDocument/didClose",
+        json!({"textDocument":{"uri":URI}}),
+    );
     assert_eq!(tokens(&mut session, None)["error"]["code"], -32602);
     open(&mut session, "");
     assert_eq!(tokens(&mut session, None)["result"], json!({"data":[]}));
@@ -651,35 +793,70 @@ fn semantic_tokens_track_committed_edits_and_retain_rejected_version() {
 fn semantic_token_invalid_requests_are_atomic_invalid_params() {
     let (mut session, _) = token_session(token_capabilities(json!({"full":true,"range":true})));
     open(&mut session, "\"😀\"");
-    for params in [Value::Null, json!({}), json!({"textDocument":null}), json!({"textDocument":{"uri":"relative"}}), json!({"textDocument":{"uri":"untitled:missing"}})] {
-        for method in ["textDocument/semanticTokens/full","textDocument/semanticTokens/range"] {
-            assert_eq!(request(&mut session, method, params.clone())["error"]["code"], -32602);
+    for params in [
+        Value::Null,
+        json!({}),
+        json!({"textDocument":null}),
+        json!({"textDocument":{"uri":"relative"}}),
+        json!({"textDocument":{"uri":"untitled:missing"}}),
+    ] {
+        for method in [
+            "textDocument/semanticTokens/full",
+            "textDocument/semanticTokens/range",
+        ] {
+            assert_eq!(
+                request(&mut session, method, params.clone())["error"]["code"],
+                -32602
+            );
         }
     }
-    for range in [Value::Null, json!({}), token_range((0,2),(0,3)), token_range((0,0),(0,5)), json!({"start":{"line":-1,"character":0},"end":{"line":0,"character":0}})] {
+    for range in [
+        Value::Null,
+        json!({}),
+        token_range((0, 2), (0, 3)),
+        token_range((0, 0), (0, 5)),
+        json!({"start":{"line":-1,"character":0},"end":{"line":0,"character":0}}),
+    ] {
         assert_eq!(tokens(&mut session, Some(range))["error"]["code"], -32602);
     }
-    assert_eq!(request(&mut session, "textDocument/semanticTokens/range", json!({"textDocument":{"uri":URI}}))["error"]["code"], -32602);
+    assert_eq!(
+        request(
+            &mut session,
+            "textDocument/semanticTokens/range",
+            json!({"textDocument":{"uri":URI}})
+        )["error"]["code"],
+        -32602
+    );
     assert_eq!(session.document(URI).unwrap().version(), 1);
 }
 
 #[test]
 fn semantic_token_fragment_and_lexer_resource_boundaries_fail_whole_queries() {
-    let (mut session, options) = token_session(token_capabilities(json!({"full":true,"range":true})));
+    let (mut session, options) =
+        token_session(token_capabilities(json!({"full":true,"range":true})));
     open(&mut session, &"1 ".repeat(10_000));
     let reply = tokens(&mut session, None);
     let decoded = decoded_tokens(&reply, &options);
     assert_eq!(decoded.len(), 10_000);
-    assert_eq!(decoded.first().unwrap(), &(0,0,1,"number".into()));
-    assert_eq!(decoded.last().unwrap(), &(0,19_998,1,"number".into()));
+    assert_eq!(decoded.first().unwrap(), &(0, 0, 1, "number".into()));
+    assert_eq!(decoded.last().unwrap(), &(0, 19_998, 1, "number".into()));
     assert!(serde_json::to_vec(&reply["result"]).unwrap().len() <= 1024 * 1024);
     change(&mut session, 2, &"1 ".repeat(10_001));
     let failed = tokens(&mut session, None);
     assert_eq!(failed["error"]["code"], -32803);
     assert!(failed.get("result").is_none());
-    assert_eq!(decoded_tokens(&tokens(&mut session, Some(token_range((0,20_000),(0,20_001)))), &options), expected_tokens(&[(0,20_000,1,"number")]));
+    assert_eq!(
+        decoded_tokens(
+            &tokens(&mut session, Some(token_range((0, 20_000), (0, 20_001)))),
+            &options
+        ),
+        expected_tokens(&[(0, 20_000, 1, "number")])
+    );
     change(&mut session, 3, &format!("/*{}*/", "a\n".repeat(9_999)));
-    assert_eq!(decoded_tokens(&tokens(&mut session, None), &options).len(), 10_000);
+    assert_eq!(
+        decoded_tokens(&tokens(&mut session, None), &options).len(),
+        10_000
+    );
     change(&mut session, 4, &format!("/*{}*/", "a\n".repeat(10_000)));
     assert_eq!(tokens(&mut session, None)["error"]["code"], -32803);
     change(&mut session, 5, &"a ".repeat(500_000));
@@ -688,32 +865,62 @@ fn semantic_token_fragment_and_lexer_resource_boundaries_fail_whole_queries() {
     assert_eq!(tokens(&mut session, None)["error"]["code"], -32803);
     change(&mut session, 7, &" ".repeat(ktlsp_syntax::MAX_SOURCE_BYTES));
     assert_eq!(tokens(&mut session, None)["result"], json!({"data":[]}));
-    change(&mut session, 8, &" ".repeat(ktlsp_syntax::MAX_SOURCE_BYTES + 1));
+    change(
+        &mut session,
+        8,
+        &" ".repeat(ktlsp_syntax::MAX_SOURCE_BYTES + 1),
+    );
     assert_eq!(session.document(URI).unwrap().version(), 7);
     assert_eq!(tokens(&mut session, None)["result"], json!({"data":[]}));
     change(&mut session, 8, &"§ ".repeat(256));
     assert_eq!(tokens(&mut session, None)["result"], json!({"data":[]}));
     change(&mut session, 9, &"§ ".repeat(257));
     assert_eq!(tokens(&mut session, None)["error"]["code"], -32803);
-    change(&mut session, 10, &format!("{}{}", "/*".repeat(128), "*/".repeat(128)));
-    assert_eq!(decoded_tokens(&tokens(&mut session, None), &options), expected_tokens(&[(0,0,512,"comment")]));
-    change(&mut session, 11, &format!("{}{}", "/*".repeat(129), "*/".repeat(129)));
+    change(
+        &mut session,
+        10,
+        &format!("{}{}", "/*".repeat(128), "*/".repeat(128)),
+    );
+    assert_eq!(
+        decoded_tokens(&tokens(&mut session, None), &options),
+        expected_tokens(&[(0, 0, 512, "comment")])
+    );
+    change(
+        &mut session,
+        11,
+        &format!("{}{}", "/*".repeat(129), "*/".repeat(129)),
+    );
     assert_eq!(tokens(&mut session, None)["error"]["code"], -32803);
     change(&mut session, 12, "7");
-    assert_eq!(decoded_tokens(&tokens(&mut session, None), &options), expected_tokens(&[(0,0,1,"number")]));
+    assert_eq!(
+        decoded_tokens(&tokens(&mut session, None), &options),
+        expected_tokens(&[(0, 0, 1, "number")])
+    );
 }
 
 #[test]
 fn invalid_semantic_ranges_take_precedence_over_resource_exhaustion() {
     let (mut session, _) = token_session(token_capabilities(json!({"full":true,"range":true})));
     open(&mut session, &format!("{}\"😀\"", "1 ".repeat(10_001)));
-    for end in [(0,20_007), (1,0), (0,20_004)] {
-        assert_eq!(tokens(&mut session, Some(token_range((0,0),end)))["error"]["code"], -32602);
+    for end in [(0, 20_007), (1, 0), (0, 20_004)] {
+        assert_eq!(
+            tokens(&mut session, Some(token_range((0, 0), end)))["error"]["code"],
+            -32602
+        );
     }
-    assert_eq!(tokens(&mut session, Some(token_range((0,0),(0,20_006))))["error"]["code"], -32803);
+    assert_eq!(
+        tokens(&mut session, Some(token_range((0, 0), (0, 20_006))))["error"]["code"],
+        -32803
+    );
     change(&mut session, 2, &format!("{}\"😀\"", "§ ".repeat(257)));
-    for end in [(0,519), (1,0), (0,516)] {
-        assert_eq!(tokens(&mut session, Some(token_range((0,0),end)))["error"]["code"], -32602);
+    for end in [(0, 519), (1, 0), (0, 516)] {
+        assert_eq!(
+            tokens(&mut session, Some(token_range((0, 0), end)))["error"]["code"],
+            -32602
+        );
     }
-    assert_eq!(tokens(&mut session, Some(token_range((0,0),(0,518))))["error"]["code"], -32803);
+    assert_eq!(
+        tokens(&mut session, Some(token_range((0, 0), (0, 518))))["error"]["code"],
+        -32803
+    );
 }

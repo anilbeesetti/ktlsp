@@ -20,8 +20,17 @@ pub(crate) struct Client {
 }
 impl Client {
     pub(crate) fn negotiate(capabilities: &Value) -> Option<Self> {
-        let tokens = capabilities.get("textDocument")?.get("semanticTokens")?.as_object()?;
-        for key in ["dynamicRegistration", "overlappingTokenSupport", "multilineTokenSupport", "serverCancelSupport", "augmentsSyntaxTokens"] {
+        let tokens = capabilities
+            .get("textDocument")?
+            .get("semanticTokens")?
+            .as_object()?;
+        for key in [
+            "dynamicRegistration",
+            "overlappingTokenSupport",
+            "multilineTokenSupport",
+            "serverCancelSupport",
+            "augmentsSyntaxTokens",
+        ] {
             if tokens.get(key).is_some_and(|value| !value.is_boolean()) {
                 return None;
             }
@@ -32,7 +41,10 @@ impl Client {
         };
         let supported = strings("tokenTypes")?;
         strings("tokenModifiers")?;
-        if !strings("formats")?.iter().any(|format| format == "relative") {
+        if !strings("formats")?
+            .iter()
+            .any(|format| format == "relative")
+        {
             return None;
         }
         let requests = tokens.get("requests")?.as_object()?;
@@ -41,7 +53,11 @@ impl Client {
                 None => Some(false),
                 Some(Value::Bool(value)) => Some(*value),
                 Some(Value::Object(options)) => {
-                    if key == "full" && options.get("delta").is_some_and(|value| !value.is_boolean()) {
+                    if key == "full"
+                        && options
+                            .get("delta")
+                            .is_some_and(|value| !value.is_boolean())
+                    {
                         return None;
                     }
                     Some(true)
@@ -54,7 +70,12 @@ impl Client {
         if !full && !range {
             return None;
         }
-        let mut client = Self { types: Vec::new(), indices: [None; 5], full, range };
+        let mut client = Self {
+            types: Vec::new(),
+            indices: [None; 5],
+            full,
+            range,
+        };
         for (category, name) in TYPES.into_iter().enumerate() {
             if supported.iter().any(|value| value == name) {
                 client.indices[category] = Some(client.types.len() as u32);
@@ -79,7 +100,11 @@ impl Client {
         if range { self.range } else { self.full }
     }
 
-    pub(crate) fn render(&self, text: &str, range: Option<Range>) -> Result<Value, (i32, &'static str)> {
+    pub(crate) fn render(
+        &self,
+        text: &str,
+        range: Option<Range>,
+    ) -> Result<Value, (i32, &'static str)> {
         if range.is_some_and(|range| range.start > range.end) {
             return Err(INVALID_RANGE);
         }
@@ -87,28 +112,37 @@ impl Client {
         let lexical_error = lexed.is_err();
         let mut output = Output::default();
         let mut output_error = None;
-        let mut position = Position { line: 0, character: 0 };
+        let mut position = Position {
+            line: 0,
+            character: 0,
+        };
         let mut start_seen = range.is_none();
         let mut end_seen = range.is_none();
         // One source/position sweep also validates strict range endpoints: neither
         // surrogate interiors nor the byte inside CRLF is ever a cursor position.
-        let spans = lexed.into_iter().flat_map(|lexed| lexed.tokens).map(|token| {
-            // ponytail: identifiers and opaque template interiors have no semantic
-            // identity here; upgrade with parser-backed resolution, not name guesses.
-            let category = match token.kind {
-                TokenKind::Keyword => Some(0),
-                TokenKind::LineComment | TokenKind::Shebang | TokenKind::BlockComment => Some(1),
-                TokenKind::String | TokenKind::RawString | TokenKind::Character => Some(2),
-                TokenKind::Number => Some(3),
-                TokenKind::Operator => Some(4),
-                _ => None,
-            };
-            let index = category.and_then(|category| self.indices[category]);
-            (index, &text[token.start..token.end])
-        });
+        let spans = lexed
+            .into_iter()
+            .flat_map(|lexed| lexed.tokens)
+            .map(|token| {
+                // ponytail: identifiers and opaque template interiors have no semantic
+                // identity here; upgrade with parser-backed resolution, not name guesses.
+                let category = match token.kind {
+                    TokenKind::Keyword => Some(0),
+                    TokenKind::LineComment | TokenKind::Shebang | TokenKind::BlockComment => {
+                        Some(1)
+                    }
+                    TokenKind::String | TokenKind::RawString | TokenKind::Character => Some(2),
+                    TokenKind::Number => Some(3),
+                    TokenKind::Operator => Some(4),
+                    _ => None,
+                };
+                let index = category.and_then(|category| self.indices[category]);
+                (index, &text[token.start..token.end])
+            });
         // On lexical exhaustion, validate coordinates over one unclassified span
         // before returning failure; an invalid range must still be InvalidParams.
-        for (index, text) in spans.chain((lexical_error && range.is_some()).then_some((None, text))) {
+        for (index, text) in spans.chain((lexical_error && range.is_some()).then_some((None, text)))
+        {
             let mut fragment = position;
             let mut chars = text.chars().peekable();
             while let Some(c) = chars.next() {
@@ -127,7 +161,10 @@ impl Client {
                     position.character = 0;
                     fragment = position;
                 } else {
-                    position.character = position.character.checked_add(c.len_utf16() as u32).ok_or(LIMIT)?;
+                    position.character = position
+                        .character
+                        .checked_add(c.len_utf16() as u32)
+                        .ok_or(LIMIT)?;
                 }
             }
             if output_error.is_none() {
@@ -157,8 +194,16 @@ struct Output {
     previous: Option<Position>,
 }
 impl Output {
-    fn fragment(&mut self, mut start: Position, mut end: Position, index: Option<u32>, range: Option<Range>) -> Result<(), (i32, &'static str)> {
-        let Some(index) = index else { return Ok(()); };
+    fn fragment(
+        &mut self,
+        mut start: Position,
+        mut end: Position,
+        index: Option<u32>,
+        range: Option<Range>,
+    ) -> Result<(), (i32, &'static str)> {
+        let Some(index) = index else {
+            return Ok(());
+        };
         if let Some(range) = range {
             start = start.max(range.start);
             end = end.min(range.end);
@@ -167,15 +212,30 @@ impl Output {
             return Ok(());
         }
         let fragments = self.data.len() / 5;
-        let next_bytes = fragments.checked_add(1).and_then(|count| count.checked_mul(FRAGMENT_BYTES)).and_then(|bytes| bytes.checked_add(11)).ok_or(LIMIT)?;
+        let next_bytes = fragments
+            .checked_add(1)
+            .and_then(|count| count.checked_mul(FRAGMENT_BYTES))
+            .and_then(|bytes| bytes.checked_add(11))
+            .ok_or(LIMIT)?;
         if fragments == MAX_FRAGMENTS || next_bytes > MAX_ENCODED_BYTES {
             return Err(LIMIT);
         }
-        let previous = self.previous.unwrap_or(Position { line: 0, character: 0 });
+        let previous = self.previous.unwrap_or(Position {
+            line: 0,
+            character: 0,
+        });
         let line = start.line.checked_sub(previous.line).ok_or(LIMIT)?;
-        let column = if line == 0 { start.character.checked_sub(previous.character).ok_or(LIMIT)? } else { start.character };
+        let column = if line == 0 {
+            start
+                .character
+                .checked_sub(previous.character)
+                .ok_or(LIMIT)?
+        } else {
+            start.character
+        };
         let length = end.character.checked_sub(start.character).ok_or(LIMIT)?;
-        self.data.extend_from_slice(&[line, column, length, index, 0]);
+        self.data
+            .extend_from_slice(&[line, column, length, index, 0]);
         self.previous = Some(start);
         Ok(())
     }

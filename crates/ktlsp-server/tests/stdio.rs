@@ -396,17 +396,35 @@ fn real_cli_semantic_tokens_decode_full_range_and_committed_edit() {
     let mut range = params.clone();
     range["range"] = json!({"start":{"line":1,"character":2},"end":{"line":2,"character":1}});
     let messages = [
-        request(json!("init"), "initialize", json!({"capabilities":{"textDocument":{
-            "diagnostic":{},
-            "semanticTokens":{"requests":{"full":{"delta":true},"range":{}},"formats":["relative"],
-                "tokenTypes":["number","comment","keyword","operator","string"],"tokenModifiers":[]}
-        }}})),
+        request(
+            json!("init"),
+            "initialize",
+            json!({"capabilities":{"textDocument":{
+                "diagnostic":{},
+                "semanticTokens":{"requests":{"full":{"delta":true},"range":{}},"formats":["relative"],
+                    "tokenTypes":["number","comment","keyword","operator","string"],"tokenModifiers":[]}
+            }}}),
+        ),
         notification("initialized", json!({})),
-        notification("textDocument/didOpen", json!({"textDocument":{"uri":uri,"languageId":"kotlin","version":1,"text":"val x = 1\r\n/*😀\rnext*/"}})),
-        request(json!("full"), "textDocument/semanticTokens/full", params.clone()),
+        notification(
+            "textDocument/didOpen",
+            json!({"textDocument":{"uri":uri,"languageId":"kotlin","version":1,"text":"val x = 1\r\n/*😀\rnext*/"}}),
+        ),
+        request(
+            json!("full"),
+            "textDocument/semanticTokens/full",
+            params.clone(),
+        ),
         request(json!(u64::MAX), "textDocument/semanticTokens/range", range),
-        notification("textDocument/didChange", json!({"textDocument":{"uri":uri,"version":2},"contentChanges":[{"range":{"start":{"line":0,"character":8},"end":{"line":0,"character":9}},"text":"\"😀\""}]})),
-        request(json!("edited"), "textDocument/semanticTokens/full", params.clone()),
+        notification(
+            "textDocument/didChange",
+            json!({"textDocument":{"uri":uri,"version":2},"contentChanges":[{"range":{"start":{"line":0,"character":8},"end":{"line":0,"character":9}},"text":"\"😀\""}]}),
+        ),
+        request(
+            json!("edited"),
+            "textDocument/semanticTokens/full",
+            params.clone(),
+        ),
         request(json!("pull"), "textDocument/diagnostic", params),
         request(json!("shutdown"), "shutdown", Value::Null),
         notification("exit", Value::Null),
@@ -415,9 +433,17 @@ fn real_cli_semantic_tokens_decode_full_range_and_committed_edit() {
     assert!(output.status.success());
     assert!(output.stderr.is_empty());
     let replies = decode(&output.stdout);
-    assert_eq!(replies.iter().map(|reply| &reply["id"]).collect::<Vec<_>>(), vec![
-        &json!("init"), &json!("full"), &json!(u64::MAX), &json!("edited"), &json!("pull"), &json!("shutdown"),
-    ]);
+    assert_eq!(
+        replies.iter().map(|reply| &reply["id"]).collect::<Vec<_>>(),
+        vec![
+            &json!("init"),
+            &json!("full"),
+            &json!(u64::MAX),
+            &json!("edited"),
+            &json!("pull"),
+            &json!("shutdown"),
+        ]
+    );
     assert!(replies.iter().all(|reply| reply.get("method").is_none()));
     let options = &replies[0]["result"]["capabilities"]["semanticTokensProvider"];
     assert_eq!(options["full"], true);
@@ -428,20 +454,54 @@ fn real_cli_semantic_tokens_decode_full_range_and_committed_edit() {
         let mut column = 0;
         let data = reply["result"]["data"].as_array().unwrap();
         assert_eq!(data.len() % 5, 0);
-        data.as_chunks::<5>().0.iter().map(|token| {
-            let delta = token[0].as_u64().unwrap();
-            line += delta;
-            column = if delta == 0 { column + token[1].as_u64().unwrap() } else { token[1].as_u64().unwrap() };
-            assert_eq!(token[4], 0);
-            json!([line,column,token[2],options["legend"]["tokenTypes"][token[3].as_u64().unwrap() as usize]])
-        }).collect::<Vec<_>>()
+        data.as_chunks::<5>()
+            .0
+            .iter()
+            .map(|token| {
+                let delta = token[0].as_u64().unwrap();
+                line += delta;
+                column = if delta == 0 {
+                    column + token[1].as_u64().unwrap()
+                } else {
+                    token[1].as_u64().unwrap()
+                };
+                assert_eq!(token[4], 0);
+                json!([
+                    line,
+                    column,
+                    token[2],
+                    options["legend"]["tokenTypes"][token[3].as_u64().unwrap() as usize]
+                ])
+            })
+            .collect::<Vec<_>>()
     };
     let full = decode_tokens(&replies[1]);
     let clipped = decode_tokens(&replies[2]);
     let edited = decode_tokens(&replies[3]);
-    assert_eq!(full, vec![json!([0,0,3,"keyword"]),json!([0,6,1,"operator"]),json!([0,8,1,"number"]),json!([1,0,4,"comment"]),json!([2,0,6,"comment"])]);
-    assert_eq!(clipped, vec![json!([1,2,2,"comment"]),json!([2,0,1,"comment"])]);
-    assert_eq!(edited, vec![json!([0,0,3,"keyword"]),json!([0,6,1,"operator"]),json!([0,8,4,"string"]),json!([1,0,4,"comment"]),json!([2,0,6,"comment"])]);
+    assert_eq!(
+        full,
+        vec![
+            json!([0, 0, 3, "keyword"]),
+            json!([0, 6, 1, "operator"]),
+            json!([0, 8, 1, "number"]),
+            json!([1, 0, 4, "comment"]),
+            json!([2, 0, 6, "comment"])
+        ]
+    );
+    assert_eq!(
+        clipped,
+        vec![json!([1, 2, 2, "comment"]), json!([2, 0, 1, "comment"])]
+    );
+    assert_eq!(
+        edited,
+        vec![
+            json!([0, 0, 3, "keyword"]),
+            json!([0, 6, 1, "operator"]),
+            json!([0, 8, 4, "string"]),
+            json!([1, 0, 4, "comment"]),
+            json!([2, 0, 6, "comment"])
+        ]
+    );
     assert_eq!(replies[4]["result"], json!({"kind":"full","items":[]}));
     // Temporary first-hosted actual-wire capture: ROOT must read before removal.
     let capture = serde_json::to_vec(&json!({"semanticTokens380":{"wire":replies,"decodedFull":full,"decodedRange":clipped,"decodedEdited":edited}})).unwrap();

@@ -7,7 +7,7 @@ use ktlsp_artifacts::{
 };
 use ktlsp_binary::class_path::{self, ClasspathClass, ClasspathError, ClasspathRoot};
 use ktlsp_project::{DependencyScope, Library, SourceRoot, SourceRootKind, v2::{Dependency, Module}};
-use std::path::{Component, Path, PathBuf};
+use std::{collections::HashMap, path::{Component, Path, PathBuf}};
 
 /// Explicit decoder choice; imported filenames do not establish archive kind.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -64,6 +64,7 @@ pub enum Error {
     MissingBinding { library: usize, binary_root: usize },
     DuplicateBinding { library: usize, binary_root: usize },
     BindingPath { library: usize, binary_root: usize },
+    UnboundBinding { binding: usize },
     Jar { root: usize, error: ZipIndexError },
     Jmod { root: usize, error: JmodIndexError },
     Classpath(ClasspathError),
@@ -172,11 +173,13 @@ pub fn select_class<'model, 'data>(
         }
     }
     let mut roots = Vec::new();
+    let mut selected_libraries = HashMap::new();
     for (dependency, edge) in owner.module.dependencies.iter().enumerate() {
         let Dependency::Library { library, exported, .. } = edge else { unreachable!() };
         // The immutable projection already validated every reference.
         let (library_index, library) = project.libraries.iter().enumerate()
             .find(|(_, candidate)| candidate.id == *library).expect("validated library reference");
+        selected_libraries.insert(library.id.as_str(), library.binaries.len());
         for binary_root in 0..library.binaries.len() {
             if roots.len() == class_path::MAX_ROOTS {
                 return Err(Error::Limit("roots"));
@@ -188,8 +191,11 @@ pub fn select_class<'model, 'data>(
         return Err(Error::Limit("bindings"));
     }
     let mut key_bytes = 0;
-    for binding in bindings {
+    for (ordinal, binding) in bindings.iter().enumerate() {
         charge(&mut key_bytes, binding.library.len(), class_path::MAX_SCAN_BYTES, "binding key bytes")?;
+        if selected_libraries.get(binding.library).is_some_and(|&count| binding.binary_root >= count) {
+            return Err(Error::UnboundBinding { binding: ordinal });
+        }
         for root in &mut roots {
             if binding.library != root.library.id || binding.binary_root != root.binary_root {
                 continue;

@@ -143,7 +143,8 @@ fn binding_completeness_is_checked_before_early_match_or_successful_miss() {
         assert!(matches!(select_class(&workspace, &source(), name, 8, &[early], &mut scratch), Err(Error::MissingBinding { binary_root:1, .. })));
         assert!(matches!(select_class(&workspace, &source(), name, 8, &[early, late, late], &mut scratch), Err(Error::DuplicateBinding { binary_root:1, .. })));
         let wrong_ordinal = ArtifactBinding { binary_root:2, ..late };
-        assert!(matches!(select_class(&workspace, &source(), name, 8, &[early, wrong_ordinal], &mut scratch), Err(Error::MissingBinding { binary_root:1, .. })));
+        assert!(matches!(select_class(&workspace, &source(), name, 8, &[early, wrong_ordinal], &mut scratch), Err(Error::UnboundBinding { binding:1 })));
+        assert!(matches!(select_class(&workspace, &source(), name, 8, &[early, late, wrong_ordinal], &mut scratch), Err(Error::UnboundBinding { binding:2 })));
     }
     let sources = genuine(true);
     assert!(matches!(select_class(&workspace, &source(), BUILDER, 8, &[early, binding("commons", 1, &sources)], &mut Vec::new()), Err(Error::BindingPath { binary_root:1, .. })));
@@ -317,5 +318,15 @@ fn aggregate_entry_and_name_work_caps_apply_before_early_match_or_absence() {
                 assert!(matches!(result, Err(Error::Limit(actual)) if actual == field));
             }
         }
+    }
+}
+
+#[test]
+fn selected_source_only_library_refuses_unbound_archive_but_unrelated_libraries_do_not_leak() {
+    let binary = genuine(false);
+    let workspace = import(model(vec![edge("source-only")], vec![library("source-only", &[])]));
+    for name in [BUILDER, "missing/Type"] {
+        assert!(matches!(select_class(&workspace, &source(), name, 8, &[binding("source-only", 0, &binary)], &mut Vec::new()), Err(Error::UnboundBinding { binding:0 })));
+        assert!(select_class(&workspace, &source(), name, 8, &[binding("unrelated", usize::MAX, &binary)], &mut Vec::new()).unwrap().class.is_none());
     }
 }

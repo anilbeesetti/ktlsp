@@ -148,8 +148,10 @@ not an implementation of transitive propagation.
 Caller-retained immutable `VerifiedArtifact` bindings are keyed by library ID
 and binary-root ordinal. Every owner root must have exactly one binding and its
 retained provenance path must agree with the imported path before lookup or
-successful absence, including roots after an early match. Unrelated bindings
-never grant visibility. Jar/Jmod kind is explicit, never guessed from filenames;
+successful absence, including roots after an early match. Out-of-range bindings
+for owner-selected libraries refuse, including libraries with no binary roots.
+Unrelated libraries' bindings never grant visibility. Jar/Jmod kind is explicit,
+never guessed from filenames;
 all indexes are built through the existing archive decoders before lookup.
 Digest equality verifies bytes against the caller digest, **not** coordinate,
 path or digest authenticity. No filesystem reads, downloads or invented Maven

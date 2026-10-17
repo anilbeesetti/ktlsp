@@ -96,8 +96,10 @@ substitute for exact ROOT union/compiler/original hosted actual-value/edit gates
 ## Coherent eager native workspace-symbol source contract (#426)
 
 The complete composed source now adds an independent `workspace/symbol` path;
-the narrower421 operation above did not itself grant this capability. Original
-hosted runtime/actual-value acceptance and guarded integration remain pending.
+the narrower421 operation above did not itself grant this capability.
+Capture-bearing4b3429c passed full original three-host CI and independent
+BOTH owner/ROOT complete actual-value/genuine-edit acceptance. Observation-only
+retirement's OWN source/CI gates and guarded integration remain separate.
 Only the trusted sibling-parser provider advertises `workspaceSymbolProvider:true`;
 the client's `workspace.symbol` kind profile is independent of document symbols.
 Results are eager full declaration locations, without resolve/data/pagination/
@@ -127,8 +129,12 @@ CPU/RSS/OS latency or prompt inner cancellation.
 [Full source/error/resource and evidence-layer contract](../../crates/ktlsp-server/README.md#coherent-eager-native-workspace-symbols-426).
 
 Packaged raw protocol values, separate Session ownership, actual lossless byte
-runs for giant IDs and genuinely applied returned edits require independent
-BOTH owner/ROOT complete original hosted readbacks before observation retirement.
+runs for giant IDs and genuinely applied returned edits received independent
+BOTH owner/ROOT complete original hosted readbacks BEFORE separate observation
+retirement admission. Complete old captures remain outside the repository;
+source-only aggregate/hidden internal states have no invented producer telemetry.
+The permanent real requests, producer calls, applied edits, assertions and owned
+cleanup must survive retirement and pass the cleaned union's OWN new gates.
 No local Kotlin/parser/server/Session/worker runtime is admitted under96.
 No semantic index, effective library/classpath, official matcher or full-parity
 claim is added.

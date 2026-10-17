@@ -8,7 +8,31 @@ decisions or phase boundaries. **Full official Kotlin LSP parity is NOT achieved
 Use the actual session capacity; the historical 32-concurrent instruction below
 is not a new limit. Do not manufacture hundreds of overlapping/blocked tasks.
 
-### Latest PR429 r6: all original feature gates accepted; retirement admitted
+### Latest capture-free source composition; OWN new gates required
+
+All three admitted observation retirements are now complete, independently
+double-reviewed and composed in ROOT's integration branch. Complete exact
+component leaves:426 r6→c87d472→ff38aadd9893525b09a07359ab3dab0e232938e5;
+427 r6→0681463cdaaeb9a0785e9ccd3dfec0180b537bee;
+428 r6→08b5cd1cc3296ab1c0accfc4b731ac60f75f4bad.
+ROOT read every changed line and BOTH full CURRENT component receipts for each.
+The revived426 functionality agent URI returned the old first receipt: current
+full report is artifact7392; adversary history204–318 targetsff38aadd.
+427 complete reports are in OWNER427-observation-retirement-0681463-full-independent-review-receipts.json;
+428 reports are Retire428{Function,Adversary}Review-08b5cd1-FULL-receipt.txt
+under the same outside-repo evidence directory.
+
+No real producer/consumer calls, assertions, fixture mutations, returned-edit
+applications, frequencies, bounds or cleanup were removed. Pure capture-only
+formatting/accessors/position-cache warming/recording were removed; obsolete
+observer-caused clones move at their final genuine use. Raw framed transport
+retains matching-ID OR null-ID refusal. Permanent extracted receipt survives.
+OWN full clean-source union reviews/compiler/original three-host CI and guarded
+integration/exact-main gates have NOT yet run at this checkpoint; never reuse
+capture-bearing4b3429c CI as cleaned-source CI. No local Kotlin runtime or format
+mutation is admitted. Basic430 remains prepared, not integrated/run.
+
+### Capture-bearing PR429 r6: original feature gates accepted before retirement
 
 Verified incoming main remains7afdc68dd2e283379ebaa99073b068339df84bdd.
 No merge lease or new main merge exists. Draft PR429 capture-bearing exact

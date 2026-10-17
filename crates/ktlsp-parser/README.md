@@ -898,8 +898,9 @@ evidence must be recorded separately from source.
 ### Snapshot-owned immutable-local value types (#428)
 
 **Capture-bearing `4b3429c` passed its full source/compiler/original three-host
-and BOTH OWNER+ROOT complete actual-value gates; observation-only retirement,
-its OWN new reviews/CI and guarded integration remain pending.**
+and BOTH OWNER+ROOT complete actual-value gates. Temporary observations are now
+retired; the cleaned union's OWN new reviews/CI and guarded integration remain
+pending.**
 `local_value_binding::infer_local_value_type` selects an ORIGINAL direct
 immutable-local `Declaration` with the original `RegionDirectory`,
 `SnapshotResult` and current `SourceSnapshot`. Unused/direct locals need no
@@ -945,11 +946,13 @@ cancellation infrastructure or claim is introduced.
 Real-production-parser/public-API permanent source includes genuine default/
 lexical chains, unused locals, identity/shadowing/forward/cycle/competitor cases,
 frozen malformed/overflow leaves reached THROUGH real references, full origin/
-snapshot/UTF-16 controls and cumulative resource exhaustion. TEMP428 writers
-retain COMPLETE actual snapshots/CST/token partition/diagnostics/declarations/
-owners/memberships/proof/error/terminal/pointer values until independent BOTH
-owner and ROOT original hosted readbacks. Private accounting tests complement,
-never replace, real producer acceptance. No local parser runtime is authorized.
+snapshot/UTF-16 controls and cumulative resource exhaustion. Complete actual
+snapshot/CST/token/diagnostic/declaration/membership/proof/error/terminal/pointer
+values were independently fully read by BOTH owner and ROOT before TEMP428
+retirement. The real producer/consumer calls and substantive assertions remain;
+only observation-only collection/position-cache warming/output was removed.
+Private accounting tests complement, never replace, real producer acceptance.
+No local parser runtime is authorized.
 
 ### Earlier package/import and direct-integer execution (#346 / #347)
 

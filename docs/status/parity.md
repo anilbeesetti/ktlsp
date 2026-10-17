@@ -233,3 +233,15 @@ No official oracle, full parity, general inference, semantic index, native
 deadline reliability, licensed first-party distribution or visual-editor
 certification is claimed. All96/T004/B3/oracle/original395377417 holds remain.
 
+### Observation-only retirement composed
+
+The three current feature components now have BOTH independent complete
+retirement reviews and are composed in ROOT's integration branch. Every genuine
+producer/consumer invocation, mutation, returned-edit application, assertion,
+resource boundary and owned cleanup remains. Temporary observation output,
+collection, recording, cache warm-up and observer-only copies are removed.
+This is a clean-source checkpoint, not new runtime/integration acceptance.
+The clean union requires its OWN full-source/compiler/original three-host CI,
+then the separate guard/expected-head/tree/sole-base and original exact-main
+gates. The already accepted capture-bearing actual values remain distinct.
+

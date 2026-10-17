@@ -4609,3 +4609,50 @@ No current downloadable candidate, ten-hour guarantee, first-party license,
 visual-editor certification, general semantic authority or full parity.
 All96/T004/native-only/B3/oracle/original395377417 holds remain unchanged.
 
+
+#### PR429 observation-only source retirement composed
+
+Only after the separate ROOT admission following ALL three complete
+feature OWNER+ROOT actual gates, independent isolated component branches
+retired observations. BOTH complete current reviews accepted each component,
+without findings; ROOT fully read every cumulative changed line and both
+current full receipts before composition:
+
+| Component | Complete original r6→retired chain | Exact retired tree |
+| --- | --- | --- |
+|426|4b3429c→c87d472→ff38aadd9893525b09a07359ab3dab0e232938e5|163bb853259e27e77a626ade020fe023fcf2d26c|
+|427|4b3429c→0681463cdaaeb9a0785e9ccd3dfec0180b537bee|785af38051179bf78c5f448f9b928cfe0b51233f|
+|428|4b3429c→08b5cd1cc3296ab1c0accfc4b731ac60f75f4bad|7926039d973fbbcde78910a9058d6c1a79f29c03|
+
+ROOT composed BOTH426 commits, not only its leaf;427 and428 retain their complete
+single-commit changes.426 changes only tests/document_symbols.rs; owned
+src/workspace/tests.rs intentionally unchanged.427 removes19 print sites plus
+an unused formatting label and updates the shared standalone's obsolete comment.
+428 removes17 capture calls/helper and pure observation collection. No production,
+fixture byte, dependency/config/workflow/lock or budget change.
+
+All genuine producer/consumer calls, fixtures, assertions, returned-edit
+applications, mutation order/restoration, parser call placement, invocation
+frequency, deadlines/cadence, resource and cleanup boundaries remain.
+426 embedded producer calls were extracted as meaningful checked calls at their
+original position; raw recording disappears but framing, ID/null-ID completion,
+all exact envelope boundaries, terminal waits and PR306 ownership remain.
+Its final disk read is retained with an explicit actual-content assertion.
+Observer-caused message/model/query clones move at their last genuine use;
+clones needed for real subsequent reuse/response retention remain.
+428 capture-only position calls previously incidentally warmed a OnceLock;
+that observation-induced work is removed, while substantive non-BMP LF/CRLF
+UTF16 queries/assertions remain.427 measured minimum searches and all actual
+decode probes remain. Standalone calls the shared genuine/resource proof;
+the separate13 mutation tests remain in their original registered target.
+
+Both component reviews are source-only, not runtime success. Final426
+functionality receipt is artifact7392; adversary immutable history204–318,
+not the stale first revived agent URI.427 full archive29474B
+SHAe4847327d3ddb75962a1c1de344cb5d86a0ba00510a912b524a74eddf6825601.
+428 exact08b5cd1 full function/adversary receipts remain outside repo.
+Root's BOTH full clean-source union reviews, compiler-only admission, OWN
+original unchanged three-host CI and guarded integration/exact-main acceptance
+are still required. No check, formatting, build or local Kotlin runtime was
+performed during retirement. No new capability/parity or old-failure fix claim.
+

@@ -55,8 +55,9 @@ At later independently verified main `040dbba580d908c649c7256405687e2044e4cec2`,
 ## Coherent eager native workspace symbols (#426)
 
 **Capture-bearing `4b3429c` passed its full source/compiler/original three-host
-and BOTH OWNER+ROOT complete actual-value/genuine-edit gates. Observation-only
-retirement, its OWN new reviews/CI and guarded integration remain pending.**
+and BOTH OWNER+ROOT complete actual-value/genuine-edit gates. Temporary
+observations were retired only afterward; the cleaned union's OWN new reviews/CI,
+guarded integration and original exact-main acceptance remain separate.**
 With the trusted sibling provider,
 initialization advertises `workspaceSymbolProvider: true`. Symbol-kind negotiation
 uses `capabilities.workspace.symbol` independently of document-symbol profiles.
@@ -116,15 +117,18 @@ sequentially. Cancellation takes its ID once but retains owned state until join;
 old completion cannot reply to a reused ID. Unproved same-child cleanup stops
 before another parse and propagates terminal failure.
 
-Permanent SOURCE retains real packaged cancellation/duplicate/ID-reuse/terminal
+Permanent source retains real packaged cancellation/duplicate/ID-reuse/terminal
 exchanges, separate Session retained8/overflow/join/recovery and honestly
 conditional cross-Session admission. No production probe/barrier/delay forces
-saturation. Complete original producer/protocol data and actual large-ID raw
-headers/payloads are captured losslessly as actual byte runs, not expected
-reconstructed wire. Genuine returned local-value rename edits are applied in the SAME live
-overlay. BOTH owner and ROOT must independently reconstruct/read every complete
-actual value and apply returned edits before capture retirement. No local
-parser/server/Session runtime is authorized under96; source coverage is not proof.
+saturation. BOTH owner and ROOT fully read the complete original producer/
+protocol values, independently reconstructed ALL90 actual large-ID raw frames
+and genuinely applied every returned local-value rename edit in the SAME live
+overlay before separate observation-retirement admission. The temporary byte
+recorders/output are gone; genuine framed reads/writes, matching-ID OR null-ID
+refusal, all producer calls, mutations, assertions and owned cleanup remain.
+No local parser/server/Session runtime is authorized under96. Source-only
+aggregate/hidden internal states have no invented producer telemetry; source
+coverage is not runtime proof. [Exact original evidence and limits](../../docs/status/development.md#pr429-r6-original-full-three-host-and-all-feature-actual-gates-accepted).
 
 ## Folding and diagnostics
 

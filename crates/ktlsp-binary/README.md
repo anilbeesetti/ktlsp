@@ -732,16 +732,21 @@ the complete separately admitted c03523a native public-pipeline and standalone
 consumer outputs, every original raw CP/metadata/name field and all actual
 minimum/one-short/isolated/repeated values. Both independently reviewed full-union
 source and compiler gates passed; capture-bearing `4b3429c` passed its OWN
-original full Linux/macOS/Windows CI. Both current full platform Class payloads
-match the accepted native values, including73 original same-buffer pointer
-pairs per host; all814 binary files and build inputs remain byte-identical to
-the accepted native source. Linux default capture does not expose those full
+original full Linux/macOS/Windows CI. Both of that head's full platform Class
+payloads match the accepted native values, including73 original same-buffer
+pointer pairs per host; at that capture-bearing head all814 binary files and
+build inputs are byte-identical to the accepted native source. Linux default
+capture does not expose those full
 payloads; no new local r6 native execution is invented.
 
-Observation-only retirement was separately admitted only after BOTH current
-OWNER+ROOT actual-value gates. Its OWN new source reviews/full original
-three-host CI and guarded integration remain pending. Earlier #423 values above
-remain historical scope evidence, not substitute #427 acceptance.
+Observation-only retirement followed separate admission after BOTH current
+OWNER+ROOT actual-value gates. All genuine producer/consumer calls, measured
+minimum probes, mutations/restoration, borrowing and substantive assertions
+remain in the shared proof and separate13-test mutation target. Standalone
+executes the shared genuine/resource proof, not that separate registered target.
+The cleaned union's OWN full source reviews/original three-host CI and guarded
+integration remain pending. Earlier #423 values above remain historical scope
+evidence, not substitute #427 acceptance.
 No local parser/server/Session runtime is authorized. [Exact current evidence
 and limits](../../docs/status/development.md#pr429-r6-original-full-three-host-and-all-feature-actual-gates-accepted).
 

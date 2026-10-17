@@ -65,14 +65,14 @@ fn scopes_exports_order_and_root_membership_survive_import() {
     let result = v2::from_json(&directory, FIXTURE).unwrap();
     assert_eq!(
         result
-            .modules
+            .modules()
             .iter()
             .map(|m| m.name.as_str())
             .collect::<Vec<_>>(),
         ["app😀", "shared"]
     );
     assert_eq!(
-        result.modules[0].dependencies,
+        result.modules()[0].dependencies,
         [
             Library {
                 library: "shared".into(),
@@ -128,7 +128,7 @@ fn scopes_exports_order_and_root_membership_survive_import() {
             },
         ]
     );
-    assert!(result.modules[1].dependencies.is_empty());
+    assert!(result.modules()[1].dependencies.is_empty());
     let project = result.project_projection();
     assert_eq!(
         project
@@ -201,16 +201,16 @@ fn scopes_exports_order_and_root_membership_survive_import() {
         project.libraries[0].sources,
         [directory.join("lib/sources.zip")]
     );
-    assert_eq!(result.modules[0].content_roots.len(), 2);
+    assert_eq!(result.modules()[0].content_roots.len(), 2);
     assert_eq!(
-        result.modules[0].content_roots[0].path,
+        result.modules()[0].content_roots[0].path,
         directory.join("app")
     );
     assert_eq!(
-        result.modules[0].content_roots[1].path,
+        result.modules()[0].content_roots[1].path,
         directory.join("extra")
     );
-    let roots: Vec<_> = result.modules[0]
+    let roots: Vec<_> = result.modules()[0]
         .content_roots
         .iter()
         .flat_map(|c| &c.source_roots)
@@ -229,10 +229,10 @@ fn scopes_exports_order_and_root_membership_survive_import() {
             (Path::new("extra/src"), "java-source"),
         ]
     );
-    assert_eq!(result.libraries.len(), 1);
-    assert_eq!(result.libraries[0].name, "shared");
+    assert_eq!(result.libraries().len(), 1);
+    assert_eq!(result.libraries()[0].name, "shared");
     assert_eq!(
-        result.libraries[0]
+        result.libraries()[0]
             .roots
             .iter()
             .map(|r| (
@@ -522,8 +522,8 @@ fn old_api_stays_strict_and_preserves_compatible_results() {
     let source = include_bytes!("fixtures/source-model.json");
     let old = ktlsp_import::from_json(base(), source).unwrap();
     let new = v2::from_json(base(), source).unwrap();
-    assert_eq!(old.libraries, new.libraries);
-    for (old, new) in old.modules.iter().zip(&new.modules) {
+    assert_eq!(old.libraries(), new.libraries());
+    for (old, new) in old.modules().iter().zip(new.modules()) {
         assert_eq!(old.name, new.name);
         assert_eq!(old.content_roots, new.content_roots);
         assert_eq!(old.dependencies.len(), new.dependencies.len());

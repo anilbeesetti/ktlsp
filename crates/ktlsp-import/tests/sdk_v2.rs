@@ -46,7 +46,7 @@ fn production_consumer_retains_catalog_identity_nulls_urls_and_edge_order() {
         "jrt:///jdk!/modules/java.base"
     );
     assert_eq!(
-        imported.modules[0].dependencies,
+        imported.modules()[0].dependencies,
         vec![
             v2::Dependency::Sdk {
                 name: "same😀".into(),

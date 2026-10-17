@@ -127,7 +127,7 @@ fn binding<'a>(
 fn genuine_class_owner_identity_and_owning_library_source_composition() {
     let binary = genuine(false);
     let sources = genuine(true);
-    let mut workspace = import(model(
+    let workspace = import(model(
         vec![
             json!({"type":"moduleSource"}),
             json!({"type":"library","name":"commons","scope":"compile","isExported":true}),
@@ -148,16 +148,34 @@ fn genuine_class_owner_identity_and_owning_library_source_composition() {
                 .contains('\\')
         );
     }
-    // Public mutable sidecars are not authority for ownership, order, or paths.
-    workspace.modules.clear();
-    workspace.libraries.clear();
+    // A detached public model can change, but reload must revalidate it and
+    // cannot replace the original import's authority.
+    let mut detached = workspace.project_projection().clone();
+    detached.libraries.clear();
+    assert!(matches!(
+        ktlsp_project::v2::from_json(
+            project().join("detached.json"),
+            &serde_json::to_vec(&detached).unwrap()
+        ),
+        Err(ktlsp_project::v2::Error::Validation(
+            ktlsp_project::ProjectError::UnknownReference { kind: "library", id }
+        )) if id == "commons"
+    ));
     let bindings = [binding("commons", 0, &binary)];
     let mut scratch = Vec::new();
     let result = select_class(&workspace, &source(), BUILDER, 8, &bindings, &mut scratch).unwrap();
     assert_eq!(result.owner.module.id, "app");
+    assert!(std::ptr::eq(
+        result.owner.module,
+        &workspace.project_projection().modules[0]
+    ));
     assert_eq!(result.owner.source_root.kind, SourceRootKind::Production);
     let selected = result.class.unwrap();
     assert_eq!(selected.library.id, "commons");
+    assert!(std::ptr::eq(
+        selected.library,
+        &workspace.project_projection().libraries[0]
+    ));
     assert_eq!(
         (selected.dependency, selected.binary_root, selected.exported),
         (0, 0, true)

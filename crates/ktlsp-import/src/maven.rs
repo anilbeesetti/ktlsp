@@ -122,13 +122,21 @@ pub struct Module {
     pub source_roots: Vec<SourceRoot>,
     pub dependencies: Vec<UnresolvedDependency>,
 }
+/// Immutable declared reactor/source records; dependency occurrences remain unresolved.
+/// ```compile_fail
+/// fn mutate(mut w: ktlsp_import::maven::ImportedMaven) { w.modules.clear(); }
+/// ```
 #[derive(Debug)]
 pub struct ImportedMaven {
     project: ProjectModel,
     /// Root-first declared reactor preorder. All dependency occurrences stay unresolved.
-    pub modules: Vec<Module>,
+    modules: Vec<Module>,
 }
 impl ImportedMaven {
+    /// Original root-first reactor preorder with source and dependency provenance.
+    pub fn modules(&self) -> &[Module] {
+        &self.modules
+    }
     /// Source roots only: no dependency edges, libraries, SDK or effective build settings.
     pub fn source_projection(&self) -> &ProjectModel {
         &self.project

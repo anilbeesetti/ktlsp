@@ -75,13 +75,32 @@ impl std::error::Error for ImportError {
 }
 
 /// Supported import contract. Use ordered metadata as well as the v1 projection.
+///
+/// Loader-produced order and provenance cannot diverge from the retained projection.
+/// ```compile_fail
+/// fn mutate(mut w: ktlsp_import::ImportedWorkspace) { w.modules.clear(); }
+/// ```
+/// ```compile_fail
+/// fn mutate(mut w: ktlsp_import::ImportedWorkspace) { w.libraries.clear(); }
+/// ```
 #[derive(Debug)]
 pub struct ImportedWorkspace {
     project: ProjectModel,
-    pub modules: Vec<ImportedModule>,
-    pub libraries: Vec<ImportedLibrary>,
+    modules: Vec<ImportedModule>,
+    libraries: Vec<ImportedLibrary>,
 }
 impl ImportedWorkspace {
+    /// Original ordered module metadata, including content boundaries and dependency order.
+    /// ```compile_fail
+    /// fn mutate(w: &ktlsp_import::ImportedWorkspace) { w.modules()[0].name.clear(); }
+    /// ```
+    pub fn modules(&self) -> &[ImportedModule] {
+        &self.modules
+    }
+    /// Original ordered libraries and interleaved binary/source roots.
+    pub fn libraries(&self) -> &[ImportedLibrary] {
+        &self.libraries
+    }
     /// Validated v1 projection, not the complete imported workspace semantics.
     pub fn project_projection(&self) -> &ProjectModel {
         &self.project
@@ -620,13 +639,28 @@ pub mod v2 {
     };
     use std::{fmt, io, path::Path};
 
+    /// Complete immutable v2 import, not just its projected dependency graph.
+    /// ```compile_fail
+    /// fn mutate(mut w: ktlsp_import::v2::ImportedWorkspace) { w.modules.clear(); }
+    /// ```
+    /// ```compile_fail
+    /// fn mutate(mut w: ktlsp_import::v2::ImportedWorkspace) { w.libraries.clear(); }
+    /// ```
     #[derive(Debug)]
     pub struct ImportedWorkspace {
         project: ktlsp_project::v2::ProjectModel,
-        pub modules: Vec<ImportedModule>,
-        pub libraries: Vec<ImportedLibrary>,
+        modules: Vec<ImportedModule>,
+        libraries: Vec<ImportedLibrary>,
     }
     impl ImportedWorkspace {
+        /// Original ordered module metadata, including every ModuleSource position.
+        pub fn modules(&self) -> &[ImportedModule] {
+            &self.modules
+        }
+        /// Original ordered libraries and interleaved binary/source roots.
+        pub fn libraries(&self) -> &[ImportedLibrary] {
+            &self.libraries
+        }
         /// Validated v2 projection; moduleSource placement remains in the sidecar.
         pub fn project_projection(&self) -> &ktlsp_project::v2::ProjectModel {
             &self.project

@@ -7768,6 +7768,21 @@ mod workspace_symbols {
         assert_eq!(response["error"]["message"], "limit");
         assert!(serde_json::to_vec(&response).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
         requests.push(message);
+        // Parameter errors cannot bypass the failure-envelope admission. The
+        // first frame admits its ID and retains InvalidParams; the second is
+        // still valid framed input but must take the compact resource refusal.
+        for (reserve, code) in [(514, -32602), (80, -32803)] {
+            let message = json!({"jsonrpc":"2.0",
+                "id":"q".repeat(ktlsp_protocol::MAX_PAYLOAD_BYTES - reserve),
+                "method":"workspace/symbol","params":{"query":null}});
+            assert!(serde_json::to_vec(&message).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
+            let response = recorded_send(&mut wire, &message, &mut raw_frames);
+            assert_eq!(response["id"], message["id"]);
+            refused(&response, code);
+            if code == -32803 { assert_eq!(response["error"]["message"], "limit"); }
+            assert!(serde_json::to_vec(&response).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
+            requests.push(message);
+        }
         let reload_message = source_reload(3, &options);
         result(&recorded_send(&mut wire, &reload_message, &mut raw_frames), &Value::Null);
         requests.push(reload_message);

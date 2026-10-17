@@ -84,9 +84,13 @@ impl Budget {
             return Err("limit");
         }
         budget.output(id_bytes.checked_add(64).ok_or(LIMIT)?)?;
-        budget.work(query.len(), &AtomicBool::new(false))?;
-        budget.storage(query.len())?;
+        budget.query(query)?;
         Ok(budget)
+    }
+    pub(super) fn query(&mut self, query: &str) -> Result<(), &'static str> {
+        if query.len() > MAX_QUERY_BYTES { return Err("workspace query limit exceeded"); }
+        self.work(query.len(), &AtomicBool::new(false))?;
+        self.storage(query.len())
     }
     pub(super) fn work(&mut self, amount: usize, cancelled: &AtomicBool) -> Result<(), &'static str> {
         self.verification.reserve_work(amount, cancelled).map_err(|_| LIMIT)

@@ -438,7 +438,11 @@ impl Session {
             };
         }
         if method == "workspace/symbol" && self.state == State::Running {
-            return match workspace_symbols::query(params).and_then(|query| self.start_workspace_symbols(id.clone(), query)) {
+            let admitted = workspace_symbols::Budget::new("", id)
+                .map_err(|error| (-32803, error))
+                .and_then(|budget| workspace_symbols::query(params)
+                    .and_then(|query| self.start_workspace_symbols(id.clone(), query, budget)));
+            return match admitted {
                 Ok(()) => Vec::new(),
                 Err((code, message)) => vec![response_error(id.clone(), code, message)],
             };
@@ -951,11 +955,12 @@ impl Session {
         &mut self,
         id: Value,
         query: &str,
+        mut budget: workspace_symbols::Budget,
     ) -> Result<(), (i32, &'static str)> {
         if self.parser_provider.is_none() {
             return Err((-32601, "Method not found"));
         }
-        let budget = workspace_symbols::Budget::new(query, &id).map_err(|e| (-32803, e))?;
+        budget.query(query).map_err(|e| (-32803, e))?;
         let mut owned_query = String::new();
         owned_query.try_reserve_exact(query.len()).map_err(|_| (-32803, "workspace query allocation failed"))?;
         owned_query.push_str(query);

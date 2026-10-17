@@ -1869,6 +1869,36 @@ fn extracted_lifecycle_exchange(directory: &Path, invalid_position: bool) -> Val
 }
 
 #[test]
+fn packaged_basic_editing_same_live_edits_and_lifecycle() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    // Ordinary hosted CI exercises the same wire assertions using copied real
+    // binaries. This is not extracted-archive acceptance or archive provenance.
+    let package = Package::new(true);
+    let directory = package.0.clone();
+    let server = directory.join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX));
+    let worker = directory.join(format!(
+        "ktlsp-parser-worker{}",
+        std::env::consts::EXE_SUFFIX
+    ));
+    let basic = basic_extracted_exchange(&directory);
+    let invalid_coordinates = extracted_lifecycle_exchange(&directory, true);
+    let shutdown_eof = extracted_lifecycle_exchange(&directory, false);
+    assert!(directory.is_dir() && server.is_file() && worker.is_file());
+    let receipt = serde_json::to_string(&json!({
+        "proof_kind":"copied-native-pair-not-extracted-archive",
+        "directory":directory,"server":server,"worker":worker,
+        "environment":{"PATH":"","JAVA_HOME":null,"JDK_HOME":null},
+        "basic":basic,"invalid_coordinates":invalid_coordinates,"shutdown_eof":shutdown_eof,
+        "borrowed_directory_retained_until_owner_drop":true
+    }))
+    .unwrap();
+    assert!(receipt.len() <= 65536, "paired smoke receipt exceeds 64 KiB");
+    drop(package);
+    assert!(!directory.exists(), "exclusive package owner cleanup");
+    println!("PAIRED_BASIC_EDITING_SMOKE_RECEIPT={receipt}");
+}
+
+#[test]
 #[ignore = "requires an explicitly admitted extracted native package; never part of default native tests"]
 fn extracted_archive_smoke() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());

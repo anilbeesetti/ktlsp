@@ -375,12 +375,18 @@ All4 adversarial changes per host were also independently applied.
 
 Complete values, raw logs, original18-member platform archives, source and
 independent receipts remain retained. Observation-only retirement729374b
-received both independent exact component reviews, without findings. All real
-producer/CLI/Session calls, assertions, edit/mutation placement and owned cleanup,
-including the actual error drain, remain. ROOT composed that complete source;
-both exact union reviews, compiler gates, its OWN full hosted CI and guarded
-integration remain pending. This is not official rendering/trigger/general
-signature-help parity. [Full evidence](../../docs/status/development.md#original425-full-three-host-actual-values-and-genuine-edit-acceptance).
+received both independent exact component reviews; cleaned0f4f043 received BOTH
+complete ROOT union reviews, compiler gates and its OWN original full Linux/
+macOS/Windows CI39042871021/39042871039, all32 required steps successful.
+All real producer/CLI/Session calls, assertions, edit/mutation placement and
+owned cleanup, including the actual once-only error drain, remain.
+Separate fresh strictly-readonly guard(actualouter0/parsed0/all exact lease
+facts) preceded ordinary expected-head squash7afdc68/tree93eee/SOLE1ddf parent.
+BINARY OWNER, SIGNATURE OWNER and ROOT independently accepted OWN ORIGINAL
+exact-main39045022100 full Native CI before lease clearance. First guard's
+missing outer-exit presentation remains suspended evidence, not a passed guard.
+This is not official rendering/trigger/general signature-help parity.
+[Full integration evidence](../../docs/status/development.md#verified425-cleaned-source-integration-and-original-exact-main-acceptance).
 
 ## Finite function type-parameter references and rename (#392)
 

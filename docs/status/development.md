@@ -4059,3 +4059,133 @@ tree/SOLEbase parent and independent OWN original exact-main gates.
 No active merge lease or merge/main acceptance yet.
 Full parity NOT achieved; native-only/T004/96/B3/oracle/original UNKNOWN holds
 remain unchanged.
+
+#### Verified425 cleaned source integration and original exact-main acceptance
+
+[PR425](https://github.com/anilbeesetti/ktlsp/pull/425) delivered423/424 at
+**7afdc68dd2e283379ebaa99073b068339df84bdd**, reviewed complete tree
+**93eee1d79940aa824e0dcbd141e1ce0204a61d69**, SOLE original base parent
+**1ddf69acb4158a8927a8b5a87e679c0599d96a54**. Reviewed cleaned head
+**0f4f04307ee232a64f5cecf46f450478570855cc** contained the COMPLETE owner
+retirement729374b, documentation9fc40bf/0f4f043 and both original product leaves.
+Both issues CLOSED only after every independent main gate below.
+
+Both exact component-retirement reviews were independently FULL-read/
+hash-authenticated: function53452e0359ff48000cb1149130839d4425ef27859e4f7ddaaa7d4fd522909bae,
+adversary1eb8f932488615153afdea4188332e405ba76d104230405f77a51d2e0417f977.
+BOTH independent ROOT reviewers inspected the COMPLETE current23path union,
+not merely the retirement diff; no actionable findings, confidence0.96 each:
+function8e338b0250c505aeef404ec777721f94a5d38f4963dfa9bece6c2c9dd5a9a1a2,
+adversary286147ef97f36079d47d2f8c87efb1fefef3435a536db2517c4c03c35ab58bf2.
+The latter reviewer returned complete text without a write tool; ROOT persisted
+its exact two-terminal-LF digest, not a fictional reviewer-created file.
+
+Only after those exact authorities ROOT admitted pinned1.99 compiler-only gates:
+fmtCHECK0/1.292668958s, strict locked all-target workspace Clippy0/0.922150292s,
+workspaceNoRunJSON0/1.460391625s.196 records=186 artifacts+9 build-script+1
+successful terminal,0 compiler diagnostics; actual document_symbols artifact
+fresh=false. No local Kotlin runtime, test-binary execution or second formatter.
+08fd's original strict macro failure101 remains failed; the changed9cc source
+fix and its earlier six-authority/compiler/native proof are not retroapproval.
+
+|Original complete gate|Run/attempt/job|Ordinary passed|Docs passed|Case occurrences|
+|---|---|---:|---:|---:|
+|Cleaned reviewed PR Linux|[39042871021/1/117425711153](https://github.com/anilbeesetti/ktlsp/actions/runs/39042871021/job/117425711153)|1259|40|1302|
+|Cleaned reviewed PR macOS ARM64|[39042871039/1/117425711076](https://github.com/anilbeesetti/ktlsp/actions/runs/39042871039/job/117425711076)|1257|40|1300|
+|Cleaned reviewed PR Windows X64|[39042871039/1/117425711245](https://github.com/anilbeesetti/ktlsp/actions/runs/39042871039/job/117425711245)|1206|40|1249|
+|OWN original exact-main Linux|[39045022100/1/117431916905](https://github.com/anilbeesetti/ktlsp/actions/runs/39045022100/job/117431916905)|1259|40|1302|
+
+Every host/stage has144 complete result rows,0failed/3ignored/0measured/
+0filtered. Docs38 expected compile-fail+2 compile examples are counted once;
+parser's split doc frames are legitimate. Two ignored helpers are parent-
+exercised; extractedArchiveSmoke is genuinely unexecuted.22 external fault
+controls/3 same-owned-Child raw86 confirmations are NOT extra ordinary passes.
+Main actually runs Native Linux only; no main Mac/Windows gate is invented.
+
+All32 mandatory current PR steps succeeded, full source/config/workflow/executor/
+case controls independently accepted. Actual tested checkout
+c6268bf704df3964912c912602fed1971eff082d has reviewed tree93eee and ordered
+parents[1ddf69a,0f4f043]. BOTH platform event payloads contain stalec822e991;
+this observational value remains, never replaces actual checkout/parent proof.
+
+|Preserved original bytes|Bytes|SHA256|
+|---|---:|---|
+|PR Native raw|310154|7955ca667b707480d56ed1cbd2d50ec877bc7950b6c6b21c8be8b006574d439e|
+|PR Mac raw|432067|37aa0fdff2b7dd38b85b2b9481699217e790affe4a6bd0267aef1c39a79aacee|
+|PR Windows raw|389105|28b204c7a49e9b5ccb6260d5cd28fe41155443987edaf77627b732ddd9671730|
+|Mac artifact12104927322 ZIP|50684|77dc1135ee57c64bdccdb8d483e07c9cb410525cbc735f46ce6c866227867e9e|
+|Windows artifact12105120940 ZIP|45842|959edc035bf1a6e26bd1a998318d6654464cbdc62ef17b14b6cd1784ad113bd1|
+|OWN original exact-main raw|309088|0d52f74e53070a28890a5e08997000f1a915ad9eae29b0c25e46c156ee5abb4d|
+
+Both platform ZIPs have18 unique CRC-valid members; all17 nonworkspace controls
+FULL-read, all14 native PowerShell commands+3 auxiliary queries per host finish0,
+no exception/rejection/overflow/incomplete streams/errors. Original operands
+and complementary raw head/tree/status agree, keeping invocation identity
+distinct. Format/Clippy/workspace-test exit files literal0; no format.txt member
+exists or is invented. Windows inherited autocrlf=true stays separate from
+effective false/eol=lf; original sampled indexed/raw blobs agree before/after.
+WHOLE Mac workspace member264885B/SHA7fbc29abfc62fe7786cd4866192808efc13431b9cdca1ea441daeb72b9fb3e54
+equals raw406–4272/all3867 lines. WHOLE Windows229966B/
+SHA1a9df3ca9f8ce79c741b9cc5db2858387fcec76880b692e37c2eba95d668e476
+equals raw412–4045/all3634 CRLF lines. Only outer original ISO timestamp/single
+wrapper-space and witnessed whole-line red stderr frames removed; no payload
+normalization/omission. Separate Windows LF comparison226332B/
+SHA6be551c48ba57de6ef9cc0bda7d70730d6b3a8c040014680e3b1d568881dc0ed
+is NOT substituted for original CRLF custody.
+
+ROOT FULL-read all506 complete current numeric/control reader lines plus
+all120 external-value JSON lines, both full primary independent CI-control
+receipts and all158 original main numeric/control reader lines. Native primary
+31e373fadcd3564b6e8fab798f7c9c6683f9474bfb503cad5d3b39b749dbe1c8;
+platform primary56ea0b6af4567b07a4256272fef37b308224f579ca24ba553e37a094f9fbe010.
+Giant data appendices6b9609922574667e448302d0406712bc38c9f9de5926cd3e4b14c9d44c84af5b/
+9433ae52630d924dd7980940e0f94130842661a0a08f2d586d79bcde16e911f7
+hash-authenticated; every actual row/case/complete platform stream/control
+reconciled with Root independent original bytes. No fictional literal manual
+second reading of every repeated appendix line. Original actual2598packet/
+72TYPE-edit/12adverse full-value gates were accepted BEFORE retirement, not
+reused as current cleaned-source CI. All7 real producers/every consumer/
+assertion/fixture/frequency/mutation/edit/owned cleanup/one actual drain remain.
+
+ROOT current all-source/OWN-original3hostCI acceptance proof
+f446022360d46b2b0ff41915bc4f55d9a30e53062259690511bbb70b5fb78e14.
+First separate read-only guard had complete parsed0 but direct tool presentation
+omitted explicit OUTER exit: lease SUSPENDED, NO merge, preserved artifact6698.
+Renewed separate strictly-readonly guard exposed ACTUAL outer0/stderrEmpty/
+completeparsed0/baseguard0. ROOT FULL-inspected exact current main/base/head/
+tree/scope/BOTHconfigdicts/checks/status/two original workflows/all32steps/
+artifacts/clean reviewed identity before a SEPARATE ordinary expected-head REST
+squash0. Repository squash enabled/automatic branch deletion disabled; no force/
+admin/main push/branch deletion/protection bypass. Actual reviewed squash tree
+and SOLE original base parent independently proved; all old worktrees retained.
+
+Exclusive base lease stayed held through THREE independent OWN ORIGINAL
+exact-main gates: BINARY OWNER primary021c5ea00850a55ae34abc937ff978e2e8614a91aa6cda3edfb2a857e9c2c8c9,
+SIGNATURE OWNER primaryffe027c2e96d38d9f27ad4d9269272d20b518bcfe6b8145047fe72310d322474,
+ROOT9adb220e1dc529cd0f791c00145adea13049beb873cd766c77856772b790ebd1.
+Both complete owner primaries personally FULL-read; complete data appendices
+hash-authenticated/every144 row/1302 case/group/elapsed/source line reconciled
+with Root independently parsed OWN main raw. Raw104/105 git-log output is
+actual7afdc68, not inferred from event. All9 native Class-supertype tests and
+all4 real manual signature-help tests present/pass; whole reviewed tree exact.
+Joint `/private/tmp/ktlsp-423-424-root-evidence/425-BOTH-feature-OWNERS-and-ROOT-original-exact-main-acceptance.json`
+SHA669c024407ee6cd027a0dff016d034e77af63b1c87d1a023c64da0210c5f9bcc.
+Final remote main7afdc68 and retained reviewed branch0f4f043 exact. Only THEN
+lease `/private/tmp/ktlsp-lease-425-cleaned0f4f043-outer-explicit.json` CLEARED,
+423/424 closed and [delivery published](https://github.com/anilbeesetti/ktlsp/pull/425#issuecomment-6236056806).
+
+Latest admitted SOURCE-ONLY lanes from that SAME stable verified7afdc68:
+426 coherent eager native workspace declaration search INCLUDING complete
+model/source snapshot verification, member overlays and aggregate ownership/
+packaged stdio lifecycle proof;427 IN-PLACE original Class inline bounds and
+one-level generic supertype interpretation. Completed research/data reused;
+newly encoded genuine bound carriers are NOT new native API observations.
+Owners have two reserved independent component reviewers each; ROOT owns all
+docs/Cargo/deps/lock/config/CI/integration and later union gates. No new source/
+compiler/runtime/CI/integration acceptance or workspace capability claimed yet.
+Root `/private/tmp/ktlsp-426-workspace-generic-integration`; owners isolated in
+`/private/tmp/ktlsp-426-workspace-symbols` and
+`/private/tmp/ktlsp-427-class-bound-supertypes`. Full parity NOT achieved;
+native-only/T004/#96/B3 INCONCLUSIVE/oracle HOLD/original417395377UNKNOWN remain.
+Node20→24 and future runner migration warnings recorded, not silently fixed.
+

@@ -156,7 +156,7 @@ types, cross-file resolution, official navigation evidence or an advertised
 semantic server capability. The historical matrix and cutoffs above are unchanged.
 
 
-## Verified source-authority continuation through1ddf69a
+## Prior verified source-authority checkpoint through1ddf69a
 
 The whole historical matrix/cutoffs above remain unchanged; their pending
 statements are not a fresh assessment of current main. [PR422](https://github.com/anilbeesetti/ktlsp/pull/422)
@@ -178,5 +178,29 @@ Their own reviews/runtime/CI/integration remain pending. No full parity,
 effective classpath, workspace symbols, watchers, build-tool orchestration,
 fresh official oracle or general platform/latency/RSS proof is claimed.
 Native-only/T004/96, B3 INCONCLUSIVE/HOLD, oracle HOLD and original417/395/377
+causes UNKNOWN/OPEN remain unchanged.
+
+## Verified finite signature help and Class data through7afdc68
+
+The historical assessed matrix and cutoffs above remain unchanged.
+[PR425](https://github.com/anilbeesetti/ktlsp/pull/425) delivered423 bare nominal
+Class supertype interpretation and424 manual source-owned signature help at
+`7afdc68dd2e283379ebaa99073b068339df84bdd`, reviewed tree93eee1d and SOLE
+original base1ddf69a. BOTH complete actual-value/genuine-edit gates preceded
+observation retirement; cleaned source received its OWN independent reviews,
+original full Linux/macOS/Windows CI, separate fresh complete read-only guard,
+ordinary expected-head squash/tree/sole-parent proof and independent BINARY
+OWNER+SIGNATURE OWNER+ROOT OWN original exact-main39045022100 acceptance.
+The exclusive lease cleared only afterward. [Complete proof and residual
+limits](development.md#verified425-cleaned-source-integration-and-original-exact-main-acceptance).
+
+This is not general call applicability/typing/overloads/incomplete signature
+help/official rendering, effective metadata hierarchy/classpath or full parity.
+426 coherent native workspace declaration search and427 inline Class bounds/
+generic supertypes are active SOURCE work from this SAME verified main, not
+verified providers/data outputs or delivered features at this checkpoint.
+No persistent semantic index/official matcher, source/library completeness,
+watcher/build-tool/oracle/platform/performance promotion follows.
+Native-only/T004/96/B3 INCONCLUSIVE/oracle HOLD and original417395377
 causes UNKNOWN/OPEN remain unchanged.
 

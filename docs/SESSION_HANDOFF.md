@@ -8,7 +8,80 @@ decisions or phase boundaries. **Full official Kotlin LSP parity is NOT achieved
 Use the actual session capacity; the historical 32-concurrent instruction below
 is not a new limit. Do not manufacture hundreds of overlapping/blocked tasks.
 
-### Latest verified421 integration and active423/424 composition
+### Latest verified425 integration and active426/427 source lanes
+
+ONE stable verified incoming main is **7afdc68dd2e283379ebaa99073b068339df84bdd**,
+tree **93eee1d79940aa824e0dcbd141e1ce0204a61d69**, SOLE original base parent
+**1ddf69acb4158a8927a8b5a87e679c0599d96a54**.
+[PR425](https://github.com/anilbeesetti/ktlsp/pull/425) delivered423/424; both
+issues are CLOSED. Reviewed cleaned head0f4f04307ee232a64f5cecf46f450478570855cc
+received both independent exact component-retirement reviews, BOTH complete
+ROOT23path union reviews and original compiler-only fmtCHECK/strictClippy/
+workspaceNoRun gates. The423/424 cycle's ONE mutating formatter remains SPENT.
+
+Cleaned source passed OWN ORIGINAL FULL3hostCI: Native39042871021/1/
+job117425711153, platform39042871039/1 Mac117425711076/Win117425711245;
+all32 mandatory steps SUCCESS. Actual checkoutc6268bf704df3964912c912602fed1971eff082d
+has reviewed tree93eee and orderedparents[1ddf69a,0f4f043]. Stale eventc822e991
+is retained, NOT checkout authority. Independent Native/platform control audits
+accepted all original bytes/18-member archives/whole workspace raw streams and
+every current numeric row/case inventory. BOTH original actual-value/genuine
+edit gates preceded retirement; all72 TYPE edits+12 adverse changes genuinely
+applied. No observation write/formatting removal erased real consumers or
+the once-only actual session.drain_errors() mutation.
+
+First direct-tool guard presentation omitted explicit OUTER exit despite
+parsed0: first lease SUSPENDED, NO merge; retained, not retroapproved.
+A SEPARATE renewed strictly-readonly guard exposed ACTUAL outer0/stderrEmpty,
+completeparsed0/baseguard0 and all matching lease facts, explicitly ROOT-read:
+exact main/base/head/tree/scope/BOTHconfigdicts/all3checks/status/all2original
+workflows/jobs/32steps/artifacts/clean reviewed identity. Only then separate
+ordinary expected-head REST squash0. Actual reviewed tree/SOLE1ddf parent proved.
+No force/admin/mainpush/branch deletion/CI retry/narrowing/relaxed bounds.
+
+BINARY OWNER, SIGNATURE OWNER and ROOT independently accepted OWN ORIGINAL
+[exact-main39045022100/1/job117431916905](https://github.com/anilbeesetti/ktlsp/actions/runs/39045022100/job/117431916905):
+1299passed=1259ordinary+40docs(38compilefail+2compileexamples),144rows/
+1302caseoccurrences,0failed3ignored0measured0filtered. Separate22faultcases/
+3same-ownedChild raw86 remain separate; extractedArchiveSmoke is unexecuted.
+Only Native runs main push; no main Mac/Win proof invented. Root FULL-read
+complete primary receipts and all158 original main row/control reader lines;
+complete data appendices hash-authenticated/all actual rows/cases reconciled,
+not falsely claimed literal duplicate-appendix manual rereads.
+Joint proof root-evidence/425-BOTH-feature-OWNERS-and-ROOT-original-exact-main-acceptance.json
+SHA669c024407ee6cd027a0dff016d034e77af63b1c87d1a023c64da0210c5f9bcc.
+Final remote main7afdc68 and preserved reviewed branch0f4f043 exact. Renewed
+lease `/private/tmp/ktlsp-lease-425-cleaned0f4f043-outer-explicit.json` CLEARED
+only after ALL gates. First suspended lease remains preserved.
+[Public delivery](https://github.com/anilbeesetti/ktlsp/pull/425#issuecomment-6236056806).
+
+ROOT active WT `/private/tmp/ktlsp-426-workspace-generic-integration`,
+branch `omp/426-workspace-generic-integration`, from that SAME verified7afdc68.
+Two genuine independent SOURCE-ONLY lanes are admitted; neither is delivered:
+- [426](https://github.com/anilbeesetti/ktlsp/issues/426), coherent eager native
+  workspace declaration search INCLUDING whole-snapshot verification/member
+  overlays/aggregate ownership/real packaged stdio lifecycle proof. Literal
+  native case-sensitive substring policy, not official matching/index/semantic
+  symbols. WT `/private/tmp/ktlsp-426-workspace-symbols`, branchomp/426-workspace-symbols.
+- [427](https://github.com/anilbeesetti/ktlsp/issues/427), IN-PLACE extension of
+  resolved_class_supertypes::decode to original inline Class bounds and finite
+  one-level generic supertypes, explicit CLASS-own NAME binding, one allowance.
+  WT `/private/tmp/ktlsp-427-class-bound-supertypes`, branchomp/427-class-bound-supertypes.
+Each owner has TWO reserved independent functionality/adversarial slots; ROOT
+owns docs/Cargo/lock/deps/config/CI and both later complete union reviews.
+Reuse completed linked research below; two new genuine encoded carriers are
+NOT new native interpreted-output observations. No source/compiler/actual
+runtime/CI/merge acceptance for426/427 is claimed at this checkpoint.
+ALL LOCAL Kotlin/parser/server/Session/worker runtime forbidden under96;
+even pure binary data runtime needs separate exact ROOT admission. No owner
+formatter/build/check/test mid-flight. This new cycle has no formatter admitted.
+Keep real packaged stdio cancel/ID-reuse observations distinct from complementary
+Session owned-count/retained-until-join proof; no production probe/barrier/delay.
+All old/user/component/review WTs and failures/proofs stay preserved. Do not
+restart320/packaging/PR306 historical delivered work. Full parity NOT achieved;
+native-only/T004/96/B3/oracle/original417395377UNKNOWN holds remain.
+
+### Prior verified421 integration and423/424 composition chronology
 
 ONE verified incoming main is **1ddf69acb4158a8927a8b5a87e679c0599d96a54**,
 tree **b262183f8dd8629d7f9d78512f92b3b3ef8e7f01**, sole parent

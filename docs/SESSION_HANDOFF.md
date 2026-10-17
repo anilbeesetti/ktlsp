@@ -26,8 +26,12 @@ retains first actual403 source/CST/byte-edit readback and precise timing limits.
 
 Current ROOT integration WT: `/private/tmp/ktlsp-330-type-scope-integration`,
 branch `omp/330-type-scope-integration`, based on that SAME verified608 main.
-It is a NEW, not-yet-verified composition; do not confuse prior406 evidence with
-acceptance of its future source. ROOT owns common docs/Cargo/lock/workflows,
+Draft [PR409](https://github.com/anilbeesetti/ktlsp/pull/409)'s first reviewed
+8285763/245736 source has OWN ORIGINAL full three-host success and completed
+OWNER+ROOT actual producer/CLI full-read/edit-application gates. ONLY observation
+writers/bookkeeping were then removed; cleaned-source exact reviews/OWN original
+CI and guarded integration remain PENDING. Prior406 CI is not its acceptance.
+ROOT owns common docs/Cargo/lock/workflows,
 source/runtime admission, two union reviews, CI, exclusive leases and merging.
 Preserve all original/user/old/delivered/component WTs, including frozen406 WT
 `/private/tmp/ktlsp-330-call-parameter-integration`.
@@ -49,8 +53,14 @@ functionality/adversarial static review slots:
   original pointers/ranges, distinct Throwable/Pair controls and labelled
   authored shadow/refusal/query-boundary controls passed; all537 binary-data
   tests passed. Full proof `/private/tmp/ktlsp-408-composed-native/`.
-  Genuine Function-ID positive remains GAP;407 actual producer/CLI execution,
-  final-source hosted CI and guarded exact-main integration are STILL PENDING.
+  Genuine Function-ID positive remains GAP.407's30producer/57CLI packets PER
+  original host were FULLY read by OWNER+ROOT; each independently applied all
+  171 actual version7 UTF16 batches/495edits and verified version8 replay.
+  Original Native38994222653/1 and platform38994222817/1 used actualmergef1e051a,
+  tree245736, orderedparents[608,828]. Full proof
+  `/private/tmp/ktlsp-409-first-platform-38994222817/`; independent OWNER receipt
+  `/private/tmp/ktlsp-407-owner-first-hosted/owner-three-host-full-read-and-actual-apply-receipt.json`.
+  Cleaned-source reviews/OWN original CI and guarded exact-main remain PENDING.
 
 ALL LOCAL Kotlin parser/server/Session/worker/peer/supervision runtime remains
 FORBIDDEN under96, including fake peers and parser-free Session. This overrides

@@ -1833,7 +1833,6 @@ fn local_parameter_annotations_share_one_complete_original_outer_type_partition(
         TypeParameterAnchor, bind_lexical_type_parameter, bind_local_function_callee,
         guarded_type_parameter_rename, type_parameter_occurrences,
     };
-    use serde_json::json;
     let _serial = functional::serial();
     for original in [
         "fun <T> outer(){ fun target(p:T){} }",
@@ -1880,7 +1879,6 @@ fn local_parameter_annotations_share_one_complete_original_outer_type_partition(
             assert!(std::ptr::eq(found.target(), target));
             let outer = &lower.declarations()[target.owner().unwrap()];
             assert!(std::ptr::eq(found.function(), outer));
-            let mut observed = Vec::new();
             for annotation in found.occurrences() {
                 let bound = bind_lexical_type_parameter(
                     &directory,
@@ -1925,14 +1923,6 @@ fn local_parameter_annotations_share_one_complete_original_outer_type_partition(
                     );
                     assert_ne!(parameter_ordinal, local_ordinal);
                 }
-                observed.push(json!({
-                    "referenceIndex":annotation.reference_index(), "range":annotation.range(),
-                    "annotatedOrdinal":lower.declarations().iter().position(|d| std::ptr::eq(d, annotation.annotated())),
-                    "targetOrdinal":lower.declarations().iter().position(|d| std::ptr::eq(d, bound.target())),
-                    "functionOrdinal":lower.declarations().iter().position(|d| std::ptr::eq(d, bound.function())),
-                    "referencePointerAuthenticated":std::ptr::eq(bound.reference(), &tree.elements()[annotation.reference_index()]),
-                    "namePointerAuthenticated":std::ptr::eq(bound.name_token(), &tree.elements()[annotation.reference_index()+1])
-                }));
             }
             let spare = lower
                 .declarations()
@@ -2172,59 +2162,6 @@ fn local_parameter_annotations_share_one_complete_original_outer_type_partition(
                         LocalBindingError::NoEligibleTypeParameter
                     );
                 }
-            }
-            for (phase, result, lower, directory) in [
-                ("original", &result, &lower, &directory),
-                ("edited", &edited_result, &edited_lower, &edited_directory),
-            ] {
-                let tree = result.tree_for(result.snapshot()).unwrap();
-                let actual = type_parameter_occurrences(
-                    directory,
-                    result,
-                    TypeParameterAnchor::Declaration(&lower.declarations()[1]),
-                    result.snapshot(),
-                )
-                .unwrap();
-                let packet = json!({
-                    "phase":phase, "rename":new_name, "source":tree.source(),
-                    "document":result.snapshot().document(), "revision":result.snapshot().revision(),
-                    "cst":tree.elements().iter().enumerate().map(|(i,e)|json!({
-                        "index":i,"kind":e.kind,"token":e.token,"parent":e.parent,
-                        "start":e.start,"end":e.end,"subtreeEnd":e.subtree_end
-                    })).collect::<Vec<_>>(),
-                    "diagnostics":tree.diagnostics().iter().map(|d|json!({"start":d.start,"end":d.end,"message":d.message})).collect::<Vec<_>>(),
-                    "declarations":lower.declarations().iter().enumerate().map(|(i,d)|json!({
-                        "ordinal":i,"kind":d.kind(),"name":d.raw_name(),"range":d.range(),
-                        "nameRange":d.name_range(),"owner":d.owner(),"cstIndex":d.cst_index(),
-                        "parentIndex":d.cst_parent_index(),"region":directory.memberships()[i].region()
-                    })).collect::<Vec<_>>(),
-                    "regions":directory.regions().iter().enumerate().map(|(i,r)|json!({
-                        "ordinal":i,"kind":r.kind(),"range":r.range(),"cstIndex":r.cst_index(),
-                        "parent":r.parent(),"introducer":r.introducer()
-                    })).collect::<Vec<_>>(),
-                    "bindings":actual.occurrences().iter().map(|a|{
-                        let bound=bind_lexical_type_parameter(directory,result,a.reference_index(),result.snapshot()).unwrap();
-                        json!({"referenceIndex":a.reference_index(),"range":a.range(),
-                            "annotatedOrdinal":lower.declarations().iter().position(|d|std::ptr::eq(d,bound.annotated())),
-                            "targetOrdinal":lower.declarations().iter().position(|d|std::ptr::eq(d,bound.target())),
-                            "functionOrdinal":lower.declarations().iter().position(|d|std::ptr::eq(d,bound.function())),
-                            "referencePointerAuthenticated":std::ptr::eq(bound.reference(),&tree.elements()[a.reference_index()]),
-                            "tokenPointerAuthenticated":std::ptr::eq(bound.name_token(),&tree.elements()[a.reference_index()+1])})
-                    }).collect::<Vec<_>>(),
-                    "annotationQueries":tree.elements().iter().enumerate().filter(|(_,e)|
-                        e.kind=="REFERENCE_EXPRESSION" && tree.elements()[e.parent.unwrap()].kind=="USER_TYPE")
-                        .map(|(i,e)| match bind_lexical_type_parameter(directory,result,i,result.snapshot()) {
-                            Ok(bound)=>json!({"index":i,"range":e.start..e.end,"targetOrdinal":lower.declarations().iter()
-                                .position(|d|std::ptr::eq(d,bound.target()))}),
-                            Err(error)=>json!({"index":i,"range":e.start..e.end,"refusal":error.to_string()})
-                        }).collect::<Vec<_>>(),
-                    "originalPointerChecks":observed
-                });
-                std::io::Write::write_all(
-                    &mut std::io::stderr().lock(),
-                    format!("LOCAL_TYPE_PRODUCER_JSON={packet}\n").as_bytes(),
-                )
-                .unwrap();
             }
             let foreign_result = parse(original);
             let foreign_lower = lower_declarations(&result, snapshot).unwrap();

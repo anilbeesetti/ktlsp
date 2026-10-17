@@ -618,8 +618,21 @@ evidence and integration verification remain ROOT-gated under #96.
   blanket-classified as invalid modifiers. Storage remains at most 1,024 records
   and 131,072 requested/retained bytes, measured using the actual annotation width.
   This is finite same-function lexical refactoring, not full type resolution,
-  type hover/typeDefinition, workspace rename or official equivalence. New hosted
-  producer/wire observations and checks remain ROOT-gated; no local runtime ran.
+  type hover/typeDefinition, workspace rename or official equivalence. PR409's
+  OWN ORIGINAL native38994222653 and platform38994222817 at8285763 retained
+  all30 original/edited producer packets and57 paired-CLI records PER host.
+  OWNER+ROOT FULLY read complete actual CST/source/owner/region/binding and
+  request/response data, then independently applied every returned version7
+  UTF16 batch:57applications/165edits per host,171/495 total, matching actual
+  appliedSource and version8 replay definitions/full references/unused targets.
+  All original cross-host JSON fields compare equal; repeated initial batches
+  form15 distinct payload groups and replays27, not57 distinct initial sessions.
+  Unicode CLI adds actual leading emoji-comment/CRLF trivia versus its producer
+  fixture; no whole-snapshot/pointer identity is inferred across distinct sources.
+  ONLY AFTER both full gates were observation-only writers/bookkeeping removed;
+  ALL permanent pointer/namespace/capture/budget assertions and real edit/
+  reparse/rebinding paths remain. Final cleaned-source OWN original full CI and
+  guarded exact-main integration remain separate; no local Kotlin runtime ran.
 - `local_value_binding::visible_local_values(directory, result, initializer_index,
   current_snapshot)` authenticates an existing whole-identifier initializer
   reference without requiring its spelling to bind. The owned result retains

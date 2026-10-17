@@ -2062,3 +2062,85 @@ independent original exact-main proof. Current common documentation-only
 source will be independently rechecked before first hosted admission.
 B3INCONCLUSIVE/HOLD,96 and395/377 unknown causes/full-parity limits remain.
 
+#### PR409 first ORIGINAL three-host smoke/CI; writer-only cleanup admitted
+
+First exact reviewed source82857639fd3af1d7c0231be0a521ee3508ceda2d/
+tree245736c5c55ab3cf86e9a9bf9b42d29de4b413e5 passed BOTH FULL17 current
+union reviews, after all6 postfmt component/union clears and corrected strict
+Clippy/native408 proof above. Incoming608 stayed stable; ROOT pushed ONLY
+`omp/330-type-scope-integration`, created DRAFT [PR409](https://github.com/anilbeesetti/ktlsp/pull/409)
+closing407/408 and admitted its OWN FIRST ORIGINAL unchanged full workflows.
+No active merge lease or passing-merge authorization is implied by draft CI.
+
+Original checkoutf1e051ab52b7c5c8afffc0c4a4e38715c0045630 has exacttree245736,
+orderedparents[608437dc64007bdfecd472cfb97a646242fec41b,82857639fd3af1d7c0231be0a521ee3508ceda2d].
+OriginalNative38994222653/1 and platform38994222817/1 completed ALL mandatory
+steps successfully. Native actual commands include unfiltered locked workspace
+tests; platforms include unfiltered locked RELEASE workspace tests.
+
+| Host / original job | Ordinary passes | Doctests | Total passes | Result rows |
+|---|---:|---:|---:|---:|
+| Linux117283043962 |1170|32|1202|140|
+| macOS117283045051 |1168|32|1200|140|
+| Windows117283044869 |1117|32|1149|140|
+
+Each has0failed/3ignored/0measured/0filtered. Separate worker_protocol harness
+reports22faultcases, NOT22 individual printed result rows or extra census passes.
+Its midflight/exact-depth/healthy controls do not close B3INCONCLUSIVE/B3-HOLD.
+
+Exact full raw bytes/SHA256: Linux1585226/
+96c88a4120654e6954ee871699a2221aac654efe144b990be9b1220e743ba0ea;
+Mac1699260/a944d39a304735d004c2b2372cf0e431ea71e481622670cb2cfea424e0a91c3a;
+Win1654863/bcc94c7bb14f13d69af7a5dfadd3722ae7042d687f384061cafaa51b8750850a.
+Windowsartifact12087030029/81537 SHA0413fa614f3f25a9873cfe7a4cd309908a5bf9c8f790b5d4936a81ec134a177d;
+Mac12085733605/85880 SHAa9056ae242835c9fa50f52faf370f55b92e74d82560b838f5fd9c39e2a563208.
+Each original ZIP has18members/no duplicates/noexpired/CRC0; actual API digests,
+source preflights/3native+14PowerShell command records/clean head+tree+status/
+effectiveLF/index+rawsample identities/orderedmergeparents/toolchains/all0exits
+match original raw uploads. Stale/missing observational pr_merge_sha is not
+source authority. Full retained custody `/private/tmp/ktlsp-409-first-platform-38994222817/`.
+Independent FULL native CI audit TypeScopeUnionFunction and full platform
+custody audit TypeScopeUnionAdversary are CURRENT CLEAR. The latter's initial
+unauthenticated URL401/403/reader gaps were resolved using existing authenticated
+gh byte downloads and complete reads—not source failures or CI reruns.
+
+ACTUAL—not predicted—30original/edited producer and57CLI packets PER host
+were retained. OWNER and ROOT each completed full actual source/CST/tokens/
+diagnostics/declarations/owners/regions/memberships/all binding/annotation/
+pointer-assertion observations and all initial/replay requests/responses.
+ROOT consumed all3547 lossless reader lines, explicitly rereading47 elided
+middle lines; exact repeated-vector equality links preserve every actual field.
+All873 top-level fields were independently reconstructed/authenticated by the
+adversarial auditor. All87 original packet objects per platform compare equal
+field-for-field to Linux; hashes/counts/previews/expected echoes are NOT the proof.
+Serialized equality is not pointer identity; original runtime assertions are.
+
+OWNER and ROOT EACH independently applied all171 actual version7 UTF16 edit
+batches/495edits (57/165 per host), using actual returned newText and original
+coordinates with URI/version/nonoverlap checks. Actual complete appliedSource
+equals version8 replay input; all definition/full reference/unused partitions,
+include/exclude/highlights/preparation/returned rename/capture/context/callee
+controls were read and crosschecked. Rich value/callee guards remain strict.
+57CLI records include15 distinct initial-payload groups and27 replay groups;
+repeated full initial batches are not claimed as57 distinct sessions.
+Unicode CLI has additional actual leading emoji-comment/CRLF framing versus
+its independent producer Unicode fixture: no whole-source CST/pointer identity
+is inferred across distinct snapshots. ROOT's initial data-audit exact-source
+join was overstrong for this fixture; remaining actual applications completed
+without source change or rerunning prior successful batches/Kotlin runtime/CI.
+Independent OWNER receipt:
+`/private/tmp/ktlsp-407-owner-first-hosted/owner-three-host-full-read-and-actual-apply-receipt.json`.
+ROOT complete actual gate/apps and all original raw/ZIP/payload data remain
+in the custody directory above.
+
+ONLY AFTER both complete actual read/application gates, ROOT removed407's
+observation writers and SOLE-writer import/vector/JSON/query bookkeeping.
+ALL permanent semantic queries, pointer/owner/membership assertions, namespace/
+capture/refusal/accounting controls and actual edit/reparse/rebinding paths remain.
+No production parser/server/binary change accompanied this cleanup. Cleaned
+source exact full-union+affected reviews, strict format-CHECK/Clippy, OWN ORIGINAL
+final full three-host CI, separate fresh read-only guard/ordinary expected-head
+merge/actualsquashtree+soleparent/independent original exact-main CI remain PENDING.
+No local Kotlin parser/server/Session/worker/peer/supervision/JVM/oracle ran;
+all existing HOLD/unknown-cause/native-only/full-parity limits remain unchanged.
+

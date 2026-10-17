@@ -3422,14 +3422,6 @@ fn local_annotation_type_namespace_actual_cli_all_anchors_edits_and_rebinding() 
                         json!([{"uri":URI,"range":references_range(&edited,edited.find(name).unwrap(),name.len())}])
                     );
                 }
-                let packet = json!({"source":source,"name":name,"anchor":anchor,"requests":messages,
-                    "responses":replies,"appliedResponse":rename,"appliedSource":edited,
-                    "replayRequests":replay,"replayResponses":rebound});
-                std::io::Write::write_all(
-                    &mut std::io::stderr().lock(),
-                    format!("LOCAL_TYPE_CLI_JSON={packet}\n").as_bytes(),
-                )
-                .unwrap();
             }
             assert_eq!(reply("context")["error"]["code"], -32803);
             if source.contains("q:Int") {

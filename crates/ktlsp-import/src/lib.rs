@@ -6,6 +6,7 @@ pub mod dependency_class;
 pub mod jps;
 mod json;
 pub mod maven;
+pub mod source_inventory;
 
 use ktlsp_project::{DependencyScope, ModuleDependency, ProjectError, ProjectModel};
 use serde::de::DeserializeOwned;

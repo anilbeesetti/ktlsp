@@ -556,6 +556,32 @@ evidence and integration verification remain ROOT-gated under #96.
   validation and compared bytes. Binding allocates nothing and is nonrecursive.
   This is not complete nested/outer/member/receiver/import/overload resolution,
   types, stable cross-revision identity or official navigation equivalence.
+- `local_value_binding::lookup_value` preserves the existing successful local and
+  parameter binding path, but returns `ValueLookup::Outer` only after the complete
+  original body and namespace search genuinely have no eligible target. In
+  particular, `NoEligibleLocal` from an unresolved unrelated call remains an
+  error; catching the old binder's generic error is not import authority.
+  The private-field continuation consumes its SAME monotonic semantic allowance
+  in `resolve_import`, over a complete borrowed original source directory with
+  the requester included exactly once. It authenticates every result/lowering/
+  directory/current snapshot, rejects incomplete/error-bearing and documentation-
+  only producers, compares original package/import components without splitting
+  dotted text, and requires one explicit nonstar/nonalias import and one complete
+  plain top-level immutable property in another source. Duplicate semantic
+  spellings and competing nonproperty declarations refuse; no successful prefix
+  escapes a late candidate failure. Original site, body, import, target directory,
+  result and declaration remain borrowed; target UTF-16 coordinates belong to
+  that target result, not the requester. Candidate lifetimes may be shorter than
+  the requesting continuation, allowing the consumer to produce targets only
+  after genuine outer lookup is needed. The operation allocates nothing, retains
+  the existing 2,097,152-work ceiling and checks at most 1,024 supplied files;
+  this is NOT a promise that 1,024 parser children fit the consumer's aggregate
+  budget. The caller must prove original closed production-module membership,
+  directory completeness, retained-input accounting and coherent publication.
+  This finite parser component is not general import/type/default-library
+  resolution or full Kotlin LSP parity. Its deterministic boundary and real
+  two-source producer/consumer regressions are written but NOT RUN locally under
+  #96; composed server and hosted runtime acceptance remain separate ROOT gates.
 - `local_value_binding::bind_local_function_callee(directory, result, callee_index,
   current)` adds definition-only lookup for a direct standalone plain empty call
   to an original preceding same-block local `FUN`. Local targets have ordinary

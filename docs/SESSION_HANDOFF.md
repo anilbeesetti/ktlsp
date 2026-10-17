@@ -133,6 +133,24 @@ They now use direct stdout Write; all actual payload fields and permanent
 assertions remain unchanged. No workflow/probe/retry or local Kotlin runtime.
 Publication is held for affected exact reviews and changed-source compile;
 hosted execution remains UNOBSERVED. This is capture custody, not a semantic fix.
+Original PR420 source4f124819/tree d0db5c67 was published after all SIX exact
+affected clears and pinned CHECK/strict Clippy passed. Its OWN original Native
+39014856676/1/job117344758697 FAILED101: call_syntax positive test632:58,
+lower_declarations unwrap Err Unsupported{element:30};857passed1failed2ignored/
+79rows,0measured0filtered. Actual checkout4513d2eb04b30b612bd694643a03d75aa28b9281
+has exact reviewed tree and ordered[0d7d,4f124819]. No Native419 packets: Cargo
+stopped before the server suite. Original platform39014856641/1 also FAILED
+on both hosts; five complete419 packets each were retained for full independent
+read/edit gates. Passing individual CLI assertions do NOT pass this failed union.
+ROOT and two independent diagnostics proved the new positive's sibling spelling
+`fun unused<U,send,p>(){}` violates the existing LEADING-only lowerer contract.
+The source fixture now uses `fun <U,send,p> unused(){}` with all8 cases, U/send/p
+names and original identity/type-rename/edit/reparse assertions retained.
+No production/vendor/guard/predicate/budget/deadline/workflow change or retry.
+Original failed iteration/full CST was not retained: associating that static
+defect with actual node30 is INFERENCE, not an observed branch identity.
+Earlier clears missed the fixture inconsistency; changed-source reviews and
+OWN new original full three-host CI remain required before any integration.
 Kotlin/CLI proof only original full hosted CI. Temporary writers stay until BOTH
 OWNER+ROOT FULL-read actual payloads and actually returned edits; permanent
 consumer-visible assertions remain after cleanup. Successor source needs its

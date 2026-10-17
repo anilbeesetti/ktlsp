@@ -3020,8 +3020,9 @@ before composition; all fact commands exited0.
   TYPE_PARAMETER headers still failed in BOTH callable/value candidate scans.
   Current shared helpers use actual physical direct-body parent plus membership,
   preserving authentic outer parameters/direct locals and all competition
-  before selected eligibility/arity. New unrelated `unused<U,send,p>()` positive
-  uses original identity/type-rename/actual edit/reparse/rebinding assertions.
+  before selected eligibility/arity. The original `unused<U,send,p>()` positive
+  intended original identity/type-rename/edit/reparse assertions; its post-name
+  list later proved outside the admitted lowerer envelope (PR420 failure below).
   Both reviewers fully reread current2166-line binding and741-line call tests,
   affected owner/type-root/value/callee callers and exact unchanged source.
   Earlier incomplete clears are explicitly WITHDRAWN, not current acceptance.
@@ -3139,4 +3140,48 @@ Earlier exact reviews do not cover this changed capture source; affected
 component and ROOT reviews plus changed-source format-CHECK/strict Clippy are
 required before publication. The ONE formatter is already used; no second.
 No #419 actual execution or custody acceptance is claimed at this stage.
+
+#### Original PR420 CI failure and leading-header fixture correction
+
+After all SIX exact current affected clears and pinned CHECK/strict Clippy0,
+ROOT published draft PR420 at4f124819d73ac77818796bd3b80f0289d1db0b82,
+tree d0db5c679e999fd4a15566ba3629e49755094c54. OWN ORIGINAL Native
+39014856676/1/job117344758697 FAILED101; actual checkout
+4513d2eb04b30b612bd694643a03d75aa28b9281 has the exact tree and ordered parents
+[0d7d21923246f75969e6b8d52da71e1aeec086ce,4f124819d73ac77818796bd3b80f0289d1db0b82].
+857passed1failed2ignored/79rows,0measured0filtered;860 individual case occurrences.
+The sole failed case lexical_argument_label_borrows_the_original_applicable_call_and_formal
+panicked at call_syntax.rs632:58: lower_declarations unwrap Unsupported{element:30}.
+Regions/call_site/binder were not reached in that iteration. No actual failed
+fixture identity/full CST was retained; do not claim the canonical fixture failed.
+Native halted before419 CLI: zero packets, no actual returned TYPE edits.
+
+ROOT independently retained137398bytes/1609lines SHA256
+5b399257b7d88400bcbcc9e342e17996c4816eda256b3c92763f7c3eb4362740;
+independent full Native audit agrees. Original platform39014856641/1 also FAILED:
+Windows117344758643 and macOS117344758813 each failed the same named case.
+Both retained five complete419 CLI packets, pending BOTH full actual data/edit
+gates; those individual transactions do NOT make a failed full union acceptable.
+Original raw logs and packets are in `/private/tmp/ktlsp-420-first-original/`.
+No unchanged retry, cancellation, probe or local Kotlin runtime.
+
+ROOT and two independent component diagnostics found one definite static source
+defect: the new unrelated-header positive spells `fun unused<U,send,p>(){}`.
+The producer accepts this sole post-name type list without diagnostics, but the
+documented finite lowerer deliberately admits only LEADING lists. The function
+name moves plain1 to2 before the list's mandatory plain1 guard; leading-only
+ordered completion/name-emission and existing post-name refusal tests agree.
+This statically broken positive cannot exercise header isolation. Its match to
+actual error/node30 remains INFERENCE without original branch/CST custody.
+
+Corrected ONLY that sibling spelling to `fun <U,send,p> unused(){}`, preserving
+all8 fixtures, U/send/p competitor names and every original identity/type-rename/
+actual edit/version8 reparse assertion. Shared lowerer/vendor/production/budgets/
+BodyCheck/reference/type-root/guards/workflows/deadlines remain unchanged.
+This repairs the authored input to the existing intended envelope, not an
+assertion suppression or grammar expansion. Exact changed-source reviews,
+CHECK/strict Clippy and OWN original full three-host CI are still required.
+Earlier static clears missed the inconsistency; original failures remain
+FAILED/REJECTED, not retroactively passed. Temporary writers remain until BOTH
+full actual gates, and guarded integration/main acceptance remain pending.
 

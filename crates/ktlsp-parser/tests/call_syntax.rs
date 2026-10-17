@@ -619,7 +619,7 @@ fn lexical_argument_label_borrows_the_original_applicable_call_and_formal() {
         "fun <T> outer(p:T){ fun send(to:T){}; send(to=p) }",
         "fun <T> outer(p:T){ fun send(send:T){}; send(send=p) }",
         "fun <T> outer(p:T){ fun send(p:T){}; send(p=p) }",
-        "fun <T> outer(p:T){ fun unused<U,send,p>(){}; fun send(to:T){}; send(to=p) }",
+        "fun <T> outer(p:T){ fun <U,send,p> unused(){}; fun send(to:T){}; send(to=p) }",
         "fun <`T`> outer(`p`:T){ fun `send`(`to`:`T`){}; send(to=p) }",
         "// 😀\r\nfun /* header */ <`🦀`> outer(`p🦀`: /* type */ `🦀`){\r\n fun `send🦀`(`to🦀`: `🦀`,) /* empty */ {}\r\n `send🦀`(/* label */ `to🦀` /* equals */ = /* value */ `p🦀`, /* tail */)\r\n}\r\n",
         "fun <Int> outer(p:Int){ fun send(to:`Int`){}; send(to=p) }",

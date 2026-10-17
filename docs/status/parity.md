@@ -210,3 +210,26 @@ watcher/build-tool/oracle/platform/performance promotion follows.
 Native-only/T004/96/B3 INCONCLUSIVE/oracle HOLD and original417395377
 causes UNKNOWN/OPEN remain unchanged.
 
+## PR429 capture-bearing gates accepted; new clean integration pending
+
+This supersedes the pending compiler/actual-value stage immediately above, not
+the historical assessment matrix or verified-main cutoff7afdc68.
+[Draft PR429](https://github.com/anilbeesetti/ktlsp/pull/429) capture-bearing
+head4b3429ca9bb49a8cd8150df38e6f4081c6b0082e/treeb1db1481b23be1ae29b581a2a09fd686225ef2b0
+has BOTH independent full cumulative source reviews, admitted fmtCHECK/strict
+FULL compiler gates, its OWN original Linux/macOS/Windows CI and BOTH
+feature OWNER+ROOT complete actual-value/genuine-edit acceptance for426/427/428.
+No new main merge has occurred. Observation-only retirement now has a separate
+admission; the cleaned union still needs its OWN reviews/CI and guarded
+integration followed by independent original exact-main acceptance.
+[Full original identities, actual values and evidence qualifications](development.md#pr429-r6-original-full-three-host-and-all-feature-actual-gates-accepted).
+
+The original c03523a runs remain FAILED. Their Windows typed-definition deadline
+is [#431](https://github.com/anilbeesetti/ktlsp/issues/431), UNKNOWN/OPEN:
+full original retained log/member/source review cannot identify its selected
+phase or root cause; the later pass is not a diagnosis. Basic candidate430 is
+source-prepared and independently reviewed, not a current downloadable release.
+No official oracle, full parity, general inference, semantic index, native
+deadline reliability, licensed first-party distribution or visual-editor
+certification is claimed. All96/T004/B3/oracle/original395377417 holds remain.
+

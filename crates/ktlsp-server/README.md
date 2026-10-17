@@ -54,8 +54,10 @@ At later independently verified main `040dbba580d908c649c7256405687e2044e4cec2`,
 
 ## Coherent eager native workspace symbols (#426)
 
-**Composed source contract only: original hosted runtime/actual-value gates and
-guarded integration remain pending.** With the trusted sibling provider,
+**Capture-bearing `4b3429c` passed its full source/compiler/original three-host
+and BOTH OWNER+ROOT complete actual-value/genuine-edit gates. Observation-only
+retirement, its OWN new reviews/CI and guarded integration remain pending.**
+With the trusted sibling provider,
 initialization advertises `workspaceSymbolProvider: true`. Symbol-kind negotiation
 uses `capabilities.workspace.symbol` independently of document-symbol profiles.
 There is no resolve provider, opaque data, pagination or progress output.

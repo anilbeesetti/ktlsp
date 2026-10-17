@@ -4492,3 +4492,120 @@ full workspace checks, checksums/notices/provenance and REAL extracted-pair
 behavior. Existing PR306 cleanup ownership, experimental/no-first-party-license
 status and all96/B3/oracle/original395377417 holds remain. No current release,
 visual-editor certification, general semantic authority or full parity claimed.
+
+#### PR429 r6 original full three-host and all feature actual gates accepted
+
+This supersedes the immediately preceding pending stage, not the original
+failed-run facts or verified-main cutoff7afdc68. Exact capture-bearing
+head4b3429ca9bb49a8cd8150df38e6f4081c6b0082e/treeb1db1481b23be1ae29b581a2a09fd686225ef2b0,
+sole immediate parentc03523a and31 total scoped paths, received BOTH complete
+ROOT source renewals0.96/0.97. Separately admitted fmtCHECK0/1.413853042s,
+strict locked keep-going FULL workspace/all-target/all-feature Clippy0/0.881479875s
+and FULL locked workspace NoRun0/1.616624209s ran.199 compiler records contain
+189 artifacts,9 build-script results,1 success and0 diagnostics. No Kotlin
+runtime ran locally. The original unfiltered native binary/import DATA and
+external Class consumer proofs belong to unchanged c035 source, not invented
+new local r6 executions.
+
+OWN ORIGINAL Native39056014792/attempt1/job117464020199 and platform39056014771/
+attempt1/Mac117464019952/Win117464019750 ALL PASSED. Complete actual checkout
+1f1838577b80bee6997cc7bb8c64cc76339da397 has ordered parents[7afdc68,4b3429c]
+and treeb1db1481. Stale event pr_merge_sha is not checkout authority.
+
+| Original host | Numeric rows | Named cases | Passed | Ignored | Failed |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Linux Native |147|1356|1353|3|0|
+| macOS ARM64 |147|1354|1351|3|0|
+| Windows X64 |147|1303|1300|3|0|
+
+ROOT independently read EVERY full outcome string/numeric value and complete
+actual CST/B3/allocation/fault/C13 controls; two independent CI reviewers
+verified original API/archive custody, all steps/config/checkout,147 rows each,
+host-specific cases and complete controls. FULL workspace release platform
+commands and all18 exact original artifact members per host were authenticated.
+Linux debug/default captured output is not full platform payload or all-feature
+Clippy. Three ignored tests did not execute; no current extracted-archive smoke
+is inferred. Definitive joint original-control receipt:
+`ROOT-and-TWO-reviewers429-r6-original-ALL3-full-control-numeric-case-ACCEPTED.json`,
+1829548B SHAc8143f26231ac8146079addd67a92814c61baf072229443090f1e4be665ece07.
+
+ALL THREE independent feature OWNER+ROOT current actual gates are ACCEPTED:
+
+-426: ALL315 byte-authenticated original events,819 full producer occurrences,
+7626 CST rows, every original model/source/member/query/owned/lifecycle field,
+9 complete successful13-declaration/18-query profiles and3 separate negative
+kind profiles. ROOT independently checked all162 literal query arrays, native
+kind/container/original UTF16 projections, READY full comma node line1:18..24,
+ALL90 raw frames704645412B and genuinely applied ALL6 returned local VALUE
+rename edits plus3 accepted alias changes in original strict UTF16 coordinates.
+All6 rejected alias notifications preserve the captured independent atomic
+state. Actual canonical URI differs from raw snapshot alias and is not silently
+normalized. ROOT personally read ALL complete lossless literal values; a
+verified exact1024-line source formula is not a sampling/count-only receipt.
+Joint `ROOT-and-OWNER426-r6-COMPLETE-ALL3-original-actual-values-and-genuine-edits-ACCEPTED.json`,
+69745B SHA942abcd7394ed91d84e0445d5071a34c31b78470942d9fb8834bc9ceba36a038.
+
+-427: original native standalone/public-pipeline FULL actual Class/CP/header/
+NAME/Options/span/resource values were independently read, not replaced by
+historical423 bare values. BOTH current platform10952-line payloads match
+those full accepted literals except explicitly retained labelled process
+addresses;73 actual same-buffer pointer pairs per host independently hold.
+ALL814 binary files and build inputs are unchanged. OWNER independently read
+all198 current events and complete resource wrappers; no fresh local r6 native
+run or suppressed Linux values invented. ROOT carryforward receipt1146973B
+SHA3f7786a9a73abf406672b757b8ae551e94766e63af031cc660ad0536b3fd5762;
+OWNER current3267028B SHAaaed401f89026a5a017d25f6b82f0d0f11206b245c36ba2b57c12f5b3c2f8ee3.
+
+-428: ALL original/current six actual streams,2802 packets per host, every full
+snapshot/CST/token/directory/declaration/proof/error/strict-integer control and
+ALL98 original source-query associations independently accepted. ROOT read
+all5732 lines of full actual appendix and independently checked every original
+producer/name/UTF16/function/body/terminal/lexical identity/pointer field.
+Only nonliteral framing blanks differ in one current Mac packet; every quoted
+literal and original byte map is preserved. Joint full semantic receipt57896395B
+SHA4f3674c77489c1e59536676ada865d1d6d97f81980c55f3360001bdb810123ec;
+OWNER current83546B SHAc69c392586b1a563ed5c09bb8d4329ebd973be6f6fc08fb0013b22cd4dcc3df3.
+Both current427/428 gates are joined in1848B
+SHAfbe05dfe65df846dfc3654f404b01c1b0cf1c28234f3e7eba25100373709e609.
+
+Evidence remains outside repo `/private/tmp/ktlsp-426-427-root-evidence`.
+Source-only aggregate has no authentic aggregate CST; hidden incarnations,
+private work/retained counters, exact global registry counts and unprinted
+post-rejection/final-disk values remain unobserved. Alias finalDisk is genuinely
+ChangedDisk after deliberate disk mutation, not the original text. Raw-wire
+claims cover ONLY the actual90 captured ID-envelope frames. The OWNED8/join0
+Session observations are distinct from stdio lifecycle and cross-Session
+deny-at-admission/recovery; no fake global8 barrier or telemetry is invented.
+Source ONCE-check invariants are not runtime invocation counters or RSS proof.
+
+Only AFTER ALL three joint gates, ROOT separately admitted observation-only
+retirement in three isolated r6 ticket branches with two independent reviews
+each. Every genuine invocation/fixture/assertion/mutation/edit/frequency/cadence/
+bound/owned cleanup must survive. No no-op capture shims or format mutation.
+The clean union still requires BOTH full source renewals, separate compiler-only
+gates and its OWN original full three-host CI. Guarded expected-head integration,
+actual squash-tree/SOLE verified-base proof and ALL feature OWNERS+ROOT original
+exact-main gates remain separate. No active merge lease or new main merge.
+
+Original c035 runs remain FAILED. Original Windows #431's complete API log
+55112103B SHAea7abcc5d2201f04eb05e84424287fc64a87e8f7ef9fd43dbbf913ba229b0277
+and all18 original artifact members plus exact source were fully investigated
+by two read-only lanes and ROOT. No request-correlated phase/child/reader/writer/
+deadline state survives; elapsed135.90s is whole test time, not request time,
+and3412 is test-thread identity, not worker PID. Source's multiple Timeout
+branches remain indistinguishable. UNKNOWN/OPEN, not diagnosed by later pass:
+[original-only result](https://github.com/anilbeesetti/ktlsp/issues/431#issuecomment-6238640734).
+No unchanged rerun/probe/delay/barrier/raised deadline/healthy-timeout acceptance.
+
+Basic430 smoke and docs are COMPLETE source preparations with BOTH independent
+current reviews and ROOT full source/doc readback, not integrated or executed.
+Smoke complete chain c035→7b4d60b→7899fbc; docs f0d9290. The new nonignored
+paired-basic consumer invokes the SAME genuine helper as the ignored extracted
+consumer, so ordinary CI must exercise it; actual extracted smoke stays separate.
+Compose BOTH smoke commits ONLY after429 on ONE verified incoming main, obtain
+OWN ordinary/full-main gates, then separately admit original exact-main manual
+three-host packaging/checksums/notices/provenance and REAL extracted consumer.
+No current downloadable candidate, ten-hour guarantee, first-party license,
+visual-editor certification, general semantic authority or full parity.
+All96/T004/native-only/B3/oracle/original395377417 holds remain unchanged.
+

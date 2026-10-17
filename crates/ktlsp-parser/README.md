@@ -897,11 +897,13 @@ evidence must be recorded separately from source.
 
 ### Snapshot-owned immutable-local value types (#428)
 
-**Complete composed source only; compiler and original hosted actual-value
-acceptance remain pending.** `local_value_binding::infer_local_value_type`
-selects an ORIGINAL direct immutable-local `Declaration` with the original
-`RegionDirectory`, `SnapshotResult` and current `SourceSnapshot`. Unused/direct
-locals need no fabricated reference or binding.
+**Capture-bearing `4b3429c` passed its full source/compiler/original three-host
+and BOTH OWNER+ROOT complete actual-value gates; observation-only retirement,
+its OWN new reviews/CI and guarded integration remain pending.**
+`local_value_binding::infer_local_value_type` selects an ORIGINAL direct
+immutable-local `Declaration` with the original `RegionDirectory`,
+`SnapshotResult` and current `SourceSnapshot`. Unused/direct locals need no
+fabricated reference or binding. [Complete current proof and limits](../../docs/status/development.md#pr429-r6-original-full-three-host-and-all-feature-actual-gates-accepted).
 
 Private-field `LocalValueTypeProof` retains the directory, selected declaration,
 function/body, terminal declaration/evidence, dependency count and either

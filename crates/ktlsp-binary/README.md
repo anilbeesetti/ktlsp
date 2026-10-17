@@ -636,9 +636,10 @@ general Kotlin linkage/overload engine or official Kotlin LSP parity is claimed.
 ## Original Class inline bounds and finite nominal supertypes (#423 / #427)
 
 `metadata::resolved_class_supertypes::decode(&outcome, limits)` is extended in
-place by the composed #427 source below. Its new source contract is not yet an
-execution receipt. It interprets ALL original Class parameter inline bounds and
-Class field6/wire2 supertypes from the SAME supported kind1/mv2.3.0 Outcome.
+place by the composed #427 source below, with the separately admitted original
+native and hosted execution receipts recorded below. It interprets ALL original
+Class parameter inline bounds and Class field6/wire2 supertypes from the SAME
+supported kind1/mv2.3.0 Outcome.
 `ClassSupertypes` retains the original `Owner`, complete ordered original
 `parameters`, flat ordered `bounds` and ordered `supertypes`. Absence of an
 encoded bound never supplies implicit Any? or effective nullability.
@@ -707,7 +708,7 @@ CI, then PR425's separate guarded integration7afdc68/tree93eee/SOLE1ddf parent.
 Both feature OWNERS and ROOT independently accepted OWN original exact-main
 39045022100 before lease clearance; this data scope is delivered.
 
-### #427 reviewed source composition; new actual values still pending
+### #427 accepted native/hosted actual values; clean integration pending
 
 ROOT composed the complete nine-path binary-only leaf
 `1a88ccc483773c148113a832f76af1e1d8f6661a`, tree
@@ -721,15 +722,26 @@ URIs returned the earlier rejected review. No old review was promoted.
 Portable tests and the standalone external consumer source retain COMPLETE
 unchanged ClosedRange1033-byte and ClosedFloatingPointRange1194-byte carriers from
 the checksummed original2.3.20 archive, with existing Kotlin/protobuf notices.
-Original encoded Class-owned NAME leaves and generic bound/supertype shapes are
-data witnesses, NOT yet new native interpreted outputs. Mutations are labelled
-separately. Selected original TypeTable-ID evidence remains unobserved.
+Original encoded Class-owned NAME leaves and generic bound/supertype shapes were
+fully interpreted by the native public consumer, with labelled mutation controls.
+Selected original TypeTable-ID evidence remains unobserved.
 
-The new source includes whole-operation exact/joint-one-short/cumulative
-resource and original pointer/span/Options/NAME/scope controls. ROOT full-union
-reviews, separately admitted format/compiler gates, genuine standalone and
-public-pipeline executions, independent BOTH OWNER+ROOT complete actual-value
-acceptance, OWN full original three-host CI and guarded integration remain
-pending. Earlier #423 values above are historical scope evidence, not reuse as
-#427 acceptance. No local parser/server/Session runtime is authorized.
+The source includes whole-operation exact/joint-one-short/cumulative resource
+and original pointer/span/Options/NAME/scope controls. BOTH OWNER+ROOT accepted
+the complete separately admitted c03523a native public-pipeline and standalone
+consumer outputs, every original raw CP/metadata/name field and all actual
+minimum/one-short/isolated/repeated values. Both independently reviewed full-union
+source and compiler gates passed; capture-bearing `4b3429c` passed its OWN
+original full Linux/macOS/Windows CI. Both current full platform Class payloads
+match the accepted native values, including73 original same-buffer pointer
+pairs per host; all814 binary files and build inputs remain byte-identical to
+the accepted native source. Linux default capture does not expose those full
+payloads; no new local r6 native execution is invented.
+
+Observation-only retirement was separately admitted only after BOTH current
+OWNER+ROOT actual-value gates. Its OWN new source reviews/full original
+three-host CI and guarded integration remain pending. Earlier #423 values above
+remain historical scope evidence, not substitute #427 acceptance.
+No local parser/server/Session runtime is authorized. [Exact current evidence
+and limits](../../docs/status/development.md#pr429-r6-original-full-three-host-and-all-feature-actual-gates-accepted).
 

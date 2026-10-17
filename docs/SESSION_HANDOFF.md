@@ -8,7 +8,70 @@ decisions or phase boundaries. **Full official Kotlin LSP parity is NOT achieved
 Use the actual session capacity; the historical 32-concurrent instruction below
 is not a new limit. Do not manufacture hundreds of overlapping/blocked tasks.
 
-### Latest PR429 original CI failure and basic-candidate priority
+### Latest PR429 r6: all original feature gates accepted; retirement admitted
+
+Verified incoming main remains7afdc68dd2e283379ebaa99073b068339df84bdd.
+No merge lease or new main merge exists. Draft PR429 capture-bearing exact
+head4b3429ca9bb49a8cd8150df38e6f4081c6b0082e/treeb1db1481b23be1ae29b581a2a09fd686225ef2b0
+has31paths, BOTH independent ROOT full-source reviews0.96/0.97 and separately
+admitted fmtCHECK0, FULL strict locked workspace/all-target/all-feature
+keep-going Clippy0 and FULL workspace NoRun0. No local Kotlin runtime.
+OWN original Native39056014792/1/job117464020199 and platform39056014771/1/
+Mac117464019952/Win117464019750 ALL PASSED. Actual synthetic checkout is
+1f1838577b80bee6997cc7bb8c64cc76339da397 with ordered parents[7afdc68,4b3429c]
+and exact reviewed treeb1db1481. ROOT and two independent CI reviewers accepted
+all441 numeric rows,4013 full named-case outcomes and complete actual controls.
+
+ALL THREE feature OWNER+ROOT full actual-value/genuine-edit gates are now
+ACCEPTED, not pending:426 ALL315 events/819 original CST producers/ALL9 complete
+successful profiles plus3 negative kind profiles/ALL90 actual raw frames and
+ALL6 returned VALUE rename edits plus3 accepted alias changes;427 complete
+original native Class proof plus current BOTH full platform payloads/73 pointer
+pairs each,814 binary files/build inputs unchanged;428 ALL original/current six
+streams with2802 packets per host, every full original value/proof/source query.
+ROOT independently reconstructed raw bytes and genuinely applied every edit,
+not just test names/counts/hashes. Source-only aggregate has no invented CST;
+hidden epochs/private counters/final-disk fields remain explicitly unobserved.
+The complete exact receipt names/hashes/qualifications are in
+[the development ledger](status/development.md#pr429-r6-original-full-three-host-and-all-feature-actual-gates-accepted).
+Original captures and all failed DATA-analysis assumptions remain outside repo
+at /private/tmp/ktlsp-426-427-root-evidence; do not rerun their producer paths.
+
+Only AFTER all three joint gates, ROOT separately admitted observation-only
+retirement. Three isolated current r6 branches/worktrees:
+/private/tmp/ktlsp-{426,427,428}-observation-retirement,
+omp/{426,427,428}-observation-retirement. Each owner has two independent
+component review slots. Preserve EVERY genuine producer/consumer call,
+assertion, mutation, actual edit, original frequency/cadence/bound/cleanup.
+No no-op capture shims, format mutation, local parser/server/Session/worker
+runtime, mid-flight build/check or owner push. ROOT owns existing Markdown,
+composition, BOTH exact full-union reviews, separate compiler-only admission,
+OWN original cleaned-source full three-host CI and complete guarded integration.
+Do not promote capture-bearing CI to cleaned-source CI.
+
+Original c03523a three-host runs remain FAILED. #431's original full Windows
+API log55112103B and all18 original archive members plus exact-source
+provenance were fully audited. The -32803 typed-definition deadline has no
+request-correlated selected phase/child/writer/reader timing in retained bytes:
+UNKNOWN/OPEN, not fixed by r6 passing. No retry/probe/bound relaxation.
+[Published original-only investigation](https://github.com/anilbeesetti/ktlsp/issues/431#issuecomment-6238640734).
+
+Basic430 preparations are COMPLETE and independently double-reviewed, but not
+integrated/compiled/run: smoke WT/private/tmp/ktlsp-430-extracted-basic-smoke,
+complete TWO-commit chain c035→7b4d60b→7899fbc32bdbbd15b81e7658d2b8d69493879605;
+docs WT/private/tmp/ktlsp-430-basic-consumer-docs leaf
+f0d92907231eeea9183fe556142c123960d98b87. ROOT fully read cumulative source,
+changed docs and BOTH full current component reviews. Compose BOTH smoke
+commits, not only leaf. New NONignored packaged-basic test exercises the SAME
+real helper in ordinary CI; ignored extracted consumer preserves genuine
+borrowed archive ownership and full actual receipts under existing64KiB cap.
+Integrate ONLY after429 on ONE verified incoming main, then OWN original gates,
+then separately admit exact-main manual three-host packaging/extraction smoke.
+No current downloadable basic package, ten-hour completion guarantee, visual
+editor certification or full official parity. Existing96/T004/native-only,
+B3/oracle/original395377417 holds remain. Preserve all old worktrees/branches.
+
+### Historical first PR429 original CI failure and basic-candidate priority
 
 This subsection supersedes the earlier source/compiler-stage checkpoint below.
 Verified incoming main remains7afdc68; no new merge lease is active.

@@ -6602,23 +6602,19 @@ mod workspace_symbols {
     // Reuse the real child and PR306 cleanup, permitting concurrent writes.
     struct SignatureWire {
         inner: super::SignatureWire,
-        requests: Vec<Value>,
     }
     impl SignatureWire {
         fn new(package: &Package) -> Self {
             Self {
                 inner: super::SignatureWire::new(package),
-                requests: Vec::new(),
             }
         }
         fn send(&mut self, message: Value) -> Value {
-            self.requests.push(message.clone());
             self.inner.send(message)
         }
         fn batch(&mut self, messages: &[Value]) {
             let input = self.inner.input.as_mut().unwrap();
             for message in messages {
-                self.requests.push(message.clone());
                 ktlsp_protocol::write_frame(input, &serde_json::to_vec(message).unwrap()).unwrap();
             }
             input.flush().unwrap();
@@ -6657,13 +6653,6 @@ mod workspace_symbols {
                 "{}",
                 String::from_utf8_lossy(&output.stderr)
             );
-            observe(
-                "WORKSPACE_SYMBOL_WIRE_ACTUAL_RECEIPT",
-                json!({
-                    "terminal":action,"requests":self.requests,"responses":self.inner.responses,
-                    "status":output.status.code(),"stderr":output.stderr
-                }),
-            );
             std::mem::take(&mut self.inner.responses)
         }
         fn broken_output(mut self) {
@@ -6678,11 +6667,9 @@ mod workspace_symbols {
             }
             let mut child = OwnedChild(self.inner.child.take());
             let mut input = self.inner.input.take().unwrap();
-            let responses = self.inner.responses.clone();
             // Close ONLY stdout's read end, retaining the real child and stdin.
             drop(self.inner);
             let force = json!({"jsonrpc":"2.0","id":"forcewrite","method":"unknown","params":{}});
-            self.requests.push(force.clone());
             ktlsp_protocol::write_frame(&mut input, &serde_json::to_vec(&force).unwrap()).unwrap();
             input.flush().unwrap();
             let output = child.0.take().unwrap().wait_with_output().unwrap();
@@ -6691,27 +6678,10 @@ mod workspace_symbols {
                 !output.stderr.is_empty(),
                 "broken output must report transport failure"
             );
-            observe(
-                "WORKSPACE_SYMBOL_WIRE_ACTUAL_RECEIPT",
-                json!({
-                    "terminal":"broken-output","requests":self.requests,"responsesBeforeOutputClosed":responses,
-                    "status":output.status.code(),"stderr":output.stderr
-                }),
-            );
             drop(input); // stdin stayed open through actual child termination.
         }
-        fn finish(mut self) -> Vec<Value> {
-            self.requests
-                .push(json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}));
-            self.requests.push(json!({"jsonrpc":"2.0","method":"exit"}));
-            let responses = self.inner.finish();
-            observe(
-                "WORKSPACE_SYMBOL_WIRE_ACTUAL_RECEIPT",
-                json!({
-                    "requests":self.requests,"responses":responses
-                }),
-            );
-            responses
+        fn finish(self) -> Vec<Value> {
+            self.inner.finish()
         }
         fn finish_expected_errors(mut self, expected: &[&str]) -> Vec<Value> {
             self.send(json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}));
@@ -6726,46 +6696,12 @@ mod workspace_symbols {
             assert!(output.status.success(), "{:?}", output.status);
             let stderr = std::str::from_utf8(&output.stderr).unwrap();
             assert_eq!(stderr.lines().collect::<Vec<_>>(), expected);
-            observe(
-                "WORKSPACE_SYMBOL_WIRE_ACTUAL_RECEIPT",
-                json!({
-                    "requests":self.requests,"responses":self.inner.responses,
-                    "status":output.status.code(),"stderr":output.stderr
-                }),
-            );
             std::mem::take(&mut self.inner.responses)
         }
     }
 
-    fn observe(label: &str, payload: Value) {
-        std::io::Write::write_fmt(
-            &mut std::io::stderr().lock(),
-            format_args!("{label}={payload}\n"),
-        )
-        .unwrap();
-    }
-
     fn query(id: Value, text: &str) -> Value {
         json!({"jsonrpc":"2.0","id":id,"method":"workspace/symbol","params":{"query":text}})
-    }
-    fn request(session: &mut Session, method: &str, params: Value) -> Value {
-        let response = super::request(session, method, params.clone());
-        observe(
-            "WORKSPACE_SYMBOL_SESSION_EXCHANGE_ACTUAL_RECEIPT",
-            json!({
-                "request":{"jsonrpc":"2.0","id":1,"method":method,"params":params},"response":response
-            }),
-        );
-        response
-    }
-    fn notify(session: &mut Session, method: &str, params: Value) {
-        observe(
-            "WORKSPACE_SYMBOL_SESSION_NOTIFICATION_ACTUAL_RECEIPT",
-            json!({
-                "jsonrpc":"2.0","method":method,"params":params
-            }),
-        );
-        super::notify(session, method, params);
     }
     fn initialization(options: &Value, capabilities: Value) -> Value {
         json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{
@@ -6836,25 +6772,7 @@ mod workspace_symbols {
     fn reload(wire: &mut SignatureWire, id: i32, options: &Value) -> Value {
         wire.send(source_reload(id, options))
     }
-    fn receipt(
-        label: &str,
-        original: Value,
-        requests: &[Value],
-        responses: &[Value],
-        owned: Value,
-    ) {
-        // Temporary complete actual-value capture, retained until OWNER+ROOT
-        // review; assertions, genuine mutations and Package cleanup are permanent.
-        observe(
-            "WORKSPACE_SYMBOL_ACTUAL_RECEIPT",
-            json!({
-                "fixture":label,"original":original,"requests":requests,
-                "responses":responses,"owned":owned
-            }),
-        );
-    }
-
-    fn producer(source: &str, uri: &str, revision: i64, expected: &Value) -> Value {
+    fn producer(source: &str, uri: &str, revision: i64, expected: &Value) {
         use ktlsp_parser::{FileKind, Parser, SourceSnapshot};
         // Same authenticated snapshot and supervised cleanup as the existing
         // signature producer; semantic lowering is not the outline inventory.
@@ -6886,26 +6804,10 @@ mod workspace_symbols {
                 "projected spelling must originate in an actual producer token: {symbol}"
             );
         }
-        json!({"document":snapshot.document(),"revision":snapshot.revision(),"kind":format!("{:?}",snapshot.kind()),
-            "source":snapshot.source(),"elements":tree.elements(),"diagnostics":tree.diagnostics(),"cleanup":clean})
-    }
-
-    fn memberships(entry: &ktlsp_import::source_inventory::Entry) -> Value {
-        json!(
-            entry
-                .memberships()
-                .iter()
-                .map(|member| json!({
-                    "module":member.module_index(),"contentRoot":member.content_root_index(),
-                    "sourceRoot":member.source_root_index()
-                }))
-                .collect::<Vec<_>>()
-        )
     }
 
     struct Fixture {
         options: Value,
-        originals: Value,
         expected: Value,
     }
     fn fixture(package: &Package, modern: bool) -> Fixture {
@@ -7010,31 +6912,22 @@ mod workspace_symbols {
         let mut budget = Budget::new(Limits::default()).unwrap();
         let cancelled = AtomicBool::new(false);
         let mut expected = Vec::new();
-        let mut originals = Vec::new();
         for project in [&first, &second] {
             let inventory = load(project, &mut budget, &cancelled).unwrap();
-            let mut members = Vec::new();
             for entry in inventory.entries() {
                 if let Some(source) = entry.source() {
                     let index = paths.iter().position(|path| path == entry.path()).unwrap();
                     expected.extend(declarations[index].as_array().unwrap().iter().cloned());
-                    members.push(
-                        json!({"path":entry.path(),"uri":uris[index],"source":source.as_ref(),
-                        "memberships":memberships(entry),"admittedEntry":format!("{entry:?}"),
-                        "producer":producer(source,&uris[index],0,&declarations[index])}),
-                    );
+                    producer(source, &uris[index], 0, &declarations[index]);
                     if index == 1 {
                         assert_eq!(entry.memberships().len(), 2, "nested original associations");
                     }
                 }
             }
-            originals.push(json!({"project":project,"modelBytes":inventory.workspace_json(),
-                "model":serde_json::from_slice::<Value>(inventory.workspace_json()).unwrap(),"members":members}));
         }
         assert_eq!(expected.len(), 13);
         Fixture {
             options: source_options(&[&first_uri, &second_uri]),
-            originals: json!(originals),
             expected: json!(expected),
         }
     }
@@ -7121,13 +7014,6 @@ mod workspace_symbols {
                         && s.get("children").is_none()
                         && s["location"].get("range").is_some())
             );
-            receipt(
-                "complete-literal-profiles",
-                fixture.originals,
-                &messages,
-                &replies,
-                json!({"transport":"packaged-stdio"}),
-            );
         }
     }
 
@@ -7149,13 +7035,11 @@ mod workspace_symbols {
                 .is_none()
         );
         refused(source_reply(&replies, 2), -32601);
-        receipt("missing-sibling", json!({}), &messages, &replies, json!({}));
         let package = Package::new(true);
         let mut wire = SignatureWire::new(&package);
         begin(&mut wire, &json!({}), full_profile());
         refused(&wire.send(query(json!("unavailable"), "")), -32803);
         result(&reload(&mut wire, 2, &source_options(&[])), &Value::Null);
-        let mut requests = Vec::new();
         for (index, params) in [
             Value::Null,
             json!({}),
@@ -7173,8 +7057,7 @@ mod workspace_symbols {
         .enumerate()
         {
             let request = json!({"jsonrpc":"2.0","id":format!("bad-{index}"),"method":"workspace/symbol","params":params});
-            refused(&wire.send(request.clone()), -32602);
-            requests.push(request);
+            refused(&wire.send(request), -32602);
         }
         for (index, params) in [
             json!({"query":"","workDoneToken":"work","partialResultToken":0}),
@@ -7184,8 +7067,7 @@ mod workspace_symbols {
         .enumerate()
         {
             let request = json!({"jsonrpc":"2.0","id":format!("tokens-{index}"),"method":"workspace/symbol","params":params});
-            result(&wire.send(request.clone()), &json!([]));
-            requests.push(request);
+            result(&wire.send(request), &json!([]));
         }
         let responses = wire.finish();
         assert!(
@@ -7193,13 +7075,6 @@ mod workspace_symbols {
                 .iter()
                 .all(|response| response.get("method").is_none()),
             "no fake progress"
-        );
-        receipt(
-            "strict-params-empty-clear",
-            json!({}),
-            &requests,
-            &responses,
-            json!({}),
         );
     }
 
@@ -7296,22 +7171,17 @@ mod workspace_symbols {
             &wire.send(query(json!("fresh-disk"), "")),
             &single("class ChangedDisk\r\n", &uri, "ChangedDisk"),
         );
-        let responses = wire.finish_expected_errors(&[
+        wire.finish_expected_errors(&[
             "ktlsp: an alias of this imported document is already open",
             "ktlsp: version 2 must exceed current version 2",
             "ktlsp: invalid UTF-16 position Position { line: 0, character: 999 }",
         ]);
-        receipt(
-            "alias-overlay",
-            json!({"model":source_model(&["src"]),"disk":disk,"uri":uri,
-            "alias":alias,"initialOverlay":initial,"appliedOverlay":edited,"incrementalChange":change,
-            "diskProducer":producer(disk,&uri,0,&single(disk,&uri,"Disk")),
-            "initialProducer":producer(initial,&alias,1,&single(initial,&alias,"`Ω 😀`")),
-            "editedProducer":producer(edited,&alias,2,&single(edited,&alias,"`Edited 🦀`")),
-            "finalDisk":std::fs::read_to_string(project.join("src/空 😀.kt")).unwrap()}),
-            &[],
-            &responses,
-            json!({}),
+        producer(disk, &uri, 0, &single(disk, &uri, "Disk"));
+        producer(initial, &alias, 1, &single(initial, &alias, "`Ω 😀`"));
+        producer(edited, &alias, 2, &single(edited, &alias, "`Edited 🦀`"));
+        assert_eq!(
+            std::fs::read_to_string(project.join("src/空 😀.kt")).unwrap(),
+            "class ChangedDisk\r\n"
         );
     }
 
@@ -7395,16 +7265,7 @@ mod workspace_symbols {
             &wire.send(query(json!("clear-recovery"), "")),
             &single("class Added\n", &added_uri, "Added"),
         );
-        let responses = wire.finish();
-        receipt(
-            "negative-mutations",
-            json!({"originalModelBytes":original_model,"changedModelBytes":changed_model,
-            "originalSource":"class Before\n","changedSource":"class Changed\n",
-            "addedSource":"class Added\n","uri":uri,"addedUri":added_uri}),
-            &[],
-            &responses,
-            json!({}),
-        );
+        wire.finish();
     }
 
     #[test]
@@ -7446,16 +7307,7 @@ mod workspace_symbols {
             }
             result(&reload(&mut wire, 2, &options), &Value::Null);
             result(&wire.send(query(json!("recovered-empty"), "")), &json!([]));
-            let responses = wire.finish();
-            receipt(
-                "zero-or-all-overlay-model",
-                json!({"allOverlay":overlay,"beforeModel":before,"afterModel":after,
-                "originalSource":if overlay {Some("class Disk\n")} else {None},
-                "overlaySource":if overlay {Some("class Overlay\n")} else {None},"uri":uri}),
-                &[],
-                &responses,
-                json!({}),
-            );
+            wire.finish();
         }
     }
 
@@ -7520,16 +7372,7 @@ mod workspace_symbols {
                 &expected,
             );
         }
-        let responses = wire.finish();
-        receipt(
-            "late-atomic-failures",
-            json!({"goodModel":source_model(&["src"]),"goodSource":"class Good\n",
-            "lateModel":late_model,"prefixSource":"class Prefix\n","badProjectModel":bad_model,
-            "brokenModel":source_model(&["src"]),"brokenSource":"fun broken("}),
-            &[],
-            &responses,
-            json!({}),
-        );
+        wire.finish();
     }
 
     #[test]
@@ -7609,20 +7452,12 @@ mod workspace_symbols {
             std::fs::read_to_string(project.join("src/A.kt")).unwrap(),
             disk
         );
-        let responses = wire.finish();
-        receipt(
-            "genuine-rename-replay",
-            json!({"model":source_model(&["src"]),"disk":disk,
-            "overlayBefore":source,"actualRename":rename,"overlayAfter":edited,"uri":uri,
-            "beforeProducer":producer(source,&uri,1,&expected(source,"`old😀`")),
-            "afterProducer":producer(&edited,&uri,2,&expected(&edited,"Fresh"))}),
-            &[],
-            &responses,
-            json!({}),
-        );
+        wire.finish();
+        producer(source, &uri, 1, &expected(source, "`old😀`"));
+        producer(&edited, &uri, 2, &expected(&edited, "Fresh"));
     }
 
-    fn many_project(package: &Package, count: usize) -> (PathBuf, Value, Value, Value) {
+    fn many_project(package: &Package, count: usize) -> (PathBuf, Value, Value) {
         let project = source_project(package, "many", &["src"]);
         let root = source_directory_uri(&project);
         let mut sources = Vec::new();
@@ -7631,7 +7466,7 @@ mod workspace_symbols {
             let path = project.join(format!("src/M{index}.kt"));
             std::fs::write(&path, &source).unwrap();
             sources.push(
-                json!({"path":path,"source":source,"name":format!("Member{index}"),
+                json!({"path":path,"name":format!("Member{index}"),
                 "uri":format!("{root}/src/M{index}.kt")}),
             );
         }
@@ -7643,7 +7478,7 @@ mod workspace_symbols {
             .filter_map(|entry| {
                 entry.source().map(|source| {
                     let member = sources
-                        .iter_mut()
+                        .iter()
                         .find(|s| s["path"] == json!(entry.path()))
                         .unwrap();
                     let projected = symbol(
@@ -7654,31 +7489,24 @@ mod workspace_symbols {
                         5,
                         None,
                     );
-                    member["producer"] = producer(
+                    producer(
                         source,
                         member["uri"].as_str().unwrap(),
                         0,
                         &json!([projected.clone()]),
                     );
-                    member["memberships"] = memberships(entry);
-                    member["admittedEntry"] = json!(format!("{entry:?}"));
                     projected
                 })
             })
             .collect::<Vec<_>>();
-        (
-            project,
-            source_options(&[&root]),
-            json!(sources),
-            json!(expected),
-        )
+        (project, source_options(&[&root]), json!(expected))
     }
 
     #[test]
     fn packaged_concurrent_workspace_cancellation_duplicate_id_and_same_id_reuse_are_real_stdio() {
         let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
         let package = Package::new(true);
-        let (_project, options, sources, expected) = many_project(&package, 32);
+        let (_project, options, expected) = many_project(&package, 32);
         let mut wire = SignatureWire::new(&package);
         begin(&mut wire, &options, full_profile());
         result(&wire.send(query(json!("baseline"), "")), &expected);
@@ -7705,13 +7533,6 @@ mod workspace_symbols {
             "no old completion after ID reuse"
         );
         assert_eq!(all.len(), 7, "no late duplicate/progress output: {all:?}");
-        receipt(
-            "packaged-concurrent-cancel-id-reuse",
-            json!({"model":source_model(&["src"]),"sources":sources}),
-            &messages,
-            &all,
-            json!({"observation":"stdio replies and terminal cleanup; owned counts observed separately in Session"}),
-        );
     }
 
     fn session_for(options: &Value) -> Session {
@@ -7739,7 +7560,7 @@ mod workspace_symbols {
     fn actual_workspace_owned_slot_retention_global_capacity_and_recovery() {
         let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
         let package = Package::new(true);
-        let (_project, options, sources, expected) = many_project(&package, 32);
+        let (_project, options, expected) = many_project(&package, 32);
         let mut session = session_for(&options);
         result(
             &request(&mut session, "workspace/symbol", json!({"query":""})),
@@ -7750,12 +7571,9 @@ mod workspace_symbols {
             &request(&mut other_session, "workspace/symbol", json!({"query":""})),
             &expected,
         );
-        let mut requests = Vec::new();
-        let mut replies = Vec::new();
         for index in 0..ktlsp_server::MAX_PENDING_PARSER_REQUESTS {
             let message = query(json!(format!("owned-{index}")), "");
             assert!(session.handle(message.clone()).is_empty());
-            requests.push(message);
         }
         let before = session.pending_requests();
         assert_eq!(before, ktlsp_server::MAX_PENDING_PARSER_REQUESTS);
@@ -7763,18 +7581,14 @@ mod workspace_symbols {
         let response = session.handle(overflow.clone());
         assert_eq!(response.len(), 1);
         refused(&response[0], -32803);
-        requests.push(overflow);
-        replies.extend(response);
         let global = query(json!("global-overflow"), "");
         let global_response = other_session.handle(global.clone());
         // A completed handle may legitimately be reaped on this admission.
         // Never turn scheduling into a fake global-saturation assertion.
         let global_denied = !global_response.is_empty();
-        requests.push(global);
         if global_denied {
             assert_eq!(global_response.len(), 1);
             refused(&global_response[0], -32803);
-            replies.extend(global_response);
         } else {
             assert_eq!(other_session.pending_requests(), 1);
             let cancel = json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":"global-overflow"}});
@@ -7786,16 +7600,12 @@ mod workspace_symbols {
                 1,
                 "admitted aggregate remains owned until join"
             );
-            requests.push(cancel);
-            replies.extend(response);
         }
         for index in 0..ktlsp_server::MAX_PENDING_PARSER_REQUESTS {
             let cancel = json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":format!("owned-{index}")}});
             let response = session.handle(cancel.clone());
             assert_eq!(response.len(), 1);
             refused(&response[0], -32800);
-            requests.push(cancel);
-            replies.extend(response);
         }
         let retained = session.pending_requests();
         assert_eq!(
@@ -7804,10 +7614,8 @@ mod workspace_symbols {
         );
         let blocked_request = query(json!("owned-0"), "");
         let blocked = session.handle(blocked_request.clone());
-        requests.push(blocked_request);
         assert_eq!(blocked.len(), 1);
         refused(&blocked[0], -32803);
-        replies.extend(blocked);
         let late = drain(&mut session);
         assert!(late.is_empty(), "cancelled IDs replied twice: {late:?}");
         assert!(
@@ -7833,17 +7641,6 @@ mod workspace_symbols {
             &expected,
         );
         assert!(recovered.close().1);
-        receipt(
-            "actual-owned-capacity",
-            json!({"model":source_model(&["src"]),"sources":sources}),
-            &requests,
-            &replies,
-            json!({"before":before,"cancelledButOwned":retained,
-                "afterJoin":session.pending_requests(),"clean":clean,"globalRegistryRecovery":true,
-                "otherSessionDeniedAtAdmission":global_denied,
-                "observationLimit":"private global live-handle count is not exposed; finished handles may reap before admission",
-                "layer":"actual Session, not packaged owned-count telemetry"}),
-        );
     }
 
     #[test]
@@ -7851,20 +7648,13 @@ mod workspace_symbols {
         let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
         for action in ["shutdown", "exit", "eof", "broken-output"] {
             let package = Package::new(true);
-            let (_project, options, sources, expected) = many_project(&package, 32);
+            let (_project, options, expected) = many_project(&package, 32);
             let mut wire = SignatureWire::new(&package);
             begin(&mut wire, &options, full_profile());
             result(&wire.send(query(json!("baseline"), "")), &expected);
             wire.batch(&[query(json!("terminal-active"), "")]);
             if action == "broken-output" {
                 wire.broken_output();
-                receipt(
-                    "terminal-broken-output",
-                    json!({"model":source_model(&["src"]),"sources":sources}),
-                    &[],
-                    &[],
-                    json!({"observation":"real transport failure and child exit, not private owned-count telemetry"}),
-                );
                 continue;
             }
             let responses = wire.terminal(action);
@@ -7887,13 +7677,6 @@ mod workspace_symbols {
                 if action == "shutdown" { 4 } else { 3 },
                 "no duplicate late completion"
             );
-            receipt(
-                action,
-                json!({"model":source_model(&["src"]),"sources":sources}),
-                &[],
-                &responses,
-                json!({"observation":"packaged terminal response and exit; Session observes owned joins"}),
-            );
         }
     }
 
@@ -7901,7 +7684,7 @@ mod workspace_symbols {
     fn actual_workspace_import_waiter_cancel_duplicate_supersession_and_recovery() {
         let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
         let package = Package::new(true);
-        let (_project, options, sources, expected) = many_project(&package, 32);
+        let (_project, options, expected) = many_project(&package, 32);
         let mut session = session_for(&source_options(&[]));
         result(
             &request(
@@ -7945,14 +7728,10 @@ mod workspace_symbols {
         assert_eq!(other_reply.len(), 1);
         result(other_reply[0], &expected);
         assert_eq!(joined.len(), 2, "cancelled waiter cannot complete twice");
-        let mut responses = duplicate;
-        responses.extend(cancelled);
-        responses.extend(joined);
         assert!(session.handle(waiter.clone()).is_empty());
         let reused = drain(&mut session);
         assert_eq!(reused.len(), 1);
         result(&reused[0], &expected);
-        responses.extend(reused);
         let first = source_reload(21, &options);
         let dependent = query(json!("superseded-waiter"), "");
         assert!(session.handle(first.clone()).is_empty());
@@ -7973,13 +7752,11 @@ mod workspace_symbols {
             -32801,
         );
         result(source_reply(&superseded, 22), &Value::Null);
-        responses.extend(superseded);
         let joined = drain(&mut session);
         assert!(
             joined.is_empty(),
             "cancelled owned import cannot publish after clear"
         );
-        responses.extend(joined);
         result(
             &request(&mut session, "workspace/symbol", json!({"query":""})),
             &json!([]),
@@ -8000,23 +7777,6 @@ mod workspace_symbols {
         assert!(late.is_empty());
         assert!(clean);
         assert_eq!(session.pending_requests(), 0);
-        receipt(
-            "actual-import-waiter",
-            json!({"model":source_model(&["src"]),"sources":sources}),
-            &[
-                import,
-                waiter.clone(),
-                other,
-                waiter.clone(),
-                cancel,
-                waiter,
-                first,
-                dependent,
-                successor,
-            ],
-            &responses,
-            json!({"clean":clean,"pendingAfterClose":session.pending_requests(),"layer":"actual Session"}),
-        );
     }
 
     #[test]
@@ -8073,14 +7833,6 @@ mod workspace_symbols {
                 "shutdown" => json!({"jsonrpc":"2.0","id":"shutdown","method":"shutdown"}),
                 _ => Value::Null,
             };
-            let mut messages = Vec::new();
-            if action != "open" {
-                messages.push(open_message.clone());
-            }
-            messages.push(request_message);
-            if action != "transport-close" {
-                messages.push(mutation.clone());
-            }
             let mut responses = if action == "transport-close" {
                 Vec::new()
             } else {
@@ -8094,7 +7846,6 @@ mod workspace_symbols {
             );
             if action == "reopen" {
                 session.handle(open_message.clone());
-                messages.push(open_message);
             }
             if action.starts_with("rejected-") {
                 responses.extend(drain(&mut session));
@@ -8133,13 +7884,6 @@ mod workspace_symbols {
                 refused(source_reply(&responses, 40), -32800);
             }
             session.drain_errors();
-            receipt(
-                action,
-                json!({"model":source_model(&["src"]),"disk":source,"overlay":source,"uri":uri}),
-                &messages,
-                &responses,
-                json!({"retainedBeforeJoin":retained,"pendingAfterClose":session.pending_requests(),"clean":clean,"layer":"actual Session"}),
-            );
         }
     }
 
@@ -8160,14 +7904,7 @@ mod workspace_symbols {
             -32803,
         );
         result(&wire.send(query(json!("query-recovery"), "")), &json!([]));
-        let responses = wire.finish();
-        receipt(
-            "query-byte-boundary",
-            json!({"model":source_model(&["src"]),"sources":[],"exactQuery":exact}),
-            &[],
-            &responses,
-            json!({}),
-        );
+        wire.finish();
         std::fs::write(project.join("src/A.kt"), "class ClassKind\n").unwrap();
         let mut wire = SignatureWire::new(&package);
         begin(
@@ -8181,14 +7918,7 @@ mod workspace_symbols {
             &wire.send(query(json!("negative-unsupported-kind"), "NotPresent")),
             -32803,
         );
-        let responses = wire.finish();
-        receipt(
-            "independent-kind-refusal",
-            json!({"model":source_model(&["src"]),"source":"class ClassKind\n"}),
-            &[],
-            &responses,
-            json!({}),
-        );
+        wire.finish();
         for profile in [
             json!(false),
             json!({"symbolKind":null}),
@@ -8210,13 +7940,6 @@ mod workspace_symbols {
             assert_eq!(responses.len(), 1);
             refused(&responses[0], -32602);
             assert!(session.close().1);
-            receipt(
-                "invalid-workspace-kind-profile",
-                json!({"model":source_model(&["src"])}),
-                &messages[..1],
-                &responses,
-                json!({"layer":"actual Session"}),
-            );
         }
     }
 
@@ -8240,7 +7963,6 @@ mod workspace_symbols {
         )
         .unwrap();
         let mut expected = Vec::new();
-        let mut members = Vec::new();
         for entry in inventory.entries() {
             if let Some(bytes) = entry.source() {
                 let file = entry.path().file_name().unwrap().to_str().unwrap();
@@ -8255,7 +7977,6 @@ mod workspace_symbols {
                         None,
                     ));
                 }
-                members.push(json!({"uri":uri,"source":bytes.as_ref(),"memberships":format!("{:?}",entry.memberships())}));
             }
         }
         assert_eq!(expected.len(), 16384);
@@ -8289,23 +8010,14 @@ mod workspace_symbols {
             &wire.send(query(json!("aggregate-recovery"), "p1023")),
             &filtered(&expected, "p1023"),
         );
-        let responses = wire.finish();
-        receipt(
-            "aggregate-declaration-boundary",
-            json!({"modelBytes":inventory.workspace_json(),
-            "model":source_model(&["src"]),"members":members,"overflowSource":"class Overflow\n",
-            "overflowUri":format!("{root}/src/Overflow.kt")}),
-            &[],
-            &responses,
-            json!({}),
-        );
+        wire.finish();
     }
 
     #[test]
     fn packaged_shared_import_waiter_cancellation_preserves_other_real_workspace_work() {
         let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
         let package = Package::new(true);
-        let (_project, options, sources, expected) = many_project(&package, 32);
+        let (_project, options, expected) = many_project(&package, 32);
         let mut wire = SignatureWire::new(&package);
         begin(&mut wire, &source_options(&[]), full_profile());
         result(&reload(&mut wire, 2, &source_options(&[])), &Value::Null);
@@ -8332,82 +8044,16 @@ mod workspace_symbols {
         result(other[0], &expected);
         let all = wire.finish();
         assert_eq!(all.iter().filter(|r| r["id"] == "cancel-waiter").count(), 1);
-        receipt(
-            "packaged-shared-import-cancel",
-            json!({"model":source_model(&["src"]),"sources":sources}),
-            &messages,
-            &all,
-            json!({"observation":"real concurrent import/cancel/consumer replies; Session separately proves same-attempt waiter ownership"}),
-        );
     }
 
-    // Test-only observation of bytes actually written/consumed by the existing
-    // framed transport. Runs preserve complete raw headers AND payloads.
-    fn record_runs(runs: &mut Vec<(u8, usize)>, bytes: &[u8]) {
-        for &byte in bytes {
-            match runs.last_mut() {
-                Some((prior, count)) if *prior == byte => *count += 1,
-                _ => runs.push((byte, 1)),
-            }
-        }
-    }
-    struct RecordedIo<'a, T> {
-        inner: &'a mut T,
-        runs: Vec<(u8, usize)>,
-    }
-    impl<T: std::io::Read> std::io::Read for RecordedIo<'_, T> {
-        fn read(&mut self, bytes: &mut [u8]) -> std::io::Result<usize> {
-            let count = self.inner.read(bytes)?;
-            record_runs(&mut self.runs, &bytes[..count]);
-            Ok(count)
-        }
-    }
-    impl<T: std::io::BufRead> std::io::BufRead for RecordedIo<'_, T> {
-        fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
-            self.inner.fill_buf()
-        }
-        fn consume(&mut self, count: usize) {
-            let bytes = self
-                .inner
-                .fill_buf()
-                .expect("previously observed frame buffer");
-            record_runs(&mut self.runs, &bytes[..count]);
-            self.inner.consume(count);
-        }
-    }
-    impl<T: Write> Write for RecordedIo<'_, T> {
-        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-            let count = self.inner.write(bytes)?;
-            record_runs(&mut self.runs, &bytes[..count]);
-            Ok(count)
-        }
-        fn flush(&mut self) -> std::io::Result<()> {
-            self.inner.flush()
-        }
-    }
-    fn recorded_send(
-        wire: &mut super::SignatureWire,
-        message: &Value,
-        frames: &mut Vec<Value>,
-    ) -> Value {
+    fn framed_send(wire: &mut super::SignatureWire, message: &Value) -> Value {
         let payload = serde_json::to_vec(message).unwrap();
-        let mut input = RecordedIo {
-            inner: wire.input.as_mut().unwrap(),
-            runs: Vec::new(),
-        };
-        ktlsp_protocol::write_frame(&mut input, &payload).unwrap();
+        let input = wire.input.as_mut().unwrap();
+        ktlsp_protocol::write_frame(input, &payload).unwrap();
         input.flush().unwrap();
-        frames.push(
-            json!({"direction":"stdin","rawFrameUtf8Runs":input.runs,"payloadBytes":payload.len()}),
-        );
         if let Some(id) = message.get("id") {
             loop {
-                let mut reader = RecordedIo {
-                    inner: &mut wire.reader,
-                    runs: Vec::new(),
-                };
-                let payload = ktlsp_protocol::read_frame(&mut reader).unwrap().unwrap();
-                frames.push(json!({"direction":"stdout","rawFrameUtf8Runs":reader.runs,"payloadBytes":payload.len()}));
+                let payload = ktlsp_protocol::read_frame(&mut wire.reader).unwrap().unwrap();
                 let response: Value = serde_json::from_slice(&payload).unwrap();
                 let matched = response.get("id") == Some(id);
                 wire.responses.push(response.clone());
@@ -8431,17 +8077,16 @@ mod workspace_symbols {
         let root = source_directory_uri(&project);
         let uri = format!("{root}/src/A.kt");
         let options = source_options(&[&root]);
-        // Use the unchanged shared wire owner. This test's giant literal IDs
-        // are captured losslessly below instead of repeating megabytes in logs.
+        // Use the shared wire owner with null-ID refusal matching for requests
+        // whose complete ID cannot fit a response.
         let mut wire = super::SignatureWire::new(&package);
-        let mut raw_frames = Vec::new();
-        let mut requests = vec![
+        let requests = [
             initialization(&options, full_profile()),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
             query(json!("baseline"), ""),
         ];
         for message in &requests {
-            let response = recorded_send(&mut wire, message, &mut raw_frames);
+            let response = framed_send(&mut wire, message);
             if message["id"] == "baseline" {
                 result(&response, &single(before, &uri, "Before"));
             }
@@ -8452,17 +8097,15 @@ mod workspace_symbols {
         let id = "s".repeat(ktlsp_protocol::MAX_PAYLOAD_BYTES - 512 - 2);
         let message = query(json!(id), "NeverMatches");
         assert!(serde_json::to_vec(&message).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
-        let response = recorded_send(&mut wire, &message, &mut raw_frames);
+        let response = framed_send(&mut wire, &message);
         assert_eq!(response["id"], message["id"]);
         refused(&response, -32801);
         assert!(serde_json::to_vec(&response).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
-        requests.push(message);
         let reload_message = source_reload(2, &options);
         result(
-            &recorded_send(&mut wire, &reload_message, &mut raw_frames),
+            &framed_send(&mut wire, &reload_message),
             &Value::Null,
         );
-        requests.push(reload_message);
         let before_model = std::fs::read(project.join("workspace.json")).unwrap();
         let mut after_model = before_model.clone();
         after_model.push(b' ');
@@ -8472,11 +8115,10 @@ mod workspace_symbols {
             "NeverMatches",
         );
         assert!(serde_json::to_vec(&message).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
-        let response = recorded_send(&mut wire, &message, &mut raw_frames);
+        let response = framed_send(&mut wire, &message);
         assert_eq!(response["id"], message["id"]);
         refused(&response, -32801);
         assert!(serde_json::to_vec(&response).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
-        requests.push(message);
         // The original valid-frame counterexample now refuses BEFORE source
         // work, with a compact error that can echo the complete original ID.
         let message = query(
@@ -8484,12 +8126,11 @@ mod workspace_symbols {
             "",
         );
         assert!(serde_json::to_vec(&message).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
-        let response = recorded_send(&mut wire, &message, &mut raw_frames);
+        let response = framed_send(&mut wire, &message);
         assert_eq!(response["id"], message["id"]);
         refused(&response, -32803);
         assert_eq!(response["error"]["message"], "limit");
         assert!(serde_json::to_vec(&response).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
-        requests.push(message);
         // Parameter errors cannot bypass the failure-envelope admission. The
         // first frame admits its ID and retains InvalidParams; the second is
         // still valid framed input but must take the compact resource refusal.
@@ -8500,7 +8141,7 @@ mod workspace_symbols {
             assert!(
                 serde_json::to_vec(&message).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES
             );
-            let response = recorded_send(&mut wire, &message, &mut raw_frames);
+            let response = framed_send(&mut wire, &message);
             assert_eq!(response["id"], message["id"]);
             refused(&response, code);
             if code == -32803 {
@@ -8509,7 +8150,6 @@ mod workspace_symbols {
             assert!(
                 serde_json::to_vec(&response).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES
             );
-            requests.push(message);
         }
         // A request without params has a smaller envelope than even the compact
         // error. Echo IDs only while the complete response fits; an unreplyable
@@ -8523,7 +8163,7 @@ mod workspace_symbols {
             if reserve == 53 {
                 assert_eq!(input_bytes, ktlsp_protocol::MAX_PAYLOAD_BYTES);
             }
-            let response = recorded_send(&mut wire, &message, &mut raw_frames);
+            let response = framed_send(&mut wire, &message);
             refused(&response, code);
             if code == -32600 {
                 assert_eq!(response["id"], Value::Null);
@@ -8542,39 +8182,29 @@ mod workspace_symbols {
             assert!(
                 serde_json::to_vec(&response).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES
             );
-            requests.push(message);
         }
         let reload_message = source_reload(3, &options);
         result(
-            &recorded_send(&mut wire, &reload_message, &mut raw_frames),
+            &framed_send(&mut wire, &reload_message),
             &Value::Null,
         );
-        requests.push(reload_message);
         let recovery = query(json!("same-session-recovery"), "");
         result(
-            &recorded_send(&mut wire, &recovery, &mut raw_frames),
+            &framed_send(&mut wire, &recovery),
             &single(after, &uri, "Changed"),
         );
-        requests.push(recovery);
         let stop = json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"});
         result(
-            &recorded_send(&mut wire, &stop, &mut raw_frames),
+            &framed_send(&mut wire, &stop),
             &Value::Null,
         );
-        requests.push(stop);
         let exit = json!({"jsonrpc":"2.0","method":"exit"});
-        recorded_send(&mut wire, &exit, &mut raw_frames);
-        requests.push(exit);
+        framed_send(&mut wire, &exit);
         wire.input.take();
         loop {
-            let mut reader = RecordedIo {
-                inner: &mut wire.reader,
-                runs: Vec::new(),
-            };
-            let Some(payload) = ktlsp_protocol::read_frame(&mut reader).unwrap() else {
+            let Some(payload) = ktlsp_protocol::read_frame(&mut wire.reader).unwrap() else {
                 break;
             };
-            raw_frames.push(json!({"direction":"stdout","rawFrameUtf8Runs":reader.runs,"payloadBytes":payload.len()}));
             wire.responses
                 .push(serde_json::from_slice(&payload).unwrap());
         }
@@ -8584,31 +8214,6 @@ mod workspace_symbols {
             output.stderr.is_empty(),
             "{}",
             String::from_utf8_lossy(&output.stderr)
-        );
-        let mut responses = std::mem::take(&mut wire.responses);
-        // Observation-only lossless encoding of ACTUAL large ID values on both
-        // sides. Every byte/run is retained; no digest/sample/expected label is
-        // substituted. All non-ID protocol fields remain their actual values.
-        for message in requests.iter_mut().chain(responses.iter_mut()) {
-            if let Some(id) = message.get("id").and_then(Value::as_str)
-                && id.len() > 1024 * 1024
-            {
-                let mut runs = Vec::new();
-                record_runs(&mut runs, id.as_bytes());
-                message["id"] = json!({"originalType":"string","losslessUtf8Runs":runs});
-            }
-        }
-        receipt(
-            "actual-id-error-envelope",
-            json!({
-                "modelBefore":before_model,"modelAfter":after_model,
-                "sourceBefore":before,"sourceAfter":after,"uri":uri,
-                "largeIdEncoding":"original JSON string UTF8 bytes as ordered [byte,count] runs; complete lossless values"
-            }),
-            &requests,
-            &responses,
-            json!({"transport":"packaged-stdio","sameSessionRecovery":true,
-            "rawFrames":raw_frames,"stdoutEof":true,"status":output.status.code(),"stderr":output.stderr}),
         );
     }
 }

@@ -12,7 +12,7 @@ mod structure;
 mod uri;
 mod workspace;
 mod workspace_symbols;
-use ktlsp_parser::{FileKind, ParserError, SourceSnapshot};
+use ktlsp_parser::{FileKind, ParserError, PipedTimeoutSite, SourceSnapshot};
 use ktlsp_protocol::{FrameReader, write_frame};
 use ktlsp_text::{Document, MAX_CHANGES, TextChange};
 use serde_json::{Map, Number, Value, json};
@@ -65,12 +65,23 @@ type ParserResult = Result<Value, ParserFailure>;
 #[derive(Debug)]
 enum ParserFailure {
     Protocol(i32, &'static str),
+    PipedTimeout(PipedTimeoutSite),
     Source(ktlsp_import::source_inventory::Error),
 }
 impl ParserFailure {
     fn response(self, id: Value) -> Value {
         match self {
             Self::Protocol(code, message) => response_error(id, code, message),
+            Self::PipedTimeout(site) => {
+                let site = match site {
+                    PipedTimeoutSite::SupervisorPoll => "supervisor_poll",
+                    PipedTimeoutSite::WriterJoin => "writer_join",
+                    PipedTimeoutSite::ReaderJoin => "reader_join",
+                };
+                let mut response = response_error(id, -32803, "parser deadline exceeded");
+                response["error"]["data"] = json!({"parserTimeoutSite":site});
+                response
+            }
             Self::Source(error) => {
                 let code = if matches!(error, ktlsp_import::source_inventory::Error::Cancelled) {
                     -32800
@@ -100,6 +111,7 @@ fn parser_failure(error: ParserError) -> ParserFailure {
         ParserError::Coverage => (-32803, "parser output coverage validation failed"),
         ParserError::InvalidTree => (-32803, "parser output tree validation failed"),
         ParserError::Timeout => (-32803, "parser deadline exceeded"),
+        ParserError::PipedTimeout(site) => return ParserFailure::PipedTimeout(site),
         ParserError::WorkerFailed => (-32803, "parser worker failed"),
         ParserError::Io => (-32803, "parser I/O or cleanup failed"),
         ParserError::StaleSnapshot => (-32803, "parser output snapshot mismatch"),

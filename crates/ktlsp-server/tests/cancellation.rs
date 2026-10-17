@@ -50,6 +50,15 @@ fn error(response: &Value, id: Value, code: i32) {
     assert_eq!(response["id"], id, "{response}");
     assert_eq!(response["error"]["code"], code, "{response}");
     assert!(response.get("result").is_none(), "{response}");
+    if code != -32803 {
+        assert!(
+            response["error"]
+                .get("data")
+                .and_then(|data| data.get("parserTimeoutSite"))
+                .is_none(),
+            "{response}"
+        );
+    }
 }
 struct Package(PathBuf);
 impl Package {
@@ -394,7 +403,21 @@ fn interactive_stdio_cancels_active_work_and_cleans_shutdown_exit_and_eof() {
     let _serial = SERIAL.lock().unwrap_or_else(|poison| poison.into_inner());
     let package = Package::new();
     let mut client = Client::new(&package);
-    client.send(open("wire"));
+    // This held failing peer reaches the real deadline; reuse its completed ID
+    // below to ensure that cancellation cannot inherit the prior timeout site.
+    client.send(open("wiretimeout"));
+    client.send(symbols(json!("active")));
+    let response = client.reply();
+    error(&response, json!("active"), -32803);
+    assert_eq!(response["error"]["message"], "parser deadline exceeded");
+    #[cfg(not(unix))]
+    assert_eq!(
+        response["error"]["data"],
+        json!({"parserTimeoutSite":"supervisor_poll"})
+    );
+    #[cfg(unix)]
+    assert!(response["error"].get("data").is_none(), "{response}");
+    client.send(change(2, "wire"));
     client.send(symbols(json!("active")));
     package.started("wire");
     client.send(cancel(json!("wrong")));

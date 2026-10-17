@@ -127,6 +127,12 @@ and complete current occurrence map; OWNER independently read all actual data.
 The external consumer source was removed only after BOTH gates; full executed
 source/output/custody retained. No local Kotlin/parser/server runtime.
 No publication or hosted419 runtime yet. #419 actual writer remains.
+Before publication ROOT found that the two419 temporary println! markers would
+be captured on successful Native libtest runs (platform CI uses --nocapture).
+They now use direct stdout Write; all actual payload fields and permanent
+assertions remain unchanged. No workflow/probe/retry or local Kotlin runtime.
+Publication is held for affected exact reviews and changed-source compile;
+hosted execution remains UNOBSERVED. This is capture custody, not a semantic fix.
 Kotlin/CLI proof only original full hosted CI. Temporary writers stay until BOTH
 OWNER+ROOT FULL-read actual payloads and actually returned edits; permanent
 consumer-visible assertions remain after cleanup. Successor source needs its

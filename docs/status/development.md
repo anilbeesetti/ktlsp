@@ -3127,3 +3127,16 @@ No capability expansion; compiler provenance UNVERIFIED, #417 UNKNOWN/OPEN,
 B3 INCONCLUSIVE/HOLD, oracle custody HOLD, #96/native-only/T004 and full-parity
 limits remain unchanged.
 
+#### Prepublication419 actual-payload custody correction
+
+ROOT found that both temporary KTLSP419_ACTUAL observations used println!,
+which successful Native libtest capture would hide; the platform workflow's
+existing --nocapture would expose them. Before any push/hosted run, replaced
+ONLY both temporary writers with direct stdout Write/writeln!, preserving all
+JSON fields, fixture/replay/assertions and permanent call frequency.
+No workflow change, new probe, unchanged retry or product semantic patch.
+Earlier exact reviews do not cover this changed capture source; affected
+component and ROOT reviews plus changed-source format-CHECK/strict Clippy are
+required before publication. The ONE formatter is already used; no second.
+No #419 actual execution or custody acceptance is claimed at this stage.
+

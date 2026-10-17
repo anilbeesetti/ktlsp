@@ -5042,6 +5042,8 @@ fn label_producer_packet(source: &str, revision: i64, accepted: bool) -> Value {
 
 #[test]
 fn lexical_label_definition_actual_cli_type_rename_replay_and_adversarial_edits() {
+    use std::io::Write as _;
+
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let package = Package::new(true);
     let init = json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{"capabilities":{
@@ -5279,12 +5281,14 @@ fn lexical_label_definition_actual_cli_type_rename_replay_and_adversarial_edits(
                 json!({"uri":URI,"range":references_range(&edited,type_start,"Fresh".len())})
             );
         }
-        println!(
+        writeln!(
+            std::io::stdout(),
             "KTLSP419_ACTUAL {}",
             json!({"original":original,"requests":requests,"responses":responses,
             "returnedRename":reply("type-rename"),"edited":edited_producer,
             "replayRequests":replay,"replayResponses":replay_responses})
-        );
+        )
+        .unwrap();
     }
     let source = "fun <T, U> outer(p: T) { fun send(to: T) {}; send(to = p) }";
     for (name, start, end, replacement) in [
@@ -5336,12 +5340,14 @@ fn lexical_label_definition_actual_cli_type_rename_replay_and_adversarial_edits(
             "{name}: {responses:?}"
         );
         assert!(responses[2].get("result").is_none());
-        println!(
+        writeln!(
+            std::io::stdout(),
             "KTLSP419_ACTUAL {}",
             json!({"adversarial":name,
             "edit":{"range":range,"text":replacement},"producer":label_producer_packet(edited,8,false),
             "requests":requests,"responses":responses})
-        );
+        )
+        .unwrap();
     }
 }
 

@@ -403,6 +403,7 @@ impl Session {
                 | "textDocument/prepareRename"
                 | "textDocument/rename"
                 | "textDocument/completion"
+                | "textDocument/signatureHelp"
         ) && self.state == State::Running
         {
             return match self.start_parser(id.clone(), method, params) {
@@ -488,6 +489,7 @@ impl Session {
                 result["capabilities"]["referencesProvider"] = json!(true);
                 result["capabilities"]["documentHighlightProvider"] = json!(true);
                 result["capabilities"]["completionProvider"] = json!({"resolveProvider":false});
+                result["capabilities"]["signatureHelpProvider"] = json!({});
                 if self.hover_format.is_some() {
                     result["capabilities"]["hoverProvider"] = json!(true);
                 }
@@ -723,6 +725,11 @@ impl Session {
                 .map_err(|_| (-32602, "invalid UTF-16 position"))?;
             Some(match method {
                 "textDocument/definition" => semantic_navigation::Query::Definition { offset },
+                "textDocument/signatureHelp" => {
+                    semantic_navigation::signature_context(map.get("context"))
+                        .map_err(|error| (-32602, error))?;
+                    semantic_navigation::Query::SignatureHelp { offset }
+                }
                 "textDocument/references" => {
                     let include_declaration = required(map, "context")
                         .and_then(object)

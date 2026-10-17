@@ -3202,6 +3202,12 @@ fn lexical_label_applicability_refuses_every_unproved_argument_and_callable_shap
                 );
             }
             assert!(references > 0, "{source}");
+            for list in tree.elements().iter().filter(|e| e.kind == "VALUE_ARGUMENT_LIST") {
+                let help = ktlsp_parser::local_value_binding::local_call_signature(
+                    &directory, &result, current, list.start + 1,
+                );
+                assert!(!matches!(help, Ok(Some(_))), "unsupported signature: {source}");
+            }
         }
     }
 }

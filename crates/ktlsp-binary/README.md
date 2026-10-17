@@ -396,6 +396,56 @@ parameters, library symbol lookup/source attachment, server integration and full
 Kotlin LSP parity remain unsupported. This extension does not broaden the sibling
 property/return operations' narrower scope/NAME refusals.
 
+## Selected values and finite nominal Function return (#411)
+
+`metadata::resolved_class_function_signature::decode(&outcome,
+all_class_field_ordinal, limits)` adds a distinct composition. Its `parameters`
+component is the existing `SelectedParameters`: original owner, ordered Class
+and Function-own declarations, selected Function and every ordered value.
+`return_type` retains original outer/body ranges, borrowed header, an explicitly
+and independently resolved nominal `class_id::ClassId`, and ordered original
+Argument bodies/projection Options/leaf headers and ranges. Argument `classifier`
+uses the existing `resolved_class_function_parameters::Classifier` import and
+checked Function/Class declaration ordinals in this result, never raw IDs or
+global symbols. Every raw body borrows the same retained Outcome.
+
+The return admits a nominal Class with zero or more invariant inline parameter
+leaves. Signed ID searches Function before Class; NAME uses the same actual
+resolver and unique immediate-own UTF-16 comparison as values, without parent
+fallback or normalization. The returned target is not assumed to be the owner;
+argument count is not compared with owning Class declarations because target
+arity is unavailable without loading its metadata. Nullable absent/false/true
+and projection absent/explicit INV remain encoded presence, not inferred meaning.
+
+One original Class context, resolver and monotonic budget cover all declarations,
+values and return, including independent nominal resolution, temporary NAME
+strings, each inspected comparison unit and staged/final capacities. The private
+selected-Function path is shared, not two public child calls or copied declarations.
+All Class framing and all own declarations complete before values. Any selected
+value/return error, late duplicate ID or malformed tail refuses atomically.
+Missing/table-only/duplicate inline roles, wrong significant wires, conflicting
+classifiers, nonzero effective Type flags, unknown/non-invariant projections,
+nominal/bare parameter-root/recursive/richer leaves and varargs refuse.
+
+Permanent source regressions use unchanged genuine licensed Result$Companion
+(success4/failure5) and Pair.copy9 fixtures, with same-Outcome pointers and
+separate sibling-own identities. Result's raw return index5 is checked against
+the actual public resolver, not an assumed owner/target spelling. Prospective
+return spans55..63/92..100 and NAME6 leaves59..61/96..98 are **unexecuted new-API
+assertions**, not observations. Previous #408 parameter smoke did not observe
+return semantics. Fixture custody/notices remain unchanged; compiler provenance
+is unverified. Genuine Function-own ID/shadow/ambiguous-NAME emission, table-only
+roles and richer generic returns remain gaps; their authored controls are labelled.
+
+The parameter-only API still leaves returns opaque and has unchanged allowances;
+the old self-return API still refuses Function-own declarations and retains its
+self/Class-ID/count guarantees. Property/context/method-link contracts are
+unchanged. Receiver/context/contracts/JVM extensions/bounds/TypeTables remain
+opaque: this is not a complete Kotlin signature, target loading, substitution,
+applicability, JVM linkage, symbols, server capability or full Kotlin LSP parity.
+No local build/tests/format/lint or new native smoke was run by this source owner;
+ROOT separately admits exact reviewed-source verification and data observation.
+
 ## Selected self-applied Class Function return (#390)
 
 `metadata::resolved_class_function_return::decode(&outcome, class_field_ordinal,

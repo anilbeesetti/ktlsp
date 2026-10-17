@@ -2516,3 +2516,147 @@ guard/expected-head merge and independent original exact-main acceptance.
 No second formatter, local Kotlin/JVM runtime, relaxed limits, unchanged CI retry,
 new capability promotion or official full-parity claim.
 
+#### Verified413 cleaned source original CI, guarded integration and exact-main acceptance
+
+This completed receipt supersedes the cleaned-source PENDING state above; the
+earlier first-source smoke is not substituted for this source's OWN CI.
+Cleaned reviewed **1369cce5fda0b6b38df29e3a6194a4c23b7dbbb4**, exact tree
+**a41d5a88ec1b491a9d6375c86e9ea06d3f75b868**, retained all27 paths and unchanged
+four configuration/workflow/lock blobs. Both ROOT reviewers cleared COMPLETE
+CURRENT FULL27 source/affected consumers, with both complete affected410
+post-cleanup rechecks. Unchanged411/412 component source/docs retain their exact
+prior double clears. Actual current review messages, not stale agent publication,
+are retained. Pinned format-CHECK plus strict locked workspace/all-target Clippy
+passed0/1.99s. No second formatter mutation or local Kotlin runtime occurred.
+
+OWN ORIGINAL automatic cleaned-source executions, attempt1:
+
+| Original cleaned-source job | Ordinary passed | Doctests | Failed | Ignored | Measured | Filtered | Result rows |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| [Native39000705013/117302814346](https://github.com/anilbeesetti/ktlsp/actions/runs/39000705013/job/117302814346) |1186|39|0|3|0|0|141|
+| [macOS39000704959/117302814165](https://github.com/anilbeesetti/ktlsp/actions/runs/39000704959/job/117302814165) |1184|39|0|3|0|0|141|
+| [Windows39000704959/117302814052](https://github.com/anilbeesetti/ktlsp/actions/runs/39000704959/job/117302814052) |1133|39|0|3|0|0|141|
+
+All mandatory pinned format/strict locked all-target workspace Clippy/full
+unfiltered workspace checks passed; platform release invocation is unchanged.
+All seven import authority compile-fail doctests passed. EACH host separately
+passed the22-fault-CASE harness, depth/cancellation/healthy-followup controls and
+three explicit same-owned-Child allocationcode86 confirmations; these are NOT
+extra libtest passes. All three temporary observation markers are ZERO in
+complete current logs and both complete archived workspace streams.
+
+Original actual checkout **50e983b33c110798c1bda2d7f0f95712252fe8cd** has exact
+revieweda41d tree and ordered[df6b02953d22e520ef1b0acaae691471a1666287,
+1369cce5fda0b6b38df29e3a6194a4c23b7dbbb4] parents. Original native/platform
+checkout records, both complete archived identities/preflights/parent records,
+and independent commit API agree. Both platform events' observational merge
+field is actually STALEc7129881c4ac768d1d01fb71cfea916a2eac7bff; it is NOT
+execution authority. Rust/Cargo1.99.0, PowerShell7.6.6, original executor/image
+identities, effectiveautocrlf=false/eol=lf, unchanged LF sample bytes, clean
+source, fresh Cargo/target directories and empty compiler overrides are evidenced.
+
+| Original retained bytes | Bytes | Lines | SHA256 |
+|---|---:|---:|---|
+| Cleaned Native raw |300486|3268|65fb7eda539b5833d268addf7f7df20aa66c35538169c2c554864e4dfd0bbcd2|
+| Cleaned macOS raw |422724|4221|df65658b4dab4bd24331902058b362b9583039b712002bfaefef0e355929f65f|
+| Cleaned Windows raw |377246|3975|84f3bb5199e6dd5777ec9d94c4130fac0cd62312ba5618d63dc0bee6833e54c4|
+| macOS artifact12088797216 |49053|—|5e86ce9472f25773106723c984d92046512bdfb55210c6a8ca180e6ea88691d4|
+| Windows artifact12089266710 |43880|—|e31a846df584a38af79f5e5acda3cc2da9668cb519eea9e3c17e5ba68f194bfe|
+
+ROOT independently authenticated original API/run/job/raw/archive custody and
+all18 unique CRC-valid members per platform. Complete workspace streams match
+original raw contiguously: macOS3768/3768lines at raw406–4173 and Windows3524/3524
+at raw404–3927. Full individual case/outcome multisets match first-source results.
+For COMPLETE current-value reads, ROOT reused only fully accepted original
+values, fully read ALL79 new Native lines, ALL139 small-member reader lines
+(every JSON field delta reconstructs the complete actual member, not a digest),
+and ALL299 new platform workspace lines. Independent Native auditor freshly
+downloaded all current bytes, read setup/commands/targeted controls and ALL75 new
+complete message values; other3193 current values matched its fully read base.
+Independent platform auditor freshly downloaded both raw logs/ZIPs byte-for-byte,
+covered all18 members, complete setup/invocation/publication/census and ALL241Mac/
+47Win new complete workspace values; remaining3527/3477 match its full base.
+Different comparison normalizations/reference occurrence accounting explain
+different new-line counts; no actual mismatch was tolerated. Neither ROOT nor
+auditors claim literal manual rereading of every repeated raw timestamp/byte.
+
+Complete current custody `/private/tmp/ktlsp-413-final-platform-39000704959/`:
+`platform-custody.json`, `native-custody.json`, original raw logs/ZIPs,
+`ROOT-native-acceptance.json`, `ROOT-platform-acceptance.json`,
+`ROOT-all-original-CI-acceptance.json` and complete actual new-value readers.
+Both independent auditors report correct/no findings/confidence0.98.
+Mac actualB3Ok()/deadline_selectedfalse/receiptMissing remains INCONCLUSIVE/HOLD;
+Native actualTimeout/receiptMissing also remains HOLD. A healthy followup does
+not promote missing deadline custody; Windows lacks the Unix-only B3 record.
+
+[PR413](https://github.com/anilbeesetti/ktlsp/pull/413) was readied only after
+these OWN original full CI gates. ROOT acquired exact exclusive-base lease413:
+base/main df6b, reviewedhead1369/treea41d, scope27/config4, all3 exact successful
+checks, original2 workflows/3jobs/2artifacts and clean reviewed local identity.
+A SEPARATE strictly-readonly complete guard returned process0 AND valid complete
+parsedexit0; ROOT explicitly read ALL returned facts before a SEPARATE ordinary
+`gh pr merge --squash --match-head-commit1369...` call. No admin/force/main push
+or branch protection bypass occurred. Protection remainedfalse/requiredcontexts[];
+repository independent-review/full-CI rules were still enforced.
+
+Actual squash **4bbf0f32fd5b4bad276162f927e58ac810cb8014** has EXACT reviewed
+treea41d5a88ec1b491a9d6375c86e9ea06d3f75b868 and SOLEparent
+df6b02953d22e520ef1b0acaae691471a1666287, independently confirmed by OWNER+ROOT
+fresh original commit/main APIs. Expected-head equality alone was not the base
+proof. Lease413 remained ACTIVE through actual tree/soleparent and independent
+OWNER+ROOT **ORIGINAL exact-main**
+[39001476453/1/job117305137841](https://github.com/anilbeesetti/ktlsp/actions/runs/39001476453/job/117305137841).
+Original push/main pinned1.99.0 format-CHECK/strict locked all-target Clippy/full
+unfiltered workspace passed: **141rows,1225=1186ordinary+39doc,
+0failed3ignored0measured0filtered**, plus separate22faultCASES/3samechild86 and
+all3markers0. Raw299415bytes/3252lines SHA256
+934db2d30e94a42b52fcfa85e3b3892166961d75e25fe6e9d5bb94595a0aff52.
+
+ROOT checked all1228 individual outcome occurrences including3ignored against
+complete cleaned original Native values, reused3180 complete exact current
+line occurrences, and fully read ALL72 new original-main lines. Independent
+OWNER freshly downloaded the same original bytes, read raw1–400 and ALL2263
+remaining distinct complete current-run message values across seven reader
+ranges; every3252 raw prefix/message/newline/order occurrence has byte-exact
+lossless reconstruction. Full original source/workflow/toolchain/command/outcome
+read, not a preview/count/hash substitute or a literal repeated-timestamp claim.
+Complete custody `/private/tmp/ktlsp-413-original-main-39001476453/`, ROOT
+`ROOT-exact-main-acceptance.json`, independent OWNER
+`/private/tmp/ktlsp-410-owner-original-main-39001476453-acceptance.json`.
+Only AFTER BOTH complete gates lease413 was CLEARED. Delivery:
+[PR comment](https://github.com/anilbeesetti/ktlsp/pull/413#issuecomment-6229560864),
+[parent330](https://github.com/anilbeesetti/ktlsp/issues/330#issuecomment-6229561063).
+
+#### Next admitted independent414/415 prerequisites
+
+ONE stable verified incoming main4bbf/treea41d/soleparentdf6b now admits BOTH:
+- [414](https://github.com/anilbeesetti/ktlsp/issues/414), original simple explicit
+  ordinary-function return annotation in lexical identity/occurrences/guarded
+  versioned rename. `/private/tmp/ktlsp-414-function-return-scopes`,
+  `omp/414-function-return-scopes`; reuse410 grammar/ancestry/lookup/capture
+  machinery, preserve independent value/callee guards. Prospective return-CST
+  and CLI positives remain UNOBSERVED until OWN original hosted execution.
+- [415](https://github.com/anilbeesetti/ktlsp/issues/415), scoped bare parameter
+  metadata Function returns. `/private/tmp/ktlsp-415-bare-return-signatures`,
+  `omp/415-bare-return-signatures`; existing Classifier replaces nominal-only
+  class_id field, no new decoder/shim, one staging/context/resolver/allowance.
+  Genuine Pair component roots are static candidates, not observed consumer
+  positives. Genuine bare Function-root ID/NAME producer evidence remains absent.
+
+ROOT WT `/private/tmp/ktlsp-330-function-return-integration`,
+`omp/330-function-return-integration`, owns common docs/config/checks/runtime
+admission/CI/publication/integration. Two real implementation owners each have
+two separate functionality/adversarial review slots; ROOT reserves two full
+composed-union reviewers. All old/user/component/delivered WTs are preserved.
+Completed `BareReturnNext`/`ReturnAnnotationNext` research was fully read, not
+restarted. Source implementation/static review is admitted, not mid-flight
+checks/formatting/runtime or the unobserved feature's acceptance.
+
+Older openPR384 remains DRAFT diagnostic evidence at06b998fbd273c4364c2aec9524cab3f7cfd24d6d,
+not a proven Windows fix. #96 ALL local Kotlin runtime quarantine/T004data-only/
+native-only/no JVM or C/C++ semantic dependency remains. No unchanged CI retry/
+filters/raised bounds/deadlines/cleanup weakening/new capability. B3HOLD,
+original395/377causesUNKNOWN and live-exactstep oracle custody HOLD remain.
+General types/inference/semantic imports/library navigation/formatting/tooling/
+debug/release/oracle and full official parity are NOT complete.
+

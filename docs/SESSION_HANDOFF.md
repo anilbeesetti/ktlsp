@@ -109,6 +109,21 @@ composition cargo-fmt is now SPENT: exit0/1.181157875s, empty stdout/stderr.
 No compiler/lint/test/runtime permission follows. Freeze the complete30path
 source/docs and obtain BOTH independent full-union reviews before NEW exact
 compiler gates. The preceding native-only reviews do NOT approve this union.
+First complete30path freeze4e3438d/tree94d386e received a functionality P2 HOLD:
+new426 println receipts vanish on successful default Native libtest runs.
+ROOT repaired ALL7 observation sites through one direct locked-stderr writer,
+without changing JSON payloads/labels, real calls/assertions/edits/cleanup or CI.
+New workspace replay is local-VALUE rename; inherited signature replay remains
+TYPE rename. Docs corrected, original full HOLD retained; both exact whole-union
+renewals and compiler/runtime gates still pending. No formatter rerun is admitted.
+Full r1 adversary additionally found a max-framed missing-params request whose
+ID makes even compact echoed error14bytes too large. Root now distinguishes
+replyable compact-limit IDs from UNREPLYABLE IDs before params/source work;
+the latter are InvalidRequest/id:null under explicit provider ID policy,
+never a fatal oversized output. Framed exact-fit/one-over/max-input and actual
+same-session recovery source added; all new raw frames remain lossless.
+Both r1 receipts/source stay rejected; exact cumulative whole-union renewals
+required. No check/runtime or formatter rerun occurred.
 No owner formatter/build/check/test/runtime is permitted mid-flight.
 Keep real packaged stdio cancel/ID-reuse observations distinct from complementary
 Session owned-count/retained-until-join proof; no production probe/barrier/delay.

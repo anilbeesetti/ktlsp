@@ -444,12 +444,21 @@ impl Session {
             };
         }
         if method == "workspace/symbol" && self.state == State::Running {
-            let admitted = workspace_symbols::Budget::new("", id)
-                .map_err(|error| (-32803, error))
-                .and_then(|budget| {
-                    workspace_symbols::query(params)
-                        .and_then(|query| self.start_workspace_symbols(id.clone(), query, budget))
-                });
+            let budget = match workspace_symbols::Budget::new("", id) {
+                Ok(budget) => budget,
+                Err(workspace_symbols::AdmissionError::UnreplyableId) => {
+                    return vec![response_error(
+                        Value::Null,
+                        -32600,
+                        "workspace request id cannot fit a response",
+                    )];
+                }
+                Err(workspace_symbols::AdmissionError::Resource(message)) => {
+                    return vec![response_error(id.clone(), -32803, message)];
+                }
+            };
+            let admitted = workspace_symbols::query(params)
+                .and_then(|query| self.start_workspace_symbols(id.clone(), query, budget));
             return match admitted {
                 Ok(()) => Vec::new(),
                 Err((code, message)) => vec![response_error(id.clone(), code, message)],

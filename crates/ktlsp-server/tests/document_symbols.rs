@@ -6657,8 +6657,8 @@ mod workspace_symbols {
                 "{}",
                 String::from_utf8_lossy(&output.stderr)
             );
-            println!(
-                "WORKSPACE_SYMBOL_WIRE_ACTUAL_RECEIPT={}",
+            observe(
+                "WORKSPACE_SYMBOL_WIRE_ACTUAL_RECEIPT",
                 json!({
                     "terminal":action,"requests":self.requests,"responses":self.inner.responses,
                     "status":output.status.code(),"stderr":output.stderr
@@ -6691,8 +6691,8 @@ mod workspace_symbols {
                 !output.stderr.is_empty(),
                 "broken output must report transport failure"
             );
-            println!(
-                "WORKSPACE_SYMBOL_WIRE_ACTUAL_RECEIPT={}",
+            observe(
+                "WORKSPACE_SYMBOL_WIRE_ACTUAL_RECEIPT",
                 json!({
                     "terminal":"broken-output","requests":self.requests,"responsesBeforeOutputClosed":responses,
                     "status":output.status.code(),"stderr":output.stderr
@@ -6705,8 +6705,8 @@ mod workspace_symbols {
                 .push(json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}));
             self.requests.push(json!({"jsonrpc":"2.0","method":"exit"}));
             let responses = self.inner.finish();
-            println!(
-                "WORKSPACE_SYMBOL_WIRE_ACTUAL_RECEIPT={}",
+            observe(
+                "WORKSPACE_SYMBOL_WIRE_ACTUAL_RECEIPT",
                 json!({
                     "requests":self.requests,"responses":responses
                 })
@@ -6726,8 +6726,8 @@ mod workspace_symbols {
             assert!(output.status.success(), "{:?}", output.status);
             let stderr = std::str::from_utf8(&output.stderr).unwrap();
             assert_eq!(stderr.lines().collect::<Vec<_>>(), expected);
-            println!(
-                "WORKSPACE_SYMBOL_WIRE_ACTUAL_RECEIPT={}",
+            observe(
+                "WORKSPACE_SYMBOL_WIRE_ACTUAL_RECEIPT",
                 json!({
                     "requests":self.requests,"responses":self.inner.responses,
                     "status":output.status.code(),"stderr":output.stderr
@@ -6737,13 +6737,21 @@ mod workspace_symbols {
         }
     }
 
+    fn observe(label: &str, payload: Value) {
+        std::io::Write::write_fmt(
+            &mut std::io::stderr().lock(),
+            format_args!("{label}={payload}\n"),
+        )
+        .unwrap();
+    }
+
     fn query(id: Value, text: &str) -> Value {
         json!({"jsonrpc":"2.0","id":id,"method":"workspace/symbol","params":{"query":text}})
     }
     fn request(session: &mut Session, method: &str, params: Value) -> Value {
         let response = super::request(session, method, params.clone());
-        println!(
-            "WORKSPACE_SYMBOL_SESSION_EXCHANGE_ACTUAL_RECEIPT={}",
+        observe(
+            "WORKSPACE_SYMBOL_SESSION_EXCHANGE_ACTUAL_RECEIPT",
             json!({
                 "request":{"jsonrpc":"2.0","id":1,"method":method,"params":params},"response":response
             })
@@ -6751,8 +6759,8 @@ mod workspace_symbols {
         response
     }
     fn notify(session: &mut Session, method: &str, params: Value) {
-        println!(
-            "WORKSPACE_SYMBOL_SESSION_NOTIFICATION_ACTUAL_RECEIPT={}",
+        observe(
+            "WORKSPACE_SYMBOL_SESSION_NOTIFICATION_ACTUAL_RECEIPT",
             json!({
                 "jsonrpc":"2.0","method":method,"params":params
             })
@@ -6837,8 +6845,8 @@ mod workspace_symbols {
     ) {
         // Temporary complete actual-value capture, retained until OWNER+ROOT
         // review; assertions, genuine mutations and Package cleanup are permanent.
-        println!(
-            "WORKSPACE_SYMBOL_ACTUAL_RECEIPT={}",
+        observe(
+            "WORKSPACE_SYMBOL_ACTUAL_RECEIPT",
             json!({
                 "fixture":label,"original":original,"requests":requests,
                 "responses":responses,"owned":owned
@@ -8403,7 +8411,7 @@ mod workspace_symbols {
                 let response: Value = serde_json::from_slice(&payload).unwrap();
                 let matched = response.get("id") == Some(id);
                 wire.responses.push(response.clone());
-                if matched {
+                if matched || response.get("id") == Some(&Value::Null) {
                     return response;
                 }
             }
@@ -8497,6 +8505,39 @@ mod workspace_symbols {
             refused(&response, code);
             if code == -32803 {
                 assert_eq!(response["error"]["message"], "limit");
+            }
+            assert!(
+                serde_json::to_vec(&response).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES
+            );
+            requests.push(message);
+        }
+        // A request without params has a smaller envelope than even the compact
+        // error. Echo IDs only while the complete response fits; an unreplyable
+        // ID is InvalidRequest/null, never a fatal oversized output frame.
+        for (reserve, code) in [(67, -32803), (66, -32600), (53, -32600)] {
+            let message = json!({"jsonrpc":"2.0",
+                "id":"n".repeat(ktlsp_protocol::MAX_PAYLOAD_BYTES - reserve),
+                "method":"workspace/symbol"});
+            let input_bytes = serde_json::to_vec(&message).unwrap().len();
+            assert!(input_bytes <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
+            if reserve == 53 {
+                assert_eq!(input_bytes, ktlsp_protocol::MAX_PAYLOAD_BYTES);
+            }
+            let response = recorded_send(&mut wire, &message, &mut raw_frames);
+            refused(&response, code);
+            if code == -32600 {
+                assert_eq!(response["id"], Value::Null);
+                assert_eq!(
+                    response["error"]["message"],
+                    "workspace request id cannot fit a response"
+                );
+            } else {
+                assert_eq!(response["id"], message["id"]);
+                assert_eq!(response["error"]["message"], "limit");
+                assert_eq!(
+                    serde_json::to_vec(&response).unwrap().len(),
+                    ktlsp_protocol::MAX_PAYLOAD_BYTES
+                );
             }
             assert!(
                 serde_json::to_vec(&response).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES

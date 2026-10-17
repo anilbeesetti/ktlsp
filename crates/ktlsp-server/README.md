@@ -103,7 +103,11 @@ original16-project/1,024-source/16 MiB admission ceilings.
 
 Actual escaped request IDs reserve512 bytes for bounded workspace failures BEFORE
 parameter/provider errors; selected-document detailed reasons remain unchanged.
-Malformed parameters use `-32602`, stale/unavailable authority `-32801`,
+An ID that fits a compact error but not that reserve receives echoed-ID `-32803`
+`"limit"`. An ID too large for EVEN that compact response is outside this
+provider's replyable-ID policy: `-32600` with `id:null`, not an oversized output
+frame or fatal connection failure. Missing params cannot bypass either check.
+Malformed admitted parameters use `-32602`, stale/unavailable authority `-32801`,
 cancellation `-32800`, resource/provider refusal `-32803`; no empty fallback.
 One aggregate owns ONE job in the existing shared global8 registry and parses
 sequentially. Cancellation takes its ID once but retains owned state until join;
@@ -115,7 +119,7 @@ exchanges, separate Session retained8/overflow/join/recovery and honestly
 conditional cross-Session admission. No production probe/barrier/delay forces
 saturation. Complete original producer/protocol data and actual large-ID raw
 headers/payloads are captured losslessly as actual byte runs, not expected
-reconstructed wire. Genuine returned TYPE edits are applied in the SAME live
+reconstructed wire. Genuine returned local-value rename edits are applied in the SAME live
 overlay. BOTH owner and ROOT must independently reconstruct/read every complete
 actual value and apply returned edits before capture retirement. No local
 parser/server/Session runtime is authorized under96; source coverage is not proof.

@@ -31,6 +31,8 @@ const MAX_QUERY_BYTES: usize = 8192;
 // Aggregate and workspace-waiter failures use bounded static messages; original
 // selected-document/import reasons stay on their existing consumer paths.
 const MAX_FAILURE_BYTES: usize = 512;
+// response_error(id, -32803, "limit"): fixed JSON bytes excluding the encoded ID.
+const COMPACT_ERROR_FIELDS_BYTES: usize = 65;
 const LIMIT: &str = "workspace symbol aggregate limit exceeded";
 
 #[derive(Debug)]
@@ -44,6 +46,17 @@ pub(super) struct Capture {
     pub(super) epoch: u64,
     pub(super) members: Vec<Member>,
     pub(super) closed: Vec<Vec<usize>>,
+}
+
+#[derive(Debug)]
+pub(super) enum AdmissionError {
+    UnreplyableId,
+    Resource(&'static str),
+}
+impl From<&'static str> for AdmissionError {
+    fn from(message: &'static str) -> Self {
+        Self::Resource(message)
+    }
 }
 
 /// Frozen monotonic aggregate allowances, including both verification phases.
@@ -65,14 +78,14 @@ fn charge(used: &mut usize, amount: usize, limit: usize) -> Result<(), &'static 
     if next > limit { Err(LIMIT) } else { Ok(()) }
 }
 impl Budget {
-    pub(super) fn new(query: &str, id: &Value) -> Result<Self, &'static str> {
-        if query.len() > MAX_QUERY_BYTES {
-            return Err("workspace query limit exceeded");
-        }
+    pub(super) fn new(query: &str, id: &Value) -> Result<Self, AdmissionError> {
         let mut budget = Self::default();
         // Count actual serde_json string escaping, without serializing/copying
         // the client ID. Numeric IDs need at most twenty bytes.
         let id_bytes = if let Some(id) = id.as_str() {
+            if id.len() > ktlsp_protocol::MAX_PAYLOAD_BYTES - COMPACT_ERROR_FIELDS_BYTES - 2 {
+                return Err(AdmissionError::UnreplyableId);
+            }
             budget.work(id.len(), &AtomicBool::new(false))?;
             budget.storage(id.len())?;
             id.bytes().try_fold(2usize, |bytes, byte| {
@@ -81,17 +94,22 @@ impl Budget {
                     0..=0x1f => 6,
                     _ => 1,
                 };
-                bytes.checked_add(width).ok_or(LIMIT)
+                bytes.checked_add(width).ok_or(AdmissionError::UnreplyableId)
             })?
         } else {
             20
         };
         if id_bytes
+            .checked_add(COMPACT_ERROR_FIELDS_BYTES)
+            .is_none_or(|n| n > ktlsp_protocol::MAX_PAYLOAD_BYTES)
+        {
+            return Err(AdmissionError::UnreplyableId);
+        }
+        if id_bytes
             .checked_add(MAX_FAILURE_BYTES)
             .is_none_or(|n| n > ktlsp_protocol::MAX_PAYLOAD_BYTES)
         {
-            // This refusal fits any valid workspace-query frame with this ID.
-            return Err("limit");
+            return Err(AdmissionError::Resource("limit"));
         }
         budget.output(id_bytes.checked_add(64).ok_or(LIMIT)?)?;
         budget.query(query)?;

@@ -4329,3 +4329,44 @@ union (21 source/test/data and9 existing Markdown paths) must receive BOTH
 independent exact full-union reviews, including native test-lifetime repairs.
 Only then may ROOT separately admit fresh compiler gates. No prior partial/
 failed compiler or source-only review is promoted to this whole composition.
+
+First whole30path4e3438d57a77a2e29aacd3c0ccb2ae4335b4fac0/tree94d386eadf0cb18a98f0f344ad77bcbb3cd20451
+functionality review returned P2 HOLD: successful Native default libtest suppresses
+the new workspace println receipts; platform nocapture is not Native evidence.
+ROOT FULL-read and preserved the complete11418B original receipt
+SHA6e5b857f3fc975842356b5b4e76317cd7833742775d70630fb14f94139f5753e.
+All7 new workspace observation sites now call one direct locked OS-stderr
+write_fmt helper, retaining exact labels/JSON payloads and every consumer,
+assertion, mutation, genuine edit and cleanup at the same frequency. No workflow
+filter/nocapture toggle, parser bound, delay, runtime or formatter rerun changed.
+The manually dispatched extracted-archive smoke's existing println remains:
+that separate workflow explicitly uses nocapture and is outside this repair.
+The new workspace replay uses actual local-VALUE rename edits; the inherited
+signature fixture still uses actual TYPE edits. Server docs corrected rather
+than relabelling evidence. Both exact complete-union source renewals and fresh
+compiler/runtime admissions remain pending; initial held source stays rejected.
+
+The complete r1 adversary separately identified a real production boundary:
+a MAX-framed workspace request WITHOUT params can have an ID whose compact
+echoed `"limit"` response is14bytes too large, causing fatal output failure.
+ROOT FULL-read and retained10741B original receipt
+SHA4e30406dd5a7616dcb169ebb8de0a6eead147e477fc93bf5b5ffad3d0ee9bb28.
+No product was rerun to confirm that source-derived counterexample.
+
+ROOT now has explicit typed admission outcomes. Encoded ID bytes first must fit
+the compact error's fixed65bytes; only then does the512-byte ordinary-failure
+reserve apply. An ID that fits compact only receives its full echoed-ID
+resource refusal. An ID that cannot fit EVEN compact is outside the provider's
+replyable-ID policy and receives InvalidRequest/id:null BEFORE params/source
+work, preserving a usable connection rather than pretending it can echo the ID.
+No transport ceiling was raised and unrelated selected-document error behavior
+is unchanged. The parser-free request code is STILL not authorized locally.
+
+The REAL packaged framed source adds missing-params cases with exact compact
+response fit, one-byte-over and maximum admitted INPUT length, preserving all
+existing stale/model/query-null/refusal cases, complete actual raw byte-run
+capture and subsequent same-session recovery/shutdown/EOF/child wait. The
+recorder returns actual null-ID rejection responses rather than waiting forever
+for an impossible echoed ID; each case independently asserts its allowed ID/code.
+This is source repair, not passing runtime proof. BOTH r1 source reviews remain
+rejected until independent exact cumulative whole30path renewals.

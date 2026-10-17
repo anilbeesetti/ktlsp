@@ -118,8 +118,12 @@ parser bound/deadline is added. One256 Mi-unit logical allowance includes
 verification, capture, delegated parser precharge, projection and output;
 conservative precharge permits AT MOST42 tiny-source delegations before other
 work, not1,024 successful parses merely because membership admits1,024.
-Actual escaped IDs reserve512 failure bytes before parameter errors. These
-logical limits do not prove CPU/RSS/OS latency or prompt inner cancellation.
+Actual escaped IDs reserve512 failure bytes before parameter errors. IDs fitting
+only the compact refusal keep their echoed ID; an ID that cannot fit EVEN that
+response is rejected by provider policy as InvalidRequest (`-32600`, `id:null`)
+before params/source work. The connection remains available; no false full-ID
+echo or oversized transport write is attempted. Logical limits do not prove
+CPU/RSS/OS latency or prompt inner cancellation.
 [Full source/error/resource and evidence-layer contract](../../crates/ktlsp-server/README.md#coherent-eager-native-workspace-symbols-426).
 
 Packaged raw protocol values, separate Session ownership, actual lossless byte

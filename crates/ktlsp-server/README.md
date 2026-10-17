@@ -314,8 +314,11 @@ assertions remain at their original frequency, including adversarial producer
 calls formerly inside capture output. First-source failed positive used a
 post-name generic sibling outside the existing leading-only contract; its
 fixture-only correction retains all8 cases/U/send/p isolation assertions.
-Original failed union stays rejected. Cleaned-source exact reviews/OWN full CI,
-guarded integration and independent exact-main acceptance remain separate gates.
+Original failed union stays rejected. Cleaned reviewedf9beb55ac150cebfa71296005f31933fd3400922
+passed OWN original Native39017168841/platform39017168914 full three-host CI.
+The separate fresh guard and expected-head squash produced18733fe9f1233e0671ef765b1c2295d3f7fbb39e,
+tree49e47082/soleparent0d7d219. Independent OWNER+ROOT accepted original exact-main
+39018036957/1/job117354061005 before lease420 clearance. See the development ledger.
 No local Kotlin runtime or official equivalence is claimed.
 
 ## Finite function type-parameter references and rename (#392)
@@ -597,30 +600,85 @@ Copied matching binaries ran with empty PATH and Java homes removed. Only the
 observed temporary writer was removed afterward; permanent assertions remain.
 This is first-source native evidence, not final-cleanup/main/official parity proof.
 
+## Explicit JSON source authority (#421)
+
+**Implemented composition, not yet runtime-verified at this checkpoint.**
+The opt-in initialize parameters are:
+
+```json
+{"initializationOptions":{"projects":[{"type":"json","path":"file:///absolute/project"}]}}
+```
+
+The path identifies an existing local directory containing actual
+`workspace.json`. The existing immutable v2 importer and separate
+[read-only source inventory](../ktlsp-import/README.md#bounded-read-only-source-inventory-421)
+must completely admit every configured project before publication. Meaningful
+unsupported model/project fields and late I/O/budget failures refuse atomically;
+there is no prefix, schema rewrite or fallback to the previous current model.
+The retained previous model is historical only after a failed reload.
+
+Initialization starts one owned native import after `initialized`. An immediate
+unopened-file `textDocument/documentSymbol` can wait for that same attempt,
+inside the EXISTING eight-request capacity; no status/readiness probe is needed.
+`intellij/reloadWorkspace` takes
+`{"initializationOptions":{"projects":[...]}}` and returns `null` only after a
+complete current candidate commits. An explicit empty project list clears
+authority. Reload failure is `-32803` with the actual native reason in
+`error.data.reason`; initial notification failure is safely JSON-quoted in the
+bounded error record, not fabricated protocol success or import status.
+
+Only original admitted `.kt` members can supply unopened symbols. Every
+successful closed-source render revalidates the original model AND selected
+source before and after actual parsing, using one request budget. Changed,
+replaced or unavailable bytes/identities refuse `-32801` with the actual reason;
+arbitrary outside URI queries never cause outside filesystem reads. New files
+are not silently discovered: this is explicit manual-reload snapshot policy.
+
+Open buffers remain authoritative. Existing synchronization keeps exact wire
+URI identity; imported symbol queries additionally recognize pure native-file
+URI aliases of that ONE entry/open overlay. A competing alias open refuses.
+An unresolved file overlay conservatively blocks CLOSED workspace publication,
+because outside paths are not probed to guess physical nonmembership. Existing
+open outside/custom/untitled consumers still work. Accepted file changes,
+close/reopen, reload and nonempty workspace-folder updates invalidate affected
+closed work; rejected edits/folder batches do not. Closing never treats unsaved
+bytes as disk. Workspace-folder changes store the whole validated batch and
+invalidate authority; they do not invent automatic project discovery.
+
+At most TWO whole workspace generations, including current/historical/captured
+and candidate models, may remain retained. Parser/import jobs share the same
+eight global owned handles, with at most one retained import per Session.
+Cancellation releases IDs/responds once, including dependent waiting symbols,
+but never releases owned work before join. EOF/shutdown/broken output use the
+existing cleanup proof and unchanged one-second grace, excluding OS calls.
+No watcher, progress/FINISHED status, workspace symbols, cross-file semantic
+binding, effective SDK/classpath, build-tool import or official equivalence is
+advertised. Existing provider capabilities are unchanged.
+
 ## Bounded syntactic document symbols
 
-Requests read only open Kotlin document text, never disk. Each request retains one immutable URI/version/source snapshot, runs the supervised `Parser::parse_snapshot_with_cleanup` on a bounded Rust thread and projects the validated original-byte CST. Session control, JSON-RPC validation and the document store remain single-owned. Immediately before publication, the owner checks the open-document incarnation as well as exact version/content; close/reopen cannot alias an old request even with identical bytes and version. No parser result or outline is cached.
+By default requests read open Kotlin document text, never arbitrary disk paths. Explicit #421 JSON authority additionally supplies original admitted unopened-file snapshots under the checks above. Each request retains one immutable URI/revision/source snapshot, runs the supervised `Parser::parse_snapshot_with_cleanup` on a bounded Rust thread and projects the validated original-byte CST. Session control, JSON-RPC validation and the document store remain single-owned. Open publication checks incarnation plus exact version/content; closed publication checks current model/epoch/overlay authority after native before/after verification. Close/reopen cannot alias an old request. No parser result or outline is cached.
 
 Only direct declaration-name structure proves emitted names. Supported producer shapes include named classes/interfaces/objects/enums, functions/methods, properties, typealiases, enum entries, explicit `constructor` keywords and `val`/`var` primary-constructor properties, including nested/local declarations. The outline uses nearest emitted enclosing declarations, not resolved scopes or semantic identities. Unicode and backtick spelling are preserved verbatim. A declaration range is its complete producer CST extent, including any bound leading comment; its selection range is its original name token. Implicit unnamed constructors, ordinary parameters/type parameters and anonymous expressions have no invented names. A missing function name in a top-level/member declaration is rejected, not treated as an anonymous expression.
 
 Clients advertising `hierarchicalDocumentSymbolSupport: true` receive `DocumentSymbol[]` with `range`, `selectionRange` and `children`; other clients receive flat `SymbolInformation[]` with URI/range and nearest emitted `containerName`. `symbolKind.valueSet` is respected. Without it, the original kinds 1–18 are used: object falls back to Class, enum entry to Enum, and a typealias uses Class without implying a resolved target. If neither the intended kind nor its compatible fallback is supported, the request fails instead of emitting an unsupported client kind.
 
-Incomplete/error trees, unsupported declaration shapes (including destructuring and unnamed companion objects), parser coverage/resource/process failures and outline ceilings reject the **whole** symbol request with RequestFailed (`-32803`), never partial/truncated success. A valid empty/comment-only file can return `[]`. Missing/closed documents or malformed request parameters return invalid params (`-32602`) when the provider is configured. Parsing uses the existing conservative **source-mode** grammar, not a complete script/grammar implementation. Comments/string mentions never become declarations. The outline itself proves no binding/type semantics; finite local navigation above is separate. There is no completion, type, refactoring or official document-symbol parity claim.
+Incomplete/error trees, unsupported declaration shapes (including destructuring and unnamed companion objects), parser coverage/resource/process failures and outline ceilings reject the **whole** symbol request with RequestFailed (`-32803`), never partial/truncated success. A valid empty/comment-only file can return `[]`. Without explicit source authority, unopened documents return InvalidParams (`-32602`), as do malformed generic request parameters. With configured authority, unavailable/nonmember/unsupported native URI requests refuse `-32803`; changed original model/source verification refuses `-32801`. Parsing keeps the existing conservative **source-mode** grammar, not complete script/grammar support. Comments/string mentions never become declarations. The outline proves no binding/type semantics or official document-symbol parity.
 
 ### Cancellation and library lifetime
 
-`Session::handle` returns immediate responses; accepted parser-backed symbol/definition/hover/references/highlight/completion/prepareRename/rename requests return no immediate response. Call the nonblocking `Session::poll()` while continuing to service incoming messages to collect deferred responses. `Session::pending_requests()` includes cancelled work until its thread actually terminates. Existing parser-free requests remain immediate. The real-worker test request helper polls, and the packaged stdio client waits for each request before sending dependent edits or shutdown; bulk input does not imply synchronous completion order.
+`Session::handle` returns immediate responses; accepted parser-backed requests and explicit native reloads are deferred. Call nonblocking `Session::poll()` while servicing incoming messages to collect joined results. `Session::pending_requests()` includes parser/import jobs, bounded initial-symbol waiters and cancelled work until actual completion. Existing parser-free requests remain immediate. The real-worker helper polls and packaged stdio client waits for each request before dependent edits/shutdown; bulk input does not imply synchronous completion order.
 
-A valid `$/cancelRequest` signals the exact active string/integer ID's `AtomicBool` passed to the existing Parser and returns that request's single RequestCancelled (`-32800`) response, never a notification response. Unknown IDs do nothing; invalid cancellation notifications produce bounded error records, not wire errors. IDs are reusable after their response, while old cancelled generations remain retained solely for cleanup. A duplicate still-active ID is rejected with InvalidRequest and null ID, without terminating the original request. Committed didChange/didClose invalidate matching work with ContentModified (`-32801`); rejected edits leave it alive. Stale/cancelled results never become empty success.
+A valid `$/cancelRequest` signals the exact active string/integer ID and returns its single RequestCancelled (`-32800`) response, never a notification response. Cancelling an import also cancels its dependent symbol waiters; cancelling one waiter does not detach the shared import. Unknown IDs do nothing; invalid cancellation notifications produce bounded records. IDs become reusable after their response while old cancelled work remains owned for cleanup. Duplicate active IDs return InvalidRequest with null ID without terminating the original. Committed synchronization invalidates matching open work; accepted file/configuration mutations also stale affected closed work with `-32801`. Rejected mutations preserve authority. Stale/cancelled results never become empty success.
 
-Shutdown and exit cancel owned jobs. `Session::close() -> (Vec<Value>, bool)` is terminal: it returns remaining cancellation responses and observes already-cancelled threads for a one-second grace, joining only handles whose `is_finished()` is true. True requires every owned handle actually joined **and** every original Parser invocation proved no spawn attempt or same-child reaping (plus non-Unix scoped-I/O exit). A request-specific false report or parser-thread panic permanently prevents clean success, even if cleanup might finish later. False means closure is unproved, not proof a child remains alive; later/global state never invents proof or revises the selected request result. `Drop` cancels without joining or reporting success; callers needing an outcome must use `close`. A bounded process-wide registry retains every unfinished handle after Session drop; admission/poll reap only finished handles. The one-second grace excludes time inside OS calls, including join of an already-finished handle.
+Shutdown and exit cancel owned jobs. Terminal `Session::close() -> (Vec<Value>, bool)` returns remaining cancellation responses and observes retained threads for the unchanged one-second grace, joining only handles whose `is_finished()` is true. True requires EVERY owned parser/import handle joined and every original Parser invocation proved no spawn attempt or same-child reaping (plus non-Unix scoped-I/O exit). A false cleanup report, missing worker result or worker panic permanently prevents clean success. False is unproved closure, not proof a child remains alive; later/global state cannot invent proof or revise the selected result. `Drop` cancels without reporting success; callers needing an outcome must call `close`. The bounded process-wide registry retains unfinished handles after drop. The grace excludes OS calls, including join of an already-finished handle.
 
 `run` uses the shared resumable `ktlsp_protocol::FrameReader`; partial headers/payloads survive input readiness gaps. It borrows the supplied `BufRead` without spawning a reader thread or queue. Library readers must yield WouldBlock periodically when idle to permit deferred completions; arbitrary blocking readers can delay them. The CLI supplies `BufReader<StdinInput>` over a duplicated, exclusively read native handle (not the globally buffered `std::io::Stdin`): Unix poll and Windows redirected-pipe PeekNamedPipe yield idle readiness ticks within 10 ms, excluding OS scheduling. Windows console stdin is rejected explicitly. The handle and decoder are dropped on return, including exit while the client keeps stdin open.
 
 EOF, fatal framing or broken output cancel jobs and attempt bounded cleanup. EOF is success only after shutdown; exit is success only after shutdown; any incomplete cleanup or output failure returns status 1 and controlled stderr. No writes are retried after broken output. Responses cannot be delivered after a broken transport, but work is still cancelled. Output write/flush, filesystem/handle operations and thread creation are synchronous OS calls: backpressure, OS scheduling or stuck OS calls have no hard real-time guarantee. The server does not hide a blocked join as successful cleanup.
 
-- At most **8 retained parser jobs per Session**, no waiting-job queue, and **8 owned parser thread handles process-wide**, shared across all eight parser-backed methods, with unfinished handles retained globally until joined. Capacity exhaustion returns RequestFailed (`-32803`) before copying source or spawning more work. These limits do not replace or weaken the parser's existing eight global Unix supervision reservations.
-- Snapshot text is copied once into immutable shared storage; worker and owner share that snapshot. Each job has one bounded single-result channel, at most one rendered response, and one cancellation flag. A cancelled job releases its ID immediately but not its storage/admission slot before completion.
+- At most **8 retained parser/import/waiting requests per Session** and **8 global owned parser/import thread handles**, shared across methods. At most one native import remains owned per Session; bounded waiting symbols share, not add to, capacity. Unfinished handles remain globally until joined. Exhaustion refuses `-32803`, never adds a parser pool or weakens the existing eight Unix supervision reservations.
+- Open snapshot text is copied once into shared immutable storage; imported source/URI snapshots clone retained `Arc<str>` values without copying source. Worker/owner retain the same authority, a bounded single-result channel and cancellation flag. Cancellation releases its ID, not storage/admission ownership before completion.
 - The incremental decoder retains at most one 8 KiB header and one 16 MiB payload plus the CLI's bounded read buffer. There is no accumulated input-frame queue or reader-thread lifetime to join.
 - Idle pending-input polls back off for 1 ms, so an immediately nonblocking
   library reader cannot keep an otherwise idle session busy-spinning. The wait

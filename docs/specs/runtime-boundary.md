@@ -9,3 +9,13 @@ Optional external tooling is explicit: use configured/existing Java, Gradle, Mav
 The user-authorized isolated official oracle can use its own JVM distribution in research storage. That distribution and scripts never enter the native release/archive/dependency graph. Native CI remains runnable without Java. Optional external-tool integration/oracle tests are separately identified.
 
 This clarification supersedes earlier documents' prohibition on external JDK invocation. It does not authorize replacing the native semantic engine with a JVM/compiler process or bundling Java to regain parity.
+
+Explicit JSON source authority (#421) adds bounded read-only Rust filesystem
+inventory beside, not inside, existing data-only JSON/JPS/Maven/T004 producers.
+Only configured local projects are discovered; unknown URI queries do not probe
+outside membership. Windows-only `file-id = 0.2.3` supplies native OS identity,
+not C/C++ analysis or Java. No JDK/compiler/build tool is invoked for this path.
+This finite composition is not yet runtime-verified at its current checkpoint;
+full official import, effective classpaths and external-tool orchestration remain
+separate. #96 local server/parser/Session/worker restrictions still apply.
+

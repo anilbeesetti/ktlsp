@@ -24,3 +24,16 @@ IDs must be nonempty after trim and unique in their collection. Module and libra
 Resolve relative paths lexically against the manifest parent; return absolute normalized PathBuf values. Eliminate `.`/`..` without requiring paths to exist. Parent-relative roots are permitted because real multi-project models can live outside the build root. This loader performs no classpath traversal, process execution, artifact downloads or symlink canonicalization. Missing files are retained for later explicit import-status reporting; they are not assumed resolved. Ownership validation is lexical only; symlink aliases require a separate filesystem-discovery check before analysis and must be documented as that limitation.
 
 Budgets: 2 MiB manifest bytes, 4,096 modules, 8,192 libraries, 65,536 total dependency edges, 16,384 total source roots, 32,768 total binary/source/SDK archive paths. Check before unbounded allocation/validation; reject oversized input with a named ProjectError. No recursively traversed graph. Path strings cannot be empty or contain NUL. Malformed JSON/schema/path/graph errors return Result, never panic. Public ProjectModel retains source/test/generated kinds, scopes, exports and settings; models cannot be flattened to a list of files without losing semantics.
+
+## Separate physical source authority (#421)
+
+T004 and existing model/import producers remain data-only and retain their
+lexical path/projection contracts above. A separately explicit read-only native
+`ktlsp_import::source_inventory` layer admits actual immutable v2 models, original
+model/source bytes, complete selected-root inventories, original memberships
+and full physical identities under one aggregate budget. Its local/quiescent
+filesystem assumption is NOT a hostile-replacement sandbox; it refuses
+symlink/reparse/special/external/alias/conflicting roots rather than guessing.
+The Session composition is not yet runtime-verified at this checkpoint and
+does not turn declared SDK/library/build metadata into effective semantics.
+

@@ -3242,3 +3242,100 @@ is not repaired by a later pass. B3 INCONCLUSIVE/HOLD, #417UNKNOWN, oracle custo
 HOLD, #96/no local Kotlin runtime/native-only/T004/provenance/full-parity limits
 remain. No second formatter, unchanged retry or general platform/parity claim.
 
+
+#### Verified420 capture-free integration and original exact-main acceptance
+
+Capture-free reviewedf9beb55ac150cebfa71296005f31933fd3400922,
+tree49e47082f68c0093fd379397e3f72a06b1253e8d, received BOTH exact complete ROOT
+and BOTH affected419 cleanup clears;418 production/data/tests stayed exact.
+CHECK0/1.283004s and strict locked workspace/all-target Clippy0/0.733628s.
+OWN ORIGINAL Native39017168841/1/job117351574887 and platform39017168914/1
+(Mac117351575097,Win117351575031) ALL SUCCEEDED unchanged full runs.
+Actual checkout0d1ad7e0e4af08df307887328e0e9cbf7e3ec3ca has reviewed tree49
+and ordered[0d7d21923246f75969e6b8d52da71e1aeec086ce,f9beb55ac150cebfa71296005f31933fd3400922].
+Eventde044 remained stale observational metadata, not executed source authority.
+
+| Original cleaned host | Passed including39 docs | Ordinary | Rows | Ignored | Failed |
+|---|---:|---:|---:|---:|---:|
+| Native39017168841 | 1252 | 1213 | 142 | 3 | 0 |
+| macOS39017168914 | 1250 | 1211 | 142 | 3 | 0 |
+| Windows39017168914 | 1199 | 1160 | 142 | 3 | 0 |
+
+Every run has zero measured/filtered, plus22 separately retained worker fault
+cases and3same-owned-Child code86 confirmations. ROOT accepted every new complete
+current value by full reads plus exact whole-value/occurrence correspondence to
+personally FULL-read accepted bases; all142 declared/case/outcome multisets,
+steps/source/config and18CRC-valid archive members per platform reconcile.
+Independent auditors directly fetched byte-equal complete originals.
+Native303997B/3301L SHA2565244f8709e88cc87ea8b67226e796087823a3b7d38362ee558842642f4b7a1c1;
+Mac421320B/4231L SHA256ccdaeb8cede48cab5db1c1624d85f5bfd311fb4fe86fc075134db7a9f82270f1;
+Win380835B/4008L SHA25695eae3695b3b081feacd6db1d65f5e13cba2dfc3c2f93352206f6d8859d5de5a.
+Full acceptance `/private/tmp/ktlsp-420-cleaned-original/ROOT-all-original-cleaned-CI-acceptance.json`.
+
+Fresh strictly-readonly complete guard ran in a SEPARATE call: actual outer0,
+complete valid parsedexit0, exact active exclusive main/base/head/tree/scope/
+HEAD+BASE config/status/workflow/job/artifact/clean reviewed identity inspected.
+Only then SEPARATE ordinary expected-head squash of [PR420](https://github.com/anilbeesetti/ktlsp/pull/420).
+Actual main18733fe9f1233e0671ef765b1c2295d3f7fbb39e has exact reviewed tree49
+and SOLEparent0d7d219. Independent OWNER+ROOT verified tree/parent and OWN ORIGINAL
+[main39018036957/1/job117354061005](https://github.com/anilbeesetti/ktlsp/actions/runs/39018036957/job/117354061005):
+1252=1213ordinary+39docs/142rows/1255cases,0failed3ignored0measured0filtered,
+plus22separatefaultcases/3raw86 confirmations, retired observation markers0.
+Raw302925B/3285L SHA2567c665b24796607bc502924ae32f67e1b808804d913a89dd929f9fbdbefd251ed.
+OWNER FULL-read all2638 cleaned body values and100new main body values with
+complete3301/3285 maps; ROOT FULL-read all101 new complete main values and exact
+whole-value/case maps, then BOTH complete OWNER receipts. Independent raw bytes
+match. Only AFTER both main gates was lease420 CLEARED. Full proof
+`/private/tmp/ktlsp-420-original-main-39018036957/ROOT-exact-main-acceptance.json`.
+Public delivery [6231923063](https://github.com/anilbeesetti/ktlsp/pull/420#issuecomment-6231923063);
+418/419 CLOSED completed, old source failures NEVER retroactively accepted.
+
+#### Next421 explicit JSON authority composition, no runtime acceptance yet
+
+[Issue421](https://github.com/anilbeesetti/ktlsp/issues/421) reuses completed218line
+`/private/tmp/ktlsp-next-session-json-authority-research.md` and frozen
+`local://ktlsp421-implementation-contract.md`. ROOT and every independent owner WT
+start from the SAME verified18733, preserving every old/user/delivered WT.
+ROOT WT `/private/tmp/ktlsp-421-json-authority-integration`,
+branchomp/421-json-authority-integration, owns shared source/docs/Cargo/config/
+publication/CI/guarded integration.
+
+Native inventory7edf2e1155af2d763ab416290e13c09c09c36f57/treeea5d9675 has BOTH
+complete independent static reviews, as does strict pure URI764fb72c4cc2ea6b08e8fc65116e9a23310a0256/tree086b721d.
+ROOT FULL-read all540 inventory and481 behavioral-test lines, both receipts,
+all351 URI lines and both URI receipts before composing. COMPLETE inventory
+051b/bb93/5f41/7edf range was integrated, not only the final fix.
+Two further isolated owners supplied actual CLI4fb07cd and model-state6b72251
+behavior checks. ROOT composes Session-owned import/reload, original immutable
+sources, alias/overlay guards, whole-model generations, exact cancellation and
+bounded waiters sharing the original eight handles. No extra parser pool.
+
+ROOT found and corrected the authored20*95-byte long-base fixture exceeding
+observed Darwin `getconf PATH_MAX /private/tmp`=1024: eight components retain
+512macros,1MiB work refusal and every production bound. Incidental getter echoes
+and a std Arc-clone tautology were deleted. Complete original data remain in
+`/private/tmp/ktlsp-421-root-evidence/`; historical leaf receipts are not falsely
+claimed for changed ROOT source. Real owned CLI cases retain actual requests/
+responses/raw model/source/metadata checkpoints, physical add/remove, genuine
+ranged overlay edits, stale/refusal/reload/config/cancellation behavior.
+Temporary ACTUAL421 writers bypass libtest capture via direct stdout Write and
+remain until BOTH independent OWNER+ROOT complete actual read/apply gates.
+
+Windows-only file-id0.2.3 and server->import are ROOT-admitted Cargo changes;
+metadata resolution adds only the12 native Windows registry packages while ALL
+existing package records stay exact. Native boundary/T004 data-only producers
+remain unchanged. Future complete guard must bind separate exact HEAD and BASE
+config dictionaries for legitimate reviewed Cargo.lock differences; historical
+executed420 guard is retained and BOTH ROOT reviewers must inspect the new delta.
+No active421 lease exists.
+
+Current source is **unverified**: no421formatter/compiler/check/test/import/
+server/parser/CLI runtime or hosted CI ran. ONE421formatter remains UNUSED.
+Next: BOTH exact complete ROOT union reviews, the one formatter/renewed clears,
+compile/native-data smoke admission, OWN original full three-host CI with
+complete actual gates, observation-only cleanup plus its OWN source acceptance,
+then fresh guarded integration and dual original exact-main proof. No local
+Kotlin/Session runtime, unchanged retry or widened capability. Full parity NOT
+achieved; B3 INCONCLUSIVE/HOLD, original417/395/377 causes UNKNOWN/OPEN, oracle
+HOLD and #96/native-only/provenance limits remain.
+

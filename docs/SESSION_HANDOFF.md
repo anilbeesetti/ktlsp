@@ -8,6 +8,76 @@ decisions or phase boundaries. **Full official Kotlin LSP parity is NOT achieved
 Use the actual session capacity; the historical 32-concurrent instruction below
 is not a new limit. Do not manufacture hundreds of overlapping/blocked tasks.
 
+### Latest verified420 integration and active421 composition
+
+ONE verified incoming main is now **18733fe9f1233e0671ef765b1c2295d3f7fbb39e**,
+tree**49e47082f68c0093fd379397e3f72a06b1253e8d**, sole parent
+**0d7d21923246f75969e6b8d52da71e1aeec086ce**.
+[PR420](https://github.com/anilbeesetti/ktlsp/pull/420) delivered418/419.
+Capture-free reviewedf9beb55ac150cebfa71296005f31933fd3400922 received all exact
+affected ROOT/component clears, CHECK0/1.283004s and strictClippy0/0.733628s.
+OWN original Native39017168841/1/job117351574887 and platform39017168914/1
+(Mac117351575097/Win117351575031) ALL SUCCEEDED. Actual executed
+0d1ad7e0e4af08df307887328e0e9cbf7e3ec3ca/tree49/ordered[0d7d,f9];
+stale observational eventde044 was NOT source authority. ROOT and independent
+auditors accepted every complete current value/census/step and all18CRC members
+per platform, including directly equal independently fetched raw/ZIP bytes.
+
+Fresh SEPARATE strictly-readonly guard: actual outer0 + complete parsed0, all
+leased exact identities/config/scope/status/workflow/job/artifact/clean facts
+ROOT-inspected. Only then SEPARATE ordinary expected-head squash. Actual tree/
+SOLEparent independently verified. BOTH OWNER+ROOT accepted OWN ORIGINAL main
+[39018036957/1/job117354061005](https://github.com/anilbeesetti/ktlsp/actions/runs/39018036957/job/117354061005):
+1252=1213ordinary+39docs/142rows/1255cases,0failed3ignored0measured0filtered;
+separate22faultcases/3same-owned-Child raw86, retired observation markers0.
+Raw302925B/3285L SHA256
+7c665b24796607bc502924ae32f67e1b808804d913a89dd929f9fbdbefd251ed.
+ROOT FULL-read all101 new complete main values and exact occurrence/group maps;
+OWNER independently FULL-read all complete cleaned/main values and full maps.
+ROOT FULL-read BOTH complete OWNER receipts; bytes independently fetched equal.
+Only AFTER both gates was `/private/tmp/ktlsp-lease-420.json` CLEARED.
+Full proof `/private/tmp/ktlsp-420-original-main-39018036957/ROOT-exact-main-acceptance.json`.
+Public delivery [6231923063](https://github.com/anilbeesetti/ktlsp/pull/420#issuecomment-6231923063);
+418/419 are CLOSED completed. Original failures remain FAILED/REJECTED.
+
+ROOT active WT `/private/tmp/ktlsp-421-json-authority-integration`,
+branch`omp/421-json-authority-integration`, from that SAME verified18733.
+[Issue421](https://github.com/anilbeesetti/ktlsp/issues/421) composes explicit
+JSON projects -> immutable original model/complete native inventory -> Session
+overlay/revision authority -> actual unopened-file symbols and reload.
+Reuse FULL-read218line research `/private/tmp/ktlsp-next-session-json-authority-research.md`
+and frozen `local://ktlsp421-implementation-contract.md`; do not restart.
+Native inventory7edf2e1 and URI764fb72 each have TWO full independent static
+component clears. ROOT composed COMPLETE inventory051b/bb93/5f41/7edf range,
+not just its last fix, plus URI. Two further isolated behavior owners delivered
+real CLI4fb07cd and real native-model state6b72251. ROOT additionally wires
+owned cancellation/waiters/config invalidation and real behavior checks.
+Borrowed roots are never cleaned; all old/user/delivered/component WTs remain.
+
+Current421 composed source is UNVERIFIED: no formatter/check/compiler/import/
+server/parser/test runtime or hosted CI has run. Only Cargo metadata resolution
+and system `getconf PATH_MAX /private/tmp`=1024 ran. ROOT fixed the authored
+long-base fixture to stay below Darwin's ceiling without changing512macros,
+the1MiB work limit or production bounds; removed incidental getter/Arc echoes.
+Temporary ACTUAL421 writers use direct stdout Write (not captured println) and
+stay until BOTH independent OWNER+ROOT FULL actual values/genuine edit gates.
+ROOT's ONE421 formatter is UNUSED;420's already-used formatter is historical.
+Two full ROOT union static reviewers must clear exact complete code/docs/guard
+before compile admission; then real native data smoke, OWN original full3host CI,
+capture-only cleanup/renewed source acceptance and guarded integration/main.
+
+ROOT owns Cargo/workspace/lock/docs/config/CI/publication. Windows-target-only
+file-id0.2.3 and server->import path dependency are resolved; all existing registry
+package records remain exact. Future lease must bind BOTH reviewed HEAD and
+incoming BASE config dictionaries: external complete guard now checks each
+separately for legitimate reviewed Cargo.lock changes. Historical executed420
+guard is retained in `/private/tmp/ktlsp-421-root-evidence/`; BOTH ROOT union
+reviewers must inspect this guard delta. No active421 lease/merge authority.
+Full parity NOT achieved; B3 INCONCLUSIVE/HOLD, #417/#395/#377 original causes
+UNKNOWN/OPEN, oracle HOLD, #96/native-only/T004/capability honesty unchanged.
+
+### Historical416 and418419 premerge checkpoint (superseded above)
+
 Verified incoming main is **0d7d21923246f75969e6b8d52da71e1aeec086ce**, tree
 **43dd67ec7be4a40013113eb0a5b98398522b3c9b**, sole parent
 **4bbf0f32fd5b4bad276162f927e58ac810cb8014**.

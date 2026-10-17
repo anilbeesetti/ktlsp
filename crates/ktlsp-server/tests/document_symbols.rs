@@ -7119,7 +7119,7 @@ mod workspace_symbols {
         let change = json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{
             "textDocument":{"uri":alias,"version":2},"contentChanges":[{
                 "range":native.range,"rangeLength":native.range_length,"text":native.text}]}});
-        wire.send(change.clone());
+        wire.send(change);
         let edited = document.text();
         result(
             &wire.send(query(json!("edited"), "")),
@@ -7233,7 +7233,7 @@ mod workspace_symbols {
             &single("class Added\n", &added_uri, "Added"),
         );
         let original_model = std::fs::read(project.join("workspace.json")).unwrap();
-        let mut changed_model = original_model.clone();
+        let mut changed_model = original_model;
         changed_model.push(b' ');
         std::fs::write(project.join("workspace.json"), &changed_model).unwrap();
         refused(
@@ -7295,7 +7295,7 @@ mod workspace_symbols {
                 );
             }
             let before = std::fs::read(project.join("workspace.json")).unwrap();
-            let mut after = before.clone();
+            let mut after = before;
             after.push(b'\n');
             std::fs::write(project.join("workspace.json"), &after).unwrap();
             refused(
@@ -7573,16 +7573,16 @@ mod workspace_symbols {
         );
         for index in 0..ktlsp_server::MAX_PENDING_PARSER_REQUESTS {
             let message = query(json!(format!("owned-{index}")), "");
-            assert!(session.handle(message.clone()).is_empty());
+            assert!(session.handle(message).is_empty());
         }
         let before = session.pending_requests();
         assert_eq!(before, ktlsp_server::MAX_PENDING_PARSER_REQUESTS);
         let overflow = query(json!("overflow"), "");
-        let response = session.handle(overflow.clone());
+        let response = session.handle(overflow);
         assert_eq!(response.len(), 1);
         refused(&response[0], -32803);
         let global = query(json!("global-overflow"), "");
-        let global_response = other_session.handle(global.clone());
+        let global_response = other_session.handle(global);
         // A completed handle may legitimately be reaped on this admission.
         // Never turn scheduling into a fake global-saturation assertion.
         let global_denied = !global_response.is_empty();
@@ -7592,7 +7592,7 @@ mod workspace_symbols {
         } else {
             assert_eq!(other_session.pending_requests(), 1);
             let cancel = json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":"global-overflow"}});
-            let response = other_session.handle(cancel.clone());
+            let response = other_session.handle(cancel);
             assert_eq!(response.len(), 1);
             refused(&response[0], -32800);
             assert_eq!(
@@ -7603,7 +7603,7 @@ mod workspace_symbols {
         }
         for index in 0..ktlsp_server::MAX_PENDING_PARSER_REQUESTS {
             let cancel = json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":format!("owned-{index}")}});
-            let response = session.handle(cancel.clone());
+            let response = session.handle(cancel);
             assert_eq!(response.len(), 1);
             refused(&response[0], -32800);
         }
@@ -7613,7 +7613,7 @@ mod workspace_symbols {
             "cancellation releases IDs, not owned aggregate slots"
         );
         let blocked_request = query(json!("owned-0"), "");
-        let blocked = session.handle(blocked_request.clone());
+        let blocked = session.handle(blocked_request);
         assert_eq!(blocked.len(), 1);
         refused(&blocked[0], -32803);
         let late = drain(&mut session);
@@ -7703,14 +7703,14 @@ mod workspace_symbols {
         let waiter = query(json!("waiter"), "");
         let other = query(json!("other"), "");
         let cancel = json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":"waiter"}});
-        assert!(session.handle(import.clone()).is_empty());
+        assert!(session.handle(import).is_empty());
         assert!(session.handle(waiter.clone()).is_empty());
-        assert!(session.handle(other.clone()).is_empty());
+        assert!(session.handle(other).is_empty());
         let duplicate = session.handle(waiter.clone());
         assert_eq!(duplicate.len(), 1);
         assert_eq!(duplicate[0]["id"], Value::Null);
         refused(&duplicate[0], -32600);
-        let cancelled = session.handle(cancel.clone());
+        let cancelled = session.handle(cancel);
         assert_eq!(cancelled.len(), 1);
         assert_eq!(cancelled[0]["id"], "waiter");
         refused(&cancelled[0], -32800);
@@ -7728,16 +7728,16 @@ mod workspace_symbols {
         assert_eq!(other_reply.len(), 1);
         result(other_reply[0], &expected);
         assert_eq!(joined.len(), 2, "cancelled waiter cannot complete twice");
-        assert!(session.handle(waiter.clone()).is_empty());
+        assert!(session.handle(waiter).is_empty());
         let reused = drain(&mut session);
         assert_eq!(reused.len(), 1);
         result(&reused[0], &expected);
         let first = source_reload(21, &options);
         let dependent = query(json!("superseded-waiter"), "");
-        assert!(session.handle(first.clone()).is_empty());
-        assert!(session.handle(dependent.clone()).is_empty());
+        assert!(session.handle(first).is_empty());
+        assert!(session.handle(dependent).is_empty());
         let successor = source_reload(22, &source_options(&[]));
-        let superseded = session.handle(successor.clone());
+        let superseded = session.handle(successor);
         assert_eq!(
             superseded.len(),
             3,
@@ -7812,7 +7812,7 @@ mod workspace_symbols {
                 session.handle(open_message.clone());
             }
             let request_message = query(json!("pending"), "");
-            assert!(session.handle(request_message.clone()).is_empty());
+            assert!(session.handle(request_message).is_empty());
             assert_eq!(session.pending_requests(), 1);
             let mutation = match action {
                 "change" | "rejected-version" | "rejected-range" => json!({
@@ -7836,7 +7836,7 @@ mod workspace_symbols {
             let mut responses = if action == "transport-close" {
                 Vec::new()
             } else {
-                session.handle(mutation.clone())
+                session.handle(mutation)
             };
             let retained = session.pending_requests();
             assert_eq!(
@@ -7845,7 +7845,7 @@ mod workspace_symbols {
                 "old work stays owned; reload additionally owns its actual import"
             );
             if action == "reopen" {
-                session.handle(open_message.clone());
+                session.handle(open_message);
             }
             if action.starts_with("rejected-") {
                 responses.extend(drain(&mut session));
@@ -7900,7 +7900,7 @@ mod workspace_symbols {
         assert_eq!(exact.len(), 8192);
         result(&wire.send(query(json!("exact-query"), &exact)), &json!([]));
         refused(
-            &wire.send(query(json!("exceeded-query"), &(exact.clone() + "x"))),
+            &wire.send(query(json!("exceeded-query"), &(exact + "x"))),
             -32803,
         );
         result(&wire.send(query(json!("query-recovery"), "")), &json!([]));
@@ -7929,14 +7929,14 @@ mod workspace_symbols {
             json!({"symbolKind":{"valueSet":["5"]}}),
             json!({"symbolKind":{"valueSet":[2147483648_i64]}}),
         ] {
-            let messages = [initialization(
+            let message = initialization(
                 &options,
                 json!({
                 "workspace":{"symbol":profile},"textDocument":{"diagnostic":{}}}),
-            )];
+            );
             // Invalid initialization never commits running-session authority.
             let mut session = Session::with_parser(worker()).unwrap();
-            let responses = session.handle(messages[0].clone());
+            let responses = session.handle(message);
             assert_eq!(responses.len(), 1);
             refused(&responses[0], -32602);
             assert!(session.close().1);
@@ -8107,7 +8107,7 @@ mod workspace_symbols {
             &Value::Null,
         );
         let before_model = std::fs::read(project.join("workspace.json")).unwrap();
-        let mut after_model = before_model.clone();
+        let mut after_model = before_model;
         after_model.push(b' ');
         std::fs::write(project.join("workspace.json"), &after_model).unwrap();
         let message = query(
@@ -8205,8 +8205,7 @@ mod workspace_symbols {
             let Some(payload) = ktlsp_protocol::read_frame(&mut wire.reader).unwrap() else {
                 break;
             };
-            wire.responses
-                .push(serde_json::from_slice(&payload).unwrap());
+            wire.responses.push(serde_json::from_slice(&payload).unwrap());
         }
         let output = wire.child.take().unwrap().wait_with_output().unwrap();
         assert!(output.status.success(), "{:?}", output.status);

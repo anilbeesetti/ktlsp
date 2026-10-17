@@ -45,6 +45,14 @@ pub enum FileKind {
     Script,
 }
 
+/// Existing piped deadline selection location, not a worker phase or cause.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PipedTimeoutSite {
+    SupervisorPoll,
+    WriterJoin,
+    ReaderJoin,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParserError {
     InputLimit,
@@ -55,7 +63,10 @@ pub enum ParserError {
     Coverage,
     InvalidTree,
     Cancelled,
+    /// Deadline selected by the Unix control path.
     Timeout,
+    /// Deadline selected by the non-Unix piped supervisor or its I/O joins.
+    PipedTimeout(PipedTimeoutSite),
     WorkerFailed,
     Io,
     StaleSnapshot,
@@ -2606,7 +2617,7 @@ fn supervise_piped(
                     return Err(ParserError::Cancelled);
                 }
                 if Instant::now() >= deadline {
-                    return Err(ParserError::Timeout);
+                    return Err(ParserError::PipedTimeout(PipedTimeoutSite::SupervisorPoll));
                 }
                 if output.is_none() {
                     match receiver.try_recv() {
@@ -2640,13 +2651,14 @@ fn join_io<T>(
     handle: thread::ScopedJoinHandle<'_, T>,
     deadline: Instant,
     cancelled: &AtomicBool,
+    site: PipedTimeoutSite,
 ) -> Result<T, ParserError> {
     loop {
         if cancelled.load(Ordering::Relaxed) {
             return Err(ParserError::Cancelled);
         }
         if Instant::now() >= deadline {
-            return Err(ParserError::Timeout);
+            return Err(ParserError::PipedTimeout(site));
         }
         if handle.is_finished() {
             return handle.join().map_err(|_| ParserError::Io);
@@ -2663,8 +2675,9 @@ fn finish_io(
     deadline: Instant,
     cancelled: &AtomicBool,
 ) -> Result<Vec<u8>, ParserError> {
-    join_io(writer, deadline, cancelled)?.map_err(|_| ParserError::Io)?;
-    join_io(reader, deadline, cancelled)?;
+    join_io(writer, deadline, cancelled, PipedTimeoutSite::WriterJoin)?
+        .map_err(|_| ParserError::Io)?;
+    join_io(reader, deadline, cancelled, PipedTimeoutSite::ReaderJoin)?;
     output
         .map(Ok)
         .unwrap_or_else(|| receiver.try_recv().map_err(|_| ParserError::Io)?)
@@ -2916,6 +2929,7 @@ mod tests {
         work: impl FnOnce() -> T + Send,
         deadline_after: Duration,
         cancel: bool,
+        site: PipedTimeoutSite,
     ) -> Result<(), ParserError> {
         let (release, gate) = mpsc::channel::<()>();
         let (started, ready) = mpsc::channel();
@@ -2932,7 +2946,8 @@ mod tests {
                     });
                     ready.recv().unwrap();
                     cancelled.store(cancel, Ordering::Relaxed);
-                    let outcome = join_io(handle, Instant::now() + deadline_after, &cancelled);
+                    let outcome =
+                        join_io(handle, Instant::now() + deadline_after, &cancelled, site);
                     let _ = selected.send(outcome.map(|_| ()));
                 });
             });
@@ -3052,22 +3067,28 @@ mod tests {
 
     #[test]
     fn pending_io_checks_cancellation_and_deadline_before_join() {
-        for (deadline, cancel, expected) in [
-            (Duration::ZERO, false, ParserError::Timeout),
-            (TIMEOUT, true, ParserError::Cancelled),
-            (TIMEOUT, false, ParserError::Timeout),
-        ] {
-            assert_eq!(
-                pending_io(|| Ok::<(), std::io::Error>(()), deadline, cancel),
-                Err(expected)
-            );
-            assert_eq!(pending_io(|| (), deadline, cancel), Err(expected));
+        for (deadline, cancel) in [(Duration::ZERO, false), (TIMEOUT, true), (TIMEOUT, false)] {
+            for site in [PipedTimeoutSite::WriterJoin, PipedTimeoutSite::ReaderJoin] {
+                let expected = if cancel {
+                    ParserError::Cancelled
+                } else {
+                    ParserError::PipedTimeout(site)
+                };
+                assert_eq!(
+                    pending_io(|| Ok::<(), std::io::Error>(()), deadline, cancel, site),
+                    Err(expected)
+                );
+                assert_eq!(pending_io(|| (), deadline, cancel, site), Err(expected));
+            }
         }
     }
     #[test]
     fn output_receipt_does_not_mean_reader_thread_finished() {
         for (cancel, expected) in [
-            (false, ParserError::Timeout),
+            (
+                false,
+                ParserError::PipedTimeout(PipedTimeoutSite::ReaderJoin),
+            ),
             (true, ParserError::Cancelled),
         ] {
             let (sender, receiver) = mpsc::sync_channel(1);
@@ -3076,6 +3097,7 @@ mod tests {
                     move || sender.send(Ok::<_, ParserError>(b"ok".to_vec())).unwrap(),
                     if cancel { TIMEOUT } else { Duration::ZERO },
                     cancel,
+                    PipedTimeoutSite::ReaderJoin,
                 ),
                 Err(expected)
             );
@@ -3094,7 +3116,10 @@ mod tests {
             ("success", Ok(b"ok".to_vec())),
             ("buffered-success", Ok(b"ok".to_vec())),
             ("cancel-ready", Err(ParserError::Cancelled)),
-            ("timeout-ready", Err(ParserError::Timeout)),
+            (
+                "timeout-ready",
+                Err(ParserError::PipedTimeout(PipedTimeoutSite::WriterJoin)),
+            ),
         ] {
             let actual = thread::scope(|scope| {
                 let writer = scope.spawn(move || match case {
@@ -3331,9 +3356,13 @@ mod tests {
     #[test]
     fn supervised_faults_terminate_and_allow_next_request() {
         let _functional = crate::functional_test::serial();
+        #[cfg(unix)]
+        let timeout = ParserError::Timeout;
+        #[cfg(not(unix))]
+        let timeout = ParserError::PipedTimeout(PipedTimeoutSite::SupervisorPoll);
         for (mode, expected) in [
-            ("hang", ParserError::Timeout),
-            ("no-read", ParserError::Timeout),
+            ("hang", timeout),
+            ("no-read", timeout),
             ("oversize", ParserError::OutputLimit),
             ("crash", ParserError::WorkerFailed),
             ("exit-failure", ParserError::WorkerFailed),
@@ -3371,10 +3400,7 @@ mod tests {
             );
             if mode == "crash" {
                 // Abort completion can cross the deadline checked before exit status.
-                assert!(matches!(
-                    result,
-                    Err(ParserError::WorkerFailed | ParserError::Timeout)
-                ));
+                assert!(result == Err(ParserError::WorkerFailed) || result == Err(timeout));
             } else {
                 assert_eq!(result, Err(expected));
             }

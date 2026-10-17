@@ -15,6 +15,187 @@ Install **both** `ktlsp` and `ktlsp-parser-worker` from that same build into the
 
 Without that sibling, synchronization/folding/lexical diagnostics, compatible lexical semantic tokens and the negotiated structural quickfix remain available, `documentSymbolProvider`/`workspaceSymbolProvider`/`definitionProvider`/`hoverProvider`/`referencesProvider`/`documentHighlightProvider`/`completionProvider`/`signatureHelpProvider`/`renameProvider` are omitted and their requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. A configured worker that subsequently fails is a request failure, not a fabricated outline or binding. No JVM/JDK, Kotlin compiler or C parser is required.
 
+## Basic native candidate setup (#430)
+
+**Source/setup contract, not a ready release or editor verification.** PR429's
+capture-free source is verified on main `21aab03`, after its OWN original full
+three-host CI, guarded integration and independent feature OWNERS+ROOT original
+exact-main acceptance. Its first c035 runs remain FAILED; later passes do not
+diagnose historical deadlines. #430's expanded copied-pair consumer passed on
+all three original acf06cd hosts; ROOT and its independent feature owner checked
+the complete captured Mac/Windows values and applied every returned edit.
+However, that source's original Windows full CI FAILED an older navigation
+request with `parser deadline exceeded`; cause remains UNKNOWN. The copied-pair
+pass is not extracted-archive or release acceptance. [Exact outcome and holds](https://github.com/anilbeesetti/ktlsp/pull/432#issuecomment-6240834265).
+At that earlier checkpoint, the #433 selected-site prerequisite was source-only.
+Use only current-source archives and extracted proof separately accepted in
+[#430](https://github.com/anilbeesetti/ktlsp/issues/430); the historical
+[#373 receipts below](#optional-extracted-archive-smoke-373) certify only their
+exact sources. The ten-hour goal is not a guarantee.
+
+The changed `2627f9e` composition subsequently passed its OWN original full
+Linux/macOS/Windows CI. Independent controls, both #433 OWNERS and the basic
+consumer OWNER+ROOT accepted the complete current actual replies and genuine
+edits. [Exact original source and evidence](../../docs/status/development.md#basic430-and-bounded433-original2627-smoke-and-ci-accepted)
+remain distinct from the documentation-completion head and its still-required
+guarded integration/exact-main/packaging gates. This is copied-pair proof,
+not an accepted extracted archive, editor certification or historical diagnosis.
+
+For #433's non-Unix piped deadline errors, the existing `-32803` and
+`parser deadline exceeded` message remain unchanged. Optional
+`error.data.parserTimeoutSite` is exactly `supervisor_poll`, `writer_join` or
+`reader_join`: the existing check that selected the deadline, NOT an OS cause,
+elapsed time or evidence of an unfinished thread. It follows the same owned
+request/freshness/cancellation/cleanup arbitration. Other chosen errors do not
+inherit it. If the extra data would exceed the existing frame ceiling for a
+large escaped ID, the original echoed-ID timeout error is retained without the
+annotation; request admission and frame limits are not enlarged. Unix ordinary
+Timeout has no piped-site annotation. No new observer stream, retry or timer.
+
+1. Once that exact-source package is accepted, obtain the package and its separate
+   evidence from the admitted run for your host/architecture. Verify its outer
+   SHA-256 before extraction and its inner inventory/checksums/provenance against
+   the trusted run; checksums alone do not authenticate a distributor. Keep the
+   matching `ktlsp` and `ktlsp-parser-worker` together in one trusted directory.
+   Do not mix builds. See [installation trust](#build-and-distribute-both-executables).
+2. Create a small local project, for example `/absolute/demo`, containing
+   `workspace.json` and a `src` directory. Save this **unversioned importer model**
+   as `workspace.json` (not the separate versioned T004 manifest):
+
+   ```json
+   {
+     "modules": [{
+       "name": "app",
+       "dependencies": [{"type": "moduleSource"}],
+       "contentRoots": [{
+         "path": "<WORKSPACE>/",
+         "sourceRoots": [{
+           "path": "<WORKSPACE>/src",
+           "type": "kotlin-source"
+         }]
+       }]
+     }],
+     "libraries": []
+   }
+   ```
+
+   Keep `<WORKSPACE>` literal; the importer resolves it to the project directory.
+   For a finite value-editing example, save `src/Basic.kt`:
+
+   ```kotlin
+   // Basic editing 😀
+   // Native lexical providers
+   fun host() {
+       val `old😀` = 1
+       val use = `old😀`
+   }
+   ```
+
+   Keep the separate signature-help envelope in `src/Signature.kt`:
+
+   ```kotlin
+   fun <T> outer(p: T) {
+       fun send(to: T) {}
+       send(to = p)
+   }
+   ```
+
+3. Map these settings into an existing generic LSP client's normal launcher:
+
+   ```text
+   command:          /absolute/trusted-install/ktlsp
+   arguments:        ["--stdio"]
+   transport:        Content-Length-framed stdio
+   language/filetype: kotlin
+   root directory:   /absolute/demo
+   initialization options:
+     projects:
+       - type: json
+         path: file:///absolute/demo
+   ```
+
+   Use `.exe` on Windows and a native absolute command path; a Windows project
+   URI looks like `file:///C:/absolute/demo`. Percent-encode spaces/non-ASCII
+   characters in file URIs. `projects[].path` is the **directory URI**, not
+   `file:///absolute/demo/workspace.json`. `initializationOptions.projects` is
+   mandatory for this workspace authority: `rootUri`/`workspaceFolders` alone
+   do not import sources, and there is no implicit Gradle/Maven/compiler import.
+   In Neovim-style configuration these map to `cmd`, Kotlin buffer attachment,
+   `root_dir` and `init_options`; this is a **configuration suggestion, not
+   observed Neovim/VS Code compatibility or visual-editor proof**. No first-party
+   editor client/plugin/configuration generator is supplied.
+4. Let the client perform `initialize` → `initialized` and `didOpen` with
+   `languageId:"kotlin"`. Use its real supported capabilities, inspect the returned
+   providers, and enable only features it can consume. A compatible **pull-mode
+   capability fragment** is:
+
+   ```json
+   {
+     "general": {"positionEncodings": ["utf-16"]},
+     "workspace": {
+       "workspaceEdit": {"documentChanges": true},
+       "symbol": {}
+     },
+     "textDocument": {
+       "diagnostic": {},
+       "documentSymbol": {"hierarchicalDocumentSymbolSupport": true},
+       "hover": {"contentFormat": ["plaintext"]},
+       "rename": {"prepareSupport": true},
+       "semanticTokens": {
+         "requests": {"full": true, "range": true},
+         "tokenTypes": ["keyword", "comment", "string", "number", "operator"],
+         "tokenModifiers": [],
+         "formats": ["relative"]
+       }
+     }
+   }
+   ```
+
+   This is `initialize.params.capabilities`, not initialization options and not
+   a promise that an arbitrary client implements every field. Advertising
+   `textDocument.diagnostic:{}` selects always-full pull reports and suppresses
+   push: the client must request `textDocument/diagnostic` after changes. For a
+   push-only client **omit that field entirely**. Hierarchical outlines require
+   the shown document-symbol flag; workspace-symbol kind negotiation is separate.
+   Tokens use the returned lexical legend, full/range only (no delta/modifiers).
+   Rename requires versioned `documentChanges`; advertise preparation only if
+   supported. Completion and signature help have no automatic trigger characters.
+5. Synchronize edits with increasing document versions and **UTF-16 ranged**
+   `didChange` positions, including CRLF/non-BMP text; saving is not sync authority.
+   In `Basic.kt`, definition/hover/references/highlights on the final initializer
+   stay within the same-function parameter/preceding immutable-local envelope.
+   For manual completion, replace that initializer with the complete identifier
+   `olSuffix`, place the caret after `ol`, then apply the returned whole-token
+   `textEdit` and synchronize it. A hole or unfinished quote is unsupported.
+   Prepare/rename the original local to bare ASCII `Fresh`, apply the actual
+   returned current-version `documentChanges`, and synchronize before requesting
+   fresh results. This is not parameter/member/function/workspace rename.
+   In `Signature.kt`, manually invoke signature help inside the **completed**
+   `send(to = p)` argument list: one preceding empty local, one required named
+   argument, formal and outer parameter sharing the same lexical `T`. Incomplete
+   calls, overloads, constructors and general Kotlin signature help are unsupported.
+
+Diagnostics/folding and token categories are lexical/structural, not compiler
+errors or semantic type coloring. Workspace search requires the explicit project;
+matching is literal case-sensitive substring, not fuzzy/normalized matching or
+cross-file semantic resolution. Only captured admitted `.kt` members participate;
+closing an unsaved buffer restores disk authority. New files/model changes need
+explicit `intellij/reloadWorkspace` with `{"initializationOptions":{"projects":[...]}}`;
+folder changes alone do not discover sources. Keep unrelated file overlays out of
+this tiny project. Parser-backed providers have a **64 KiB source / 500 ms exchange**
+ceiling, independent of the larger sync limit; aggregate workspace search allows
+**at most 42 tiny parser delegations before other work**, not guaranteed 42 and
+never a 1,024-file success promise. Whole-answer exhaustion refuses, not truncates.
+See [workspace limits](#coherent-eager-native-workspace-symbols-426),
+[provider limits](#independent-limits) and the finite provider sections below.
+
+This remains experimental: unresolved [#96](https://github.com/anilbeesetti/ktlsp/issues/96)
+and [#377](https://github.com/anilbeesetti/ktlsp/issues/377) platform reliability
+limits remain; a later pass does not explain or repair an earlier parser deadline.
+No first-party license grant (including commercial-use permission), signatures,
+notarization, installer, general-platform/editor certification or full official
+Rust/Kotlin parity is established.
+
 ## Optional extracted-archive smoke (#373)
 
 The existing manual experimental packaging workflow keeps the full unfiltered
@@ -34,12 +215,18 @@ An absent/invalid directory fails this explicit invocation; it is never a
 success-shaped skip. Default native tests do not require an archive or JDK and
 do **not** exercise this ignored test. The smoke runs the actual extracted server
 `--help`, `--version` and matching sibling-worker stdio with empty PATH and
-JAVA_HOME/JDK_HOME removed. It reuses the ordinary-parameter/local-shadow fixture,
-original string/u64 request IDs, CRLF/non-BMP UTF-16 ranges, definition/hover,
-references/highlights and full empty pull diagnostics without duplicate pushes.
-All processes must exit successfully with empty stderr. The borrowing exchange
-helper never deletes the extraction directory; only exclusively created `Package`
-test directories have deletion ownership, and retained extraction is asserted.
+JAVA_HOME/JDK_HOME removed. It preserves the ordinary-parameter/local-shadow
+fixture and original string/u64 IDs, then exercises the SAME basic-editing helper
+as the nonignored copied-pair consumer: CRLF/non-BMP incremental edits, nonempty
+then cleared diagnostics, outlines/folds/full and range lexical tokens, explicit
+project workspace search, actual returned completion/rename edits applied to the
+same live overlay with fresh navigation/search, close restoring disk authority,
+finite completed-call signature help, invalid-surrogate refusal/recovery, and
+shutdown/exit plus separate shutdown/EOF. Complete requests/responses/edited
+texts remain within the existing64KiB receipt. The copied-pair test is not archive
+provenance or extracted execution. All processes require exit0 and empty stderr.
+Borrowing helpers never delete the extraction; only exclusively created
+`Package` scratch directories have deletion ownership. Retention is asserted.
 
 The permanent bounded decoded wire/CLI/provenance receipt is
 `extracted-smoke.json` in the **separate evidence ZIP**, alongside verification
@@ -54,10 +241,11 @@ At later independently verified main `040dbba580d908c649c7256405687e2044e4cec2`,
 
 ## Coherent eager native workspace symbols (#426)
 
-**Capture-bearing `4b3429c` passed its full source/compiler/original three-host
-and BOTH OWNER+ROOT complete actual-value/genuine-edit gates. Temporary
-observations were retired only afterward; the cleaned union's OWN new reviews/CI,
-guarded integration and original exact-main acceptance remain separate.**
+**Delivered in PR429 at verified main `21aab03`.** Complete original actual-value/
+genuine-edit gates preceded observation retirement. The cleaned union passed
+its OWN full source/compiler/original three-host CI and guarded integration;
+all THREE feature OWNERS+ROOT independently accepted its original exact-main
+CI before the base lease cleared. [Exact evidence and limits](../../docs/status/development.md#verified429-cleaned-source-integration-and-original-exact-main-acceptance).
 With the trusted sibling provider,
 initialization advertises `workspaceSymbolProvider: true`. Symbol-kind negotiation
 uses `capabilities.workspace.symbol` independently of document-symbol profiles.
@@ -800,9 +988,10 @@ eight global owned handles, with at most one retained import per Session.
 Cancellation releases IDs/responds once, including dependent waiting symbols,
 but never releases owned work before join. EOF/shutdown/broken output use the
 existing cleanup proof and unchanged one-second grace, excluding OS calls.
-No watcher, progress/FINISHED status, workspace symbols, cross-file semantic
-binding, effective SDK/classpath, build-tool import or official equivalence is
-advertised. Existing provider capabilities are unchanged.
+The #421 operation did not itself advertise workspace symbols; the separate
+[#426 source contract](#coherent-eager-native-workspace-symbols-426) now adds them.
+No watcher, progress/FINISHED status, cross-file semantic binding, effective
+SDK/classpath, build-tool import or official equivalence follows from #421.
 
 ## Bounded syntactic document symbols
 

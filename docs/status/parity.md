@@ -245,3 +245,35 @@ The clean union requires its OWN full-source/compiler/original three-host CI,
 then the separate guard/expected-head/tree/sole-base and original exact-main
 gates. The already accepted capture-bearing actual values remain distinct.
 
+
+## Verified PR429 finite delivery through21aab03
+
+This supersedes the pending429 stages above, not the historical assessment matrix.
+[PR429](https://github.com/anilbeesetti/ktlsp/pull/429) delivered426 literal coherent
+workspace symbols,427 original Class inline bounds/generic supertypes and428
+library-only immutable-local type proofs at main21aab03e4e232be128cf9ff1414ac17041bf78e0,
+tree732b9636d8c58ace9f910ad6e6c1e575e812dfcc, SOLE original base7afdc68.
+Complete actual/genuine-edit gates preceded observation retirement; the cleaned
+union passed its OWN full source/compiler/original Linux/macOS/Windows CI,
+separate strict read-only guard and ordinary expected-head squash. ALL THREE
+feature OWNERS+ROOT independently accepted original exact-main39063111523/1/
+job117485003868 complete controls/147rows/1356cases before the lease cleared.
+[Exact delivery and qualifications](development.md#verified429-cleaned-source-integration-and-original-exact-main-acceptance).
+
+The successor430 basic consumer/setup is composed on that ONE verified main.
+Its original acf copied-pair case passed on Linux/macOS/Windows; OWNER+ROOT
+accepted all captured Mac/Windows values and genuine edit applications. However,
+original Windows full CI FAILED an older navigation deadline request, whose
+selected timeout site/cause remains UNKNOWN after two complete original audits.
+The #433 finite selected-site prerequisite changes no deadline/priority/cleanup/
+healthy assertion and is NOT a cause repair. Changed2627f9e subsequently passed
+its OWN original full Linux/macOS/Windows CI, both independent controls and
+parser/server/basic OWNERS+ROOT actual finite behavior/edit gates.
+[Exact current source, actual values and limits](development.md#basic430-and-bounded433-original2627-smoke-and-ci-accepted)
+are not final documentation-source guarded integration/exact-main clearance.
+Separate exact-source manual packaging/real extracted proof is still required:
+copied-pair CI is not archive acceptance or visual-editor certification. No
+general inference/index/hierarchy/compiler/oracle/parity, first-party license or
+reliability promotion follows. Original431/432/395/377/417 UNKNOWNs, old failed
+runs and96/T004/native-only/B3/oracle holds remain.
+

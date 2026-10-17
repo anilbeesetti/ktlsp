@@ -50,6 +50,15 @@ fn error(response: &Value, id: Value, code: i32) {
     assert_eq!(response["id"], id, "{response}");
     assert_eq!(response["error"]["code"], code, "{response}");
     assert!(response.get("result").is_none(), "{response}");
+    if code != -32803 {
+        assert!(
+            response["error"]
+                .get("data")
+                .and_then(|data| data.get("parserTimeoutSite"))
+                .is_none(),
+            "{response}"
+        );
+    }
 }
 struct Package(PathBuf);
 impl Package {
@@ -394,13 +403,29 @@ fn interactive_stdio_cancels_active_work_and_cleans_shutdown_exit_and_eof() {
     let _serial = SERIAL.lock().unwrap_or_else(|poison| poison.into_inner());
     let package = Package::new();
     let mut client = Client::new(&package);
-    client.send(open("wire"));
+    // This held failing peer reaches the real deadline; reuse its completed ID
+    // below to ensure that cancellation cannot inherit the prior timeout site.
+    client.send(open("wiretimeout"));
+    client.send(symbols(json!("active")));
+    let response = client.reply();
+    error(&response, json!("active"), -32803);
+    assert_eq!(response["error"]["message"], "parser deadline exceeded");
+    #[cfg(not(unix))]
+    assert_eq!(
+        response["error"]["data"],
+        json!({"parserTimeoutSite":"supervisor_poll"})
+    );
+    #[cfg(unix)]
+    assert!(response["error"].get("data").is_none(), "{response}");
+    println!("PIPED_TIMEOUT_RESPONSE {response}");
+    client.send(change(2, "wire"));
     client.send(symbols(json!("active")));
     package.started("wire");
     client.send(cancel(json!("wrong")));
     client.send(cancel(json!("active")));
     let response = client.reply();
     error(&response, json!("active"), -32800);
+    println!("PIPED_TIMEOUT_REUSED_ID_CANCEL_RESPONSE {response}");
     // A responsive reply while the controlled worker is still gated is the
     // consumer-visible proof, not a source/schema assertion.
     assert!(!package.0.join("release-wire").exists());
@@ -566,4 +591,40 @@ fn navigation_uses_shared_wire_ids_cancellation_and_snapshot_guards() {
             client.finish(1);
         }
     }
+}
+
+#[cfg(not(unix))]
+#[test]
+fn piped_timeout_annotation_respects_actual_escaped_frame_boundary() {
+    let _serial = SERIAL.lock().unwrap_or_else(|poison| poison.into_inner());
+    let package = Package::new();
+    let mut client = Client::new(&package);
+    client.send(open("wireboundary"));
+    for (padding, tagged) in [(135, true), (134, false)] {
+        // Encoded ID includes two quotes and a two-byte escaped backslash.
+        // With the 131-byte poll envelope, the first fits exactly; the next
+        // byte must omit only optional data, not break the existing response.
+        let id = format!(
+            "{}\\",
+            "a".repeat(ktlsp_protocol::MAX_PAYLOAD_BYTES - padding)
+        );
+        client.send(symbols(json!(&id)));
+        let response = client.reply();
+        assert_eq!(response["id"].as_str(), Some(id.as_str()));
+        assert_eq!(response["error"]["code"], -32803, "{response}");
+        assert_eq!(response["error"]["message"], "parser deadline exceeded");
+        assert!(response.get("result").is_none());
+        if tagged {
+            assert_eq!(
+                response["error"]["data"],
+                json!({"parserTimeoutSite":"supervisor_poll"})
+            );
+        } else {
+            assert!(response["error"].get("data").is_none());
+        }
+    }
+    client.send(request(json!("stop"), "shutdown", Value::Null));
+    assert_eq!(client.reply()["id"], "stop");
+    client.send(notify("exit", Value::Null));
+    client.finish(0);
 }

@@ -8,7 +8,136 @@ decisions or phase boundaries. **Full official Kotlin LSP parity is NOT achieved
 Use the actual session capacity; the historical 32-concurrent instruction below
 is not a new limit. Do not manufacture hundreds of overlapping/blocked tasks.
 
-### Latest capture-free source composition; OWN new gates required
+### Latest verified delivery and basic-candidate continuation
+
+[PR429](https://github.com/anilbeesetti/ktlsp/pull/429) is delivered on ONE verified
+incoming main **21aab03e4e232be128cf9ff1414ac17041bf78e0**,
+tree732b9636d8c58ace9f910ad6e6c1e575e812dfcc, SOLE original base
+7afdc68dd2e283379ebaa99073b068339df84bdd. Full current31path source reviews,
+compiler gates and OWN original cleaned-source Linux/macOS/Windows CI passed.
+The separate fresh read-only actualouter0/parsed0/fullmatching lease guard
+preceded an ordinary expected-head squash; actual tree/sole-parent were proved.
+ALL THREE feature OWNERS426427428 and ROOT independently accepted OWN ORIGINAL
+exact-main39063111523/attempt1/job117485003868: all8 steps,147 complete rows,
+1356 full named outcomes,1353pass/0fail/3ignored and every printed control.
+The exclusive original-base lease cleared only afterward. Children426427428
+are closed; broader parents and full parity remain open.
+[Complete public delivery evidence](https://github.com/anilbeesetti/ktlsp/pull/429#issuecomment-6240002934)
+and [ledger](status/development.md#verified429-cleaned-source-integration-and-original-exact-main-acceptance).
+Main's automatic workflow is Native push only, not a new three-host main run.
+Post-test hosted source cleanliness is unobserved. Properly retired private
+feature values carry their full original gates, not fabricated new main output.
+
+ROOT preserved WT/private/tmp/ktlsp-430-basic-candidate-integration,
+branchomp/430-basic-candidate-integration and draft [PR432](https://github.com/anilbeesetti/ktlsp/pull/432).
+Both prepared smoke commits7b4d60b→7899fbc and docsf0d9290 were composed on that
+SAME verified main; every original owner/user worktree and branch remains.
+Prior preserved headacf06cda8ecf6ea15749c0e9232438f3fa5e3d7a/
+tree10c079733cfdccfc09da789a9f15e2adb0f4dcf2 received BOTH full current9path
+source renewals0.97/0.97, then separately admitted fmtCHECK0, FULL strict locked
+all-target/all-feature Clippy0 and FULL workspace NoRun0. No local product ran.
+Original Native39066463560/job117495071633 and platform39066463557/Mac117495071437
+passed; original Windows117495071556 FAILED the older navigation negotiation
+definition with `-32803 / parser deadline exceeded`. Actual checkoutb853cd81
+has exact reviewed tree and ordered parents[21a,acf]. No merge/packaging lease.
+
+The new nonignored copied-pair basic consumer passed on ALL THREE original hosts.
+ROOT and independent feature OWNER accepted ALL captured Mac18426B/Win17884B
+values and independently applied every actual UTF-16/CRLF/non-BMP didChange,
+returned completion and versioned rename edit in the same live overlay, with
+fresh definition/references/outlines/workspace/close/signature/lifecycle checks.
+Full outline correctly includes both leading comments. Linux's raw receipt is
+unprinted: only its named pass is claimed. These are NOT extracted archives,
+CLI help/version, actual IDE or broad reliability proof.
+[Complete original outcome](https://github.com/anilbeesetti/ktlsp/pull/432#issuecomment-6240834265).
+Two independent complete original source/custody audits found no recoverable
+request-correlated Windows selected timeout site or worker/I/O/clock timeline.
+Cause remains UNKNOWN; 110.13s is suite time,4308 a libtest thread, not worker PID.
+
+ROOT separately admitted SOURCE-only [#433](https://github.com/anilbeesetti/ktlsp/issues/433)
+in WT/private/tmp/ktlsp-433-timeout-provenance-integration,
+branchomp/433-timeout-provenance-integration, preserving that same incoming21a.
+Disjoint isolated parser/server owners implement finite already-selected piped
+deadline provenance through existing failure responses; active Unix Timeout,
+500ms, cancellation-before-deadline-before-readiness, all bounds and cleanup stay.
+Optional metadata is omitted only if needed to preserve the original frame-bound
+timeout reply; no new ID policy/observer/probe/retry. This is NOT a cause repair.
+Both owners have separate functionality/adversarial review slots reserved.
+Complete composed-source reviews precede separate compiler admission and OWN
+original full hosted CI; passing exact-source/guarded integration/exact-main
+acceptance must precede separately admitted three-host packaging/extracted proof.
+No local Kotlin/parser/server/Session/worker/peer/fake/CLI runtime is authorized.
+No ten-hour guarantee/current archive/visual-editor/license/full-parity claim.
+Original431/432 deadlines remain UNKNOWN;96/T004/B3/oracle/395377417 holds remain.
+
+Complete433 head70ba7c5/treefc5cb993 received ALL FOUR independent full15path
+source reviews0.96, no findings. Separate compiler-only admission ran fmtCHECK
+once: FAILED1/1.237061208s, stdout2445B
+SHA0be54713cf16a8a4964138072e113789640124ae4d6a3944bb3dcff378dd3dd0,
+stderr0. Clippy/NoRun were NOT attempted. ROOT manually applied ONLY its five
+displayed formatter blocks: two expression expansions and two cfg-import moves.
+No formatter mutation, changed condition/assertion/fixture/bound or runtime.
+Renew ALL FOUR full current15path source authorities before separate fresh
+compiler admission; prior70ba format refusal remains failed.
+
+For required actual-wire readback, the controlled stdio regression also retains
+its two already-received small Timeout/reused-ID-cancel responses on test stdout.
+No new request, engine observer, timing sample or production log is added; large
+boundary IDs are NOT printed. These are source-only receipt statements until
+their OWN original hosted execution. Include them in the complete source renewal.
+
+#### Current433 actual smoke and original CI accepted; final documentation next
+
+This supersedes the pending433 source/compiler stages above, not their failures.
+ROOT published reviewed2627f9e5800ab28f6b35b56e592738873130d7dd/
+tree42bd70914573e094fbad21120bd78e250f715590, SOLE immediate parent9fb312b,
+to the preserved430 branch/draft PR432, retaining SAME verified incoming21a.
+ALL FOUR full15path source renewals0.96 preceded separate fmtCHECK0,
+FULL strict locked all-target/all-feature Clippy0 and FULL workspace NoRun0;
+all199 Cargo records parsed,142 declared executables NOT run locally.
+Separate publication/OWN original hosted admission then produced ALL3 PASS:
+Native39070764100/1/job117507705425 and platform39070764057/1/
+Mac117507705560/Win117507705352. Actual checkout235a25d63bcee51491c77adae7541d4db5f7537e
+has tree42bd and ordered parents[21a,2627]; both retained stale event
+`pr_merge_sha=b853cd81` fields are observational, NOT actual checkout authority.
+
+Two independent complete CI controls0.97/0.97, parser/server OWNERS and ROOT
+accepted all original gates/147rows per host. Basic OWNER+ROOT independently
+read both complete current641typedscalar payloads and genuinely applied every
+UTF16/CRLF/astral change and returned completion/versioned rename edit.
+Actual Windows timeout has `supervisor_poll`; Mac Unix timeout has no data.
+Both following reused `active` IDs return cancellation without stale site data.
+Only poll is observed on the wire; join sites have source/regression evidence.
+Windows escaped-frame exact-fit/one-byte-over omission regression passed;
+large raw IDs and Linux successful-test raw values remain unprinted.
+[Complete original values, counts, hashes and limits](status/development.md#basic430-and-bounded433-original2627-smoke-and-ci-accepted).
+
+After this observed smoke, ROOT updates ONLY these seven existing docs; all
+product/test/config bytes stay exact2627. The documentation-completion head
+still needs independent complete15path source renewals and its OWN original CI
+before separate fresh read-only guard/ordinary expected-head squash, actual
+tree/SOLE21a proof and independent OWNER+ROOT original exact-main clearance.
+No active merge/packaging lease or local runtime grant. Only then separately
+admit exact-source three-host packaging and genuine extracted acceptance.
+Old acf Windows cause UNKNOWN,70ba format FAILED,96/431/417 and all broader
+native-only/T004/B3/oracle/license/parity holds remain.
+
+Initial430 head91005d4/tree48efe0a4 did NOT clear its source gate: complete
+functionality review found the shared outline expectation trimmed two bound
+leading comments from the original FUN range. This was static source evidence,
+not an observed runtime/CI failure; no430 compiler/runtime/CI ran. ROOT changed
+only that expected extent to the existing full-comment-bound declaration policy,
+keeping selectionRange, fixtures, genuine calls and all assertions. BOTH complete
+current9path authorities must renew before separate compiler-only admission.
+
+Corrected0a17492/tree784d1ff2 received BOTH full current renewals0.97/0.97.
+Separate compiler-only admission then ran fmtCHECK once: FAILED1/1.434625s,
+stdout8710B SHA5f7b89b32d9691741df224b62df6de1944a538437400b3772970f2976f9cac15,
+stderr0. Clippy/NoRun were NOT attempted. ROOT manually applied ONLY the11
+displayed formatter diff blocks; no formatter mutation or runtime. Renew BOTH
+complete current9path source authorities before fresh separate compiler admission.
+
+### Historical capture-free composition checkpoint before final verification
 
 All three admitted observation retirements are now complete, independently
 double-reviewed and composed in ROOT's integration branch. Complete exact

@@ -30,6 +30,22 @@ checks before accepting either completion. This preserves these priorities,
 not asynchronous thread-arrival timing. Post-success deadline selection sends
 no grammar observation, as before. Observer validation still follows cleanup.
 
+The #433 source contract distinguishes existing non-Unix deadline selections as
+`ParserError::PipedTimeout(site)`, with `PipedTimeoutSite` variants
+`SupervisorPoll`, `WriterJoin` and `ReaderJoin`.
+`ParserError::Timeout` remains the active Unix-control outcome. These are selection
+locations, not evidence that a thread was blocked, a worker phase or a runtime
+cause. Tagging adds no clock/I/O/status/readiness query and changes no deadline,
+priority or cleanup. The server may carry the finite site in an existing failure
+response; if that annotation cannot fit the existing frame limit, it preserves
+the original unannotated error instead. Original `2627f9e` three-host CI and
+independent OWNER+ROOT gates exercised this finite contract: Windows actually
+returned `supervisor_poll`, while the Unix timeout remained untagged. Join-site
+regressions passed, but their production wire values were not captured.
+[Exact evidence and limits](../../docs/status/development.md#basic430-and-bounded433-original2627-smoke-and-ci-accepted)
+do not diagnose the earlier Windows failure or clear #96; final integration and
+separate exact-source packaging gates remain.
+
 On Unix, all Parser instances share eight reservations covering active children,
 pending cleanup and permanent failure pins. Admission happens before normalization,
 Command/observer allocation and terminal Once initialization. Once may block before
@@ -897,10 +913,12 @@ evidence must be recorded separately from source.
 
 ### Snapshot-owned immutable-local value types (#428)
 
-**Capture-bearing `4b3429c` passed its full source/compiler/original three-host
-and BOTH OWNER+ROOT complete actual-value gates. Temporary observations are now
-retired; the cleaned union's OWN new reviews/CI and guarded integration remain
-pending.**
+**Delivered in PR429 at verified main `21aab03`.** Complete original values were
+accepted before observation retirement. Unchanged production and preserved real
+consumers/assertions passed the cleaned union's OWN source/compiler/original
+three-host CI and guarded integration, then independent ALL THREE feature
+OWNERS+ROOT original exact-main acceptance before lease clearance. Unprinted
+private proof values are not invented new main output. [Delivery evidence](../../docs/status/development.md#verified429-cleaned-source-integration-and-original-exact-main-acceptance).
 `local_value_binding::infer_local_value_type` selects an ORIGINAL direct
 immutable-local `Declaration` with the original `RegionDirectory`,
 `SnapshotResult` and current `SourceSnapshot`. Unused/direct locals need no

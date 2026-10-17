@@ -453,17 +453,27 @@ fn rich_syntax_admits_only_the_closed_type_namespace_not_value_or_callee_consume
         );
         assert_eq!(
             bind_lexical_type_parameter(&directory, &result, annotation, current)
-                .unwrap().target().raw_name(),
+                .unwrap()
+                .target()
+                .raw_name(),
             "T"
         );
         for found in [
             type_parameter_occurrences(
-                &directory, &result, TypeParameterAnchor::AnnotationReference(annotation), current,
-            ).unwrap(),
+                &directory,
+                &result,
+                TypeParameterAnchor::AnnotationReference(annotation),
+                current,
+            )
+            .unwrap(),
             guarded_type_parameter_rename(
-                &directory, &result, TypeParameterAnchor::AnnotationReference(annotation),
-                current, Some("Fresh"),
-            ).unwrap(),
+                &directory,
+                &result,
+                TypeParameterAnchor::AnnotationReference(annotation),
+                current,
+                Some("Fresh"),
+            )
+            .unwrap(),
         ] {
             assert_eq!(found.target().raw_name(), "T");
             assert_eq!(found.occurrences().len(), 2);

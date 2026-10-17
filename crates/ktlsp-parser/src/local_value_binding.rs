@@ -696,14 +696,22 @@ fn type_function<'a>(
     }
     let (body_ordinal, body) = body.ok_or(LocalBindingError::UnsupportedContext)?;
     crate::call_syntax::validate_type_namespace(
-        directory.lowered(), parsed, function, body.cst_index(), b,
+        directory.lowered(),
+        parsed,
+        function,
+        body.cst_index(),
+        b,
     )?;
     if immediate.owner().is_some() {
         let node = b.element(parsed, immediate.cst_index())?;
         b.charge(1)?;
         if node.parent != Some(body.cst_index())
-            || directory.memberships().get(immediate_ordinal)
-                .ok_or(LocalBindingError::InvalidOrigin)?.region() != body_ordinal
+            || directory
+                .memberships()
+                .get(immediate_ordinal)
+                .ok_or(LocalBindingError::InvalidOrigin)?
+                .region()
+                != body_ordinal
         {
             return Err(LocalBindingError::UnsupportedContext);
         }
@@ -735,18 +743,28 @@ fn check_type_annotation(
     let parent = b.element(parsed, parent_index)?;
     b.charge(2)?;
     let expected_region = if parameter {
-        let owner_ordinal = annotated.owner().ok_or(LocalBindingError::UnsupportedContext)?;
+        let owner_ordinal = annotated
+            .owner()
+            .ok_or(LocalBindingError::UnsupportedContext)?;
         b.charge(1)?;
-        let owner = directory.lowered().declarations().get(owner_ordinal)
+        let owner = directory
+            .lowered()
+            .declarations()
+            .get(owner_ordinal)
             .ok_or(LocalBindingError::InvalidOrigin)?;
         if owner_ordinal != context.ordinal {
             let node = b.element(parsed, owner.cst_index())?;
             b.charge(1)?;
-            if owner.incomplete() || !b.equal(owner.kind(), "FUN")?
+            if owner.incomplete()
+                || !b.equal(owner.kind(), "FUN")?
                 || owner.owner() != Some(context.ordinal)
                 || node.parent != Some(context.body.cst_index())
-                || directory.memberships().get(owner_ordinal)
-                    .ok_or(LocalBindingError::InvalidOrigin)?.region() != context.body_ordinal
+                || directory
+                    .memberships()
+                    .get(owner_ordinal)
+                    .ok_or(LocalBindingError::InvalidOrigin)?
+                    .region()
+                    != context.body_ordinal
             {
                 return Err(LocalBindingError::UnsupportedContext);
             }
@@ -764,7 +782,9 @@ fn check_type_annotation(
             .region()
     } else {
         if annotated.owner() != Some(context.ordinal)
-            || !b.equal(annotated.kind(), "PROPERTY")? || parent_index != context.body.cst_index() {
+            || !b.equal(annotated.kind(), "PROPERTY")?
+            || parent_index != context.body.cst_index()
+        {
             return Err(LocalBindingError::UnsupportedContext);
         }
         context.body_ordinal

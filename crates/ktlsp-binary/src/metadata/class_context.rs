@@ -139,9 +139,8 @@ pub(super) fn push_parameter<'a>(
     budget: &mut string_table::Budget,
 ) -> Result<(), Error> {
     budget.node(2, body_span.start)?;
-    let parameter = type_parameter::decode_with_budget(body, budget).map_err(|e| {
-        failure(body_span.start + e.offset, ErrorKind::TypeParameter(e.kind))
-    })?;
+    let parameter = type_parameter::decode_with_budget(body, budget)
+        .map_err(|e| failure(body_span.start + e.offset, ErrorKind::TypeParameter(e.kind)))?;
     let mut pos = 0;
     while pos < body.len() {
         let child = wire::field(body, &mut pos, body.len(), &mut budget.wire)

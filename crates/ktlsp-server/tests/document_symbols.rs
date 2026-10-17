@@ -3186,47 +3186,96 @@ fn local_annotation_type_namespace_actual_cli_all_anchors_edits_and_rebinding() 
         "fun <Int, Spare> outer(){ fun before(p:Int){}; unknown(label=1); fun after(p:`Int`){} }",
         "// 😀\r\nfun <`🦀`, Spare> outer(){ fun before(p:`🦀`){}; fun after(p:`🦀`){} }\r\n",
     ] {
-        let start = source.find('<').unwrap()+1;
-        let raw = &source[start..source.find([',','>']).unwrap()];
-        let declaration = start..start+raw.len();
-        let annotations:Vec<_> = source.match_indices(&format!(":{raw}"))
-            .map(|(i,_)|i+1..i+1+raw.len())
-            .chain(if raw=="T" {
-                source.match_indices(":`T`").map(|(i,_)|i+1..i+4).collect::<Vec<_>>()
-            } else if raw=="Int" {
-                source.match_indices(":`Int`").map(|(i,_)|i+1..i+6).collect::<Vec<_>>()
-            } else {vec![]}).collect();
-        let mut annotations=annotations;
-        annotations.sort_by_key(|r|r.start);
-        let spare=source.find("Spare").map(|i|i..i+5);
-        let anchors:Vec<_>=std::iter::once(declaration.clone()).chain(annotations.clone())
-            .chain(spare.clone()).collect();
-        for name in ["Fresh","out","reified"] {
-            let mut messages=vec![init.clone(),
+        let start = source.find('<').unwrap() + 1;
+        let raw = &source[start..source.find([',', '>']).unwrap()];
+        let declaration = start..start + raw.len();
+        let annotations: Vec<_> = source
+            .match_indices(&format!(":{raw}"))
+            .map(|(i, _)| i + 1..i + 1 + raw.len())
+            .chain(if raw == "T" {
+                source
+                    .match_indices(":`T`")
+                    .map(|(i, _)| i + 1..i + 4)
+                    .collect::<Vec<_>>()
+            } else if raw == "Int" {
+                source
+                    .match_indices(":`Int`")
+                    .map(|(i, _)| i + 1..i + 6)
+                    .collect::<Vec<_>>()
+            } else {
+                vec![]
+            })
+            .collect();
+        let mut annotations = annotations;
+        annotations.sort_by_key(|r| r.start);
+        let spare = source.find("Spare").map(|i| i..i + 5);
+        let anchors: Vec<_> = std::iter::once(declaration.clone())
+            .chain(annotations.clone())
+            .chain(spare.clone())
+            .collect();
+        for name in ["Fresh", "out", "reified"] {
+            let mut messages = vec![
+                init.clone(),
                 json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-                json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":7,"text":source}}})];
-            for (i,anchor) in anchors.iter().enumerate() {
-                for (role,method,params) in [
-                    ("definition","textDocument/definition",navigation_params(source,anchor.start)),
-                    ("refs","textDocument/references",references_params(source,anchor.start,true)),
-                    ("uses","textDocument/references",references_params(source,anchor.start,false)),
-                    ("highlights","textDocument/documentHighlight",navigation_params(source,anchor.start)),
-                    ("prepare","textDocument/prepareRename",navigation_params(source,anchor.start)),
-                    ("rename","textDocument/rename",rename_params(source,anchor.start,name)),
+                json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":7,"text":source}}}),
+            ];
+            for (i, anchor) in anchors.iter().enumerate() {
+                for (role, method, params) in [
+                    (
+                        "definition",
+                        "textDocument/definition",
+                        navigation_params(source, anchor.start),
+                    ),
+                    (
+                        "refs",
+                        "textDocument/references",
+                        references_params(source, anchor.start, true),
+                    ),
+                    (
+                        "uses",
+                        "textDocument/references",
+                        references_params(source, anchor.start, false),
+                    ),
+                    (
+                        "highlights",
+                        "textDocument/documentHighlight",
+                        navigation_params(source, anchor.start),
+                    ),
+                    (
+                        "prepare",
+                        "textDocument/prepareRename",
+                        navigation_params(source, anchor.start),
+                    ),
+                    (
+                        "rename",
+                        "textDocument/rename",
+                        rename_params(source, anchor.start, name),
+                    ),
                 ] {
                     messages.push(json!({"jsonrpc":"2.0","id":format!("{role}-{i}"),"method":method,"params":params}));
                 }
             }
-            for (id,offset,new_name) in [
-                ("capture",Some(declaration.start),"Int"),
-                ("unused-capture",spare.as_ref().map(|r|r.start),"Int"),
-                ("context",Some(annotations[0].start),"where"),
-            ].into_iter().filter_map(|(id,offset,name)|offset.map(|offset|(id,offset,name))) {
+            for (id, offset, new_name) in [
+                ("capture", Some(declaration.start), "Int"),
+                ("unused-capture", spare.as_ref().map(|r| r.start), "Int"),
+                ("context", Some(annotations[0].start), "where"),
+            ]
+            .into_iter()
+            .filter_map(|(id, offset, name)| offset.map(|offset| (id, offset, name)))
+            {
                 messages.push(json!({"jsonrpc":"2.0","id":id,"method":"textDocument/rename","params":rename_params(source,offset,new_name)}));
             }
             if source.contains("unknown(") {
-                for (id,offset) in [("callee",source.find("unknown(").unwrap()),
-                    ("value",source.find("noSuch=x").map(|i|i+7).unwrap_or_else(||source.find("label=1").unwrap()+6))] {
+                for (id, offset) in [
+                    ("callee", source.find("unknown(").unwrap()),
+                    (
+                        "value",
+                        source
+                            .find("noSuch=x")
+                            .map(|i| i + 7)
+                            .unwrap_or_else(|| source.find("label=1").unwrap() + 6),
+                    ),
+                ] {
                     messages.push(json!({"jsonrpc":"2.0","id":id,"method":"textDocument/definition","params":navigation_params(source,offset)}));
                 }
             }
@@ -3234,50 +3283,100 @@ fn local_annotation_type_namespace_actual_cli_all_anchors_edits_and_rebinding() 
                 json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
                 json!({"jsonrpc":"2.0","method":"exit"}),
             ]);
-            let replies=package.exchange(&messages);
-            let reply=|id:&str|replies.iter().find(|r|r["id"]==id).unwrap();
-            assert_eq!(reply("init")["result"]["capabilities"]["positionEncoding"],"utf-16");
-            let full:Vec<_>=std::iter::once(declaration.clone()).chain(annotations.clone()).collect();
-            for (i,anchor) in anchors.iter().enumerate() {
-                let unused=spare.as_ref()==Some(anchor);
-                let partition=if unused {vec![anchor.clone()]} else {full.clone()};
-                let range=|r:&std::ops::Range<usize>|references_range(source,r.start,r.len());
-                assert_eq!(reply(&format!("refs-{i}"))["result"],json!(partition.iter()
-                    .map(|r|json!({"uri":URI,"range":range(r)})).collect::<Vec<_>>()));
-                assert_eq!(reply(&format!("uses-{i}"))["result"],json!(partition.iter().skip(1)
-                    .map(|r|json!({"uri":URI,"range":range(r)})).collect::<Vec<_>>()));
-                assert_eq!(reply(&format!("highlights-{i}"))["result"],json!(partition.iter().enumerate()
-                    .map(|(j,r)|json!({"range":range(r),"kind":if j==0 {3}else{2}})).collect::<Vec<_>>()));
-                assert_eq!(reply(&format!("prepare-{i}"))["result"],
-                    json!({"range":range(anchor),"placeholder":if unused {"Spare"}else{raw.trim_matches('`')}}));
+            let replies = package.exchange(&messages);
+            let reply = |id: &str| replies.iter().find(|r| r["id"] == id).unwrap();
+            assert_eq!(
+                reply("init")["result"]["capabilities"]["positionEncoding"],
+                "utf-16"
+            );
+            let full: Vec<_> = std::iter::once(declaration.clone())
+                .chain(annotations.clone())
+                .collect();
+            for (i, anchor) in anchors.iter().enumerate() {
+                let unused = spare.as_ref() == Some(anchor);
+                let partition = if unused {
+                    vec![anchor.clone()]
+                } else {
+                    full.clone()
+                };
+                let range = |r: &std::ops::Range<usize>| references_range(source, r.start, r.len());
+                assert_eq!(
+                    reply(&format!("refs-{i}"))["result"],
+                    json!(
+                        partition
+                            .iter()
+                            .map(|r| json!({"uri":URI,"range":range(r)}))
+                            .collect::<Vec<_>>()
+                    )
+                );
+                assert_eq!(
+                    reply(&format!("uses-{i}"))["result"],
+                    json!(
+                        partition
+                            .iter()
+                            .skip(1)
+                            .map(|r| json!({"uri":URI,"range":range(r)}))
+                            .collect::<Vec<_>>()
+                    )
+                );
+                assert_eq!(
+                    reply(&format!("highlights-{i}"))["result"],
+                    json!(
+                        partition
+                            .iter()
+                            .enumerate()
+                            .map(|(j, r)| json!({"range":range(r),"kind":if j==0 {3}else{2}}))
+                            .collect::<Vec<_>>()
+                    )
+                );
+                assert_eq!(
+                    reply(&format!("prepare-{i}"))["result"],
+                    json!({"range":range(anchor),"placeholder":if unused {"Spare"}else{raw.trim_matches('`')}})
+                );
                 if annotations.contains(anchor) {
-                    assert_eq!(reply(&format!("definition-{i}"))["result"],
-                        json!({"uri":URI,"range":range(&declaration)}));
+                    assert_eq!(
+                        reply(&format!("definition-{i}"))["result"],
+                        json!({"uri":URI,"range":range(&declaration)})
+                    );
                 } else {
                     // Existing declaration-definition behavior remains null;
                     // declaration anchors are positive only for occurrence APIs.
-                    assert_eq!(reply(&format!("definition-{i}"))["result"],Value::Null);
+                    assert_eq!(reply(&format!("definition-{i}"))["result"], Value::Null);
                 }
-                let rename=reply(&format!("rename-{i}"));
-                let edited=apply_original_rename(source,rename,URI,7);
-                let mut replay=vec![init.clone(),
+                let rename = reply(&format!("rename-{i}"));
+                let edited = apply_original_rename(source, rename, URI, 7);
+                let mut replay = vec![
+                    init.clone(),
                     json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-                    json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":8,"text":edited}}})];
-                let edited_type=if unused {raw.trim_matches('`')} else {name};
-                let edited_target=edited.find('<').unwrap()+1;
-                let edited_annotation_ranges:Vec<_>=edited.match_indices(&format!(":{edited_type}"))
-                    .map(|(j,_)|j+1..j+1+edited_type.len())
+                    json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":8,"text":edited}}}),
+                ];
+                let edited_type = if unused { raw.trim_matches('`') } else { name };
+                let edited_target = edited.find('<').unwrap() + 1;
+                let edited_annotation_ranges: Vec<_> = edited
+                    .match_indices(&format!(":{edited_type}"))
+                    .map(|(j, _)| j + 1..j + 1 + edited_type.len())
                     .chain(if unused && !raw.starts_with('`') {
-                        edited.match_indices(&format!(":`{edited_type}`")).map(|(j,_)|j+1..j+3+edited_type.len()).collect()
-                    }else{vec![]}).collect();
+                        edited
+                            .match_indices(&format!(":`{edited_type}`"))
+                            .map(|(j, _)| j + 1..j + 3 + edited_type.len())
+                            .collect()
+                    } else {
+                        vec![]
+                    })
+                    .collect();
                 // For the unused-target edit, query the untouched original
                 // annotations by their actual unchanged raw token spelling.
-                let mut edited_annotation_ranges=if unused && raw.starts_with('`') {
-                    edited.match_indices(&format!(":{raw}")).map(|(j,_)|j+1..j+1+raw.len()).collect()
-                }else{edited_annotation_ranges};
-                edited_annotation_ranges.sort_by_key(|r|r.start);
-                assert_eq!(edited_annotation_ranges.len(),annotations.len());
-                for (j,r) in edited_annotation_ranges.iter().enumerate() {
+                let mut edited_annotation_ranges = if unused && raw.starts_with('`') {
+                    edited
+                        .match_indices(&format!(":{raw}"))
+                        .map(|(j, _)| j + 1..j + 1 + raw.len())
+                        .collect()
+                } else {
+                    edited_annotation_ranges
+                };
+                edited_annotation_ranges.sort_by_key(|r| r.start);
+                assert_eq!(edited_annotation_ranges.len(), annotations.len());
+                for (j, r) in edited_annotation_ranges.iter().enumerate() {
                     replay.push(json!({"jsonrpc":"2.0","id":format!("type-{j}"),"method":"textDocument/definition","params":navigation_params(&edited,r.start)}));
                 }
                 if unused {
@@ -3289,36 +3388,58 @@ fn local_annotation_type_namespace_actual_cli_all_anchors_edits_and_rebinding() 
                     json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
                     json!({"jsonrpc":"2.0","method":"exit"}),
                 ]);
-                let rebound=package.exchange(&replay);
+                let rebound = package.exchange(&replay);
                 for j in 0..annotations.len() {
-                    let actual=rebound.iter().find(|r|r["id"]==format!("type-{j}")).unwrap();
-                    assert_eq!(actual["result"],json!({"uri":URI,"range":references_range(&edited,edited_target,if unused {raw.len()}else{name.len()})}));
+                    let actual = rebound
+                        .iter()
+                        .find(|r| r["id"] == format!("type-{j}"))
+                        .unwrap();
+                    assert_eq!(
+                        actual["result"],
+                        json!({"uri":URI,"range":references_range(&edited,edited_target,if unused {raw.len()}else{name.len()})})
+                    );
                 }
-                let edited_target_len=if unused {raw.len()}else{name.len()};
-                let expected_rebound:Vec<_>=std::iter::once(edited_target..edited_target+edited_target_len)
-                    .chain(edited_annotation_ranges.clone()).map(|r|json!({
-                        "uri":URI,"range":references_range(&edited,r.start,r.len())
-                    })).collect();
-                assert_eq!(rebound.iter().find(|r|r["id"]=="refs").unwrap()["result"],json!(expected_rebound));
+                let edited_target_len = if unused { raw.len() } else { name.len() };
+                let expected_rebound: Vec<_> =
+                    std::iter::once(edited_target..edited_target + edited_target_len)
+                        .chain(edited_annotation_ranges.clone())
+                        .map(|r| {
+                            json!({
+                                "uri":URI,"range":references_range(&edited,r.start,r.len())
+                            })
+                        })
+                        .collect();
+                assert_eq!(
+                    rebound.iter().find(|r| r["id"] == "refs").unwrap()["result"],
+                    json!(expected_rebound)
+                );
                 if unused {
-                    assert_eq!(rebound.iter().find(|r|r["id"]=="unused-rebound").unwrap()["result"],
-                        json!([{"uri":URI,"range":references_range(&edited,edited.find(name).unwrap(),name.len())}]));
+                    assert_eq!(
+                        rebound
+                            .iter()
+                            .find(|r| r["id"] == "unused-rebound")
+                            .unwrap()["result"],
+                        json!([{"uri":URI,"range":references_range(&edited,edited.find(name).unwrap(),name.len())}])
+                    );
                 }
-                let packet=json!({"source":source,"name":name,"anchor":anchor,"requests":messages,
+                let packet = json!({"source":source,"name":name,"anchor":anchor,"requests":messages,
                     "responses":replies,"appliedResponse":rename,"appliedSource":edited,
                     "replayRequests":replay,"replayResponses":rebound});
-                std::io::Write::write_all(&mut std::io::stderr().lock(),
-                    format!("LOCAL_TYPE_CLI_JSON={packet}\n").as_bytes()).unwrap();
+                std::io::Write::write_all(
+                    &mut std::io::stderr().lock(),
+                    format!("LOCAL_TYPE_CLI_JSON={packet}\n").as_bytes(),
+                )
+                .unwrap();
             }
-            assert_eq!(reply("context")["error"]["code"],-32803);
+            assert_eq!(reply("context")["error"]["code"], -32803);
             if source.contains("q:Int") {
-                for id in ["capture","unused-capture"] {
-                    assert_eq!(reply(id)["error"]["code"],-32803);
+                for id in ["capture", "unused-capture"] {
+                    assert_eq!(reply(id)["error"]["code"], -32803);
                     assert!(reply(id).get("result").is_none());
                 }
             }
             if source.contains("unknown(") {
-                assert_eq!(reply("callee")["error"]["code"],-32803);
+                assert_eq!(reply("callee")["error"]["code"], -32803);
             }
         }
     }
@@ -3342,10 +3463,26 @@ fn type_parameter_wire_quote_context_capture_growth_negotiation_and_reopen() {
         ("fun <T> f(p:U){}", "U", false),
         ("fun <Spare> f(p:Int){}", "Int", false),
         ("fun <`T`> f(){fun target(p:`T`){} }", "T", true),
-        ("fun <`where`> f(){fun target(p:`where`){} }", "where", false),
-        ("fun <`dynamic`> f(){fun target(p:`dynamic`){} }", "dynamic", false),
-        ("fun <`suspend`> f(){fun target(p:`suspend`){} }", "suspend", false),
-        ("fun <T, Spare> f(){fun target(p:T){};fun other(p:Int){} }", "Int", false),
+        (
+            "fun <`where`> f(){fun target(p:`where`){} }",
+            "where",
+            false,
+        ),
+        (
+            "fun <`dynamic`> f(){fun target(p:`dynamic`){} }",
+            "dynamic",
+            false,
+        ),
+        (
+            "fun <`suspend`> f(){fun target(p:`suspend`){} }",
+            "suspend",
+            false,
+        ),
+        (
+            "fun <T, Spare> f(){fun target(p:T){};fun other(p:Int){} }",
+            "Int",
+            false,
+        ),
     ] {
         open(&mut session, source);
         let offset = source.find('<').unwrap() + 1;
@@ -3374,12 +3511,19 @@ fn type_parameter_wire_quote_context_capture_growth_negotiation_and_reopen() {
     }
     let rich = "fun <T> f(){ fun before(p:T){}; unknown(label=1); fun after(q:T){} }";
     open(&mut session, rich);
-    let response = request(&mut session, "textDocument/rename",
-        rename_params(rich, rich.find("p:T").unwrap()+2, &"A".repeat(33000)));
+    let response = request(
+        &mut session,
+        "textDocument/rename",
+        rename_params(rich, rich.find("p:T").unwrap() + 2, &"A".repeat(33000)),
+    );
     assert_eq!(response["error"]["code"], -32803);
     assert!(response.get("result").is_none());
     assert_eq!(session.document(URI).unwrap().text(), rich);
-    notify(&mut session, "textDocument/didClose", json!({"textDocument":{"uri":URI}}));
+    notify(
+        &mut session,
+        "textDocument/didClose",
+        json!({"textDocument":{"uri":URI}}),
+    );
     let source = "fun <T> f(p:T){}";
     open(&mut session, source);
     let response = request(
@@ -3446,24 +3590,24 @@ fn type_role_queries_keep_atomic_cancel_stale_incarnation_and_output_guards() {
         ("fun <T> f(p:T){val x:T=p}", 5),
         ("fun <T> f(){fun target(p:T){}; unknown(label=1)}", 25),
     ] {
-    for method in [
-        "textDocument/references",
-        "textDocument/prepareRename",
-        "textDocument/rename",
-    ] {
-        for action in ["cancel", "change", "reopen"] {
-            let mut session = running_rename();
-            open(&mut session, source);
-            let mut params = references_params(source, anchor, true);
-            params["newName"] = json!("Fresh");
-            assert!(
+        for method in [
+            "textDocument/references",
+            "textDocument/prepareRename",
+            "textDocument/rename",
+        ] {
+            for action in ["cancel", "change", "reopen"] {
+                let mut session = running_rename();
+                open(&mut session, source);
+                let mut params = references_params(source, anchor, true);
+                params["newName"] = json!("Fresh");
+                assert!(
                 session
                     .handle(
                         json!({"jsonrpc":"2.0","id":"type-pending","method":method,"params":params})
                     )
                     .is_empty()
             );
-            let messages = match action {
+                let messages = match action {
                 "cancel" => session.handle(json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":"type-pending"}})),
                 "change" => session.handle(json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":URI,"version":2},"contentChanges":[{"text":source}]}})),
                 _ => {
@@ -3472,22 +3616,22 @@ fn type_role_queries_keep_atomic_cancel_stale_incarnation_and_output_guards() {
                     replies
                 }
             };
-            assert_eq!(messages.len(), 1, "{method}/{action}: {messages:?}");
-            assert_eq!(messages[0]["id"], "type-pending");
-            assert_eq!(
-                messages[0]["error"]["code"],
-                if action == "cancel" { -32800 } else { -32801 }
-            );
-            assert!(messages[0].get("result").is_none());
-            let (remaining, clean) = session.close();
-            assert!(clean, "{method}/{action}");
-            assert!(
-                remaining
-                    .iter()
-                    .all(|message| message["id"] != "type-pending")
-            );
+                assert_eq!(messages.len(), 1, "{method}/{action}: {messages:?}");
+                assert_eq!(messages[0]["id"], "type-pending");
+                assert_eq!(
+                    messages[0]["error"]["code"],
+                    if action == "cancel" { -32800 } else { -32801 }
+                );
+                assert!(messages[0].get("result").is_none());
+                let (remaining, clean) = session.close();
+                assert!(clean, "{method}/{action}");
+                assert!(
+                    remaining
+                        .iter()
+                        .all(|message| message["id"] != "type-pending")
+                );
+            }
         }
-    }
     }
     let long_uri = format!("untitled:{}", "a".repeat(8000));
     let source = format!(

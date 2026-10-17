@@ -710,7 +710,10 @@ fn genuine_result_companion_name_binding_preserves_original_sibling_declarations
     ] {
         let result = decode(&input, ordinal, Limits::default()).unwrap();
         assert_eq!(result.owner.class_id.package_name(), units("kotlin"));
-        assert_eq!(result.owner.class_id.relative_class_name(), units("Result.Companion"));
+        assert_eq!(
+            result.owner.class_id.relative_class_name(),
+            units("Result.Companion")
+        );
         assert!(!result.owner.class_id.local);
         assert_eq!(result.owner.body_span, 29..126);
         borrowed(result.owner.header.raw, bytes, 29..126);
@@ -784,7 +787,9 @@ fn authored_own_signed_ids_shadow_class_and_late_declarations_keep_original_ordi
     ]) {
         assert_eq!(v.classifier, expected);
     }
-    let metadata::Outcome::Decoded { bytes, .. } = &input else { unreachable!() };
+    let metadata::Outcome::Decoded { bytes, .. } = &input else {
+        unreachable!()
+    };
     for p in &result.function.type_parameters {
         borrowed(p.parameter.raw, bytes, p.body_span.clone());
     }
@@ -798,13 +803,17 @@ fn authored_own_signed_ids_shadow_class_and_late_declarations_keep_original_ordi
     let mut siblings = function(&own(7, 1));
     siblings.extend(function(&value(4, &leaf(7))));
     assert_eq!(
-        decode(&input_for(&siblings), 2, Limits::default()).unwrap_err().kind,
+        decode(&input_for(&siblings), 2, Limits::default())
+            .unwrap_err()
+            .kind,
         ErrorKind::UnknownParameterId
     );
     let mut siblings = function(&own(7, 1));
     siblings.extend(function(&value(4, &scalar(9, 1))));
     assert_eq!(
-        decode(&input_for(&siblings), 2, Limits::default()).unwrap_err().kind,
+        decode(&input_for(&siblings), 2, Limits::default())
+            .unwrap_err()
+            .kind,
         ErrorKind::UnknownParameterName
     );
 }
@@ -817,7 +826,10 @@ fn authored_name_binding_is_unique_immediate_own_resolved_content_only() {
     roles.extend(own(8, 2)); // Late declaration now supplies B.
     let result_input = input_for(&fields(&roles));
     let result = decode(&result_input, 3, Limits::default()).unwrap();
-    assert_eq!(result.function.parameters[0].classifier, Classifier::FunctionParameter(1));
+    assert_eq!(
+        result.function.parameters[0].classifier,
+        Classifier::FunctionParameter(1)
+    );
     let mut roles = own(7, 1);
     roles.extend(own(8, 1));
     roles.extend(value(4, &scalar(9, 1)));
@@ -841,10 +853,16 @@ fn authored_name_binding_is_unique_immediate_own_resolved_content_only() {
         let original = input(class_with_table(&function(&roles), &table), &names);
         let result = decode(&original, 1, Limits::default()).unwrap();
         assert_eq!(result.function.type_parameters[0].name, resolved);
-        assert_eq!(result.function.parameters[0].classifier, Classifier::FunctionParameter(0));
+        assert_eq!(
+            result.function.parameters[0].classifier,
+            Classifier::FunctionParameter(0)
+        );
         roles.extend(own(124, 6)); // Different index, equal resolved name is ambiguous.
         let input = input(class_with_table(&function(&roles), &table), &names);
-        assert_eq!(decode(&input, 1, Limits::default()).unwrap_err().kind, ErrorKind::AmbiguousParameterName);
+        assert_eq!(
+            decode(&input, 1, Limits::default()).unwrap_err().kind,
+            ErrorKind::AmbiguousParameterName
+        );
     }
     let surrogate = [0xd800, 0, 0xdc00];
     let different = [0xfffd, 0, 0xfffd];
@@ -858,7 +876,10 @@ fn authored_name_binding_is_unique_immediate_own_resolved_content_only() {
     let input = input(class(&function(&roles)), &names);
     let result = decode(&input, 1, Limits::default()).unwrap();
     assert_eq!(result.function.type_parameters[0].name, surrogate);
-    assert_eq!(result.function.parameters[0].classifier, Classifier::FunctionParameter(0));
+    assert_eq!(
+        result.function.parameters[0].classifier,
+        Classifier::FunctionParameter(0)
+    );
 }
 
 #[test]
@@ -880,40 +901,60 @@ fn authored_own_options_opaque_bounds_and_nullable_presence_are_retained() {
         let p = &result.function.type_parameters[0];
         assert_eq!(p.parameter.id, -1);
         assert_eq!(p.parameter.reified, Some(true));
-        assert_eq!(p.parameter.variance, Some(metadata::type_parameter::Variance::In));
+        assert_eq!(
+            p.parameter.variance,
+            Some(metadata::type_parameter::Variance::In)
+        );
         assert_eq!(p.parameter.upper_bound_id, [-1, 7, 8]);
         assert_eq!(p.parameter.upper_bound.len(), 1);
         let bound = &p.parameter.upper_bound[0];
         borrowed(bound.raw, p.parameter.raw, bound.span.clone());
         assert_eq!(bound.raw, [0x80]);
         assert_eq!(result.function.parameters[0].header.nullable, nullable);
-        assert_eq!(result.function.parameters[0].classifier, Classifier::FunctionParameter(0));
+        assert_eq!(
+            result.function.parameters[0].classifier,
+            Classifier::FunctionParameter(0)
+        );
     }
 }
 
 #[test]
 fn authored_late_own_failures_are_atomic_rebased_once_and_name_shapes_stay_bare() {
     for (body, relative_error) in [
-        (vec![8, 7], 2), // Missing required name.
-        (vec![16, 1], 2), // Missing required ID.
+        (vec![8, 7], 2),                     // Missing required name.
+        (vec![16, 1], 2),                    // Missing required ID.
         (vec![8, 7, 16, 1, 50, 1, 0x80], 7), // Truncated packed bound ID.
-        (vec![8, 7, 16, 1, 10, 0], 4), // Significant ID wrong wire.
-        (vec![8, 7, 16, 1, 18, 0], 4), // Significant name wrong wire.
+        (vec![8, 7, 16, 1, 10, 0], 4),       // Significant ID wrong wire.
+        (vec![8, 7, 16, 1, 18, 0], 4),       // Significant name wrong wire.
     ] {
         let mut roles = value(4, &leaf(0));
         roles.extend(message(4, &body));
         let input = input_for(&fields(&roles));
         let error = decode(&input, 3, Limits::default()).unwrap_err();
-        let metadata::Outcome::Decoded { bytes, .. } = &input else { unreachable!() };
+        let metadata::Outcome::Decoded { bytes, .. } = &input else {
+            unreachable!()
+        };
         let start = bytes.len() - body.len();
         assert_eq!(error.offset, start + relative_error);
         assert!(matches!(error.kind, ErrorKind::Context(_)));
     }
     for extra in [
-        scalar(6, 6), scalar(7, 7), scalar(12, 0), scalar(4, 0),
-        scalar(8, 0), scalar(11, 0), scalar(14, 0), scalar(1, 1),
-        message(2, &[]), message(5, &[]), message(10, &[]), message(13, &[]),
-        message(1, &[]), message(3, &[]), message(6, &[]), message(7, &[]),
+        scalar(6, 6),
+        scalar(7, 7),
+        scalar(12, 0),
+        scalar(4, 0),
+        scalar(8, 0),
+        scalar(11, 0),
+        scalar(14, 0),
+        scalar(1, 1),
+        message(2, &[]),
+        message(5, &[]),
+        message(10, &[]),
+        message(13, &[]),
+        message(1, &[]),
+        message(3, &[]),
+        message(6, &[]),
+        message(7, &[]),
         message(9, &[]),
     ] {
         let mut ty = scalar(9, 1);
@@ -931,8 +972,14 @@ fn authored_late_own_failures_are_atomic_rebased_once_and_name_shapes_stay_bare(
     roles.extend(message(6, &v));
     let input = input_for(&fields(&roles));
     let result = decode(&input, 3, Limits::default()).unwrap();
-    assert_eq!(result.function.parameters[0].header.type_parameter_name, Some(1));
-    assert_eq!(result.function.parameters[0].classifier, Classifier::FunctionParameter(0));
+    assert_eq!(
+        result.function.parameters[0].header.type_parameter_name,
+        Some(1)
+    );
+    assert_eq!(
+        result.function.parameters[0].classifier,
+        Classifier::FunctionParameter(0)
+    );
 }
 
 fn minimum_limit(input: &metadata::Outcome<'_>, set: fn(&mut Limits, usize)) -> usize {
@@ -969,11 +1016,20 @@ fn authored_own_bounds_values_and_temporary_name_queries_share_exact_budget() {
     let original = input_for(&function(&roles));
     type Set = fn(&mut Limits, usize);
     let dimensions: [Set; 9] = [
-        |l, n| l.bytes = n, |l, n| l.records = n, |l, n| l.nodes = n,
-        |l, n| l.work = n, |l, n| l.owned_bytes = n, |l, n| l.queries = n,
-        |l, n| l.output_units = n, |l, n| l.entries = n, |l, n| l.range_slots = n,
+        |l, n| l.bytes = n,
+        |l, n| l.records = n,
+        |l, n| l.nodes = n,
+        |l, n| l.work = n,
+        |l, n| l.owned_bytes = n,
+        |l, n| l.queries = n,
+        |l, n| l.output_units = n,
+        |l, n| l.entries = n,
+        |l, n| l.range_slots = n,
     ];
-    let mut exact = Limits { depth: 2, ..Default::default() };
+    let mut exact = Limits {
+        depth: 2,
+        ..Default::default()
+    };
     for set in dimensions {
         set(&mut exact, minimum_limit(&original, set));
     }
@@ -981,9 +1037,27 @@ fn authored_own_bounds_values_and_temporary_name_queries_share_exact_budget() {
         decode(&original, 1, exact).unwrap(),
         decode(&original, 1, Limits::default()).unwrap()
     );
-    assert!(decode(&original, 1, Limits { depth: 1, ..Default::default() }).is_err());
+    assert!(
+        decode(
+            &original,
+            1,
+            Limits {
+                depth: 1,
+                ..Default::default()
+            }
+        )
+        .is_err()
+    );
     assert_eq!(
-        decode(&original, 1, Limits { depth: usize::MAX, ..Default::default() }).unwrap(),
+        decode(
+            &original,
+            1,
+            Limits {
+                depth: usize::MAX,
+                ..Default::default()
+            }
+        )
+        .unwrap(),
         decode(&original, 1, exact).unwrap()
     );
     let mut extra_value = roles.clone();
@@ -1003,7 +1077,10 @@ fn authored_own_bounds_values_and_temporary_name_queries_share_exact_budget() {
         for (set, n) in [
             ((|l: &mut Limits, n| l.records = n) as Set, exact.records),
             ((|l: &mut Limits, n| l.work = n) as Set, exact.work),
-            ((|l: &mut Limits, n| l.owned_bytes = n) as Set, exact.owned_bytes),
+            (
+                (|l: &mut Limits, n| l.owned_bytes = n) as Set,
+                exact.owned_bytes,
+            ),
         ] {
             let mut limits = Limits::default();
             set(&mut limits, n);
@@ -1012,8 +1089,12 @@ fn authored_own_bounds_values_and_temporary_name_queries_share_exact_budget() {
     }
     // Owner string+local membership, Function, two locals, two values, temporary NAME.
     assert_eq!(exact.queries, 8);
-    let produced = NAMES[0].len() + NAMES[3].len() + NAMES[1].len() * 2
-        + NAMES[2].len() + NAMES[4].len() + NAMES[5].len();
+    let produced = NAMES[0].len()
+        + NAMES[3].len()
+        + NAMES[1].len() * 2
+        + NAMES[2].len()
+        + NAMES[4].len()
+        + NAMES[5].len();
     assert_eq!(exact.output_units, produced);
 }
 
@@ -1038,9 +1119,23 @@ fn authored_long_equal_prefix_name_comparisons_consume_work_per_inspected_unit()
     let late_input = input(bytes, &names);
     let late_work = minimum_limit(&late_input, |l, n| l.work = n);
     assert_eq!(late_work - early_work, 255);
-    assert!(decode(&late_input, 1, Limits { work: early_work, ..Default::default() }).is_err());
+    assert!(
+        decode(
+            &late_input,
+            1,
+            Limits {
+                work: early_work,
+                ..Default::default()
+            }
+        )
+        .is_err()
+    );
     assert_eq!(
-        decode(&late_input, 1, Limits::default()).unwrap().function.parameters[0].classifier,
+        decode(&late_input, 1, Limits::default())
+            .unwrap()
+            .function
+            .parameters[0]
+            .classifier,
         Classifier::FunctionParameter(1)
     );
 }
@@ -1063,6 +1158,12 @@ fn authored_names_are_not_normalized_and_signed_id_varints_are_not_positions() {
     roles.extend(value(4, &scalar(7, u64::MAX))); // Ten-byte signed -1, not ordinal.
     let original = input(class(&function(&roles)), &names);
     let result = decode(&original, 1, Limits::default()).unwrap();
-    assert_eq!(result.function.parameters[0].header.type_parameter, Some(-1));
-    assert_eq!(result.function.parameters[0].classifier, Classifier::FunctionParameter(0));
+    assert_eq!(
+        result.function.parameters[0].header.type_parameter,
+        Some(-1)
+    );
+    assert_eq!(
+        result.function.parameters[0].classifier,
+        Classifier::FunctionParameter(0)
+    );
 }

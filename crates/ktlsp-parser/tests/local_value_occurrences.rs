@@ -2356,20 +2356,19 @@ fn local_type_namespace_refuses_the_entire_unsupported_envelope_and_annotation_c
             .declarations()
             .iter()
             .find(|d| d.raw_name() == "Spare")
+            && !source.contains("`T`")
         {
-            if !source.contains("`T`") {
-                assert_eq!(
-                    guarded_type_parameter_rename(
-                        &directory,
-                        &result,
-                        TypeParameterAnchor::Declaration(spare),
-                        snapshot,
-                        Some("Captured")
-                    )
-                    .unwrap_err(),
-                    LocalBindingError::AmbiguousTypeParameter
-                );
-            }
+            assert_eq!(
+                guarded_type_parameter_rename(
+                    &directory,
+                    &result,
+                    TypeParameterAnchor::Declaration(spare),
+                    snapshot,
+                    Some("Captured")
+                )
+                .unwrap_err(),
+                LocalBindingError::AmbiguousTypeParameter
+            );
         }
     }
 }

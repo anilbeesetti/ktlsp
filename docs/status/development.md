@@ -4787,3 +4787,86 @@ frequency/ownership/deadline/bound remains. No formatter mutation, runtime,
 suppression or unchanged retry. Prior refusal remains failed; BOTH complete
 CURRENT9path authorities must renew before fresh separate compiler-only admission.
 
+
+#### Basic430 original acf three-host result and bounded433 prerequisite
+
+Preserved draft [PR432](https://github.com/anilbeesetti/ktlsp/pull/432) head
+acf06cda8ecf6ea15749c0e9232438f3fa5e3d7a/tree10c079733cfdccfc09da789a9f15e2adb0f4dcf2
+received BOTH complete current9path source renewals0.97/0.97. Separately admitted
+fmtCHECK0/1.196277959s, FULL strict locked keep-going workspace/all-target/all-feature
+Clippy0/2.207072917s and FULL workspace NoRun0/2.508353708s completed. All199 Cargo
+JSON records parsed:189 artifacts,9 build scripts,1 success,0 diagnostics;142
+declared executables were NOT run. All13 frozen source/config bytes remained
+exact; no local Kotlin/product/parser/server/Session/worker/peer/fake/CLI runtime.
+
+Original actual checkoutb853cd81df125ba97a007d0d657ce36e73b0bc93 has that exact
+reviewed tree and ordered parents[verified21aab03,acf06cd], independently proved
+by immutable Git API and original logs/preflight/identity.
+
+|Original attempt1 execution|Result|Rows|Named cases|Pass|Fail|Ignored|
+|---|---|---:|---:|---:|---:|---:|
+|[Native39066463560/job117495071633](https://github.com/anilbeesetti/ktlsp/actions/runs/39066463560/job/117495071633)|PASS|147|1357|1354|0|3|
+|[Mac39066463557/job117495071437](https://github.com/anilbeesetti/ktlsp/actions/runs/39066463557/job/117495071437)|PASS|147|1355|1352|0|3|
+|[Windows39066463557/job117495071556](https://github.com/anilbeesetti/ktlsp/actions/runs/39066463557/job/117495071556)|FAIL|147|1304|1300|1|3|
+
+Sole Windows failure: unchanged
+`actual_packaged_stdio_navigation_negotiation_and_existing_providers`,
+third profile `["plaintext","markdown"]`, actual definition error
+`-32803 / parser deadline exceeded`; expected `untitled:outline` original
+declaration range2:14..2:19. Missing `result` indexed as Null is not a captured
+`result:null` response. Suite110.13s is not request time;4308 is libtest thread
+identity, not worker PID. Artifact workspace command exit101/Actions process1.
+Two independent source/custody audits consumed complete original primary logs,
+all18 artifact members per host and all28 run-log members, authenticated actual
+source/commands/preflight/controls and reconciled every numeric/named outcome.
+No retained request-correlated Windows selected timeout site, worker identity
+or I/O/clock timeline exists; source has three indistinguishable piped deadline
+selections. Cause remains UNKNOWN, not inferred environmental/startup/pipe/grammar.
+No unchanged rerun or relaxed bound/assertion. Original Windows failure blocks
+that head's merge/packaging; post-test hosted cleanliness remains unobserved.
+
+The new ordinary basic consumer passed on ALL THREE original hosts. Independent
+feature OWNER and ROOT accepted complete actual Mac18426B/Win17884B receipts,
+all641 typed scalar fields each, every request/response/capability/range/token/
+query/diagnostic/fold/signature/status/stderr/path and original lifecycle.
+Both independently applied ALL real UTF-16/CRLF/non-BMP sequential changes and
+genuine returned completion/versioned rename edits in one live v1→v6 overlay;
+fresh definition/references/outlines/workspace/close match derived text. Both
+leading comments belong to full original outline0:0..5:1, selection2:4..8.
+Linux raw values are unprinted: only the original named pass is claimed.
+This is copied-pair proof, NOT extracted/archive/CLI help/version/IDE/license/
+reliability/parity acceptance, and it does not repair the other failed request.
+
+Retained outside-repo independent OWNER239493B
+SHA4ce416353c5de82bafaa422ed1b020550e7624f28ba653776a40a8120f0ce4ce;
+ROOT genuine-edit replay16112B
+SHA56c970932530b7fd37623b84a6c838637f003ec28d84ef934d660fe94f6a9ac9;
+source audit80199B SHAa1a8b17ec7ccaa3a7628a63d8f8c89510adc3a3f33a85ec5b0e2ec70d8057409;
+complete control audit12018793B
+SHAc5e22a1c0f3d4d910352e01844600e290f5c821debd6a9fa0c40b2631228282b.
+ROOT+OWNER finite-gate receipt3248B
+SHA85724b81b2fe8302bad15a7b0ed93feda2eccf2dc16cabe062176cf9d1260d51.
+[Public exact result and limits](https://github.com/anilbeesetti/ktlsp/pull/432#issuecomment-6240834265).
+
+ROOT opened [#433](https://github.com/anilbeesetti/ktlsp/issues/433) and separately
+admitted SOURCE implementation ONLY in isolated root/parser/server worktrees
+from preserved acf, retaining ONE verified incoming main21a and all user work.
+Fixed allocation-free `PipedTimeoutSite`/`ParserError::PipedTimeout` distinguish
+only existing poll/writer-join/reader-join deadline selections. Unix ordinary
+Timeout stays active. Existing failure/result paths carry optional bounded
+`error.data.parserTimeoutSite`; existing code/message/ID remain. To prevent a
+NEW near-frame ID overflow, omit only that optional annotation when it cannot
+fit, reusing checked borrowed JSON-escape accounting without serialization/copy,
+new ID admission policy or enlarged frame limit. Source tests cover genuine
+selection/arbitration/boundaries, not an unchanged diagnostic runtime retry.
+No extra clock/I/O/status/readiness query, observer framework, pool, retry,
+deadline/priority/cleanup/healthy-assertion change or dependency/config mutation.
+Site means selection location, NEVER blocked state, measured phase or cause.
+Two independent review slots per owner are reserved; COMPLETE composed source
+reviews and separate compiler/OWN original hosted admission remain required.
+No check/runtime/publication/merge/packaging permission follows from this source
+stage. A future pass is not historical diagnosis. #430 remains open pending
+guarded source/main gates and separately admitted exact-source three-host
+packaging/actual extracted acceptance;96/B3/oracle/T004/native-only and older
+431/395/377/417 UNKNOWN holds remain. Full official parity is NOT achieved.
+

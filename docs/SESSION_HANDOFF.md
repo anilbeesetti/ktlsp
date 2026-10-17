@@ -28,20 +28,47 @@ Main's automatic workflow is Native push only, not a new three-host main run.
 Post-test hosted source cleanliness is unobserved. Properly retired private
 feature values carry their full original gates, not fabricated new main output.
 
-ROOT's successor WT/private/tmp/ktlsp-430-basic-candidate-integration,
-branchomp/430-basic-candidate-integration, starts from that SAME verified main.
-Both prepared smoke commits7b4d60b→7899fbc and docsf0d9290 were composed, not
-only the smoke leaf; all original owner/user worktrees and branches remain.
-The nonignored real copied-pair consumer executes the SAME basic/edit/lifecycle
-helpers as the separately invoked borrowed extracted consumer. Genuine original
-completion/rename edits are applied in one live overlay; receipt stays64KiB.
-At this source checkpoint the successor's OWN full-union reviews, compiler,
-original full hosted CI, guarded integration/exact-main and separately admitted
-manual three-host packaging/actual extracted gates are still required.
-Do not dispatch packaging or invoke ANY local Kotlin/parser/server/Session/
-worker/peer/fake runtime from this preparation. No ten-hour guarantee or current
-archive/visual-editor/first-party-license/full-parity claim. Original431 remains
-UNKNOWN/OPEN; failedc035/acbfmt/bddClippy and96/T004/B3/oracle/395377417 holds remain.
+ROOT preserved WT/private/tmp/ktlsp-430-basic-candidate-integration,
+branchomp/430-basic-candidate-integration and draft [PR432](https://github.com/anilbeesetti/ktlsp/pull/432).
+Both prepared smoke commits7b4d60b→7899fbc and docsf0d9290 were composed on that
+SAME verified main; every original owner/user worktree and branch remains.
+Current preserved headacf06cda8ecf6ea15749c0e9232438f3fa5e3d7a/
+tree10c079733cfdccfc09da789a9f15e2adb0f4dcf2 received BOTH full current9path
+source renewals0.97/0.97, then separately admitted fmtCHECK0, FULL strict locked
+all-target/all-feature Clippy0 and FULL workspace NoRun0. No local product ran.
+Original Native39066463560/job117495071633 and platform39066463557/Mac117495071437
+passed; original Windows117495071556 FAILED the older navigation negotiation
+definition with `-32803 / parser deadline exceeded`. Actual checkoutb853cd81
+has exact reviewed tree and ordered parents[21a,acf]. No merge/packaging lease.
+
+The new nonignored copied-pair basic consumer passed on ALL THREE original hosts.
+ROOT and independent feature OWNER accepted ALL captured Mac18426B/Win17884B
+values and independently applied every actual UTF-16/CRLF/non-BMP didChange,
+returned completion and versioned rename edit in the same live overlay, with
+fresh definition/references/outlines/workspace/close/signature/lifecycle checks.
+Full outline correctly includes both leading comments. Linux's raw receipt is
+unprinted: only its named pass is claimed. These are NOT extracted archives,
+CLI help/version, actual IDE or broad reliability proof.
+[Complete original outcome](https://github.com/anilbeesetti/ktlsp/pull/432#issuecomment-6240834265).
+Two independent complete original source/custody audits found no recoverable
+request-correlated Windows selected timeout site or worker/I/O/clock timeline.
+Cause remains UNKNOWN; 110.13s is suite time,4308 a libtest thread, not worker PID.
+
+ROOT separately admitted SOURCE-only [#433](https://github.com/anilbeesetti/ktlsp/issues/433)
+in WT/private/tmp/ktlsp-433-timeout-provenance-integration,
+branchomp/433-timeout-provenance-integration, preserving that same incoming21a.
+Disjoint isolated parser/server owners implement finite already-selected piped
+deadline provenance through existing failure responses; active Unix Timeout,
+500ms, cancellation-before-deadline-before-readiness, all bounds and cleanup stay.
+Optional metadata is omitted only if needed to preserve the original frame-bound
+timeout reply; no new ID policy/observer/probe/retry. This is NOT a cause repair.
+Both owners have separate functionality/adversarial review slots reserved.
+Complete composed-source reviews precede separate compiler admission and OWN
+original full hosted CI; passing exact-source/guarded integration/exact-main
+acceptance must precede separately admitted three-host packaging/extracted proof.
+No local Kotlin/parser/server/Session/worker/peer/fake/CLI runtime is authorized.
+No ten-hour guarantee/current archive/visual-editor/license/full-parity claim.
+Original431/432 deadlines remain UNKNOWN;96/T004/B3/oracle/395377417 holds remain.
 
 Initial430 head91005d4/tree48efe0a4 did NOT clear its source gate: complete
 functionality review found the shared outline expectation trimmed two bound

@@ -19,6 +19,10 @@ This is source/setup guidance, not visual-editor verification or a ready release
 PR429 is verified on main `21aab03`; its first failed runs remain historical
 failures. Use only separately accepted exact-source archives and extracted proof
 from [#430](https://github.com/anilbeesetti/ktlsp/issues/430), not old package receipts.
+The expanded copied-pair basic consumer passed on all three original PR432 hosts,
+but Windows full CI failed an older parser deadline request; no candidate archive
+is accepted. [Original result and bounded #433 prerequisite](https://github.com/anilbeesetti/ktlsp/pull/432#issuecomment-6240834265)
+remain separate from release/full-parity claims.
 
 ## Current behavior
 

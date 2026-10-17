@@ -30,6 +30,18 @@ checks before accepting either completion. This preserves these priorities,
 not asynchronous thread-arrival timing. Post-success deadline selection sends
 no grammar observation, as before. Observer validation still follows cleanup.
 
+The #433 source contract distinguishes existing non-Unix deadline selections as
+`ParserError::PipedTimeout(site)`, with `PipedTimeoutSite` variants
+`SupervisorPoll`, `WriterJoin` and `ReaderJoin`.
+`ParserError::Timeout` remains the active Unix-control outcome. These are selection
+locations, not evidence that a thread was blocked, a worker phase or a runtime
+cause. Tagging adds no clock/I/O/status/readiness query and changes no deadline,
+priority or cleanup. The server may carry the finite site in an existing failure
+response; if that annotation cannot fit the existing frame limit, it preserves
+the original unannotated error instead. This changed source still requires its
+own reviews and separately admitted verification. Original PR432 Windows failure
+remains UNKNOWN; a later pass cannot diagnose it.
+
 On Unix, all Parser instances share eight reservations covering active children,
 pending cleanup and permanent failure pins. Admission happens before normalization,
 Command/observer allocation and terminal Once initialization. Once may block before

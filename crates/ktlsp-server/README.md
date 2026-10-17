@@ -21,12 +21,28 @@ Without that sibling, synchronization/folding/lexical diagnostics, compatible le
 capture-free source is verified on main `21aab03`, after its OWN original full
 three-host CI, guarded integration and independent feature OWNERS+ROOT original
 exact-main acceptance. Its first c035 runs remain FAILED; later passes do not
-diagnose historical deadlines. #430's expanded basic consumer is composed on
-that ONE verified incoming main, with execution/publication gates separate.
+diagnose historical deadlines. #430's expanded copied-pair consumer passed on
+all three original acf06cd hosts; ROOT and its independent feature owner checked
+the complete captured Mac/Windows values and applied every returned edit.
+However, that source's original Windows full CI FAILED an older navigation
+request with `parser deadline exceeded`; cause remains UNKNOWN. The copied-pair
+pass is not extracted-archive or release acceptance. [Exact outcome and holds](https://github.com/anilbeesetti/ktlsp/pull/432#issuecomment-6240834265).
+The #433 selected-site prerequisite is source-only until its own gates pass.
 Use only current-source archives and extracted proof separately accepted in
 [#430](https://github.com/anilbeesetti/ktlsp/issues/430); the historical
 [#373 receipts below](#optional-extracted-archive-smoke-373) certify only their
 exact sources. The ten-hour goal is not a guarantee.
+
+For #433's non-Unix piped deadline errors, the existing `-32803` and
+`parser deadline exceeded` message remain unchanged. Optional
+`error.data.parserTimeoutSite` is exactly `supervisor_poll`, `writer_join` or
+`reader_join`: the existing check that selected the deadline, NOT an OS cause,
+elapsed time or evidence of an unfinished thread. It follows the same owned
+request/freshness/cancellation/cleanup arbitration. Other chosen errors do not
+inherit it. If the extra data would exceed the existing frame ceiling for a
+large escaped ID, the original echoed-ID timeout error is retained without the
+annotation; request admission and frame limits are not enlarged. Unix ordinary
+Timeout has no piped-site annotation. No new observer stream, retry or timer.
 
 1. Once that exact-source package is accepted, obtain the package and its separate
    evidence from the admitted run for your host/architecture. Verify its outer

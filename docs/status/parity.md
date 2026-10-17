@@ -261,9 +261,16 @@ job117485003868 complete controls/147rows/1356cases before the lease cleared.
 [Exact delivery and qualifications](development.md#verified429-cleaned-source-integration-and-original-exact-main-acceptance).
 
 The successor430 basic consumer/setup is composed on that ONE verified main.
-It needs its OWN original gates and separate exact-source manual packaging/
-real extracted proof; copied-pair CI is not archive acceptance or visual-editor
-certification. No general inference/index/hierarchy/compiler/oracle/parity,
-first-party license or reliability promotion follows. Original431395377417
-UNKNOWNs, old failed runs and96/T004/native-only/B3/oracle holds remain.
+Its original acf copied-pair case passed on Linux/macOS/Windows; OWNER+ROOT
+accepted all captured Mac/Windows values and genuine edit applications. However,
+original Windows full CI FAILED an older navigation deadline request, whose
+selected timeout site/cause remains UNKNOWN after two complete original audits.
+The #433 finite selected-site source prerequisite changes no deadline/priority/
+cleanup/healthy assertion and is NOT a cause repair; its own composed-source and
+separately admitted verification gates remain pending. [Exact result and holds](development.md#basic430-original-acf-three-host-result-and-bounded433-prerequisite).
+Separate exact-source manual packaging/real extracted proof is still required:
+copied-pair CI is not archive acceptance or visual-editor certification. No
+general inference/index/hierarchy/compiler/oracle/parity, first-party license or
+reliability promotion follows. Original431/432/395/377/417 UNKNOWNs, old failed
+runs and96/T004/native-only/B3/oracle holds remain.
 

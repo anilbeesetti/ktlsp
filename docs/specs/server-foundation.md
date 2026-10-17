@@ -140,3 +140,19 @@ cleanup survived retirement and passed the cleaned union's OWN new gates.
 No local Kotlin/parser/server/Session/worker runtime is admitted under96.
 No semantic index, effective library/classpath, official matcher or full-parity
 claim is added.
+
+## Selected piped deadline provenance (#433 source contract)
+
+Only an actually selected non-Unix piped parser deadline can carry optional
+`error.data.parserTimeoutSite`: `supervisor_poll`, `writer_join` or `reader_join`.
+The existing code `-32803`, message `parser deadline exceeded`, original ID and
+owned freshness/cancellation/cleanup arbitration remain. The active Unix
+`ParserError::Timeout` has no piped-site annotation. Site means the check that
+selected a deadline, not a blocked state, worker phase, duration or cause.
+No extra clock/I/O/status/readiness check, observer channel, retry or raised bound.
+If annotation alone would overflow the existing frame ceiling, retain the
+original unannotated timeout response; no new ID admission policy or larger frame.
+Workspace aggregate failure reserve and other error data remain unchanged.
+This changed source needs its own reviews/verification. Original PR432 Windows
+failure remains UNKNOWN/blocking, despite the different basic consumer's pass.
+

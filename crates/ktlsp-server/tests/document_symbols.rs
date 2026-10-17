@@ -5999,6 +5999,8 @@ fn signature_element<'a>(packet: &'a Value, role: &str) -> &'a Value {
     &packet["elements"][packet["proof"][role].as_u64().unwrap() as usize]
 }
 fn signature_assert_source(packet: &Value, response: &Value) {
+    assert_eq!(packet["cleanup"], true);
+    assert_eq!(packet["diagnostics"], json!([]));
     assert!(response.get("error").is_none(), "{response}");
     assert_eq!(response["result"], packet["result"]);
     let source = packet["source"].as_str().unwrap();
@@ -6035,7 +6037,10 @@ fn manual_signature_help_actual_source_cursor_profiles_and_same_session_type_edi
         ("fun <T> outer(p:T){ fun <U,send,p> unused(){}; fun send(to:T){}; send(to=p) }", "send(", json!({})),
         ("import elsewhere.send\nclass send {}\nfun send(){}\nfun <Int> outer(p:Int){ fun send(to:`Int`){}; send(to=p) }", "send(", json!({})),
     ] {
-        let cursor = source.rfind(marker).unwrap() + marker.len();
+        let call_start = source.rfind(marker).unwrap() + marker.len();
+        // '=' ends before value trivia, never at the opening slash of the
+        // original immediately-following label comment.
+        let cursor = source.rfind('=').unwrap() + 1;
         let original = signature_producer_packet(source, 7, cursor);
         let mut wire = SignatureWire::new(&package);
         let initialized = signature_open(&mut wire, source, profile);
@@ -6059,7 +6064,7 @@ fn manual_signature_help_actual_source_cursor_profiles_and_same_session_type_edi
         }) {
             let start = token["start"].as_u64().unwrap() as usize;
             let end = token["end"].as_u64().unwrap() as usize;
-            if cursor <= start { positions.extend([start, start + 1, end]); }
+            if call_start <= start { positions.extend([start, start + 1, end]); }
         }
         positions.sort_unstable();
         positions.dedup();
@@ -6078,7 +6083,7 @@ fn manual_signature_help_actual_source_cursor_profiles_and_same_session_type_edi
         let content_changes = edits.iter().rev().map(|edit| json!({"range":edit["range"],"text":edit["newText"]})).collect::<Vec<_>>();
         wire.send(json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{
             "textDocument":{"uri":URI,"version":8},"contentChanges":content_changes}}));
-        let edited_cursor = edited.rfind(marker).unwrap() + marker.len();
+        let edited_cursor = edited.rfind('=').unwrap() + 1;
         let edited_producer = signature_producer_packet(&edited, 8, edited_cursor);
         let after = signature_request(&mut wire, json!("edited"), &edited, edited_cursor, Some(json!({"triggerKind":2,"triggerCharacter":"(","isRetrigger":false})));
         let responses = wire.finish();
@@ -6250,7 +6255,7 @@ fn manual_signature_help_actual_pending_work_keeps_owned_join_and_incarnation_gu
     let source = "fun <T> outer(p:T){ fun send(to:T){}; send(to=p) }";
     let cursor = source.rfind("send(").unwrap()+5;
     let producer = signature_producer_packet(source,7,cursor);
-    for action in ["cancel","change","reopen","rejected-change","shutdown","close"] {
+    for action in ["cancel","change","reopen","rejected-change","rejected-range","shutdown","close"] {
         let mut session = running_rename();
         let open_message = json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{
             "textDocument":{"uri":URI,"languageId":"kotlin","version":7,"text":source}}});
@@ -6261,9 +6266,11 @@ fn manual_signature_help_actual_pending_work_keeps_owned_join_and_incarnation_gu
         let before = session.pending_requests();
         let mutation = match action {
             "cancel" => json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":"help-owned"}}),
-            "change" | "rejected-change" => json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{
-                "textDocument":{"uri":URI,"version":if action=="change"{8}else{7}},
-                "contentChanges":[{"text":source}]}}),
+            "change" | "rejected-change" | "rejected-range" => json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{
+                "textDocument":{"uri":URI,"version":if action=="rejected-change"{7}else{8}},
+                "contentChanges":if action=="rejected-range" {
+                    json!([{"range":{"start":{"line":99,"character":0},"end":{"line":99,"character":1}},"text":"bad"}])
+                } else { json!([{"text":source}]) }}}),
             "reopen" => json!({"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":URI}}}),
             "shutdown" => json!({"jsonrpc":"2.0","id":"shutdown","method":"shutdown"}),
             _ => Value::Null,
@@ -6271,7 +6278,18 @@ fn manual_signature_help_actual_pending_work_keeps_owned_join_and_incarnation_gu
         let mut responses = if action=="close" { Vec::new() } else { session.handle(mutation.clone()) };
         let retained = session.pending_requests();
         let reopened = if action=="reopen" { session.handle(open_message.clone()) } else { Vec::new() };
-        let (closing, clean) = if action=="rejected-change" {
+        let fresh_request = json!({"jsonrpc":"2.0","id":"help-reopened","method":"textDocument/signatureHelp",
+            "params":navigation_params(source,cursor)});
+        let mut fresh = Vec::new();
+        if action=="reopen" {
+            fresh.extend(session.handle(fresh_request.clone()));
+            let deadline = Instant::now()+Duration::from_secs(3);
+            while fresh.is_empty() && Instant::now()<deadline {
+                fresh.extend(session.poll());
+                if fresh.is_empty() { std::thread::sleep(Duration::from_millis(2)); }
+            }
+        }
+        let (closing, clean) = if action.starts_with("rejected-") {
             let deadline = Instant::now()+Duration::from_secs(3);
             while session.pending_requests()!=0 && Instant::now()<deadline {
                 responses.extend(session.poll());
@@ -6284,6 +6302,7 @@ fn manual_signature_help_actual_pending_work_keeps_owned_join_and_incarnation_gu
         signature_observation("SESSION_OWNED", &json!({"source":source,"action":action,
             "open":open_message,"opened":opened,"request":request_message,"initial":initial,
             "mutation":mutation,"reopened":reopened,"responses":responses,
+            "freshRequest":if action=="reopen" { fresh_request } else { Value::Null },"freshResponses":fresh,
             "ownedBefore":before,"ownedAfterMutation":retained,"ownedAfterClose":after,"clean":clean,
             "errors":session.drain_errors()}));
         assert!(initial.is_empty());
@@ -6293,7 +6312,7 @@ fn manual_signature_help_actual_pending_work_keeps_owned_join_and_incarnation_gu
         assert_eq!(after,0);
         let help = responses.iter().filter(|response| response["id"]=="help-owned").collect::<Vec<_>>();
         assert_eq!(help.len(),1,"{responses:?}");
-        if action=="rejected-change" {
+        if action.starts_with("rejected-") {
             signature_assert_source(&producer,help[0]);
         } else {
             assert_eq!(help[0]["error"]["code"],if matches!(action,"change"|"reopen"){-32801}else{-32800});
@@ -6301,6 +6320,11 @@ fn manual_signature_help_actual_pending_work_keeps_owned_join_and_incarnation_gu
         }
         if action=="shutdown" {
             assert_eq!(responses.iter().filter(|response|response["id"]=="shutdown").count(),1);
+        }
+        if action=="reopen" {
+            assert_eq!(fresh.len(),1,"{fresh:?}");
+            assert_eq!(fresh[0]["id"],"help-reopened");
+            signature_assert_source(&producer,&fresh[0]);
         }
     }
 }

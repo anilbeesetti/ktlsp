@@ -442,7 +442,8 @@ pub(crate) fn render(
     let bytes = match query {
         Query::Definition { .. } => target.name_range(),
         Query::Hover { .. } => site.range(),
-        Query::References { .. }
+        Query::SignatureHelp { .. }
+        | Query::References { .. }
         | Query::Highlights { .. }
         | Query::PrepareRename { .. }
         | Query::Rename { .. }

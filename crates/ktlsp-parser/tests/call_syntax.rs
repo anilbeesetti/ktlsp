@@ -914,7 +914,7 @@ fn lexical_argument_label_borrows_the_original_applicable_call_and_formal() {
                 rebound.type_parameter()
             ));
         }
-        let signature = local_call_signature(&directory2, &updated, updated.snapshot(), call2.open_paren().end)
+        let signature = local_call_signature(&directory2, &updated, updated.snapshot(), call2.arguments()[0].value_token().start)
             .unwrap().unwrap();
         assert!(std::ptr::eq(signature.binding().type_parameter(), rebound.type_parameter()));
         let range = signature.signature_range();

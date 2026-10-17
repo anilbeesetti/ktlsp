@@ -3432,3 +3432,62 @@ Affected exact source reviews/checks and full native packages must pass before
 actual consumer runtime; original full hosted3host CI remains required for the
 composed LSP surface. #96/native-only/B3/oracle/unknown-original-failure/full-parity
 limits remain unchanged; no push/PR/lease/merge acceptance exists.
+
+#### Native421 complete actual-data acceptance, hosted composed surface still pending
+
+Reviewed71040c8435e6835895ee06aa56cf86362f378782/treef9ac3eaf7d17f0ef963551977bed89c6236053b2
+received both full20path/external-control ROOT clears, both affected inventory
+component clears and unchanged strict URI2 byte-pinned authority. ROOT FULL-read
+all new meaningful receipt values and losslessly authenticated complete prior
+appendices. Pinned format-CHECK0/1.162872s, strict locked workspace/all-target
+Clippy0/.307181s, full workspace test--no-run0/.381838s; all195 actual compiler
+records parsed with terminal success and no compiler-message. This executes
+NO Kotlin/parser/server/Session/worker code.
+
+Entire unfiltered native binary/import packages0/15.404715s:665passed across
+68 result rows,657ordinary+8privacy compile-fail doctests,0fail/ignored/measured/
+filtered. All17 actual inventory cases passed, including all-Unix public nonUTF8
+input refusal and original unconditional symlink/socket/ancestor assertions.
+Actual invalid-filename discovery remains active on Linux; macOS cannot create
+the observed0xff fixture. Original3464 native101/16pass1fail remains retained;
+the two earlier source-specific strict Clippy failures are not erased.
+
+The actual public inventory consumer ran ONCE0/.454531917s with empty PATH and
+6Java environment names removed. Full stdout53817B SHA256
+fa17752d1590bd6893060cae28dc7c76a4121f7fd79f498213ce81f9f7f097f2; stderr empty.
+All17 complete actual packets were independently FULL-read/validated by OWNER
+and ROOT, not count summaries: original immutable model/projection, every entry/
+kind/source/original membership ordinal, true10byte Ω->Ψ source and790byte
+app->new model writes, stale refusal/original retained data, source-byte/source-ID
+restoration, equal-byte real source/model replacements, shared project refusal,
+data-only v2 success versus late missing-root atomic physical refusal, and
+unknown/non-source refusal with original project absent. Root879-line and
+Owner2478-line saved lossless readers EACH reconstruct ALL53817 original bytes.
+
+Original stdout Metadata Debug omits numerical native IDs. Separate post-run
+read-only observations on retained original/replacement files corroborated
+device16777229, source inodes31317540/31317546 with identical10byte contents,
+model inodes31317539/31317547 with identical790byte contents. These are NOT
+backfilled stdout fields or invented private Inventory maps. No returned
+WorkspaceEdit, model-identity restoration success, zero-Java process counter,
+parser-between-verifications or full LSP/platform/oracle/sandbox/latency proof
+is claimed. Actual source/model writes are authored native data, not official
+oracle or LSP returned edits; genuine client ranged-edit application stays hosted.
+
+Both complete gates are recorded in
+`/private/tmp/ktlsp-421-native/ROOT-complete-native-data-acceptance.json`,
+SHAae083d1524048325f6923962a84a013a79abd1a14073d434090b9c24b96505ab,
+and independent OWNER JSON2daabf7416c18eb245cb7d55eefcdb2ec87eae3bfddf6073393051e2debfd2fa
+/TXTdf0c58c94daacb40e4b96d1f4cf44ae91dbbb3ef12ab1a29299580c2bc5ed742.
+ROOT FULL-read all owner new proof/observation/limit fields; complete embedded
+original packets and source/compiler provenance matched already FULL Root-read
+values exactly. ONLY AFTER BOTH accepted gates, temporary standalone consumer.rs
+was removed; complete152line executed source remains in native-consumer-executed-
+source.json at original52556b8d hash, plus executable/rlibs/fixtures/all outputs/
+readers/full evidence retained. The FOUR committed ACTUAL421 writers stay until
+both FULL actual original hosted gates; then observation-only cleanup requires
+its OWN exact source review/CI. No second formatter, retry/probe or local Kotlin/
+Session runtime. Next docs-only ROOT2 review/publication/original full3host CI,
+fresh leased read-only guards/ordinary expected-head merge/actual tree+soleparent
+and dual original exact-main proof. Full parity NOT achieved; B3/oracle/native/
+T004/#96 and original417/395/377 UNKNOWN limits unchanged; no active lease.

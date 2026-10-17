@@ -54,45 +54,39 @@ real CLI4fb07cd and real native-model state6b72251. ROOT additionally wires
 owned cancellation/waiters/config invalidation and real behavior checks.
 Borrowed roots are never cleaned; all old/user/delivered/component WTs remain.
 
-Current421 remains runtime-UNVERIFIED. BOTH full20 ROOT reviews cleared3a4cb4f,
-then ONE pinned formatter succeeded1.36s; it is SPENT, NEVER a second formatter.
-All SIX exact formatted ROOT/component clears accepted6d43de4/tree53500bb,
-and all SIX renewed clears accepted derived-default871c82/tree0bbba4ed;
-ROOT FULL-read/authenticated every receipt, including lossless complete prior
-appendices, before each changed-source compile admission. Original format-CHECK0
-then strictClippy101/5.258058s (derivable_impls) remains retained with its complete
-59line2612B stderr4841158a5eda3db5d722aeeb7b6f723f1b16fad796b5ff5b09f6cd99ffcfdab9.
-Derived Budget preserves custom frozen Limits, zero counters and empty owner map.
-Successor format-CHECK0/1.145952s, strictClippy101/1.144165s reports ONLY
-type_complexity at workspace.rs343 (capture's existing four-element tuple).
-Complete1203B stderr9fcf8848aaf87013d977d9d7447b2fc6da9bdc25bee43d1fdf46722e5cf1bc66
-is retained separately as corrected-strict-clippy.stderr; neither failure erased.
-Sequence STOPPED again: workspace--no-run/tests/native consumer/server/parser/
-CLI runtime and hosted CI NEVER ran. ROOT adds ONLY a private CapturedSource
-type alias for that identical tuple and uses it in the return signature.
-No allocation/copy/ownership, bounds, caller behavior, suppression or second
-formatter. Failed Budget LSP refs remain unavailable; complete concrete capture
-caller fallback recovered later capped search matches. Exact affected rechecks
-must renew before another changed-source CHECK/strictClippy/compile-only gate.
-All four ACTUAL421 writers stay through BOTH full actual OWNER+ROOT gates;
-three CLI packets emit BEFORE outer result assertions. Reviewed outside native
-consumer52556b8d includes real same-length source/model byte and identity cases.
-After renewed SIX exact clears3464d6f/treee9f3ff5a, pinned CHECK0/1.146082s,
-strict locked workspace/all-target Clippy0/1.091233s and full workspace
-test--no-run0/13.945685s passed (NO parser/Session runtime). Separate native-only
-admission ran unfiltered binary/import tests:101/59.323599s; source_inventory
-16passed/1FAILED because fs::write at487 rejects authored0xff filename with
-Darwin code92 Illegal byte sequence BEFORE importer inspection. All original
-streams retained; doctests and native consumer runtime NOT reached. Outside
-consumer compiled0/0.217723s, source52556b8d unchanged, fixtures not created.
-ROOT corrects ONLY fixture portability: every Unix target now actually exercises
-public non-UTF8 input refusal; non-macOS additionally retains original invalid
-filename/discovery assertions. All symlink/socket/ancestor assertions still run
-on macOS. Production validation/bounds unchanged, no caught error or weak pass.
-Next: exact affected reviews for test+docs correction, changed-source CHECK/
-Clippy/compile-only, full unfiltered native packages and real native consumer,
-OWN original full3host CI, observation-only cleanup/OWN source acceptance,
-fresh guarded integration and dual original exact-main proof. No second formatter.
+Composed421 Session/CLI remains hosted-runtime-UNVERIFIED; native data is accepted.
+Reviewed71040c8435e6835895ee06aa56cf86362f378782/treef9ac3eaf7d17f0ef963551977bed89c6236053b2
+has BOTH complete20path ROOT clears, BOTH affected inventory clears and exact
+unchanged URI2 component authority. ROOT FULL-read/authenticated all receipts.
+Pinned format-CHECK0/1.162872s, strict locked workspace/all-target Clippy0/.307181s
+and workspace test--no-run0/.381838s passed. NO local parser/Session execution.
+Unfiltered binary/import packages0/15.404715s:665passed=657ordinary+8privacy
+compile-fail docs,0failed/ignored/filtered; all17 actual inventory cases pass.
+Real public native consumer0/.454531917s, PATH empty/6Java variables removed,
+stdout53817B SHAfa17752d1590bd6893060cae28dc7c76a4121f7fd79f498213ce81f9f7f097f2,
+stderr empty. All17 actual complete model/inventory/membership/source/mutation/
+identity/shared-budget/atomic/no-source packets FULL independently accepted:
+ROOT879lossless lines, OWNER2478lossless lines; each reconstructs ALL raw bytes.
+Numeric dev+ino came separately from retained post-run files, NOT stdout.
+ROOT receipt `/private/tmp/ktlsp-421-native/ROOT-complete-native-data-acceptance.json`
+SHAae083d1524048325f6923962a84a013a79abd1a14073d434090b9c24b96505ab;
+OWNER JSON2daabf7416c18eb245cb7d55eefcdb2ec87eae3bfddf6073393051e2debfd2fa
+and TXTdf0c58c94daacb40e4b96d1f4cf44ae91dbbb3ef12ab1a29299580c2bc5ed742.
+ONLY AFTER BOTH gates temporary consumer.rs retired; full executed152line source
+archived in root-evidence/native-consumer-executed-source.json (52556b8d), with
+executable/rlibs/all fixtures/outputs/readers/full proofs retained. No returned
+WorkspaceEdit, model-identity-restoration success or zero-JVM counter claimed.
+Three original failures stay in ledger/evidence:6d43 Budget derivable_impls,
+871c capture type_complexity,3464 APFS0xff fixture creation Darwin92. Minimal
+derive/private tuple alias/portable real invalid-input fixture fixes only;
+no production guard/bound/default/assertion/cleanup relaxation or unchanged retry.
+ONE formatter is SPENT; NEVER another. Failed LSP refs remain failed; honest
+complete concrete source/caller fallback recovered capped later matches.
+All FOUR ACTUAL421 committed writers stay until BOTH full hosted OWNER+ROOT
+actual gates, including applying the genuine client ranged edit. Three CLI
+packets precede outer result assertions. Next: docs-only exact ROOT2 acceptance,
+OWN original full Linux/macOS/Windows CI, observation-only cleanup/OWN source
+review+CI, fresh guarded merge and dual original exact-main proof.
 
 ROOT owns Cargo/workspace/lock/docs/config/CI/publication. Windows-target-only
 file-id0.2.3 and server->import path dependency are resolved; all existing registry

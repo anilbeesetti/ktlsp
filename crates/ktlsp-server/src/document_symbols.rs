@@ -33,11 +33,23 @@ impl Client {
         let Some(symbols) = document.get("documentSymbol") else {
             return Ok(client);
         };
-        let symbols = symbols
-            .as_object()
-            .ok_or("documentSymbol must be an object")?;
-        if let Some(value) = symbols.get("hierarchicalDocumentSymbolSupport") {
-            client.hierarchical = value
+        client.profile(symbols, true)?;
+        Ok(client)
+    }
+    /// Workspace kinds negotiate independently; hierarchy is document-only.
+    pub(crate) fn workspace(capabilities: &Value) -> Result<Self, &'static str> {
+        let mut client = Self::default();
+        if let Some(workspace) = capabilities.get("workspace")
+            && let Some(symbols) = crate::object(workspace)?.get("symbol")
+        {
+            client.profile(symbols, false)?;
+        }
+        Ok(client)
+    }
+    fn profile(&mut self, symbols: &Value, document: bool) -> Result<(), &'static str> {
+        let symbols = symbols.as_object().ok_or("symbol profile must be an object")?;
+        if document && let Some(value) = symbols.get("hierarchicalDocumentSymbolSupport") {
+            self.hierarchical = value
                 .as_bool()
                 .ok_or("hierarchicalDocumentSymbolSupport must be boolean")?;
         }
@@ -50,19 +62,19 @@ impl Client {
                 if values.len() > 128 {
                     return Err("symbolKind valueSet exceeds limit");
                 }
-                client.kinds.fill(false);
+                self.kinds.fill(false);
                 for value in values {
                     let kind = value
                         .as_u64()
                         .filter(|v| (1..=i32::MAX as u64).contains(v))
                         .ok_or("symbolKind must be a positive LSP integer")?;
                     if kind <= 26 {
-                        client.kinds[kind as usize] = true;
+                        self.kinds[kind as usize] = true;
                     }
                 }
             }
         }
-        Ok(client)
+        Ok(())
     }
     fn kind(&self, kind: usize, fallback: usize) -> Result<usize, &'static str> {
         if self.kinds[kind] {
@@ -108,18 +120,26 @@ impl Provider {
     }
 }
 
-struct Symbol<'a> {
-    node: &'a Element,
-    name: &'a Element,
-    spelling: &'a str,
-    kind: usize,
-    owner: Option<usize>,
+pub(super) struct Symbol<'a> {
+    pub(super) node: &'a Element,
+    pub(super) name: &'a Element,
+    pub(super) spelling: &'a str,
+    pub(super) kind: usize,
+    pub(super) owner: Option<usize>,
     depth: usize,
 }
 
 // Only validated Parser output enters this projection. Child jumps visit direct
 // declaration structure, never text matches or arbitrary descendant identifiers.
 fn declarations<'a>(tree: &'a Parsed, client: &Client) -> Result<Vec<Symbol<'a>>, &'static str> {
+    declarations_with_work(tree, client, |_| Ok(()))
+}
+
+pub(super) fn declarations_with_work<'a>(
+    tree: &'a Parsed,
+    client: &Client,
+    mut work: impl FnMut(usize) -> Result<(), &'static str>,
+) -> Result<Vec<Symbol<'a>>, &'static str> {
     if !tree.diagnostics().is_empty() {
         return Err(UNSUPPORTED);
     }
@@ -127,6 +147,7 @@ fn declarations<'a>(tree: &'a Parsed, client: &Client) -> Result<Vec<Symbol<'a>>
     let mut symbols: Vec<Symbol<'a>> = Vec::new();
     let mut owners: Vec<(usize, usize)> = Vec::new();
     for (index, node) in elements.iter().enumerate() {
+        work(1)?;
         while owners.last().is_some_and(|&(end, _)| end <= index) {
             owners.pop();
         }
@@ -168,6 +189,7 @@ fn declarations<'a>(tree: &'a Parsed, client: &Client) -> Result<Vec<Symbol<'a>>
         let mut child = index + 1;
         while child < node.subtree_end {
             let part = &elements[child];
+            work(1)?;
             if part.token {
                 match part.kind.as_str() {
                     "IDENTIFIER" => {
@@ -192,6 +214,7 @@ fn declarations<'a>(tree: &'a Parsed, client: &Client) -> Result<Vec<Symbol<'a>>
                 let mut modifier = child + 1;
                 while modifier < part.subtree_end {
                     let token = &elements[modifier];
+                    work(1)?;
                     if token.token && token.kind == "ENUM_KEYWORD" {
                         enumeration = true;
                     }
@@ -270,6 +293,9 @@ fn declarations<'a>(tree: &'a Parsed, client: &Client) -> Result<Vec<Symbol<'a>>
             return Err("document symbol output or nesting limit exceeded");
         }
         let spelling = tree.source().get(name.start..name.end).ok_or(UNSUPPORTED)?;
+        work(spelling.len())?;
+        symbols.try_reserve(1).map_err(|_| "symbol allocation failed")?;
+        owners.try_reserve(1).map_err(|_| "symbol allocation failed")?;
         let ordinal = symbols.len();
         symbols.push(Symbol {
             node,

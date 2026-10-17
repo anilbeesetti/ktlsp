@@ -1,6 +1,8 @@
 //! Native data-only authored fixtures; no parser, server, worker or build-tool runtime.
 use ktlsp_import::{
-    source_inventory::{self, Budget, EntryKind, Error, Inventory, Limits},
+    source_inventory::{
+        self, Budget, EntryKind, Error, Inventory, Limits, SnapshotBudget, SnapshotLimits,
+    },
     v2,
 };
 use serde_json::{Value, json};
@@ -871,4 +873,347 @@ fn consumer_uri_reservations_share_the_candidate_path_and_work_counters() {
         budget.reserve_path_bytes(1),
         Err(Error::Budget("path bytes"))
     ));
+}
+
+fn kotlin_indices(inventory: &Inventory) -> Vec<usize> {
+    inventory
+        .entries()
+        .iter()
+        .enumerate()
+        .filter_map(|(index, entry)| (entry.kind() == EntryKind::KotlinSource).then_some(index))
+        .collect()
+}
+
+fn verify_two_phases(
+    inventories: &[Inventory],
+    limits: SnapshotLimits,
+) -> Result<(), Error> {
+    let cancelled = AtomicBool::new(false);
+    let mut budget = SnapshotBudget::new(limits)?;
+    for _ in 0..2 {
+        budget.begin_phase()?;
+        for inventory in inventories {
+            inventory.verify_inventory(&kotlin_indices(inventory), &mut budget, &cancelled)?;
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn snapshot_models_remain_authoritative_without_any_closed_sources() {
+    let cancelled = AtomicBool::new(false);
+    for all_overlaid in [false, true] {
+        let project = Project::new();
+        let original = if all_overlaid {
+            project.put("src/A.kt", b"fun disk() = 1");
+            project.model(&[("src", "kotlin-source")])
+        } else {
+            project.model(&[])
+        };
+        let inventory = project.load().unwrap();
+        let mut budget = SnapshotBudget::default();
+        budget.begin_phase().unwrap();
+        inventory.verify_inventory(&[], &mut budget, &cancelled).unwrap();
+        if all_overlaid {
+            // An overlay selection does not depend on its retained disk bytes.
+            fs::remove_file(project.0.join("src/A.kt")).unwrap();
+        }
+        budget.begin_phase().unwrap();
+        inventory.verify_inventory(&[], &mut budget, &cancelled).unwrap();
+
+        let mut budget = SnapshotBudget::default();
+        budget.begin_phase().unwrap();
+        inventory.verify_inventory(&[], &mut budget, &cancelled).unwrap();
+        let changed = String::from_utf8(original.clone())
+            .unwrap()
+            .replace("\"app\"", "\"new\"");
+        assert_eq!(changed.len(), original.len());
+        project.put("workspace.json", changed.as_bytes());
+        budget.begin_phase().unwrap();
+        assert!(matches!(
+            inventory.verify_inventory(&[], &mut budget, &cancelled),
+            Err(Error::Changed)
+        ));
+        // Even the first phase must verify a zero-source/all-overlay model.
+        let mut budget = SnapshotBudget::default();
+        budget.begin_phase().unwrap();
+        assert!(matches!(
+            inventory.verify_inventory(&[], &mut budget, &cancelled),
+            Err(Error::Changed)
+        ));
+    }
+}
+
+#[test]
+fn snapshot_verifies_nonmatching_closed_sources_and_original_membership_only() {
+    let project = Project::new();
+    project.model(&[("src", "kotlin-source")]);
+    project.put("src/Match.kt", b"fun wanted() = 1");
+    project.put("src/Other.kt", b"fun absent() = 2");
+    let inventory = project.load().unwrap();
+    let indices = kotlin_indices(&inventory);
+    let cancelled = AtomicBool::new(false);
+    let mut budget = SnapshotBudget::default();
+    budget.begin_phase().unwrap();
+    inventory.verify_inventory(&indices, &mut budget, &cancelled).unwrap();
+    // Additions are not discovered until reload: no directory membership rescan.
+    project.put("src/New.kt", b"fun added() = 3");
+    budget.begin_phase().unwrap();
+    inventory.verify_inventory(&indices, &mut budget, &cancelled).unwrap();
+
+    let mut budget = SnapshotBudget::default();
+    budget.begin_phase().unwrap();
+    inventory.verify_inventory(&indices, &mut budget, &cancelled).unwrap();
+    project.put("src/Other.kt", b"fun hidden() = 2");
+    budget.begin_phase().unwrap();
+    assert!(matches!(
+        inventory.verify_inventory(&indices, &mut budget, &cancelled),
+        Err(Error::Changed)
+    ));
+    let inventory = project.load().unwrap();
+    let indices = kotlin_indices(&inventory);
+    let mut budget = SnapshotBudget::default();
+    budget.begin_phase().unwrap();
+    inventory.verify_inventory(&indices, &mut budget, &cancelled).unwrap();
+    fs::remove_file(project.0.join("src/Other.kt")).unwrap();
+    budget.begin_phase().unwrap();
+    assert!(matches!(
+        inventory.verify_inventory(&indices, &mut budget, &cancelled),
+        Err(Error::Io(_))
+    ));
+}
+
+#[test]
+fn snapshot_selection_is_validated_before_io_and_cancellation_is_preserved() {
+    let project = Project::new();
+    project.model(&[("src", "kotlin-source")]);
+    project.put("src/A.kt", b"fun a() = 1");
+    project.put("src/script.kts", b"println(1)");
+    let inventory = project.load().unwrap();
+    let source = source_index(&inventory);
+    let nonsource = inventory.entries().iter().position(|entry| {
+        entry.kind() == EntryKind::KotlinScript
+    }).unwrap();
+    fs::remove_file(project.0.join("workspace.json")).unwrap();
+    let cancelled = AtomicBool::new(false);
+    for selection in [vec![usize::MAX], vec![nonsource], vec![source, source]] {
+        let mut budget = SnapshotBudget::default();
+        budget.begin_phase().unwrap();
+        assert!(matches!(
+            inventory.verify_inventory(&selection, &mut budget, &cancelled),
+            Err(Error::InvalidSource(_))
+        ));
+    }
+    assert!(matches!(
+        inventory.verify_inventory(&[], &mut SnapshotBudget::default(), &cancelled),
+        Err(Error::Budget("verification phase not begun"))
+    ));
+    let mut budget = SnapshotBudget::default();
+    budget.begin_phase().unwrap();
+    cancelled.store(true, Ordering::Relaxed);
+    assert!(matches!(
+        inventory.verify_inventory(&[], &mut budget, &cancelled),
+        Err(Error::Cancelled)
+    ));
+    assert!(matches!(budget.reserve_work(1, &cancelled), Err(Error::Cancelled)));
+}
+
+#[test]
+fn snapshot_exact_and_exceeded_aggregate_limits_are_reducible_not_raiseable() {
+    let defaults = SnapshotLimits::default();
+    assert_eq!(
+        [defaults.phases, defaults.project_visits, defaults.source_visits,
+            defaults.source_bytes, defaults.work],
+        [2, 32, 2048, 32 * 1024 * 1024, 256 * 1024 * 1024]
+    );
+    let setters: [fn(&mut SnapshotLimits, usize); 5] = [
+        |limits, value| limits.phases = value,
+        |limits, value| limits.project_visits = value,
+        |limits, value| limits.source_visits = value,
+        |limits, value| limits.source_bytes = value,
+        |limits, value| limits.work = value,
+    ];
+    let maxima = [defaults.phases, defaults.project_visits, defaults.source_visits,
+        defaults.source_bytes, defaults.work];
+    let first = Project::new();
+    let second = Project::new();
+    let sources: [&[u8]; 2] = [b"fun first() = 1", b"fun second() = 2"];
+    for project in [&first, &second] {
+        project.model(&[("src", "kotlin-source")]);
+        project.put("src/A.kt", sources[0]);
+        project.put("src/B.kt", sources[1]);
+    }
+    let inventories = [first.load().unwrap(), second.load().unwrap()];
+    let expected = [Some(2), Some(4), Some(8),
+        Some(4 * (sources[0].len() + sources[1].len())), None];
+    for (index, set) in setters.into_iter().enumerate() {
+        let mut raised = defaults;
+        set(&mut raised, maxima[index] + 1);
+        assert!(matches!(
+            SnapshotBudget::new(raised),
+            Err(Error::Budget("invalid snapshot limits"))
+        ));
+        let mut low = 0;
+        let mut high = maxima[index];
+        while low < high {
+            let mid = low + (high - low) / 2;
+            let mut limits = defaults;
+            set(&mut limits, mid);
+            if verify_two_phases(&inventories, limits).is_ok() {
+                high = mid;
+            } else {
+                low = mid + 1;
+            }
+        }
+        if let Some(expected) = expected[index] {
+            assert_eq!(low, expected, "snapshot boundary {index}");
+        }
+        assert!(low > 0);
+        let mut exact = defaults;
+        set(&mut exact, low);
+        verify_two_phases(&inventories, exact).unwrap();
+        set(&mut exact, low - 1);
+        assert!(matches!(
+            verify_two_phases(&inventories, exact),
+            Err(Error::Budget(_))
+        ));
+    }
+}
+
+#[test]
+fn snapshot_both_full_admission_passes_fit_without_raising_old_limits() {
+    let project = Project::new();
+    project.model(&[("src", "kotlin-source")]);
+    let full_source = vec![b'a'; Limits::default().source_file_bytes];
+    for index in 0..Limits::default().sources {
+        project.put(
+            &format!("src/File{index}.kt"),
+            if index < 256 { &full_source } else { b"" },
+        );
+    }
+    let inventory = project.load().unwrap();
+    let indices = kotlin_indices(&inventory);
+    assert_eq!(indices.len(), 1024);
+    assert_eq!(
+        indices.iter().map(|&index| inventory.entries()[index].source().unwrap().len())
+            .sum::<usize>(),
+        16 * 1024 * 1024
+    );
+    verify_two_phases(&[inventory], SnapshotLimits::default()).unwrap();
+}
+
+#[test]
+fn snapshot_per_phase_project_and_source_visits_do_not_borrow_the_second_pass() {
+    let project = Project::new();
+    project.model(&[("src", "kotlin-source")]);
+    project.put("src/A.kt", b"fun a() = 1");
+    let inventory = project.load().unwrap();
+    let cancelled = AtomicBool::new(false);
+    let mut budget = SnapshotBudget::default();
+    budget.begin_phase().unwrap();
+    for _ in 0..Limits::default().projects {
+        inventory.verify_inventory(&[], &mut budget, &cancelled).unwrap();
+    }
+    assert!(matches!(
+        inventory.verify_inventory(&[], &mut budget, &cancelled),
+        Err(Error::Budget("per-phase verification projects"))
+    ));
+
+    let project = Project::new();
+    project.model(&[("src", "kotlin-source")]);
+    for index in 0..513 {
+        project.put(&format!("src/F{index}.kt"), b"");
+    }
+    let inventory = project.load().unwrap();
+    let indices = kotlin_indices(&inventory);
+    let mut budget = SnapshotBudget::default();
+    budget.begin_phase().unwrap();
+    inventory.verify_inventory(&indices, &mut budget, &cancelled).unwrap();
+    assert!(matches!(
+        inventory.verify_inventory(&indices, &mut budget, &cancelled),
+        Err(Error::Budget("per-phase verification sources"))
+    ));
+}
+
+#[test]
+fn snapshot_consumer_work_and_verification_share_one_nonrefundable_allowance() {
+    let project = Project::new();
+    project.model(&[]);
+    let inventory = project.load().unwrap();
+    let cancelled = AtomicBool::new(false);
+    let mut low = 0;
+    let mut high = SnapshotLimits::default().work;
+    while low < high {
+        let mid = low + (high - low) / 2;
+        let mut budget = SnapshotBudget::new(SnapshotLimits {
+            work: mid,
+            ..SnapshotLimits::default()
+        }).unwrap();
+        let result = budget.begin_phase().and_then(|()| {
+            inventory.verify_inventory(&[], &mut budget, &cancelled)
+        });
+        if result.is_ok() { high = mid; } else { low = mid + 1; }
+    }
+    let mut budget = SnapshotBudget::new(SnapshotLimits {
+        work: low + 7,
+        ..SnapshotLimits::default()
+    }).unwrap();
+    budget.reserve_work(7, &cancelled).unwrap();
+    budget.begin_phase().unwrap();
+    inventory.verify_inventory(&[], &mut budget, &cancelled).unwrap();
+    assert!(matches!(budget.reserve_work(1, &cancelled), Err(Error::Budget("work"))));
+    // Beginning another phase cannot refund the exhausted shared allowance.
+    assert!(matches!(budget.begin_phase(), Err(Error::Budget("work"))));
+}
+
+#[test]
+fn snapshot_per_phase_bytes_and_phase_count_are_independently_bounded() {
+    let project = Project::new();
+    project.model(&[("src", "kotlin-source")]);
+    let source = vec![b'a'; Limits::default().source_file_bytes];
+    for index in 0..128 {
+        project.put(&format!("src/F{index}.kt"), &source);
+    }
+    let inventory = project.load().unwrap();
+    let mut indices = kotlin_indices(&inventory);
+    let cancelled = AtomicBool::new(false);
+    let mut budget = SnapshotBudget::default();
+    budget.begin_phase().unwrap();
+    inventory.verify_inventory(&indices, &mut budget, &cancelled).unwrap();
+    // Selection order is unrestricted; uniqueness, not sorting, is required.
+    indices.reverse();
+    inventory.verify_inventory(&indices, &mut budget, &cancelled).unwrap();
+    assert!(matches!(
+        inventory.verify_inventory(&indices[..1], &mut budget, &cancelled),
+        Err(Error::Budget("per-phase verification source bytes"))
+    ));
+    // A refused byte visit is not refunded into the aggregate second phase.
+    budget.begin_phase().unwrap();
+    inventory.verify_inventory(&indices, &mut budget, &cancelled).unwrap();
+    assert!(matches!(
+        inventory.verify_inventory(&indices, &mut budget, &cancelled),
+        Err(Error::Budget("verification source bytes"))
+    ));
+    assert!(matches!(
+        budget.begin_phase(),
+        Err(Error::Budget("verification phases"))
+    ));
+}
+
+#[test]
+fn snapshot_two_complete_project_passes_fit_the_original_project_admission() {
+    let projects: Vec<_> = (0..Limits::default().projects)
+        .map(|_| {
+            let project = Project::new();
+            project.model(&[]);
+            project
+        })
+        .collect();
+    let mut admission = Budget::default();
+    let cancelled = AtomicBool::new(false);
+    let inventories: Vec<_> = projects
+        .iter()
+        .map(|project| source_inventory::load(&project.0, &mut admission, &cancelled).unwrap())
+        .collect();
+    verify_two_phases(&inventories, SnapshotLimits::default()).unwrap();
 }

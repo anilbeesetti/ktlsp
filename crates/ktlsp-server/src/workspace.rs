@@ -176,6 +176,22 @@ impl Snapshot {
     ) -> Result<(), source_inventory::Error> {
         self.projects[key.project].verify_source(key.entry, budget, cancelled)
     }
+
+    pub(super) fn verify_all(
+        &self,
+        closed: &[Vec<usize>],
+        budget: &mut source_inventory::SnapshotBudget,
+        cancelled: &AtomicBool,
+    ) -> Result<(), source_inventory::Error> {
+        if closed.len() != self.projects.len() {
+            return Err(source_inventory::Error::InvalidSource("incomplete captured project selection"));
+        }
+        budget.begin_phase()?;
+        for (project, entries) in self.projects.iter().zip(closed) {
+            project.verify_inventory(entries, budget, cancelled)?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -228,6 +244,7 @@ impl Workspace {
         if empty {
             self.snapshot = None;
             self.overlays.clear();
+            self.available = true;
             self.unknown.clear();
             return Ok((self.attempt, None));
         }
@@ -367,5 +384,86 @@ impl Workspace {
                 .snapshot
                 .as_ref()
                 .is_some_and(|current| Arc::ptr_eq(current, snapshot))
+    }
+
+    /// One immutable generation and exact mapped overlay incarnation/source.
+    /// Enumeration follows original project/entry order, never HashMap order.
+    pub(super) fn capture_all(
+        &self,
+        documents: &HashMap<String, ktlsp_text::Document>,
+        incarnations: &HashMap<String, u64>,
+        budget: &mut crate::workspace_symbols::Budget,
+        cancelled: &AtomicBool,
+    ) -> Result<crate::workspace_symbols::Capture, &'static str> {
+        use crate::workspace_symbols::{Capture, Member};
+        if !self.available || self.exhausted || !self.unknown.is_empty() {
+            return Err("workspace source inventory unavailable; reload required");
+        }
+        let mut capture = Capture {
+            snapshot: self.snapshot.clone(),
+            epoch: self.epoch,
+            members: Vec::new(),
+            closed: Vec::new(),
+        };
+        let Some(snapshot) = &self.snapshot else {
+            return Ok(capture);
+        };
+        let mut files = Vec::new();
+        budget.storage(snapshot.files.len().checked_mul(std::mem::size_of::<(&Arc<str>, &SourceKey)>()).ok_or("workspace storage limit exceeded")?)?;
+        files.try_reserve_exact(snapshot.files.len()).map_err(|_| "workspace allocation failed")?;
+        files.extend(snapshot.files.iter());
+        let sort_work = files.len().checked_mul(usize::BITS as usize - files.len().leading_zeros() as usize).ok_or("workspace work limit exceeded")?;
+        budget.work(sort_work, cancelled)?;
+        files.sort_unstable_by_key(|(_, key)| (key.project, key.entry));
+        budget.storage(snapshot.projects.len().checked_mul(std::mem::size_of::<Vec<usize>>()).ok_or("workspace storage limit exceeded")?)?;
+        capture.closed.try_reserve_exact(snapshot.projects.len()).map_err(|_| "workspace allocation failed")?;
+        capture.closed.resize_with(snapshot.projects.len(), Vec::new);
+        for (uri, key) in files {
+            budget.work(1, cancelled)?;
+            let original = snapshot.projects[key.project].entries()[key.entry].source().ok_or("member source unavailable")?;
+            let (source, revision, overlay) = if let Some(overlay) = self.overlays.get(key) {
+                let document = documents.get(overlay.uri.as_ref()).ok_or("member overlay unavailable")?;
+                if incarnations.get(overlay.uri.as_ref()) != Some(&overlay.incarnation) {
+                    return Err("member overlay incarnation mismatch");
+                }
+                budget.source(document.text().len())?;
+                // Precharge both the retained copy and publication's exact-byte check.
+                budget.work(document.text().len().checked_mul(2).ok_or("workspace work limit exceeded")?, cancelled)?;
+                // This is the one retained source copy for an authoritative open member.
+                (Arc::<str>::from(document.text()), i64::from(document.version()), Some((Arc::clone(&overlay.uri), overlay.incarnation)))
+            } else {
+                budget.source(original.len())?;
+                budget.storage(std::mem::size_of::<usize>())?;
+                capture.closed[key.project].try_reserve(1).map_err(|_| "workspace allocation failed")?;
+                capture.closed[key.project].push(key.entry);
+                (Arc::clone(original), snapshot.generation, None)
+            };
+            budget.storage(std::mem::size_of::<Member>())?;
+            capture.members.try_reserve(1).map_err(|_| "workspace allocation failed")?;
+            let source = ktlsp_parser::SourceSnapshot::new(Arc::clone(uri), revision, ktlsp_parser::FileKind::Source, source).map_err(|_| "workspace source exceeds parser limits")?;
+            capture.members.push(Member { source, overlay });
+        }
+        Ok(capture)
+    }
+
+    pub(super) fn fresh_all(
+        &self,
+        capture: &crate::workspace_symbols::Capture,
+        documents: &HashMap<String, ktlsp_text::Document>,
+        incarnations: &HashMap<String, u64>,
+    ) -> bool {
+        let authority = match &capture.snapshot {
+            Some(snapshot) => self.fresh(snapshot, capture.epoch),
+            None => self.available && !self.exhausted && self.snapshot.is_none() && self.epoch == capture.epoch,
+        };
+        authority && capture.members.iter().all(|member| {
+            member.overlay.as_ref().is_none_or(|(uri, incarnation)| {
+                incarnations.get(uri.as_ref()) == Some(incarnation)
+                    && documents.get(uri.as_ref()).is_some_and(|document| {
+                        i64::from(document.version()) == member.source.revision()
+                            && document.text() == member.source.source()
+                    })
+            })
+        })
     }
 }

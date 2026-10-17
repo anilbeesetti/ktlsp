@@ -205,6 +205,128 @@ impl Budget {
     }
 }
 
+/// Aggregate whole-snapshot verification ceilings, distinct from admission.
+/// Defaults permit two phases over the original 16 projects, 1024 sources and
+/// 16 MiB of source bytes. Callers may reduce, but never raise, these ceilings.
+#[derive(Debug, Clone, Copy)]
+pub struct SnapshotLimits {
+    pub phases: usize,
+    pub project_visits: usize,
+    pub source_visits: usize,
+    pub source_bytes: usize,
+    pub work: usize,
+}
+impl Default for SnapshotLimits {
+    fn default() -> Self {
+        let admission = Limits::default();
+        Self {
+            phases: 2,
+            project_visits: 2 * admission.projects,
+            source_visits: 2 * admission.sources,
+            source_bytes: 2 * admission.source_bytes,
+            work: admission.work,
+        }
+    }
+}
+impl SnapshotLimits {
+    fn counters(self) -> [usize; 4] {
+        [
+            self.phases,
+            self.project_visits,
+            self.source_visits,
+            self.source_bytes,
+        ]
+    }
+}
+
+/// One monotonic allowance for a whole request, including both verification
+/// phases and consumer work. Never recreate it per project, source or phase.
+/// Each phase separately retains the original admission ceilings; the lifetime
+/// counters additionally bound actual repeated visits. Models are checked twice
+/// per project visit, including projects with no closed sources.
+#[derive(Debug, Default)]
+pub struct SnapshotBudget {
+    limits: SnapshotLimits,
+    used: [usize; 4],
+    phase_used: [usize; 3],
+    budget: Budget,
+}
+impl SnapshotBudget {
+    pub fn new(limits: SnapshotLimits) -> Result<Self, Error> {
+        let defaults = SnapshotLimits::default();
+        if limits
+            .counters()
+            .iter()
+            .zip(defaults.counters())
+            .any(|(requested, maximum)| *requested > maximum)
+            || limits.work > defaults.work
+        {
+            return Err(Error::Budget("invalid snapshot limits"));
+        }
+        Ok(Self {
+            limits,
+            used: [0; 4],
+            phase_used: [0; 3],
+            budget: Budget::new(Limits {
+                work: limits.work,
+                ..Limits::default()
+            })?,
+        })
+    }
+    /// Begin once before visiting all projects, then once again after parsing.
+    /// Only per-phase visit counters reset; no lifetime work/visit charge refunds.
+    pub fn begin_phase(&mut self) -> Result<(), Error> {
+        self.budget.charge(Count::Work, 1)?;
+        self.charge(0, 1)?;
+        self.phase_used = [0; 3];
+        Ok(())
+    }
+    /// Charge capture/projection/rendering against the SAME allowance used by
+    /// physical and exact-byte verification, with cancellation before work.
+    pub fn reserve_work(
+        &mut self,
+        amount: usize,
+        cancelled: &AtomicBool,
+    ) -> Result<(), Error> {
+        self.budget.work(amount, cancelled)
+    }
+    fn charge(&mut self, index: usize, amount: usize) -> Result<(), Error> {
+        let name = [
+            "verification phases",
+            "verification projects",
+            "verification sources",
+            "verification source bytes",
+        ][index];
+        let next = self.used[index]
+            .checked_add(amount)
+            .ok_or(Error::Budget(name))?;
+        let maximum = self.limits.counters()[index];
+        self.used[index] = next.min(maximum);
+        if next > maximum {
+            return Err(Error::Budget(name));
+        }
+        Ok(())
+    }
+    fn visit(&mut self, index: usize, amount: usize) -> Result<(), Error> {
+        self.charge(index + 1, amount)?;
+        let admission = Limits::default();
+        let maximum = [admission.projects, admission.sources, admission.source_bytes][index];
+        let name = [
+            "per-phase verification projects",
+            "per-phase verification sources",
+            "per-phase verification source bytes",
+        ][index];
+        let next = self.phase_used[index]
+            .checked_add(amount)
+            .ok_or(Error::Budget(name))?;
+        self.phase_used[index] = next.min(maximum);
+        if next > maximum {
+            return Err(Error::Budget(name));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 pub enum Error {
     Cancelled,
@@ -396,6 +518,84 @@ impl Inventory {
             entry.identity,
             expected.as_bytes(),
             budget,
+            cancelled,
+        )
+    }
+    /// Verify one project's original model before AND after the complete selected
+    /// closed-source pass, without rescanning directories or decoding the model.
+    /// Call once per project in each begun phase, sharing one `SnapshotBudget`
+    /// across the entire request. An empty selection still verifies the model.
+    /// Selections must contain unique original Kotlin indices; order is free.
+    /// Overlay membership/content authority remains the consumer's responsibility.
+    pub fn verify_inventory(
+        &self,
+        closed_indices: &[usize],
+        budget: &mut SnapshotBudget,
+        cancelled: &AtomicBool,
+    ) -> Result<(), Error> {
+        budget.reserve_work(1, cancelled)?;
+        if budget.used[0] == 0 {
+            return Err(Error::Budget("verification phase not begun"));
+        }
+        budget.visit(0, 1)?;
+        if closed_indices.len() > Limits::default().sources {
+            return Err(Error::Budget("per-phase verification sources"));
+        }
+        // Validate the complete selection before any filesystem access.
+        budget.reserve_work(
+            closed_indices
+                .len()
+                .checked_mul(std::mem::size_of::<usize>())
+                .ok_or(Error::Budget("work"))?,
+            cancelled,
+        )?;
+        let mut seen = HashSet::new();
+        seen.try_reserve(closed_indices.len())
+            .map_err(|_| Error::Budget("verification indices allocation"))?;
+        for &index in closed_indices {
+            budget.reserve_work(1, cancelled)?;
+            let entry = self
+                .entries
+                .get(index)
+                .ok_or(Error::InvalidSource("unknown entry"))?;
+            if entry.kind != EntryKind::KotlinSource || entry.source.is_none() {
+                return Err(Error::InvalidSource("not an original Kotlin source"));
+            }
+            if !seen.insert(index) {
+                return Err(Error::InvalidSource("duplicate original Kotlin source"));
+            }
+        }
+        self.verify_file(
+            &self.model_path,
+            self.model_identity,
+            &self.workspace_json,
+            &mut budget.budget,
+            cancelled,
+        )?;
+        for &index in closed_indices {
+            budget.reserve_work(1, cancelled)?;
+            let entry = &self.entries[index];
+            let expected = entry.source.as_ref().ok_or(Error::InvalidSource(
+                "not an original Kotlin source",
+            ))?;
+            if expected.len() > budget.budget.limits.source_file_bytes {
+                return Err(Error::Budget("per-source bytes"));
+            }
+            budget.visit(1, 1)?;
+            budget.visit(2, expected.len())?;
+            self.verify_file(
+                &entry.path,
+                entry.identity,
+                expected.as_bytes(),
+                &mut budget.budget,
+                cancelled,
+            )?;
+        }
+        self.verify_file(
+            &self.model_path,
+            self.model_identity,
+            &self.workspace_json,
+            &mut budget.budget,
             cancelled,
         )
     }

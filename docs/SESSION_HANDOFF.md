@@ -151,6 +151,32 @@ Original failed iteration/full CST was not retained: associating that static
 defect with actual node30 is INFERENCE, not an observed branch identity.
 Earlier clears missed the fixture inconsistency; changed-source reviews and
 OWN new original full three-host CI remain required before any integration.
+Corrected c6c065ba5ff77015fe388bf07ac0ba4c645268cb/tree66d17def received two
+fresh ROOT and two affected419 exact clears;418 source/tests/binary README
+explicitly carry unchanged. Pinned CHECK0/1.1421s and strict Clippy0/0.2006s passed.
+Its OWN ORIGINAL Native39015889975/1/job117347797027 and platform39015890015/1
+(Mac117347796742/Win117347796641) ALL SUCCEEDED, actual executed
+de044e4f6d8323e911c2b6ac0687351b126735f0/tree66d17def/ordered[0d7d,c6].
+Native1252=1213ordinary+39doc,Mac1250=1211+39,Win1199=1160+39;
+each142rows,0failed3ignored0measured0filtered, plus22 SEPARATE fault cases and
+three same-owned-Child raw86 confirmations. Independent full CI auditors and
+ROOT authenticated source/config/steps/cases/raw plus all18CRC-valid ZIP members
+per platform, with directly equal independent raw/ZIP bytes.
+BOTH current OWNER+ROOT complete actual gates accepted all15 actual packets:
+21 complete producers/312 protocol messages/240 responses. Each independently
+applied all6 genuine current version7 TYPE batches/18 returned edits plus9 actual
+adversarial changes to exact complete version8 producer/replay identities.
+All current whole serialized+parsed payloads exactly equal the previously FULL
+read original five; every current host occurrence is authenticated.
+Dual gate `/private/tmp/ktlsp-420-corrected-original/ROOT-BOTH-current-three-host-actual-gates.json`;
+OWNER complete receipt `OWNER-current-three-host-419-payload-acceptance.json`.
+Only AFTER BOTH full gates ROOT admitted observation-only cleanup. Two writers,
+their local Write import/comment and sole JSON observation fields are removed;
+all permanent assertions and original parser/binder/query/edit/reparse call
+placement/frequency remain, including three adversarial producer refusal calls.
+The cleaned successor still requires exact affected reviews/CHECK/strictClippy,
+its OWN original full three-host CI and separate fresh guarded integration/main
+dual acceptance. ONE formatter used, no second; no local Kotlin runtime/retry.
 Kotlin/CLI proof only original full hosted CI. Temporary writers stay until BOTH
 OWNER+ROOT FULL-read actual payloads and actually returned edits; permanent
 consumer-visible assertions remain after cleanup. Successor source needs its

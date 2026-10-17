@@ -602,9 +602,17 @@ evidence and integration verification remain ROOT-gated under #96.
   signature help, nominal/imported applicability or overload resolution.
   Permanent original-worker acceptance source covers original identities,
   semantic backticks/non-BMP/trivia/CRLF, real type-rename range replay and
-  adversarial refusals. New hosted execution and independent complete actual
-  producer/paired-protocol readback remain required; source assertions are not
-  execution evidence or official equivalence. #96 remains OPEN/UNKNOWN,
+  adversarial refusals. Original PR420 corrected-source Native39015889975 and
+  platform39015890015 passed full Linux/macOS/Windows workspace checks.
+  Independent OWNER+ROOT fully read all15 complete actual producer/protocol
+  packets and independently applied all6 genuine returned TYPE batches/18 edits
+  plus9 adversarial changes to exact version8 sources and replay identities.
+  Only afterward were temporary writers/sole observation JSON removed; all
+  permanent producer/binding/edit/reparse/refusal assertions retain frequency.
+  The first-source post-name sibling positive remains failed/rejected; its
+  leading-header correction preserves all8 cases and U/send/p header isolation.
+  Cleaned-source exact reviews/OWN full CI/guarded integration remain separate.
+  This finite observation is not official equivalence. #96 remains OPEN/UNKNOWN,
   #417's original Windows docless-hover cause remains UNKNOWN/OPEN, B3 remains
   INCONCLUSIVE/HOLD, and oracle-runtime/provenance/full-semantic parity HOLDs
   are not discharged by this finite label proof.
@@ -678,7 +686,7 @@ evidence and integration verification remain ROOT-gated under #96.
   independently accepted by OWNER+ROOT before lease clearance. See the
   [delivery receipt](https://github.com/anilbeesetti/ktlsp/pull/416#issuecomment-6230407655)
   and [verified integration / next prerequisite wave](../../docs/status/development.md#verified416-integration-and-next418419-prerequisite-wave).
-  This accepts #414's finite delivery, not #419's unexecuted successor, and does
+  This accepts #414's finite delivery, not #419's separate integration, and does
   not diagnose or close #417's original Windows failure.
   This is finite recursive ordinary-function lexical refactoring, not full Kotlin
   type resolution, hover/typeDefinition, workspace rename or official equivalence. PR409's

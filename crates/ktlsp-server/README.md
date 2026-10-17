@@ -303,10 +303,20 @@ imported applicability, signature help or official parity is claimed.
 Permanent genuine paired-CLI tests obtain actual version-7 TYPE rename edits,
 apply them to the original source, reparse version 8 and prove the label/formal/
 argument and both annotation identities again. Real distinct-binder, future
-shadow and other-arity competitor edits must refuse. Temporary complete
-`KTLSP419_ACTUAL` producer/wire/edit writers remain for independent OWNER+ROOT
-readback. These are source assertions only: execution, formatting, compilation
-and original hosted acceptance are pending; no local runtime was run.
+shadow and other-arity competitor edits refuse. At corrected
+c6c065ba5ff77015fe388bf07ac0ba4c645268cb/tree66d17def, original Native39015889975
+and platform39015890015 passed full three-host checks. Independent OWNER+ROOT
+fully read all15 actual packets, applied all6 genuinely returned TYPE batches/
+18 edits plus9 adversarial changes and matched complete version8 sources and
+replay identities. Only then were temporary KTLSP419_ACTUAL writers and sole
+observation JSON removed; permanent parser/binder/query/edit/reparse/refusal
+assertions remain at their original frequency, including adversarial producer
+calls formerly inside capture output. First-source failed positive used a
+post-name generic sibling outside the existing leading-only contract; its
+fixture-only correction retains all8 cases/U/send/p isolation assertions.
+Original failed union stays rejected. Cleaned-source exact reviews/OWN full CI,
+guarded integration and independent exact-main acceptance remain separate gates.
+No local Kotlin runtime or official equivalence is claimed.
 
 ## Finite function type-parameter references and rename (#392)
 

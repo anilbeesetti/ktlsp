@@ -3185,3 +3185,60 @@ Earlier static clears missed the inconsistency; original failures remain
 FAILED/REJECTED, not retroactively passed. Temporary writers remain until BOTH
 full actual gates, and guarded integration/main acceptance remain pending.
 
+#### Corrected PR420 original three-host CI and complete actual gates
+
+Corrected c6c065ba5ff77015fe388bf07ac0ba4c645268cb/tree66d17def924314dfe8540594eeaa9cdc78afe258
+received both exact ROOT and both affected419 reviews;418 unchanged-code/document
+authority explicitly carries. Pinned CHECK0/1.1421s and strict Clippy0/0.2006s.
+OWN original Native39015889975/1/job117347797027 and platform39015890015/1
+(Mac117347796742,Win117347796641) ALL SUCCEEDED. Actual checkout
+de044e4f6d8323e911c2b6ac0687351b126735f0 has exact reviewed tree and ordered
+[0d7d21923246f75969e6b8d52da71e1aeec086ce,c6c065ba5ff77015fe388bf07ac0ba4c645268cb].
+All mandatory steps/source/config/case rows and each platform's18CRC-valid ZIP
+members are authenticated; independent fetches directly equal ROOT originals.
+
+|Original current host|Passes incl39 doctests|Ordinary|Rows|Ignored|Failures|
+|---|---:|---:|---:|---:|---:|
+|Native39015889975|1252|1213|142|3|0|
+|macOS39015890015|1250|1211|142|3|0|
+|Windows39015890015|1199|1160|142|3|0|
+
+Zero measured/filtered; actual case occurrences1255/1253/1202. Each separately
+retains22 worker fault cases and three same-owned-Child code86 confirmations;
+these are not ordinary libtest rows or invented individual CASE dumps.
+ROOT full accepted bases plus every complete new current value and exact
+occurrence correspondence cover all actual output; full independent auditors
+record precise lossless read extents. Native raw404450B/3306L SHA256
+1e50ff6f846ef91729be5165e7be7d15f88b56bad8f5ff5ad022317e47b4a661;
+Mac524586B/4249L SHA2560be8af6b29a68f5aeda55d87980afe34c4e309b16777094d918fb5d4783ea17c;
+Win481292B/4013L SHA256d9640aa1de44958f2bf870e320fdccf405cfbd0eea3e8eb1ba29975f50d2df32.
+Mac artifact12095061405/58542B SHA25610ccabf210537ec74d80e66d036a41034c832f15d92c0abf9f2cdd499ce787fd;
+Win12094643275/53517B SHA256d07a28e9e0d8d300d4b0f2cf949904ff95062dad952e14de2d53a0b83485ab86.
+
+BOTH independent OWNER+ROOT full current actual gates accepted all15 packets,
+21 complete producers/312 messages/240 responses. Current whole serialized bytes
+AND parsed whole values match the previously personally FULL-read original five
+payloads, with every current host/raw/archive occurrence authenticated. Each
+independently applied six genuine current version7 TYPE batches/18 returned edits
+and nine actual adversarial changes to complete actual version8 sources, checking
+original CST/declarations/owners/memberships/regions/all proof roles/both original
+lexical annotation identities and original/replayed UTF16 locations/refusals.
+ROOT actual gate:
+`/private/tmp/ktlsp-420-corrected-original/ROOT-BOTH-current-three-host-actual-gates.json`;
+independent OWNER receipt `OWNER-current-three-host-419-payload-acceptance.json`.
+No selected fields/count-only proof or claim of rereading repeated raw JSON lines.
+
+Only AFTER BOTH full gates ROOT admitted observation-only cleanup. Removed both
+temporary writers/local Write import/obsolete retention comment and sole JSON
+observation fields, keeping only data consumed by permanent assertions. Every
+original producer/binder/query/edit/reparse/refusal assertion and its frequency
+remains; the three adversarial producer calls formerly inside output stay as
+explicit calls after the same protocol assertions. No semantic/fixture/predicate/
+production/budget/workflow/deadline change. The cleaned successor needs renewed
+exact affected reviews/CHECK/strict Clippy and its OWN original full three-host
+CI before fresh guarded integration and independent exact-main acceptance.
+Original4f failures remain FAILED/REJECTED; missing original loop/CST attribution
+is not repaired by a later pass. B3 INCONCLUSIVE/HOLD, #417UNKNOWN, oracle custody
+HOLD, #96/no local Kotlin runtime/native-only/T004/provenance/full-parity limits
+remain. No second formatter, unchanged retry or general platform/parity claim.
+

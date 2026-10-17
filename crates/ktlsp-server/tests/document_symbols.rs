@@ -4898,7 +4898,6 @@ fn recursive_type_capture_unused_inner_and_safe_sibling_actual_cli() {
     }
 }
 
-// Retain until OWNER and ROOT independently read complete hosted payloads.
 fn label_producer_packet(source: &str, revision: i64, accepted: bool) -> Value {
     use ktlsp_parser::{
         FileKind, Parser, SourceSnapshot,
@@ -5010,40 +5009,23 @@ fn label_producer_packet(source: &str, revision: i64, accepted: bool) -> Value {
             "formalParens":[element_index(parameters.open_paren()),element_index(parameters.close_paren())],
             "formalBody":element_index(parameters.body()),
             "annotations":([binding.formal_annotation(),binding.argument_annotation()].map(|a| json!({
-                "annotated":declaration_index(a.annotated()),"reference":a.reference_index(),
-                "nameToken":element_index(a.name_token()),"range":a.range(),
-                "target":declaration_index(binding.type_parameter())
+                "range":a.range()
             })))
         })
     } else {
-        json!({"refusal":format!("{:?}",binding.unwrap_err())})
+        binding.unwrap_err();
+        return Value::Null;
     };
     json!({
-        "uri":URI,"revision":revision,"source":source,
-        "diagnostics":format!("{:?}",tree.diagnostics()),
-        "cst":tree.elements().iter().enumerate().map(|(i,e)| json!({
-            "index":i,"kind":e.kind,"token":e.token,"start":e.start,"end":e.end,
-            "parent":e.parent,"subtreeEnd":e.subtree_end
+        "declarations":lower.declarations().iter().map(|d| json!({
+            "nameRange":d.name_range()
         })).collect::<Vec<_>>(),
-        "declarations":lower.declarations().iter().enumerate().map(|(i,d)| json!({
-            "index":i,"kind":d.kind(),"rawName":d.raw_name(),"semanticSpelling":d.semantic_spelling(),
-            "range":d.range(),"nameRange":d.name_range(),
-            "cst":d.cst_index(),"cstParent":d.cst_parent_index(),"cstParentKind":d.cst_parent_kind(),
-            "owner":d.owner(),"incomplete":d.incomplete(),
-            "membership":directory.memberships()[i].region()
-        })).collect::<Vec<_>>(),
-        "regions":directory.regions().iter().enumerate().map(|(i,r)| json!({
-            "index":i,"cst":r.cst_index(),"kind":r.kind(),"range":r.range(),
-            "parent":r.parent(),"introducer":r.introducer(),"subtreeEnd":r.subtree_end()
-        })).collect::<Vec<_>>(),
-        "selectedLabel":label_index,"proof":proof
+        "proof":proof
     })
 }
 
 #[test]
 fn lexical_label_definition_actual_cli_type_rename_replay_and_adversarial_edits() {
-    use std::io::Write as _;
-
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let package = Package::new(true);
     let init = json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{"capabilities":{
@@ -5281,14 +5263,6 @@ fn lexical_label_definition_actual_cli_type_rename_replay_and_adversarial_edits(
                 json!({"uri":URI,"range":references_range(&edited,type_start,"Fresh".len())})
             );
         }
-        writeln!(
-            std::io::stdout(),
-            "KTLSP419_ACTUAL {}",
-            json!({"original":original,"requests":requests,"responses":responses,
-            "returnedRename":reply("type-rename"),"edited":edited_producer,
-            "replayRequests":replay,"replayResponses":replay_responses})
-        )
-        .unwrap();
     }
     let source = "fun <T, U> outer(p: T) { fun send(to: T) {}; send(to = p) }";
     for (name, start, end, replacement) in [
@@ -5340,14 +5314,7 @@ fn lexical_label_definition_actual_cli_type_rename_replay_and_adversarial_edits(
             "{name}: {responses:?}"
         );
         assert!(responses[2].get("result").is_none());
-        writeln!(
-            std::io::stdout(),
-            "KTLSP419_ACTUAL {}",
-            json!({"adversarial":name,
-            "edit":{"range":range,"text":replacement},"producer":label_producer_packet(edited,8,false),
-            "requests":requests,"responses":responses})
-        )
-        .unwrap();
+        label_producer_packet(edited, 8, false);
     }
 }
 

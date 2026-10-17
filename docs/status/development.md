@@ -2005,3 +2005,60 @@ NAME parent-refusal/ambiguity and accepted/one-query-below typed resource
 controls now accompany genuine Result/Pairs. Independent adversarial static
 API sanity recheck is CLEAR; script and all composed behavior remain UNEXECUTED.
 
+#### Actual composed408 native verification;407 hosted proof still pending
+
+Both independent FULL17 reviewers cleared corrected446299e9b80ae881f6907d2fc7d36682b35f1adb/tree19291b934067b2d42f1232b7fdb735cb48b1ce21.
+ROOT's ONE pinned formatter pass exited0(1.26s), then all six exact union/
+affected rechecks cleared7bc23b0738de0c485e0a0b1123c345bdbab6b92f/tree32097a2d9def11dbf85babde28ce533feb7c06e0.
+First strict Clippy reported ONLY a collapsible nested test-if; ROOT made
+the equivalent let-chain without suppression or changed assertion/fixture.
+Two FULL17 and both affected407 exact rechecks cleared corrected
+0a0d8024478ce074ada7ecba3636709a5f2b515e/treee3ec94c9e0d51815dd152a84ebfff4f21226e3d1;
+408 blobs remain unchanged from its two current7bc component reviews.
+Final format-CHECK plus strict locked workspace/alltargets Clippy exited0
+(1.33s), not a second formatting mutation or unchanged failing retry.
+
+ROOT separately admitted BINARY DATA ONLY. Cargo built the actual public
+ktlsp_binary lib at that source; its reported rlib—not a guessed stale target—
+was linked into an actual standalone external Rust consumer. Both compile
+and run exited0 with empty stderr. All177 actual source lines/commands and
+all9 complete output lines/2107bytes were FULLY read by ROOT and independent
+408 OWNER. SourceSHAe9b9771822e0682fe4eb82b585abe21e7258a930a59d62d055893fd3ecfec733.
+This used the NEW COMPOSED public operation, not separate raw-decoder echoes.
+
+Actual genuine Result ownerkotlin/Result.Companion/localfalse/body29..126,
+successALLClassordinal4/outer49..86/body51..86, ownordinal0/Tbody65..69/
+ID1/nameindex6, valueouter69..77/body71..77/Type75..77/raw4806 yielded
+FunctionParameter(0), NAMEindexSome6/IDNone/nullableNone. Encoded reified/
+variance/bounds remained absent/opaque; sameOutcome raw pointer+byte
+assertions passed for owner/Function/own declaration/value/Type.
+Failureordinal5/outer86..123/body88..123 retained its DISTINCT ownTbody102..106
+and nominalThrowable valueouter106..114/body108..114/Type112..114.
+PairClassParameter0/1 and nominalAny?/nullableSomeTrue controls passed.
+WrongALLClassordinal3 refusedNotFunction@38. No genuine own-ID leaf is claimed.
+
+Separate EXPLICITLY AUTHORED controls actually observed signed-7 Class/own
+collision choosingFunctionParameter0; NAMEparentrefusal@27; ownNAMEambiguity@39.
+Actual minimum7queries accepted;6 refusedNameLimitqueries/indexSome3/offset29.
+This observed7 is NOT the previously predicted6. Query budgets never became
+an inferred effective type or source/JVM mapping. Both full read gates
+completed BEFORE ONLY the177-line throwaway Rust source was removed; full
+source/commands/output/proof and compiled verification artifact remain under
+`/private/tmp/ktlsp-408-composed-native/`, as do all permanent assertions.
+
+The complete native BINARY package suite passed537cases/57result rows,
+0failed/ignored/measured/filtered and0docpasses,42.48s. ROOT read all881
+original output lines, including16 selected-operation and shared Class/
+property/return regressions. A default300line reader preview was NOT accepted;
+bounded remaining reads completed the full census without rerunning tests.
+Stored reader-text digest is not falsely described as a GitHub raw-log digest.
+
+No LOCAL Kotlin parser/server/Session/worker/peer/supervision or JVM/oracle ran.
+407's retained original producer/paired-CLI writers and all actual edit/
+reparse/rebinding paths remain UNEXECUTED until ROOT's OWN ORIGINAL hosted
+full workflows. Native binary data proof does not substitute for that surface,
+final-source CI, separate fresh guard/expected-head merge/tree+soleparent/
+independent original exact-main proof. Current common documentation-only
+source will be independently rechecked before first hosted admission.
+B3INCONCLUSIVE/HOLD,96 and395/377 unknown causes/full-parity limits remain.
+

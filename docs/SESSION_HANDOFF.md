@@ -42,8 +42,15 @@ functionality/adversarial static review slots:
   `/private/tmp/ktlsp-408-function-own-scope`, `omp/408-function-own-scope`.
   Original selected Function declarations, ID own-before-Class and NAME OWN-only.
   Genuine Result.Companion.success encodes NAME6 (`48 06`), NOT declaration ID1.
-  Native original observation `/private/tmp/ktlsp-next-function-local-data/`;
-  no new interpreted binding success or genuine Function-ID positive is claimed.
+  Original raw observation `/private/tmp/ktlsp-next-function-local-data/` remains.
+  Subsequent REAL public composed native smoke at reviewed0a0d802/e3ec94
+  compiled/ran0 with empty stderr; OWNER+ROOT fully read all177 source/9 output
+  lines before only its throwaway Rust source was removed. Genuine NAME9→own0,
+  original pointers/ranges, distinct Throwable/Pair controls and labelled
+  authored shadow/refusal/query-boundary controls passed; all537 binary-data
+  tests passed. Full proof `/private/tmp/ktlsp-408-composed-native/`.
+  Genuine Function-ID positive remains GAP;407 actual producer/CLI execution,
+  final-source hosted CI and guarded exact-main integration are STILL PENDING.
 
 ALL LOCAL Kotlin parser/server/Session/worker/peer/supervision runtime remains
 FORBIDDEN under96, including fake peers and parser-free Session. This overrides

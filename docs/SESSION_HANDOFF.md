@@ -79,19 +79,37 @@ treec1c06a5, solebase7afdc68 received BOTH renewed independent component source
 reviews and ROOT composed it at06035e3 after the six-doc checkpoint0948f6a.
 Earlier `bv` findings were fixed/renewed; revived-agent URIs returned old
 rejected receipts, so ROOT recovered and FULL-read both current r3 reports from
-immutable histories. No stale approval was transferred. #426 initial11c2624
-and both component HOLD findings remain rejected while its owner repairs real
-failure framing/pre-delegation bounds and fixture expectations.
-Current ROOT native-plus-docs scope does NOT yet include426 or428 source.
-Both complete ROOT union reviews must renew after every later composition.
-No compiler/actual runtime/CI/merge acceptance for426/427/428 is claimed.
-ALL LOCAL Kotlin/parser/server/Session/worker runtime forbidden under96;
-pure binary data runtime needs separate exact ROOT admission. No owner
-formatter/build/check/test mid-flight. ROOT's separately admitted ONE native427-
-only pinned1.99.0 rustfmt invocation is now SPENT: exit0 in0.191277709s.
-It covered only the seven native Rust paths; no compiler/tests/runtime followed.
-Future426/428 composition needs its OWN explicit exact-source admission and
-renewed full-union reviews, not implicit permission from this native-only stage.
+immutable histories. No stale approval was transferred.
+
+ALL THREE COMPLETE reviewed leaves are now composed:
+- 426a206d80/tree53b047c, full SINGLE-parent chain11c2624/0bb2460/81afd75/a206d80
+  above7afdc68, all8paths. Root FULL-read both final receipts and recomputed
+  ACTUAL original raw hashes809d1302.../2d701d1d..., not rendered-LF guesses.
+  All4 commits cherry-picked7a2afa0/5736176/3732cac/dc9afee. Earlier initial/
+  intermediate HOLD/partial-clear source and receipts remain rejected/preserved.
+- 428784e7fb/treeff0468e/SOLE7afdc68, all4parser paths, composed985ed23.
+  Root FULL-read/authenticated complete source contract and both current full
+  reviews3c9c4397.../c00aa661.../88dda21a.... TEMP428 writers stay.
+- 427 first native+docs freeze2711142 received BOTH complete independent ROOT
+  15path SOURCE reviews, but its strict native Clippy101 REJECTED test-source
+  E0382 plus2E0716 errors. Earlier fmtCHECK0 is not a Clippy/native runtime pass;
+  NoRun was NOT invoked. Original3680B stderr SHA579b83d264d2de7b868c1c1d92eb8f79a155b90fddef133b8f95c2544ab95096.
+  Root repaired only2tests atb6fc0ee: retain/reuse one borrowed slice without
+  moving its printed Range; build conditional parameter arrays inside calls
+  so their lifetimes survive, with no new allocation/assertion removal.
+  Production native backend unchanged; BOTH final union reviews must recheck.
+
+ROOT now owns complete426427428 source plus in-place docs. No CURRENT full-union/
+compiler/actual runtime/CI/merge acceptance is yet claimed. ALL LOCAL Kotlin/
+parser/server/Session/worker runtime remains forbidden under96; even pure
+binary/import data runtime needs separate exact ROOT admission.
+The native427-only pinned1.99.0 ONE formatter is SPENT, exit0/.191277709s;
+the old423424 formatter remains SPENT. A SEPARATELY admitted ONE whole426427428
+composition cargo-fmt is now SPENT: exit0/1.181157875s, empty stdout/stderr.
+No compiler/lint/test/runtime permission follows. Freeze the complete30path
+source/docs and obtain BOTH independent full-union reviews before NEW exact
+compiler gates. The preceding native-only reviews do NOT approve this union.
+No owner formatter/build/check/test/runtime is permitted mid-flight.
 Keep real packaged stdio cancel/ID-reuse observations distinct from complementary
 Session owned-count/retained-until-join proof; no production probe/barrier/delay.
 All old/user/component/review WTs and failures/proofs stay preserved. Do not

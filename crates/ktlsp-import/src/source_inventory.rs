@@ -283,11 +283,7 @@ impl SnapshotBudget {
     }
     /// Charge capture/projection/rendering against the SAME allowance used by
     /// physical and exact-byte verification, with cancellation before work.
-    pub fn reserve_work(
-        &mut self,
-        amount: usize,
-        cancelled: &AtomicBool,
-    ) -> Result<(), Error> {
+    pub fn reserve_work(&mut self, amount: usize, cancelled: &AtomicBool) -> Result<(), Error> {
         self.budget.work(amount, cancelled)
     }
     fn charge(&mut self, index: usize, amount: usize) -> Result<(), Error> {
@@ -310,7 +306,11 @@ impl SnapshotBudget {
     fn visit(&mut self, index: usize, amount: usize) -> Result<(), Error> {
         self.charge(index + 1, amount)?;
         let admission = Limits::default();
-        let maximum = [admission.projects, admission.sources, admission.source_bytes][index];
+        let maximum = [
+            admission.projects,
+            admission.sources,
+            admission.source_bytes,
+        ][index];
         let name = [
             "per-phase verification projects",
             "per-phase verification sources",
@@ -575,9 +575,10 @@ impl Inventory {
         for &index in closed_indices {
             budget.reserve_work(1, cancelled)?;
             let entry = &self.entries[index];
-            let expected = entry.source.as_ref().ok_or(Error::InvalidSource(
-                "not an original Kotlin source",
-            ))?;
+            let expected = entry
+                .source
+                .as_ref()
+                .ok_or(Error::InvalidSource("not an original Kotlin source"))?;
             if expected.len() > budget.budget.limits.source_file_bytes {
                 return Err(Error::Budget("per-source bytes"));
             }

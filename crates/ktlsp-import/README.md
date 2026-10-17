@@ -277,10 +277,12 @@ official runtime parity remain required work.
 
 ## Bounded read-only source inventory (#421)
 
-**Native data runtime and the capture-bearing composed consumer are verified within
-the [recorded scope](../../docs/status/development.md#pr422-original-hosted-actual-gates-and-capture-only-retirement);
-capture-free integration still requires its own reviewed full CI.** This separate API
-performs explicit native I/O; JSON-v1/v2, JPS, Maven and T004 producers keep their
+**The earlier native data/capture-bearing proof and capture-free PR422
+integration are delivered within the
+[recorded finite scope](../../docs/status/development.md#verified422-capture-free-integration-and-original-exact-main-acceptance).
+The #426 whole-inventory extension below is composed SOURCE, not new runtime
+acceptance.** This separate API performs explicit native I/O; JSON-v1/v2, JPS,
+Maven and T004 producers keep their
 existing data-only contracts. No Java, build tool, compiler or C/C++ analyzer is
 required. Windows uses target-only pinned `file-id = 0.2.3` Rust OS bindings for
 full native file identity, not a semantic engine.
@@ -333,6 +335,27 @@ bytes, full identities, ancestors, size and EOF, using bounded streaming reads.
 Unknown/nonsource indices cause no filesystem reads. Model comparison charges
 work, not retained-model storage again. The Session calls it before parsing and
 before publishing a successful render with the SAME request budget.
+
+For aggregate consumers, `Inventory::verify_inventory(closed_indices,
+&mut SnapshotBudget, &AtomicBool)` validates the COMPLETE unique original Kotlin
+selection before filesystem access, then checks the original model before AND
+after the selected closed-source pass. An EMPTY selection still checks the model.
+This does not itself authenticate overlays or prove the caller visited every
+project; the actual server's `Snapshot::verify_all` consumes every retained
+inventory in both phases, including zero-source/all-overlay projects.
+
+ONE `SnapshotBudget` covers the WHOLE request, never a new budget per project,
+file or phase. `begin_phase` permits2 phases; lifetime ceilings are32 project
+visits,2,048 closed-source visits and32 MiB verified source bytes. Per-phase
+ceilings remain16 projects/1,024 sources/16 MiB. Only per-phase visit counters
+reset; lifetime visits/work never refund. `reserve_work` lets the aggregate
+consumer charge capture/delegation/projection/rendering against that SAME
+256 Mi-unit work allowance. Limits can reduce, never raise, the defaults.
+Model checks twice per project visit are real byte/native-identity observations,
+not model reloads or retained-model byte/storage charges. Logical visit/storage/
+work ceilings do not establish allocator/RSS, hard I/O latency or hostile-FS
+transactional guarantees. New compiler and original hosted actual-data gates
+remain pending for this extension.
 
 Source and model changes require explicit reload; no automatic watcher,
 discovery outside configured roots, source mutation, archive/SDK traversal,

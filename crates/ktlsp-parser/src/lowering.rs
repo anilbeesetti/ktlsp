@@ -3503,7 +3503,7 @@ mod tests {
     #[test]
     fn local_type_one_allowance_exact_cumulative_edges_annotations_and_literal() {
         use crate::{
-            local_value_binding::{LocalValueTypeError, LocalBindingError, local_type_with_budget},
+            local_value_binding::{LocalBindingError, LocalValueTypeError, local_type_with_budget},
             structural_regions::build_regions,
         };
         // Synthetic accounting complements tests/local_value_types.rs REAL
@@ -3567,9 +3567,20 @@ mod tests {
             let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
             let mut costs = Vec::new();
             for name in ["a", "b", "c"] {
-                let selected = lower.declarations().iter().find(|d| d.raw_name() == name).unwrap();
+                let selected = lower
+                    .declarations()
+                    .iter()
+                    .find(|d| d.raw_name() == name)
+                    .unwrap();
                 let mut measured = ReferenceBudget::default();
-                local_type_with_budget(&directory, &result, selected, result.snapshot(), &mut measured).unwrap();
+                local_type_with_budget(
+                    &directory,
+                    &result,
+                    selected,
+                    result.snapshot(),
+                    &mut measured,
+                )
+                .unwrap();
                 assert_eq!((measured.requested, measured.retained), (0, 0));
                 costs.push(measured.work);
                 let mut exact = ReferenceBudget {
@@ -3577,25 +3588,65 @@ mod tests {
                     requested: REQUESTED,
                     retained: RETAINED,
                 };
-                local_type_with_budget(&directory, &result, selected, result.snapshot(), &mut exact).unwrap();
-                assert_eq!((exact.work, exact.requested, exact.retained), (WORK, REQUESTED, RETAINED));
+                local_type_with_budget(
+                    &directory,
+                    &result,
+                    selected,
+                    result.snapshot(),
+                    &mut exact,
+                )
+                .unwrap();
+                assert_eq!(
+                    (exact.work, exact.requested, exact.retained),
+                    (WORK, REQUESTED, RETAINED)
+                );
                 for work in [WORK - measured.work + 1, usize::MAX] {
-                    let error = local_type_with_budget(&directory, &result, selected, result.snapshot(),
-                        &mut ReferenceBudget { work, ..ReferenceBudget::default() }).unwrap_err();
-                    assert!(matches!(error,
+                    let error = local_type_with_budget(
+                        &directory,
+                        &result,
+                        selected,
+                        result.snapshot(),
+                        &mut ReferenceBudget {
+                            work,
+                            ..ReferenceBudget::default()
+                        },
+                    )
+                    .unwrap_err();
+                    assert!(matches!(
+                        error,
                         LocalValueTypeError::Binding(LocalBindingError::Resource)
-                        | LocalValueTypeError::Integer(crate::integer_initializer_types::IntegerInitializerError::Resource)));
+                            | LocalValueTypeError::Integer(
+                                crate::integer_initializer_types::IntegerInitializerError::Resource
+                            )
+                    ));
                 }
             }
             assert!(costs[0] < costs[1] && costs[1] < costs[2]);
-            let selected = lower.declarations().iter().find(|d| d.raw_name() == "c").unwrap();
+            let selected = lower
+                .declarations()
+                .iter()
+                .find(|d| d.raw_name() == "c")
+                .unwrap();
             // Enough for an earlier selected proof cannot reset at a later hop.
             for prior_cost in &costs[..2] {
-                let error = local_type_with_budget(&directory, &result, selected, result.snapshot(),
-                    &mut ReferenceBudget { work: WORK - prior_cost, ..ReferenceBudget::default() }).unwrap_err();
-                assert!(matches!(error,
+                let error = local_type_with_budget(
+                    &directory,
+                    &result,
+                    selected,
+                    result.snapshot(),
+                    &mut ReferenceBudget {
+                        work: WORK - prior_cost,
+                        ..ReferenceBudget::default()
+                    },
+                )
+                .unwrap_err();
+                assert!(matches!(
+                    error,
                     LocalValueTypeError::Binding(LocalBindingError::Resource)
-                    | LocalValueTypeError::Integer(crate::integer_initializer_types::IntegerInitializerError::Resource)));
+                        | LocalValueTypeError::Integer(
+                            crate::integer_initializer_types::IntegerInitializerError::Resource
+                        )
+                ));
             }
         }
     }
@@ -3603,7 +3654,7 @@ mod tests {
     #[test]
     fn local_type_authenticates_selected_owner_and_membership_not_only_its_bytes() {
         use crate::{
-            local_value_binding::{LocalValueTypeError, LocalBindingError, infer_local_value_type},
+            local_value_binding::{LocalBindingError, LocalValueTypeError, infer_local_value_type},
             structural_regions::build_regions,
         };
         // Private invalid-origin construction, not a real-producer substitute.
@@ -3617,10 +3668,19 @@ mod tests {
                 _ => lower.declarations[selected].incomplete = true,
             }
             let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
-            let error = infer_local_value_type(&directory, &result, &lower.declarations()[selected],
-                result.snapshot()).unwrap_err();
-            assert!(matches!(error, LocalValueTypeError::Binding(
-                LocalBindingError::InvalidOrigin | LocalBindingError::UnsupportedContext)));
+            let error = infer_local_value_type(
+                &directory,
+                &result,
+                &lower.declarations()[selected],
+                result.snapshot(),
+            )
+            .unwrap_err();
+            assert!(matches!(
+                error,
+                LocalValueTypeError::Binding(
+                    LocalBindingError::InvalidOrigin | LocalBindingError::UnsupportedContext
+                )
+            ));
         }
     }
 

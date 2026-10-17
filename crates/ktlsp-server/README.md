@@ -13,7 +13,7 @@ cargo build --locked --release -p ktlsp-server -p ktlsp-parser --bins
 
 Install **both** `ktlsp` and `ktlsp-parser-worker` from that same build into the same trusted directory (with `.exe` suffixes on Windows). The default CLI discovers the worker only beside its own executable, checking that the sibling is a regular executable file on Unix. There is no PATH, current-directory or environment-selected worker fallback. Installation trust and matching build identity are the distributor's responsibility; this is not a sandbox, signature check or version-authentication protocol.
 
-Without that sibling, synchronization/folding/lexical diagnostics, compatible lexical semantic tokens and the negotiated structural quickfix remain available, `documentSymbolProvider`/`definitionProvider`/`hoverProvider`/`referencesProvider`/`documentHighlightProvider`/`completionProvider`/`signatureHelpProvider`/`renameProvider` are omitted and their requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. A configured worker that subsequently fails is a request failure, not a fabricated outline or binding. No JVM/JDK, Kotlin compiler or C parser is required.
+Without that sibling, synchronization/folding/lexical diagnostics, compatible lexical semantic tokens and the negotiated structural quickfix remain available, `documentSymbolProvider`/`workspaceSymbolProvider`/`definitionProvider`/`hoverProvider`/`referencesProvider`/`documentHighlightProvider`/`completionProvider`/`signatureHelpProvider`/`renameProvider` are omitted and their requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. A configured worker that subsequently fails is a request failure, not a fabricated outline or binding. No JVM/JDK, Kotlin compiler or C parser is required.
 
 ## Optional extracted-archive smoke (#373)
 
@@ -51,6 +51,74 @@ are not runtime proof. The first separately admitted [original experiment3891194
 Windows failed that first experiment's full workspace before staging: an actual definition reply was `-32803`, `parser deadline exceeded`, not `result:null`; no Windows package or extracted receipt exists for that run. The failure's phase/root cause remains unestablished, not repaired by later success. Every later manual dispatch still requires separate ROOT admission after reviewed source and exact-main verification.
 
 At later independently verified main `040dbba580d908c649c7256405687e2044e4cec2`, separately admitted original [run38926477362](https://github.com/anilbeesetti/ktlsp/issues/373#issuecomment-6219465863), attempt1, actually exercised the extracted Linux/macOS/Windows pairs after full unfiltered release workspace checks. ROOT and independent platform owners authenticated all six original ZIPs, three outer TAR/sidecars, complete inner inventories/checksums/notices/provenance and native ELF/Mach-O/PE headers. Actual empty-PATH/no-Java CLI/stdio succeeded with retained borrowed directories; all three 19-message/16-reply wire payloads are byte-identical. Receipts remain separate from their TARs. #373's concrete extracted-runtime gap is closed, not the historical Windows timeout/#377 or general platform/official/release gates. Artifacts remain experimental14-day evidence; #96/B3/#46/first-party licensing/full parity remain open.
+
+## Coherent eager native workspace symbols (#426)
+
+**Composed source contract only: original hosted runtime/actual-value gates and
+guarded integration remain pending.** With the trusted sibling provider,
+initialization advertises `workspaceSymbolProvider: true`. Symbol-kind negotiation
+uses `capabilities.workspace.symbol` independently of document-symbol profiles.
+There is no resolve provider, opaque data, pagination or progress output.
+
+`workspace/symbol` requires a string `query`; empty selects all declarations,
+otherwise matching is native case-sensitive LITERAL substring on the existing
+outline's projected spelling. Whitespace, Unicode and backticks are not trimmed,
+normalized or fuzzily matched. Every captured admitted `.kt` member is parsed,
+even when it cannot match. Original project/member/CST order and duplicates
+survive. Flat eager results retain full original declaration locations, strict
+UTF-16, native kind/fallback policy and nearest emitted container names.
+This is syntactic search, not the official matcher, semantic index or library/
+Java/script search. Outside open buffers are not appended to the workspace.
+
+One immutable workspace snapshot Arc/epoch and every mapped member overlay's
+original URI/incarnation/version/EXACT bytes govern the aggregate. Both phases
+verify EVERY original model, including zero-source/all-overlay projects, and
+EVERY captured closed source, including nonmatches. Changed/deleted recorded
+sources refuse; additions need manual reload. Unknown file overlays fail closed.
+Publication after join authenticates the same snapshot and exact overlay
+authority; accepted changes stale work, rejected changes preserve it.
+The existing two-generation retention and trusted-quiescent-local-filesystem
+limitations remain; these observations are not an atomic hostile-FS transaction.
+
+| Aggregate resource | Frozen ceiling |
+|---|---:|
+| Captured source members | 1,024 |
+| Captured source bytes | 16 MiB |
+| Query bytes | 8 KiB |
+| Declarations / emitted symbols | 16,384 each |
+| Logical requested/retained storage | 32 MiB |
+| Conservative escaped payload | 16 MiB |
+| Shared logical work | 256 Mi units |
+
+The SAME work allowance includes both whole-snapshot verification phases,
+capture, parsing admission, projection and rendering. Before EVERY parser call,
+it reserves `MAX_OUTPUT_BYTES + MAX_ELEMENTS * MAX_NESTING + 4 * source_bytes`;
+smaller replies/failures do not refund it. Thus **at most42 tiny-source parser
+delegations** fit before other work; even42 is not guaranteed, and1,024 inventory
+members is NOT a promise that1,024-file queries succeed. Exhaustion refuses the
+WHOLE answer, never a successful prefix. Per-parser bounds/deadlines are unchanged.
+Verification separately caps both phases at32 total project visits,2,048 total
+closed-source visits and32 MiB source verification, while each phase retains the
+original16-project/1,024-source/16 MiB admission ceilings.
+
+Actual escaped request IDs reserve512 bytes for bounded workspace failures BEFORE
+parameter/provider errors; selected-document detailed reasons remain unchanged.
+Malformed parameters use `-32602`, stale/unavailable authority `-32801`,
+cancellation `-32800`, resource/provider refusal `-32803`; no empty fallback.
+One aggregate owns ONE job in the existing shared global8 registry and parses
+sequentially. Cancellation takes its ID once but retains owned state until join;
+old completion cannot reply to a reused ID. Unproved same-child cleanup stops
+before another parse and propagates terminal failure.
+
+Permanent SOURCE retains real packaged cancellation/duplicate/ID-reuse/terminal
+exchanges, separate Session retained8/overflow/join/recovery and honestly
+conditional cross-Session admission. No production probe/barrier/delay forces
+saturation. Complete original producer/protocol data and actual large-ID raw
+headers/payloads are captured losslessly as actual byte runs, not expected
+reconstructed wire. Genuine returned TYPE edits are applied in the SAME live
+overlay. BOTH owner and ROOT must independently reconstruct/read every complete
+actual value and apply returned edits before capture retirement. No local
+parser/server/Session runtime is authorized under96; source coverage is not proof.
 
 ## Folding and diagnostics
 

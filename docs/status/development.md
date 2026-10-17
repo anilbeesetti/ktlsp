@@ -4266,3 +4266,66 @@ No new compiler/native interpreted-output/CLI/CI/integration acceptance is
 claimed for426/427/428. All user/old/owner/review WTs, carriers and failures remain.
 Full parity NOT achieved; native-only/T004/#96/B3 INCONCLUSIVE/oracle HOLD and
 original417395377 UNKNOWN/OPEN remain unchanged.
+
+#### Complete426427428 source composition; compiler/runtime acceptance pending
+
+All THREE leaves now use that SAME verified7afdc68. ROOT FULL-read and
+authenticated both COMPLETE final8path426 receipts (actual original bytes,
+not display text missing a terminal LF):
+- function14425B SHA809d130283456e413f1cdefe624fb1a8d7e3dd882eabcc8b40d52c12cd33ab42;
+- adversary14770B SHA2d701d1dc5a44d63fa5dcc680c3e587996a261b2d2f2ecf4d3d1778a92c0193a.
+Verified complete single-parent chain7afd→11c2624→0bb2460→81afd75→a206d80,
+finaltree53b047c5d5908dff5616e02d916ea0f18b8a2a88, not a sole-parent-to-base
+claim for its final fourth commit. ALL4 commits composed7a2afa0/5736176/
+3732cac/dc9afee. Earlier initial/intermediate findings and source remain
+rejected/preserved; final renewals cover the whole feature, not only repair.
+
+ROOT FULL-read/authenticated428 complete contract and both independent
+exact4path784e7fb4037adcf20f955d6217af5c9c3e118369 reviews, treeff0468e132863ac33c325fe6943e00904173942e,
+SOLEbase7afdc68. Contract SHA3c9c4397e313a5058a396d92d302b24e189e2908f9be3e29639c71fe7238ce5c,
+function9684B SHAc00aa66111be69fd57ed5df27db3a579f89b7bdc0dbcd64c4bd39f6460dfaca7,
+adversary10832B SHA88dda21ad990f4551e1f447a6127b32a985c4b6d81005275c5d1521234091166.
+Complete source composed985ed23; TEMP428 full actual writers remain.
+
+Before these two leaves, formatted native+docs2711142/tree2e2e52b received
+BOTH independent COMPLETE15path ROOT source clears (function0.96/adversary0.94).
+ROOT personally read both complete responses; full persisted rendered receipt
+hashesc4adb66d287bae7fe08b38e2606034f57b533b8a523963248d6c519091c9daaa
+and537078ccd2ede146019b04e46ee51c2d6a116c04041628ba2f61308651e8a573.
+These explicit rendered-byte hashes do not claim original terminal-LF custody.
+Source clears were NOT compiler proof: separate original native-only fmtCHECK0
+in1.224047792s, then strictClippy101 in4.522072792s. NoRun was NOT called and
+NO native product/runtime executed. Complete original3680B stderr
+SHA579b83d264d2de7b868c1c1d92eb8f79a155b90fddef133b8f95c2544ab95096
+contains actual E0382 Range move plus two E0716 conditional array lifetimes.
+ROOT read it once, did not rerun to confirm, and repaired only the2test files
+atb6fc0ee. One retained slice serves equality/pointer/output; parameter arrays
+live through branch-local calls without new allocation. All assertions remain,
+production native backend unchanged. The failed source/proofs remain retained.
+
+Current full source now requires a NEW exact whole-composition format/compiler
+admission and BOTH independent COMPLETE union reviews, including native repair,
+all actual dispatch/shared callers and every in-place docs cutover. Native-only
+review/formatter/check authority is not silently transferred. The new workspace
+spec documents actual whole-model/closed-source two-phase authority, exact overlay
+publication, bounded errors/pre-delegation cost and AT-MOST42 tiny-source parser
+ceiling; inventory membership1024 is NOT successful query coverage1024.
+Packaged/Session/global-owned evidence layers and lossless ACTUAL raw byte-run
+capture remain distinct; BOTH owner/ROOT complete values and genuinely applied
+edits precede any capture retirement.
+
+No CURRENT full-union compiler/native interpreted-output/Kotlin/CLI/hosted CI/
+integration pass is claimed. Future pure binary/import data runtime needs its
+OWN exact admission; all local Kotlin/parser/server/Session/worker/peer runtime
+is forbidden under96, even parserfree. Full parity NOT achieved; native-only/
+T004/B3 INCONCLUSIVE/oracle HOLD and original417395377 UNKNOWN/OPEN unchanged.
+
+After all three complete leaves and six independent component source clears,
+ROOT separately admitted ONE whole426427428 composition `cargo fmt --all`.
+Actual exit0 in1.181157875s, empty stdout/stderr. This composition formatter is
+SPENT; prior native-only and historical423424 mutators remain separately SPENT.
+No compiler/test/runtime permission follows. The resulting complete30path
+union (21 source/test/data and9 existing Markdown paths) must receive BOTH
+independent exact full-union reviews, including native test-lifetime repairs.
+Only then may ROOT separately admit fresh compiler gates. No prior partial/
+failed compiler or source-only review is promoted to this whole composition.

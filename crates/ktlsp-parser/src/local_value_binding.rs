@@ -166,7 +166,13 @@ pub fn infer_local_value_type<'a>(
     selected: &'a Declaration<'a>,
     current: &SourceSnapshot,
 ) -> Result<LocalValueTypeProof<'a>, LocalValueTypeError> {
-    local_type_with_budget(directory, result, selected, current, &mut ReferenceBudget::default())
+    local_type_with_budget(
+        directory,
+        result,
+        selected,
+        current,
+        &mut ReferenceBudget::default(),
+    )
 }
 
 pub(super) fn local_type_with_budget<'a>(
@@ -193,27 +199,42 @@ pub(super) fn local_type_with_budget<'a>(
     let context = type_function(directory, parsed, selected.owner(), b)?;
     b.charge(3)?;
     if selected.cst_parent_index() != Some(context.body.cst_index())
-        || directory.memberships().get(selected_ordinal)
-            .ok_or(LocalBindingError::InvalidOrigin)?.region() != context.body_ordinal
+        || directory
+            .memberships()
+            .get(selected_ordinal)
+            .ok_or(LocalBindingError::InvalidOrigin)?
+            .region()
+            != context.body_ordinal
         || b.element(parsed, selected.cst_index())?.parent != Some(context.body.cst_index())
     {
         return Err(LocalBindingError::UnsupportedContext.into());
     }
     BodyCheck {
-        parsed, directory, selected: None, selected_target: None, cursor: 0, b,
-    }.function(context.function, context.body.cst_index())?;
+        parsed,
+        directory,
+        selected: None,
+        selected_target: None,
+        cursor: 0,
+        b,
+    }
+    .function(context.function, context.body.cst_index())?;
     // The richer type-only grammar does NOT replace the strict proof above.
     let root = type_root(directory, parsed, selected.owner(), b)?;
     b.charge(2)?;
-    if !std::ptr::eq(root.function, context.function)
-        || !std::ptr::eq(root.body, context.body)
-    {
+    if !std::ptr::eq(root.function, context.function) || !std::ptr::eq(root.body, context.body) {
         return Err(LocalBindingError::UnsupportedContext.into());
     }
-    let name = b.spelling(selected.raw_name())?
+    let name = b
+        .spelling(selected.raw_name())?
         .ok_or(LocalBindingError::UnsupportedSpelling)?;
-    let (local, _) = value_candidates(directory, context.body_ordinal,
-        context.body.cst_index(), context.function, name, b)?;
+    let (local, _) = value_candidates(
+        directory,
+        context.body_ordinal,
+        context.body.cst_index(),
+        context.function,
+        name,
+        b,
+    )?;
     b.charge(1)?;
     if !local.is_some_and(|local| std::ptr::eq(local, selected)) {
         return Err(LocalBindingError::InvalidOrigin.into());
@@ -230,13 +251,17 @@ pub(super) fn local_type_with_budget<'a>(
             if required_type.is_some_and(|required| !std::ptr::eq(required, target)) {
                 return Err(LocalValueTypeError::IncompatibleAnnotation);
             }
-            break (LocalValueType::LexicalTypeParameter(target),
-                LocalValueTypeTerminal::Parameter(annotation));
+            break (
+                LocalValueType::LexicalTypeParameter(target),
+                LocalValueTypeTerminal::Parameter(annotation),
+            );
         }
         // Direct children only: an annotation reference is never an initializer.
         let mut initializer = None;
-        let mut cursor = declaration.cst_index()
-            .checked_add(1).ok_or(LocalBindingError::Resource)?;
+        let mut cursor = declaration
+            .cst_index()
+            .checked_add(1)
+            .ok_or(LocalBindingError::Resource)?;
         while cursor < node.subtree_end {
             let element = b.element(parsed, cursor)?;
             if !element.token && b.equal(&element.kind, "TYPE_REFERENCE")? {
@@ -245,14 +270,19 @@ pub(super) fn local_type_with_budget<'a>(
                 let mut reference_index = None;
                 for index in cursor..element.subtree_end {
                     let part = b.element(parsed, index)?;
-                    if !part.token && b.equal(&part.kind, "REFERENCE_EXPRESSION")?
+                    if !part.token
+                        && b.equal(&part.kind, "REFERENCE_EXPRESSION")?
                         && reference_index.replace(index).is_some()
                     {
                         return Err(LocalBindingError::UnsupportedContext.into());
                     }
                 }
-                let (ordinal, annotation) = type_annotation(directory, parsed,
-                    reference_index.ok_or(LocalBindingError::UnsupportedContext)?, b)?;
+                let (ordinal, annotation) = type_annotation(
+                    directory,
+                    parsed,
+                    reference_index.ok_or(LocalBindingError::UnsupportedContext)?,
+                    b,
+                )?;
                 check_type_annotation(directory, parsed, ordinal, &annotation, &context, b)?;
                 b.charge(1)?;
                 if !std::ptr::eq(annotation.annotated(), declaration) {
@@ -280,15 +310,30 @@ pub(super) fn local_type_with_budget<'a>(
                 return Err(LocalValueTypeError::IncompatibleAnnotation);
             }
             let leaf = crate::integer_initializer_types::original_integer_leaf(
-                parsed, declaration.cst_index(), b)?;
-            break (LocalValueType::DefaultInteger(leaf.default_type),
-                LocalValueTypeTerminal::Integer(LocalIntegerTypeTerminal { leaf }));
+                parsed,
+                declaration.cst_index(),
+                b,
+            )?;
+            break (
+                LocalValueType::DefaultInteger(leaf.default_type),
+                LocalValueTypeTerminal::Integer(LocalIntegerTypeTerminal { leaf }),
+            );
         }
-        let raw = parsed.source().get(initializer.start..initializer.end)
+        let raw = parsed
+            .source()
+            .get(initializer.start..initializer.end)
             .ok_or(LocalBindingError::UnsupportedContext)?;
-        let name = b.spelling(raw)?.ok_or(LocalBindingError::UnsupportedSpelling)?;
-        let (local, parameter) = value_candidates(directory, context.body_ordinal,
-            context.body.cst_index(), context.function, name, b)?;
+        let name = b
+            .spelling(raw)?
+            .ok_or(LocalBindingError::UnsupportedSpelling)?;
+        let (local, parameter) = value_candidates(
+            directory,
+            context.body_ordinal,
+            context.body.cst_index(),
+            context.function,
+            name,
+            b,
+        )?;
         let target = eligible_value_target(local, parameter, declaration, initializer.start, b)?;
         b.charge(2)?;
         if target.owner() != selected.owner()
@@ -297,13 +342,21 @@ pub(super) fn local_type_with_budget<'a>(
         {
             return Err(LocalBindingError::UnsupportedContext.into());
         }
-        dependency_edges = dependency_edges.checked_add(1).ok_or(LocalBindingError::Resource)?;
+        dependency_edges = dependency_edges
+            .checked_add(1)
+            .ok_or(LocalBindingError::Resource)?;
         declaration = target;
     };
     b.charge(8)?;
     Ok(LocalValueTypeProof {
-        directory, selected, function: context.function, body: context.body,
-        value_type, terminal_declaration: declaration, terminal, dependency_edges,
+        directory,
+        selected,
+        function: context.function,
+        body: context.body,
+        value_type,
+        terminal_declaration: declaration,
+        terminal,
+        dependency_edges,
     })
 }
 
@@ -1967,8 +2020,13 @@ fn binding_target_with_budget<'a>(
         spelling,
         b,
     )?;
-    let target = eligible_value_target(local, parameter, site.containing_property(),
-        site.range().start, b)?;
+    let target = eligible_value_target(
+        local,
+        parameter,
+        site.containing_property(),
+        site.range().start,
+        b,
+    )?;
     Ok((body, target))
 }
 
@@ -1981,11 +2039,14 @@ fn eligible_value_target<'a>(
     b: &mut ReferenceBudget,
 ) -> Result<&'a Declaration<'a>> {
     b.charge(3)?;
-    local.filter(|target| {
-        !std::ptr::eq(*target, containing)
-            && target.cst_index() < containing.cst_index()
-            && target.range().end <= reference_start
-    }).or(parameter).ok_or(LocalBindingError::NoEligibleLocal)
+    local
+        .filter(|target| {
+            !std::ptr::eq(*target, containing)
+                && target.cst_index() < containing.cst_index()
+                && target.range().end <= reference_start
+        })
+        .or(parameter)
+        .ok_or(LocalBindingError::NoEligibleLocal)
 }
 
 fn find_body<'a>(

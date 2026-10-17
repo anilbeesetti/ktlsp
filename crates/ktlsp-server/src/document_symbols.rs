@@ -47,7 +47,9 @@ impl Client {
         Ok(client)
     }
     fn profile(&mut self, symbols: &Value, document: bool) -> Result<(), &'static str> {
-        let symbols = symbols.as_object().ok_or("symbol profile must be an object")?;
+        let symbols = symbols
+            .as_object()
+            .ok_or("symbol profile must be an object")?;
         if document && let Some(value) = symbols.get("hierarchicalDocumentSymbolSupport") {
             self.hierarchical = value
                 .as_bool()
@@ -294,8 +296,12 @@ pub(super) fn declarations_with_work<'a>(
         }
         let spelling = tree.source().get(name.start..name.end).ok_or(UNSUPPORTED)?;
         work(spelling.len())?;
-        symbols.try_reserve(1).map_err(|_| "symbol allocation failed")?;
-        owners.try_reserve(1).map_err(|_| "symbol allocation failed")?;
+        symbols
+            .try_reserve(1)
+            .map_err(|_| "symbol allocation failed")?;
+        owners
+            .try_reserve(1)
+            .map_err(|_| "symbol allocation failed")?;
         let ordinal = symbols.len();
         symbols.push(Symbol {
             node,

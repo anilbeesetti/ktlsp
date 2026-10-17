@@ -331,35 +331,64 @@ fn aggregate_capture_authenticates_alias_content_version_and_reopen_incarnation(
     fixture.reload(&mut workspace, &[]).unwrap();
     let mut documents = HashMap::new();
     let mut incarnations = HashMap::new();
-    documents.insert(alias.clone(), ktlsp_text::Document::new(2, "fun unsaved() = 9\n".into()).unwrap());
+    documents.insert(
+        alias.clone(),
+        ktlsp_text::Document::new(2, "fun unsaved() = 9\n".into()).unwrap(),
+    );
     incarnations.insert(alias.clone(), 61);
     workspace.opened(&alias, 61);
     let cancelled = AtomicBool::new(false);
-    let capture = workspace.capture_all(&documents, &incarnations, &mut crate::workspace_symbols::Budget::default(), &cancelled).unwrap();
+    let capture = workspace
+        .capture_all(
+            &documents,
+            &incarnations,
+            &mut crate::workspace_symbols::Budget::default(),
+            &cancelled,
+        )
+        .unwrap();
     assert_eq!(capture.members.len(), 2);
     assert_eq!(capture.members[0].source.document(), uri);
     assert_eq!(capture.members[0].source.source(), "fun unsaved() = 9\n");
     assert_eq!(capture.members[0].source.revision(), 2);
-    assert_eq!(capture.members[0].overlay, Some((Arc::from(alias.as_str()), 61)));
+    assert_eq!(
+        capture.members[0].overlay,
+        Some((Arc::from(alias.as_str()), 61))
+    );
     assert_eq!(capture.closed.iter().map(Vec::len).sum::<usize>(), 1);
     assert!(workspace.fresh_all(&capture, &documents, &incarnations));
-    documents.insert(alias.clone(), ktlsp_text::Document::new(3, "fun unsaved() = 9\n".into()).unwrap());
+    documents.insert(
+        alias.clone(),
+        ktlsp_text::Document::new(3, "fun unsaved() = 9\n".into()).unwrap(),
+    );
     assert!(!workspace.fresh_all(&capture, &documents, &incarnations));
-    documents.insert(alias.clone(), ktlsp_text::Document::new(2, "fun different() = 9\n".into()).unwrap());
+    documents.insert(
+        alias.clone(),
+        ktlsp_text::Document::new(2, "fun different() = 9\n".into()).unwrap(),
+    );
     assert!(!workspace.fresh_all(&capture, &documents, &incarnations));
-    documents.insert(alias.clone(), ktlsp_text::Document::new(2, "fun unsaved() = 9\n".into()).unwrap());
+    documents.insert(
+        alias.clone(),
+        ktlsp_text::Document::new(2, "fun unsaved() = 9\n".into()).unwrap(),
+    );
     workspace.closed(&alias, 61);
     incarnations.insert(alias.clone(), 62);
     workspace.opened(&alias, 62);
     assert!(!workspace.fresh_all(&capture, &documents, &incarnations));
-    let reopened = workspace.capture_all(&documents, &incarnations, &mut crate::workspace_symbols::Budget::default(), &cancelled).unwrap();
+    let reopened = workspace
+        .capture_all(
+            &documents,
+            &incarnations,
+            &mut crate::workspace_symbols::Budget::default(),
+            &cancelled,
+        )
+        .unwrap();
     assert!(workspace.fresh_all(&reopened, &documents, &incarnations));
 }
 
 #[test]
 fn aggregate_models_are_checked_with_zero_sources_and_all_member_overlays() {
-    use std::collections::HashMap;
     use ktlsp_import::source_inventory::SnapshotBudget;
+    use std::collections::HashMap;
     let fixture = Fixture::new();
     let cancelled = AtomicBool::new(false);
     let mut workspace = Workspace::default();
@@ -369,27 +398,60 @@ fn aggregate_models_are_checked_with_zero_sources_and_all_member_overlays() {
     for (name, incarnation) in [("A.kt", 71), ("B.kt", 72)] {
         let uri = fixture.uri(&format!("src/{name}"));
         workspace.opened(&uri, incarnation);
-        documents.insert(uri.clone(), ktlsp_text::Document::new(1, "class Overlay\n".into()).unwrap());
+        documents.insert(
+            uri.clone(),
+            ktlsp_text::Document::new(1, "class Overlay\n".into()).unwrap(),
+        );
         incarnations.insert(uri, incarnation);
     }
-    let capture = workspace.capture_all(&documents, &incarnations, &mut crate::workspace_symbols::Budget::default(), &cancelled).unwrap();
+    let capture = workspace
+        .capture_all(
+            &documents,
+            &incarnations,
+            &mut crate::workspace_symbols::Budget::default(),
+            &cancelled,
+        )
+        .unwrap();
     assert!(capture.closed.iter().all(Vec::is_empty));
     let snapshot = capture.snapshot.as_ref().unwrap();
     let mut verification = SnapshotBudget::default();
-    snapshot.verify_all(&capture.closed, &mut verification, &cancelled).unwrap();
+    snapshot
+        .verify_all(&capture.closed, &mut verification, &cancelled)
+        .unwrap();
     fixture.put("workspace.json", b"{ changed original model");
-    assert!(snapshot.verify_all(&capture.closed, &mut verification, &cancelled).is_err());
-    assert!(snapshot.verify_all(&[], &mut SnapshotBudget::default(), &cancelled).is_err());
+    assert!(
+        snapshot
+            .verify_all(&capture.closed, &mut verification, &cancelled)
+            .is_err()
+    );
+    assert!(
+        snapshot
+            .verify_all(&[], &mut SnapshotBudget::default(), &cancelled)
+            .is_err()
+    );
     drop(capture);
     fixture.model();
     fs::remove_file(fixture.0.join("src/A.kt")).unwrap();
     fs::remove_file(fixture.0.join("src/B.kt")).unwrap();
     fixture.reload(&mut workspace, &[]).unwrap();
-    let empty = workspace.capture_all(&HashMap::new(), &HashMap::new(), &mut crate::workspace_symbols::Budget::default(), &cancelled).unwrap();
+    let empty = workspace
+        .capture_all(
+            &HashMap::new(),
+            &HashMap::new(),
+            &mut crate::workspace_symbols::Budget::default(),
+            &cancelled,
+        )
+        .unwrap();
     assert!(empty.members.is_empty());
     let snapshot = empty.snapshot.as_ref().unwrap();
     let mut verification = SnapshotBudget::default();
-    snapshot.verify_all(&empty.closed, &mut verification, &cancelled).unwrap();
+    snapshot
+        .verify_all(&empty.closed, &mut verification, &cancelled)
+        .unwrap();
     fixture.put("workspace.json", b"{ changed empty model");
-    assert!(snapshot.verify_all(&empty.closed, &mut verification, &cancelled).is_err());
+    assert!(
+        snapshot
+            .verify_all(&empty.closed, &mut verification, &cancelled)
+            .is_err()
+    );
 }

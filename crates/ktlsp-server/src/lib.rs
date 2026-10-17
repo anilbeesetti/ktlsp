@@ -181,7 +181,10 @@ impl PendingWorkspaceSymbol {
 #[derive(Debug)]
 enum SymbolRequest {
     Document(Arc<str>),
-    Workspace { query: String, budget: workspace_symbols::Budget },
+    Workspace {
+        query: String,
+        budget: workspace_symbols::Budget,
+    },
 }
 
 #[derive(Debug)]
@@ -418,7 +421,10 @@ impl Session {
                 .as_ref()
                 .is_some_and(|pending| pending.id.as_ref() == Some(id))
             || self.waiting_symbols.iter().any(|pending| &pending.id == id)
-            || self.pending_workspace_symbols.iter().any(|pending| pending.id.as_ref() == Some(id))
+            || self
+                .pending_workspace_symbols
+                .iter()
+                .any(|pending| pending.id.as_ref() == Some(id))
         {
             return vec![response_error(
                 Value::Null,
@@ -440,8 +446,10 @@ impl Session {
         if method == "workspace/symbol" && self.state == State::Running {
             let admitted = workspace_symbols::Budget::new("", id)
                 .map_err(|error| (-32803, error))
-                .and_then(|budget| workspace_symbols::query(params)
-                    .and_then(|query| self.start_workspace_symbols(id.clone(), query, budget)));
+                .and_then(|budget| {
+                    workspace_symbols::query(params)
+                        .and_then(|query| self.start_workspace_symbols(id.clone(), query, budget))
+                });
             return match admitted {
                 Ok(()) => Vec::new(),
                 Err((code, message)) => vec![response_error(id.clone(), code, message)],
@@ -498,8 +506,11 @@ impl Session {
             )
             .map_err(|e| (-32602, e))?;
             let workspace_symbol_client = document_symbols::Client::workspace(
-                params.and_then(|p| p.get("capabilities")).expect("validated capabilities"),
-            ).map_err(|e| (-32602, e))?;
+                params
+                    .and_then(|p| p.get("capabilities"))
+                    .expect("validated capabilities"),
+            )
+            .map_err(|e| (-32602, e))?;
             let rename_client = semantic_navigation::RenameClient::parse(
                 params
                     .and_then(|p| p.get("capabilities"))
@@ -906,8 +917,7 @@ impl Session {
                     }
                     let (parsed, clean) = provider.parse(&worker_snapshot, &worker_cancelled);
                     cleanup_confirmed &= clean;
-                    let parsed = parsed
-                        .map_err(parser_failure)?;
+                    let parsed = parsed.map_err(parser_failure)?;
                     if worker_cancelled.load(Ordering::Relaxed) {
                         return Err(ParserFailure::Protocol(-32800, "Request cancelled"));
                     }
@@ -962,7 +972,9 @@ impl Session {
         }
         budget.query(query).map_err(|e| (-32803, e))?;
         let mut owned_query = String::new();
-        owned_query.try_reserve_exact(query.len()).map_err(|_| (-32803, "workspace query allocation failed"))?;
+        owned_query
+            .try_reserve_exact(query.len())
+            .map_err(|_| (-32803, "workspace query allocation failed"))?;
         owned_query.push_str(query);
         self.start_workspace_symbol_query(id, owned_query, budget)
     }
@@ -973,38 +985,77 @@ impl Session {
         owned_query: String,
         mut budget: workspace_symbols::Budget,
     ) -> Result<(), (i32, &'static str)> {
-        let provider = Arc::clone(self.parser_provider.as_ref().ok_or((-32601, "Method not found"))?);
+        let provider = Arc::clone(
+            self.parser_provider
+                .as_ref()
+                .ok_or((-32601, "Method not found"))?,
+        );
         if self.pending_requests() >= MAX_PENDING_PARSER_REQUESTS {
             return Err((-32803, "native analysis capacity exhausted"));
         }
         if self.pending_import.as_ref().is_some_and(|pending| {
             !pending.cancelled.load(Ordering::Relaxed) && pending.attempt == self.workspace.attempt
         }) {
-            self.waiting_symbols.try_reserve(1).map_err(|_| (-32803, "workspace waiter allocation failed"))?;
+            self.waiting_symbols
+                .try_reserve(1)
+                .map_err(|_| (-32803, "workspace waiter allocation failed"))?;
             self.waiting_symbols.push(WaitingSymbol {
                 id,
-                request: SymbolRequest::Workspace { query: owned_query, budget },
+                request: SymbolRequest::Workspace {
+                    query: owned_query,
+                    budget,
+                },
                 attempt: self.workspace.attempt,
             });
             return Ok(());
         }
-        let mut threads = PARSER_THREADS.try_lock().map_err(|_| (-32803, "native worker admission unavailable"))?;
+        let mut threads = PARSER_THREADS
+            .try_lock()
+            .map_err(|_| (-32803, "native worker admission unavailable"))?;
         reap_parser_threads(&mut threads);
-        let slot = threads.iter().position(Option::is_none).ok_or((-32803, "native worker capacity exhausted"))?;
+        let slot = threads
+            .iter()
+            .position(Option::is_none)
+            .ok_or((-32803, "native worker capacity exhausted"))?;
         let cancelled = Arc::new(AtomicBool::new(false));
-        let capture = Arc::new(self.workspace.capture_all(&self.documents, &self.incarnations, &mut budget, &cancelled).map_err(|e| (-32803, e))?);
+        let capture = Arc::new(
+            self.workspace
+                .capture_all(&self.documents, &self.incarnations, &mut budget, &cancelled)
+                .map_err(|e| (-32803, e))?,
+        );
         let worker_capture = Arc::clone(&capture);
         let worker_cancelled = Arc::clone(&cancelled);
         let client = self.workspace_symbol_client.clone();
-        self.pending_workspace_symbols.try_reserve(1).map_err(|_| (-32803, "workspace job allocation failed"))?;
+        self.pending_workspace_symbols
+            .try_reserve(1)
+            .map_err(|_| (-32803, "workspace job allocation failed"))?;
         let (sender, result) = mpsc::sync_channel(1);
-        let thread = thread::Builder::new().name("ktlsp-workspace-symbols".into()).spawn(move || {
-            let result = workspace_symbols::run(&worker_capture, &provider, &client, &owned_query, budget, &worker_cancelled);
-            let _ = sender.send(result);
-        }).map_err(|_| (-32803, "workspace symbol worker could not start"))?;
+        let thread = thread::Builder::new()
+            .name("ktlsp-workspace-symbols".into())
+            .spawn(move || {
+                let result = workspace_symbols::run(
+                    &worker_capture,
+                    &provider,
+                    &client,
+                    &owned_query,
+                    budget,
+                    &worker_cancelled,
+                );
+                let _ = sender.send(result);
+            })
+            .map_err(|_| (-32803, "workspace symbol worker could not start"))?;
         let outcome = Arc::new(AtomicU8::new(0));
-        threads[slot] = Some(ParserThread { handle: thread, outcome: Arc::clone(&outcome) });
-        self.pending_workspace_symbols.push(PendingWorkspaceSymbol { id: Some(id), capture, cancelled, result, outcome });
+        threads[slot] = Some(ParserThread {
+            handle: thread,
+            outcome: Arc::clone(&outcome),
+        });
+        self.pending_workspace_symbols.push(PendingWorkspaceSymbol {
+            id: Some(id),
+            capture,
+            cancelled,
+            result,
+            outcome,
+        });
         Ok(())
     }
 
@@ -1121,7 +1172,11 @@ impl Session {
             .filter(|pending| matches!(&pending.authority, ParserAuthority::Imported { .. }))
             .filter_map(|pending| pending.cancel(code, message))
             .collect();
-        responses.extend(self.pending_workspace_symbols.iter_mut().filter_map(|pending| pending.cancel(code, message)));
+        responses.extend(
+            self.pending_workspace_symbols
+                .iter_mut()
+                .filter_map(|pending| pending.cancel(code, message)),
+        );
         responses.extend(
             self.waiting_symbols
                 .drain(..)
@@ -1133,7 +1188,11 @@ impl Session {
     fn cancel_all(&mut self, code: i32, message: &str) -> Vec<Value> {
         let mut responses = self.cancel_parser(None, code, message);
         responses.extend(self.cancel_import(code, message));
-        responses.extend(self.pending_workspace_symbols.iter_mut().filter_map(|pending| pending.cancel(code, message)));
+        responses.extend(
+            self.pending_workspace_symbols
+                .iter_mut()
+                .filter_map(|pending| pending.cancel(code, message)),
+        );
         responses.extend(
             self.waiting_symbols
                 .drain(..)
@@ -1193,8 +1252,15 @@ impl Session {
                     if committed && request.attempt == pending.attempt {
                         let id = request.id;
                         let started = match request.request {
-                            SymbolRequest::Document(uri) => self.start_parser_uri(id.clone(), "textDocument/documentSymbol", &uri, None),
-                            SymbolRequest::Workspace { query, budget } => self.start_workspace_symbol_query(id.clone(), query, budget),
+                            SymbolRequest::Document(uri) => self.start_parser_uri(
+                                id.clone(),
+                                "textDocument/documentSymbol",
+                                &uri,
+                                None,
+                            ),
+                            SymbolRequest::Workspace { query, budget } => {
+                                self.start_workspace_symbol_query(id.clone(), query, budget)
+                            }
                         };
                         if let Err((code, message)) = started {
                             responses.push(response_error(id, code, message));
@@ -1292,27 +1358,52 @@ impl Session {
         }
         let mut index = 0;
         while index < self.pending_workspace_symbols.len() {
-            let outcome = self.pending_workspace_symbols[index].outcome.load(Ordering::Relaxed);
-            if outcome == 0 { index += 1; continue; }
+            let outcome = self.pending_workspace_symbols[index]
+                .outcome
+                .load(Ordering::Relaxed);
+            if outcome == 0 {
+                index += 1;
+                continue;
+            }
             let mut pending = self.pending_workspace_symbols.swap_remove(index);
             let result = if outcome != 1 {
                 self.cleanup_confirmed = false;
-                Err(ParserFailure::Protocol(-32803, "workspace symbol worker failed"))
+                Err(ParserFailure::Protocol(
+                    -32803,
+                    "workspace symbol worker failed",
+                ))
             } else {
                 match pending.result.try_recv() {
-                    Ok((result, clean)) => { self.cleanup_confirmed &= clean; result }
+                    Ok((result, clean)) => {
+                        self.cleanup_confirmed &= clean;
+                        result
+                    }
                     Err(_) => {
                         self.cleanup_confirmed = false;
-                        Err(ParserFailure::Protocol(-32803, "workspace symbol worker failed"))
+                        Err(ParserFailure::Protocol(
+                            -32803,
+                            "workspace symbol worker failed",
+                        ))
                     }
                 }
             };
-            let Some(id) = pending.id.take() else { continue; };
-            let result = if !self.workspace.fresh_all(&pending.capture, &self.documents, &self.incarnations) {
-                Err(ParserFailure::Protocol(-32801, "workspace snapshot is stale"))
-            } else if pending.cancelled.load(Ordering::Relaxed) {
-                Err(ParserFailure::Protocol(-32800, "Request cancelled"))
-            } else { result };
+            let Some(id) = pending.id.take() else {
+                continue;
+            };
+            let result =
+                if !self
+                    .workspace
+                    .fresh_all(&pending.capture, &self.documents, &self.incarnations)
+                {
+                    Err(ParserFailure::Protocol(
+                        -32801,
+                        "workspace snapshot is stale",
+                    ))
+                } else if pending.cancelled.load(Ordering::Relaxed) {
+                    Err(ParserFailure::Protocol(-32800, "Request cancelled"))
+                } else {
+                    result
+                };
             responses.push(match result {
                 Ok(result) => {
                     let mut response = json!({"jsonrpc":"2.0","id":null,"result":null});
@@ -1455,7 +1546,9 @@ impl Session {
                     {
                         return vec![response];
                     }
-                    if let Some(response) = self.pending_workspace_symbols.iter_mut()
+                    if let Some(response) = self
+                        .pending_workspace_symbols
+                        .iter_mut()
                         .find(|pending| pending.id.as_ref() == Some(id))
                         .and_then(|pending| pending.cancel(-32800, "Request cancelled"))
                     {

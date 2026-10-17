@@ -196,12 +196,14 @@ limits](development.md#verified425-cleaned-source-integration-and-original-exact
 
 This is not general call applicability/typing/overloads/incomplete signature
 help/official rendering, effective metadata hierarchy/classpath or full parity.
-426 coherent native workspace declaration search,427 inline Class bounds/generic
+426 eager native workspace declaration search,427 inline Class bounds/generic
 supertypes and428 snapshot-owned immutable-local type propagation use this SAME
-verified main.427's complete leaf has both renewed component source reviews and
-is composed into ROOT's branch; full union/compiler/actual-value gates remain
-pending.426's initial component HOLD remains rejected while repairs proceed.
-428 is a new independent parser-library-only contract, not general inference.
+verified main. All THREE complete source leaves have BOTH independent component
+reviews and are composed in ROOT's branch. Full CURRENT union/compiler/original
+hosted actual-value gates and guarded integration remain pending. The first
+native-only2711142 Clippy101 test-source failure is retained/repaired, not
+promoted to a pass.428 is library-only, not general inference;426 has an explicit
+AT-MOST42 tiny-delegation work ceiling, not1,024 successful-file-query coverage.
 None is a verified new provider/data output or delivered feature yet.
 No persistent semantic index/official matcher, source/library completeness,
 watcher/build-tool/oracle/platform/performance promotion follows.

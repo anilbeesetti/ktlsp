@@ -367,7 +367,7 @@ fn provider_is_explicit_and_parser_failures_are_errors() {
 
 struct Package(PathBuf);
 impl Package {
-    fn new(include_worker: bool) -> Self {
+    fn source_only() -> Self {
         let unique = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -377,15 +377,19 @@ impl Package {
             std::process::id()
         ));
         std::fs::create_dir(&directory).unwrap();
+        Self(directory)
+    }
+    fn new(include_worker: bool) -> Self {
+        let package = Self::source_only();
         std::fs::copy(
             env!("CARGO_BIN_EXE_ktlsp"),
-            directory.join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX)),
+            package.0.join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX)),
         )
         .unwrap();
         if include_worker {
-            std::fs::copy(worker(), directory.join(worker().file_name().unwrap())).unwrap();
+            std::fs::copy(worker(), package.0.join(worker().file_name().unwrap())).unwrap();
         }
-        Self(directory)
+        package
     }
     fn exchange(&self, messages: &[Value]) -> Vec<Value> {
         exchange_directory(&self.0, messages)
@@ -1470,6 +1474,400 @@ fn parameter_shadowing_exchange(directory: &Path) -> Value {
     json!({"requests":messages,"responses":replies,"exit_code":0,"stderr":""})
 }
 
+// Only the installed pair produces provider results here: no Session or CST oracle.
+fn basic_extracted_exchange(directory: &Path) -> Value {
+    let scratch = Package::source_only();
+    let project = source_project(&scratch, "basic", &["src"]);
+    assert!(!project.starts_with(directory));
+    let disk = "class DiskOnly\r\n";
+    let path = project.join("src/A.kt");
+    std::fs::write(&path, disk).unwrap();
+    let root = source_directory_uri(&project);
+    let uri = format!("{root}/src/A.kt");
+    let source = "// 😀\r\n// Native\r\nfun host() {\r\n val `old😀` = 1\r\n val use = `old😀`\r\n}\r\n";
+    let mut wire = SignatureWire::in_directory(directory);
+    let mut requests = Vec::new();
+    let mut send = |id: Option<&str>, method: &str, params: Value| {
+        let mut message = json!({"jsonrpc":"2.0","method":method,"params":params});
+        if let Some(id) = id {
+            message["id"] = json!(id);
+        }
+        requests.push(message.clone());
+        wire.send(message)
+    };
+    let result = |response: Value, expected: Value| {
+        assert!(response.get("error").is_none(), "{response}");
+        assert_eq!(response["result"], expected, "{response}");
+    };
+    let document = json!({"textDocument":{"uri":uri}});
+    let at = |text: &str, offset| {
+        json!({"textDocument":{"uri":uri},"position":offset_to_position(text,offset).unwrap()})
+    };
+    let initialized = send(
+        Some("init"),
+        "initialize",
+        json!({"initializationOptions":source_options(&[&root]),"capabilities":{
+            "general":{"positionEncodings":["utf-8","utf-32"]},
+            "workspace":{"symbol":{"symbolKind":{"valueSet":(1..=26).collect::<Vec<_>>()}},
+                "workspaceEdit":{"documentChanges":true}},
+            "textDocument":{"diagnostic":{},"hover":{"contentFormat":["plaintext"]},
+                "documentSymbol":{"hierarchicalDocumentSymbolSupport":true},
+                "rename":{"prepareSupport":true},"signatureHelp":{},
+                "semanticTokens":{"requests":{"full":true,"range":true},"formats":["relative"],
+                    "tokenTypes":["number","comment","keyword","operator","string"],"tokenModifiers":[]}}
+        }}),
+    );
+    let caps = &initialized["result"]["capabilities"];
+    assert_eq!(caps["positionEncoding"], "utf-16");
+    assert_eq!(caps["textDocumentSync"]["change"], 2);
+    for provider in [
+        "foldingRangeProvider",
+        "documentSymbolProvider",
+        "workspaceSymbolProvider",
+        "definitionProvider",
+        "referencesProvider",
+    ] {
+        assert_eq!(caps[provider], true, "{caps}");
+    }
+    assert_eq!(caps["renameProvider"], json!({"prepareProvider":true}));
+    assert_eq!(caps["completionProvider"], json!({"resolveProvider":false}));
+    assert_eq!(caps["signatureHelpProvider"], json!({}));
+    let options = &caps["semanticTokensProvider"];
+    assert_eq!(options["full"], true);
+    assert_eq!(options["range"], true);
+    assert_eq!(options["legend"]["tokenModifiers"], json!([]));
+    send(None, "initialized", json!({}));
+    let disk_symbols = json!([{"name":"DiskOnly","kind":5,
+        "location":{"uri":uri,"range":span(disk,"class DiskOnly")}}]);
+    result(
+        send(Some("disk"), "workspace/symbol", json!({"query":"DiskOnly"})),
+        disk_symbols.clone(),
+    );
+    send(
+        None,
+        "textDocument/didOpen",
+        json!({"textDocument":{"uri":uri,"languageId":"kotlin","version":1,"text":source}}),
+    );
+    result(
+        send(Some("valid"), "textDocument/diagnostic", document.clone()),
+        json!({"kind":"full","items":[]}),
+    );
+    // CRLF and astral UTF-16 replacement must commit before fresh token results.
+    let emoji_range = json!({"start":{"line":0,"character":3},"end":{"line":0,"character":5}});
+    send(
+        None,
+        "textDocument/didChange",
+        json!({"textDocument":{"uri":uri,"version":2},"contentChanges":[
+            {"range":emoji_range,"rangeLength":2,"text":"x"},
+            {"range":{"start":{"line":6,"character":0},"end":{"line":6,"character":0}},"text":")"}]}),
+    );
+    result(
+        send(Some("broken"), "textDocument/diagnostic", document.clone()),
+        json!({"kind":"full","items":[{"range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},
+            "severity":1,"source":"ktlsp-lexical-structural","code":"structural",
+            "message":"unexpected or mismatched closing delimiter"}]}),
+    );
+    send(
+        None,
+        "textDocument/didChange",
+        json!({"textDocument":{"uri":uri,"version":3},"contentChanges":[
+            {"range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"text":""}]}),
+    );
+    let corrected = source.replacen('😀', "x", 1);
+    result(
+        send(Some("cleared"), "textDocument/diagnostic", document.clone()),
+        json!({"kind":"full","items":[]}),
+    );
+    result(
+        send(Some("folds"), "textDocument/foldingRange", document.clone()),
+        json!([
+            {"startLine":0,"startCharacter":0,"endLine":1,"endCharacter":9,"kind":"comment"},
+            {"startLine":2,"startCharacter":11,"endLine":5,"endCharacter":1,"kind":"region"}
+        ]),
+    );
+    let outline = |text: &str, name: &str| {
+        json!([{"name":"host","kind":12,"range":span(text,text[text.find("fun host").unwrap()..].trim_end()),
+            "selectionRange":span(text,"host"),"children":[
+                {"name":name,"kind":7,"range":span(text,&format!("val {name} = 1")),
+                    "selectionRange":span(text,name),"children":[]},
+                {"name":"use","kind":7,"range":span(text,&format!("val use = {name}")),
+                    "selectionRange":span(text,"use"),"children":[]}
+            ]}])
+    };
+    result(
+        send(Some("outline"), "textDocument/documentSymbol", document.clone()),
+        outline(&corrected, "`old😀`"),
+    );
+    let decode = |response: Value| {
+        assert!(response.get("error").is_none(), "{response}");
+        assert!(response["result"].get("resultId").is_none());
+        let data = response["result"]["data"].as_array().unwrap();
+        assert_eq!(data.len() % 5, 0);
+        let mut line = 0;
+        let mut column = 0;
+        data.as_chunks::<5>()
+            .0
+            .iter()
+            .map(|token| {
+                let delta = token[0].as_u64().unwrap();
+                line += delta;
+                column = if delta == 0 {
+                    column + token[1].as_u64().unwrap()
+                } else {
+                    token[1].as_u64().unwrap()
+                };
+                assert_eq!(token[4], 0);
+                json!([line,column,token[2],
+                    options["legend"]["tokenTypes"][token[3].as_u64().unwrap() as usize]])
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        decode(send(
+            Some("tokens"),
+            "textDocument/semanticTokens/full",
+            document.clone()
+        )),
+        vec![
+            json!([0,0,4,"comment"]),
+            json!([1,0,9,"comment"]),
+            json!([2,0,3,"keyword"]),
+            json!([3,1,3,"keyword"]),
+            json!([3,13,1,"operator"]),
+            json!([3,15,1,"number"]),
+            json!([4,1,3,"keyword"]),
+            json!([4,9,1,"operator"])
+        ]
+    );
+    assert_eq!(
+        decode(send(
+            Some("clipped"),
+            "textDocument/semanticTokens/range",
+            json!({"textDocument":{"uri":uri},"range":{
+                "start":{"line":0,"character":2},"end":{"line":1,"character":4}}})
+        )),
+        vec![json!([0,2,2,"comment"]), json!([1,0,4,"comment"])]
+    );
+    let workspace_local = |text: &str, name: &str| {
+        json!([{"name":name,"kind":7,"containerName":"host",
+            "location":{"uri":uri,"range":span(text,&format!("val {name} = 1"))}}])
+    };
+    result(
+        send(Some("literal"), "workspace/symbol", json!({"query":"old"})),
+        workspace_local(&corrected, "`old😀`"),
+    );
+    for (id, query) in [
+        ("case", "Old"),
+        ("absent", "NeverPresent"),
+        ("overlay", "DiskOnly"),
+    ] {
+        result(
+            send(Some(id), "workspace/symbol", json!({"query":query})),
+            json!([]),
+        );
+    }
+    let use_start = corrected.rfind("`old😀`").unwrap();
+    let use_range = references_range(&corrected, use_start, "`old😀`".len());
+    send(
+        None,
+        "textDocument/didChange",
+        json!({"textDocument":{"uri":uri,"version":4},"contentChanges":[
+            {"range":use_range,"text":"`olSuffix`"}]}),
+    );
+    let incomplete = corrected.replacen("val use = `old😀`", "val use = `olSuffix`", 1);
+    let caret = incomplete.find("`olSuffix`").unwrap() + 3;
+    let completion = send(
+        Some("complete"),
+        "textDocument/completion",
+        at(&incomplete, caret),
+    );
+    assert!(completion.get("error").is_none(), "{completion}");
+    assert_eq!(completion["result"]["isIncomplete"], true);
+    assert_eq!(completion["result"]["items"].as_array().unwrap().len(), 1);
+    let item = &completion["result"]["items"][0];
+    assert_eq!(item["label"], "`old😀`");
+    assert_eq!(item["filterText"], "old😀");
+    assert_eq!(item["textEdit"]["range"], span(&incomplete, "`olSuffix`"));
+    let (completed, completed_use) = apply_completion(&incomplete, item, caret);
+    assert_eq!(completed, corrected);
+    send(
+        None,
+        "textDocument/didChange",
+        json!({"textDocument":{"uri":uri,"version":5},"contentChanges":[
+            {"range":item["textEdit"]["range"],"text":item["textEdit"]["newText"]}]}),
+    );
+    result(
+        send(
+            Some("rebound"),
+            "textDocument/definition",
+            at(&completed, completed_use),
+        ),
+        json!({"uri":uri,"range":span(&completed,"`old😀`")}),
+    );
+    let declaration = completed.find("`old😀`").unwrap();
+    result(
+        send(
+            Some("prepare"),
+            "textDocument/prepareRename",
+            at(&completed, declaration),
+        ),
+        json!({"range":span(&completed,"`old😀`"),"placeholder":"old😀"}),
+    );
+    let mut params = at(&completed, declaration);
+    params["newName"] = json!("Fresh");
+    let rename = send(Some("rename"), "textDocument/rename", params);
+    let renamed = apply_original_rename(&completed, &rename, &uri, 5);
+    assert_eq!(renamed, completed.replace("`old😀`", "Fresh"));
+    let edits = rename["result"]["documentChanges"][0]["edits"]
+        .as_array()
+        .unwrap();
+    assert_eq!(edits.len(), 2);
+    assert_eq!(edits[0]["range"], span(&completed, "`old😀`"));
+    assert_eq!(
+        edits[1]["range"],
+        references_range(&completed, completed_use, "`old😀`".len())
+    );
+    let changes = edits
+        .iter()
+        .rev()
+        .map(|edit| json!({"range":edit["range"],"text":edit["newText"]}))
+        .collect::<Vec<_>>();
+    send(
+        None,
+        "textDocument/didChange",
+        json!({"textDocument":{"uri":uri,"version":6},"contentChanges":changes}),
+    );
+    let fresh_use = renamed.rfind("Fresh").unwrap();
+    result(
+        send(
+            Some("fresh-definition"),
+            "textDocument/definition",
+            at(&renamed, fresh_use),
+        ),
+        json!({"uri":uri,"range":span(&renamed,"Fresh")}),
+    );
+    let mut params = at(&renamed, fresh_use);
+    params["context"] = json!({"includeDeclaration":true});
+    result(
+        send(Some("fresh-references"), "textDocument/references", params),
+        json!([{"uri":uri,"range":span(&renamed,"Fresh")},
+            {"uri":uri,"range":references_range(&renamed,fresh_use,"Fresh".len())}]),
+    );
+    result(
+        send(
+            Some("fresh-outline"),
+            "textDocument/documentSymbol",
+            document.clone(),
+        ),
+        outline(&renamed, "Fresh"),
+    );
+    result(
+        send(Some("new"), "workspace/symbol", json!({"query":"Fresh"})),
+        workspace_local(&renamed, "Fresh"),
+    );
+    for (id, query) in [("old", "old"), ("fresh-case", "fresh")] {
+        result(
+            send(Some(id), "workspace/symbol", json!({"query":query})),
+            json!([]),
+        );
+    }
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), disk);
+    send(None, "textDocument/didClose", document.clone());
+    result(
+        send(Some("closed"), "workspace/symbol", json!({"query":"DiskOnly"})),
+        disk_symbols,
+    );
+    result(
+        send(
+            Some("closed-overlay"),
+            "workspace/symbol",
+            json!({"query":"Fresh"}),
+        ),
+        json!([]),
+    );
+    let signature = "fun <T> outer(p: T) {\n fun send(to: T) {}\n send(to = p)\n}\n";
+    send(
+        None,
+        "textDocument/didOpen",
+        json!({"textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":signature}}),
+    );
+    let signature_response = send(
+        Some("signature"),
+        "textDocument/signatureHelp",
+        navigation_params(signature, signature.rfind('=').unwrap() + 1),
+    );
+    result(
+        signature_response,
+        json!({"signatures":[{
+            "label":"send(to: T)","parameters":[{"label":"to: T"}]}],
+            "activeSignature":0,"activeParameter":0}),
+    );
+    let (responses, status, stderr) = wire.terminate(true);
+    requests.push(json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}));
+    requests.push(json!({"jsonrpc":"2.0","method":"exit"}));
+    assert!(
+        responses.iter().map(|reply| reply.get("id")).eq(requests
+            .iter()
+            .filter_map(|message| message.get("id"))
+            .map(Some)),
+        "exact request order, no push diagnostics or extra output: {responses:?}"
+    );
+    let receipt = json!({"source_project":project,"workspace_model":source_model(&["src"]),
+        "disk":disk,"corrected":corrected,"completion_input":incomplete,
+        "completion_applied":completed,"rename_applied":renamed,
+        "requests":requests,"responses":responses,"exit_code":status.code(),
+        "stderr":String::from_utf8(stderr).unwrap()});
+    drop(scratch);
+    assert!(!project.exists(), "source-only scratch cleanup");
+    receipt
+}
+
+fn extracted_lifecycle_exchange(directory: &Path, invalid_position: bool) -> Value {
+    let mut wire = SignatureWire::in_directory(directory);
+    let mut requests = vec![
+        json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{
+            "capabilities":{"textDocument":{"diagnostic":{}}}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+    ];
+    if invalid_position {
+        requests.extend([
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{
+                "textDocument":{"uri":URI,"languageId":"kotlin","version":1,"text":"// 😀\r\nfun f() {}\r\n"}}}),
+            json!({"jsonrpc":"2.0","id":"split-surrogate","method":"textDocument/definition","params":{
+                "textDocument":{"uri":URI},"position":{"line":0,"character":4}}}),
+            json!({"jsonrpc":"2.0","id":"usable","method":"textDocument/diagnostic","params":{"textDocument":{"uri":URI}}}),
+        ]);
+    }
+    for message in &requests {
+        let response = wire.send(message.clone());
+        match message["id"].as_str() {
+            Some("split-surrogate") => {
+                assert_eq!(response["error"]["code"], -32602, "{response}");
+                assert!(response.get("result").is_none());
+            }
+            Some("usable") => assert_eq!(response["result"], json!({"kind":"full","items":[]})),
+            Some("init") => assert_eq!(
+                response["result"]["capabilities"]["positionEncoding"],
+                "utf-16"
+            ),
+            _ => {}
+        }
+    }
+    let (responses, status, stderr) = wire.terminate(invalid_position);
+    requests.push(json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}));
+    if invalid_position {
+        requests.push(json!({"jsonrpc":"2.0","method":"exit"}));
+    }
+    assert!(
+        responses.iter().map(|reply| reply.get("id")).eq(requests
+            .iter()
+            .filter_map(|message| message.get("id"))
+            .map(Some))
+    );
+    json!({"requests":requests,"responses":responses,"exit_code":status.code(),
+        "stderr":String::from_utf8(stderr).unwrap()})
+}
+
 #[test]
 #[ignore = "requires an explicitly admitted extracted native package; never part of default native tests"]
 fn extracted_archive_smoke() {
@@ -1501,7 +1899,7 @@ fn extracted_archive_smoke() {
             .current_dir(&directory)
             .output()
             .unwrap();
-        assert!(output.status.success(), "{:?}", output.status);
+        assert_eq!(output.status.code(), Some(0), "{:?}", output.status);
         assert!(output.stderr.is_empty(), "{:?}", output.stderr);
         let stdout = String::from_utf8(output.stdout).unwrap();
         if argument == "--version" {
@@ -1509,10 +1907,23 @@ fn extracted_archive_smoke() {
                 stdout.trim_end(),
                 concat!("ktlsp ", env!("CARGO_PKG_VERSION"))
             );
+        } else {
+            for expected in [
+                "native Kotlin language server",
+                "Usage: ktlsp [--stdio | --help | --version]",
+                "UTF-16 incremental document synchronization",
+                "no JVM or JDK",
+                "Protocol messages use stdout; errors use stderr.",
+            ] {
+                assert!(stdout.contains(expected), "{stdout}");
+            }
         }
         cli.push(json!({"argument":argument,"stdout":stdout,"stderr":"","exit_code":output.status.code()}));
     }
     let wire = parameter_shadowing_exchange(&directory);
+    let basic = basic_extracted_exchange(&directory);
+    let invalid_coordinates = extracted_lifecycle_exchange(&directory, true);
+    let shutdown_eof = extracted_lifecycle_exchange(&directory, false);
     assert!(directory.is_dir() && executable.is_file() && worker.is_file());
     let receipt = serde_json::to_string(&json!({
         "extracted_directory":directory,
@@ -1522,6 +1933,9 @@ fn extracted_archive_smoke() {
         "environment":{"PATH":"","JAVA_HOME":null,"JDK_HOME":null},
         "cli":cli,
         "wire":wire,
+        "basic":basic,
+        "invalid_coordinates":invalid_coordinates,
+        "shutdown_eof":shutdown_eof,
         "borrowed_directory_retained":true
     }))
     .unwrap();
@@ -5929,21 +6343,20 @@ struct SignatureWire {
 }
 impl SignatureWire {
     fn new(package: &Package) -> Self {
-        let mut child = Command::new(
-            package
-                .0
-                .join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX)),
-        )
-        .arg("--stdio")
-        .env("PATH", "")
-        .env_remove("JAVA_HOME")
-        .env_remove("JDK_HOME")
-        .current_dir(&package.0)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
+        Self::in_directory(&package.0)
+    }
+    fn in_directory(directory: &Path) -> Self {
+        let mut child = Command::new(directory.join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX)))
+            .arg("--stdio")
+            .env("PATH", "")
+            .env_remove("JAVA_HOME")
+            .env_remove("JDK_HOME")
+            .current_dir(directory)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
         let input = child.stdin.take();
         let reader = std::io::BufReader::new(child.stdout.take().unwrap());
         Self {
@@ -5972,21 +6385,32 @@ impl SignatureWire {
         }
         Value::Null
     }
-    fn finish(mut self) -> Vec<Value> {
-        self.send(json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}));
-        self.send(json!({"jsonrpc":"2.0","method":"exit"}));
+    fn finish(self) -> Vec<Value> {
+        self.terminate(true).0
+    }
+    fn terminate(mut self, exit: bool) -> (Vec<Value>, std::process::ExitStatus, Vec<u8>) {
+        let stopped = self.send(json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}));
+        assert!(stopped.get("error").is_none(), "{stopped}");
+        assert_eq!(stopped["result"], Value::Null);
+        if exit {
+            self.send(json!({"jsonrpc":"2.0","method":"exit"}));
+        }
         self.input.take();
         while let Some(frame) = ktlsp_protocol::read_frame(&mut self.reader).unwrap() {
             self.responses.push(serde_json::from_slice(&frame).unwrap());
         }
         let output = self.child.take().unwrap().wait_with_output().unwrap();
-        assert!(output.status.success(), "{:?}", output.status);
+        assert_eq!(output.status.code(), Some(0), "{:?}", output.status);
         assert!(
             output.stderr.is_empty(),
             "{}",
             String::from_utf8_lossy(&output.stderr)
         );
-        std::mem::take(&mut self.responses)
+        (
+            std::mem::take(&mut self.responses),
+            output.status,
+            output.stderr,
+        )
     }
 }
 impl Drop for SignatureWire {

@@ -17,29 +17,26 @@ Without that sibling, synchronization/folding/lexical diagnostics, compatible le
 
 ## Basic native candidate setup (#430)
 
-**Source/setup contract, not a ready release or editor verification.** PR429's
-capture-free source is verified on main `21aab03`, after its OWN original full
-three-host CI, guarded integration and independent feature OWNERS+ROOT original
-exact-main acceptance. Its first c035 runs remain FAILED; later passes do not
-diagnose historical deadlines. #430's expanded copied-pair consumer passed on
-all three original acf06cd hosts; ROOT and its independent feature owner checked
-the complete captured Mac/Windows values and applied every returned edit.
-However, that source's original Windows full CI FAILED an older navigation
-request with `parser deadline exceeded`; cause remains UNKNOWN. The copied-pair
-pass is not extracted-archive or release acceptance. [Exact outcome and holds](https://github.com/anilbeesetti/ktlsp/pull/432#issuecomment-6240834265).
-At that earlier checkpoint, the #433 selected-site prerequisite was source-only.
-Use only current-source archives and extracted proof separately accepted in
-[#430](https://github.com/anilbeesetti/ktlsp/issues/430); the historical
-[#373 receipts below](#optional-extracted-archive-smoke-373) certify only their
-exact sources. The ten-hour goal is not a guarantee.
+**Verified experimental basic candidate at exact main `5926de3`, not a general
+release or editor certification.** [Exact downloads, checksums and proof](https://github.com/anilbeesetti/ktlsp/issues/430#issuecomment-6242490468)
+cover actual extracted Linux X64, macOS ARM64 and Windows X64 pairs in original
+package39074621949/1. Verify the outer TAR checksum before extraction, then
+`SHA256SUMS` and `provenance.json` before trusting/executing the pair. Keep both
+binaries together. Artifacts have fourteen-day retention; these exact5926
+archives are not binaries for a later documentation head.
 
-The changed `2627f9e` composition subsequently passed its OWN original full
-Linux/macOS/Windows CI. Independent controls, both #433 OWNERS and the basic
-consumer OWNER+ROOT accepted the complete current actual replies and genuine
-edits. [Exact original source and evidence](../../docs/status/development.md#basic430-and-bounded433-original2627-smoke-and-ci-accepted)
-remain distinct from the documentation-completion head and its still-required
-guarded integration/exact-main/packaging gates. This is copied-pair proof,
-not an accepted extracted archive, editor certification or historical diagnosis.
+PR432 passed complete final-source reviews, its OWN original three-host CI,
+guarded integration and all three feature OWNERS+ROOT original exact-main gates.
+The separately admitted package passed all42 steps; two independent complete
+controls plus basic OWNER+ROOT accepted every current extracted reply and genuine
+completion/rename edit. CLI help/version, the older parameter-shadow fixture,
+basic editing, invalid-coordinate recovery and shutdown/EOF actually ran.
+[Full source identities and finite limits](../../docs/status/development.md#verified432-integration-and430-actual-extracted-basic-candidate)
+do not establish IDE compatibility, signing, first-party licensing, general
+reliability or full Kotlin parity. Earlier acf/c035 deadline failures remain
+FAILED/cause UNKNOWN; later success is not diagnosis. Historical
+[#373 receipts below](#optional-extracted-archive-smoke-373) retain their own
+source scope. The ten-hour goal was not a safety waiver or guarantee.
 
 For #433's non-Unix piped deadline errors, the existing `-32803` and
 `parser deadline exceeded` message remain unchanged. Optional

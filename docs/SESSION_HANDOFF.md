@@ -8,6 +8,46 @@ decisions or phase boundaries. **Full official Kotlin LSP parity is NOT achieved
 Use the actual session capacity; the historical 32-concurrent instruction below
 is not a new limit. Do not manufacture hundreds of overlapping/blocked tasks.
 
+### Verified basic candidate5926 — supersedes pending stages below
+
+[PR432](https://github.com/anilbeesetti/ktlsp/pull/432) is merged at
+**5926de3cbfc91ffcb102a17986d53d80751992df**, tree
+c268b74f371fa205b5aeb0e2eb1c6b6908162bb4, SOLE original main parent
+21aab03e4e232be128cf9ff1414ac17041bf78e0. Final reviewed41b341c passed BOTH
+complete15path source reviews and OWN original Native39072737642/1 plus
+platform39072737633/1. Five independent CI/feature gates and ROOT accepted the
+complete original data and actual edits. Separate strictly read-only fresh
+guard returned actualouter0/parsed0/fullmatching exclusive-base facts before
+ordinary expected-head squash. Actual tree/sole original parent were verified.
+ALL THREE feature OWNERS+ROOT then accepted OWN original exact-main
+39073917620/1/job117517028656: all8steps,147rows/1357cases,1354pass0fail3ignored.
+The exclusive original21a base lease is CLEARED; no active merge lease remains.
+
+ROOT separately admitted original manual package39074621949/1 on this SAME
+verified5926. All three hosts/all42steps passed full release checks, archive
+verification and actual borrowed extracted smoke. Two independent complete
+whole-package controls0.97/0.97 and basic OWNER+ROOT accepted ALL current
+receipts and genuine UTF16 completion/both version5 rename edits. All6ZIPs/
+69members,48runlog members,3TARs/102files/101inner hashes each, notices,
+provenance/source/workflow/lock and extracted paths authenticated. Full147row
+workspace totals are1354Linux/1352Mac/1302Windows pass,0failed/filtered,3ignored;
+SEPARATE exact extracted test is1pass77filtered on each host. No combined
+filtered0, private worker telemetry or request-latency claim.
+[#430 is closed with exact downloads/checksums/evidence](https://github.com/anilbeesetti/ktlsp/issues/430#issuecomment-6242490468).
+Archives are pinned5926, fourteen-day artifacts, NOT a later documentation head
+or permanent signed release. No first-party license grant or IDE/general
+platform/reliability/full-parity certification. Old FAILED/UNKNOWN,
+96/431/417/T004/native-only/B3/oracle remain unchanged.
+
+ROOT owns the documentation-only434 worktree
+`/private/tmp/ktlsp-434-verified-basic-docs`, branch
+`omp/434-verified-basic-docs`, from verified5926. Its five existing docs require
+their OWN complete source reviews/original CI/guarded integration/exact-main
+gates; the verified5926 product and package evidence is not relabeled as434.
+Preserve every older user/owner worktree. Continue source-resolution/library
+linkage prerequisites after this checkpoint; completed metadata witness
+research must not restart. No local runtime or new package dispatch is granted.
+
 ### Latest verified delivery and basic-candidate continuation
 
 [PR429](https://github.com/anilbeesetti/ktlsp/pull/429) is delivered on ONE verified

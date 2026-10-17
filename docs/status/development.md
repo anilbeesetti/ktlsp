@@ -4969,3 +4969,77 @@ full parity. Originalacf Windows FAILED/causeUNKNOWN and70ba fmtFAILED remain;
 96/431/417/B3/oracle/T004/native-only and other historical holds are unchanged.
 
 
+## Verified432 integration and430 actual extracted basic candidate
+
+This supersedes the pending final-documentation/integration/package stages
+above, not their historical failures or the fixed assessment cutoff.
+Final reviewed head41b341c125deb3dc0068ac4c4de75e1232580cf4,
+treec268b74f371fa205b5aeb0e2eb1c6b6908162bb4, passed BOTH independent complete
+15path source reviews0.97/0.97 and its OWN original Native39072737642/1/
+job117513525475 and platform39072737633/1/Mac117513525575/Win117513525445.
+All32steps and147rows per host passed; two complete CI controls, parser/server/
+basic OWNERS and ROOT accepted current actual values/genuine edits. Actual
+checkout0aae95a967c83e6fb28db557b1b85b5f45ce9cdd has treec268 and ordered
+parents[21a,41b]. Both retained event `pr_merge_sha=235a25d` fields were stale
+observations, not the actual checkout and not silently corrected.
+
+ROOT's exclusive original21a base lease and separate strictly read-only complete
+fresh guard preceded an ordinary expected-head squash. Actual main
+**5926de3cbfc91ffcb102a17986d53d80751992df** has the reviewed tree and SOLE
+original parent21aab03e4e232be128cf9ff1414ac17041bf78e0. OWN ORIGINAL
+[exact-main39073917620/1/job117517028656](https://github.com/anilbeesetti/ktlsp/actions/runs/39073917620/job/117517028656)
+passed all8steps/147rows/1357cases:1354pass0fail3ignored. ALL THREE feature
+OWNERS+ROOT independently accepted complete original controls/cases before the
+lease cleared. Default-captured Linux raw successful Values were unprinted;
+prior final-PR Mac/Windows raw values were not relabeled as main output.
+[Guarded delivery](https://github.com/anilbeesetti/ktlsp/pull/432#issuecomment-6242131159).
+
+Only afterward ROOT separately admitted original manual
+[package39074621949/attempt1](https://github.com/anilbeesetti/ktlsp/actions/runs/39074621949)
+at immutable main5926/treec268/defaultref and matching workflow SHA. All14steps
+per host succeeded: pinned1.99 formatCHECK/strict locked Clippy, matching release
+pair build, FULL unfiltered release workspace, archive/provenance verification,
+actual borrowed extracted smoke and success-gated upload.
+
+|Original package host/job|Full workspace rows|Pass|Fail|Ignored|Separate exact extracted test|
+|---|---:|---:|---:|---:|---|
+|Linux X64/117519114212|147|1354|0|3|1pass/77filtered|
+|macOS ARM64/117519114374|147|1352|0|3|1pass/77filtered|
+|Windows X64/117519114372|147|1302|0|3|1pass/77filtered|
+
+Workspace filtered/measured counts are0; combined148row filtered total is77,
+not0. The extracted case is explicitly ignored in default workspace execution
+and then separately executed exactly. Whole-case memberships match their
+corresponding verified source groups; actual new times/lines remain preserved.
+
+Two independent COMPLETE package functionality/adversarial controls0.97/0.97,
+basic OWNER and ROOT accepted ALL current data. All6original ZIPs/69members,
+48runlog members/three full primary byte matches, three TARs/102files/101inner
+checksums each, notices, source/workflow/lock/provenance and actual extracted
+paths authenticated. Native headers are ELF64x86_64/MachO64ARM64/PEx86_64 for
+both binaries. Postexecution receipts remain outside their own TARs.
+Empty `format.txt` is absent; no nonexistent exit files/output are fabricated.
+Pretest raw cleanliness is observed; staging's post-workspace clean check is
+assertion-backed, not a separate raw status record or post-smoke filesystem audit.
+
+Actual compact extracted receipts are35925Linux/37588Mac/37069Windows UTF8bytes,
+all below unchanged65536. OWNER+ROOT independently consumed every field:
+CLI help/version, old parameter-shadow19messages/16responses, new basic37/27,
+invalid7/4 and EOF3/2. All genuine sequential v2–v6 UTF16/CRLF/astral changes,
+returned completion and BOTH original-version5 rename edits were independently
+applied, yielding actual fresh definition/references/full outlines/workspace/
+close results. Diagnostics appear/clear; lexical full/range tokens, completed
+signature and invalid-surrogate recovery match. All four parent sessions per
+host exit0 with empty SERVERstderr. No private worker stderr/PID/IO/clock,
+request-latency, historical cause or unobserved post-smoke cleanliness inferred.
+
+[#430 closes with exact artifact downloads, TAR checksums and proof](https://github.com/anilbeesetti/ktlsp/issues/430#issuecomment-6242490468).
+ROOT acceptance8821B SHA256
+102ceecfe97a64150ba9c8b6a4aedcea5af25409ee89bcf5a709151c8211477c remains
+outside repository with complete reports/raw originals. Archives are EXACT5926,
+not later documentation heads; fourteen-day artifacts are not permanent release
+assets, checksums not signatures, third-party notices not a first-party license.
+No IDE/UI/signing/installer/general-platform/performance/reliability/full-parity
+certification. Originalacf Windows FAILED/causeUNKNOWN and70ba formatterFAILED
+remain; 96/431/417/T004/native-only/B3/oracle and other holds remain.
+

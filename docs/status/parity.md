@@ -277,3 +277,29 @@ general inference/index/hierarchy/compiler/oracle/parity, first-party license or
 reliability promotion follows. Original431/432/395/377/417 UNKNOWNs, old failed
 runs and96/T004/native-only/B3/oracle holds remain.
 
+## Verified basic native candidate at exact5926
+
+This supersedes pending432/430 integration/package stages above, not the fixed
+assessment matrix or historical failures. [PR432](https://github.com/anilbeesetti/ktlsp/pull/432)
+is delivered at5926de3cbfc91ffcb102a17986d53d80751992df,
+treec268b74f371fa205b5aeb0e2eb1c6b6908162bb4, SOLE original parent21aab03.
+Final41b complete-source/OWN original three-host CI and actual-value gates,
+separate fresh guard/expected-head squash, actual ancestry and ALL THREE feature
+OWNERS+ROOT OWN original exact-main39073917620/1 passed before lease clearance.
+
+Separately admitted original package39074621949/1 then passed all42steps,
+unfiltered release workspace and actual borrowed extracted smoke on Linux X64,
+macOS ARM64 and Windows X64. Two independent whole-package controls plus basic
+OWNER+ROOT accepted complete archives/provenance/actual replies and genuine
+returned completion/both version5 rename edits. [Exact identities, counts,
+downloads and limits](development.md#verified432-integration-and430-actual-extracted-basic-candidate)
+close concrete430, NOT full46/release/parity. Archives stay pinned5926 even
+when documentation advances; fourteen-day artifacts are not signed permanent
+releases and no first-party license grant is invented.
+
+This is finite CLI/protocol/basic-editing proof, not IDE/UI, general-platform/
+reliability/performance, semantic index, library-aware inference/compiler
+diagnostics/refactorings or official Kotlin LSP equivalence. Full parity is NOT
+achieved. Old FAILED/causeUNKNOWN and96/431/417/T004/native-only/B3/oracle holds
+remain unchanged; current success is not diagnosis of historical deadlines.
+

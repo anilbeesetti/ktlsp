@@ -464,6 +464,14 @@ impl<'a> BodyCheck<'a, '_> {
             return Err(LocalBindingError::UnsupportedContext);
         }
         self.finish(expression_index, expression.subtree_end)?;
+        if body == 0 {
+            // MemberOrToplevel producer mode owns its optional terminator inside
+            // PROPERTY; local mode leaves it in the surrounding BLOCK.
+            self.trivia(index, node.subtree_end)?;
+            if self.cursor < node.subtree_end {
+                self.expect("SEMICOLON", true, index, node.subtree_end)?;
+            }
+        }
         self.finish(index, node.subtree_end)
     }
     fn empty_function(&mut self, body: usize, end: usize) -> Result<()> {
@@ -1967,6 +1975,247 @@ pub(super) fn type_occurrences_with_budget<'a>(
     })
 }
 
+/// A successful local binding or a sealed continuation after a complete local
+/// search. An arbitrary binding error never authorizes imported lookup.
+#[derive(Debug)]
+pub enum ValueLookup<'a> {
+    Local(LocalValueBinding<'a>),
+    Outer(OuterValueLookup<'a>),
+}
+
+#[derive(Debug)]
+pub struct OuterValueLookup<'a> {
+    directory: &'a RegionDirectory<'a>,
+    site: &'a ReferenceSite<'a>,
+    body: &'a Region<'a>,
+    budget: ReferenceBudget,
+}
+
+/// Original imported target authority, not a copied name/range identity.
+#[derive(Debug)]
+pub struct ImportedValueBinding<'a> {
+    site: &'a ReferenceSite<'a>,
+    body: &'a Region<'a>,
+    import: &'a crate::lowering::ImportDirective<'a>,
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    target: &'a Declaration<'a>,
+}
+impl<'a> ImportedValueBinding<'a> {
+    pub fn site(&self) -> &'a ReferenceSite<'a> {
+        self.site
+    }
+    pub fn body(&self) -> &'a Region<'a> {
+        self.body
+    }
+    pub fn import(&self) -> &'a crate::lowering::ImportDirective<'a> {
+        self.import
+    }
+    pub fn directory(&self) -> &'a RegionDirectory<'a> {
+        self.directory
+    }
+    pub fn result(&self) -> &'a SnapshotResult {
+        self.result
+    }
+    pub fn target(&self) -> &'a Declaration<'a> {
+        self.target
+    }
+}
+
+/// Preserve local/parameter precedence; outer authority exists only after the
+/// original whole body, both namespaces and final eligible search are checked.
+pub fn lookup_value<'a>(
+    directory: &'a RegionDirectory<'a>,
+    site: &'a ReferenceSite<'a>,
+    current: &SourceSnapshot,
+) -> Result<ValueLookup<'a>> {
+    lookup_value_with_budget(directory, site, current, ReferenceBudget::default())
+}
+
+pub(super) fn lookup_value_with_budget<'a>(
+    directory: &'a RegionDirectory<'a>,
+    site: &'a ReferenceSite<'a>,
+    current: &SourceSnapshot,
+    mut budget: ReferenceBudget,
+) -> Result<ValueLookup<'a>> {
+    let (body, target) = validated_value_target(directory, site, current, &mut budget)?;
+    Ok(match target {
+        Some(target) => ValueLookup::Local(LocalValueBinding { site, body, target }),
+        None => ValueLookup::Outer(OuterValueLookup {
+            directory,
+            site,
+            body,
+            budget,
+        }),
+    })
+}
+
+// Charge the producer iterator's complete flat traversal before using it. Never
+// split flattened text: quoted dots remain within their original component.
+fn charge_import_name(
+    name: &crate::lowering::QualifiedName<'_>,
+    parsed: &Parsed,
+    b: &mut ReferenceBudget,
+) -> Result<()> {
+    let node = b.element(parsed, name.cst_index())?;
+    b.charge(
+        node.subtree_end
+            .checked_sub(name.cst_index())
+            .ok_or(LocalBindingError::InvalidOrigin)?,
+    )?;
+    b.charge(name.range().len())?;
+    Ok(())
+}
+
+impl<'a> OuterValueLookup<'a> {
+    /// Consume one shared allowance over the COMPLETE original closed-module
+    /// directory, including the requester exactly once. The caller owns module
+    /// membership/completeness, retained-input budgets and publication freshness;
+    /// a successful prefix or a subset is not a closed-module certificate.
+    pub fn resolve_import<'b>(
+        mut self,
+        files: &[(&'b RegionDirectory<'b>, &'b SnapshotResult, &SourceSnapshot)],
+    ) -> Result<ImportedValueBinding<'b>>
+    where
+        'a: 'b,
+    {
+        let b = &mut self.budget;
+        b.charge(files.len())?;
+        if files.len() > 1_024 {
+            return Err(LocalBindingError::Resource);
+        }
+        let parsed = self.site.origin().parsed();
+        let spelling = b
+            .spelling(self.site.raw_spelling())?
+            .ok_or(LocalBindingError::UnsupportedSpelling)?;
+        let mut selected = None;
+        for import in self.site.origin().imports() {
+            b.charge(1)?;
+            charge_import_name(import.name(), parsed, b)?;
+            let mut last = None;
+            for segment in import.name().segments() {
+                last = Some(
+                    b.spelling(segment.raw_spelling())?
+                        .ok_or(LocalBindingError::UnsupportedSpelling)?,
+                );
+            }
+            let visible = if let Some(alias) = import.alias() {
+                b.spelling(alias.raw_spelling())?
+                    .ok_or(LocalBindingError::UnsupportedSpelling)?
+            } else {
+                last.ok_or(LocalBindingError::UnsupportedContext)?
+            };
+            if import.on_demand() || !b.equal(visible, spelling)? {
+                continue;
+            }
+            if import.alias().is_some() {
+                return Err(LocalBindingError::UnsupportedContext);
+            }
+            if selected.replace(import).is_some() {
+                return Err(LocalBindingError::AmbiguousLocal);
+            }
+        }
+        let import = selected.ok_or(LocalBindingError::NoEligibleLocal)?;
+        let mut requester = false;
+        let mut found = None;
+        // ponytail: per-request borrowed scans share the fixed semantic work
+        // ceiling; add a producer cache only if measured workloads require it.
+        for &(directory, result, current) in files {
+            b.charge(3)?;
+            if !std::ptr::eq(directory.snapshot(), directory.lowered().snapshot()) {
+                return Err(LocalBindingError::InvalidOrigin);
+            }
+            let tree = authenticated_tree(directory.lowered(), result, current, b)?;
+            if !directory.lowered().errors().is_empty()
+                || directory.lowered().documentation_operation.is_some()
+            {
+                return Err(LocalBindingError::UnsupportedContext);
+            }
+            let is_requester = std::ptr::eq(directory, self.directory);
+            if is_requester {
+                if requester {
+                    return Err(LocalBindingError::InvalidOrigin);
+                }
+                requester = true;
+            } else if b.equal(result.snapshot().document(), self.directory.snapshot().document())? {
+                return Err(LocalBindingError::InvalidOrigin);
+            }
+            charge_import_name(import.name(), parsed, b)?;
+            let mut imported = import.name().segments();
+            let mut package_matches = true;
+            if let Some(package) = directory.lowered().package() {
+                charge_import_name(package.name(), tree, b)?;
+                for segment in package.name().segments() {
+                    let name = b
+                        .spelling(segment.raw_spelling())?
+                        .ok_or(LocalBindingError::UnsupportedSpelling)?;
+                    if let Some(expected) = imported.next() {
+                        let expected = b
+                            .spelling(expected.raw_spelling())?
+                            .ok_or(LocalBindingError::UnsupportedSpelling)?;
+                        package_matches &= b.equal(name, expected)?;
+                    } else {
+                        package_matches = false;
+                    }
+                }
+            }
+            // Exactly one remaining component is the declaration name.
+            let target_name = imported.next();
+            package_matches &= target_name.is_some() && imported.next().is_none();
+            for declaration in directory.lowered().declarations() {
+                b.charge(3)?;
+                if declaration.incomplete() {
+                    return Err(LocalBindingError::UnsupportedContext);
+                }
+                let name = b
+                    .spelling(declaration.raw_name())?
+                    .ok_or(LocalBindingError::UnsupportedSpelling)?;
+                if declaration.owner().is_some() || declaration.cst_parent_index() != Some(0) {
+                    continue;
+                }
+                let property = b.equal(declaration.kind(), "PROPERTY")?;
+                if property {
+                    // Lowering alone admits some non-reference-bearing
+                    // incomplete property shapes. Cover even nonmatching files
+                    // before allowing a target from an earlier file to escape.
+                    let root_end = b.element(tree, 0)?.subtree_end;
+                    BodyCheck {
+                        parsed: tree,
+                        directory,
+                        selected: None,
+                        selected_target: None,
+                        cursor: declaration.cst_index(),
+                        b,
+                    }
+                    .property(0, root_end)?;
+                }
+                if !package_matches || !b.equal(name, spelling)? {
+                    continue;
+                }
+                if is_requester || !property {
+                    return Err(LocalBindingError::UnsupportedContext);
+                }
+                if found.replace((directory, result, declaration)).is_some() {
+                    return Err(LocalBindingError::AmbiguousLocal);
+                }
+            }
+        }
+        if !requester {
+            return Err(LocalBindingError::InvalidOrigin);
+        }
+        let (directory, result, target) = found.ok_or(LocalBindingError::NoEligibleLocal)?;
+        b.charge(1)?;
+        Ok(ImportedValueBinding {
+            site: self.site,
+            body: self.body,
+            import,
+            directory,
+            result,
+            target,
+        })
+    }
+}
+
 /// Return the unique eligible preceding local val or same-function parameter.
 /// A refusal is not a claim that a reference is globally unresolved. Recheck the
 /// authoritative open-document incarnation under its synchronization before use.
@@ -1993,6 +2242,18 @@ fn binding_target_with_budget<'a>(
     current: &SourceSnapshot,
     b: &mut ReferenceBudget,
 ) -> Result<(&'a Region<'a>, &'a Declaration<'a>)> {
+    let (body, target) = validated_value_target(directory, site, current, b)?;
+    Ok((body, target.ok_or(LocalBindingError::NoEligibleLocal)?))
+}
+
+// Only this completed search may certify outer lookup. In particular, a
+// NoEligibleLocal from BodyCheck::call is still an error, never a continuation.
+fn validated_value_target<'a>(
+    directory: &'a RegionDirectory<'a>,
+    site: &ReferenceSite<'a>,
+    current: &SourceSnapshot,
+    b: &mut ReferenceBudget,
+) -> Result<(&'a Region<'a>, Option<&'a Declaration<'a>>)> {
     if !std::ptr::eq(directory.lowered(), site.origin())
         || !std::ptr::eq(directory.snapshot(), site.origin().snapshot())
     {
@@ -2020,13 +2281,17 @@ fn binding_target_with_budget<'a>(
         spelling,
         b,
     )?;
-    let target = eligible_value_target(
+    let target = match eligible_value_target(
         local,
         parameter,
         site.containing_property(),
         site.range().start,
         b,
-    )?;
+    ) {
+        Ok(target) => Some(target),
+        Err(LocalBindingError::NoEligibleLocal) => None,
+        Err(error) => return Err(error),
+    };
     Ok((body, target))
 }
 

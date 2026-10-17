@@ -1,4 +1,4 @@
-//! One original Class Function's values and finite nominal parameter-leaf return.
+//! One original Class Function's values and finite scoped/nominal return.
 use super::{
     Outcome, class_context, class_id, name_resolver, payload,
     resolved_class_function_parameters::{self as parameters, Classifier, SelectedParameters},
@@ -25,9 +25,10 @@ pub struct ReturnType<'a> {
     pub span: Range<usize>,
     pub body_span: Range<usize>,
     pub header: type_header::TypeHeader<'a>,
-    /// Independently resolved target, NOT necessarily the Function's owning Class.
-    pub class_id: class_id::ClassId,
-    /// Original order; target arity is unknown without loading target declarations.
+    /// Independently resolved Class, or checked declaration ordinal in `parameters`.
+    pub classifier: Classifier,
+    /// Original order for Class roots; bare parameter roots always have no arguments.
+    /// Target arity is unknown without loading target declarations.
     pub arguments: Vec<Argument<'a>>,
 }
 
@@ -84,7 +85,7 @@ fn wire_error(start: usize, e: wire::Error) -> Error {
     failure(start + e.offset, ErrorKind::Wire(e.kind))
 }
 
-fn nominal_return<'a>(
+fn return_type<'a>(
     bytes: &'a [u8],
     span: Range<usize>,
     context: &class_context::Context<'_>,
@@ -96,6 +97,21 @@ fn nominal_return<'a>(
     // Fixed flat selected slices, not a recursively decoded signature tree.
     let staged =
         type_arguments::decode_with_budget(bytes, budget).map_err(|e| wire_error(start, e))?;
+    if staged.header.class_name.is_none()
+        && (staged.header.type_parameter.is_some() || staged.header.type_parameter_name.is_some())
+    {
+        // The shared classifier rejects EVERY argument occurrence, including wrong
+        // wires; staging still precedes shape validation and retains its error order.
+        let classifier =
+            parameters::classifier(&staged.header, start, context, own, resolver, budget)?;
+        return Ok(ReturnType {
+            span,
+            body_span: start..start + bytes.len(),
+            header: staged.header,
+            classifier,
+            arguments: Vec::new(),
+        });
+    }
     let mut pos = 0;
     while pos < bytes.len() {
         let field = wire::field(bytes, &mut pos, bytes.len(), &mut budget.wire)
@@ -182,14 +198,14 @@ fn nominal_return<'a>(
         span,
         body_span: start..start + bytes.len(),
         header: staged.header,
-        class_id,
+        classifier: Classifier::Class(class_id),
         arguments,
     })
 }
 
 /// Select one original field9 by ALL-Class-field ordinal in the SAME Outcome.
-/// Values retain the parameter-only contract; the return must be a nominal Class
-/// with invariant inline signed-ID/own-NAME parameter leaves (possibly no leaves).
+/// Values retain the parameter-only contract. Returns admit a bare scoped ID/own
+/// NAME, or a nominal Class with invariant inline parameter leaves.
 /// Nullable/projection Options remain encoded markings, not inferred semantics.
 /// Receiver/context/contracts/JVM extensions/bounds/TypeTables remain opaque.
 /// ONE context/resolver/monotonic allowance covers declarations, values AND return.
@@ -248,7 +264,7 @@ pub fn decode<'a>(
             ErrorKind::MissingRole
         },
     ))?;
-    let return_type = nominal_return(
+    let return_type = return_type(
         raw,
         span,
         &context,

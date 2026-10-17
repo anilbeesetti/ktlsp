@@ -282,7 +282,7 @@ were removed afterward; changed completion/rename rebind assertions remain.
 
 References/highlights and negotiated prepare/versioned rename now positively
 select an original function type-parameter declaration (including unused names)
-or a supported simple parameter/property annotation in a recursive ordinary-function tree.
+or a supported simple parameter/property/function-return annotation in a recursive ordinary-function tree.
 Initializer, callee and value-declaration roles remain separate. Type hover/typeDefinition
 and richer types remain unsupported; no new capability is advertised for them.
 
@@ -292,6 +292,12 @@ aggregate work/storage budget. Each function may own the restricted leading
 unbounded/unmodified type list. Annotation lookup searches own declarations then
 enclosing functions nearest-first; sibling scopes and other roots are not fallback
 candidates. Partitions retain exact original declaration identity, not spelling.
+Each ordinary block function may have one direct simple explicit return after
+its parameter list. Return lookup starts at that function itself; inherited
+returns keep the enclosing target-declaring function/body identity. The original
+Function is the annotated declaration, with header membership outside its own
+body. Every direct return, including a root return, enters the once-only ordered
+partition and the whole-root hypothetical capture/unmatched-preservation proof.
 Rename hypothetically relooks up every annotation: edited uses keep their original
 target and unedited bound/unmatched annotations keep their identity/status.
 Duplicate own-list names, descendant capture in either direction and capture by
@@ -317,15 +323,33 @@ replay. Recorded repeated-response applications531/3017 per host are not distinc
 transactions. Only afterward were all four temporary writers/sole JSON captures
 removed. Permanent actual edit/reparse/rebinding assertions and the CLI helper's
 diagnostics/lowering/region checks remain at their original frequency/placement.
-Cleaned-source reviews/OWN full CI/guarded exact-main integration are still
-required. No local Kotlin runtime ran. This is not workspace refactoring,
-generic inference, official equivalence or full parity; #96/#377/#395 stay open.
+PR413 cleaned1369/treea41d received renewed reviews, OWN original full three-host
+CI and guarded integration as4bbf. Independent OWNER+ROOT accepted original
+exact-main39001476453 before lease clearance. No local Kotlin runtime ran.
+This is not workspace refactoring, generic inference, official equivalence or
+full parity; #96/#377/#395 stay open.
+
+#414's first original PR416 source64de24/tree98c67178 now has actual complete
+return-CST/paired-CLI evidence across Linux/macOS/Windows. Independent OWNER+ROOT
+FULLread all21 packets PER host and applied all37 genuine original version7
+batches/261 edits per host through complete version8 source/declaration/
+parameter/property/return identity replay, preserving unmatched/unused/unedited/
+sibling partitions, strict CRLF/astral coordinates and contextual out/reified.
+Twelve duplicate selected-response fields/41 edits per host are additional
+custody, NOT new transactions. ONLY AFTER both gates ROOT removed temporary
+writers/sole observation JSON; permanent actual edit/reparse/query/assertion
+flows retain their original frequency/placement, including target-pointer checks.
+First-source Windows full CI separately failed the unchanged long-fence docless
+hover assertion; its complete original response was not retained, so cause is
+UNKNOWN under #417. Added complete-response assertion context changes no input,
+acceptance predicate, cap or deadline and is NOT a behavioral fix or retry.
+Cleaned-source reviews/OWN full CI/guarded exact-main integration remain required.
 
 ## Finite local definition and declaration hover
 
 Over open Kotlin documents, a strict UTF-16 position selects an actual original value `REFERENCE_EXPRESSION` containing that position (end-exclusive). The existing declaration lowerer, structural-region directory, authenticated `ReferenceSite` and `bind_local_value` prove a unique eligible preceding direct immutable local `val` or same-function ordinary parameter. Only ordinary named top-level block functions with complete plain integer/whole-identifier local initializers and simple syntax-only parameter/local annotations are eligible. Definition returns the original target **name** range and same URI. Hover returns the original target **declaration text** (`p: T` for a parameter) and original reference range: no invented types, initializer chasing or inferred global unresolvedness.
 
-Definition additionally accepts an authenticated simple parameter/local annotation
+Definition additionally accepts an authenticated simple parameter/local/function-return annotation
 inside the admitted recursive ordinary-function tree. The annotation-only lexical
 query returns the nearest matching original function `TYPE_PARAMETER` name range
 and URI, preserving the actual annotated owner separately from the target owner.
@@ -334,7 +358,7 @@ trailing comma retain original identity; duplicate semantic names in any own lis
 refuse even when unused. Outer classes, imports/aliases, siblings, other roots
 and values are not candidates or fallbacks. Bounds/variance/reified/annotations,
 where clauses, malformed/empty/post-name/second lists, receivers/context,
-explicit returns, expression bodies, member headers, richer annotation syntax
+expression bodies, member headers, richer annotation syntax
 and unsupported syntax anywhere in the root remain refused. Bare `T` does not
 imply semantic non-nullability. Recursive depth follows existing structural
 ceilings, not a fixed function-nesting lane.

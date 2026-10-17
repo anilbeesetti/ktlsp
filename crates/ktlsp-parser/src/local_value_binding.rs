@@ -482,6 +482,7 @@ pub struct LexicalTypeParameterBinding<'a> {
     target: &'a Declaration<'a>,
 }
 impl<'a> LexicalTypeParameterBinding<'a> {
+    /// Original parameter/property, or the original Function for a return annotation.
     pub fn annotated(&self) -> &'a Declaration<'a> {
         self.annotated
     }
@@ -528,8 +529,9 @@ pub(super) fn type_parameter_with_budget<'a>(
 ) -> Result<LexicalTypeParameterBinding<'a>> {
     let parsed = type_tree(directory, result, current, b)?;
     let (ordinal, annotation) = type_annotation(directory, parsed, index, b)?;
-    type_root(directory, parsed, annotation.annotated.owner(), b)?;
-    let context = type_function(directory, parsed, annotation.annotated.owner(), b)?;
+    let owner = annotation_owner(ordinal, &annotation, b)?;
+    type_root(directory, parsed, owner, b)?;
+    let context = type_function(directory, parsed, owner, b)?;
     check_type_annotation(directory, parsed, ordinal, &annotation, &context, b)?;
     let spelling = annotation_spelling(parsed, &annotation, b)?;
     let target = type_target(directory, &context, spelling, None, b)?
@@ -566,6 +568,7 @@ pub struct TypeParameterAnnotation<'a> {
     reference_index: usize,
 }
 impl<'a> TypeParameterAnnotation<'a> {
+    /// Original parameter/property, or the original Function for a return annotation.
     pub fn annotated(&self) -> &'a Declaration<'a> {
         self.annotated
     }
@@ -651,6 +654,18 @@ fn type_annotation<'a>(
         }
     }
     Err(LocalBindingError::UnsupportedContext)
+}
+
+fn annotation_owner(
+    ordinal: usize,
+    annotation: &TypeParameterAnnotation<'_>,
+    b: &mut ReferenceBudget,
+) -> Result<Option<usize>> {
+    Ok(if b.equal(annotation.annotated.kind(), "FUN")? {
+        Some(ordinal)
+    } else {
+        annotation.annotated.owner()
+    })
 }
 
 struct TypeFunction<'a> {
@@ -795,35 +810,24 @@ fn type_root<'a>(
                     }
                 }
             }
-        } else if b.equal(declaration.kind(), "VALUE_PARAMETER")?
-            || b.equal(declaration.kind(), "PROPERTY")?
-        {
-            let scope = type_function(directory, parsed, declaration.owner(), b)?;
-            let node = b.element(parsed, declaration.cst_index())?;
-            for index in declaration.cst_index()..node.subtree_end {
-                let element = b.element(parsed, index)?;
-                if !element.token && b.equal(&element.kind, "REFERENCE_EXPRESSION")? {
-                    let parent = b.element(
-                        parsed,
-                        element.parent.ok_or(LocalBindingError::InvalidOrigin)?,
-                    )?;
-                    if b.equal(&parent.kind, "USER_TYPE")? {
-                        let (annotated, reference, name_token) =
-                            annotation_parts(parsed, index, b)?;
-                        if annotated != declaration.cst_index() {
-                            return Err(LocalBindingError::InvalidOrigin);
-                        }
-                        let annotation = TypeParameterAnnotation {
-                            annotated: declaration,
-                            reference,
-                            name_token,
-                            reference_index: index,
-                        };
-                        check_type_annotation(directory, parsed, ordinal, &annotation, &scope, b)?;
-                        let name = annotation_spelling(parsed, &annotation, b)?;
-                        type_target(directory, &scope, name, None, b)?;
-                    }
-                }
+        }
+    }
+    // Visit original annotation references once, in CST/source order. Scanning
+    // a Function subtree as one annotation would duplicate all descendants.
+    for index in root.function.cst_index()..end {
+        let element = b.element(parsed, index)?;
+        if !element.token && b.equal(&element.kind, "REFERENCE_EXPRESSION")? {
+            let parent = b.element(
+                parsed,
+                element.parent.ok_or(LocalBindingError::InvalidOrigin)?,
+            )?;
+            if b.equal(&parent.kind, "USER_TYPE")? {
+                let (ordinal, annotation) = type_annotation(directory, parsed, index, b)?;
+                let owner = annotation_owner(ordinal, &annotation, b)?;
+                let scope = type_function(directory, parsed, owner, b)?;
+                check_type_annotation(directory, parsed, ordinal, &annotation, &scope, b)?;
+                let name = annotation_spelling(parsed, &annotation, b)?;
+                type_target(directory, &scope, name, None, b)?;
             }
         }
     }
@@ -848,7 +852,32 @@ fn check_type_annotation(
         .ok_or(LocalBindingError::UnsupportedContext)?;
     let parent = b.element(parsed, parent_index)?;
     b.charge(2)?;
-    let expected_region = if parameter {
+    let expected_region = if b.equal(annotated.kind(), "FUN")? {
+        let user = b.element(
+            parsed,
+            annotation
+                .reference
+                .parent
+                .ok_or(LocalBindingError::InvalidOrigin)?,
+        )?;
+        let header = b.element(parsed, user.parent.ok_or(LocalBindingError::InvalidOrigin)?)?;
+        // Complete-root namespace validation proved the ordered post-parameter
+        // colon/annotation pair. Authenticate this exact original direct header,
+        // not a descendant annotation or a range geometrically in our body.
+        if ordinal != context.ordinal
+            || !std::ptr::eq(annotated, context.function)
+            || header.parent != Some(annotated.cst_index())
+            || header.start <= annotated.name_range().end
+            || header.end > context.body.range().start
+        {
+            return Err(LocalBindingError::UnsupportedContext);
+        }
+        directory
+            .memberships()
+            .get(context.ordinal)
+            .ok_or(LocalBindingError::InvalidOrigin)?
+            .region()
+    } else if parameter {
         let owner_ordinal = annotated
             .owner()
             .ok_or(LocalBindingError::UnsupportedContext)?;
@@ -1106,9 +1135,12 @@ pub(super) fn type_occurrences_with_budget<'a>(
             (None, Some(type_annotation(directory, parsed, index, b)?))
         }
     };
-    let owner = declaration
-        .map(|d| d.owner())
-        .unwrap_or_else(|| selected_annotation.as_ref().unwrap().1.annotated.owner());
+    let owner = if let Some(declaration) = declaration {
+        declaration.owner()
+    } else {
+        let (ordinal, annotation) = selected_annotation.as_ref().unwrap();
+        annotation_owner(*ordinal, annotation, b)?
+    };
     let root = type_root(directory, parsed, owner, b)?;
     let context = type_function(directory, parsed, owner, b)?;
     let spelling = if let Some(target) = declaration {
@@ -1161,81 +1193,61 @@ pub(super) fn type_occurrences_with_budget<'a>(
     let mut occurrences = Vec::new();
     b.reserve(&mut occurrences, count)?;
     type_annotation_storage(occurrences.capacity())?;
-    for (ordinal, annotated) in directory.lowered().declarations().iter().enumerate() {
-        b.charge(1)?;
-        if annotated.cst_index() <= root.function.cst_index()
-            || annotated.cst_index() >= node.subtree_end
-            || !(b.equal(annotated.kind(), "VALUE_PARAMETER")?
-                || b.equal(annotated.kind(), "PROPERTY")?)
-        {
+    for index in root.function.cst_index()..node.subtree_end {
+        let element = b.element(parsed, index)?;
+        if element.token || !b.equal(&element.kind, "REFERENCE_EXPRESSION")? {
             continue;
         }
-        let annotation_context = type_function(directory, parsed, annotated.owner(), b)?;
-        let node = b.element(parsed, annotated.cst_index())?;
-        for index in annotated.cst_index()..node.subtree_end {
-            let element = b.element(parsed, index)?;
-            if element.token || !b.equal(&element.kind, "REFERENCE_EXPRESSION")? {
-                continue;
-            }
-            let parent = b.element(
-                parsed,
-                element.parent.ok_or(LocalBindingError::InvalidOrigin)?,
+        let parent = b.element(
+            parsed,
+            element.parent.ok_or(LocalBindingError::InvalidOrigin)?,
+        )?;
+        if !b.equal(&parent.kind, "USER_TYPE")? {
+            continue;
+        }
+        let selected = selected_annotation
+            .as_ref()
+            .is_some_and(|(_, annotation)| annotation.reference_index == index);
+        let (ordinal, annotation) = if selected {
+            selected_annotation.take().unwrap()
+        } else {
+            type_annotation(directory, parsed, index, b)?
+        };
+        let owner = annotation_owner(ordinal, &annotation, b)?;
+        let annotation_context = type_function(directory, parsed, owner, b)?;
+        check_type_annotation(
+            directory,
+            parsed,
+            ordinal,
+            &annotation,
+            &annotation_context,
+            b,
+        )?;
+        let name = if selected {
+            spelling
+        } else {
+            annotation_spelling(parsed, &annotation, b)?
+        };
+        let original = type_target(directory, &annotation_context, name, None, b)?;
+        let matched = original.is_some_and(|original| std::ptr::eq(original, target));
+        if let Some(new_name) = new_name {
+            let hypothetical = type_target(
+                directory,
+                &annotation_context,
+                if matched { new_name } else { name },
+                Some((target, new_name)),
+                b,
             )?;
-            if !b.equal(&parent.kind, "USER_TYPE")? {
-                continue;
+            if original.map(|d| d as *const _) != hypothetical.map(|d| d as *const _) {
+                return Err(LocalBindingError::AmbiguousTypeParameter);
             }
-            let selected = selected_annotation
-                .as_ref()
-                .is_some_and(|(_, annotation)| annotation.reference_index == index);
-            let annotation = if selected {
-                selected_annotation.take().unwrap().1
-            } else {
-                let (original, reference, name_token) = annotation_parts(parsed, index, b)?;
-                if original != annotated.cst_index() {
-                    return Err(LocalBindingError::InvalidOrigin);
-                }
-                let annotation = TypeParameterAnnotation {
-                    annotated,
-                    reference,
-                    name_token,
-                    reference_index: index,
-                };
-                check_type_annotation(
-                    directory,
-                    parsed,
-                    ordinal,
-                    &annotation,
-                    &annotation_context,
-                    b,
-                )?;
-                annotation
-            };
-            let name = if selected {
-                spelling
-            } else {
-                annotation_spelling(parsed, &annotation, b)?
-            };
-            let original = type_target(directory, &annotation_context, name, None, b)?;
-            let matched = original.is_some_and(|original| std::ptr::eq(original, target));
-            if let Some(new_name) = new_name {
-                let hypothetical = type_target(
-                    directory,
-                    &annotation_context,
-                    if matched { new_name } else { name },
-                    Some((target, new_name)),
-                    b,
-                )?;
-                if original.map(|d| d as *const _) != hypothetical.map(|d| d as *const _) {
-                    return Err(LocalBindingError::AmbiguousTypeParameter);
-                }
+        }
+        if matched {
+            b.charge(1)?;
+            if occurrences.len() >= count {
+                return Err(LocalBindingError::Resource);
             }
-            if matched {
-                b.charge(1)?;
-                if occurrences.len() >= count {
-                    return Err(LocalBindingError::Resource);
-                }
-                occurrences.push(annotation);
-            }
+            occurrences.push(annotation);
         }
     }
     // Final emission also shares the query budget; no successful prefix escapes.

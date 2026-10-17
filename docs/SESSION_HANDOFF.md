@@ -8,56 +8,122 @@ decisions or phase boundaries. **Full official Kotlin LSP parity is NOT achieved
 Use the actual session capacity; the historical 32-concurrent instruction below
 is not a new limit. Do not manufacture hundreds of overlapping/blocked tasks.
 
-Verified incoming main is **df6b02953d22e520ef1b0acaae691471a1666287**, tree
-**f66a67f55aa010d5b474c982f6e54c9aabe06069**, sole parent
-**608437dc64007bdfecd472cfb97a646242fec41b**.
-[PR409](https://github.com/anilbeesetti/ktlsp/pull/409) delivered407/408:
-complete finite original outer type binding in direct-local annotations and
-original Function-owned metadata declarations/scoped value identities.
-Cleaned reviewed35f82fa5fd14b6fd53e9573ffaa07165b277fea0 received BOTH exact
-FULL17 union reviews, BOTH affected407 rechecks, strict format-CHECK/Clippy0,
-OWN ORIGINAL Native38995562257/platform38995562244 full three-host success.
-ROOT and independent reviewers authenticated complete original source/commands/
-raw/archive custody, not earlier-source CI substitution. Actual squash tree
-and sole parent above match; independent OWNER+ROOT accepted ORIGINAL exact-main
-[38996439150/job117289940398](https://github.com/anilbeesetti/ktlsp/actions/runs/38996439150/job/117289940398):
-1202=1170ordinary+32doc/140rows,0failed3ignored0measured0filtered, plus22
-SEPARATE protocol fault CASES. Main raw296355bytes/3223lines SHA256
-ab42e6ca988b85b412f582e89a52da5db0dd932dd589ae048e15e39cc741a62b.
-Fresh separate read-only process0+parsedexit0 complete lease guard preceded
-separate ordinary expected-head squash. Lease409 is CLEARED only after both
-original exact-main acceptances. [Full evidence ledger](status/development.md)
-retains first actual smoke, complete data applications and final CI receipts.
+Verified incoming main is **4bbf0f32fd5b4bad276162f927e58ac810cb8014**, tree
+**a41d5a88ec1b491a9d6375c86e9ea06d3f75b868**, sole parent
+**df6b02953d22e520ef1b0acaae691471a1666287**.
+[PR413](https://github.com/anilbeesetti/ktlsp/pull/413) delivered410/411/412:
+complete finite original recursive ordinary-function lexical type scopes and
+capture-safe versioned rename; selected Function values plus scoped nominal
+returns; immutable complete JSON/JPS/Maven sidecars and migrated borrowed callers.
+Cleaned reviewed1369cce5fda0b6b38df29e3a6194a4c23b7dbbb4 received BOTH exact
+FULL27 union clears, BOTH affected410 rechecks, pinned format-CHECK/strict Clippy0,
+OWN ORIGINAL Native39000705013/platform39000704959 full three-host success,
+independently ROOT+Native/platform-auditor accepted. Actual executed PR checkout
+50e983b33c110798c1bda2d7f0f95712252fe8cd has exacttreea41d and ordered[df6b,1369];
+stale observational eventc712 is NOT authority. Separate fresh read-only complete
+guard process0+complete parsedexit0 preceded a SEPARATE ordinary expected-head
+squash. ROOT explicitly inspected all lease/base/head/tree/scope/config/check/
+workflow/job/artifact/clean-identity facts. Actual squash tree/soleparent match.
+Independent OWNER+ROOT accepted ORIGINAL exact-main
+[39001476453/job117305137841](https://github.com/anilbeesetti/ktlsp/actions/runs/39001476453/job/117305137841):
+1225=1186ordinary+39doc/141rows,0failed3ignored0measured0filtered, plus22
+SEPARATE protocol fault CASES and3same-owned-child allocationcode86 confirmations.
+All3 removed-writer markers0. Raw299415bytes/3252lines SHA256
+934db2d30e94a42b52fcfa85e3b3892166961d75e25fe6e9d5bb94595a0aff52.
+Lease413 CLEARED only AFTER both original exact-main gates. Complete actual-value
+read/custody and exact full-base/every-new-value correspondence, not literal
+manual repeated-raw claims, are retained in [the evidence ledger](status/development.md).
 
-ROOT integration WT: `/private/tmp/ktlsp-330-recursive-signature-integration`,
-branch `omp/330-recursive-signature-integration`, based on SAME verifieddf6b.
+ROOT active WT: `/private/tmp/ktlsp-330-function-return-integration`,
+branch `omp/330-function-return-integration`, based on SAME verified4bbf.
 ROOT owns common docs/Cargo/lock/workflows, source/runtime admission, two union
 reviews, CI, exclusive leases and merging. Preserve ALL old/user/delivered/
-component WTs, including frozen409 `/private/tmp/ktlsp-330-type-scope-integration`.
+component WTs, including frozen413 `/private/tmp/ktlsp-330-recursive-signature-integration`
+and409 `/private/tmp/ktlsp-330-type-scope-integration`.
 
-Two admitted independent implementation owners use SAME verifieddf6b, each
-with TWO separate functionality/adversarial review slots:
-- [410](https://github.com/anilbeesetti/ktlsp/issues/410):
-  `/private/tmp/ktlsp-410-recursive-type-scope`, `omp/410-recursive-type-scope`.
-  Complete recursively nested ordinary-function original lexical type scopes,
-  identity partitions and capture-safe rename, including lowering/region proof.
-- [411](https://github.com/anilbeesetti/ktlsp/issues/411):
-  `/private/tmp/ktlsp-411-function-signature`, `omp/411-function-signature`.
-  One-budget selected Function values plus explicit finite nominal return and
-  original own/Class argument identities; existing opaque-return/self-return
-  consumers retain their separate contracts. Actual admitted public native smoke
-  observed both genuine returns as kotlin.Result, distinct original own-T bindings.
-Both410 and411 source components are implemented and independently statically
-reviewed:410 head865396234376c82d36a1a31695a1520cd410879e/treec8845584;
-411 head4a1566db040fa928ac748fc2cdb11d140efa1d74/tree700ba507.
-ROOT also implemented [412](https://github.com/anilbeesetti/ktlsp/issues/412)
-immutable complete JSONv1/v2/JPS/Maven import results at
-`/private/tmp/ktlsp-412-immutable-imports`, `omp/412-immutable-imports`;
-head89d8708fd794e3d274b2a53f7bab3c7ef342aef0/tree1e8ee6a4 has TWO current FULL11
-static clears after fixing the one reported unmigrated chained library read.
-No existing dependency visibility bypass is claimed: its query already trusted
-the private projection; this closes mutable sidecar/projection divergence.
-All THREE reviewed components are composed into ROOT's successor WT.
+Two genuine independent implementation owners use SAME verified4bbf, each
+GRANTED TWO separate complete functionality/adversarial review slots:
+- [414](https://github.com/anilbeesetti/ktlsp/issues/414):
+  `/private/tmp/ktlsp-414-function-return-scopes`, `omp/414-function-return-scopes`.
+  Optional original simple ordinary-function return annotation, own-function
+  immediate scope, unique source-ordered root/nested return occurrences and
+  capture-safe actual versioned rename. Reuse410 ancestry/grammar/budgets;
+  value/callee guards stay closed. First original return-CST/CLI positives are
+  now observed across all three hosts; Windows full CI separately failed under417.
+- [415](https://github.com/anilbeesetti/ktlsp/issues/415):
+  `/private/tmp/ktlsp-415-bare-return-signatures`, `omp/415-bare-return-signatures`.
+  Replace nominal-only ReturnType.class_id with EXISTING scoped Classifier;
+  no shim/new decoder, one context/resolver/allowance, nominal error ordering
+  preserved. The admitted native smoke now ACTUALLY binds genuine Pair component
+  roots to original Class A/B; genuine Function-root producer evidence remains a gap.
+Completed research `agent://ReturnAnnotationNext` and `agent://BareReturnNext`
+was read in full; continue it, do not restart. Implementation/static reviews and
+separately admitted native data verification are complete; hosted414 actual
+gates are complete, but original Windows full CI failed with unknown cause.
+Root grants TWO further complete composed-union reviews and owns one formatter.
+No first-source/previous-source CI substitutes for a successor's OWN full CI.
+
+Both components are now implemented and have TWO complete current static clears:
+414 f5d9027981c210fbc7fbeca24f20c03a6912b1fc/treebb0688e7 (eight files);
+415 ec7dafa30bae79d9d443b40e98144b9408ded27b/tree774e2e11 (three files).
+Both use soleparent4bbf. Findings were fixed/rechecked:414 stale blanket simple-
+return refusal now proves lowering success plus independent value refusal;
+415 external consumer Range borrow/move and stale declaration field accesses.
+Full receipts `/private/tmp/ktlsp-414-component-static-handoff.json` and
+`/private/tmp/ktlsp-415-native/component-handoff.json`.
+ROOT composed both plus common admission docs, obtained BOTH complete14 union
+clears, used its ONE formatter, and obtained all SIX exact postformat clears at
+947826cd70c39e75300d6eae72f7929a9034f5b4/tree632897829df1ff0711a4dd85b7140e7ee9b4fb7c.
+Pinned format-CHECK and strict locked workspace/all-target Clippy passed0(7.14s).
+Separately admitted pure binary/import data tests passed637=630ordinary+7doc,
+66rows,0failed0ignored0measured0filtered; all18 signature tests passed.
+Public native415 consumer compiled0/ran0, empty PATH/stderr, and actually bound
+Pair component1/2 to original Class A/B. OWNER+ROOT independently FULLread all477
+actual records/all original fields and checked146 pointer pairs,48 outer slices,
+28 scoped bindings,20 complete parameter-only pairs and all nine-resource
+exact/one-below/joint/depth boundaries. ROOT read all1726 complete semantic reader
+lines; OWNER read all2760 lossless reader lines and reconstructed all1568416 raw
+stdout bytes exactly. Neither claims literal manual55051 repeated pretty lines.
+ONLY AFTER BOTH full gates ROOT removed outside-repo consumer.rs; complete source
+is embedded in actual-consumer-proof.json, with output/executable/custody retained.
+Full proof `/private/tmp/ktlsp-415-native/ROOT-complete-actual-native-acceptance.json`;
+new minima and limits are in the evidence ledger. Initial ROOT-driver E0463 was
+corrected using BOTH actual Cargo artifact dependency directories, with unchanged
+source and no Cargo rebuild; initial failure remains recorded, not suppressed.
+Doc-only64de24d31833dcd5b219e51379a23ac10e742833/tree98c67178 received ALL SIX exact
+current full clears and pinned format-CHECK/strict Clippy0/1.34s before DRAFT
+PR416 publication. FIRST ORIGINAL Native39004570583/1/job117314294229 passed1234;
+platform39004570596/1 Mac117314294338 passed1232; Windows117314294583 FAILED:
+1180passed1failed3ignored/141rows, unchanged long-fence docless-hover4012.
+Its indexed value was Null, but complete original response/error/CST was NOT
+retained. Source/transport audits exclude no confirmed-clean parser refusal.
+Cause UNKNOWN; #417 tracks it. No unchanged retry/filter/bound/deadline relaxation.
+
+Actual executed bf62d8797198590b1cb0f1701bb24ba8f98bfaf0 has exacttree98c67178
+and ordered[4bbf,64de24]. ALL21 #414 packets PER host passed independently
+OWNER+ROOT FULLactual read/application gates:37 genuine original version7
+batches/261 edits per host=111/783 total;12duplicate selected fields/41edits
+per host are NOT additional transactions. ROOT read ALL4304 lossless reader
+lines/48schemas/4223complete values and independently reconciled19 distinct
+complete sources/CSTs/declarations/owners/regions/memberships/nearest scopes/
+partitions, every592 protocol result and48 hypothetical rename checks per host.
+Every Mac/Windows complete JSON value ANDserialized payload byte matches the
+fully read Native base with complete occurrence maps. Full source outside edits,
+version8 rebinds, unmatched/unused/unedited/sibling partitions, astral/backticks/
+CRLF/out/reified and refusals remain actual, not count echoes.
+ROOT `/private/tmp/ktlsp-416-first-platform-39004570596/ROOT-complete-three-host-actual-gates.json`;
+OWNER `/private/tmp/ktlsp-414-owner-416-first/OWNER-complete-original-three-host-actual-gate.json`.
+Only AFTER BOTH gates ROOT removed temporary414 writers/sole JSON bookkeeping,
+keeping all permanent assertions/reparses/query frequency/placement. Original
+found.target pointer observation is now an assertion. Existing failing hover
+assertion gains complete-response failure context ONLY; no predicate/input/cap/
+deadline changes or behavioral fix claim. Windows fullCI remains REJECTED.
+Normal cleaned changed-source successor needs exact full14/allaffected reviews,
+CHECK/strict Clippy and its OWN original full CI, then guarded integration and
+independent original main proof. No rerun of the failed source, second formatter,
+local Kotlin runtime or merge lease is admitted by these actual smoke gates.
+
+Delivered413 history below retains the original component/source/smoke gates:
 Both full27 union reviews and all SIX affected reviews cleared the formatted
 source. Strict compilation found two test-only type/complexity errors; minimal
 fixes received renewed exact union/affected clears, then pinned format-CHECK
@@ -70,7 +136,7 @@ passed/66rows/0failed0ignored0filtered. Complete custody
 `/private/tmp/ktlsp-411-412-native/`; ONLY throwaway Rust sources were then removed,
 with full original source/output/exe/commands retained.
 
-Draft [PR413](https://github.com/anilbeesetti/ktlsp/pull/413) first source
+[PR413](https://github.com/anilbeesetti/ktlsp/pull/413) first source
 694f2f91903b5d80259cfed489e28b8a0903ddbe/treee0d3c32dfcc47bca83be348658e5ec536c45333d
 received BOTH CURRENT FULL27 ROOT clears and all affected component clears.
 FIRST ORIGINAL Native38998942941/1/job117297572789 passed1225=1186ordinary+39doc;
@@ -94,9 +160,18 @@ ONLY AFTER BOTH complete three-host gates, ROOT removed all four temporary
 writers/sole JSON bookkeeping. Permanent actual edit/reparse/rebinding and
 pointer/namespace/refusal/budget assertions remain. The CLI source helper retains
 its diagnostics/lowering/region checks at the same call frequency/placement,
-without constructing observation JSON. Cleaned-source exact reviews,
-format-CHECK/strict Clippy, OWN ORIGINAL full CI and guarded integration are
-PENDING; do not merge using first-source CI. No second formatter.
+without constructing observation JSON. Cleaned1369/treea41d then received exact
+FULL27/affected reviews and pinned format-CHECK/strict Clippy0/1.99s. OWN ORIGINAL
+Native39000705013/1/job117302814346 and platform39000704959/1
+Mac117302814165/Win117302814052 passed the same complete per-host censuses above.
+Separate Native/platform auditors freshly downloaded/read all current source/
+commands/outcomes/raw/18-member artifacts; ROOT independently accepted complete
+actual values and every difference. Macartifact12088797216/49053bytes/SHA256
+5e86ce9472f25773106723c984d92046512bdfb55210c6a8ca180e6ea88691d4;
+Win12089266710/43880bytes/SHA256
+e31a846df584a38af79f5e5acda3cc2da9668cb519eea9e3c17e5ba68f194bfe.
+Guarded integration and original exact-main acceptance are COMPLETE above;
+no second formatter or earlier-source CI substitution occurred.
 
 ALL LOCAL Kotlin parser/server/Session/worker/peer/supervision runtime remains
 FORBIDDEN under96, including fake peers and parser-free Session. This overrides

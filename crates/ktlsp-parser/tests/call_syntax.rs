@@ -392,91 +392,99 @@ fn actual_edits_reparse_original_syntax_and_rebind_existing_empty_proof() {
 fn rich_syntax_admits_only_the_closed_type_namespace_not_value_or_callee_consumers() {
     let _serial = functional::serial();
     for extra in ["target(first=p, second=2L)", "target(1)", "target()"] {
-        let source = format!(
-            "fun <T> outer(p:T){{ fun target(first:Int, second:Long){{}}; val x=1; {extra}; val y=x; val z:T=p }}"
-        );
-        let result = parse(&source, 1);
-        let current = result.snapshot();
-        let tree = result.tree_for(current).unwrap();
-        let lower = lower_declarations(&result, current).unwrap();
-        let directory = build_regions(&lower, &result, current).unwrap();
-        let call = call_site(&lower, &result, current, selected_call(tree)).unwrap();
-        callable_parameters(&lower, &result, current, &lower.declarations()[3]).unwrap();
-        let use_index = tree
-            .elements()
-            .iter()
-            .position(|e| {
-                e.kind == "REFERENCE_EXPRESSION" && e.start == source.find("y=x").unwrap() + 2
-            })
-            .unwrap();
-        let annotation = tree
-            .elements()
-            .iter()
-            .position(|e| {
-                e.kind == "REFERENCE_EXPRESSION" && e.start == source.find("p:T").unwrap() + 2
-            })
-            .unwrap();
-        let site = reference_site(&lower, &result, current, use_index).unwrap();
-        assert_eq!(
-            bind_local_value(&directory, &site, current).unwrap_err(),
-            LocalBindingError::UnsupportedContext
-        );
-        assert_eq!(
-            bind_local_function_callee(&directory, &result, original(tree, call.callee()), current)
+        for returns in [false, true] {
+            let source = format!(
+                "fun <T> outer(p:T){}{{ fun target(first:Int, second:Long){{}}; val x=1; {extra}; val y=x; val z:T=p }}",
+                if returns { ":T" } else { "" }
+            );
+            let result = parse(&source, 1);
+            let current = result.snapshot();
+            let tree = result.tree_for(current).unwrap();
+            let lower = lower_declarations(&result, current).unwrap();
+            let directory = build_regions(&lower, &result, current).unwrap();
+            let call = call_site(&lower, &result, current, selected_call(tree)).unwrap();
+            callable_parameters(&lower, &result, current, &lower.declarations()[3]).unwrap();
+            let use_index = tree
+                .elements()
+                .iter()
+                .position(|e| {
+                    e.kind == "REFERENCE_EXPRESSION" && e.start == source.find("y=x").unwrap() + 2
+                })
+                .unwrap();
+            let annotation = tree
+                .elements()
+                .iter()
+                .position(|e| {
+                    e.kind == "REFERENCE_EXPRESSION" && e.start == source.find("p:T").unwrap() + 2
+                })
+                .unwrap();
+            let site = reference_site(&lower, &result, current, use_index).unwrap();
+            assert_eq!(
+                bind_local_value(&directory, &site, current).unwrap_err(),
+                LocalBindingError::UnsupportedContext
+            );
+            assert_eq!(
+                bind_local_function_callee(
+                    &directory,
+                    &result,
+                    original(tree, call.callee()),
+                    current
+                )
                 .unwrap_err(),
-            LocalBindingError::UnsupportedContext
-        );
-        assert_eq!(
-            visible_local_values(&directory, &result, use_index, current).unwrap_err(),
-            LocalBindingError::UnsupportedContext
-        );
-        assert_eq!(
-            local_value_occurrences(
-                &directory,
-                &result,
-                LocalValueAnchor::ReferenceExpression(use_index),
-                current
-            )
-            .unwrap_err(),
-            LocalBindingError::UnsupportedContext
-        );
-        assert_eq!(
-            guarded_local_value_rename(
-                &directory,
-                &result,
-                LocalValueAnchor::ReferenceExpression(use_index),
-                current,
-                Some("fresh")
-            )
-            .unwrap_err(),
-            LocalBindingError::UnsupportedContext
-        );
-        assert_eq!(
-            bind_lexical_type_parameter(&directory, &result, annotation, current)
-                .unwrap()
-                .target()
-                .raw_name(),
-            "T"
-        );
-        for found in [
-            type_parameter_occurrences(
-                &directory,
-                &result,
-                TypeParameterAnchor::AnnotationReference(annotation),
-                current,
-            )
-            .unwrap(),
-            guarded_type_parameter_rename(
-                &directory,
-                &result,
-                TypeParameterAnchor::AnnotationReference(annotation),
-                current,
-                Some("Fresh"),
-            )
-            .unwrap(),
-        ] {
-            assert_eq!(found.target().raw_name(), "T");
-            assert_eq!(found.occurrences().len(), 2);
+                LocalBindingError::UnsupportedContext
+            );
+            assert_eq!(
+                visible_local_values(&directory, &result, use_index, current).unwrap_err(),
+                LocalBindingError::UnsupportedContext
+            );
+            assert_eq!(
+                local_value_occurrences(
+                    &directory,
+                    &result,
+                    LocalValueAnchor::ReferenceExpression(use_index),
+                    current
+                )
+                .unwrap_err(),
+                LocalBindingError::UnsupportedContext
+            );
+            assert_eq!(
+                guarded_local_value_rename(
+                    &directory,
+                    &result,
+                    LocalValueAnchor::ReferenceExpression(use_index),
+                    current,
+                    Some("fresh")
+                )
+                .unwrap_err(),
+                LocalBindingError::UnsupportedContext
+            );
+            assert_eq!(
+                bind_lexical_type_parameter(&directory, &result, annotation, current)
+                    .unwrap()
+                    .target()
+                    .raw_name(),
+                "T"
+            );
+            for found in [
+                type_parameter_occurrences(
+                    &directory,
+                    &result,
+                    TypeParameterAnchor::AnnotationReference(annotation),
+                    current,
+                )
+                .unwrap(),
+                guarded_type_parameter_rename(
+                    &directory,
+                    &result,
+                    TypeParameterAnchor::AnnotationReference(annotation),
+                    current,
+                    Some("Fresh"),
+                )
+                .unwrap(),
+            ] {
+                assert_eq!(found.target().raw_name(), "T");
+                assert_eq!(found.occurrences().len(), if returns { 3 } else { 2 });
+            }
         }
     }
 }
@@ -539,6 +547,67 @@ fn unsupported_calls_and_selected_function_headers_never_get_partial_views() {
                     "{source}"
                 );
             }
+        }
+    }
+}
+
+#[test]
+fn nongeneric_returns_do_not_authorize_any_value_body_route_or_callable_return() {
+    let _serial = functional::serial();
+    for (outer_return, local_return) in [(":Missing", ""), ("", ":Missing")] {
+        let source = format!(
+            "fun outer(){outer_return}{{ fun target(){local_return}{{}}; val x=1; target(); val y=x }}"
+        );
+        let result = parse(&source, 7);
+        let current = result.snapshot();
+        let tree = result.tree_for(current).unwrap();
+        assert_tree(tree);
+        let lower = lower_declarations(&result, current).unwrap();
+        let directory = build_regions(&lower, &result, current).unwrap();
+        let call = call_site(&lower, &result, current, selected_call(tree)).unwrap();
+        let use_index = tree
+            .elements()
+            .iter()
+            .position(|e| {
+                e.kind == "REFERENCE_EXPRESSION" && e.start == source.find("y=x").unwrap() + 2
+            })
+            .unwrap();
+        let site = reference_site(&lower, &result, current, use_index).unwrap();
+        assert_eq!(
+            bind_local_value(&directory, &site, current).unwrap_err(),
+            LocalBindingError::UnsupportedContext
+        );
+        assert_eq!(
+            bind_local_function_callee(&directory, &result, original(tree, call.callee()), current)
+                .unwrap_err(),
+            LocalBindingError::UnsupportedContext
+        );
+        assert_eq!(
+            visible_local_values(&directory, &result, use_index, current).unwrap_err(),
+            LocalBindingError::UnsupportedContext
+        );
+        let anchor = LocalValueAnchor::ReferenceExpression(use_index);
+        assert_eq!(
+            local_value_occurrences(&directory, &result, anchor, current).unwrap_err(),
+            LocalBindingError::UnsupportedContext
+        );
+        assert_eq!(
+            guarded_local_value_rename(&directory, &result, anchor, current, Some("fresh"))
+                .unwrap_err(),
+            LocalBindingError::UnsupportedContext
+        );
+        let target = lower
+            .declarations()
+            .iter()
+            .find(|d| d.raw_name() == "target")
+            .unwrap();
+        if local_return.is_empty() {
+            callable_parameters(&lower, &result, current, target).unwrap();
+        } else {
+            assert_eq!(
+                callable_parameters(&lower, &result, current, target).unwrap_err(),
+                ReferenceSiteError::UnsupportedContext
+            );
         }
     }
 }

@@ -2703,7 +2703,7 @@ fn generic_annotation_definition_is_lexical_unique_and_definition_only() {
         ("class T {}\nfun <U> f(p: T) {}", false),
         ("fun <T> f() {}\nfun <U> g(p: T) {}", false),
         ("fun <T: Any> f(p: T) {}", false),
-        ("fun <T> f(p: T): T {}", false),
+        ("fun <`T`> f(p: T): T {}", true),
     ] {
         open(&mut session, source);
         let annotation = source.find("p: T").unwrap() + 3;
@@ -4011,7 +4011,8 @@ fn documentation_profiles_keep_disabled_clients_and_legacy_docless_fence_accepta
     let fence = "`".repeat(45001);
     assert_eq!(
         response["result"]["contents"]["value"],
-        format!("{fence}kotlin\n{source}\n{fence}")
+        format!("{fence}kotlin\n{source}\n{fence}"),
+        "complete docless hover response: {response}"
     );
     // This previously supported docless output is larger than the managed
     // documentation String ceiling and must not be sent through that new cap.
@@ -4292,7 +4293,7 @@ type RecursiveCliLayout = (
     Vec<(std::ops::Range<usize>, Option<usize>)>,
 );
 
-fn recursive_cli_layout(source: &str, renamed: Option<usize>) -> RecursiveCliLayout {
+fn recursive_cli_layout(source: &str, renamed: Option<(usize, &str)>) -> RecursiveCliLayout {
     let targets = [
         ("outer", "T"),
         ("outer", "Spare"),
@@ -4301,6 +4302,7 @@ fn recursive_cli_layout(source: &str, renamed: Option<usize>) -> RecursiveCliLay
         ("peer", "U"),
         ("shadow", "T"),
         ("other", "T"),
+        ("returnOnly", "Only"),
     ];
     let declarations = targets
         .iter()
@@ -4308,8 +4310,10 @@ fn recursive_cli_layout(source: &str, renamed: Option<usize>) -> RecursiveCliLay
         .map(|(ordinal, (owner, raw))| {
             let end = source.find(&format!("> {owner}(")).unwrap();
             let start = source[..end].rfind('<').unwrap() + 1;
-            let raw = if renamed == Some(ordinal) {
-                "Fresh"
+            let raw = if let Some((selected, name)) = renamed
+                && selected == ordinal
+            {
+                name
             } else {
                 raw
             };
@@ -4319,41 +4323,59 @@ fn recursive_cli_layout(source: &str, renamed: Option<usize>) -> RecursiveCliLay
         .collect();
     let annotations = [
         ("root", Some(0)),
+        ("@outer", Some(0)),
         ("before", Some(0)),
         ("a", Some(0)),
         ("b", Some(2)),
+        ("@inner", Some(0)),
         ("inherited", Some(0)),
         ("c", Some(0)),
+        ("@middle", Some(0)),
         ("d", Some(3)),
         ("e", Some(2)),
         ("f", None),
+        ("@deep", Some(3)),
         ("own", Some(3)),
         ("g", Some(0)),
+        ("@side", None),
         ("h", Some(4)),
         ("i", Some(0)),
+        ("@peer", Some(4)),
         ("j", Some(5)),
+        ("@shadow", Some(5)),
         ("k", Some(0)),
+        ("@after", Some(0)),
         ("last", Some(0)),
         ("z", Some(6)),
+        ("@other", Some(6)),
+        ("@returnOnly", Some(7)),
+        ("@unmatched", None),
     ]
     .iter()
     .map(|(label, target)| {
-        let pattern = format!("{label}:");
-        let offset = source
-            .match_indices(&pattern)
-            .find(|(i, _)| {
-                *i == 0
-                    || !source.as_bytes()[i - 1].is_ascii_alphanumeric()
-                        && source.as_bytes()[i - 1] != b'_'
-            })
-            .unwrap()
-            .0
-            + pattern.len();
+        let offset = if let Some(function) = label.strip_prefix('@') {
+            let name = source.find(&format!(" {function}(")).unwrap();
+            let close = name + source[name..].find(')').unwrap() + 1;
+            assert_eq!(&source[close..close + 1], ":");
+            close + 1
+        } else {
+            let pattern = format!("{label}:");
+            source
+                .match_indices(&pattern)
+                .find(|(i, _)| {
+                    *i == 0
+                        || !source.as_bytes()[i - 1].is_ascii_alphanumeric()
+                            && source.as_bytes()[i - 1] != b'_'
+                })
+                .unwrap()
+                .0
+                + pattern.len()
+        };
         let raw = &source[offset..];
         let length = if let Some(quoted) = raw.strip_prefix('`') {
             quoted.find('`').unwrap() + 2
         } else {
-            raw.find([',', ')', '=', ';', ' ']).unwrap()
+            raw.find([',', ')', '=', ';', ' ', '{']).unwrap()
         };
         (offset..offset + length, *target)
     })
@@ -4361,9 +4383,19 @@ fn recursive_cli_layout(source: &str, renamed: Option<usize>) -> RecursiveCliLay
     (declarations, annotations)
 }
 
-fn assert_recursive_cli_source(source: &str, revision: i64) {
+struct RecursiveProducer {
+    declarations: Vec<(String, Option<usize>)>,
+    annotations: Vec<(usize, Option<usize>)>,
+}
+
+fn assert_recursive_cli_source(source: &str, revision: i64) -> RecursiveProducer {
     use ktlsp_parser::{
-        FileKind, Parser, SourceSnapshot, lowering::lower_declarations,
+        FileKind, Parser, SourceSnapshot,
+        local_value_binding::{
+            LocalBindingError, TypeParameterAnchor, bind_lexical_type_parameter,
+            type_parameter_occurrences,
+        },
+        lowering::lower_declarations,
         structural_regions::build_regions,
     };
     let snapshot = SourceSnapshot::new(URI, revision, FileKind::Source, source).unwrap();
@@ -4374,37 +4406,140 @@ fn assert_recursive_cli_source(source: &str, revision: i64) {
     let tree = result.tree_for(&snapshot).unwrap();
     assert!(tree.diagnostics().is_empty());
     let lower = lower_declarations(&result, &snapshot).unwrap();
-    build_regions(&lower, &result, &snapshot).unwrap();
+    let directory = build_regions(&lower, &result, &snapshot).unwrap();
+    let declarations: Vec<_> = lower
+        .declarations()
+        .iter()
+        .map(|d| (d.kind().to_owned(), d.owner()))
+        .collect();
+    let mut annotations = Vec::new();
+    let mut annotation_sites = Vec::new();
+    for (index, element) in tree.elements().iter().enumerate().filter(|(_, e)| {
+        e.kind == "REFERENCE_EXPRESSION" && tree.elements()[e.parent.unwrap()].kind == "USER_TYPE"
+    }) {
+        let annotated_index = tree.elements()
+            [tree.elements()[element.parent.unwrap()].parent.unwrap()]
+        .parent
+        .unwrap();
+        let annotated = lower
+            .declarations()
+            .iter()
+            .position(|d| d.cst_index() == annotated_index)
+            .unwrap();
+        let bound = bind_lexical_type_parameter(&directory, &result, index, &snapshot);
+        let target = match bound {
+            Ok(binding) => {
+                assert!(std::ptr::eq(binding.reference(), element));
+                assert!(std::ptr::eq(
+                    binding.annotated(),
+                    &lower.declarations()[annotated]
+                ));
+                assert!(std::ptr::eq(
+                    binding.name_token(),
+                    &tree.elements()[index + 1]
+                ));
+                let target = lower
+                    .declarations()
+                    .iter()
+                    .position(|d| std::ptr::eq(d, binding.target()))
+                    .unwrap();
+                let function = lower
+                    .declarations()
+                    .iter()
+                    .position(|d| std::ptr::eq(d, binding.function()))
+                    .unwrap();
+                assert_eq!(lower.declarations()[target].owner(), Some(function));
+                assert_eq!(binding.body().introducer(), Some(function));
+                Some(target)
+            }
+            Err(error) => {
+                assert!(matches!(
+                    error,
+                    LocalBindingError::NoEligibleTypeParameter
+                        | LocalBindingError::AmbiguousTypeParameter
+                ));
+                None
+            }
+        };
+        annotations.push((annotated, target));
+        annotation_sites.push((index, target));
+    }
+    for (ordinal, target) in lower
+        .declarations()
+        .iter()
+        .enumerate()
+        .filter(|(_, d)| d.kind() == "TYPE_PARAMETER")
+    {
+        let found = match type_parameter_occurrences(
+            &directory,
+            &result,
+            TypeParameterAnchor::Declaration(target),
+            &snapshot,
+        ) {
+            Ok(found) => found,
+            Err(error) => {
+                assert_eq!(error, LocalBindingError::AmbiguousTypeParameter);
+                continue;
+            }
+        };
+        let expected: Vec<_> = annotation_sites
+            .iter()
+            .filter(|(_, target)| *target == Some(ordinal))
+            .map(|(index, _)| *index)
+            .collect();
+        assert_eq!(
+            found
+                .occurrences()
+                .iter()
+                .map(|a| a.reference_index())
+                .collect::<Vec<_>>(),
+            expected
+        );
+        assert!(std::ptr::eq(found.target(), target));
+    }
+    RecursiveProducer {
+        declarations,
+        annotations,
+    }
 }
 
 #[test]
 fn recursive_type_scope_actual_paired_cli_all_anchors_and_full_version8_replay() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let package = Package::new(true);
-    let source = "// 😀\r\nfun <T, Spare> outer(root:T){ val before:T=root; fun <U> inner(a:`T`,b:U){ val inherited:T=a; fun middle(c:T){ fun <`🦀`> deep(d:`🦀`,e:U,f:Missing){ val own:`🦀`=d; unknown(noSuch=d); }; fun side(g:T){} }; fun <U> peer(h:U,i:T){} }; fun <T> shadow(j:T){}; fun after(k:T){}; val last:T=root }\r\nfun <T> other(z:T){}\r\n";
+    let source = "// 😀\r\nfun <T, Spare> outer(root:T):T{ val before:T=root; fun <U> inner(a:`T`,b:U):T{ val inherited:T=a; fun middle(c:T):T{ fun <`🦀`> deep(d:`🦀`,e:U,f:Missing):`🦀`{ val own:`🦀`=d; unknown(noSuch=d); }; fun side(g:T):Missing{} }; fun <U> peer(h:U,i:T):U{} }; fun <T> shadow(j:T):T{}; fun after(k:T):T{}; val last:T=root }\r\nfun <T> other(z:T):T{}\r\nfun <Only> returnOnly():Only{}\r\nfun unmatched():Missing{}\r\n";
     let init = json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{"capabilities":{
         "general":{"positionEncodings":["utf-8"]},
         "workspace":{"workspaceEdit":{"documentChanges":true}},
         "textDocument":{"rename":{"prepareSupport":true}}
     }}});
     let (declarations, annotations) = recursive_cli_layout(source, None);
-    let anchors: Vec<_> = declarations
+    let mut anchors: Vec<_> = declarations
         .iter()
         .cloned()
         .enumerate()
-        .map(|(t, r)| (r, t, false))
+        .map(|(t, r)| (r, t, false, "Fresh"))
         .chain(
             annotations
                 .iter()
-                .filter_map(|(r, t)| t.map(|t| (r.clone(), t, true))),
+                .filter_map(|(r, t)| t.map(|t| (r.clone(), t, true, "Fresh"))),
         )
         .collect();
+    let return_only = annotations
+        .iter()
+        .find(|(_, t)| *t == Some(7))
+        .unwrap()
+        .0
+        .clone();
+    for name in ["out", "reified"] {
+        anchors.push((return_only.clone(), 7, true, name));
+    }
     let mut requests = vec![
         init.clone(),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":7,"text":source}}}),
     ];
-    for (i, (anchor, _, _)) in anchors.iter().enumerate() {
+    for (i, (anchor, _, _, name)) in anchors.iter().enumerate() {
         for (role, method, params) in [
             (
                 "definition",
@@ -4434,7 +4569,7 @@ fn recursive_type_scope_actual_paired_cli_all_anchors_and_full_version8_replay()
             (
                 "rename",
                 "textDocument/rename",
-                rename_params(source, anchor.start, "Fresh"),
+                rename_params(source, anchor.start, name),
             ),
         ] {
             requests.push(
@@ -4462,14 +4597,44 @@ fn recursive_type_scope_actual_paired_cli_all_anchors_and_full_version8_replay()
     ] {
         requests.push(json!({"jsonrpc":"2.0","id":id,"method":"textDocument/rename","params":rename_params(source,offset,name)}));
     }
+    for name in ["where", "dynamic", "suspend"] {
+        requests.push(
+            json!({"jsonrpc":"2.0","id":name,"method":"textDocument/rename",
+            "params":rename_params(source,return_only.start,name)}),
+        );
+    }
+    for (id, character) in [("split-surrogate", 4), ("interior-crlf", 6)] {
+        requests.push(
+            json!({"jsonrpc":"2.0","id":id,"method":"textDocument/prepareRename",
+            "params":{"textDocument":{"uri":URI},"position":{"line":0,"character":character}}}),
+        );
+    }
+    let unmatched_return = annotations.last().unwrap().0.start;
+    for method in [
+        "definition",
+        "references",
+        "documentHighlight",
+        "prepareRename",
+        "rename",
+    ] {
+        let params = match method {
+            "references" => references_params(source, unmatched_return, true),
+            "rename" => rename_params(source, unmatched_return, "Fresh"),
+            _ => navigation_params(source, unmatched_return),
+        };
+        requests.push(
+            json!({"jsonrpc":"2.0","id":format!("unmatched-return-{method}"),
+            "method":format!("textDocument/{method}"),"params":params}),
+        );
+    }
     requests.extend([
         json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
         json!({"jsonrpc":"2.0","method":"exit"}),
     ]);
     let replies = package.exchange(&requests);
     let reply = |id: &str| replies.iter().find(|r| r["id"] == id).unwrap();
-    assert_recursive_cli_source(source, 7);
-    for (i, (anchor, target, is_use)) in anchors.iter().enumerate() {
+    let original_producer = assert_recursive_cli_source(source, 7);
+    for (i, (anchor, target, is_use, name)) in anchors.iter().enumerate() {
         let partition: Vec<_> = std::iter::once(declarations[*target].clone())
             .chain(
                 annotations
@@ -4517,11 +4682,11 @@ fn recursive_type_scope_actual_paired_cli_all_anchors_and_full_version8_replay()
         let actual_rename = reply(&format!("rename-{i}"));
         let edited = apply_original_rename(source, actual_rename, URI, 7);
         let (edited_declarations, edited_annotations) =
-            recursive_cli_layout(&edited, Some(*target));
+            recursive_cli_layout(&edited, Some((*target, name)));
         // Preserve the complete source outside actual returned edit coordinates.
         let mut expected = source.to_owned();
         for r in partition.iter().rev() {
-            expected.replace_range(r.clone(), "Fresh");
+            expected.replace_range(r.clone(), name);
         }
         assert_eq!(edited, expected);
         let mut replay = vec![
@@ -4583,7 +4748,9 @@ fn recursive_type_scope_actual_paired_cli_all_anchors_and_full_version8_replay()
                 )
             );
         }
-        assert_recursive_cli_source(&edited, 8);
+        let edited_producer = assert_recursive_cli_source(&edited, 8);
+        assert_eq!(edited_producer.declarations, original_producer.declarations);
+        assert_eq!(edited_producer.annotations, original_producer.annotations);
     }
     for id in [
         "outer-capture",
@@ -4596,6 +4763,24 @@ fn recursive_type_scope_actual_paired_cli_all_anchors_and_full_version8_replay()
     ] {
         assert_eq!(reply(id)["error"]["code"], -32803, "{id}");
     }
+    for name in ["where", "dynamic", "suspend"] {
+        assert_eq!(reply(name)["error"]["code"], -32803);
+    }
+    for id in ["split-surrogate", "interior-crlf"] {
+        assert_eq!(reply(id)["error"]["code"], -32602);
+    }
+    for method in [
+        "definition",
+        "references",
+        "documentHighlight",
+        "prepareRename",
+        "rename",
+    ] {
+        assert_eq!(
+            reply(&format!("unmatched-return-{method}"))["error"]["code"],
+            -32803
+        );
+    }
 }
 
 #[test]
@@ -4603,28 +4788,28 @@ fn recursive_type_capture_unused_inner_and_safe_sibling_actual_cli() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let package = Package::new(true);
     for (source, needle, name, accepted) in [
-        ("fun <T> outer(){ fun <U> inner(a:T){} }", "<T", "U", false),
-        ("fun <T> outer(){ fun <U> inner(a:T){} }", "<U", "T", false),
+        ("fun <T> outer(){ fun <U> inner():T{} }", "<T", "U", false),
+        ("fun <T> outer(){ fun <U> inner():T{} }", "<U", "T", false),
         (
-            "fun <T> outer(){ fun middle(){ fun unused(a:Captured){} } }",
+            "fun <T> outer(){ fun middle(){ fun unused():Captured{} } }",
             "<T",
             "Captured",
             false,
         ),
         (
-            "fun <T> outer(){ fun <U> inner(){ fun unused(a:Captured){} } }",
+            "fun <T> outer(){ fun <U> inner(){ fun unused():Captured{} } }",
             "<U",
             "Captured",
             false,
         ),
         (
-            "fun <T> outer(){ fun <U> inner(a:U){}; fun sibling(b:T){} }",
+            "fun <T> outer(){ fun <U> inner():U{}; fun sibling():T{} }",
             "<T",
             "U",
             true,
         ),
         (
-            "fun <T> outer(){ fun <U> inner(a:U){}; fun sibling(b:T){} }",
+            "fun <T> outer(){ fun <U> inner():U{}; fun sibling():T{} }",
             "<U",
             "T",
             true,
@@ -4635,6 +4820,7 @@ fn recursive_type_capture_unused_inner_and_safe_sibling_actual_cli() {
             "Fresh",
             false,
         ),
+        ("fun <T> outer(){ fun <U,V> inner():U{} }", "<U", "V", false),
     ] {
         let offset = source.find(needle).unwrap() + 1;
         let requests = vec![
@@ -4650,11 +4836,16 @@ fn recursive_type_capture_unused_inner_and_safe_sibling_actual_cli() {
         ];
         let replies = package.exchange(&requests);
         let response = replies.iter().find(|r| r["id"] == "rename").unwrap();
+        let original_producer = assert_recursive_cli_source(source, 7);
         if accepted {
             let edited = apply_original_rename(source, response, URI, 7);
             let mut expected = source.to_owned();
-            let use_needle = if needle == "<T" { "b:T" } else { "a:U" };
-            let use_offset = source.find(use_needle).unwrap() + 2;
+            let use_needle = if needle == "<T" {
+                "sibling():T"
+            } else {
+                "inner():U"
+            };
+            let use_offset = source.find(use_needle).unwrap() + use_needle.len() - 1;
             expected.replace_range(use_offset..use_offset + 1, name);
             expected.replace_range(offset..offset + 1, name);
             assert_eq!(edited, expected);
@@ -4663,7 +4854,7 @@ fn recursive_type_capture_unused_inner_and_safe_sibling_actual_cli() {
                 requests[1].clone(),
                 json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":8,"text":edited}}}),
             ];
-            let expected_partitions: Vec<_> = [("outer", "b:"), ("inner", "a:")]
+            let expected_partitions: Vec<_> = [("outer", "sibling():"), ("inner", "inner():")]
                 .iter()
                 .map(|(owner, label)| {
                     let end = edited.find(&format!("> {owner}(")).unwrap();
@@ -4697,12 +4888,12 @@ fn recursive_type_capture_unused_inner_and_safe_sibling_actual_cli() {
                     ])
                 );
             }
-            assert_recursive_cli_source(source, 7);
-            assert_recursive_cli_source(&edited, 8);
+            let edited_producer = assert_recursive_cli_source(&edited, 8);
+            assert_eq!(edited_producer.declarations, original_producer.declarations);
+            assert_eq!(edited_producer.annotations, original_producer.annotations);
         } else {
             assert_eq!(response["error"]["code"], -32803);
             assert!(response.get("result").is_none());
-            assert_recursive_cli_source(source, 7);
         }
     }
 }

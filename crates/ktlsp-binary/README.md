@@ -396,26 +396,28 @@ parameters, library symbol lookup/source attachment, server integration and full
 Kotlin LSP parity remain unsupported. This extension does not broaden the sibling
 property/return operations' narrower scope/NAME refusals.
 
-## Selected values and finite nominal Function return (#411)
+## Selected values and finite scoped/nominal Function return (#411/#415)
 
 `metadata::resolved_class_function_signature::decode(&outcome,
 all_class_field_ordinal, limits)` adds a distinct composition. Its `parameters`
 component is the existing `SelectedParameters`: original owner, ordered Class
 and Function-own declarations, selected Function and every ordered value.
-`return_type` retains original outer/body ranges, borrowed header, an explicitly
-and independently resolved nominal `class_id::ClassId`, and ordered original
-Argument bodies/projection Options/leaf headers and ranges. Argument `classifier`
-uses the existing `resolved_class_function_parameters::Classifier` import and
-checked Function/Class declaration ordinals in this result, never raw IDs or
-global symbols. Every raw body borrows the same retained Outcome.
+`return_type` retains original outer/body ranges, borrowed header, the existing
+`resolved_class_function_parameters::Classifier`, and ordered original Argument
+bodies/projection Options/leaf headers and ranges. A nominal `Classifier::Class`
+contains an independently resolved `class_id::ClassId`; Function/Class parameter
+variants contain checked declaration ordinals in this result, never raw IDs or
+global symbols. Bare parameter roots always have no arguments, including no
+wrong-wire argument occurrences. Every raw body borrows the same retained Outcome.
 
-The return admits a nominal Class with zero or more invariant inline parameter
-leaves. Signed ID searches Function before Class; NAME uses the same actual
-resolver and unique immediate-own UTF-16 comparison as values, without parent
-fallback or normalization. The returned target is not assumed to be the owner;
-argument count is not compared with owning Class declarations because target
-arity is unavailable without loading its metadata. Nullable absent/false/true
-and projection absent/explicit INV remain encoded presence, not inferred meaning.
+The return admits either a bare parameter ID/NAME or a nominal Class with zero or
+more invariant inline parameter leaves. Signed ID searches Function before Class;
+NAME uses the same actual resolver and unique immediate-own UTF-16 comparison as
+values, without parent fallback or normalization. The nominal target is not assumed
+to be the owner; argument count is not compared with owning Class declarations
+because target arity is unavailable without loading its metadata. Nullable
+absent/false/true and projection absent/explicit INV remain encoded presence, not
+inferred meaning.
 
 One original Class context, resolver and monotonic budget cover all declarations,
 values and return, including independent nominal resolution, temporary NAME
@@ -425,7 +427,7 @@ All Class framing and all own declarations complete before values. Any selected
 value/return error, late duplicate ID or malformed tail refuses atomically.
 Missing/table-only/duplicate inline roles, wrong significant wires, conflicting
 classifiers, nonzero effective Type flags, unknown/non-invariant projections,
-nominal/bare parameter-root/recursive/richer leaves and varargs refuse.
+nominal/recursive/richer argument leaves and varargs refuse.
 
 Permanent source regressions use unchanged genuine licensed Result$Companion
 (success4/failure5) and Pair.copy9 fixtures, with same-Outcome pointers and
@@ -444,14 +446,38 @@ this return evidence. Fixture custody/notices unchanged; compiler provenance
 and genuine Function-own ID/shadow/ambiguous-NAME/table/richer-return emission
 remain gaps, with authored controls labelled.
 
+The #415 cutover replaces `ReturnType.class_id` outright with `classifier`;
+nominal callers must match `Classifier::Class`. It stages the original Type once,
+preserves Class-bearing validation/error order, and routes bare parameter roots
+through the existing shared classifier. At reviewed947826/tree63289782, ROOT's
+separately admitted public native consumer compiled0/ran0 with empty stderr/PATH.
+It ACTUALLY bound genuine Pair component1/2 (all-Class ordinals7/8, return bodies
+121..123=`3800`/138..140=`3801`) to original Class A54..60/B62..68. Full Pair.copy
+and Result controls retain the nominal targets and original scoped arguments above.
+Authored signed-ID/NAME/UTF-16/marking/role/atomicity controls remain labelled
+separately, not represented as compiler emission.
+
+Independent OWNER+ROOT fully read all477 actual records, including complete
+original class bytes/model/annotations/Outcome, every signature,146 pointer pairs,
+48 outer slices,28 scoped declaration bindings and20 complete parameter-only
+comparisons. Five fully read complete success bases cover all45 exact/one-below
+resource boundaries and five joint successes;45 joint one-below and five depth1
+refusals retain actual typed errors/offsets. Late NAME mismatch costs255 extra
+work units. All637 binary/import checks passed, including all18 signature tests.
+Only AFTER both full gates was the throwaway consumer source removed; full source,
+commands, output and proofs remain `/private/tmp/ktlsp-415-native/`. See the
+[complete current evidence](../../docs/status/development.md#reviewed414415-composed-source-and-complete-native-data-acceptance).
+Historical411 evidence remains unchanged. Genuine bare Function-root producer
+emission and exact compiler provenance remain unestablished.
+
 The parameter-only API still leaves returns opaque and has unchanged allowances;
 the old self-return API still refuses Function-own declarations and retains its
 self/Class-ID/count guarantees. Property/context/method-link contracts are
 unchanged. Receiver/context/contracts/JVM extensions/bounds/TypeTables remain
 opaque: this is not a complete Kotlin signature, target loading, substitution,
 applicability, JVM linkage, symbols, server capability or full Kotlin LSP parity.
-No local build/tests/format/lint or new native smoke was run by this source owner;
-ROOT separately admits exact reviewed-source verification and data observation.
+ROOT's exact reviewed-source compilation and separately admitted native data
+observation do not authorize local Kotlin parser/server runtime under #96.
 
 ## Selected self-applied Class Function return (#390)
 

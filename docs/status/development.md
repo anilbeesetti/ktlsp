@@ -4189,3 +4189,80 @@ Root `/private/tmp/ktlsp-426-workspace-generic-integration`; owners isolated in
 native-only/T004/#96/B3 INCONCLUSIVE/oracle HOLD/original417395377UNKNOWN remain.
 Node20→24 and future runner migration warnings recorded, not silently fixed.
 
+
+#### Current427 source composition and independent428 native typing lane
+
+All lanes use ONE stable fully verified incoming main7afdc68dd2e283379ebaa99073b068339df84bdd.
+ROOT committed the preceding verified425 documentation checkpoint at0948f6a,
+then composed the COMPLETE427 leaf1a88ccc483773c148113a832f76af1e1d8f6661a
+at06035e3. Its original leaf treec1c06a542b9734443e3cf50e1688c416d9fff86a
+has SOLE parent7afdc68 and exactly nine binary-only paths, including complete
+unchanged ClosedRange/ClosedFloatingPointRange data and portable consumer source.
+No Cargo/dependency/lock/config/workflow or owner Markdown changed.
+
+BOTH independent component reviews renewed on exact1a88ccc with no open finding.
+The prior absent-bv assertion was repaired to the schema's existing [1,0,3]
+default while retaining omission/presence evidence; all three target-tuple
+helper callers were independently reviewed. Direct revived-agent URIs returned
+the INITIAL3248006 rejected receipts. ROOT did not transfer their authority:
+it recovered both COMPLETE current r3 reports from immutable histories and
+personally read them, then separately authenticated both canonical hashes.
+Current full rendered primary receipts are retained:
+- function5729B SHAe37bfd674f0374ab897c0fac1268f7b5527c59ec88e5ad8c7d6100b1fc1f0bd5;
+- adversary5701B SHAc16f74459f738e414537e80ab9cd6d1d0c0202964aecf93fdefaca3f34339975.
+
+The same public resolved_class_supertypes::decode now has a composed-source
+contract for ALL original inline Class bounds plus finite nominal supertypes/
+invariant inline Class-parameter leaves. Immediate-Class NAME scope is explicit;
+callable scopes, including empty scopes, retain their existing identities.
+One context/resolver/monotonic allowance covers the complete operation; root
+ClassIds move rather than duplicate. New selected ID/table/richer/malformed
+roles refuse atomically; unused tables remain opaque. No recursive expansion,
+implicit bound/nullability, legal inheritance, target/classpath/server authority
+or full-parity promotion follows. The binary README is cut over in place,
+retaining the old423 execution as HISTORICAL evidence, not new427 acceptance.
+
+After BOTH current component reviews, ROOT separately admitted ONE native427-
+only pinned1.99.0 rustfmt invocation over its seven Rust paths. Actual exit0
+in0.191277709s; this native-only formatter is SPENT. No compiler/check/test/
+product runtime is admitted by that formatting permission. Both ROOT full
+CURRENT-union reviews must inspect the exact formatted source/docs; source
+membership still excludes426 and428. Later composition requires both complete
+union renewals and its own separate exact compiler/format/runtime admission.
+The old423/424 formatter remains spent and all rejected source/proofs preserved.
+
+[428](https://github.com/anilbeesetti/ktlsp/issues/428) is a NEW independent
+parser-library-only native immutable-local TYPE proof, not a literal-value
+substitute or server feature. It follows ORIGINAL initializer positions and
+existing physical candidate rules to default integer or original lexical type-
+parameter evidence, with explicit local annotations accepted ONLY by the SAME
+lexical identity. No nominal/builtin spelling or general constraints are added.
+Existing direct-integer/value/call/rename/applicability/provider envelopes stay
+strict. One existing budget includes selector authentication, once-per-query
+whole strict body/root proof, every dependency/annotation/literal and emission.
+Strictly decreasing local order avoids recursion/visited collections. Current
+native query budgets do not observe element-level cancellation; no prompt
+cancellation claim or new cancellation infrastructure is smuggled into this API.
+
+Two genuinely independent READ-ONLY scouts reused the existing scope/literal
+research and returned complete actionable contracts, not runtime evidence:
+- value typing18549B SHAbab75abe898722bf9c6a3f8b2ab18f0fa2d3becf92e9a3645b381f72ef8f33b2;
+- Class namespace22922B SHAa75e520812db7f4d20fdbc41afe2dba66de881dc837f0229c7506223a96432db.
+The Class report identifies missing Class-parameter owner/region admission and
+a separate real same-file nominal annotation resolver/consumer. It is retained
+for subsequent coherent work, NOT claimed implemented; concurrent edits to the
+same parser binding/lowering files are deliberately avoided.
+
+426's initial11c2624 and both component HOLD findings remain rejected while
+its owner repairs real stale-error framing/pre-delegation resource accounting
+and two incorrect fixture expectations. Proposed unchanged-limit repairs and
+lossless actual-byte giant-ID run encoding require renewed independent reviews
+and later BOTH owner/ROOT original hosted actual-value acceptance. Session
+retained8, cross-Session admission/reaping, shared-registry controls and actual
+packaged stdio cancel/ID-reuse are separate evidence layers, never inferred from
+one another or forced with a new production probe/barrier/delay.
+
+No new compiler/native interpreted-output/CLI/CI/integration acceptance is
+claimed for426/427/428. All user/old/owner/review WTs, carriers and failures remain.
+Full parity NOT achieved; native-only/T004/#96/B3 INCONCLUSIVE/oracle HOLD and
+original417395377 UNKNOWN/OPEN remain unchanged.

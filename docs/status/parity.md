@@ -196,9 +196,13 @@ limits](development.md#verified425-cleaned-source-integration-and-original-exact
 
 This is not general call applicability/typing/overloads/incomplete signature
 help/official rendering, effective metadata hierarchy/classpath or full parity.
-426 coherent native workspace declaration search and427 inline Class bounds/
-generic supertypes are active SOURCE work from this SAME verified main, not
-verified providers/data outputs or delivered features at this checkpoint.
+426 coherent native workspace declaration search,427 inline Class bounds/generic
+supertypes and428 snapshot-owned immutable-local type propagation use this SAME
+verified main.427's complete leaf has both renewed component source reviews and
+is composed into ROOT's branch; full union/compiler/actual-value gates remain
+pending.426's initial component HOLD remains rejected while repairs proceed.
+428 is a new independent parser-library-only contract, not general inference.
+None is a verified new provider/data output or delivered feature yet.
 No persistent semantic index/official matcher, source/library completeness,
 watcher/build-tool/oracle/platform/performance promotion follows.
 Native-only/T004/96/B3 INCONCLUSIVE/oracle HOLD and original417395377

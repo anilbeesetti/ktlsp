@@ -8,7 +8,7 @@ decisions or phase boundaries. **Full official Kotlin LSP parity is NOT achieved
 Use the actual session capacity; the historical 32-concurrent instruction below
 is not a new limit. Do not manufacture hundreds of overlapping/blocked tasks.
 
-### Latest verified425 integration and active426/427 source lanes
+### Latest verified425 integration and active426/427/428 source lanes
 
 ONE stable verified incoming main is **7afdc68dd2e283379ebaa99073b068339df84bdd**,
 tree **93eee1d79940aa824e0dcbd141e1ce0204a61d69**, SOLE original base parent
@@ -57,7 +57,7 @@ only after ALL gates. First suspended lease remains preserved.
 
 ROOT active WT `/private/tmp/ktlsp-426-workspace-generic-integration`,
 branch `omp/426-workspace-generic-integration`, from that SAME verified7afdc68.
-Two genuine independent SOURCE-ONLY lanes are admitted; neither is delivered:
+Three independent SOURCE-ONLY tickets use that SAME base; none is delivered:
 - [426](https://github.com/anilbeesetti/ktlsp/issues/426), coherent eager native
   workspace declaration search INCLUDING whole-snapshot verification/member
   overlays/aggregate ownership/real packaged stdio lifecycle proof. Literal
@@ -67,14 +67,31 @@ Two genuine independent SOURCE-ONLY lanes are admitted; neither is delivered:
   resolved_class_supertypes::decode to original inline Class bounds and finite
   one-level generic supertypes, explicit CLASS-own NAME binding, one allowance.
   WT `/private/tmp/ktlsp-427-class-bound-supertypes`, branchomp/427-class-bound-supertypes.
+- [428](https://github.com/anilbeesetti/ktlsp/issues/428), complete snapshot-owned
+  immutable-local type propagation using original reference/lexical identities,
+  not a general constraint framework or new server envelope.
+  WT `/private/tmp/ktlsp-428-local-value-types`, branchomp/428-local-value-types.
 Each owner has TWO reserved independent functionality/adversarial slots; ROOT
 owns docs/Cargo/lock/deps/config/CI and both later complete union reviews.
-Reuse completed linked research below; two new genuine encoded carriers are
-NOT new native interpreted-output observations. No source/compiler/actual
-runtime/CI/merge acceptance for426/427 is claimed at this checkpoint.
+Reuse completed linked research; two genuine encoded carriers are NOT new
+native interpreted-output observations. #427 complete binary-only leaf1a88ccc,
+treec1c06a5, solebase7afdc68 received BOTH renewed independent component source
+reviews and ROOT composed it at06035e3 after the six-doc checkpoint0948f6a.
+Earlier `bv` findings were fixed/renewed; revived-agent URIs returned old
+rejected receipts, so ROOT recovered and FULL-read both current r3 reports from
+immutable histories. No stale approval was transferred. #426 initial11c2624
+and both component HOLD findings remain rejected while its owner repairs real
+failure framing/pre-delegation bounds and fixture expectations.
+Current ROOT native-plus-docs scope does NOT yet include426 or428 source.
+Both complete ROOT union reviews must renew after every later composition.
+No compiler/actual runtime/CI/merge acceptance for426/427/428 is claimed.
 ALL LOCAL Kotlin/parser/server/Session/worker runtime forbidden under96;
-even pure binary data runtime needs separate exact ROOT admission. No owner
-formatter/build/check/test mid-flight. This new cycle has no formatter admitted.
+pure binary data runtime needs separate exact ROOT admission. No owner
+formatter/build/check/test mid-flight. ROOT's separately admitted ONE native427-
+only pinned1.99.0 rustfmt invocation is now SPENT: exit0 in0.191277709s.
+It covered only the seven native Rust paths; no compiler/tests/runtime followed.
+Future426/428 composition needs its OWN explicit exact-source admission and
+renewed full-union reviews, not implicit permission from this native-only stage.
 Keep real packaged stdio cancel/ID-reuse observations distinct from complementary
 Session owned-count/retained-until-join proof; no production probe/barrier/delay.
 All old/user/component/review WTs and failures/proofs stay preserved. Do not

@@ -4,8 +4,7 @@ use super::{
     class_context::{self, Owner, Parameter},
     class_id, payload,
     resolved_class_function_parameters::{self as parameters, Classifier},
-    resolved_class_function_signature as signature,
-    string_table, type_header, wire,
+    resolved_class_function_signature as signature, string_table, type_header, wire,
 };
 use std::ops::Range;
 
@@ -103,7 +102,10 @@ impl From<signature::Error> for Error {
                 ErrorKind::UnsupportedType
             }
         };
-        Self { offset: e.offset, kind }
+        Self {
+            offset: e.offset,
+            kind,
+        }
     }
 }
 
@@ -170,8 +172,11 @@ pub fn decode<'a>(metadata: &'a Outcome<'_>, limits: Limits) -> Result<ClassSupe
         let mut pos = 0;
         let mut ordinal = 0;
         while pos < raw.len() {
-            let field = wire::field(raw, &mut pos, raw.len(), &mut budget.wire)
-                .map_err(|e| Error { offset: start + e.offset, kind: ErrorKind::Wire(e.kind) })?;
+            let field =
+                wire::field(raw, &mut pos, raw.len(), &mut budget.wire).map_err(|e| Error {
+                    offset: start + e.offset,
+                    kind: ErrorKind::Wire(e.kind),
+                })?;
             let offset = start + field.span.start;
             budget.wire.work(1, offset)?;
             match (field.number, field.value) {
@@ -187,8 +192,18 @@ pub fn decode<'a>(metadata: &'a Outcome<'_>, limits: Limits) -> Result<ClassSupe
                     )?;
                     budget.push(&mut bounds, Bound { parameter, ty }, offset)?;
                 }
-                (6, _) => return Err(Error { offset, kind: ErrorKind::UnsupportedTableRole }),
-                (1..=5, _) => return Err(Error { offset, kind: ErrorKind::UnsupportedParameter }),
+                (6, _) => {
+                    return Err(Error {
+                        offset,
+                        kind: ErrorKind::UnsupportedTableRole,
+                    });
+                }
+                (1..=5, _) => {
+                    return Err(Error {
+                        offset,
+                        kind: ErrorKind::UnsupportedParameter,
+                    });
+                }
                 _ => {}
             }
             ordinal += 1;
@@ -202,7 +217,12 @@ pub fn decode<'a>(metadata: &'a Outcome<'_>, limits: Limits) -> Result<ClassSupe
         let offset = field.span.start;
         budget.wire.work(1, offset)?;
         match (field.number, field.value) {
-            (2, _) => return Err(Error { offset, kind: ErrorKind::UnsupportedTableRole }),
+            (2, _) => {
+                return Err(Error {
+                    offset,
+                    kind: ErrorKind::UnsupportedTableRole,
+                });
+            }
             (6, wire::Value::Bytes(body)) => {
                 let ty = nominal(
                     body,
@@ -214,7 +234,12 @@ pub fn decode<'a>(metadata: &'a Outcome<'_>, limits: Limits) -> Result<ClassSupe
                 )?;
                 budget.push(&mut supertypes, ty, offset)?;
             }
-            (6, _) => return Err(Error { offset, kind: ErrorKind::UnsupportedClass }),
+            (6, _) => {
+                return Err(Error {
+                    offset,
+                    kind: ErrorKind::UnsupportedClass,
+                });
+            }
             _ => {}
         }
         ordinal += 1;

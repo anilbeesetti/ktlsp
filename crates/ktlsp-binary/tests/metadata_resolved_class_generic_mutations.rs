@@ -157,7 +157,10 @@ fn immediate_class_name_lookup_is_required_unique_and_lossless_utf16() {
             assert_eq!(out.parameters[0].name, LOSSLESS);
             for ty in [&out.bounds[0].ty, &out.supertypes[0]] {
                 assert_eq!(ty.arguments[0].header.type_parameter_name, Some(4));
-                assert_eq!(ty.arguments[0].classifier, classifier::Classifier::ClassParameter(0));
+                assert_eq!(
+                    ty.arguments[0].classifier,
+                    classifier::Classifier::ClassParameter(0)
+                );
                 assert_eq!(ty.arguments[0].header.type_parameter, None);
             }
             drop(out);
@@ -197,7 +200,10 @@ fn signed_ids_are_original_ids_not_positions_or_name_scope() {
             let out = decode(&input, Limits::default()).unwrap();
             assert_eq!(out.parameters[0].parameter.id, 91);
             assert_eq!(out.parameters[1].parameter.id, -7);
-            assert_eq!(out.bounds.iter().map(|b| b.parameter).collect::<Vec<_>>(), [0, 1]);
+            assert_eq!(
+                out.bounds.iter().map(|b| b.parameter).collect::<Vec<_>>(),
+                [0, 1]
+            );
             for (ty, ordinal, id) in [
                 (&out.bounds[0].ty, 1, -7),
                 (&out.bounds[1].ty, 0, 91),
@@ -205,7 +211,10 @@ fn signed_ids_are_original_ids_not_positions_or_name_scope() {
                 (&out.supertypes[1], 0, 91),
             ] {
                 let a = &ty.arguments[0];
-                assert_eq!(a.classifier, classifier::Classifier::ClassParameter(ordinal));
+                assert_eq!(
+                    a.classifier,
+                    classifier::Classifier::ClassParameter(ordinal)
+                );
                 assert_eq!(a.header.type_parameter, Some(id));
                 assert_eq!(a.header.type_parameter_name, None);
                 borrowed(a.header.raw, bytes(&input), a.type_span.clone());
@@ -289,7 +298,12 @@ fn every_significant_wrong_wire_and_richer_type_shape_refuses() {
             for bound in [false, true] {
                 with_input(carrier, |mut input| {
                     let bounds = if bound { vec![ty.clone()] } else { vec![] };
-                    rewrite(&mut input, carrier, &[parameter(0, 1, &bounds)], &[ty.clone()]);
+                    rewrite(
+                        &mut input,
+                        carrier,
+                        &[parameter(0, 1, &bounds)],
+                        &[ty.clone()],
+                    );
                     unsupported_type(&input);
                 });
             }
@@ -387,7 +401,12 @@ fn argument_projection_presence_missing_role_and_duplicate_singular_bodies() {
             ty.extend(scalar(1, 0));
             ty.extend(scalar(3, 1));
             ty.extend(message(15, &[0xff]));
-            rewrite(&mut input, carrier, &[parameter(0, 1, &[ty.clone()])], &[ty]);
+            rewrite(
+                &mut input,
+                carrier,
+                &[parameter(0, 1, &[ty.clone()])],
+                &[ty],
+            );
             let out = decode(&input, Limits::default()).unwrap();
             for ty in [&out.bounds[0].ty, &out.supertypes[0]] {
                 assert_eq!(ty.header.flags, Some(0));
@@ -398,7 +417,11 @@ fn argument_projection_presence_missing_role_and_duplicate_singular_bodies() {
                 assert_eq!(a.raw.inline_types.len(), 1);
                 borrowed(a.raw.raw, bytes(&input), a.body_span.clone());
                 borrowed(a.header.raw, bytes(&input), a.type_span.clone());
-                borrowed(a.raw.inline_types[0].raw, a.raw.raw, a.raw.inline_types[0].span.clone());
+                borrowed(
+                    a.raw.inline_types[0].raw,
+                    a.raw.raw,
+                    a.raw.inline_types[0].span.clone(),
+                );
             }
         });
     }
@@ -444,7 +467,10 @@ fn bounds_are_parameter_major_and_all_original_repetitions_keep_order_and_custod
                     5 => 2,
                     _ => 0,
                 }];
-                assert_eq!(b.ty.body_span.start, original.body_span.start + selected.span.start);
+                assert_eq!(
+                    b.ty.body_span.start,
+                    original.body_span.start + selected.span.start
+                );
                 assert_eq!(b.ty.header.raw.as_ptr(), selected.raw.as_ptr());
                 assert_eq!(b.ty.span.start + 2, b.ty.body_span.start);
                 assert_eq!(b.ty.span.end, b.ty.body_span.end);
@@ -456,7 +482,10 @@ fn bounds_are_parameter_major_and_all_original_repetitions_keep_order_and_custod
             ] {
                 assert_eq!(s.ordinal, ordinal);
                 assert_eq!(s.header.class_name, Some(index));
-                assert_eq!(s.arguments[0].classifier, classifier::Classifier::ClassParameter(parameter));
+                assert_eq!(
+                    s.arguments[0].classifier,
+                    classifier::Classifier::ClassParameter(parameter)
+                );
                 borrowed(s.header.raw, bytes(&input), s.body_span.clone());
             }
             assert_eq!(out.supertypes[0].class_id, out.supertypes[2].class_id);
@@ -476,15 +505,30 @@ fn bounds_are_parameter_major_and_all_original_repetitions_keep_order_and_custod
 fn selected_table_roles_refuse_id_only_mixed_empty_malformed_and_wrong_wire_forms() {
     for carrier in CARRIERS {
         for mixed in [false, true] {
-            for role in [scalar(2, 0), message(2, &[]), message(2, &[0x80]), vec![0x15, 0, 0, 0, 0]] {
+            for role in [
+                scalar(2, 0),
+                message(2, &[]),
+                message(2, &[0x80]),
+                vec![0x15, 0, 0, 0, 0],
+            ] {
                 with_input(carrier, |mut input| {
                     let supers = if mixed { vec![name_type(3, 1)] } else { vec![] };
-                    rewrite(&mut input, carrier, &[parameter(0, 1, &[name_type(2, 1)])], &supers);
+                    rewrite(
+                        &mut input,
+                        carrier,
+                        &[parameter(0, 1, &[name_type(2, 1)])],
+                        &supers,
+                    );
                     bytes_mut(&mut input).extend(role);
                     assert_eq!(failure(&input).kind, ErrorKind::UnsupportedTableRole);
                 });
             }
-            for role in [scalar(6, 0), message(6, &[]), message(6, &[0x80]), vec![0x35, 0, 0, 0, 0]] {
+            for role in [
+                scalar(6, 0),
+                message(6, &[]),
+                message(6, &[0x80]),
+                vec![0x35, 0, 0, 0, 0],
+            ] {
                 with_input(carrier, |mut input| {
                     let bounds = if mixed { vec![name_type(2, 1)] } else { vec![] };
                     let mut p = parameter(0, 1, &bounds);
@@ -494,21 +538,33 @@ fn selected_table_roles_refuse_id_only_mixed_empty_malformed_and_wrong_wire_form
                     if role == message(6, &[0x80]) {
                         // Complete original declarations are decoded before selection;
                         // malformed packed IDs may fail in that existing reader first.
-                        assert!(matches!(error.kind,
+                        assert!(matches!(
+                            error.kind,
                             ErrorKind::UnsupportedTableRole
-                            | ErrorKind::Context(class_context::ErrorKind::TypeParameter(
-                                metadata::type_parameter::ErrorKind::Wire(wire::ErrorKind::Truncated)
-                            ))
+                                | ErrorKind::Context(class_context::ErrorKind::TypeParameter(
+                                    metadata::type_parameter::ErrorKind::Wire(
+                                        wire::ErrorKind::Truncated
+                                    )
+                                ))
                         ));
                     } else {
                         assert_eq!(error.kind, ErrorKind::UnsupportedTableRole);
                     }
                 });
             }
-            for role in [scalar(3, 0), message(3, &[]), message(3, &[0x80]), vec![0x1d, 0, 0, 0, 0]] {
+            for role in [
+                scalar(3, 0),
+                message(3, &[]),
+                message(3, &[0x80]),
+                vec![0x1d, 0, 0, 0, 0],
+            ] {
                 for bound in [false, true] {
                     with_input(carrier, |mut input| {
-                        let mut argument = if mixed { message(2, &scalar(9, 1)) } else { vec![] };
+                        let mut argument = if mixed {
+                            message(2, &scalar(9, 1))
+                        } else {
+                            vec![]
+                        };
                         argument.extend(&role);
                         let ty = generic(2, &argument);
                         let bounds = if bound { vec![ty.clone()] } else { vec![] };
@@ -536,9 +592,12 @@ fn malformed_late_class_and_selected_children_never_return_successful_prefixes()
             bytes_mut(&mut input).push(0x80);
             let error = failure(&input);
             assert_eq!(error.offset, end + 1);
-            assert_eq!(error.kind, ErrorKind::Context(class_context::ErrorKind::Class(
-                metadata::class_header::ErrorKind::Wire(wire::ErrorKind::Truncated)
-            )));
+            assert_eq!(
+                error.kind,
+                ErrorKind::Context(class_context::ErrorKind::Class(
+                    metadata::class_header::ErrorKind::Wire(wire::ErrorKind::Truncated)
+                ))
+            );
         });
         with_input(carrier, |mut input| {
             let end = bytes(&input).len();
@@ -555,12 +614,18 @@ fn malformed_late_class_and_selected_children_never_return_successful_prefixes()
                     &[parameter(0, 1, &[name_type(2, 1), bad_bound])],
                     &[name_type(3, 1)],
                 );
-                assert_eq!(failure(&input).kind, ErrorKind::Wire(wire::ErrorKind::Truncated));
+                assert_eq!(
+                    failure(&input).kind,
+                    ErrorKind::Wire(wire::ErrorKind::Truncated)
+                );
             });
         }
         with_input(carrier, |mut input| {
             bytes_mut(&mut input).extend(message(6, &generic(3, &[0x80])));
-            assert_eq!(failure(&input).kind, ErrorKind::Wire(wire::ErrorKind::Truncated));
+            assert_eq!(
+                failure(&input).kind,
+                ErrorKind::Wire(wire::ErrorKind::Truncated)
+            );
         });
     }
 }
@@ -609,14 +674,21 @@ fn assert_limit(error: Error, label: &'static str) {
         | ErrorKind::Context(class_context::ErrorKind::TypeParameter(
             metadata::type_parameter::ErrorKind::Wire(wire::ErrorKind::Limit(found)),
         ))
-        | ErrorKind::Classifier(classifier::ErrorKind::Wire(wire::ErrorKind::Limit(found))) => found,
+        | ErrorKind::Classifier(classifier::ErrorKind::Wire(wire::ErrorKind::Limit(found))) => {
+            found
+        }
         ErrorKind::Classifier(classifier::ErrorKind::Name(name_resolver::Error {
-            kind: name_resolver::ErrorKind::Limit(found), ..
+            kind: name_resolver::ErrorKind::Limit(found),
+            ..
         }))
         | ErrorKind::Context(class_context::ErrorKind::Name(name_resolver::Error {
-            kind: name_resolver::ErrorKind::Limit(found), ..
+            kind: name_resolver::ErrorKind::Limit(found),
+            ..
         })) => found,
-        other => panic!("expected {label} exhaustion, got {other:?} at {}", error.offset),
+        other => panic!(
+            "expected {label} exhaustion, got {other:?} at {}",
+            error.offset
+        ),
     };
     assert_eq!(found, label);
 }
@@ -625,12 +697,18 @@ fn assert_limit(error: Error, label: &'static str) {
 fn new_operation_measures_joint_exact_and_every_joint_one_short_allowance() {
     for carrier in CARRIERS {
         with_input(carrier, |input| {
-            let minima: Vec<_> = DIMENSIONS.iter().map(|(_, set)| minimum(&input, *set)).collect();
+            let minima: Vec<_> = DIMENSIONS
+                .iter()
+                .map(|(_, set)| minimum(&input, *set))
+                .collect();
             let mut exact = Limits::default();
             for ((_, set), n) in DIMENSIONS.iter().zip(&minima) {
                 set(&mut exact, *n);
             }
-            assert_eq!(decode(&input, exact).unwrap(), decode(&input, Limits::default()).unwrap());
+            assert_eq!(
+                decode(&input, exact).unwrap(),
+                decode(&input, Limits::default()).unwrap()
+            );
             for ((label, set), n) in DIMENSIONS.iter().zip(&minima) {
                 let mut below = exact;
                 set(&mut below, n - 1);
@@ -649,8 +727,16 @@ fn bounds_and_supertypes_share_one_resolver_and_later_children_never_reset_resou
             let mut separate = [0, 0];
             for (slot, bound_only) in [true, false].into_iter().enumerate() {
                 with_input(carrier, |mut input| {
-                    let bounds = if bound_only { vec![name_type(2, 1)] } else { vec![] };
-                    let supers = if bound_only { vec![] } else { vec![name_type(3, 1)] };
+                    let bounds = if bound_only {
+                        vec![name_type(2, 1)]
+                    } else {
+                        vec![]
+                    };
+                    let supers = if bound_only {
+                        vec![]
+                    } else {
+                        vec![name_type(3, 1)]
+                    };
                     rewrite(&mut input, carrier, &[parameter(0, 1, &bounds)], &supers);
                     separate[slot] = minimum(&input, set);
                 });
@@ -669,11 +755,23 @@ fn bounds_and_supertypes_share_one_resolver_and_later_children_never_reset_resou
                 assert_limit(decode(&input, limited).unwrap_err(), label);
             });
         }
-        for (label, set) in [DIMENSIONS[1], DIMENSIONS[2], DIMENSIONS[4], DIMENSIONS[5], DIMENSIONS[6], DIMENSIONS[7]] {
+        for (label, set) in [
+            DIMENSIONS[1],
+            DIMENSIONS[2],
+            DIMENSIONS[4],
+            DIMENSIONS[5],
+            DIMENSIONS[6],
+            DIMENSIONS[7],
+        ] {
             with_input(carrier, |mut input| {
                 // A single selected child determines a fresh allowance. A second
                 // occurrence must consume MORE, even when its bytes/identity repeat.
-                rewrite(&mut input, carrier, &[parameter(0, 1, &[name_type(2, 1)])], &[]);
+                rewrite(
+                    &mut input,
+                    carrier,
+                    &[parameter(0, 1, &[name_type(2, 1)])],
+                    &[],
+                );
                 let first = minimum(&input, set);
                 let later_start = bytes(&input).len();
                 bytes_mut(&mut input).extend(message(6, &name_type(3, 1)));
@@ -682,12 +780,20 @@ fn bounds_and_supertypes_share_one_resolver_and_later_children_never_reset_resou
                 set(&mut limited, first);
                 let error = decode(&input, limited).unwrap_err();
                 if matches!(label, "queries" | "output_units" | "nodes") {
-                    assert!(error.offset >= later_start, "later child {label}: {error:?}");
+                    assert!(
+                        error.offset >= later_start,
+                        "later child {label}: {error:?}"
+                    );
                 }
                 assert_limit(error, label);
             });
             with_input(carrier, |mut input| {
-                rewrite(&mut input, carrier, &[parameter(0, 1, &[])], &[name_type(3, 1)]);
+                rewrite(
+                    &mut input,
+                    carrier,
+                    &[parameter(0, 1, &[])],
+                    &[name_type(3, 1)],
+                );
                 let first = minimum(&input, set);
                 bytes_mut(&mut input).extend(message(6, &name_type(3, 1)));
                 assert!(minimum(&input, set) > first, "repeated supertype {label}");
@@ -702,8 +808,12 @@ fn bounds_and_supertypes_share_one_resolver_and_later_children_never_reset_resou
 #[test]
 fn repeated_arguments_keep_order_and_consume_cumulative_child_allowances() {
     let dimensions = [
-        DIMENSIONS[1], DIMENSIONS[2], DIMENSIONS[4],
-        DIMENSIONS[5], DIMENSIONS[6], DIMENSIONS[7],
+        DIMENSIONS[1],
+        DIMENSIONS[2],
+        DIMENSIONS[4],
+        DIMENSIONS[5],
+        DIMENSIONS[6],
+        DIMENSIONS[7],
     ];
     for carrier in CARRIERS {
         for bound in [false, true] {
@@ -724,18 +834,32 @@ fn repeated_arguments_keep_order_and_consume_cumulative_child_allowances() {
                         &supers,
                     );
                     let out = decode(&input, Limits::default()).unwrap();
-                    let selected = if bound { &out.bounds[0].ty } else { &out.supertypes[0] };
+                    let selected = if bound {
+                        &out.bounds[0].ty
+                    } else {
+                        &out.supertypes[0]
+                    };
                     assert_eq!(selected.arguments.len(), count);
                     for (argument, ordinal) in selected.arguments.iter().zip([0, 1, 0]) {
-                        assert_eq!(argument.classifier, classifier::Classifier::ClassParameter(ordinal));
+                        assert_eq!(
+                            argument.classifier,
+                            classifier::Classifier::ClassParameter(ordinal)
+                        );
                         assert_eq!(argument.raw.projection, None);
                         assert_eq!(argument.raw.type_id, None);
                         borrowed(argument.raw.raw, bytes(&input), argument.body_span.clone());
-                        borrowed(argument.header.raw, bytes(&input), argument.type_span.clone());
+                        borrowed(
+                            argument.header.raw,
+                            bytes(&input),
+                            argument.type_span.clone(),
+                        );
                     }
-                    assert!(selected.arguments.windows(2).all(|pair| {
-                        pair[0].body_span.end <= pair[1].body_span.start
-                    }));
+                    assert!(
+                        selected
+                            .arguments
+                            .windows(2)
+                            .all(|pair| { pair[0].body_span.end <= pair[1].body_span.start })
+                    );
                     let last_leaf = selected.arguments.last().unwrap().type_span.start;
                     drop(out);
                     for (slot, (label, set)) in dimensions.into_iter().enumerate() {

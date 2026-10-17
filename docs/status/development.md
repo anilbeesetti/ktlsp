@@ -2692,3 +2692,46 @@ ROOT composed this reviewed component after its common admission documentation;
 one formatter, renewed exact clears, strict compile and separate native/hosted
 runtime admission. Earlier native or PR413 CI does not validate this successor.
 
+#### Reviewed414 return-annotation component and first composition — source only
+
+Owner `FunctionReturnScopes` committed
+**f5d9027981c210fbc7fbeca24f20c03a6912b1fc**, tree
+**bb0688e71e809db721c9b9457ca2bd5bb917b66f**, SOLEparent verified4bbf.
+Exactly EIGHT paths: lowering/call_syntax/local_value_binding; parser occurrence
+and call-syntax integration tests; parser README; server document-symbol tests
+and README. Public layouts/signatures, production semantic_navigation and region
+representation remain unchanged. Original ordered optional simple return header,
+own immediate-function scope, direct original header/body/region authentication,
+unique source-ordered root/nested annotation partitions and whole-root hypothetical
+identity/unmatched preservation reuse the existing finite grammar and budgets.
+Every independent callable/value/callee guard remains closed.
+
+BOTH current complete source/affected-consumer reviews cleared exacttreebb0688e7:
+functionality correct/confidence0.96; adversarial correct/confidence0.97.
+Both found the same stale blanket simple-return refusal; the exact original
+fixture now requires lowering success and independent value-occurrence
+UnsupportedContext, while nullableT? stays unsupported. Both independently
+rechecked the correction and complete scope. Current actual messages/fullscope/
+assertions/unknowns: `/private/tmp/ktlsp-414-component-static-handoff.json`.
+
+Permanent assertions cover own/inherited/shadowed/root-only/unmatched returns,
+all declaration/parameter/property/return anchors, unused and both-direction
+capture, duplicates/safe siblings, malformed/richer/uncalled-descendant whole-root
+refusals, foreign/stale/documentation authority, source order, exact/one-short
+aggregate resources, CRLF/astral boundaries, actual received version7 edit
+application and full version8 producer/partition replay. These are UNEXECUTED
+source assertions, not new observed producer/CLI success.
+Temporary direct stdout `KTLSP414_ACTUAL` writer retains complete original
+producer/protocol data, original main session ONCE and each distinct actual
+edited producer/session, including capture controls. Writer remains until BOTH
+OWNER+ROOT independently FULLread actual original payloads and apply actual
+returned edits; no preview/digest/count echo substitutes.
+
+ROOT composed both reviewed components plus common admission documentation into
+`omp/330-function-return-integration` from SAME verified4bbf: complete14-path
+union reviews are next, BEFORE one formatter and renewed exact current clears,
+strict compilation and separately admitted native/hosted runtime. No build/test/
+lint/format/runtime/push/PR/CI action has yet run for this new composition.
+Actual return-CST positives, Pair bare-root observations and new native minima
+remain UNOBSERVED; all96/native-only/T004/B3/oracle/unknown-cause limits remain.
+

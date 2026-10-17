@@ -62,6 +62,20 @@ static review only. All mid-flight checks/formatting/runtime are ROOT-gated.
 Root grants TWO further complete composed-union reviews and owns one formatter.
 No first-source/previous-source CI substitutes for a successor's OWN full CI.
 
+Both components are now implemented and have TWO complete current static clears:
+414 f5d9027981c210fbc7fbeca24f20c03a6912b1fc/treebb0688e7 (eight files);
+415 ec7dafa30bae79d9d443b40e98144b9408ded27b/tree774e2e11 (three files).
+Both use soleparent4bbf. Findings were fixed/rechecked:414 stale blanket simple-
+return refusal now proves lowering success plus independent value refusal;
+415 external consumer Range borrow/move and stale declaration field accesses.
+Full receipts `/private/tmp/ktlsp-414-component-static-handoff.json` and
+`/private/tmp/ktlsp-415-native/component-handoff.json`; complete prepared native
+consumer `/private/tmp/ktlsp-415-native/consumer.rs`412B remains UNEXECUTED.
+ROOT composed both plus common admission docs. COMPLETE14 union reviews,
+ONE formatter, exact renewed clears, strict compilation, separately admitted
+native data and original full hosted return producer/CLI CI remain PENDING.
+No temporary writer/consumer cleanup until BOTH OWNER+ROOT fullactual gates.
+
 Delivered413 history below retains the original component/source/smoke gates:
 Both full27 union reviews and all SIX affected reviews cleared the formatted
 source. Strict compilation found two test-only type/complexity errors; minimal

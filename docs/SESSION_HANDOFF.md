@@ -27,10 +27,17 @@ applications, frequencies, bounds or cleanup were removed. Pure capture-only
 formatting/accessors/position-cache warming/recording were removed; obsolete
 observer-caused clones move at their final genuine use. Raw framed transport
 retains matching-ID OR null-ID refusal. Permanent extracted receipt survives.
-OWN full clean-source union reviews/compiler/original three-host CI and guarded
-integration/exact-main gates have NOT yet run at this checkpoint; never reuse
-capture-bearing4b3429c CI as cleaned-source CI. No local Kotlin runtime or format
-mutation is admitted. Basic430 remains prepared, not integrated/run.
+Initial clean headacb03bf/treebe4aba7f received BOTH full ROOT source renewals
+0.96/0.97. Its separately admitted first fmtCHECK FAILED1 with six expression
+layout differences in tests/document_symbols.rs; Clippy/NoRun were NOT attempted.
+Complete original output3957B SHAe4ba13885b40cb1e15f11e7eee42c80c873d29a9d4b9cbcbe7f0f9c7c4dd0ae3
+is retained. ROOT manually applied ONLY those displayed formatting repairs,
+including restoring the two-line drain push incorrectly guessed to fit.
+No format mutation tool or unchanged check retry. Renew BOTH exact full-union
+source authorities before separately admitting checks on the changed source.
+Its OWN original three-host CI/guarded integration/exact-main gates remain;
+never reuse capture-bearing4b3429c CI as clean-source CI. No local Kotlin runtime.
+Basic430 remains prepared, not integrated/run.
 
 ### Capture-bearing PR429 r6: original feature gates accepted before retirement
 

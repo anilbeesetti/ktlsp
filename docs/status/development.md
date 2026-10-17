@@ -4656,3 +4656,22 @@ original unchanged three-host CI and guarded integration/exact-main acceptance
 are still required. No check, formatting, build or local Kotlin runtime was
 performed during retirement. No new capability/parity or old-failure fix claim.
 
+
+#### First clean-source format check retained; manual expression-layout repair
+
+Exact31path clean unionacb03bfeb95abdf8e28039c054c33ecbe3bbbea9/
+treebe4aba7f96e70dff6e3aafabe7875af377cbee6c received BOTH full ROOT source
+renewals0.96/0.97, including19 own-review unchanged-blob carryforwards and all12
+changed paths. Separate compiler-only admission ran fmtCHECK once: exit1,
+1.463552s, stdout3957B SHAe4ba13885b40cb1e15f11e7eee42c80c873d29a9d4b9cbcbe7f0f9c7c4dd0ae3,
+stderr0. It requested six layouts in tests/document_symbols.rs; strict Clippy
+and NoRun were NOT attempted after that failure. ROOT's guessed one-line final
+response push was incorrect; the actual formatter requires the original chain
+split. ROOT manually applied ONLY the displayed six expression-format repairs,
+with identical genuine calls/assertions/fixtures/control flow and optional
+trailing-comma layout. No formatter mutation, unchanged retry or product runtime.
+BOTH exact full-union authorities must renew on the changed source before new
+separate compiler-only admission. OWN original clean-source three-host CI and
+all integration/exact-main gates remain separate. All prior failed evidence and
+semantic/runtime holds are unchanged.
+

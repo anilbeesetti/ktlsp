@@ -7465,10 +7465,8 @@ mod workspace_symbols {
             let source = format!("class Member{index}\n");
             let path = project.join(format!("src/M{index}.kt"));
             std::fs::write(&path, &source).unwrap();
-            sources.push(
-                json!({"path":path,"name":format!("Member{index}"),
-                "uri":format!("{root}/src/M{index}.kt")}),
-            );
+            sources.push(json!({"path":path,"name":format!("Member{index}"),
+                "uri":format!("{root}/src/M{index}.kt")}));
         }
         let mut budget = Budget::new(Limits::default()).unwrap();
         let inventory = load(&project, &mut budget, &AtomicBool::new(false)).unwrap();
@@ -8053,7 +8051,9 @@ mod workspace_symbols {
         input.flush().unwrap();
         if let Some(id) = message.get("id") {
             loop {
-                let payload = ktlsp_protocol::read_frame(&mut wire.reader).unwrap().unwrap();
+                let payload = ktlsp_protocol::read_frame(&mut wire.reader)
+                    .unwrap()
+                    .unwrap();
                 let response: Value = serde_json::from_slice(&payload).unwrap();
                 let matched = response.get("id") == Some(id);
                 wire.responses.push(response.clone());
@@ -8102,10 +8102,7 @@ mod workspace_symbols {
         refused(&response, -32801);
         assert!(serde_json::to_vec(&response).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
         let reload_message = source_reload(2, &options);
-        result(
-            &framed_send(&mut wire, &reload_message),
-            &Value::Null,
-        );
+        result(&framed_send(&mut wire, &reload_message), &Value::Null);
         let before_model = std::fs::read(project.join("workspace.json")).unwrap();
         let mut after_model = before_model;
         after_model.push(b' ');
@@ -8184,20 +8181,14 @@ mod workspace_symbols {
             );
         }
         let reload_message = source_reload(3, &options);
-        result(
-            &framed_send(&mut wire, &reload_message),
-            &Value::Null,
-        );
+        result(&framed_send(&mut wire, &reload_message), &Value::Null);
         let recovery = query(json!("same-session-recovery"), "");
         result(
             &framed_send(&mut wire, &recovery),
             &single(after, &uri, "Changed"),
         );
         let stop = json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"});
-        result(
-            &framed_send(&mut wire, &stop),
-            &Value::Null,
-        );
+        result(&framed_send(&mut wire, &stop), &Value::Null);
         let exit = json!({"jsonrpc":"2.0","method":"exit"});
         framed_send(&mut wire, &exit);
         wire.input.take();
@@ -8205,7 +8196,8 @@ mod workspace_symbols {
             let Some(payload) = ktlsp_protocol::read_frame(&mut wire.reader).unwrap() else {
                 break;
             };
-            wire.responses.push(serde_json::from_slice(&payload).unwrap());
+            wire.responses
+                .push(serde_json::from_slice(&payload).unwrap());
         }
         let output = wire.child.take().unwrap().wait_with_output().unwrap();
         assert!(output.status.success(), "{:?}", output.status);

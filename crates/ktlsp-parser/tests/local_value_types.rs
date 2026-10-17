@@ -14,16 +14,6 @@ use ktlsp_parser::{
 };
 use std::sync::atomic::AtomicBool;
 
-// TEMP428 actual-value writers stay until BOTH owner and ROOT read ORIGINAL
-// hosted values. Assertions/fixtures remain permanent after writer retirement.
-fn capture(label: &str, value: impl std::fmt::Debug) {
-    std::io::Write::write_all(
-        &mut std::io::stderr().lock(),
-        format!("LOCAL_VALUE_TYPE_428 {label}\n{value:#?}\nEND_LOCAL_VALUE_TYPE_428\n").as_bytes(),
-    )
-    .unwrap();
-}
-
 fn parse(source: &str) -> SnapshotResult {
     let snapshot =
         SourceSnapshot::new("file:///local-value-types.kt", 7, FileKind::Source, source).unwrap();
@@ -31,23 +21,11 @@ fn parse(source: &str) -> SnapshotResult {
         .unwrap()
         .parse_snapshot(&snapshot, &AtomicBool::new(false))
         .unwrap();
-    capture("original-snapshot-result-CST-diagnostics", &result);
     let tree = result.tree_for(&snapshot).unwrap();
     let mut cursor = 0;
-    for (index, token) in tree.elements().iter().enumerate().filter(|(_, e)| e.token) {
+    for token in tree.elements().iter().filter(|e| e.token) {
         assert_eq!(token.start, cursor, "complete original token partition");
         assert!(token.start < token.end);
-        let raw = &tree.source()[token.start..token.end];
-        capture(
-            "original-token-raw-UTF16",
-            (
-                index,
-                token,
-                raw,
-                tree.position(token.start),
-                tree.position(token.end),
-            ),
-        );
         cursor = token.end;
     }
     assert_eq!(cursor, source.len());
@@ -68,24 +46,7 @@ fn query<'a>(
     result: &'a SnapshotResult,
     selected: &'a Declaration<'a>,
 ) -> Result<LocalValueTypeProof<'a>, LocalValueTypeError> {
-    capture(
-        "complete-original-declarations-owners-memberships",
-        directory,
-    );
-    capture(
-        "original-request-selector-snapshot-and-pointer",
-        (
-            selected,
-            result.snapshot(),
-            directory
-                .lowered()
-                .declarations()
-                .iter()
-                .position(|d| std::ptr::eq(d, selected)),
-        ),
-    );
     let outcome = infer_local_value_type(directory, result, selected, result.snapshot());
-    capture("complete-public-proof-or-error", &outcome);
     if let Ok(proof) = &outcome {
         let tree = result.tree_for(result.snapshot()).unwrap();
         let selected_ordinal = directory
@@ -110,13 +71,7 @@ fn query<'a>(
         let comparisons = (
             std::ptr::eq(directory, proof.directory()),
             std::ptr::eq(selected, proof.selected()),
-            selected_ordinal,
-            terminal_ordinal,
-            function_ordinal,
-            body_ordinal,
-            proof.dependency_edges(),
         );
-        capture("original-proof-pointer-comparisons", comparisons);
         assert!(comparisons.0 && comparisons.1);
         assert!(selected_ordinal.is_some() && terminal_ordinal.is_some());
         assert!(function_ordinal.is_some() && body_ordinal.is_some());
@@ -132,10 +87,6 @@ fn query<'a>(
                 .declarations()
                 .iter()
                 .position(|d| std::ptr::eq(d, target));
-            capture(
-                "lexical-type-original-declaration-pointer-and-owner",
-                (ordinal, target.owner(), target),
-            );
             assert!(ordinal.is_some());
             assert_eq!(target.owner(), function_ordinal);
         }
@@ -153,16 +104,6 @@ fn query<'a>(
                         == Some(proof.terminal_declaration().cst_index()),
                     terminal.raw_spelling().as_ptr() == tree.source()[terminal.range()].as_ptr(),
                 );
-                capture(
-                    "integer-terminal-original-pointer-raw-range-value",
-                    (
-                        comparisons,
-                        index,
-                        terminal.range(),
-                        terminal.raw_spelling(),
-                        terminal.value(),
-                    ),
-                );
                 assert!(comparisons.0 && comparisons.1 && comparisons.2);
                 assert_eq!(&tree.source()[terminal.range()], terminal.raw_spelling());
             }
@@ -175,10 +116,6 @@ fn query<'a>(
                 let comparisons = (
                     std::ptr::eq(annotation.reference(), &tree.elements()[index]),
                     std::ptr::eq(annotation.name_token(), &tree.elements()[index + 1]),
-                );
-                capture(
-                    "parameter-terminal-original-annotation-pointers",
-                    (comparisons, annotation),
                 );
                 assert!(comparisons.0 && comparisons.1);
                 assert_eq!(proof.terminal_declaration().kind(), "VALUE_PARAMETER");
@@ -255,7 +192,6 @@ fn unused_direct_and_chained_original_integer_defaults() {
         let site = reference_site(&lower, &result, current, index).unwrap();
         let binding = bind_local_value(&directory, &site, current).unwrap();
         let old = infer_integer_initializer(&binding, current);
-        capture("unchanged-direct-integer-reference-refusal", &old);
         assert_eq!(
             old.unwrap_err(),
             IntegerInitializerError::ReferenceInitializer
@@ -409,7 +345,6 @@ fn original_bytes_utf16_and_foreign_origin_snapshot_selectors() {
         let name = declaration(&directory, "`🦀`").name_range();
         let start = tree.position(name.start).unwrap();
         let end = tree.position(name.end).unwrap();
-        capture("nonBMP-exact-LF-CRLF-name-range-UTF16", (&name, start, end));
         assert_eq!(start.line, 2);
         assert_eq!(start.character, 4);
         assert_eq!(end.character, 8);
@@ -427,7 +362,6 @@ fn original_bytes_utf16_and_foreign_origin_snapshot_selectors() {
             .unwrap(),
         ] {
             let outcome = infer_local_value_type(&directory, &result, selected, &changed);
-            capture("changed-snapshot-proof-refusal", (&changed, &outcome));
             assert_eq!(
                 outcome.unwrap_err(),
                 LocalValueTypeError::Binding(LocalBindingError::StaleSnapshot)
@@ -441,14 +375,12 @@ fn original_bytes_utf16_and_foreign_origin_snapshot_selectors() {
             &foreign_lower.declarations()[1],
         ] {
             let outcome = infer_local_value_type(&directory, &result, target, current);
-            capture("equal-byte-foreign-selector-refusal", &outcome);
             assert_eq!(
                 outcome.unwrap_err(),
                 LocalValueTypeError::Binding(LocalBindingError::InvalidOrigin)
             );
         }
         let outcome = infer_local_value_type(&directory, &foreign, selected, current);
-        capture("equal-byte-foreign-result-refusal", &outcome);
         assert_eq!(
             outcome.unwrap_err(),
             LocalValueTypeError::Binding(LocalBindingError::InvalidOrigin)
@@ -503,11 +435,10 @@ fn strict_complete_body_is_not_widened_by_type_only_grammar() {
         );
     }
     // Shapes refused by lowering have NO selected declaration or public proof.
-    // Capture their actual producer/lowering error, never count this as leaf proof.
+    // Check their actual producer/lowering error, never count this as leaf proof.
     for tail in ["var z=1", "a=2", "if(true){val z=1}", "val z=", "val z=1+"] {
         let result = parse(&format!("fun f(){{val a=1;val c=a;{tail}}}"));
         let lowered = lower_declarations(&result, result.snapshot());
-        capture("unsupported-tail-complete-lowering-outcome", &lowered);
         match lowered {
             Err(_) => {}
             Ok(lower) => {
@@ -595,8 +526,6 @@ fn parameter_selector_and_script_producer_do_not_manufacture_local_proofs() {
         .unwrap()
         .parse_snapshot(&snapshot, &AtomicBool::new(false))
         .unwrap();
-    capture("original-script-snapshot-result", &result);
     let lowered = lower_declarations(&result, &snapshot);
-    capture("script-lowering-no-declaration-authority", &lowered);
     assert!(lowered.is_err());
 }

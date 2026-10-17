@@ -16,7 +16,7 @@ pub struct Argument<'a> {
     pub raw: type_argument::TypeArgument<'a>,
     pub header: type_header::TypeHeader<'a>,
     pub type_span: Range<usize>,
-    /// Checked identity in `SelectedSignature.parameters`; never the Class variant.
+    /// Checked declaration identity in the containing composed result; never Class.
     pub classifier: Classifier,
 }
 
@@ -85,11 +85,11 @@ fn wire_error(start: usize, e: wire::Error) -> Error {
     failure(start + e.offset, ErrorKind::Wire(e.kind))
 }
 
-fn return_type<'a>(
+pub(super) fn finite_type<'a>(
     bytes: &'a [u8],
     span: Range<usize>,
     context: &class_context::Context<'_>,
-    own: &[class_context::Parameter<'_>],
+    own: Option<&[class_context::Parameter<'_>]>,
     resolver: &mut name_resolver::Resolver<'_, '_>,
     budget: &mut string_table::Budget,
 ) -> Result<ReturnType<'a>, Error> {
@@ -97,7 +97,8 @@ fn return_type<'a>(
     // Fixed flat selected slices, not a recursively decoded signature tree.
     let staged =
         type_arguments::decode_with_budget(bytes, budget).map_err(|e| wire_error(start, e))?;
-    if staged.header.class_name.is_none()
+    if own.is_some()
+        && staged.header.class_name.is_none()
         && (staged.header.type_parameter.is_some() || staged.header.type_parameter_name.is_some())
     {
         // The shared classifier rejects EVERY argument occurrence, including wrong
@@ -147,6 +148,9 @@ fn return_type<'a>(
             budget.wire.work(1, offset)?;
             match (field.number, field.value) {
                 (1, wire::Value::Varint(value)) if (0..=3).contains(&(value as u32 as i32)) => {}
+                (3, _) if own.is_none() => {
+                    return Err(failure(offset, ErrorKind::UnsupportedTableRole));
+                }
                 (1, _) => return Err(failure(offset, ErrorKind::UnsupportedProjection)),
                 (2, wire::Value::Bytes(_)) | (3, wire::Value::Varint(_)) => {}
                 (2 | 3, _) => return Err(failure(offset, ErrorKind::UnsupportedType)),
@@ -264,11 +268,11 @@ pub fn decode<'a>(
             ErrorKind::MissingRole
         },
     ))?;
-    let return_type = return_type(
+    let return_type = finite_type(
         raw,
         span,
         &context,
-        &function.type_parameters,
+        Some(&function.type_parameters),
         &mut resolver,
         &mut budget,
     )?;

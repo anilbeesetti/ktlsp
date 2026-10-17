@@ -570,6 +570,44 @@ evidence and integration verification remain ROOT-gated under #96.
   General overload/invoke, nonempty/nested local bodies, package/global fallback,
   callee references/hover and function rename remain unsupported;
   #96 quarantine and the full-parity gap are unchanged.
+- `local_value_binding::bind_local_argument_label(directory, result,
+  label_reference_cst_index, current)` supplies a separate **definition-only**
+  finite applicability proof for `fun <T> outer(p:T) { fun send(to:T) {};
+  send(to=p) }`. The selector must be the original `VALUE_ARGUMENT_NAME`
+  reference of a direct standalone call in an ordinary top-level function.
+  Exactly one named argument must be a plain reference to a unique original
+  outer-function parameter. The unique preceding same-block ordinary local
+  function must be nongeneric, receiver-free and empty-bodied, with exactly
+  one required simple-typed formal and no return annotation. Outer return
+  annotations also remain outside this envelope. All relevant callable-name
+  competitors are inspected before arity/eligibility filtering; argument-name
+  competition includes future direct values, functions and classifiers.
+  Both original annotations must resolve to the **same original lexical
+  `TYPE_PARAMETER` declaration**, establishing only reflexive `T <: T`.
+  An actual lexical `<Int>` binder qualifies; nominal `Int` without that binder
+  does not. Equal spelling in distinct nested binders is not identity.
+  The returned `target()`, `argument_parameter()`, `type_parameter()`, `call()`,
+  `parameters()`, `formal_annotation()` and `argument_annotation()` retain the
+  original declaration/CST/list/owner associations. Call/parameter syntax and
+  the complete lexical root are composed under one existing reference budget,
+  without public-query budget resets or a repeated root proof per annotation.
+  Stale/equal-byte foreign origins, wrong selectors, unsupported shapes,
+  competition and exhaustion refuse atomically without a partial target.
+  This does **not** relax any `BodyCheck` route or initializer-only
+  `ReferenceSite`: richer bodies still refuse complete value binding,
+  callee definition, completion, occurrences and value rename rather than
+  silently omitting argument occurrences. Existing empty-call/mixed-value
+  behavior remains separate and unchanged. There is no parameter rename,
+  literal/builtin inference, initializer chasing, general argument mapper,
+  signature help, nominal/imported applicability or overload resolution.
+  Permanent original-worker acceptance source covers original identities,
+  semantic backticks/non-BMP/trivia/CRLF, real type-rename range replay and
+  adversarial refusals. New hosted execution and independent complete actual
+  producer/paired-protocol readback remain required; source assertions are not
+  execution evidence or official equivalence. #96 remains OPEN/UNKNOWN,
+  #417's original Windows docless-hover cause remains UNKNOWN/OPEN, B3 remains
+  INCONCLUSIVE/HOLD, and oracle-runtime/provenance/full-semantic parity HOLDs
+  are not discharged by this finite label proof.
 - `local_value_binding::bind_lexical_type_parameter(directory, result,
   annotation_reference_index, current)` authenticates original snapshot/tree
   association, exact reference/token/USER_TYPE/TYPE_REFERENCE/declaration
@@ -635,7 +673,13 @@ evidence and integration verification remain ROOT-gated under #96.
   permanent source/edit/reparse/binding assertions retain their placement/frequency.
   First-source Windows full CI separately failed an unchanged docless-hover
   assertion; original cause UNKNOWN under #417. Cleanup is NOT its fix.
-  Cleaned-source reviews/OWN full CI/guarded integration remain required.
+  PR416 subsequently merged as `0d7d21923246f75969e6b8d52da71e1aeec086ce`;
+  original exact-main Native `39007350276/1/job117322423948` passed and was
+  independently accepted by OWNER+ROOT before lease clearance. See the
+  [delivery receipt](https://github.com/anilbeesetti/ktlsp/pull/416#issuecomment-6230407655)
+  and [verified integration / next prerequisite wave](../../docs/status/development.md#verified416-integration-and-next418419-prerequisite-wave).
+  This accepts #414's finite delivery, not #419's unexecuted successor, and does
+  not diagnose or close #417's original Windows failure.
   This is finite recursive ordinary-function lexical refactoring, not full Kotlin
   type resolution, hover/typeDefinition, workspace rename or official equivalence. PR409's
   OWN ORIGINAL native38994222653 and platform38994222817 at8285763 retained

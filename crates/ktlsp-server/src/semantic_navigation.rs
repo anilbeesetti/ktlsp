@@ -4,7 +4,7 @@ use ktlsp_parser::{
     documentation::{self, Budget as DocumentationBudget},
     local_value_binding::{
         LocalValueAnchor, TypeParameterAnchor, bind_lexical_type_parameter,
-        bind_local_function_callee, bind_local_value, guarded_local_value_rename,
+        bind_local_argument_label, bind_local_function_callee, bind_local_value, guarded_local_value_rename,
         guarded_type_parameter_rename, local_value_occurrences, type_parameter_occurrences,
         visible_local_values,
     },
@@ -243,6 +243,18 @@ pub(crate) fn render(
     {
         // Annotation role is selected positively, never as a failed-value fallback.
         let binding = bind_lexical_type_parameter(&directory, result, index, snapshot)
+            .map_err(|_| UNSUPPORTED)?;
+        let target = binding.target();
+        return render_target(tree.source(), snapshot, query, target, target.name_range());
+    }
+    if matches!(query, Query::Definition { .. })
+        && let Some((index, expression)) = reference
+        && expression
+            .parent
+            .is_some_and(|parent| tree.elements()[parent].kind == "VALUE_ARGUMENT_NAME")
+    {
+        // Positive label-role proof only; other consumers retain their guards.
+        let binding = bind_local_argument_label(&directory, result, index, snapshot)
             .map_err(|_| UNSUPPORTED)?;
         let target = binding.target();
         return render_target(tree.source(), snapshot, query, target, target.name_range());

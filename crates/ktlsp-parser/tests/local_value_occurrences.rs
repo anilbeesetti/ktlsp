@@ -3065,3 +3065,198 @@ fn return_only_headers_require_the_complete_original_ordered_finite_shape() {
         );
     }
 }
+
+#[test]
+fn lexical_label_applicability_refuses_every_unproved_argument_and_callable_shape() {
+    use ktlsp_parser::local_value_binding::bind_local_argument_label;
+    let _serial = functional::serial();
+    let canonical = "fun <T> outer(p:T){ fun send(to:T){}; send(to=p) }";
+    let mut cases = vec![
+        // A nominal spelling, even Int, is not a lexical binder.
+        "fun outer(p:Int){ fun send(to:Int){}; send(to=p) }".to_owned(),
+        "fun <T,U> outer(p:T){ fun send(to:U){}; send(to=p) }".to_owned(),
+        "fun <T> outer(p:Missing){ fun send(to:T){}; send(to=p) }".to_owned(),
+        "fun <T> outer(p:T){ fun send(to:Missing){}; send(to=p) }".to_owned(),
+        "fun <T> outer(p){ fun send(to:T){}; send(to=p) }".to_owned(),
+        "fun <T> outer(p:T){ fun send(to){}; send(to=p) }".to_owned(),
+        "fun <T> outer(p:T){ fun <T> send(to:T){}; send(to=p) }".to_owned(),
+        "fun <T> root(p:T){ fun <T> outer(q:T){ fun send(to:T){}; send(to=p) } }".to_owned(),
+        "fun <T> outer(p:T){ send(to=p); fun send(to:T){} }".to_owned(),
+        "fun <T> outer(p:T):T{ fun send(to:T){}; send(to=p) }".to_owned(),
+        "class C { fun <T> outer(p:T){ fun send(to:T){}; send(to=p) } }".to_owned(),
+        "fun <T> outer(p:T){ fun middle(){ fun send(to:T){}; send(to=p) } }".to_owned(),
+        "fun <T> outer(p:T){ fun send(to:T){}; val q:T=p; send(to=q) }".to_owned(),
+    ];
+    for argument in [
+        "", "p", "wrong=p", "to=p,to=p", "to=p,other=p", "p,to=p", "to=p,p",
+        "to=1", "to=2L", "to=(p)", "to=missing", "to=send()", "to=p+p", "to=*p",
+    ] {
+        cases.push(canonical.replace("send(to=p)", &format!("send({argument})")));
+    }
+    for header in [
+        "fun send(){}", "fun send(to:T,other:T){}", "fun send(to:T=p){}",
+        "fun send(vararg to:T){}", "fun <U> send(to:T){}", "fun T.send(to:T){}",
+        "suspend fun send(to:T){}", "fun send(to:T):T{}", "fun send(to:T){ val x=1 }",
+        "fun send(to:T)=p", "fun send(to:T?){}", "fun send(to:pkg.T){}",
+        "fun send(to:List<T>){}", "fun send(to:()->T){}", "fun send(@A to:T){}",
+    ] {
+        cases.push(canonical.replace("fun send(to:T){}", header));
+    }
+    for call in [
+        "obj.send(to=p)", "obj?.send(to=p)", "send<T>(to=p)", "send(to=p){}",
+        "send(to=p)()", "(send)(to=p)", "val result=send(to=p)",
+    ] {
+        cases.push(canonical.replace("send(to=p)", call));
+    }
+    // Competition is checked before arity/eligibility, on both sides of the call.
+    for competitor in [
+        "fun send(){}", "fun `send`(){}", "fun send(other:T){}",
+        "fun send(a:T,b:T){}", "fun send(to:T=p){}", "fun send(vararg to:T){}",
+        "fun <U> send(to:U){}", "fun T.send(to:T){}", "fun send(to:T):T{}",
+        "fun send(to:T){ val x=1 }", "val send=1", "val `send`=1",
+        "class send", "object send {}",
+    ] {
+        for future in [false, true] {
+            cases.push(if future {
+                canonical.replace("send(to=p) }", &format!("send(to=p); {competitor} }}"))
+            } else {
+                canonical.replace("; send(to=p)", &format!("; {competitor}; send(to=p)"))
+            });
+        }
+    }
+    cases.push(canonical.replace("outer(p:T)", "outer(p:T,send:T)"));
+    // Argument lookup also refuses future values, functions and classifiers.
+    for competitor in ["val p=1", "val `p`=1", "fun p(){}", "class p", "object p {}"] {
+        for future in [false, true] {
+            cases.push(if future {
+                canonical.replace("send(to=p) }", &format!("send(to=p); {competitor} }}"))
+            } else {
+                canonical.replace("; send(to=p)", &format!("; {competitor}; send(to=p)"))
+            });
+        }
+    }
+    cases.push(canonical.replace("outer(p:T)", "outer(p:T,`p`:T)"));
+    cases.push(canonical.replace("<T>", "<T,`T`>"));
+    for source in cases {
+        let result = parse(&source);
+        let current = result.snapshot();
+        // Some shapes are already rejected by the unchanged lowerer/regions.
+        // If projected, every possible reference selector must still refuse.
+        if let Ok(lower) = lower_declarations(&result, current)
+            && let Ok(directory) = build_regions(&lower, &result, current)
+        {
+            let tree = result.tree_for(current).unwrap();
+            let mut references = 0;
+            for (index, _) in tree.elements().iter().enumerate().filter(|(_, e)| e.kind == "REFERENCE_EXPRESSION") {
+                references += 1;
+                assert!(bind_local_argument_label(&directory, &result, index, current).is_err(), "{source}: selector {index}");
+            }
+            assert!(references > 0, "{source}");
+        }
+    }
+}
+
+#[test]
+fn lexical_label_distinguishes_equal_spelled_original_nested_type_binders() {
+    use ktlsp_parser::local_value_binding::{bind_lexical_type_parameter, bind_local_argument_label};
+    let _serial = functional::serial();
+    let source = "fun <T> outer(p:T){ fun <`T`> send(to:T){}; send(to=p) }";
+    let result = parse(source);
+    let current = result.snapshot();
+    let tree = result.tree_for(current).unwrap();
+    let lower = lower_declarations(&result, current).unwrap();
+    let directory = build_regions(&lower, &result, current).unwrap();
+    let annotations: Vec<_> = tree.elements().iter().enumerate().filter(|(_, e)| {
+        e.kind == "REFERENCE_EXPRESSION" && tree.elements()[e.parent.unwrap()].kind == "USER_TYPE"
+    }).map(|(index, _)| bind_lexical_type_parameter(&directory, &result, index, current).unwrap()).collect();
+    assert_eq!(annotations.len(), 2);
+    assert_eq!(annotations[0].target().semantic_spelling(), annotations[1].target().semantic_spelling());
+    assert!(!std::ptr::eq(annotations[0].target(), annotations[1].target()));
+    assert_ne!(annotations[0].target().owner(), annotations[1].target().owner());
+    let label = tree.elements().iter().position(|e| {
+        e.kind == "REFERENCE_EXPRESSION" && tree.elements()[e.parent.unwrap()].kind == "VALUE_ARGUMENT_NAME"
+    }).unwrap();
+    assert!(bind_local_argument_label(&directory, &result, label, current).is_err());
+}
+
+#[test]
+fn lexical_label_authenticates_exact_role_original_parse_and_every_snapshot_dimension() {
+    use ktlsp_parser::local_value_binding::bind_local_argument_label;
+    let _serial = functional::serial();
+    let source = "fun <T> outer(p:T){ fun send(to:T){}; send(to=p) }";
+    let result = parse(source);
+    let current = result.snapshot();
+    let tree = result.tree_for(current).unwrap();
+    let lower = lower_declarations(&result, current).unwrap();
+    let directory = build_regions(&lower, &result, current).unwrap();
+    let label = tree.elements().iter().position(|e| {
+        e.kind == "REFERENCE_EXPRESSION" && tree.elements()[e.parent.unwrap()].kind == "VALUE_ARGUMENT_NAME"
+    }).unwrap();
+    bind_local_argument_label(&directory, &result, label, current).unwrap();
+    for index in (0..tree.elements().len()).filter(|&i| i != label).chain([tree.elements().len(), usize::MAX]) {
+        assert!(bind_local_argument_label(&directory, &result, index, current).is_err(), "wrong original role {index}");
+    }
+    let foreign = parse(source);
+    let foreign_lower = lower_declarations(&foreign, foreign.snapshot()).unwrap();
+    let foreign_directory = build_regions(&foreign_lower, &foreign, foreign.snapshot()).unwrap();
+    assert_eq!(bind_local_argument_label(&directory, &foreign, label, foreign.snapshot()).unwrap_err(), LocalBindingError::InvalidOrigin);
+    assert_eq!(bind_local_argument_label(&foreign_directory, &result, label, current).unwrap_err(), LocalBindingError::InvalidOrigin);
+    for stale in [
+        SourceSnapshot::new("other-document", 7, FileKind::Source, source).unwrap(),
+        SourceSnapshot::new(current.document(), 8, FileKind::Source, source).unwrap(),
+        SourceSnapshot::new(current.document(), 7, FileKind::Script, source).unwrap(),
+        SourceSnapshot::new(current.document(), 7, FileKind::Source, source.replace("to=p", "to=q")).unwrap(),
+    ] {
+        assert_eq!(bind_local_argument_label(&directory, &result, label, &stale).unwrap_err(), LocalBindingError::StaleSnapshot);
+    }
+}
+
+#[test]
+fn lexical_label_positive_does_not_open_any_complete_value_or_callee_route() {
+    use ktlsp_parser::local_value_binding::{
+        bind_local_argument_label, bind_local_function_callee, guarded_local_value_rename,
+        visible_local_values,
+    };
+    let _serial = functional::serial();
+    let source = "fun <T> outer(p:T){ fun empty(){}; fun send(to:T){}; val x=1; empty(); send(to=p); val y=x; val z=p }";
+    let result = parse(source);
+    let current = result.snapshot();
+    let tree = result.tree_for(current).unwrap();
+    let lower = lower_declarations(&result, current).unwrap();
+    let directory = build_regions(&lower, &result, current).unwrap();
+    let label = tree.elements().iter().position(|e| {
+        e.kind == "REFERENCE_EXPRESSION" && tree.elements()[e.parent.unwrap()].kind == "VALUE_ARGUMENT_NAME"
+    }).unwrap();
+    let found = bind_local_argument_label(&directory, &result, label, current).unwrap();
+    assert_eq!(found.target().raw_name(), "to");
+    for (index, node) in tree.elements().iter().enumerate().filter(|(_, e)| e.kind == "REFERENCE_EXPRESSION") {
+        match tree.elements()[node.parent.unwrap()].kind.as_str() {
+            "CALL_EXPRESSION" => assert_eq!(
+                bind_local_function_callee(&directory, &result, index, current).unwrap_err(),
+                LocalBindingError::UnsupportedContext
+            ),
+            "PROPERTY" => {
+                let site = reference_site(&lower, &result, current, index).unwrap();
+                assert_eq!(bind_local_value(&directory, &site, current).unwrap_err(), LocalBindingError::UnsupportedContext);
+                assert_eq!(visible_local_values(&directory, &result, index, current).unwrap_err(), LocalBindingError::UnsupportedContext);
+                let anchor = LocalValueAnchor::ReferenceExpression(index);
+                assert_eq!(local_value_occurrences(&directory, &result, anchor, current).unwrap_err(), LocalBindingError::UnsupportedContext);
+                for name in [None, Some("fresh")] {
+                    assert_eq!(guarded_local_value_rename(&directory, &result, anchor, current, name).unwrap_err(), LocalBindingError::UnsupportedContext);
+                }
+            }
+            "VALUE_ARGUMENT" | "VALUE_ARGUMENT_NAME" => {
+                assert_eq!(reference_site(&lower, &result, current, index).unwrap_err(), ktlsp_parser::lowering::ReferenceSiteError::UnsupportedContext);
+                assert_eq!(local_value_occurrences(&directory, &result, LocalValueAnchor::ReferenceExpression(index), current).unwrap_err(), LocalBindingError::UnsupportedContext);
+            }
+            _ => {}
+        }
+    }
+    for target in lower.declarations().iter().filter(|d| matches!(d.kind(), "PROPERTY" | "VALUE_PARAMETER")) {
+        let anchor = LocalValueAnchor::Declaration(target);
+        assert_eq!(local_value_occurrences(&directory, &result, anchor, current).unwrap_err(), LocalBindingError::UnsupportedContext);
+        for name in [None, Some("fresh")] {
+            assert_eq!(guarded_local_value_rename(&directory, &result, anchor, current, name).unwrap_err(), LocalBindingError::UnsupportedContext);
+        }
+    }
+}

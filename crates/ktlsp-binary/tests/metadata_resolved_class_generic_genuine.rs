@@ -58,12 +58,13 @@ fn bytes_mut<'a>(input: &'a mut metadata::Outcome<'_>) -> &'a mut Vec<u8> {
     bytes
 }
 fn borrowed(raw: &[u8], input: &[u8], span: Range<usize>) {
-    assert_eq!(raw, &input[span.clone()]);
-    assert_eq!(raw.as_ptr(), input[span.clone()].as_ptr());
+    let retained = &input[span.start..span.end];
+    assert_eq!(raw, retained);
+    assert_eq!(raw.as_ptr(), retained.as_ptr());
     println!(
         "actual borrowed span={span:?} raw={raw:?} ptr={:p} retained={:p}",
         raw.as_ptr(),
-        input[span].as_ptr()
+        retained.as_ptr()
     );
 }
 fn identity(id: &metadata::class_id::ClassId, package: &str, relative: &str) {

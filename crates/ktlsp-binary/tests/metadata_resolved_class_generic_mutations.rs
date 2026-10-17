@@ -122,7 +122,11 @@ fn immediate_class_name_lookup_is_required_unique_and_lossless_utf16() {
     for carrier in CARRIERS {
         for bound in [false, true] {
             with_input(carrier, |mut input| {
-                let p = parameter(91, 1, if bound { &[name_type(2, 0)] } else { &[] });
+                let p = if bound {
+                    parameter(91, 1, &[name_type(2, 0)])
+                } else {
+                    parameter(91, 1, &[])
+                };
                 rewrite(&mut input, carrier, &[p], &[name_type(3, 0)]);
                 assert_eq!(
                     failure(&input).kind,
@@ -130,7 +134,11 @@ fn immediate_class_name_lookup_is_required_unique_and_lossless_utf16() {
                 );
             });
             with_input(carrier, |mut input| {
-                let first = parameter(91, 1, if bound { &[name_type(2, 1)] } else { &[] });
+                let first = if bound {
+                    parameter(91, 1, &[name_type(2, 1)])
+                } else {
+                    parameter(91, 1, &[])
+                };
                 let second = parameter(-7, 1, &[]);
                 rewrite(&mut input, carrier, &[first, second], &[name_type(3, 1)]);
                 assert_eq!(

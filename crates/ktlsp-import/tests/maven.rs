@@ -51,13 +51,13 @@ fn reactor_preserves_order_scopes_provenance_and_source_only_projection() {
     .unwrap();
     assert_eq!(
         result
-            .modules
+            .modules()
             .iter()
             .map(|m| m.coordinate.artifact.as_str())
             .collect::<Vec<_>>(),
         ["reactor", "core", "app"]
     );
-    let modules = &result.modules;
+    let modules = result.modules();
     assert_eq!(modules[0].packaging, "pom");
     assert!(modules[0].source_roots.is_empty());
     assert_eq!(
@@ -139,17 +139,17 @@ fn defaults_empty_lists_and_literal_comments() {
         SIMPLE.replace("org.example", "org.<!-- note -->example"),
     ] {
         let result = import(&text).unwrap();
-        assert_eq!(result.modules[0].packaging, "jar");
-        assert!(result.modules[0].dependencies.is_empty());
+        assert_eq!(result.modules()[0].packaging, "jar");
+        assert!(result.modules()[0].dependencies.is_empty());
         assert_eq!(
-            result.modules[0].source_roots[0].path,
+            result.modules()[0].source_roots[0].path,
             base().join("src/main/java")
         );
-        let range = result.modules[0].source.range.clone().unwrap();
+        let range = result.modules()[0].source.range.clone().unwrap();
         assert!(text[range].starts_with("<project>"));
     }
     let result = import(&with("<packaging>pom</packaging><build/>")).unwrap();
-    assert!(result.modules[0].source_roots.is_empty());
+    assert!(result.modules()[0].source_roots.is_empty());
 }
 
 #[test]
@@ -476,7 +476,7 @@ fn nested_reactor_preorder_is_independent_of_input_order() {
     .unwrap();
     assert_eq!(
         result
-            .modules
+            .modules()
             .iter()
             .map(|m| m.coordinate.artifact.as_str())
             .collect::<Vec<_>>(),
@@ -643,7 +643,7 @@ fn bom_provenance_ranges_address_the_original_snapshot() {
     ] {
         let xml = format!("{prefix}{}", with(body));
         let result = import(&xml).unwrap();
-        let module = &result.modules[0];
+        let module = &result.modules()[0];
         assert_eq!(module.source.range, Some(prefix.len()..xml.len()));
         let root = &module.source_roots[0].source;
         assert_eq!(

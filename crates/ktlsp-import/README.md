@@ -18,6 +18,14 @@ Upstream source notice: Copyright 2000-2025 JetBrains s.r.o. and contributors. U
 
 The complete supported result is `ImportedWorkspace`: ordered modules, content-root boundaries/source membership/exact root type, full dependency order (including moduleSource position), and library-root order/type, together with `project_projection()`. The latter is a validated ProjectModel v1 projection and **alone loses import semantics**. Later consumers must use the whole imported result. This import-local representation does not change ProjectModel v1.
 
+Complete JSON-v1/v2, JPS and Maven import results retain immutable loader-produced
+records. Use borrowed `modules()` and (JSON) `libraries()` slices; the former
+public vectors are intentionally no longer mutable fields. Nested record types
+remain ordinary public data, but shared result views cannot mutate retained
+order, roots or provenance independently of the validated projection. Standalone
+project-model clones remain mutable and must pass the normal loader validation
+before reuse. No replacement API, duplicate catalog or workspace provider is added.
+
 Supported fields/defaults follow the source contract:
 
 - Workspace modules/libraries default empty. sdks/kotlinSettings/javaSettings may be absent or empty; externalSystem absent/null.
@@ -136,7 +144,7 @@ export bit, CLASSES-root ordinal/import path, retained artifact (digest and
 provenance), and existing classpath origin/entry/rank/decoded identity.
 
 Ownership and ordering come only from the private validated immutable v2
-projection, not mutable public importer sidecars. Paths must be absolute UTF-8,
+projection; complete ordered importer metadata is retained immutably alongside it. Paths must be absolute UTF-8,
 lexically normalized host paths under declared source roots, not content-root
 boundaries. Native Windows separators are accepted in query/provenance PathBufs;
 foreign backslashes on Unix are refused. Imported JSON still uses the importer's

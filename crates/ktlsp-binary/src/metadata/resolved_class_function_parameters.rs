@@ -119,7 +119,7 @@ pub(super) fn classifier(
     header: &type_header::TypeHeader<'_>,
     start: usize,
     context: &class_context::Context<'_>,
-    own: &[Parameter<'_>],
+    own: Option<&[Parameter<'_>]>,
     resolver: &mut name_resolver::Resolver<'_, '_>,
     budget: &mut string_table::Budget,
 ) -> Result<Classifier, Error> {
@@ -154,7 +154,7 @@ pub(super) fn classifier(
         }
         (None, Some(id), None) => {
             // ponytail: bounded linear scoped lookup; no secondary owning index.
-            for (ordinal, parameter) in own.iter().enumerate() {
+            for (ordinal, parameter) in own.unwrap_or(&[]).iter().enumerate() {
                 budget.wire.work(1, start)?;
                 if parameter.parameter.id == id {
                     return Ok(Classifier::FunctionParameter(ordinal));
@@ -172,8 +172,11 @@ pub(super) fn classifier(
             let query = resolver
                 .get_string_with_budget(index, budget)
                 .map_err(|e| failure(start, ErrorKind::Name(e)))?;
+            // None explicitly selects immediate Class NAME scope. Some(empty)
+            // remains an empty callable scope and must never fall back to Class.
+            let declarations = own.unwrap_or(&context.parameters);
             let mut found = None;
-            for (ordinal, parameter) in own.iter().enumerate() {
+            for (ordinal, parameter) in declarations.iter().enumerate() {
                 budget.wire.work(1, start)?;
                 if query.len() != parameter.name.len() {
                     continue;
@@ -194,7 +197,10 @@ pub(super) fn classifier(
                 }
             }
             found
-                .map(Classifier::FunctionParameter)
+                .map(|ordinal| match own {
+                    Some(_) => Classifier::FunctionParameter(ordinal),
+                    None => Classifier::ClassParameter(ordinal),
+                })
                 .ok_or(failure(start, ErrorKind::UnknownParameterName))
         }
         _ => Err(failure(start, ErrorKind::UnsupportedType)),
@@ -247,7 +253,7 @@ pub(super) fn parameter<'a>(
     budget.node(2, type_start)?;
     let header = type_header::decode_with_budget(ty, &mut budget.wire)
         .map_err(|e| wire_error(type_start, e))?;
-    let classifier = classifier(&header, type_start, context, own, resolver, budget)?;
+    let classifier = classifier(&header, type_start, context, Some(own), resolver, budget)?;
     let name = resolver
         .get_string_with_budget(raw.name, budget)
         .map_err(|e| failure(start, ErrorKind::Name(e)))?;

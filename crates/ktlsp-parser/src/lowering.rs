@@ -3501,6 +3501,190 @@ mod tests {
     }
 
     #[test]
+    fn local_type_one_allowance_exact_cumulative_edges_annotations_and_literal() {
+        use crate::{
+            local_value_binding::{LocalBindingError, LocalValueTypeError, local_type_with_budget},
+            structural_regions::build_regions,
+        };
+        // Synthetic accounting complements tests/local_value_types.rs REAL
+        // producer proofs; these trees are NOT producer/leaf acceptance evidence.
+        for lexical in [false, true] {
+            let result = if lexical {
+                let mut tree = Tree::new();
+                tree.open("FUN");
+                tree.token("FUN_KEYWORD", "fun");
+                tree.open("TYPE_PARAMETER_LIST");
+                tree.token("LT", "<");
+                tree.open("TYPE_PARAMETER");
+                tree.token("IDENTIFIER", "T");
+                tree.close();
+                tree.token("GT", ">");
+                tree.close();
+                tree.token("WHITE_SPACE", " ");
+                tree.token("IDENTIFIER", "f");
+                tree.open("VALUE_PARAMETER_LIST");
+                tree.token("LPAR", "(");
+                tree.open("VALUE_PARAMETER");
+                tree.token("IDENTIFIER", "p");
+                tree.token("COLON", ":");
+                tree.open("TYPE_REFERENCE");
+                tree.open("USER_TYPE");
+                tree.open("REFERENCE_EXPRESSION");
+                tree.token("IDENTIFIER", "T");
+                tree.close();
+                tree.close();
+                tree.close();
+                tree.close();
+                tree.token("RPAR", ")");
+                tree.close();
+                tree.open("BLOCK");
+                tree.token("LBRACE", "{");
+                for (name, reference) in [("a", "p"), ("b", "a"), ("c", "b")] {
+                    tree.open("PROPERTY");
+                    tree.token("VAL_KEYWORD", "val");
+                    tree.token("WHITE_SPACE", " ");
+                    tree.token("IDENTIFIER", name);
+                    tree.token("COLON", ":");
+                    tree.open("TYPE_REFERENCE");
+                    tree.open("USER_TYPE");
+                    tree.open("REFERENCE_EXPRESSION");
+                    tree.token("IDENTIFIER", "T");
+                    tree.close();
+                    tree.close();
+                    tree.close();
+                    tree.token("EQ", "=");
+                    tree.open("REFERENCE_EXPRESSION");
+                    tree.token("IDENTIFIER", reference);
+                    tree.close();
+                    tree.close();
+                    tree.token("SEMICOLON", ";");
+                }
+                finish_body(tree)
+            } else {
+                binding_fixture(&[&[("a", None), ("b", Some("a")), ("c", Some("b"))]])
+            };
+            let lower = lower(&result).unwrap();
+            let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
+            let mut costs = Vec::new();
+            for name in ["a", "b", "c"] {
+                let selected = lower
+                    .declarations()
+                    .iter()
+                    .find(|d| d.raw_name() == name)
+                    .unwrap();
+                let mut measured = ReferenceBudget::default();
+                local_type_with_budget(
+                    &directory,
+                    &result,
+                    selected,
+                    result.snapshot(),
+                    &mut measured,
+                )
+                .unwrap();
+                assert_eq!((measured.requested, measured.retained), (0, 0));
+                costs.push(measured.work);
+                let mut exact = ReferenceBudget {
+                    work: WORK - measured.work,
+                    requested: REQUESTED,
+                    retained: RETAINED,
+                };
+                local_type_with_budget(
+                    &directory,
+                    &result,
+                    selected,
+                    result.snapshot(),
+                    &mut exact,
+                )
+                .unwrap();
+                assert_eq!(
+                    (exact.work, exact.requested, exact.retained),
+                    (WORK, REQUESTED, RETAINED)
+                );
+                for work in [WORK - measured.work + 1, usize::MAX] {
+                    let error = local_type_with_budget(
+                        &directory,
+                        &result,
+                        selected,
+                        result.snapshot(),
+                        &mut ReferenceBudget {
+                            work,
+                            ..ReferenceBudget::default()
+                        },
+                    )
+                    .unwrap_err();
+                    assert!(matches!(
+                        error,
+                        LocalValueTypeError::Binding(LocalBindingError::Resource)
+                            | LocalValueTypeError::Integer(
+                                crate::integer_initializer_types::IntegerInitializerError::Resource
+                            )
+                    ));
+                }
+            }
+            assert!(costs[0] < costs[1] && costs[1] < costs[2]);
+            let selected = lower
+                .declarations()
+                .iter()
+                .find(|d| d.raw_name() == "c")
+                .unwrap();
+            // Enough for an earlier selected proof cannot reset at a later hop.
+            for prior_cost in &costs[..2] {
+                let error = local_type_with_budget(
+                    &directory,
+                    &result,
+                    selected,
+                    result.snapshot(),
+                    &mut ReferenceBudget {
+                        work: WORK - prior_cost,
+                        ..ReferenceBudget::default()
+                    },
+                )
+                .unwrap_err();
+                assert!(matches!(
+                    error,
+                    LocalValueTypeError::Binding(LocalBindingError::Resource)
+                        | LocalValueTypeError::Integer(
+                            crate::integer_initializer_types::IntegerInitializerError::Resource
+                        )
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn local_type_authenticates_selected_owner_and_membership_not_only_its_bytes() {
+        use crate::{
+            local_value_binding::{LocalBindingError, LocalValueTypeError, infer_local_value_type},
+            structural_regions::build_regions,
+        };
+        // Private invalid-origin construction, not a real-producer substitute.
+        for corruption in 0..3 {
+            let result = binding_fixture(&[&[("a", None), ("c", Some("a"))], &[("other", None)]]);
+            let mut lower = lower(&result).unwrap();
+            let selected = 2;
+            match corruption {
+                0 => lower.declarations[selected].owner = Some(3),
+                1 => lower.declarations[selected].owner = None,
+                _ => lower.declarations[selected].incomplete = true,
+            }
+            let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
+            let error = infer_local_value_type(
+                &directory,
+                &result,
+                &lower.declarations()[selected],
+                result.snapshot(),
+            )
+            .unwrap_err();
+            assert!(matches!(
+                error,
+                LocalValueTypeError::Binding(
+                    LocalBindingError::InvalidOrigin | LocalBindingError::UnsupportedContext
+                )
+            ));
+        }
+    }
+
+    #[test]
     fn occurrence_query_shares_budget_through_final_emission_and_refuses_atomically() {
         use crate::{
             local_value_binding::{LocalBindingError, LocalValueAnchor, occurrences_with_budget},

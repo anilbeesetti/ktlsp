@@ -89,6 +89,46 @@ ordinary fixed-count JSON/final serializer allocations do not establish a
 whole-pipeline/RSS/prompt semantic-cancellation guarantee. [Exact provider and
 current acceptance limits](../../crates/ktlsp-server/README.md#manual-source-owned-signature-help-424)
 do not establish incomplete typing, general argument/overload/inference/imported
-semantics or official signature-help equivalence. Static component clears do not
-substitute for pending ROOT union/compiler/original hosted actual-value/edit gates.
+semantics or official signature-help equivalence. Static component clears never
+substitute for exact ROOT union/compiler/original hosted actual-value/edit gates.
 
+
+## Coherent eager native workspace-symbol source contract (#426)
+
+The complete composed source now adds an independent `workspace/symbol` path;
+the narrower421 operation above did not itself grant this capability. Original
+hosted runtime/actual-value acceptance and guarded integration remain pending.
+Only the trusted sibling-parser provider advertises `workspaceSymbolProvider:true`;
+the client's `workspace.symbol` kind profile is independent of document symbols.
+Results are eager full declaration locations, without resolve/data/pagination/
+progress. Empty query selects all; otherwise native matching is case-sensitive
+LITERAL substring on existing outline spelling, not official fuzzy matching.
+
+The operation captures every unique admitted.kt member under one immutable
+workspace Arc/epoch and exact mapped-overlay incarnation/version/content. Both
+verification phases visit every original model and every captured closed source,
+including zero/all-overlay models, empty/negative and nonmatching files. Manual
+reload admits additions; changed/deleted records refuse. Whole-success publication
+requires the same authority after joined work; no valid prefix escapes a late
+failure. The original two-generation/trusted-quiescent-FS limitation remains.
+
+One existing globally owned8-slot job parses sequentially and retains cancelled
+ownership until join. No second pool, production probe/barrier/delay or raised
+parser bound/deadline is added. One256 Mi-unit logical allowance includes
+verification, capture, delegated parser precharge, projection and output;
+conservative precharge permits AT MOST42 tiny-source delegations before other
+work, not1,024 successful parses merely because membership admits1,024.
+Actual escaped IDs reserve512 failure bytes before parameter errors. IDs fitting
+only the compact refusal keep their echoed ID; an ID that cannot fit EVEN that
+response is rejected by provider policy as InvalidRequest (`-32600`, `id:null`)
+before params/source work. The connection remains available; no false full-ID
+echo or oversized transport write is attempted. Logical limits do not prove
+CPU/RSS/OS latency or prompt inner cancellation.
+[Full source/error/resource and evidence-layer contract](../../crates/ktlsp-server/README.md#coherent-eager-native-workspace-symbols-426).
+
+Packaged raw protocol values, separate Session ownership, actual lossless byte
+runs for giant IDs and genuinely applied returned edits require independent
+BOTH owner/ROOT complete original hosted readbacks before observation retirement.
+No local Kotlin/parser/server/Session/worker runtime is admitted under96.
+No semantic index, effective library/classpath, official matcher or full-parity
+claim is added.

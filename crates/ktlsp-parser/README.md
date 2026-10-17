@@ -895,6 +895,62 @@ overflow spellings all the way to the integer query: an upstream refusal fails
 the test rather than substituting decoder-only evidence. Hosted execution
 evidence must be recorded separately from source.
 
+### Snapshot-owned immutable-local value types (#428)
+
+**Complete composed source only; compiler and original hosted actual-value
+acceptance remain pending.** `local_value_binding::infer_local_value_type`
+selects an ORIGINAL direct immutable-local `Declaration` with the original
+`RegionDirectory`, `SnapshotResult` and current `SourceSnapshot`. Unused/direct
+locals need no fabricated reference or binding.
+
+Private-field `LocalValueTypeProof` retains the directory, selected declaration,
+function/body, terminal declaration/evidence, dependency count and either
+`LocalValueType::DefaultInteger(IntegerType)` or
+`LexicalTypeParameter(&original_declaration)`. Integer terminal evidence borrows
+the ORIGINAL literal/token/raw bytes/range/value; propagating its value TYPE
+does NOT make a reference a new literal, constant expression or narrowing proof.
+Parameter terminals retain their original authenticated annotation.
+
+ONE unchanged `ReferenceBudget` starts before selector/snapshot authentication,
+then covers the complete strict value body ONCE, one complete lexical root,
+all physical candidate/edge/annotation/literal work and final emission.
+Every dependency uses its OWN original initializer position. Unique preceding
+locals, self/future exclusion, same-function parameter fallback, later quoted
+duplicates and local-function competitors retain existing rules. Local-to-local
+CST order strictly decreases; no recursion, visited graph/index, source copy or
+new collection is added. An explicit local annotation is accepted only by the
+SAME original lexical function type-parameter identity as its initializer proof.
+`<Int>` remains lexical, not builtin Int; nominal/imported/source-class spelling,
+different T/U, literal-to-T and backward contextual retyping refuse atomically.
+
+The strict value-body grammar is intersected with, not replaced by, type-only
+admission. The proof establishes whole-body STRUCTURAL admissibility and the
+selected dependency path, not type correctness of unrelated declarations.
+Original pointer/owner/membership and document/revision/kind/source authority
+remain mandatory; equal-byte foreign producers, documentation origins and
+scripts do not substitute.
+
+The existing `infer_integer_initializer` above intentionally remains STRICT:
+same public binding/literal/value/default/error contract and parameter,
+annotated-target and reference-initializer refusals. Only a private original-
+leaf kernel is shared. Current value/call/occurrence/rename/visibility/applicability
+and server consumers remain unchanged. No general constraints, nominal/builtin
+resolution, dispatch or capability is added. Existing2,097,152-work/1,024-decl/
+131,072-byte bounds are unchanged and are not whole-process/RSS/time guarantees.
+These native budgets do not observe element-level cancellation; no prompt
+cancellation infrastructure or claim is introduced.
+
+Real-production-parser/public-API permanent source includes genuine default/
+lexical chains, unused locals, identity/shadowing/forward/cycle/competitor cases,
+frozen malformed/overflow leaves reached THROUGH real references, full origin/
+snapshot/UTF-16 controls and cumulative resource exhaustion. TEMP428 writers
+retain COMPLETE actual snapshots/CST/token partition/diagnostics/declarations/
+owners/memberships/proof/error/terminal/pointer values until independent BOTH
+owner and ROOT original hosted readbacks. Private accounting tests complement,
+never replace, real producer acceptance. No local parser runtime is authorized.
+
+### Earlier package/import and direct-integer execution (#346 / #347)
+
 ROOT composed #346/PR348 source `e9f8aeec5396c6f76a4c76ab8b5f74ea78dfd337`
 and #347/PR349 source `749ed9854f7b16ab8b2975234d1c58bff378743b` on verified
 incoming main `bb6a75f61fd467c9b090210a369c7e1d225713d5`.

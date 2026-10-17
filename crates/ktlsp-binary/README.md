@@ -632,3 +632,42 @@ constructor ordinal5→method0/CP8,9 and copy ordinal9→method6/CP50,51; these 
 are source coverage, not an execution receipt. ROOT's separate public-API smoke
 and native-data admission remain required. No JVM/compiler, parser/server runtime,
 general Kotlin linkage/overload engine or official Kotlin LSP parity is claimed.
+
+## Original bare nominal Class supertypes (#423)
+
+`metadata::resolved_class_supertypes::decode(&outcome, limits)` internally selects
+ALL original Class field6/wire2 occurrences from the SAME supported kind1/mv2.3.0
+Outcome. `ClassSupertypes` retains the original `Owner`, complete ordered original
+Class parameter declarations/opaque bounds and ordered `Supertype` occurrences.
+Each occurrence carries its ordinal among ALL Class fields, decoded-d1 outer/body
+spans, borrowed Type header/raw scalar Options and resolver-derived nominal
+ClassId/local membership. Repetitions remain separate; nothing is sorted/deduped.
+
+Only bare nominal Types are interpreted. Any Class supertype-ID field2,
+including empty/malformed packed interiors or mixed inline/ID lists, refuses the
+WHOLE operation. Parameter ID/NAME classifiers, significant wrong wires, nonzero
+flags, arguments, flexible/outer/alias/abbreviated Types and malformed late
+parent/selected children refuse without a partial result. Class declarations are
+never passed as Function-own NAME scope. Unknown extensions and unused tables
+stay bounded opaque data, not semantically validated overlays.
+
+One monotonic existing allowance covers combined decoded d1+d2, framing/schema,
+one resolver, complete owner/declarations/selection scans, Type/classifier/name
+work and output reservations, including repeated occurrences. Earlier classfile/
+annotation/Metadata decoding has separate budgets. No child reset/refund, second
+resolver, copied raw metadata, target loading or general type graph is added.
+Bounds stay original opaque bodies/IDs; absence is not an interpreted implicit
+Any? bound or effective nullability. Same-Outcome custody is NOT authentication
+of caller-constructible models, retained archive bytes or classfile `this_class`.
+No legal inheritance, subtype/hierarchy/classpath/server or full-parity claim.
+
+The initial source and complete retained standalone consumer have TWO independent
+functionality/adversarial static clears at48e0a0e. Nine meaningful unexecuted
+checks cover genuine Unit/Result interpretation expectations, original Pair
+abbreviation refusal/A–B custody, explicitly labelled original-data mutations,
+atomic/refusal/UTF16/local/opaque-bound controls and shared exact/one-short/
+late-target/repeated-child allowances. New-operation values/minima remain
+UNOBSERVED: ROOT compiler-only admission, separately admitted pure-data runtime,
+FULL independent OWNER+ROOT actual-value gates and composed hosted/integration
+proof are still pending. No local parser/server/Session runtime is authorized.
+

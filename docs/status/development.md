@@ -3694,3 +3694,50 @@ original417/395/377 UNKNOWN/OPEN remain unchanged. Tickets423 and424 now use thi
 ONE stable verified incoming main in isolated WTs; their implementation, own
 reviews/compiler/runtime/CI/merge/main proof remain separate pending work.
 
+
+#### Original423 nominal-supertype source delivery, runtime unobserved
+
+[Issue423](https://github.com/anilbeesetti/ktlsp/issues/423) uses the SAME verified
+incoming1ddf as424, preserving all old/user WTs. Its isolated leaf
+**48e0a0e2b0325a4c71dc032d2a73308ef8a68b6c**,
+tree **f288fc9a84c40598f0e2a81dcd0be93c3bd16b8a**, sole parent1ddf, changes ONLY
+the metadata module export, new `resolved_class_supertypes.rs` and meaningful
+public integration checks. ROOT independently read all141 implementation lines,
+all49 export lines, all431 test lines and all314 standalone-consumer lines,
+then composed the COMPLETE leaf as649bc39 in its isolated424 integration WT.
+No Cargo/lock/dependency/config/workflow or existing API/helper was changed.
+
+The real public operation returns original Owner/complete Class declarations
+and ordered original nominal supertype occurrences with all-Class ordinals,
+outer/body d1 spans, borrowed raw headers/Options and resolved ClassIds/local
+membership. Complete Class framing/declarations precede selection; ID/mixed
+roles, significant wrong wires/richer Types and malformed late data refuse
+atomically. One resolver/shared monotonic allowance covers complete context/
+selection/classification/resolution/output, never per-child resets. Bounds stay
+opaque; this is not target loading, inheritance, a subtype engine, classpath or
+server hierarchy. Existing structural and selected Function/Constructor APIs
+retain their separate contracts.
+
+TWO distinct isolated exact-head static reviewers independently read all changed
+source/tests, helper/caller/consumer contracts and the whole frozen consumer.
+No actionable findings. ROOT FULL-read both complete148/124line receipts and
+independently authenticated their actual SHA256 values:
+function57aee47e6c8857d2401db9f302e81dd1877f3f500eb6d1244bebb257a17af993;
+adversaryec96d3a933ba053591c4dd5201c919e24b2d7452073dcdb766a06e21c2743218.
+Their no-write-tool delivery statements remain in the exact owner-persisted
+receipts; Root does not claim the reviewers themselves wrote those files.
+Frozen `/private/tmp/ktlsp-423-native-consumer.rs` has independently checked
+SHA09651d52ef21e1b83a500257da11437a15b97b654f46519c75b75104c161c30e.
+Retain unchanged until both actual gates; no compilation/execution yet.
+
+Nine UNEXECUTED meaningful checks cover original Unit/Result expectations,
+genuine Pair abbreviation refusal/original A–B preservation and labelled
+mutations for actual indices, ordered repeats, UTF16/local/options/opaque
+bounds, late atomic failures, typed errors and exact/one-short/joint/repeated
+allowances. Source-derived new-operation offsets/minima are NOT observations.
+Root union reviews/ONE formatter/exact reviewed compiler gates, separately
+admitted pure binary runtime and BOTH FULL independent actual-value gates,
+original full three-host CI/guarded integration/dualmain remain pending.
+No compiler/runtime/CI/push/PR occurred for this leaf. Native-only/T004/96,
+B3/oracle HOLD, original417/395/377 UNKNOWN and full parity NOT achieved remain.
+

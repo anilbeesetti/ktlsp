@@ -102,6 +102,35 @@ annotation records and every caller/assertion/frequency. No production/guard
 change, suppression, unchanged retry or second formatter. Renew exact affected
 source/ROOT authorities and explicit unchanged423 custody BEFORE new compiler
 admission. LSP refs failed code0; all SEVEN concrete producer call sites recovered.
+Current source9cc182381de9bfd29a7721b66bce62318c1625ad/tree44697f5c15a6fe8f1747c8846f8cbc6172800b5b
+then received ALL SIX independent exact renewed static clears, FULL ROOT-read/
+hash-authenticated. Pinned compiler-only CHECK0/1.277913s, strict workspace/all-
+target Clippy0/1.26984975s and workspaceNoRunJSON0/13.372929541s passed.
+Original08fd failure remains FAILED; this is changed-source proof, not a retry.
+Separately ROOT-admitted unfiltered binary/import data tests passed674
+(666ordinary+8privacy compile-fail),69rows/674cases,0failed/ignored/measured/filtered.
+Frozen public native consumer compiled0/.164482042s, executed ONCE0/.683454125s
+with empty PATH and JAVA_HOME/JDK_HOME/JDK_JAVA_OPTIONS/JAVA_TOOL_OPTIONS/
+_JAVA_OPTIONS/CLASSPATH removed. Full190502B/2919rawline stdout SHA
+09dc0e1ed5e84cd71d2fccb13a1813191c4bbc0d7424d64540d7654fda17408e; stderr0B.
+ROOT FULL-read all3803lossless reader lines/all actual original values plus all69
+test result rows, independently freshly matched all3carriers to original JAR,
+and accepted finite nominal outcomes/refusals/budget/custody. Full ROOT proof:
+`/private/tmp/ktlsp-423-424-root-evidence/ROOT-full-actual-native-acceptance9cc.json`
+SHA3a94517ee87f92663c4195d4402d59fd4544b4b2018f09beb210fb4f89eae2e4.
+Independent binary OWNER full actual gate now ACCEPTED, structured862958B SHA
+e843b6c43205451de9669b2cde0b3d018f639bcb917760d3ae18a24fe6294bca.
+ROOT read all unique Owner conclusions and independently matched its entire
+embedded actual stdout/lossless reconstruction to all personally read original
+values; duplicate831line appendix exact, not falsely claimed a new manual read.
+Joint proof root-evidence/BOTH-independent-full-actual-native-gates9cc.json
+SHA633a4f9967f903358fcca7c467061f53b915eae392744cc1aa717912b42086d6.
+Full executed consumer source archived native-consumer-executed-source9cc.json;
+all source/output/consumer/executable/rlib/fixtures/receipts stay retained.
+All TEMP424 remains for OWN ORIGINAL FULL hosted3host CI,
+independent complete actual producer/wire/lifecycle values and genuinely applied
+ALL returned edits; no new Kotlin/server runtime, hosted CI, PR or merge yet.
+Docs-only status renewal must receive exact ROOT review before publication.
 ALL local parser/server/Session/worker runtime remains forbidden under96;
 pure binary-data runtime also needs separate exact ROOT admission. Actual
 packets stay until BOTH full independent actual-value/genuine-edit gates.

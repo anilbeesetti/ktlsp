@@ -661,13 +661,29 @@ Any? bound or effective nullability. Same-Outcome custody is NOT authentication
 of caller-constructible models, retained archive bytes or classfile `this_class`.
 No legal inheritance, subtype/hierarchy/classpath/server or full-parity claim.
 
-The initial source and complete retained standalone consumer have TWO independent
-functionality/adversarial static clears at48e0a0e. Nine meaningful unexecuted
-checks cover genuine Unit/Result interpretation expectations, original Pair
-abbreviation refusal/A–B custody, explicitly labelled original-data mutations,
-atomic/refusal/UTF16/local/opaque-bound controls and shared exact/one-short/
-late-target/repeated-child allowances. New-operation values/minima remain
-UNOBSERVED: ROOT compiler-only admission, separately admitted pure-data runtime,
-FULL independent OWNER+ROOT actual-value gates and composed hosted/integration
-proof are still pending. No local parser/server/Session runtime is authorized.
+All six independent component/union static reviews and pinned compiler-only
+gates passed at9cc1823. Separately admitted unfiltered binary/import execution
+passed674 checks (666 ordinary and8 privacy compile-fail), all69 complete result
+rows, with zero failed/ignored/measured/filtered. All nine new checks ran.
+The frozen public-API consumer executed once with empty PATH and six Java
+environment variables removed: exit0, empty stderr, complete190502-byte stdout
+SHA09dc0e1ed5e84cd71d2fccb13a1813191c4bbc0d7424d64540d7654fda17408e.
+ROOT personally read every complete actual value and independently matched all
+three original class carriers to the existing2.3.20 archive. Genuine Unit and
+Result.Companion each resolve their original bare supertype to kotlin.Any;
+genuine Pair refuses its abbreviation atomically at72. Its separate original
+A/B declaration control and explicitly labelled abbreviation-strip mutation
+preserve original declarations, not an invented genuine positive.
+
+Actual joint exact allowance: bytes106, records30, nodes8, depth2, work1710,
+owned_bytes1378, entries11, range_slots6, queries4, output_units21. Every
+one-short dimension refuses; repeated children cannot reset the shared budget.
+Full original spans/options/UTF16/local/raw/pointer equality and typed refusal
+records remain retained. This proves this finite data operation, not target
+authentication or semantic inheritance. Genuine nonempty bounds remain
+unobserved; their positive coverage is explicitly mutated data.
+BOTH independent OWNER+ROOT full actual-value gates accepted these original
+values. Full consumer source/executable/rlib/fixtures/outputs and both receipts
+remain preserved. Original full hosted/integration proof is separate.
+No local parser/server/Session runtime is authorized.
 

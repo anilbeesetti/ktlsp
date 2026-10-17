@@ -3874,3 +3874,74 @@ No unchanged retry or second formatter. Changed source requires renewed affected
 424/component+both ROOT exact authority and explicit unchanged423 proof before
 new compiler admission. Native/hosted actual gates and all holds remain pending.
 
+
+#### Corrected9cc compiler gates and original pure-native actual values
+
+Exact9cc182381de9bfd29a7721b66bce62318c1625ad,
+tree44697f5c15a6fe8f1747c8846f8cbc6172800b5b, received ALL SIX independent
+renewed component/union static clears, each complete receipt personally ROOT-
+read/hash-authenticated. Root function837ef0badd11c4cfc32bd8cba6761cd61e845304e1a6e1ebb359e03d88bbdeb1;
+Root adversarya905305d2d173444a06e77a9ee3fa1f6f61d0fa3c859716dc898d628eb412034.
+Pinned compiler-only fmt-CHECK0/1.277913s, strict locked workspace/all-target
+Clippy0/1.26984975s and locked workspace--no-run JSON0/13.372929541s passed.
+All196JSON records parsed:186artifacts/9build scripts/one successful terminal,
+zero compiler-message records. The original08fd failure remains FAILED and
+retained. Only two grouping parentheses changed; no second formatter.
+
+Separate exact ROOT admission allowed ONLY pure binary/import data runtime and
+the frozen reviewed public native consumer. Unfiltered binary/import passed
+674=666ordinary+8privacy compile-fail,69complete result rows/674individual cases,
+0failed/ignored/measured/filtered; allNINE new423checks actually ran.
+Frozen314line consumer SHA09651d52ef21e1b83a500257da11437a15b97b654f46519c75b75104c161c30e
+compiled0/.164482042s against the actual freshly emitted public binary rlib
+SHAacd00af1d9ea4358fff98dbea821ceffe40b3c8005bad7379b7b3bc6cd511961.
+Executable SHA2300f2783d7287587591751d1c0bba1d16c1d62f3e3687fefd5fc49a1cd9b331
+ran ONCE0/.683454125s with empty PATH and all six JAVA_HOME/JDK_HOME/
+JDK_JAVA_OPTIONS/JAVA_TOOL_OPTIONS/_JAVA_OPTIONS/CLASSPATH removed.
+Actual stdout190502B/2919lines SHA
+09dc0e1ed5e84cd71d2fccb13a1813191c4bbc0d7424d64540d7654fda17408e,
+stderr0B. ROOT FULL-read all3803lossless-reader lines covering ALL original
+values, not a count/schema/exit-only substitute; all69 numeric result rows read.
+Fresh data-only checks matched complete printed Unit781B/Result.Companion1682B/
+Pair2983B to unchanged files AND original2.3.20 archive SHA
+0ae12504a5040ebaf37703908483420d1a5624dd1d93f357665f8c77c848a01e.
+
+Genuine Unit owner19..52, flags326, occurrence ordinal2/outer24..28/body26..28,
+raw3001 resolves kotlin.Any. Genuine Result.Companion owner29..126, flags390,
+ordinal2/outer34..38/body36..38/raw3001 also resolves kotlin.Any. Both retain
+all optional scalar distinctions, complete original headers, zero declarations,
+ClassId UTF16/local=false and borrowed raw byte/pointer equality.
+Genuine Pair refuses its abbreviation atomically at72; separate existing
+declaration control retains original A54..60/id0/name1 and B62..68/id1/name2,
+both Out with empty opaque bounds/IDs. Explicit abbreviation-strip MUTATION
+alone succeeds to java.io.Serializable, ordinal4/outer68..72/body70..72/raw3003,
+retaining both original declarations. Not a genuine bare Pair positive.
+Actual ordered/repeated controls, UTF16 unpaired-surrogate/local membership,
+all richer/wrong-wire/ID/malformed-late/kind/version typed refusals and every
+raw/options/span/pointer value remain in complete retained output.
+Actual joint exact bytes106/records30/nodes8/depth2/work1710/owned1378/
+entries11/range_slots6/queries4/output_units21 succeeds. ALL one-short
+dimensions refuse; original per-child minima cannot reset for repeated targets.
+No target authentication, legal inheritance, effective bounds, hierarchy,
+classpath or full parity follows; genuine nonempty-bound positive unobserved.
+
+ROOT full actual-native proof
+`/private/tmp/ktlsp-423-424-root-evidence/ROOT-full-actual-native-acceptance9cc.json`
+SHA3a94517ee87f92663c4195d4402d59fd4544b4b2018f09beb210fb4f89eae2e4.
+Binary OWNER independently FULL-read every actual value and accepted, structured
+862958B SHAe843b6c43205451de9669b2cde0b3d018f639bcb917760d3ae18a24fe6294bca;
+human148875B SHAd1735c3d5be8ef4106a787e578c0420670856c6f87e47d1a95e4173137cb8e0d.
+ROOT read all239 unique Owner conclusion/custody/refusal/pointer lines; complete
+Owner embedded stdout and lossless reconstruction independently equal ALL
+personally ROOT-read original190502B. Duplicate831line factored appendix equals
+Owner reader exactly; not falsely claimed a second literal manual read.
+Both full gates accepted, joint proof
+`/private/tmp/ktlsp-423-424-root-evidence/BOTH-independent-full-actual-native-gates9cc.json`
+SHA633a4f9967f903358fcca7c467061f53b915eae392744cc1aa717912b42086d6.
+Full executed314line source archived native-consumer-executed-source9cc.json;
+all source/consumer/executable/rlib/fixtures/provenance/outputs/receipts retained.
+All TEMP424 is untouched. Its own ORIGINAL FULL Linux/macOS/Windows actual
+producer/wire/lifecycle values, genuine ALL returned edits, cleaned-source own
+reviews/CI and guarded merge/original exact-main gates remain pending.
+No local parser/server/Session/worker/JVM/oracle runtime; all96/T004/B3/oracle/
+original UNKNOWN holds and native-only/honest-capability boundaries unchanged.

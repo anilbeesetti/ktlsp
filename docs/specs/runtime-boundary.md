@@ -15,7 +15,9 @@ inventory beside, not inside, existing data-only JSON/JPS/Maven/T004 producers.
 Only configured local projects are discovered; unknown URI queries do not probe
 outside membership. Windows-only `file-id = 0.2.3` supplies native OS identity,
 not C/C++ analysis or Java. No JDK/compiler/build tool is invoked for this path.
-This finite composition is not yet runtime-verified at its current checkpoint;
-full official import, effective classpaths and external-tool orchestration remain
-separate. #96 local server/parser/Session/worker restrictions still apply.
+Capture-bearing composition passed original full three-host runtime and independent
+actual-value/edit gates; capture-free source still requires its own reviewed CI.
+[Exact evidence and limits](../status/development.md#pr422-original-hosted-actual-gates-and-capture-only-retirement)
+do not establish full official import, effective classpaths or external-tool
+orchestration. #96 local server/parser/Session/worker restrictions still apply.
 

@@ -34,6 +34,8 @@ model/source bytes, complete selected-root inventories, original memberships
 and full physical identities under one aggregate budget. Its local/quiescent
 filesystem assumption is NOT a hostile-replacement sandbox; it refuses
 symlink/reparse/special/external/alias/conflicting roots rather than guessing.
-The Session composition is not yet runtime-verified at this checkpoint and
-does not turn declared SDK/library/build metadata into effective semantics.
+Capture-bearing Session composition passed original full three-host runtime and
+independent actual-value/edit gates; capture-free source still requires its own
+reviewed CI. [Exact evidence and limits](../status/development.md#pr422-original-hosted-actual-gates-and-capture-only-retirement)
+do not turn declared SDK/library/build metadata into effective semantics.
 

@@ -6686,6 +6686,23 @@ mod workspace_symbols {
             }));
             responses
         }
+        fn finish_expected_errors(mut self, expected: &[&str]) -> Vec<Value> {
+            self.send(json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}));
+            self.send(json!({"jsonrpc":"2.0","method":"exit"}));
+            self.inner.input.take();
+            while let Some(frame) = ktlsp_protocol::read_frame(&mut self.inner.reader).unwrap() {
+                self.inner.responses.push(serde_json::from_slice(&frame).unwrap());
+            }
+            let output = self.inner.child.take().unwrap().wait_with_output().unwrap();
+            assert!(output.status.success(), "{:?}", output.status);
+            let stderr = std::str::from_utf8(&output.stderr).unwrap();
+            assert_eq!(stderr.lines().collect::<Vec<_>>(), expected);
+            println!("WORKSPACE_SYMBOL_WIRE_ACTUAL_RECEIPT={}",json!({
+                "requests":self.requests,"responses":self.inner.responses,
+                "status":output.status.code(),"stderr":output.stderr
+            }));
+            std::mem::take(&mut self.inner.responses)
+        }
     }
 
     fn query(id: Value, text: &str) -> Value {
@@ -7010,7 +7027,11 @@ mod workspace_symbols {
         refused(&wire.send(query(json!("closed-disk-stale"),"NotPresent")),-32801);
         result(&reload(&mut wire,3,&options),&Value::Null);
         result(&wire.send(query(json!("fresh-disk"),"")),&single("class ChangedDisk\r\n",&uri,"ChangedDisk"));
-        let responses = wire.finish();
+        let responses = wire.finish_expected_errors(&[
+            "ktlsp: an alias of this imported document is already open",
+            "ktlsp: version 2 must exceed current version 2",
+            "ktlsp: invalid UTF-16 position Position { line: 0, character: 999 }",
+        ]);
         receipt("alias-overlay",json!({"model":source_model(&["src"]),"disk":disk,"uri":uri,
             "alias":alias,"initialOverlay":initial,"appliedOverlay":edited,"incrementalChange":change,
             "diskProducer":producer(disk,&uri,0,&single(disk,&uri,"Disk")),
@@ -7415,7 +7436,7 @@ mod workspace_symbols {
         let superseded = session.handle(successor.clone());
         assert_eq!(superseded.len(),3,"superseded import/waiter and immediate explicit-clear result");
         refused(source_reply(&superseded,21),-32800);
-        refused(superseded.iter().find(|r|r["id"]=="superseded-waiter").unwrap(),-32800);
+        refused(superseded.iter().find(|r|r["id"]=="superseded-waiter").unwrap(),-32801);
         result(source_reply(&superseded,22),&Value::Null);
         responses.extend(superseded);
         let joined = drain(&mut session);
@@ -7622,5 +7643,99 @@ mod workspace_symbols {
         assert_eq!(all.iter().filter(|r|r["id"]=="cancel-waiter").count(),1);
         receipt("packaged-shared-import-cancel",json!({"model":source_model(&["src"]),"sources":sources}),
             &messages,&all,json!({"observation":"real concurrent import/cancel/consumer replies; Session separately proves same-attempt waiter ownership"}));
+    }
+
+    #[test]
+    fn packaged_actual_id_failure_envelopes_preserve_stale_refusal_and_recovery() {
+        let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+        let package = Package::new(true);
+        let project = source_project(&package, "id-envelope", &["src"]);
+        let path = project.join("src/A.kt");
+        let before = "class Before\n";
+        let after = "class Changed\n";
+        std::fs::write(&path, before).unwrap();
+        let root = source_directory_uri(&project);
+        let uri = format!("{root}/src/A.kt");
+        let options = source_options(&[&root]);
+        // Use the unchanged shared wire owner. This test's giant literal IDs
+        // are captured losslessly below instead of repeating megabytes in logs.
+        let mut wire = super::SignatureWire::new(&package);
+        let mut requests = vec![
+            initialization(&options, full_profile()),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            query(json!("baseline"), ""),
+        ];
+        for message in &requests {
+            let response = wire.send(message.clone());
+            if message["id"] == "baseline" {
+                result(&response, &single(before, &uri, "Before"));
+            }
+        }
+        std::fs::write(&path, after).unwrap();
+        // Two JSON quotes plus this ASCII string leave EXACTLY the frozen
+        // 512-byte failure envelope, while the valid request itself fits.
+        let id = "s".repeat(ktlsp_protocol::MAX_PAYLOAD_BYTES - 512 - 2);
+        let message = query(json!(id), "NeverMatches");
+        assert!(serde_json::to_vec(&message).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
+        let response = wire.send(message.clone());
+        assert_eq!(response["id"], message["id"]);
+        refused(&response, -32801);
+        assert!(serde_json::to_vec(&response).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
+        requests.push(message);
+        let reload_message = source_reload(2, &options);
+        result(&wire.send(reload_message.clone()), &Value::Null);
+        requests.push(reload_message);
+        let before_model = std::fs::read(project.join("workspace.json")).unwrap();
+        let mut after_model = before_model.clone();
+        after_model.push(b' ');
+        std::fs::write(project.join("workspace.json"), &after_model).unwrap();
+        let message = query(json!("m".repeat(ktlsp_protocol::MAX_PAYLOAD_BYTES - 512 - 2)), "NeverMatches");
+        assert!(serde_json::to_vec(&message).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
+        let response = wire.send(message.clone());
+        assert_eq!(response["id"], message["id"]);
+        refused(&response, -32801);
+        assert!(serde_json::to_vec(&response).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
+        requests.push(message);
+        // The original valid-frame counterexample now refuses BEFORE source
+        // work, with a compact error that can echo the complete original ID.
+        let message = query(json!("r".repeat(ktlsp_protocol::MAX_PAYLOAD_BYTES - 128)), "");
+        assert!(serde_json::to_vec(&message).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
+        let response = wire.send(message.clone());
+        assert_eq!(response["id"], message["id"]);
+        refused(&response, -32803);
+        assert_eq!(response["error"]["message"], "limit");
+        assert!(serde_json::to_vec(&response).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
+        requests.push(message);
+        let reload_message = source_reload(3, &options);
+        result(&wire.send(reload_message.clone()), &Value::Null);
+        requests.push(reload_message);
+        let recovery = query(json!("same-session-recovery"), "");
+        result(&wire.send(recovery.clone()), &single(after, &uri, "Changed"));
+        requests.push(recovery);
+        requests.push(json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}));
+        requests.push(json!({"jsonrpc":"2.0","method":"exit"}));
+        let mut responses = wire.finish();
+        // Observation-only lossless encoding of ACTUAL large ID values on both
+        // sides. Every byte/run is retained; no digest/sample/expected label is
+        // substituted. All non-ID protocol fields remain their actual values.
+        for message in requests.iter_mut().chain(responses.iter_mut()) {
+            if let Some(id) = message.get("id").and_then(Value::as_str)
+                && id.len() > 1024 * 1024
+            {
+                let mut runs: Vec<(u8, usize)> = Vec::new();
+                for byte in id.bytes() {
+                    match runs.last_mut() {
+                        Some((prior, count)) if *prior == byte => *count += 1,
+                        _ => runs.push((byte, 1)),
+                    }
+                }
+                message["id"] = json!({"originalType":"string","losslessUtf8Runs":runs});
+            }
+        }
+        receipt("actual-id-error-envelope", json!({
+            "modelBefore":before_model,"modelAfter":after_model,
+            "sourceBefore":before,"sourceAfter":after,"uri":uri,
+            "largeIdEncoding":"original JSON string UTF8 bytes as ordered [byte,count] runs; complete lossless values"
+        }), &requests, &responses, json!({"transport":"packaged-stdio","sameSessionRecovery":true}));
     }
 }

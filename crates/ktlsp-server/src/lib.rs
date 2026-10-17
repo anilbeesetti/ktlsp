@@ -1206,7 +1206,9 @@ impl Session {
                             -32803,
                             "workspace source inventory unavailable; reload required",
                         );
-                        if let Some(reason) = failure.as_deref() {
+                        if matches!(&request.request, SymbolRequest::Document(_))
+                            && let Some(reason) = failure.as_deref()
+                        {
                             response["error"]["data"] = json!({"reason":reason});
                         }
                         responses.push(response);

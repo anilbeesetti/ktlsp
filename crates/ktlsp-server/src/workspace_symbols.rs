@@ -25,6 +25,9 @@ const MAX_SOURCE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_DECLARATIONS: usize = 16384;
 const MAX_STORAGE: usize = 32 * 1024 * 1024;
 const MAX_QUERY_BYTES: usize = 8192;
+// Aggregate and workspace-waiter failures use bounded static messages; original
+// selected-document/import reasons stay on their existing consumer paths.
+const MAX_FAILURE_BYTES: usize = 512;
 const LIMIT: &str = "workspace symbol aggregate limit exceeded";
 
 #[derive(Debug)]
@@ -76,6 +79,10 @@ impl Budget {
                 bytes.checked_add(width).ok_or(LIMIT)
             })?
         } else { 20 };
+        if id_bytes.checked_add(MAX_FAILURE_BYTES).is_none_or(|n| n > ktlsp_protocol::MAX_PAYLOAD_BYTES) {
+            // This refusal fits any valid workspace-query frame with this ID.
+            return Err("limit");
+        }
         budget.output(id_bytes.checked_add(64).ok_or(LIMIT)?)?;
         budget.work(query.len(), &AtomicBool::new(false))?;
         budget.storage(query.len())?;
@@ -96,8 +103,22 @@ impl Budget {
     fn output(&mut self, amount: usize) -> Result<(), &'static str> {
         charge(&mut self.rendered, amount, ktlsp_protocol::MAX_PAYLOAD_BYTES)
     }
-    fn parse(&mut self) -> Result<(), &'static str> {
-        charge(&mut self.parses, 1, MAX_SOURCES)
+    fn parse(&mut self, bytes: usize, cancelled: &AtomicBool) -> Result<(), &'static str> {
+        charge(&mut self.parses, 1, MAX_SOURCES)?;
+        // Precharge the complete delegated chain BEFORE invoking the parser.
+        // Logical units cover bounded reply/decode bytes, maximum validation
+        // element/ancestor visits, and four source-byte passes (preflight,
+        // normalization/map, worker input, original-source capture). This is
+        // conservative logical accounting, not measured CPU/allocation/RSS/time.
+        // Smaller replies and failed invocations never refund this reservation.
+        // ponytail: fixed worst-case delegate reservation admits at most 42
+        // tiny-source parses within 256 MiB; other work reduces that ceiling.
+        // A parser-internal shared actual-work path could refine this later.
+        let delegated = ktlsp_parser::MAX_OUTPUT_BYTES
+            .checked_add(ktlsp_parser::MAX_ELEMENTS.checked_mul(ktlsp_parser::MAX_NESTING).ok_or(LIMIT)?)
+            .and_then(|n| bytes.checked_mul(4).and_then(|bytes| n.checked_add(bytes)))
+            .ok_or(LIMIT)?;
+        self.work(delegated, cancelled)
     }
 }
 
@@ -125,7 +146,8 @@ fn failure(error: &'static str, cancelled: &AtomicBool) -> ParserFailure {
 fn source_failure(error: source_inventory::Error) -> ParserFailure {
     match error {
         source_inventory::Error::Budget(_) | source_inventory::Error::InvalidSource(_) => ParserFailure::Protocol(-32803, "workspace verification resource or source limit exceeded"),
-        error => ParserFailure::Source(error),
+        source_inventory::Error::Cancelled => ParserFailure::Protocol(-32800, "Request cancelled"),
+        _ => ParserFailure::Protocol(-32801, "workspace source snapshot is stale or unavailable; reload required"),
     }
 }
 fn render(
@@ -192,8 +214,7 @@ pub(super) fn run(
         }
         let mut result = Vec::new();
         for member in &capture.members {
-            budget.parse().map_err(|e| failure(e, cancelled))?;
-            budget.work(member.source.source().len(), cancelled).map_err(|e| failure(e, cancelled))?;
+            budget.parse(member.source.source().len(), cancelled).map_err(|e| failure(e, cancelled))?;
             let (parsed, closed) = provider.parse(&member.source, cancelled);
             clean &= closed;
             let parsed = parsed.map_err(crate::parser_failure)?;
@@ -224,9 +245,10 @@ mod tests {
     #[test]
     fn aggregate_exact_and_exceeded_allowances_do_not_reset_per_source() {
         let mut budget = Budget::new("", &json!("actual\u{0000}id")).unwrap();
-        for _ in 0..MAX_SOURCES { budget.source(MAX_SOURCE_BYTES / MAX_SOURCES).unwrap(); budget.parse().unwrap(); }
+        for _ in 0..MAX_SOURCES { budget.source(MAX_SOURCE_BYTES / MAX_SOURCES).unwrap(); }
         assert!(budget.source(1).is_err());
-        assert!(budget.parse().is_err());
+        charge(&mut budget.parses, MAX_SOURCES, MAX_SOURCES).unwrap();
+        assert!(budget.parse(0, &AtomicBool::new(false)).is_err());
         let mut budget = Budget::default();
         budget.source(MAX_SOURCE_BYTES.min(ktlsp_parser::MAX_SOURCE_BYTES)).unwrap();
         assert!(budget.source(ktlsp_parser::MAX_SOURCE_BYTES + 1).is_err());
@@ -245,6 +267,18 @@ mod tests {
         assert!(charge(&mut budget.symbols, 1, MAX_DECLARATIONS).is_err());
         let mut used = usize::MAX;
         assert!(charge(&mut used, 1, usize::MAX).is_err());
+        let delegated = ktlsp_parser::MAX_OUTPUT_BYTES
+            + ktlsp_parser::MAX_ELEMENTS * ktlsp_parser::MAX_NESTING + 4 * 19;
+        for allowance in [delegated - 1, delegated] {
+            let mut budget = Budget {
+                verification: SnapshotBudget::new(source_inventory::SnapshotLimits {
+                    work: allowance, ..source_inventory::SnapshotLimits::default()
+                }).unwrap(),
+                ..Budget::default()
+            };
+            assert_eq!(budget.parse(19, &AtomicBool::new(false)).is_ok(), allowance == delegated);
+            assert!(budget.parse(19, &AtomicBool::new(false)).is_err());
+        }
     }
     #[test]
     fn actual_escaped_id_and_query_bounds_are_admitted_before_source_work() {

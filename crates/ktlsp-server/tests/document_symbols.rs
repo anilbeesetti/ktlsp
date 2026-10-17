@@ -5915,10 +5915,10 @@ fn signature_producer_packet(source: &str, revision: i64, cursor: usize) -> Valu
             "formalOpen":element(parameters.open_paren()),"formalClose":element(parameters.close_paren()),
             "formalAnnotation":element(parameters.parameters()[0].annotation()),
             "formalComma":parameters.parameters()[0].comma().map(element),
-            "annotations":[binding.argument_annotation(),binding.formal_annotation()].map(|a| json!({
+            "annotations":([binding.argument_annotation(),binding.formal_annotation()].map(|a| json!({
                 "annotated":declaration(a.annotated()),"reference":a.reference_index(),
                 "token":element(a.name_token()),"range":a.range()
-            })),
+            }))),
             "cursor":proof.cursor(),"signatureRange":proof.signature_range(),"parameterRange":proof.parameter_range()
         });
         let labels = proof.into_labels(20);

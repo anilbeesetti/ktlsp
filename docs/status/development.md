@@ -3838,3 +3838,39 @@ Session/worker/peer/runtime/CI/push/PR has occurred for this union. TEMP424,
 frozen native consumer/source/fixtures and every failed original remain intact.
 No full parity or relaxed #96/native/T004/B3/oracle/original-UNKNOWN limit.
 
+
+#### Original08fd strict compiler macro failure and minimal capture correction
+
+At08fd952bad3c1c2c43aae1a246f1b88b051129b5/tree6bbe649a7a14366fa61ceb0530371b6b8592e388,
+ROOT FULL-read/hash-authenticated ALL SIX renewed exact static source authorities:
+both complete23path ROOT reviews, both423 and both424 component reviews.
+Root function receipt SHA
+f34791cd94cb9a1a48cb02126bb46fcc2a1334e8ceca353f218b65ad4ab9e6b7;
+Root adversaryd9af9fb391382027eacc3d74dcf19d1ec7cfa307825f25a01b1326ecf2307dc9.
+423 function b463b8d2c61906b399e4378569f0d7e70b9c2868532b89a0c4f41d41d43b5bdb,
+adversary2e90851178931adf189c2bdf7ff358411b05dc7db4c3831446774c3073929830.
+424 function f501edc9ac2007310edcbee96dcb8688bf02bccb5a4e6f862f5e7caac1cc4b7f,
+adversary4414df6eab1df572518f1db1e3676b5ecda7322cb0fbdcc5d0536a09c8a384b6.
+Initial qualified423 function receipt11d0c45c remains separately retained; explicit
+read-only checksum permission resolved its self-imposed custody question ONCE,
+with matching actual consumer/old-receipt hashes and NO tool rejection.
+
+After actual readonly tracked-diff0/exactHEAD08, compiler-only admission ran:
+pinned fmt-CHECK0/1.156816542s, empty stdout/stderr; strict locked workspace/
+all-target Clippy FAILED101/3.580893167s. Complete stderr989B SHA
+6124434ac4303bd0563bfc41ab2c6b334c4f3ed97735e55457590be3bfcdcd7d.
+Actual error is `no rules expected '.'` in document_symbols.rs5918: json! parses
+the leading annotations array as its own array value, then rejects the following
+`.map` expression. Workspace test--no-run was NOT invoked; no test/runtime/CI.
+All actual outputs/command/exit/elapsed stay in root-evidence/formatted08fd-*.
+
+ROOT fixes the common producer once: group the COMPLETE original array-map
+expression in parentheses. Both actual original annotation records, all SEVEN
+producer callers, calls/assertions/frequency/packet ordering remain; no field,
+fixture or assertion removed. No production semantic/guard/budget/cleanup change.
+Rust LSP reference lookup again exited unexpectedly code0, reported; concrete
+read/grep recovered the definition plus ALL SEVEN call sites before editing.
+No unchanged retry or second formatter. Changed source requires renewed affected
+424/component+both ROOT exact authority and explicit unchanged423 proof before
+new compiler admission. Native/hosted actual gates and all holds remain pending.
+

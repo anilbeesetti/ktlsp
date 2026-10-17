@@ -88,6 +88,20 @@ Formatting touched EIGHT Rust source/test files only, before this status update.
 Freeze formatted source/docs, renew BOTH affected component pairs and BOTH ROOT
 exact changed-head reviews BEFORE any compiler/data/runtime/CI admission.
 No runtime/compiler/CI result follows merely from static clearance or formatting.
+ALL SIX exact formatted08fd952/tree6bbe649 static renewals were then FULL ROOT-
+read/hash-authenticated, including both complete ROOT receipts and both affected
+component pairs. A metadata function-reviewer custody qualification was resolved
+by explicitly authorized READONLY checksum ONCE, no tool rejection; old text kept.
+ONLY compiler gates admitted. Original pinned fmt-CHECK0/1.156816542s passed;
+strict locked workspace/all-target Clippy101/3.580893167s FAILED before no-run:
+json! could not parse `.map` immediately after the annotations array in the
+shared TEMP424 producer. Raw989B SHA6124434ac4303bd0563bfc41ab2c6b334c4f3ed97735e55457590be3bfcdcd7d
+retained. No tests/runtime/CI ran; no-run was NOT invoked. ROOT adds ONLY grouping
+parentheses around that complete array-map value, preserving both actual
+annotation records and every caller/assertion/frequency. No production/guard
+change, suppression, unchanged retry or second formatter. Renew exact affected
+source/ROOT authorities and explicit unchanged423 custody BEFORE new compiler
+admission. LSP refs failed code0; all SEVEN concrete producer call sites recovered.
 ALL local parser/server/Session/worker runtime remains forbidden under96;
 pure binary-data runtime also needs separate exact ROOT admission. Actual
 packets stay until BOTH full independent actual-value/genuine-edit gates.

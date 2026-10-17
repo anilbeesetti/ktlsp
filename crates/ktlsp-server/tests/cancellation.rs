@@ -417,6 +417,7 @@ fn interactive_stdio_cancels_active_work_and_cleans_shutdown_exit_and_eof() {
     );
     #[cfg(unix)]
     assert!(response["error"].get("data").is_none(), "{response}");
+    println!("PIPED_TIMEOUT_RESPONSE {response}");
     client.send(change(2, "wire"));
     client.send(symbols(json!("active")));
     package.started("wire");
@@ -424,6 +425,7 @@ fn interactive_stdio_cancels_active_work_and_cleans_shutdown_exit_and_eof() {
     client.send(cancel(json!("active")));
     let response = client.reply();
     error(&response, json!("active"), -32800);
+    println!("PIPED_TIMEOUT_REUSED_ID_CANCEL_RESPONSE {response}");
     // A responsive reply while the controlled worker is still gated is the
     // consumer-visible proof, not a source/schema assertion.
     assert!(!package.0.join("release-wire").exists());

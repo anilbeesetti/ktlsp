@@ -80,6 +80,12 @@ No formatter mutation, changed condition/assertion/fixture/bound or runtime.
 Renew ALL FOUR full current15path source authorities before separate fresh
 compiler admission; prior70ba format refusal remains failed.
 
+For required actual-wire readback, the controlled stdio regression also retains
+its two already-received small Timeout/reused-ID-cancel responses on test stdout.
+No new request, engine observer, timing sample or production log is added; large
+boundary IDs are NOT printed. These are source-only receipt statements until
+their OWN original hosted execution. Include them in the complete source renewal.
+
 Initial430 head91005d4/tree48efe0a4 did NOT clear its source gate: complete
 functionality review found the shared outline expectation trimmed two bound
 leading comments from the original FUN range. This was static source evidence,

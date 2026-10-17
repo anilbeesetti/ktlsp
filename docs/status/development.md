@@ -4892,3 +4892,12 @@ retry. ALL FOUR full CURRENT15path authorities must renew before a separate
 changed-source compiler-only admission. Own original hosted/runtime/publication/
 integration/exact-main/packaging gates remain; original Windows failure UNKNOWN.
 
+
+Required smoke readback also needs actual received wire values, not a named test
+pass alone. ROOT separately adds two direct test-stdout receipts of the existing
+small controlled Timeout and following reused-ID cancellation replies, after
+their existing assertions. No new request/worker/clock/probe/production logging,
+copies/observer framework or large-ID output. This source-only evidence retention
+must be included in the full current source renewal before any check/runtime
+admission; no response is fabricated or claimed observed before hosted execution.
+

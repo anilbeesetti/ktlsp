@@ -2,6 +2,8 @@
 mod functional;
 
 use ktlsp_parser::{FileKind, MAX_NESTING, MAX_SOURCE_BYTES, Parser, ParserError};
+#[cfg(not(unix))]
+use ktlsp_parser::PipedTimeoutSite;
 use std::{
     io::Write,
     path::PathBuf,
@@ -70,11 +72,24 @@ fn malformed_eof_and_generated_unicode_are_lossless_or_explicitly_rejected() {
             Ok(parsed) => {
                 assert_eq!(parsed.source(), source);
             }
+            #[cfg(unix)]
             Err(error) => assert!(matches!(
                 error,
                 ParserError::Coverage
                     | ParserError::WorkerFailed
                     | ParserError::Timeout
+                    | ParserError::AllocationLimit
+            )),
+            #[cfg(not(unix))]
+            Err(error) => assert!(matches!(
+                error,
+                ParserError::Coverage
+                    | ParserError::WorkerFailed
+                    | ParserError::PipedTimeout(
+                        PipedTimeoutSite::SupervisorPoll
+                            | PipedTimeoutSite::WriterJoin
+                            | PipedTimeoutSite::ReaderJoin
+                    )
                     | ParserError::AllocationLimit
             )),
         }
@@ -125,9 +140,21 @@ fn backtracking_regressions_are_bounded() {
         .unwrap();
         match result {
             Ok(parsed) => assert_eq!(parsed.source(), source),
+            #[cfg(unix)]
             Err(error) => assert!(matches!(
                 error,
                 ParserError::WorkerFailed | ParserError::Timeout | ParserError::AllocationLimit
+            )),
+            #[cfg(not(unix))]
+            Err(error) => assert!(matches!(
+                error,
+                ParserError::WorkerFailed
+                    | ParserError::PipedTimeout(
+                        PipedTimeoutSite::SupervisorPoll
+                            | PipedTimeoutSite::WriterJoin
+                            | PipedTimeoutSite::ReaderJoin
+                    )
+                    | ParserError::AllocationLimit
             )),
         }
         check("val healthy = 1", FileKind::Source);

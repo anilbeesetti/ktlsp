@@ -6,6 +6,8 @@ use ktlsp_parser::{
     Diagnostic, Element, FileKind, MAX_ALLOCATION_BYTES, MAX_OUTPUT_BYTES, Parser, ParserError,
     Reply, SnapshotResult, SourceSnapshot,
 };
+#[cfg(not(unix))]
+use ktlsp_parser::PipedTimeoutSite;
 use std::{
     alloc::{GlobalAlloc, Layout},
     io::{Read, Write},
@@ -25,6 +27,10 @@ fn main() {
     let _functional = functional::serial();
     let faulty = Parser::new(std::env::current_exe().unwrap()).unwrap();
     let healthy = Parser::new(env!("CARGO_BIN_EXE_ktlsp-parser-worker")).unwrap();
+    #[cfg(unix)]
+    let timeout = ParserError::Timeout;
+    #[cfg(not(unix))]
+    let timeout = ParserError::PipedTimeout(PipedTimeoutSite::SupervisorPoll);
     for (source, expected) in [
         ("unknown-kind", ParserError::InvalidTree),
         ("wrong-root", ParserError::InvalidTree),
@@ -45,7 +51,7 @@ fn main() {
         ("allocation_alloc", ParserError::AllocationLimit),
         ("allocation_zeroed", ParserError::AllocationLimit),
         ("allocation_realloc", ParserError::AllocationLimit),
-        ("hang", ParserError::Timeout),
+        ("hang", timeout),
         ("depth129-token", ParserError::NestingLimit),
         ("depth129-empty", ParserError::NestingLimit),
     ] {
@@ -59,10 +65,7 @@ fn main() {
             .unwrap_err();
         if source == "crash" {
             // Abort completion can cross the deadline checked before exit status.
-            assert!(matches!(
-                error,
-                ParserError::WorkerFailed | ParserError::Timeout
-            ));
+            assert!(error == ParserError::WorkerFailed || error == timeout);
         } else {
             assert_eq!(error, expected, "{source}");
         }

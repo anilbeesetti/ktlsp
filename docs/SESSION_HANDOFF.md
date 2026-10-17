@@ -8,7 +8,69 @@ decisions or phase boundaries. **Full official Kotlin LSP parity is NOT achieved
 Use the actual session capacity; the historical 32-concurrent instruction below
 is not a new limit. Do not manufacture hundreds of overlapping/blocked tasks.
 
-### Latest verified420 integration and active421 composition
+### Latest verified421 integration and active423/424 composition
+
+ONE verified incoming main is **1ddf69acb4158a8927a8b5a87e679c0599d96a54**,
+tree **b262183f8dd8629d7f9d78512f92b3b3ef8e7f01**, sole parent
+**18733fe9f1233e0671ef765b1c2295d3f7fbb39e**.
+[PR422](https://github.com/anilbeesetti/ktlsp/pull/422) delivered421, reviewed
+head **d80c55e8d87b074ee19ed0901d935135cd127582**. Its OWN original Native
+39031035430/1/job117391351271 and platform39031035401/1
+(Mac117391351204/Win117391351338) ALL SUCCEEDED with all32 required steps.
+Actual checkout d17cdb5205c752a65f5257dddc7978b2a468f187 had the reviewed tree
+and ordered parents[18733,d80]; stale event781afa was NOT checkout authority.
+BOTH independent current-source reviews, full original CI/artifact audits and
+prior complete native/hosted actual-value/edit gates were accepted. All real
+consumers/assertions/frequency/FS mutation placement remain after capture-only
+retirement. Original failed runs and all actual evidence remain retained.
+
+ROOT explicitly inspected actual outer0 and complete parsed0/nativeguard0 in a
+SEPARATE strictly-readonly guard call, including BOTH exact HEAD and BASE config
+dictionaries, all scope/check/status/workflow/job/artifact/clean reviewed facts.
+Only then a SEPARATE ordinary expected-head squash; actual reviewed tree and
+SOLE base parent independently proved. BOTH OWNER+ROOT accepted OWN ORIGINAL
+[main39032579306/1/job117395870753](https://github.com/anilbeesetti/ktlsp/actions/runs/39032579306/job/117395870753):
+1286=1246ordinary+40docs,143resultrows/1289caseoccurrences,
+0failed3ignored0measured0filtered; separate22faultcases/3owned-Child raw86.
+Only Native runs on main push; do NOT invent main macOS/Windows runs.
+ROOT proof `/private/tmp/ktlsp-422-original-main-39032579306/ROOT-exact-main-acceptance.json`
+SHA256 **c8d6ae9418fd559b3efa0206b7f69445b874371a09177a0f54fd0735802497a4**.
+Owner's correction explicitly distinguishes changed observation-only TEST
+compiler inputs cffc->d80 from exact ALL compiler inputs491->d80; original
+receipts retained. Lease `/private/tmp/ktlsp-lease-422.json` is CLEARED only
+after both gates and fresh remote-main identity. Public
+[delivery6234007316](https://github.com/anilbeesetti/ktlsp/pull/422#issuecomment-6234007316);
+[complete ledger](status/development.md#verified422-capture-free-integration-and-original-exact-main-acceptance).
+
+ROOT active WT `/private/tmp/ktlsp-424-signature-supertype-integration`,
+branch `omp/424-signature-supertype-integration`, from that SAME verified1ddf.
+Two genuine independent implementations are admitted from this one base:
+- [423](https://github.com/anilbeesetti/ktlsp/issues/423): original bare nominal
+  Class supertype interpretation, ONE shared metadata allowance, complete
+  original owner/parameter/occurrence custody; no hierarchy/classpath inference.
+  WT `/private/tmp/ktlsp-423-class-supertypes`, branch `omp/423-class-supertypes`.
+  FULL saved research `/private/tmp/ktlsp-423-class-supertype-research.md`,
+  SHAfaeaf903c0a381690d0c3da2808c98dc5949a5348ef24e3a1b142f6a6eebdb6c.
+- [424](https://github.com/anilbeesetti/ktlsp/issues/424): working open-document
+  manual signature help for the existing419 applicable named-call envelope,
+  original source-owned labels/cursor/formal proof and genuinely edited CLI.
+  WT `/private/tmp/ktlsp-424-call-signature`, branch `omp/424-call-signature`.
+  FULL saved research `/private/tmp/ktlsp-424-call-signature-research.md`,
+  SHAbff9b493b5d48182a5562264a4c1bb341e44d0b2c6eb20438a3b9f6f05d81c41.
+Each owner has TWO reserved independent functionality/adversarial review slots
+in isolated exact-head review WTs; ROOT must obtain its own TWO union clears.
+ROOT retains Cargo/lock/docs/config/workflows/CI/publication/runtime/integration.
+No423/424 compiler/runtime/CI/merge acceptance yet, no active integration lease.
+The next union's ONE formatter is not yet spent; NEVER rerun421's spent one.
+ALL local parser/server/Session/worker runtime remains forbidden under96;
+pure binary-data runtime also needs separate exact ROOT admission. Actual
+packets stay until BOTH full independent actual-value/genuine-edit gates.
+Frozen421 `/private/tmp/ktlsp-421-json-authority-integration` and ALL user/old/
+component WTs remain preserved. Do not restart320/packaging/PR306 historical work.
+Full parity NOT achieved; B3 INCONCLUSIVE/HOLD, oracle HOLD and original417/395/377
+causes UNKNOWN/OPEN; native-only/T004/96/honest capabilities unchanged.
+
+### Prior420 integration and421 composition checkpoint (superseded above)
 
 ONE verified incoming main is now **18733fe9f1233e0671ef765b1c2295d3f7fbb39e**,
 tree**49e47082f68c0093fd379397e3f72a06b1253e8d**, sole parent

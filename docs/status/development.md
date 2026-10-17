@@ -3602,3 +3602,95 @@ Full parity NOT achieved; native-only/T004/#96/B3/oracle and original417/395/377
 UNKNOWN/OPEN limits stay unchanged. Legitimate Cargo.lock change still requires
 separate exact BASE and HEAD config dictionaries in the future exclusive lease.
 
+
+#### Verified422 capture-free integration and original exact-main acceptance
+
+[PR422](https://github.com/anilbeesetti/ktlsp/pull/422) delivered421 at
+**1ddf69acb4158a8927a8b5a87e679c0599d96a54**, reviewed
+**d80c55e8d87b074ee19ed0901d935135cd127582**, actual reviewed/squash tree
+**b262183f8dd8629d7f9d78512f92b3b3ef8e7f01**, SOLE parent
+**18733fe9f1233e0671ef765b1c2295d3f7fbb39e**. This supersedes the preceding
+capture-free pending checkpoint, not the historical assessed28ff42d cutoff.
+
+Only after BOTH complete cffc actual-value/genuine-edit gates above, Root retired
+four observation writers and solely owned scaffolds. Every real Session/CLI
+consumer/assertion/frequency/owned close and exact iterator FS-mutation placement
+remains. Cleaned491c063a5d397bf049be2e018dc4ead38cf7ce1f received TWO full ROOT
+clears and pinned Rust1.99 format-CHECK0/1.143982959s, strict locked workspace/
+all-target Clippy0/.899013958s and workspace test--no-run0/1.657547625s.
+Its OWN original full three-host CI also passed. Root then corrected TWO stale
+doc sentences to d80; ALL compiler inputs are byte-identical ONLY491->d80.
+The cffc->d80 interval changes observation-only TEST compiler inputs plus docs;
+production/manifests/lock remain exact. Owner's original unqualified compiler-
+identity sentence is explicitly superseded by its separately preserved correction,
+not silently rewritten. No local parser/Session runtime or second formatter ran.
+
+Final d80 has TWO further exact full20path ROOT reviews; receipt SHAs
+f8d27b08f291ab1d53c5cb5c1fd87c89172d1bd3d53f838e3689b05f56cfcb99 and
+6e080ec0c8f5df798d67175d919c2d0b6c37c4f84b20dcc44843d9519269f8d7.
+Its OWN ORIGINAL full CI succeeded at actual checkout
+**d17cdb5205c752a65f5257dddc7978b2a468f187**, reviewed tree above, ordered
+parents `[18733fe9f1233e0671ef765b1c2295d3f7fbb39e,d80c55e8d87b074ee19ed0901d935135cd127582]`.
+Stale event781afa is NOT actual checkout authority. All32 mandatory PR steps
+succeeded. Each row below is one exact execution, never a sum/parity percentage.
+Every execution has0failed/3ignored/0measured/0filtered; two ignored helpers are
+parent-exercised, third extracted-archive helper is NOT exercised. Separate22
+protocol fault cases and3 same-owned-Child raw86 are not added to test totals.
+
+| Original execution | Run/attempt/job | Passed | Ordinary | Docs | Case occurrences |
+|---|---|---:|---:|---:|---:|
+| Reviewed d80 Native | [39031035430/1/117391351271](https://github.com/anilbeesetti/ktlsp/actions/runs/39031035430/job/117391351271) |1286|1246|40|1289|
+| Reviewed d80 macOS | [39031035401/1/117391351204](https://github.com/anilbeesetti/ktlsp/actions/runs/39031035401/job/117391351204) |1284|1244|40|1287|
+| Reviewed d80 Windows | [39031035401/1/117391351338](https://github.com/anilbeesetti/ktlsp/actions/runs/39031035401/job/117391351338) |1233|1193|40|1236|
+| Actual exact-main Native | [39032579306/1/117395870753](https://github.com/anilbeesetti/ktlsp/actions/runs/39032579306/job/117395870753) |1286|1246|40|1289|
+
+ROOT and independent auditors reconciled complete original checkout/preflight/
+clean identities, job metadata, every result value and exact case census.
+All18 CRC/member digests per platform archive retained and matched original raw
+workspace windows. Only outer ISO timestamps and witnessed whole-line PowerShell
+error-stream decoration were removed for that equality; no semantic values were
+normalized. Mac artifact12099569477/50189B SHA
+2a4f7986f97611abbf89fa1ba84a56fe292f50b00e6a600b58db5b06e30cf08d;
+Windows12100258569/45526B SHA
+1a04b0e279ae27a13bc1898387cc531b9d650ef4030679cd098eef030b931af4.
+Final CI gate `/private/tmp/ktlsp-422-original-d80c-platform/ROOT-all-final-original-CI-acceptance.json`
+SHAf186e2f963a7ada69a5388718ffc5c7ff98c57be510ae67c2cc0a55a38ee9df7.
+Interleaved stdout/stderr runner headings do NOT prove per-target ownership;
+full actual case/result values, not last-seen headings, establish the census.
+
+The external complete guard separately checks exact BASE and HEAD configuration
+dictionaries, including legitimate different Cargo.lock blobs. In a SEPARATE
+strictly-readonly tool call ROOT observed actual outer exit0 and complete parsed0/
+nativeguard0, explicitly inspected every exact lease/main/head/base/tree/scope/
+config/check/status/workflow/job/artifact/clean fact BEFORE a SEPARATE ordinary
+expected-head squash. No force/admin/main push/protection bypass. Actual GitHub
+reviewed tree and SOLE original base parent were independently verified; the base
+lease stayed exclusive through BOTH original exact-main gates. Full independent
+guarded-chain receipt SHAfd5550e4dd2170286228c0db6ce0c70557016e24391ee03b6866e412e55e496c
+distinguishes ROOT-attested original process ordering from independently read
+API effects; it does not invent independent access to ROOT's tool transcript.
+
+OWN original main raw307139B/3325L SHA
+679802100add60cc3a33ac6c9e8232422307dbfeefd0096fe31fad90642d402c.
+BOTH OWNER+ROOT independently accepted complete source/job/run/census/original
+expected-negative/fault values and all143 result rows; Root's full meaningful
+Owner narrative read and exact143-row/1289-case comparison are recorded without
+claiming a manual reread of duplicate appendices or all3325 raw lines. Owner
+independently FULL-read the complete original raw. Main runs only Native, not
+invented post-merge macOS/Windows jobs. The four actual421 consumer cases pass;
+retired ACTUAL421 markers remain0. B3 original Timeout/Missing ACK stays
+INCONCLUSIVE/HOLD, separate normal healthy followup is not a Timeout success.
+Root main proof `/private/tmp/ktlsp-422-original-main-39032579306/ROOT-exact-main-acceptance.json`
+SHAc8d6ae9418fd559b3efa0206b7f69445b874371a09177a0f54fd0735802497a4;
+independent Owner JSON34b6b69df5f22ba1fcfa01c030c87b4fe0800a167a80cb9c98c57f1d9028de77
+and separate compiler-input correction fd7b202b497768805fb9c9d80fe47252d180d8c65f7fbbf5d7324311a1e3269f.
+ONLY after both gates and fresh remote1ddf identity was lease422 CLEARED.
+Public [delivery6234007316](https://github.com/anilbeesetti/ktlsp/pull/422#issuecomment-6234007316).
+All original failures/source/captures/archives/readers/fixtures/proofs and user/
+component WTs remain. No additional hostileFS/private-ID graph/syscall/no-outside-
+IO/all-eight-slot/nonBMP-edit/latency/RSS/official-equivalence proof is claimed.
+Full official parity NOT achieved; native-only/T004/96, oracle HOLD, B3 HOLD and
+original417/395/377 UNKNOWN/OPEN remain unchanged. Tickets423 and424 now use this
+ONE stable verified incoming main in isolated WTs; their implementation, own
+reviews/compiler/runtime/CI/merge/main proof remain separate pending work.
+

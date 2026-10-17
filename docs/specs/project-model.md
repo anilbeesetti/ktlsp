@@ -35,7 +35,8 @@ and full physical identities under one aggregate budget. Its local/quiescent
 filesystem assumption is NOT a hostile-replacement sandbox; it refuses
 symlink/reparse/special/external/alias/conflicting roots rather than guessing.
 Capture-bearing Session composition passed original full three-host runtime and
-independent actual-value/edit gates; capture-free source still requires its own
-reviewed CI. [Exact evidence and limits](../status/development.md#pr422-original-hosted-actual-gates-and-capture-only-retirement)
+independent actual-value/edit gates. Capture-free source then passed its OWN
+reviews/full three-host CI, guarded PR422 integration and both original
+exact-main gates. [Exact evidence and limits](../status/development.md#verified422-capture-free-integration-and-original-exact-main-acceptance)
 do not turn declared SDK/library/build metadata into effective semantics.
 

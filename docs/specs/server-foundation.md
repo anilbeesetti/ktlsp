@@ -46,8 +46,9 @@ Shutdown/exit/EOF/fatal input/output errors cancel owned work. Clean shutdown/ex
 ## Explicit JSON source authority (#421)
 
 Capture-bearing composition passed original full Linux/macOS/Windows CI and
-independent actual-value/edit gates; capture-free integration still needs its own
-reviewed CI. [Exact evidence and limits](../status/development.md#pr422-original-hosted-actual-gates-and-capture-only-retirement)
+independent actual-value/edit gates. Capture-free source then passed its OWN
+reviews/full three-host CI, guarded PR422 integration and both original
+exact-main gates. [Exact evidence and limits](../status/development.md#verified422-capture-free-integration-and-original-exact-main-acceptance)
 remain narrower than official project equivalence. Explicit
 `initialize.initializationOptions.projects` entries `{type:"json",path:fileURI}`
 load actual `workspace.json` through unchanged immutable v2 import and a separate

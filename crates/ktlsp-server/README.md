@@ -602,10 +602,11 @@ This is first-source native evidence, not final-cleanup/main/official parity pro
 
 ## Explicit JSON source authority (#421)
 
-Capture-bearing `cffc4b6a04c2c2f96633a93e43eb95deb5227780` passed original full
-Linux/macOS/Windows CI and independent complete actual-value/edit gates.
-[Exact evidence and limits](../../docs/status/development.md#pr422-original-hosted-actual-gates-and-capture-only-retirement)
-remain separate from the capture-free candidate's required OWN reviewed CI.
+Capture-bearing composition passed original full Linux/macOS/Windows CI and
+independent complete actual-value/edit gates. Capture-free source then passed
+its OWN reviews/full three-host CI, guarded PR422 integration and both original
+exact-main gates. [Exact verified evidence and limits](../../docs/status/development.md#verified422-capture-free-integration-and-original-exact-main-acceptance)
+remain narrower than official project equivalence.
 The opt-in initialize parameters are:
 
 ```json

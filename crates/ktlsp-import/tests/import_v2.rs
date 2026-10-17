@@ -752,7 +752,7 @@ fn paths_and_error_sources_retain_boundary_validation() {
     let mut value = fixture();
     value["libraries"][0]["roots"][0]["path"] = json!("<WORKSPACE>/../不存在.zip");
     assert_eq!(
-        import(value).unwrap().libraries[0].roots[0].path,
+        import(value).unwrap().libraries()[0].roots[0].path,
         base().parent().unwrap().join("不存在.zip")
     );
     let error = v2::from_json(base(), b"{").unwrap_err();

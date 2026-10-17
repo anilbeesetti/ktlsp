@@ -27,6 +27,7 @@ pub mod property_types;
 pub mod resolved_alias_signature;
 pub mod resolved_class_function_parameters;
 pub mod resolved_class_function_return;
+pub mod resolved_class_function_signature;
 pub mod resolved_class_properties;
 pub mod string_table;
 pub mod type_alias;

@@ -680,10 +680,11 @@ owned_bytes1378, entries11, range_slots6, queries4, output_units21. Every
 one-short dimension refuses; repeated children cannot reset the shared budget.
 Full original spans/options/UTF16/local/raw/pointer equality and typed refusal
 records remain retained. This proves this finite data operation, not target
-authentication or semantic inheritance. Genuine nonempty bounds remain
-unobserved; their positive coverage is explicitly mutated data.
-BOTH independent OWNER+ROOT full actual-value gates accepted these original
-values. Full consumer source/executable/rlib/fixtures/outputs and both receipts
-remain preserved. Original full hosted/integration proof is separate.
+authentication or semantic inheritance. Genuine nonempty-bound interpretation
+in this public consumer remains unobserved; its positive coverage is labelled
+mutated data. BOTH independent OWNER+ROOT full actual-value gates accepted
+these original values. Full consumer source/executable/rlib/fixtures/outputs
+and both receipts remain preserved. PR425's original full three-host composition
+also passed; cleaned-source own reviews/CI and guarded integration are separate.
 No local parser/server/Session runtime is authorized.
 

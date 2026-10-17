@@ -3945,3 +3945,109 @@ producer/wire/lifecycle values, genuine ALL returned edits, cleaned-source own
 reviews/CI and guarded merge/original exact-main gates remain pending.
 No local parser/server/Session/worker/JVM/oracle runtime; all96/T004/B3/oracle/
 original UNKNOWN holds and native-only/honest-capability boundaries unchanged.
+
+#### Original425 full three-host actual values and genuine edit acceptance
+
+[PR425](https://github.com/anilbeesetti/ktlsp/pull/425) composes423/424 from ONE
+stable verified incoming1ddf69acb4158a8927a8b5a87e679c0599d96a54.
+Docs-only reviewed **deaaafa0b96152de1f9affa4e40b4d0d4d0e5943**,
+tree **0031b768bbbe8d1f914bfd2d4aa57d6ddde50258**, retained ALL9cc compiler
+inputs/config/fixtures/tests exactly. BOTH independent full-union ROOT renewals
+accepted the four-document delta before ROOT separately admitted original FULL
+hosted CI. Function receipta6c70fd2e5d78a1099c23c131c172d12fbee316efa6e56494377cf88e7dba0e4;
+adversary receipt retained under root-evidence/ROOT-adversary-docs-deaaafa-returned-receipt.txt.
+No formatter rerun or local Kotlin/server/Session runtime.
+
+OWN ORIGINAL Native39039420422/1 and platform39039420424/1 ALL SUCCEEDED,
+all8+12+12 mandatory steps. Actual checkout **c822e991adf27dc3e3e697c08c95088d0a69e5dc**
+had the reviewed tree and ordered parents[1ddf69a,deaaafa], independently
+authenticated through actual checkout logs, platform preflights/parent records
+and original Git-commit object. Empty platform event-merge is not authority.
+Both BASE+HEAD configs remain Nativefc6202e6/platform7765e331/packaging22144056/
+lockb58f0db0; no manifests/dependencies/guard/tool/workflow changes.
+
+| Original host/job | Ordinary passed | Docs passed | Failed | Ignored | Measured | Filtered | Rows | Case occurrences |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Linux117415684635 |1259|40|0|3|0|0|144|1302|
+| Mac117415684668 |1257|40|0|3|0|0|144|1300|
+| Windows117415684845 |1206|40|0|3|0|0|144|1249|
+
+Each40docs is38compile-fail+2compile-only. Both parser doc frames are legitimate,
+not duplicates. Two ignored subprocess helpers were parent-exercised; the
+third extracted_archive_smoke was NOT executed. Separate three custom harnesses,
+22faultcases and three actual same-owned-Child raw86 controls are NOT added.
+Linux B3 actualTimeout/deadline_selected=true/sendSomeOk16/receiptMissing and
+Mac actualOk/deadline_selected=false/sendNone/receiptMissing remain
+INCONCLUSIVE/B3-HOLD; Windows Unix targets remain0tests. Healthy followups pass;
+none diagnoses historical #395/#377/#417.
+
+| Original retained bytes | Bytes | SHA256 |
+|---|---:|---|
+| Linux full raw |1661021|497d059988123ad5a097da779ff0b62c84e2edd0f187489a8d1744cdcf92eeb0|
+| Mac full raw |1780933|36f7f0c9d058a48cc2ce87a70e602ed31d8cfdd2039817a2b1a93ef54743b415|
+| Windows full raw |1740520|a4ce64f1fffff117b1a6a88d6c09f0847fbd007294e0bf0bfb801e64806806d1|
+| Mac archive12103835282 |111843|d34f2991876b272cf8d6c2098b951d035663b04bcb3dae5a135c744139b4af62|
+| Windows archive12103895308 |106437|93aa746ce1498da11111a83e6b962e123fb6e1bd85b66a28ca0fec4345631e28|
+
+Each original archive has18unique CRC-valid members, including full actual
+identity/preflight/parents/toolchain/auxiliary/exit values. format.txt is absent,
+not fabricated. Entire Mac4724line workspace stream equals raw406..5129;
+Win4500line stream equals raw412..4911, removing ONLY witnessed outer ISO
+timestamps/single separator and whole-line PowerShell stderr ANSI wrappers,
+plus stream newline separators. Original CRLF bytes/digest remain distinct.
+Root personally read all432 original numeric rows and complete original control
+values. Independent Native and renewed BOTHplatform control/census audits accepted.
+Original platformWITHHELD tool/permission receipt retained; explicit READONLY
+stdlib data inspection resolved it, not a product/CI retry. Initial native log
+retrieval blocked terminal escapes; corrected transfer preserved complete bytes
+with --allow-escape-sequences. Original rejected retrieval remains retained.
+
+BOTH independent OWNER+ROOT FULL actual-value gates accepted ALL2598 packets,
+1656 original wire occurrences,165 producer terminals,654 declaration memberships,
+138 real packaged CLI sessions,273 caret outcomes and21 owned-lifecycle cases.
+ROOT read all4143 complete unique literal/container values and all336 key/string
+rows, with every exact repeated occurrence referenced losslessly, not omitted.
+All wire-byte arrays reconstruct EXACT original canonical UTF8 payloads.
+OWNER independently read its complete4775line value reader and91line editreader.
+ROOT FULL-read complete OWNER conclusion; its entire ordered catalog and every
+edit batch exactly equal Root independently full-read original values. No fake
+second manual duplicate-dataset read. All original CST token byte partitions,
+parent/subtree ranges, declaration/region ownership and positive annotation
+identity/source spans separately checked.
+
+Each host supplied55parse/39complete/16strict-lowering-refusal packets and
+46clean CLI sessions, no abort/stderr/semantic filesystem source input. All91
+actual caret responses per host retain41positive/50null, complete comment/
+post-comma boundaries, Unicode/backticks/CRLF/loneCR and real context/error values.
+All176 signature requests per host remain captured. Independent OWNER+ROOT
+genuinely applied EVERY returned TYPE edit:8batches/24edits per host,24batches/
+72edits total, complete original v7 coordinates->same-live v8 didChange source->
+edited producer->new original labels. All12 adversarial source changes also
+genuinely applied. Lifecycle counts remain1owned until join/close, then0clean;
+cancel/change/reopen/rejected-version/rejected-range/shutdown/close stay distinct.
+
+OWNER complete conclusion SHA
+f5e8a7f1a9ea010fa8f45c87ca03b70e5346279b7dd8e12b37ce7ab2ac141097;
+OWNER fullproof28f9e1c0b082f34b7b813ef6bbd84df649c71a2e078a004371bd724cb40be7a2.
+ROOT fullgate89e1fafe43e6d1956d75d133e45d245d165182269e6ab7695b02c177ce76a79a
+and deeper original CST/membership/adversarial supplemente40e2a76cfcc4ac8b913c9b6799244ac3ee3ae21121b08bb394f6f19bf1dda6e.
+Root data-reader comparison initially compared Owner complete edited response
+to only Root.result; reading the actual shape corrected only that audit
+assertion, then all24 COMPLETE responses matched. No runtime/CI/source retry.
+Final joint proof:
+`/private/tmp/ktlsp-423-424-root-evidence/BOTH-425-ALL-original-hosted-actual-values-genuine-edits-and-CI-control-acceptance.json`
+SHA80eaf956640f9d96c4963be2dd0a0c1d933e52e5d5ed732adc588783ce37d53b.
+
+Only AFTER both complete gates, ROOT admits observation-only retirement in
+NEW isolated424 WT/branch from exactdeaa. The owner changes ONLY server
+tests/document_symbols.rs; Root owns docs/union. Every real producer/consumer/
+assertion/frequency/FS mutation/actual returned edit/same-v8query/owned cleanup
+must stay, including ONE actual session.drain_errors() at the same placement.
+All original source/raw/ZIP/reader/receipt/failure evidence stays preserved.
+Retired source must receive TWO component reviews, BOTH ROOT exact full-union
+reviews, compiler gates and its OWN ORIGINAL FULL3hostCI before fresh separate
+strictly-readonly complete exclusive guard, separate ordinary expected-head
+squash, reviewed tree/SOLEbase parent and independent OWN original exact-main
+gates. No active merge lease or merge/main acceptance yet.
+Full parity NOT achieved; native-only/T004/96/B3/oracle/original UNKNOWN holds
+remain unchanged.

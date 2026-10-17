@@ -354,13 +354,32 @@ or prompt internal semantic-cancellation guarantee is claimed. Existing
 global8 ownership, exact ID/cancel/join, version/content/incarnation publication,
 accepted versus rejected mutation and terminal cleanup rules remain unchanged.
 
-Current538743f source has TWO independent component static clears after fixing
-the reviewers' initial exhaustive-match and positive-comment-caret defects.
-Real original producer/packaged CLI/same-live-v7->v8 genuine returned TYPE-edit
-and owned Session checks are authored but UNEXECUTED. TEMP424 direct complete
-captures stay until BOTH independent OWNER+ROOT full actual-value/edit gates.
-ROOT union reviews/compiler admission/hosted CI/guarded integration remain
-pending; this is not official rendering/trigger/full signature-help parity.
+All six independent component/union source authorities, both documentation-head
+renewals and pinned compiler-only gates passed before ROOT admitted the original
+full hosted composition. [PR425](https://github.com/anilbeesetti/ktlsp/pull/425)
+head deaaafa/tree0031b768 ran original Native39039420422/1 and
+platform39039420424/1: all32 mandatory steps succeeded. Actual checkout
+c822e991adf27dc3e3e697c08c95088d0a69e5dc retained that reviewed tree and ordered
+parents[1ddf69a,deaaafa]; no event-merge guess substituted for checkout authority.
+
+BOTH independent OWNER+ROOT FULL-read every original producer/CST/diagnostic/
+declaration/region/proof/source/response/lifecycle value, with lossless exact
+repeat factoring and original wire-byte reconstruction. Each host supplied
+55 parses/39 complete proofs/16 strict-lowering refusals,46 real packaged CLI
+sessions and7 owned-lifecycle cases. All91 actual caret outcomes per host
+(41 positive/50 null), foreign contexts, malformed coordinates and unsupported
+calls retain their actual results. Every returned TYPE edit was genuinely
+applied:8 batches/24 edits per host,24 batches/72 edits total, equal to the
+actual same-session v8 didChange source, edited producer and new source labels.
+All4 adversarial changes per host were also independently applied.
+
+Complete values, raw logs, original18-member platform archives, source and
+independent receipts remain retained before observation-only retirement.
+Retirement preserves all real producer/CLI/Session calls, assertions, edit/
+mutation placement and owned cleanup, including the actual error-drain call.
+Its OWN exact source reviews/compiler/full hosted CI and guarded integration
+remain separate pending gates. This is not official rendering/trigger/general
+signature-help parity. [Full evidence](../../docs/status/development.md#original425-full-three-host-actual-values-and-genuine-edit-acceptance).
 
 ## Finite function type-parameter references and rename (#392)
 

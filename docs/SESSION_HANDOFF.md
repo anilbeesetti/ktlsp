@@ -127,10 +127,57 @@ Joint proof root-evidence/BOTH-independent-full-actual-native-gates9cc.json
 SHA633a4f9967f903358fcca7c467061f53b915eae392744cc1aa717912b42086d6.
 Full executed consumer source archived native-consumer-executed-source9cc.json;
 all source/output/consumer/executable/rlib/fixtures/receipts stay retained.
-All TEMP424 remains for OWN ORIGINAL FULL hosted3host CI,
-independent complete actual producer/wire/lifecycle values and genuinely applied
-ALL returned edits; no new Kotlin/server runtime, hosted CI, PR or merge yet.
-Docs-only status renewal must receive exact ROOT review before publication.
+PR425 is now OPEN: https://github.com/anilbeesetti/ktlsp/pull/425.
+Exact reviewed docs-only headdeaaafa0b96152de1f9affa4e40b4d0d4d0e5943,
+tree0031b768bbbe8d1f914bfd2d4aa57d6ddde50258, received BOTH independent ROOT
+renewals; ALL compiler inputs/config unchanged from9cc. ROOT admitted ONLY OWN
+ORIGINAL FULL hosted3host runs: Native39039420422/1/job117415684635 and
+platform39039420424/1 Mac117415684668/Win117415684845 ALL SUCCEEDED/all32steps.
+Actual checkoutc822e991adf27dc3e3e697c08c95088d0a69e5dc/tree0031b768/ordered
+parents[1ddf69a,deaaafa]; platform eventmerge was absent, not source authority.
+Native1299=1259ordinary+40docs/144rows/1302cases; Mac1297=1257+40/144/1300;
+Win1246=1206+40/144/1249. Everyhost0failed3ignored0measured0filtered;
+22externalfaultcases/3sameownedChildraw86 stay separate. B3 remainsHOLD.
+
+BOTH independent OWNER+ROOT FULL actual-value/genuine-edit gates ACCEPTED:
+all2598original packets/1656wire occurrences/165producer terminals/654original
+memberships/138CLI sessions/273caret outcomes/21ownedlifecycle cases. All24
+returned TYPE batches/72edits genuinely applied independently, complete actual
+v7->v8 source equals same-live didChange/edited producer/newlabels; all12
+adversarial changes applied too. ROOT read ALL4143uniquecomplete original value
+records plus ALL336column/stringkeys and all469 numeric/control reader lines.
+OWNER independently read its complete4775line reader+91line editreader.
+ROOT FULL-read complete OWNER conclusion; complete Ownercatalog ordered values
+and all actual edit applications independently match Rootfull-read originals.
+No duplicate-dataset second literal manual read is falsely claimed.
+Joint proof root-evidence/BOTH-425-ALL-original-hosted-actual-values-genuine-edits-and-CI-control-acceptance.json
+SHA80eaf956640f9d96c4963be2dd0a0c1d933e52e5d5ed732adc588783ce37d53b.
+Independent Native control and renewed BOTHplatform control audits accepted;
+original platformWITHHELD permission/tool-custody receipt remains, resolved by
+explicit READONLY stdlib ZIP/hash/comparison, no product/runtime/CI rerun.
+Initial native log transfer blocked terminal escapes; corrected byte-preserving
+transfer added --allow-escape-sequences, original rejection retained.
+
+ROOT now admits ONLY observation retirement in NEW isolated424 owner WT
+`/private/tmp/ktlsp-424-capture-retirement`, branchomp/424-capture-retirement,
+from exactdeaa; ONLY server/tests/document_symbols.rs. Root owns docs/union.
+Preserve ALL7producer calls, actual send/read/flush/finish/DropEOF+ownedChildwait,
+every assertion/fixture/frequency/realedit/samev8query/mutationplacement and
+ONEactual session.drain_errors() SAMEposition/frequency. TWO independent owner
+component slots reserved, then BOTH ROOT exact union reviews/compiler gates
+and cleaned-source OWN ORIGINAL FULL3hostCI before any merge. ONEformatterSPENT.
+No active merge lease, no merge/main acceptance. All originals/evidence retained.
+
+Parallel next research COMPLETED without product runtime; do not restart:
+root-evidence/next-genuine-bound-supertype-research.txt SHAd428436cd666a2fa32607a00d673c2276161b80748fd50da3ad1e4fa36f6c2a8;
+next-workspace-symbol-prerequisite-research.txt SHA1e57a1389e5614b48226a1774affad39b2ef8878719673fb1f2ec85ed5ce29f0.
+Original ClosedRange/ClosedFloatingPointRange bytes now establish genuine
+encoded nonempty bounds/generic supertype NAME1 leaves (NOT native interpreted
+outputs); ROOT data receipt /private/tmp/ktlsp-next-original-generic-class-data.json
+SHA77f572ca59838e2a39011627ec4d922e9346b2b5aa7d98ccae1555bf3e7610fe.
+Workspace symbols require coherent whole-snapshot verification, not looping
+single-source verification or inventing an index/official matching. Next source
+admission must wait for this integration's ONE stable verified incoming main.
 ALL local parser/server/Session/worker runtime remains forbidden under96;
 pure binary-data runtime also needs separate exact ROOT admission. Actual
 packets stay until BOTH full independent actual-value/genuine-edit gates.

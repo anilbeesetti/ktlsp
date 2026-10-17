@@ -158,15 +158,24 @@ explicit READONLY stdlib ZIP/hash/comparison, no product/runtime/CI rerun.
 Initial native log transfer blocked terminal escapes; corrected byte-preserving
 transfer added --allow-escape-sequences, original rejection retained.
 
-ROOT now admits ONLY observation retirement in NEW isolated424 owner WT
-`/private/tmp/ktlsp-424-capture-retirement`, branchomp/424-capture-retirement,
-from exactdeaa; ONLY server/tests/document_symbols.rs. Root owns docs/union.
-Preserve ALL7producer calls, actual send/read/flush/finish/DropEOF+ownedChildwait,
+Only AFTER both complete gates, ROOT admitted observation-only retirement in
+NEW isolated424 WT `/private/tmp/ktlsp-424-capture-retirement`,
+branchomp/424-capture-retirement from exactdeaa. Complete owner leaf
+729374b1492dc16ef333be541bffba513a5c9d4b/tree301c15cd5577bb96049411068dbec2f3f69578d2
+changes ONLY server/tests/document_symbols.rs,7insertions/64deletions.
+Both independent exact component reviews clear, no findings:
+function53452e0359ff48000cb1149130839d4425ef27859e4f7ddaaa7d4fd522909bae;
+adversary1eb8f932488615153afdea4188332e405ba76d104230405f77a51d2e0417f977.
+Owner preservation receipt root-evidence/OWNER-425-retirement-preservation-729374b.json
+SHAc346c4f72a817e7cbeb9c2d55901541ddf41e5a8a4d555326ff1966c67f15c7a.
+ROOT composed entire leaf asd0cf363 after documentation commit9fc40bf.
+ALL7producer calls, actual send/read/flush/finish/DropEOF+sameownedChildwait,
 every assertion/fixture/frequency/realedit/samev8query/mutationplacement and
-ONEactual session.drain_errors() SAMEposition/frequency. TWO independent owner
-component slots reserved, then BOTH ROOT exact union reviews/compiler gates
-and cleaned-source OWN ORIGINAL FULL3hostCI before any merge. ONEformatterSPENT.
-No active merge lease, no merge/main acceptance. All originals/evidence retained.
+ONEactual session.drain_errors() SAMEposition/frequency remain. Source-only
+preservation is NOT runtime equivalence: observation allocations/output/timing
+change. BOTH ROOT exact full-union reviews, compiler gates and cleaned-source
+OWN ORIGINAL FULL3hostCI remain pending before any merge. ONEformatterSPENT.
+No active merge lease or merge/main acceptance. All originals/evidence retained.
 
 Parallel next research COMPLETED without product runtime; do not restart:
 root-evidence/next-genuine-bound-supertype-research.txt SHAd428436cd666a2fa32607a00d673c2276161b80748fd50da3ad1e4fa36f6c2a8;

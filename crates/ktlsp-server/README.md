@@ -374,11 +374,12 @@ actual same-session v8 didChange source, edited producer and new source labels.
 All4 adversarial changes per host were also independently applied.
 
 Complete values, raw logs, original18-member platform archives, source and
-independent receipts remain retained before observation-only retirement.
-Retirement preserves all real producer/CLI/Session calls, assertions, edit/
-mutation placement and owned cleanup, including the actual error-drain call.
-Its OWN exact source reviews/compiler/full hosted CI and guarded integration
-remain separate pending gates. This is not official rendering/trigger/general
+independent receipts remain retained. Observation-only retirement729374b
+received both independent exact component reviews, without findings. All real
+producer/CLI/Session calls, assertions, edit/mutation placement and owned cleanup,
+including the actual error drain, remain. ROOT composed that complete source;
+both exact union reviews, compiler gates, its OWN full hosted CI and guarded
+integration remain pending. This is not official rendering/trigger/general
 signature-help parity. [Full evidence](../../docs/status/development.md#original425-full-three-host-actual-values-and-genuine-edit-acceptance).
 
 ## Finite function type-parameter references and rename (#392)

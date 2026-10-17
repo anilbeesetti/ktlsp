@@ -4038,16 +4038,24 @@ Final joint proof:
 `/private/tmp/ktlsp-423-424-root-evidence/BOTH-425-ALL-original-hosted-actual-values-genuine-edits-and-CI-control-acceptance.json`
 SHA80eaf956640f9d96c4963be2dd0a0c1d933e52e5d5ed732adc588783ce37d53b.
 
-Only AFTER both complete gates, ROOT admits observation-only retirement in
-NEW isolated424 WT/branch from exactdeaa. The owner changes ONLY server
-tests/document_symbols.rs; Root owns docs/union. Every real producer/consumer/
-assertion/frequency/FS mutation/actual returned edit/same-v8query/owned cleanup
-must stay, including ONE actual session.drain_errors() at the same placement.
-All original source/raw/ZIP/reader/receipt/failure evidence stays preserved.
-Retired source must receive TWO component reviews, BOTH ROOT exact full-union
-reviews, compiler gates and its OWN ORIGINAL FULL3hostCI before fresh separate
-strictly-readonly complete exclusive guard, separate ordinary expected-head
-squash, reviewed tree/SOLEbase parent and independent OWN original exact-main
-gates. No active merge lease or merge/main acceptance yet.
+Only AFTER both complete gates, ROOT admitted observation-only retirement in
+NEW isolated424 WT/branch from exactdeaa. Owner leaf
+729374b1492dc16ef333be541bffba513a5c9d4b/tree301c15cd5577bb96049411068dbec2f3f69578d2
+changes ONLY server/tests/document_symbols.rs,7insertions/64deletions. Both exact
+independent component source reviews clear without findings:
+function53452e0359ff48000cb1149130839d4425ef27859e4f7ddaaa7d4fd522909bae;
+adversary1eb8f932488615153afdea4188332e405ba76d104230405f77a51d2e0417f977.
+Owner preservation receiptc346c4f72a817e7cbeb9c2d55901541ddf41e5a8a4d555326ff1966c67f15c7a.
+ROOT composed the complete leaf asd0cf363 after docs commit9fc40bf. Every real
+producer/consumer/assertion/frequency/FS mutation/actual returned edit/same-v8
+query/owned cleanup remains, including ONE actual session.drain_errors() at
+the same placement. All original source/raw/ZIP/reader/receipt/failure evidence
+stays preserved. Static preservation does not assert execution/timing equality
+after deleting observation allocations/output.
+BOTH ROOT exact full-union reviews, compiler gates and cleaned-source OWN
+ORIGINAL FULL3hostCI remain pending before fresh separate strictly-readonly
+complete exclusive guard, separate ordinary expected-head squash, reviewed
+tree/SOLEbase parent and independent OWN original exact-main gates.
+No active merge lease or merge/main acceptance yet.
 Full parity NOT achieved; native-only/T004/96/B3/oracle/original UNKNOWN holds
 remain unchanged.

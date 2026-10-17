@@ -60,6 +60,22 @@ Two genuine independent implementations are admitted from this one base:
 Each owner has TWO reserved independent functionality/adversarial review slots
 in isolated exact-head review WTs; ROOT must obtain its own TWO union clears.
 ROOT retains Cargo/lock/docs/config/workflows/CI/publication/runtime/integration.
+Both complete source leaves are now composed, not yet compiler/runtime verified:
+423 leaf48e0a0e2b0325a4c71dc032d2a73308ef8a68b6c/treef288fc9a84c40598f0e2a81dcd0be93c3bd16b8a
+as Root649bc39, plus424 COMPLETE oldest-first range
+d568bb324d9690cbb736e56af207aac113c6edf7 -> 538743f1e13d7d4a231b383d3c888769a362c79b
+(leaftree8fa2fe4233c3bab15b8f35d47a46dbba80046eac) as Root3f48ee2/9157b50.
+Both have TWO independent exact current component static clears. ROOT FULL-read
+both423 receipts/source/tests/consumer and both424 original rejected/renewed
+receipts, exact current production/proof/output and actual new consumer/edit/
+lifecycle source. Initial424 non-exhaustive match and positive comment-caret
+findings are source-fixed/rechecked, NOT compiler/runtime observations.
+Frozen423 consumer `/private/tmp/ktlsp-423-native-consumer.rs`
+SHA09651d52ef21e1b83a500257da11437a15b97b654f46519c75b75104c161c30e
+and all TEMP424 packets remain. ROOT must now freeze full source/docs scope,
+obtain TWO independent UNION clears, run ONE formatter then exact affected
+rechecks/compiler-only gates and separately admit pure data/full original hosted
+actual-value/genuine-edit evidence. No initial rejected source is retroapproved.
 No423/424 compiler/runtime/CI/merge acceptance yet, no active integration lease.
 The next union's ONE formatter is not yet spent; NEVER rerun421's spent one.
 ALL local parser/server/Session/worker runtime remains forbidden under96;

@@ -34,7 +34,7 @@ At most eight retained parser/import/waiting requests per Session and eight owne
 
 The provider uses `Parser::parse_snapshot_with_cleanup -> (Result<SnapshotResult, ParserError>, bool)` through the same existing parse/supervise/admission/reaper pipeline. True proves no child ownership/spawn attempt, or same-child reaping before return and non-Unix scoped-I/O exit. False is unproved closure, not an assertion that a child remains alive. A false report or thread panic permanently latches the Session's terminal cleanup failure; later/global state cannot turn it into proof, and original Cancelled/Timeout errors remain unchanged. Limits, deadlines and the Unix 20 ms observation grace are unchanged. This conservative status-1 limit is intentional; successful symbol-thread joins alone do not prove graceful cleanup.
 
-Symbols, finite definition/hover, same-body references/highlights, eager local completion and guarded local-val prepare/rename use that one pipeline. Parser `Cancelled` remains RequestCancelled (`-32800`); other parser variants remain RequestFailed (`-32803`) with a distinct static category for input/nesting/output/allocation limits, coverage/tree validation, deadline, worker failure, I/O-or-cleanup and snapshot mismatch. This preserves selected-result, cancellation/freshness and cleanup precedence. Category text does not diagnose an OS cause or repair the original failures in #377; no error code, deadline or resource ceiling is relaxed. Negotiated lexical semantic-token transport is synchronous and parser-free; it does not establish identifier semantics.
+Symbols, finite definition/hover, same-body references/highlights, eager local completion, manual source-owned signature help and guarded local-val prepare/rename use that one pipeline. Parser `Cancelled` remains RequestCancelled (`-32800`); other parser variants remain RequestFailed (`-32803`) with a distinct static category for input/nesting/output/allocation limits, coverage/tree validation, deadline, worker failure, I/O-or-cleanup and snapshot mismatch. This preserves selected-result, cancellation/freshness and cleanup precedence. Category text does not diagnose an OS cause or repair the original failures in #377; no error code, deadline or resource ceiling is relaxed. Negotiated lexical semantic-token transport is synchronous and parser-free; it does not establish identifier semantics.
 
 An active request's exact string/integer ID receives exactly one normal/error response. Valid `$/cancelRequest` signals the same AtomicBool used by Parser and completes that ID with RequestCancelled (`-32800`); unknown IDs are ignored, invalid notifications only record bounded errors. A completed/cancelled ID can be reused without confusing old work with its new generation. Duplicate active IDs return InvalidRequest with null ID and do not cancel the original request. Accepted didChange/didClose invalidate matching requests with ContentModified (`-32801`). Publication independently checks the open-document incarnation, version and exact content; identical close/reopen cannot publish old ranges. Rejected notifications do not invalidate committed state.
 
@@ -72,4 +72,23 @@ data-only. The explicit I/O layer has stricter trusted-quiescent-local filesyste
 physical ownership and aggregate bounds documented in the import/server READMEs.
 No watcher, status/FINISHED signal, effective classpath, build-tool orchestration,
 workspace-symbol or official project/URI/semantic equivalence is claimed.
+
+
+## Manual signature-help boundary (#424)
+
+Only the trusted parser-provider branch advertises `signatureHelpProvider:{}`.
+The manual completed named-call envelope reuses the original419 applicability
+proof and current OPEN document, not imported421 aliases/waiters. Signature and
+sole-formal labels are original source strings, active indices zero; no trigger
+or optional label-offset negotiation/state is added. Context shape is validated
+but prior client help is not source authority. Strict UTF16 and existing global8
+owned work/cancellation/join/incarnation/version/content publication remain.
+One semantic allowance continues through escaped1MiB response/ID/framing
+preflight and source copies; separately bounded lowering/region stages and
+ordinary fixed-count JSON/final serializer allocations do not establish a
+whole-pipeline/RSS/prompt semantic-cancellation guarantee. [Exact provider and
+current acceptance limits](../../crates/ktlsp-server/README.md#manual-source-owned-signature-help-424)
+do not establish incomplete typing, general argument/overload/inference/imported
+semantics or official signature-help equivalence. Static component clears do not
+substitute for pending ROOT union/compiler/original hosted actual-value/edit gates.
 

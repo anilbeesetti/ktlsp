@@ -616,6 +616,31 @@ evidence and integration verification remain ROOT-gated under #96.
   #417's original Windows docless-hover cause remains UNKNOWN/OPEN, B3 remains
   INCONCLUSIVE/HOLD, and oracle-runtime/provenance/full-semantic parity HOLDs
   are not discharged by this finite label proof.
+- `local_value_binding::local_call_signature(directory, result, current, cursor)`
+  adds a separate completed-call cursor projection (#424), returning
+  `Option<LocalCallSignature>`. It consumes the SAME private authenticated
+  original-CallSite applicability kernel as the unchanged label-definition API
+  above, including complete competitors/root and pointer-identical lexical type
+  declarations. Existing richer value/callee/occurrence/rename refusals stay.
+  `binding()`, `cursor()`, `signature_range()` and `parameter_range()` retain
+  original callable/formal/argument/type/annotation/paren/source provenance.
+  Signature range is original function name.start through formal-list close.end;
+  parameter range is the original sole formal declaration. No inferred Unit,
+  KDoc, source reparse, general argument mapper or imported applicability.
+  The cursor interval is `[open.end, close.start]`; comment tokens exclude
+  `[start,end)`, and a trailing comma excludes comma.end through close.start
+  instead of inventing another formal or clamping to zero.
+  `into_labels(response_id_bound)` MOVES the same private ReferenceBudget through
+  exact escaped-byte/source/envelope preflight and both fallible fresh String
+  reservations/copies, returning original-source strings without a new budget.
+  Existing semantic work/requested/retained ceilings stay unchanged; the complete
+  success-response bound is1MiB including conservative actual ID/framing.
+  Lowering/regions are separately bounded stages, fixed-count JSON map/key/final
+  serializer allocations remain ordinary infallible allocations, and no
+  whole-parser-to-wire/RSS/prompt element-level cancellation bound is claimed.
+  Both component static reviews cleared538743f after their initial source/test
+  findings were corrected. Runtime/original hosted actual-value/edit and final
+  union/integration gates remain pending; #96 and all existing HOLDs unchanged.
 - `local_value_binding::bind_lexical_type_parameter(directory, result,
   annotation_reference_index, current)` authenticates original snapshot/tree
   association, exact reference/token/USER_TYPE/TYPE_REFERENCE/declaration

@@ -3741,3 +3741,58 @@ original full three-host CI/guarded integration/dualmain remain pending.
 No compiler/runtime/CI/push/PR occurred for this leaf. Native-only/T004/96,
 B3/oracle HOLD, original417/395/377 UNKNOWN and full parity NOT achieved remain.
 
+
+#### Original424 manual-signature source delivery, composed runtime unobserved
+
+[Issue424](https://github.com/anilbeesetti/ktlsp/issues/424) isolated owner delivered
+the COMPLETE oldest-first range d568bb324d9690cbb736e56af207aac113c6edf7 ->
+**538743f1e13d7d4a231b383d3c888769a362c79b**,
+tree **8fa2fe4233c3bab15b8f35d47a46dbba80046eac**, from the SAME verified1ddf as423.
+ROOT authenticated exact commits/parents and allNINE source/test paths, then
+composed BOTH commits as3f48ee2/9157b50, never just the last fix.
+No Cargo/lock/dependency/docs/config/workflow owner changes.
+
+The new cursor projection and unchanged label-definition entry consume the
+SAME private original-CallSite applicability kernel. `LocalCallSignature`
+retains original callable/formal/argument/type/annotation/paren/cursor/source
+provenance and moves ONE ReferenceBudget through escaped response preflight and
+both source-string reservations/copies. Wire STRING labels move into JSON,
+top-level active indices zero. Trusted-worker capability is{}, no triggers;
+open-only authority, global8 ownership/cancel/join/incarnation/version/content
+publication and all old richer-body refusals remain. Lowering/regions remain
+separate budgets, JSON/final serializer fixed allocations ordinary, no full
+pipeline/RSS/prompt semantic-cancellation bound or official rendering parity.
+
+Distinct functionality/adversarial reviewers initially REJECTED d568:
+F1 missing exhaustive Query arm is a static compile-blocker deduction, NOT
+observed compiler output; F2 positive fixtures selected a comment opening slash,
+contradicting the correct comment-null policy. Minimal source/test corrections
+preserve every positive fixture/comment endpoint and no production relaxation.
+BOTH independently rechecked exact538743f and cleared, including valid-version
+bad-range rejection and fresh equal-text/version reopened help. ROOT FULL-read
+both complete original rejected receipts with authoritative anchor corrections,
+both renewed receipts with recovered long qualifications, current shared proof/
+output/reservation code and complete actual producer/wire/edit/lifecycle source.
+Final function receipt SHA3d4d0a0b6a8461626551951ceecea2f87806b1b460c08389103b723522ce2664;
+adversarye83fc81efccd9b045dc12395f4fc5a8fd91acd72e6db2a826ed6c669b966ec4b.
+Full source contract SHA c2d967b9381df585af4d03936e5f62045e1fd76bb3b5cbb69da85551bc1ca39a;
+original rejected receipts remain preserved, no changed-head approval invented.
+
+UNEXECUTED authored checks use original producers, every UTF8-boundary caret,
+source/formal span readback, real packaged CLI and SAME live v7->v8 document
+after independently applying ALL genuine returned TYPE edits; distinct-formal/
+future-shadow/other-arity/damaged/unsupported calls, UTF16/context/open/missing-
+worker errors, actual cancellation/accepted-vs-rejected changes/reopen/terminal
+owned joins remain. TEMP424 direct Write captures full actual producer/CST/
+declarations/regions/proof/spans/source, all sent/raw-received wire values and
+exit/stderr or abort, plus actual Session ownership/errors BEFORE outer asserts.
+They remain until BOTH independent FULL actual-value/genuine-edit gates.
+No compiler/build/check/lint/formatter/runtime/probe/CI/push/PR performed.
+
+ROOT now owns complete423/424 union/docs review, ONE formatter/affected exact
+rechecks, admitted compiler-only/pure-data verification and OWN ORIGINAL full
+three-host hosted actual-value/edit CI; cleaned-source OWN reviews/CI and fresh
+separate readonly complete guard/expected-head squash/tree/SOLEparent/dualmain
+remain required. Full parity NOT achieved; native-only/T004/96, B3/oracle HOLD
+and original417/395/377 UNKNOWN/OPEN unchanged. Every old/user/review WT retained.
+

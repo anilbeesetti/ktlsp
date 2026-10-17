@@ -13,7 +13,7 @@ cargo build --locked --release -p ktlsp-server -p ktlsp-parser --bins
 
 Install **both** `ktlsp` and `ktlsp-parser-worker` from that same build into the same trusted directory (with `.exe` suffixes on Windows). The default CLI discovers the worker only beside its own executable, checking that the sibling is a regular executable file on Unix. There is no PATH, current-directory or environment-selected worker fallback. Installation trust and matching build identity are the distributor's responsibility; this is not a sandbox, signature check or version-authentication protocol.
 
-Without that sibling, synchronization/folding/lexical diagnostics, compatible lexical semantic tokens and the negotiated structural quickfix remain available, `documentSymbolProvider`/`definitionProvider`/`hoverProvider`/`referencesProvider`/`documentHighlightProvider`/`completionProvider`/`renameProvider` are omitted and their requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. A configured worker that subsequently fails is a request failure, not a fabricated outline or binding. No JVM/JDK, Kotlin compiler or C parser is required.
+Without that sibling, synchronization/folding/lexical diagnostics, compatible lexical semantic tokens and the negotiated structural quickfix remain available, `documentSymbolProvider`/`definitionProvider`/`hoverProvider`/`referencesProvider`/`documentHighlightProvider`/`completionProvider`/`signatureHelpProvider`/`renameProvider` are omitted and their requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. A configured worker that subsequently fails is a request failure, not a fabricated outline or binding. No JVM/JDK, Kotlin compiler or C parser is required.
 
 ## Optional extracted-archive smoke (#373)
 
@@ -320,6 +320,47 @@ The separate fresh guard and expected-head squash produced18733fe9f1233e0671ef76
 tree49e47082/soleparent0d7d219. Independent OWNER+ROOT accepted original exact-main
 39018036957/1/job117354061005 before lease420 clearance. See the development ledger.
 No local Kotlin runtime or official equivalence is claimed.
+
+## Manual source-owned signature help (#424)
+
+With the trusted matching worker, `textDocument/signatureHelp` advertises
+`signatureHelpProvider:{}`. No trigger/retrigger characters or optional offset-
+label profile are published. Missing workers omit it and return `-32601`.
+Requests use strict UTF16 coordinates in the exact current OPEN document,
+including untitled documents. Imported aliases/waiters remain documentSymbol-
+only; there is no new disk/source authority, pool, index or cache.
+
+The provider consumes the SAME private419 applicability proof for one completed
+direct named reference argument to a preceding empty nongeneric receiver-free
+local function's sole required formal. Both the original outer argument
+parameter and formal annotate the SAME original lexical type declaration.
+Original physical competitors precede eligibility and the complete root is
+checked; nominal/literal/import/inference/default/vararg/overload/member/
+constructor/multiple/positional/incomplete calls remain unsupported.
+
+One signature and one parameter have original-source STRING labels, with
+top-level `activeSignature:0`/`activeParameter:0`. Backticks/comments/trivia/
+nonBMP/line endings are not pretty-printed or normalized. No inferred Unit,
+KDoc or range extension is supplied. Context/previous-help wire shapes are
+validated, but client labels/indices do not authenticate a call or active formal.
+Outside the completed list, comment `[start,end)` and post-trailing-comma
+next-slot carets return null; unsupported containing calls refuse.
+
+One semantic allowance continues through source selection, complete proof,
+escaped1MiB response/ID/envelope preflight and both fallible source copies.
+Strings move directly into JSON. Lowerer/region stages and fixed-count JSON/
+serializer allocations retain separate existing limits; no RSS/whole-pipeline
+or prompt internal semantic-cancellation guarantee is claimed. Existing
+global8 ownership, exact ID/cancel/join, version/content/incarnation publication,
+accepted versus rejected mutation and terminal cleanup rules remain unchanged.
+
+Current538743f source has TWO independent component static clears after fixing
+the reviewers' initial exhaustive-match and positive-comment-caret defects.
+Real original producer/packaged CLI/same-live-v7->v8 genuine returned TYPE-edit
+and owned Session checks are authored but UNEXECUTED. TEMP424 direct complete
+captures stay until BOTH independent OWNER+ROOT full actual-value/edit gates.
+ROOT union reviews/compiler admission/hosted CI/guarded integration remain
+pending; this is not official rendering/trigger/full signature-help parity.
 
 ## Finite function type-parameter references and rename (#392)
 

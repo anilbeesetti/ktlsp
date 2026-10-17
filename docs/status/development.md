@@ -4773,3 +4773,17 @@ is retained outside repo; the other original review does not override the defect
 BOTH full CURRENT9path source authorities must renew on the changed exact source
 before separate ROOT compiler-only admission and OWN original hosted gates.
 
+
+#### Basic430 first format refusal and manual displayed-layout repair
+
+Corrected0a174923c794c344dadffaffc95e582c48fd6636/tree784d1ff21b86fc3eeeb0cd58556cc4775f4e5401
+received BOTH complete current9path source renewals0.97/0.97. Separate ROOT
+compiler-only admission ran fmtCHECK once: exit1/1.434625292s, stdout8710B
+SHA5f7b89b32d9691741df224b62df6de1944a538437400b3772970f2976f9cac15,stderr0.
+Strict Clippy and NoRun were NOT attempted after failure. ROOT manually applied
+ONLY the11 displayed formatter diff blocks: expression layout/JSON token spacing
+and optional trailing commas. Every real call/assertion/fixture string/edit/
+frequency/ownership/deadline/bound remains. No formatter mutation, runtime,
+suppression or unchanged retry. Prior refusal remains failed; BOTH complete
+CURRENT9path authorities must renew before fresh separate compiler-only admission.
+

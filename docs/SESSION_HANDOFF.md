@@ -51,6 +51,13 @@ only that expected extent to the existing full-comment-bound declaration policy,
 keeping selectionRange, fixtures, genuine calls and all assertions. BOTH complete
 current9path authorities must renew before separate compiler-only admission.
 
+Corrected0a17492/tree784d1ff2 received BOTH full current renewals0.97/0.97.
+Separate compiler-only admission then ran fmtCHECK once: FAILED1/1.434625s,
+stdout8710B SHA5f7b89b32d9691741df224b62df6de1944a538437400b3772970f2976f9cac15,
+stderr0. Clippy/NoRun were NOT attempted. ROOT manually applied ONLY the11
+displayed formatter diff blocks; no formatter mutation or runtime. Renew BOTH
+complete current9path source authorities before fresh separate compiler admission.
+
 ### Historical capture-free composition checkpoint before final verification
 
 All three admitted observation retirements are now complete, independently

@@ -383,7 +383,9 @@ impl Package {
         let package = Self::source_only();
         std::fs::copy(
             env!("CARGO_BIN_EXE_ktlsp"),
-            package.0.join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX)),
+            package
+                .0
+                .join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX)),
         )
         .unwrap();
         if include_worker {
@@ -1484,7 +1486,8 @@ fn basic_extracted_exchange(directory: &Path) -> Value {
     std::fs::write(&path, disk).unwrap();
     let root = source_directory_uri(&project);
     let uri = format!("{root}/src/A.kt");
-    let source = "// 😀\r\n// Native\r\nfun host() {\r\n val `old😀` = 1\r\n val use = `old😀`\r\n}\r\n";
+    let source =
+        "// 😀\r\n// Native\r\nfun host() {\r\n val `old😀` = 1\r\n val use = `old😀`\r\n}\r\n";
     let mut wire = SignatureWire::in_directory(directory);
     let mut requests = Vec::new();
     let mut send = |id: Option<&str>, method: &str, params: Value| {
@@ -1500,9 +1503,7 @@ fn basic_extracted_exchange(directory: &Path) -> Value {
         assert_eq!(response["result"], expected, "{response}");
     };
     let document = json!({"textDocument":{"uri":uri}});
-    let at = |text: &str, offset| {
-        json!({"textDocument":{"uri":uri},"position":offset_to_position(text,offset).unwrap()})
-    };
+    let at = |text: &str, offset| json!({"textDocument":{"uri":uri},"position":offset_to_position(text,offset).unwrap()});
     let initialized = send(
         Some("init"),
         "initialize",
@@ -1540,7 +1541,11 @@ fn basic_extracted_exchange(directory: &Path) -> Value {
     let disk_symbols = json!([{"name":"DiskOnly","kind":5,
         "location":{"uri":uri,"range":span(disk,"class DiskOnly")}}]);
     result(
-        send(Some("disk"), "workspace/symbol", json!({"query":"DiskOnly"})),
+        send(
+            Some("disk"),
+            "workspace/symbol",
+            json!({"query":"DiskOnly"}),
+        ),
         disk_symbols.clone(),
     );
     send(
@@ -1587,15 +1592,19 @@ fn basic_extracted_exchange(directory: &Path) -> Value {
     );
     let outline = |text: &str, name: &str| {
         json!([{"name":"host","kind":12,"range":span(text,text.trim_end()),
-            "selectionRange":span(text,"host"),"children":[
-                {"name":name,"kind":7,"range":span(text,&format!("val {name} = 1")),
-                    "selectionRange":span(text,name),"children":[]},
-                {"name":"use","kind":7,"range":span(text,&format!("val use = {name}")),
-                    "selectionRange":span(text,"use"),"children":[]}
-            ]}])
+        "selectionRange":span(text,"host"),"children":[
+            {"name":name,"kind":7,"range":span(text,&format!("val {name} = 1")),
+                "selectionRange":span(text,name),"children":[]},
+            {"name":"use","kind":7,"range":span(text,&format!("val use = {name}")),
+                "selectionRange":span(text,"use"),"children":[]}
+        ]}])
     };
     result(
-        send(Some("outline"), "textDocument/documentSymbol", document.clone()),
+        send(
+            Some("outline"),
+            "textDocument/documentSymbol",
+            document.clone(),
+        ),
         outline(&corrected, "`old😀`"),
     );
     let decode = |response: Value| {
@@ -1617,8 +1626,12 @@ fn basic_extracted_exchange(directory: &Path) -> Value {
                     token[1].as_u64().unwrap()
                 };
                 assert_eq!(token[4], 0);
-                json!([line,column,token[2],
-                    options["legend"]["tokenTypes"][token[3].as_u64().unwrap() as usize]])
+                json!([
+                    line,
+                    column,
+                    token[2],
+                    options["legend"]["tokenTypes"][token[3].as_u64().unwrap() as usize]
+                ])
             })
             .collect::<Vec<_>>()
     };
@@ -1629,14 +1642,14 @@ fn basic_extracted_exchange(directory: &Path) -> Value {
             document.clone()
         )),
         vec![
-            json!([0,0,4,"comment"]),
-            json!([1,0,9,"comment"]),
-            json!([2,0,3,"keyword"]),
-            json!([3,1,3,"keyword"]),
-            json!([3,13,1,"operator"]),
-            json!([3,15,1,"number"]),
-            json!([4,1,3,"keyword"]),
-            json!([4,9,1,"operator"])
+            json!([0, 0, 4, "comment"]),
+            json!([1, 0, 9, "comment"]),
+            json!([2, 0, 3, "keyword"]),
+            json!([3, 1, 3, "keyword"]),
+            json!([3, 13, 1, "operator"]),
+            json!([3, 15, 1, "number"]),
+            json!([4, 1, 3, "keyword"]),
+            json!([4, 9, 1, "operator"])
         ]
     );
     assert_eq!(
@@ -1646,7 +1659,7 @@ fn basic_extracted_exchange(directory: &Path) -> Value {
             json!({"textDocument":{"uri":uri},"range":{
                 "start":{"line":0,"character":2},"end":{"line":1,"character":4}}})
         )),
-        vec![json!([0,2,2,"comment"]), json!([1,0,4,"comment"])]
+        vec![json!([0, 2, 2, "comment"]), json!([1, 0, 4, "comment"])]
     );
     let workspace_local = |text: &str, name: &str| {
         json!([{"name":name,"kind":7,"containerName":"host",
@@ -1774,7 +1787,11 @@ fn basic_extracted_exchange(directory: &Path) -> Value {
     assert_eq!(std::fs::read_to_string(&path).unwrap(), disk);
     send(None, "textDocument/didClose", document.clone());
     result(
-        send(Some("closed"), "workspace/symbol", json!({"query":"DiskOnly"})),
+        send(
+            Some("closed"),
+            "workspace/symbol",
+            json!({"query":"DiskOnly"}),
+        ),
         disk_symbols,
     );
     result(
@@ -1892,7 +1909,10 @@ fn packaged_basic_editing_same_live_edits_and_lifecycle() {
         "borrowed_directory_retained_until_owner_drop":true
     }))
     .unwrap();
-    assert!(receipt.len() <= 65536, "paired smoke receipt exceeds 64 KiB");
+    assert!(
+        receipt.len() <= 65536,
+        "paired smoke receipt exceeds 64 KiB"
+    );
     drop(package);
     assert!(!directory.exists(), "exclusive package owner cleanup");
     println!("PAIRED_BASIC_EDITING_SMOKE_RECEIPT={receipt}");
@@ -6376,17 +6396,18 @@ impl SignatureWire {
         Self::in_directory(&package.0)
     }
     fn in_directory(directory: &Path) -> Self {
-        let mut child = Command::new(directory.join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX)))
-            .arg("--stdio")
-            .env("PATH", "")
-            .env_remove("JAVA_HOME")
-            .env_remove("JDK_HOME")
-            .current_dir(directory)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .unwrap();
+        let mut child =
+            Command::new(directory.join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX)))
+                .arg("--stdio")
+                .env("PATH", "")
+                .env_remove("JAVA_HOME")
+                .env_remove("JDK_HOME")
+                .current_dir(directory)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap();
         let input = child.stdin.take();
         let reader = std::io::BufReader::new(child.stdout.take().unwrap());
         Self {

@@ -3083,3 +3083,47 @@ Native418 data and original full hosted419/Linux/macOS/Windows evidence remain
 UNOBSERVED; temporary writers remain until BOTH independent full actual gates.
 All #96/native-only/T004/#417UNKNOWN/B3/oracle/provenance/full-parity holds remain.
 
+#### Composed418419 compile acceptance and independent native418 actual proof
+
+The minimal JSON-expression repair at2aef0924f8a426bad821c279583a652df6589645,
+tree89c7302d6106016d20391bcf2d01cfdc990df513, received all FOUR affected exact
+functionality/adversarial clears. The two418 source reviews explicitly apply to
+byte-identical source, not an invented fresh review. Pinned format-CHECK and
+strict locked workspace/all-target Clippy passed; the original failure above is
+retained. No second formatter, suppression or unchanged retry.
+
+Separately admitted unfiltered native binary/import tests passed647 =
+640ordinary+7compile-fail doctests across67rows,0failed0ignored0measured0filtered.
+ROOT fully read all1092stdout/72stderr lines and retained complete case/runner
+associations in `/private/tmp/ktlsp-418-native/ROOT-full-binary-import-data-tests.json`.
+The external actual public-API consumer used the actual Cargo-reported fresh
+binary rlib and pinned Rust1.99, compiled0/0.1641s, ran0/0.5684s with empty PATH
+and no Kotlin/parser/server/JVM runtime. Original stdout299512bytes/7160lines
+SHA2562a9cc7b531b82d3ffdcfca33ae2ae9a1c485de4965df04566c38a2679086d13e;
+compile/run stderr empty.
+
+Independent OWNER+ROOT FULL actual gates accepted every genuine Class model,
+annotation/Outcome/Constructor value and all original pointer/raw-byte pairs.
+ROOT proved whole-value equality to previously fully read genuine Pair bases,
+then fully read all new fields and the complete current occurrence map;
+OWNER independently read all current actual data. All560 records reconcile:
+228actual calls/157 whole-value+pointer successes/71 full errors,18 original
+pointer/byte records and22 explicitly authored inputs with2 complete successes
+and20 complete errors. Actual operation minima: bytes859,records101,nodes22,
+work4996,owned_bytes3200,entries39,range_slots26,queries6,output_units24.
+Joint exact succeeds; all9 joint one-less and flat depth1 refuse. Signed IDs,
+Class NAME refusal, structural-before-semantic failures, atomic late errors
+and third-value cumulative output exhaustion were actually observed.
+
+Only after BOTH full gates was the outside throwaway consumer source removed;
+full executed source, commands, library/fixture hashes and original payloads
+remain retained. Complete dual acceptance:
+`/private/tmp/ktlsp-418-native/ROOT-complete-actual-native-acceptance.json`;
+independent OWNER receipt766lines SHA256
+b2dc607fe66fef229f57cd0f51c177637d13af541d6680c7786ffb2b40718060.
+No #419 runtime/publication or full hosted union/workspace acceptance yet.
+Its temporary writer remains until BOTH full actual producer/protocol/edit gates.
+No capability expansion; compiler provenance UNVERIFIED, #417 UNKNOWN/OPEN,
+B3 INCONCLUSIVE/HOLD, oracle custody HOLD, #96/native-only/T004 and full-parity
+limits remain unchanged.
+

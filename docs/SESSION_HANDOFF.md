@@ -108,10 +108,25 @@ receipts embedded in `/private/tmp/ktlsp-418-419-all-six-formatted-clears-and-co
 Pinned format-CHECK passed; first strict locked workspace/all-target Clippy
 FAILED101/3.97s: unparenthesized array.map inside json! at server test5012.
 ROOT minimally parenthesized that complete JSON expression without changing any
-payload/fixture/assertion, and renewed exact changed-source reviews are required
-before another compile. Original failure retained; no unchanged retry/secondfmt.
-No tests/local Kotlin runtime/publication. #419 actual writer remains.
-Native binary data proof needs separate ROOT admission after all static clears;
+payload/fixture/assertion. All FOUR affected exact changed-source reviewers
+cleared2aef0924/tree89c7302d; the two418 clears explicitly carry forward only
+byte-identical source. Pinned format-CHECK and strict locked workspace/all-target
+Clippy then PASSED. No second formatter or unchanged retry.
+Separately admitted binary/import native data tests passed647=640ordinary+
+7compile-fail doctests/67rows,0failed0ignored0measured0filtered. ROOT fully read
+all1092stdout and72stderr lines. Native418 actual public consumer compiled0 and
+ran0/0.5684s with empty PATH, producing299512bytes/7160lines SHA256
+2a9cc7b531b82d3ffdcfca33ae2ae9a1c485de4965df04566c38a2679086d13e.
+BOTH independent OWNER+ROOT FULL actual native-data gates are accepted:
+`/private/tmp/ktlsp-418-native/ROOT-complete-actual-native-acceptance.json`.
+All560 records include complete genuine models/Outcome/Constructor,18 original
+pointer/byte pairs,228 real calls/157 successes/71 complete failures, and22
+explicitly authored inputs/results/errors. ROOT used whole-value equality to
+previously fully accepted genuine Pair models plus fully read every new value
+and complete current occurrence map; OWNER independently read all actual data.
+The external consumer source was removed only after BOTH gates; full executed
+source/output/custody retained. No local Kotlin/parser/server runtime.
+No publication or hosted419 runtime yet. #419 actual writer remains.
 Kotlin/CLI proof only original full hosted CI. Temporary writers stay until BOTH
 OWNER+ROOT FULL-read actual payloads and actually returned edits; permanent
 consumer-visible assertions remain after cleanup. Successor source needs its

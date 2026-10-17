@@ -364,9 +364,10 @@ flagsSome(70), empty version IDs; first outer80..88/body82..88/Type86..88
 binds original A ID0/ordinal0/body54..60, and second88..96/90..96/Type94..96
 binds B ID1/ordinal1/body62..68. Value flags/type IDs/vararg IDs/nullable marking
 are absent; OUT declaration variance is not inferred nullability or projection.
-These are byte-derived test expectations, not an execution receipt. Producing
-compiler provenance stays **UNVERIFIED**, distinct from stdlib distribution2.3.20.
-Existing fixture notices/provenance and binary bytes are unchanged.
+ROOT's actual native public-API consumer independently observed these complete
+values on source2aef0924/tree89c7302d, with empty PATH and no Kotlin/JVM runtime.
+Producing compiler provenance stays **UNVERIFIED**, distinct from stdlib
+distribution2.3.20. Existing fixture notices/provenance and bytes are unchanged.
 
 Authored controls separately cover structural/semantic error order, original
 nonminimal spans, empty/multiple Constructors, signed/reordered/duplicate IDs,
@@ -378,7 +379,18 @@ and nonzero effective Type flags refuse. Raw Options/default bits stay data.
 Annotations/plugin/extensions/version applicability, bounds/substitution,
 source/JVM mapping, overloads, server integration and full parity stay outside
 this operation. Existing Function/signature/raw-constructor/#394 APIs are unchanged.
-No execution or formatter was run by this source owner; ROOT admits those gates.
+Both independent OWNER+ROOT gates fully read the actual payloads, reconciled
+original bytes/pointers and all228 real calls (157 full-value/pointer-equal
+successes,71 complete failures), plus22 explicitly authored controls. Actual
+genuine minima are bytes859/records101/nodes22/work4996/owned_bytes3200/
+entries39/range_slots26/queries6/output_units24; joint exact succeeds and each
+joint one-less/depth1 refuses. These are operation-specific logical allowances,
+not memory/RSS or compiler-equivalence claims. All647 binary/import data checks
+(640 ordinary+7 compile-fail doctests) passed without filtering. The throwaway
+source was removed only after both full gates; executed source and original
+output remain in `/private/tmp/ktlsp-418-native/actual-consumer-proof.json` and
+`consumer.stdout`. Full hosted workspace/419 evidence and integration remain
+separate gates, not inferred from this native data smoke.
 
 ## Selected Class Function value declarations (#402)
 

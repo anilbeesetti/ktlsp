@@ -4287,13 +4287,12 @@ fn documentation_paired_cli_selects_original_class_property_parameter_and_nested
     }
 }
 
-fn recursive_cli_layout(
-    source: &str,
-    renamed: Option<usize>,
-) -> (
+type RecursiveCliLayout = (
     Vec<std::ops::Range<usize>>,
     Vec<(std::ops::Range<usize>, Option<usize>)>,
-) {
+);
+
+fn recursive_cli_layout(source: &str, renamed: Option<usize>) -> RecursiveCliLayout {
     let targets = [
         ("outer", "T"),
         ("outer", "Spare"),

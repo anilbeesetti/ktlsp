@@ -2313,3 +2313,12 @@ writeln!, preserving complete payloads and all permanent behavior assertions.
 No workflow/nocapture override or rerun was added; renewed exact union/affected
 static clears are required before first formatting/compile admission.
 
+After BOTH exact full27 and all SIX affected post-format clears atca6871be/
+tree126d5638, ROOT admitted format-CHECK and strict locked workspace/all-target
+compile-lint ONLY. Format-CHECK passed; Clippy compilation exited101 in6.93s:
+new stale-snapshot test passed &String where SourceSnapshot requires Into<Arc<str>>,
+and new CLI layout tuple triggered type_complexity. Before any runtime, ROOT
+changed ONLY that argument to original.as_str() and named the existing test-only
+layout tuple; no suppression, semantic fallback, second formatter or new
+allocation. Changed-scope exact reviews must renew before the next strict check.
+

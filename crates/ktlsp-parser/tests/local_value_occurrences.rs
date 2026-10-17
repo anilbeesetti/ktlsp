@@ -2690,9 +2690,13 @@ fn recursive_type_scopes_preserve_complete_original_identity_partitions_and_repl
                         .unwrap_err(),
                     LocalBindingError::InvalidOrigin
                 );
-                let stale =
-                    SourceSnapshot::new("local-occurrences", 8, FileKind::Source, &original)
-                        .unwrap();
+                let stale = SourceSnapshot::new(
+                    "local-occurrences",
+                    8,
+                    FileKind::Source,
+                    original.as_str(),
+                )
+                .unwrap();
                 assert_eq!(
                     type_parameter_occurrences(&directory, &result, anchor, &stale).unwrap_err(),
                     LocalBindingError::StaleSnapshot

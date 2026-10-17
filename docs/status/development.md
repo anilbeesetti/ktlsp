@@ -2660,3 +2660,35 @@ original395/377causesUNKNOWN and live-exactstep oracle custody HOLD remain.
 General types/inference/semantic imports/library navigation/formatting/tooling/
 debug/release/oracle and full official parity are NOT complete.
 
+#### Reviewed415 bare-return component — source only, no runtime acceptance
+
+Owner `BareReturnSignatures` committed
+**ec7dafa30bae79d9d443b40e98144b9408ded27b**, tree
+**774e2e117c2cfcfc1c294bdeb93f5aa9b15d31e6**, SOLEparent verified4bbf.
+Exactly THREE component paths changed: selected Function signature implementation,
+its behavior tests and binary README. ReturnType.class_id is removed, not
+aliased; existing Classifier preserves nominal or original scoped root identity.
+Bare roots reuse the shared classifier after the same staging pass; every
+argument occurrence including wrong-wire rejects. Nominal validation/precedence,
+all value/declaration validation, one context/resolver/allowance and caps stay.
+Live consumers migrated; historical411 proof/source and unrelated return APIs
+remain unchanged. Actual xd://lsp attempt returned unavailable/No such tool,
+not a successful reference query; full grep/read fallback mapped live callers.
+
+BOTH CURRENT full static reviewers cleared source20BE/tests7554/README2E0F and
+complete external consumer412B after correcting its Range borrow/move and stale
+declaration-field accesses. Functionality correct/confidence0.94; adversarial
+correct/confidence0.98. Complete current messages, consumer and handoff:
+`/private/tmp/ktlsp-415-native/{functionality-current-review.txt,adversary-current-review.txt,consumer.rs,component-handoff.json}`.
+The consumer is PREPARED ONLY: actual original Pair components/copy and Result,
+full original bytes/model/annotations/Outcome/member discovery/results/pointers,
+separately labelled authored scope/marking/refusal controls and NEW nine-resource
+minima routines. No compilation/test/formatter/runtime/push/PR was performed.
+No new observed Pair component positive, resource minimum, genuine bare
+Function-root producer emission or exact compiler provenance is claimed.
+
+ROOT composed this reviewed component after its common admission documentation;
+414 implementation/reviews and COMPLETE union reviews remain pending before
+one formatter, renewed exact clears, strict compile and separate native/hosted
+runtime admission. Earlier native or PR413 CI does not validate this successor.
+

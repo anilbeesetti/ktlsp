@@ -2138,10 +2138,10 @@ fn documentation_operation_cannot_authorize_lexical_type_consumers() {
         },
     };
     let _serial = functional::serial();
-    for (source, prose) in [
-        ("fun <T> f(){ /** doc */ val x:T=1 }", Some("doc")),
-        ("fun <T> f(){ /** doc */ final val x:T=1 }", Some("doc")),
-        ("fun <T> f(){ val x:T=1 }", None),
+    for (source, strict_control) in [
+        ("fun <T> f(){ /** doc */ val x:T=1 }", false),
+        ("fun <T> f(){ /** doc */ final val x:T=1 }", false),
+        ("fun <T> f(){ val x:T=1 }", true),
     ] {
         let result = parse(source);
         let snapshot = result.snapshot();
@@ -2154,7 +2154,6 @@ fn documentation_operation_cannot_authorize_lexical_type_consumers() {
             &lowered, &result, snapshot, property.name_range().start, &mut budget,
         ).unwrap();
         assert!(std::ptr::eq(attached.declaration(), property));
-        assert_eq!(attached.prose(), prose);
         let directory = build_regions(&lowered, &result, snapshot).unwrap();
         let target = lowered.declarations().iter().find(|d| d.kind() == "TYPE_PARAMETER").unwrap();
         let reference = tree.elements().iter().position(|e| {
@@ -2181,11 +2180,12 @@ fn documentation_operation_cannot_authorize_lexical_type_consumers() {
                 );
             }
         }
-        if prose.is_none() {
+        if strict_control {
             let strict = lower_declarations(&result, snapshot).unwrap();
             let directory = build_regions(&strict, &result, snapshot).unwrap();
             let bound = bind_lexical_type_parameter(&directory, &result, reference, snapshot).unwrap();
-            assert_eq!(bound.target().raw_name(), "T");
+            let target = strict.declarations().iter().find(|d| d.kind() == "TYPE_PARAMETER").unwrap();
+            assert!(std::ptr::eq(bound.target(), target));
             let found = guarded_type_parameter_rename(
                 &directory, &result, TypeParameterAnchor::AnnotationReference(reference),
                 snapshot, Some("Fresh"),

@@ -550,6 +550,14 @@ fn parameter_ambiguity_and_unsupported_headers_never_publish_partial_bindings() 
             "{source}"
         );
     }
+    // Simple returns lower structurally but do not authorize value semantics.
+    let result = parse("fun f(p: T): T { val use = p }");
+    let current = result.snapshot();
+    let lowered = lower_declarations(&result, current).unwrap();
+    let directory = build_regions(&lowered, &result, current).unwrap();
+    assert_eq!(local_value_occurrences(&directory, &result,
+        LocalValueAnchor::Declaration(&lowered.declarations()[1]), current).unwrap_err(),
+        LocalBindingError::UnsupportedContext);
     for source in [
         "fun f(p) { val use = p }",
         "fun f(p: T = 1) { val use = p }",
@@ -561,7 +569,7 @@ fn parameter_ambiguity_and_unsupported_headers_never_publish_partial_bindings() 
         "fun f(p: List<T>) { val use = p }",
         "fun f(p: () -> T) { val use = p }",
         "fun T.f(p: T) { val use = p }",
-        "fun f(p: T): T { val use = p }",
+        "fun f(p: T): T? { val use = p }",
         "fun f(p: T) = p",
         "class C { fun f(p: T) { val use = p } }",
         "fun f(p: T, , q: Q) { val use = p }",
@@ -947,7 +955,7 @@ fn generic_headers_require_complete_restricted_syntax_even_without_value_reads()
         "fun <T> f<U>() {}",
         "fun <T> T.f() {}",
         "context(T) fun <T> f() {}",
-        "fun <T> f(): T {}",
+        "fun <T> f(): T? {}",
         "fun <T> f() = 1",
         "fun <T> f()",
         "fun <T> f() {",
@@ -2266,7 +2274,7 @@ fn local_type_namespace_refuses_the_entire_unsupported_envelope_and_annotation_c
         "fun <T> outer(){ fun middle(){ fun unused(){ val x={1} } }; fun target(p:T){} }",
         "fun <T> outer(){ fun middle(){ fun unused(){ var x=1 } }; fun target(p:T){} }",
         "fun <T> outer(){ fun middle(){ fun <U:Any> unused(){} }; fun target(p:T){} }",
-        "fun <T> outer(){ fun middle(){ fun unused():T{} }; fun target(p:T){} }",
+        "fun <T> outer(){ fun middle(){ fun unused():T?{} }; fun target(p:T){} }",
         "fun <T> outer(){ fun target(p:T?){} }",
         "fun <T> outer(){ fun target(p:pkg.T){} }",
         "fun <T> outer(){ fun target(p:List<T>){} }",
@@ -2275,7 +2283,7 @@ fn local_type_namespace_refuses_the_entire_unsupported_envelope_and_annotation_c
         "fun <T> outer(){ fun target(p:){} }",
         "fun <T> outer(){ fun target(p:T=1){} }",
         "fun <T> outer(){ fun T.target(p:T){} }",
-        "fun <T> outer(){ fun target(p:T):T{} }",
+        "fun <T> outer(){ fun target(p:T):pkg.T{} }",
         "fun <T:Any> outer(){ fun target(p:T){} }",
         "fun <T> outer(){ context(T) fun target(p:T){} }",
         "class C { fun <T> outer(){ fun target(p:T){} } }",
@@ -2384,6 +2392,8 @@ fn documentation_operation_cannot_authorize_lexical_type_consumers() {
         ("fun <T> f(){ /** doc */ val x:T=1 }", false),
         ("fun <T> f(){ /** doc */ final val x:T=1 }", false),
         ("fun <T> f(){ val x:T=1 }", true),
+        ("fun <T> f():T{ val x=1 }", true),
+        ("fun <T> f():T{ /** doc */ val x=1 }", false),
         (
             "fun <T> f(){ fun middle(){ fun <U> deep(){ val x:T=1 } } }",
             true,
@@ -2480,7 +2490,7 @@ fn recursive_type_scopes_preserve_complete_original_identity_partitions_and_repl
         type_parameter_occurrences,
     };
     let _serial = functional::serial();
-    let ordinary = "// 😀\r\nfun <T, Spare> outer(root:T){ val before:T=root; fun <U> inner(a:`T`,b:U){ val inherited:T=a; fun middle(c:T){ fun <`T`> deep(d:T,e:U,f:Missing){ val own:T=d; unknown(noSuch=d); }; fun side(g:T){} }; fun <U> peer(h:U,i:T){} }; fun <T> shadow(j:T){}; fun after(k:T){}; val last:T=root }\r\nfun <T> other(z:T){}\r\n";
+    let ordinary = "// 😀\r\nfun <T, Spare> outer(root:T):T{ val before:T=root; fun <U> inner(a:`T`,b:U):T{ val inherited:T=a; fun middle(c:T):T{ fun <`T`> deep(d:T,e:U,f:Missing):T{ val own:T=d; unknown(noSuch=d); }; fun side(g:T):Missing{} }; fun <U> peer(h:U,i:T):U{} }; fun <T> shadow(j:T):T{}; fun after(k:T):T{}; val last:T=root }\r\nfun <T> other(z:T):T{}\r\nfun <Unused> returnOnly():Unused{}\r\nfun unmatched():Missing{}\r\n";
     for original in [
         ordinary.to_owned(),
         ordinary
@@ -2524,22 +2534,33 @@ fn recursive_type_scopes_preserve_complete_original_identity_partitions_and_repl
         }
         let expected = [
             ("root", Some("outer")),
+            ("outer", Some("outer")),
             ("before", Some("outer")),
             ("a", Some("outer")),
             ("b", Some("inner")),
+            ("inner", Some("outer")),
             ("inherited", Some("outer")),
             ("c", Some("outer")),
+            ("middle", Some("outer")),
             ("d", Some("deep")),
             ("e", Some("inner")),
             ("f", None),
+            ("deep", Some("deep")),
             ("own", Some("deep")),
             ("g", Some("outer")),
+            ("side", None),
             ("h", Some("peer")),
             ("i", Some("outer")),
+            ("peer", Some("peer")),
             ("j", Some("shadow")),
+            ("shadow", Some("shadow")),
             ("k", Some("outer")),
+            ("after", Some("outer")),
             ("last", Some("outer")),
             ("z", Some("other")),
+            ("other", Some("other")),
+            ("returnOnly", Some("returnOnly")),
+            ("unmatched", None),
         ];
         let annotations: Vec<_> = tree
             .elements()
@@ -2567,6 +2588,15 @@ fn recursive_type_scopes_preserve_complete_original_identity_partitions_and_repl
                         .position(|d| std::ptr::eq(d, binding.function()))
                 );
                 assert_eq!(binding.body().introducer(), binding.target().owner());
+                if binding.annotated().kind() == "FUN" {
+                    let annotated_ordinal = lower.declarations().iter()
+                        .position(|d| std::ptr::eq(d, binding.annotated())).unwrap();
+                    let own_body = directory.regions().iter()
+                        .find(|r| r.introducer() == Some(annotated_ordinal)).unwrap();
+                    assert!(binding.reference().end <= own_body.range().start);
+                    assert_eq!(directory.memberships()[annotated_ordinal].region(),
+                        own_body.parent().unwrap());
+                }
                 assert!(std::ptr::eq(binding.reference(), &tree.elements()[index]));
                 Some(
                     lower
@@ -2765,6 +2795,13 @@ fn recursive_type_rename_relooks_up_all_annotations_and_preserves_sibling_shadow
     use ktlsp_parser::local_value_binding::{TypeParameterAnchor, guarded_type_parameter_rename};
     let _serial = functional::serial();
     for (source, function, name, accepted) in [
+        ("fun <T> outer():T{ fun <U> inner():T{} }", "outer", "U", false),
+        ("fun <T> outer():T{ fun <U> inner():T{} }", "inner", "T", false),
+        ("fun <T> outer(){ fun middle(){ fun unused():Captured{} } }", "outer", "Captured", false),
+        ("fun <T> outer(){ fun <U> inner(){ fun unused():Captured{} } }", "inner", "Captured", false),
+        ("fun <T> outer():T{ fun <U> inner():U{}; fun sibling():T{} }", "outer", "U", true),
+        ("fun <T> outer():T{ fun <U> inner():U{}; fun sibling():T{} }", "inner", "T", true),
+        ("fun <T> outer(){ fun <U,V> inner():U{} }", "inner", "V", false),
         (
             "fun <T> outer(){ fun <U> inner(a:T){} }",
             "outer",
@@ -2916,5 +2953,38 @@ fn recursive_type_scope_depth_is_structural_not_a_fixed_function_lane() {
                     .collect::<Vec<_>>()
             );
         }
+    }
+}
+
+#[test]
+fn return_only_headers_require_the_complete_original_ordered_finite_shape() {
+    use ktlsp_parser::local_value_binding::bind_lexical_type_parameter;
+    let _serial = functional::serial();
+    for source in ["fun f():Missing{}", "fun f() /* header */ : `Missing` /* body */ {}"] {
+        let result = parse(source);
+        let snapshot = result.snapshot();
+        let tree = result.tree_for(snapshot).unwrap();
+        assert!(tree.diagnostics().is_empty());
+        let lower = lower_declarations(&result, snapshot).unwrap();
+        assert_eq!(lower.declarations().len(), 1);
+        let directory = build_regions(&lower, &result, snapshot).unwrap();
+        let index = tree.elements().iter().position(|e| e.kind == "REFERENCE_EXPRESSION").unwrap();
+        let annotation = &tree.elements()[tree.elements()[index].parent.unwrap()];
+        let header = &tree.elements()[annotation.parent.unwrap()];
+        assert_eq!(header.parent, Some(lower.declarations()[0].cst_index()));
+        let body = directory.regions().iter().find(|r| r.introducer() == Some(0)).unwrap();
+        assert!(header.end <= body.range().start);
+        assert_eq!(body.parent(), Some(directory.memberships()[0].region()));
+        assert_eq!(bind_lexical_type_parameter(&directory, &result, index, snapshot).unwrap_err(),
+            LocalBindingError::NoEligibleTypeParameter);
+    }
+    for source in [
+        "fun f():{}", "fun f():T:T{}", "fun f():T?{}", "fun f():pkg.T{}",
+        "fun f():List<T>{}", "fun f():(T){}", "fun f():()->T{}", "fun f():@A T{}",
+        "fun f():T = 1", "fun f():T", "fun f():T where T:Any{}", "fun f():T{ val x= }",
+        "fun f():T;{}", "fun f():T(){}", "fun f():T{ fun broken():List<T>{} }",
+    ] {
+        let result = parse(source);
+        assert!(lower_declarations(&result, result.snapshot()).is_err(), "{source}");
     }
 }

@@ -644,6 +644,14 @@ pub(crate) fn validate_type_namespace<'a>(
     // The authenticated lowerer already proved every ordinary outer parameter.
     cursor.b.charge(list.subtree_end - parameters)?;
     cursor.at = list.subtree_end;
+    if cursor.is(function.cst_index(), node.subtree_end, "COLON")? {
+        cursor.expect(function.cst_index(), node.subtree_end, "COLON", true)?;
+        let (index, annotation) =
+            cursor.expect(function.cst_index(), node.subtree_end, "TYPE_REFERENCE", false)?;
+        // The shared lowerer proved the same finite simple_annotation grammar.
+        cursor.b.charge(annotation.subtree_end - index)?;
+        cursor.at = annotation.subtree_end;
+    }
     let (block, body) = cursor.expect(function.cst_index(), node.subtree_end, "BLOCK", false)?;
     if block != body_index {
         return Err(UNSUPPORTED);

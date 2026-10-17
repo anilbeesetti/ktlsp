@@ -1241,7 +1241,7 @@ fn project_header<'a>(
     Ok(())
 }
 
-// Strict ordered states are enforced for reference- or parameter-bearing functions.
+// Strict ordered states are enforced for reference-, parameter- or return-bearing functions.
 fn plain_step(f: &mut Frame<'_>, from: u8, to: u8, b: &mut Budget) -> Result<()> {
     b.work(1)?;
     f.plain = if f.plain == from { to } else { u8::MAX };
@@ -1260,7 +1260,10 @@ fn plain_child(f: &mut Frame<'_>, child: Tag, b: &mut Budget) -> Result<()> {
             let from = f.plain;
             plain_step(f, from, 4, b)
         }
-        (Tag::Fun, Tag::Block) => plain_step(f, 3, 4, b),
+        (Tag::Fun, Tag::Block) => {
+            let from = if f.annotated { 6 } else { 3 };
+            plain_step(f, from, 4, b)
+        }
         (Tag::Block, Tag::Property | Tag::Fun | Tag::Call) => plain_step(f, 1, 1, b),
         (Tag::Call, Tag::Reference) => plain_step(f, 0, 1, b),
         (Tag::Call, Tag::Arguments) => plain_step(f, 1, 2, b),
@@ -1389,7 +1392,7 @@ fn context(t: Tag, parent: Option<Frame<'_>>, i: usize) -> Result<()> {
         Tag::Arguments => p == Some(Tag::Call),
         Tag::Argument => p == Some(Tag::Arguments),
         Tag::ArgumentName => p == Some(Tag::Argument),
-        Tag::TypeReference => matches!(p, Some(Tag::Property | Tag::Parameter)),
+        Tag::TypeReference => matches!(p, Some(Tag::Fun | Tag::Property | Tag::Parameter)),
         Tag::Error => p.is_some() && !matches!(p, Some(Tag::Package | Tag::Imports)),
     };
     if !allowed {
@@ -1527,16 +1530,19 @@ fn token<'a>(
             }
         } else if !matches!(f.tag, Tag::Fun | Tag::Property | Tag::Parameter)
             || !((f.tag != Tag::Parameter && b.one_of(&e.kind, &["EQ", "SEMICOLON"])?)
-                || (matches!(f.tag, Tag::Property | Tag::Parameter)
-                    && b.equal(&e.kind, "COLON")?))
+                || b.equal(&e.kind, "COLON")?)
         {
             return Err(unsupported(i));
-        } else if matches!(f.tag, Tag::Property | Tag::Parameter) && b.equal(&e.kind, "COLON")? {
-            if f.plain != 2 {
+        } else if b.equal(&e.kind, "COLON")? {
+            let expected = if f.tag == Tag::Fun { 3 } else { 2 };
+            if f.plain != expected {
                 return Err(unsupported(i));
             }
             f.annotated = true;
-            plain_step(&mut f, 2, 5, b)?;
+            // Even a return-only nongeneric empty function needs the complete
+            // ordered ordinary header/body proof.
+            f.reference |= f.tag == Tag::Fun;
+            plain_step(&mut f, expected, 5, b)?;
         } else if f.tag == Tag::Property && b.equal(&e.kind, "EQ")? {
             let expected = if f.annotated { 6 } else { 2 };
             plain_step(&mut f, expected, 3, b)?;
@@ -1765,15 +1771,19 @@ fn walk<'a>(
             }
             if t == Tag::TypeReference {
                 let mut declaration = parent.ok_or(unsupported(i))?;
-                let container = if declaration.tag == Tag::Parameter {
-                    Tag::Parameters
+                let ordinary = if declaration.tag == Tag::Fun {
+                    ordinary_function_path(s, depth, b)?
                 } else {
-                    Tag::Block
+                    let container = if declaration.tag == Tag::Parameter {
+                        Tag::Parameters
+                    } else {
+                        Tag::Block
+                    };
+                    let function_depth = depth.checked_sub(2).ok_or(unsupported(i))?;
+                    ordinary_function_path(s, function_depth, b)?
+                        && frame(s, depth - 2, b)?.tag == container
                 };
-                let function_depth = depth.checked_sub(2).ok_or(unsupported(i))?;
-                if !ordinary_function_path(s, function_depth, b)?
-                    || frame(s, depth - 2, b)?.tag != container
-                    || declaration.plain != 5
+                if !ordinary || declaration.plain != 5
                 {
                     return Err(unsupported(i));
                 }
@@ -2047,6 +2057,15 @@ mod tests {
         tree.token("LPAR", "(");
         tree.token("RPAR", ")");
         tree.close();
+        tree.token("COLON", ":");
+        tree.open("TYPE_REFERENCE");
+        tree.open("USER_TYPE");
+        let return_reference = tree.elements.len();
+        tree.open("REFERENCE_EXPRESSION");
+        tree.token("IDENTIFIER", "T");
+        tree.close();
+        tree.close();
+        tree.close();
         tree.open("BLOCK");
         tree.token("LBRACE", "{");
         tree.open("PROPERTY");
@@ -2116,6 +2135,7 @@ mod tests {
         for anchor in [
             TypeParameterAnchor::Declaration(&lower.declarations()[1]),
             TypeParameterAnchor::AnnotationReference(reference),
+            TypeParameterAnchor::AnnotationReference(return_reference),
             TypeParameterAnchor::Declaration(&lower.declarations()[2]),
         ] {
             for name in [None, Some("Fresh")] {
@@ -2131,7 +2151,7 @@ mod tests {
                 .unwrap();
                 assert_eq!(
                     found.occurrences().len(),
-                    usize::from(found.target().raw_name() == "T")
+                    2 * usize::from(found.target().raw_name() == "T")
                 );
                 let mut exact = ReferenceBudget {
                     work: WORK - measured.work,
@@ -2218,8 +2238,8 @@ mod tests {
             tree.token("IDENTIFIER", name);
             tree.open("VALUE_PARAMETER_LIST");
             tree.token("LPAR", "(");
-            tree.open("VALUE_PARAMETER");
-            tree.token("IDENTIFIER", "p");
+            tree.token("RPAR", ")");
+            tree.close();
             tree.token("COLON", ":");
             tree.open("TYPE_REFERENCE");
             tree.open("USER_TYPE");
@@ -2229,9 +2249,7 @@ mod tests {
             tree.close();
             tree.close();
             tree.close();
-            tree.close();
-            tree.token("RPAR", ")");
-            tree.close();
+            // Direct simple return, not a value parameter: accounting only.
             tree.open("BLOCK");
             tree.token("LBRACE", "{");
             tree.token("RBRACE", "}");

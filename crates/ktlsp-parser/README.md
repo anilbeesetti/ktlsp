@@ -404,7 +404,7 @@ evidence and integration verification remain ROOT-gated under #96.
   UTF-16 positions, backtick dots, named/star/alias/duplicate imports and the actual
   authenticated f/x/y binding consumer. Hosted execution is required under #96;
   this source change alone is not hosted proof or package/import resolution.
-- Reference-, parameter- or leading-type-parameter-bearing outer functions require
+- Reference-, parameter-, leading-type-parameter- or return-annotation-bearing functions require
   an ordinary named top-level function with an ordered brace body of plain
   immutable local `val`s, direct calls and ordinary direct local functions.
   Local initializers remain integer constants or whole-identifier references;
@@ -417,8 +417,10 @@ evidence and integration verification remain ROOT-gated under #96.
   and one optional real trailing comma. Bounds, variance, reified, annotations,
   where clauses, empty/malformed/post-name/second lists remain refused, as do
   missing/reordered/repeated syntax, defaults, vararg, richer types,
-  receivers/context/explicit returns, expression bodies,
-  members/constructors/lambdas/deeper nesting/destructuring and relevant recovery.
+  receivers/context, expression bodies, members/constructors/lambdas/destructuring
+  and relevant recovery. Each ordinary function may have exactly one optional
+  `: simple_annotation` after its original value-parameter list and before its
+  brace body; return-only headers require the same complete ordered proof.
   This is syntax admission, not generic inference or semantic non-nullability:
   unbounded `T` has implicit bound `Any?`, despite having no nullable syntax.
 - `Declaration::semantic_spelling` separately supports ASCII bare names and
@@ -570,16 +572,18 @@ evidence and integration verification remain ROOT-gated under #96.
   #96 quarantine and the full-parity gap are unchanged.
 - `local_value_binding::bind_lexical_type_parameter(directory, result,
   annotation_reference_index, current)` authenticates original snapshot/tree
-  association, exact reference/token/USER_TYPE/TYPE_REFERENCE/parameter-or-local
+  association, exact reference/token/USER_TYPE/TYPE_REFERENCE/declaration
   ancestry and the complete closed ordinary-function tree. Functions may nest
   recursively under the existing CST/depth/declaration ceilings; each may have
-  the existing restricted leading type list, simple parameter annotations,
+  the existing restricted leading type list, simple parameter and return annotations,
   immutable locals and syntax-only direct calls. Every descendant is checked,
   including uncalled functions. Lookup searches the immediate function's own
   type declarations before enclosing functions, nearest first, and never siblings
   or other roots. Actual annotation ownership remains distinct from the returned
-  function/body, which identify the exact target-declaring function.
-  Classifiers, richer types, receivers/modifiers/bounds/where, explicit returns,
+  function/body, which identify the exact target-declaring function. A return
+  starts lookup at its annotated function's own ordinal, not its enclosing owner;
+  `annotated()` retains that original Function. Header membership stays outside
+  its own body. Classifiers, richer types, receivers/modifiers/bounds/where,
   expression bodies, arbitrary blocks and unsupported syntax anywhere refuse
   the whole root. Original definition targets and all occurrence partitions use
   borrowed declaration identity, not spelling equality. Duplicate own-list names,
@@ -598,7 +602,7 @@ evidence and integration verification remain ROOT-gated under #96.
 - `local_value_binding::type_parameter_occurrences` and
   `guarded_type_parameter_rename` accept positive `TypeParameterAnchor` roles:
   an original function `TYPE_PARAMETER` declaration (even unused), or an
-  authenticated simple parameter/direct-local annotation reference. Returned
+  authenticated simple parameter/direct-local/function-return annotation reference. Returned
   `TypeParameterAnnotation` records retain original annotated declaration,
   reference/name-token identities and source order; no value site is fabricated.
   The existing definition query shares private ancestry/function/list helpers.
@@ -618,6 +622,13 @@ evidence and integration verification remain ROOT-gated under #96.
   removal. `out`/`reified` edited-producer/rebinding regressions are included, not
   blanket-classified as invalid modifiers. Storage remains at most 1,024 records
   and 131,072 requested/retained bytes, measured using the actual annotation width.
+  Direct returns, including the root return, are visited exactly once in original
+  CST/source order, never by treating a complete function subtree as an annotation.
+  Return-only, inherited, shadowed, unmatched and unused-binder capture regressions
+  and actual version7-edit/version8 producer/paired-CLI assertions are authored for
+  #414. Prospective original return-CST/runtime positives remain **UNOBSERVED**
+  until ROOT admits and reads the original full hosted CI. Temporary full actual
+  observation writers remain until independent OWNER+ROOT read/application gates.
   This is finite recursive ordinary-function lexical refactoring, not full Kotlin
   type resolution, hover/typeDefinition, workspace rename or official equivalence. PR409's
   OWN ORIGINAL native38994222653 and platform38994222817 at8285763 retained

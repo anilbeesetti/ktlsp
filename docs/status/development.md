@@ -2144,3 +2144,92 @@ merge/actualsquashtree+soleparent/independent original exact-main CI remain PEND
 No local Kotlin parser/server/Session/worker/peer/supervision/JVM/oracle ran;
 all existing HOLD/unknown-cause/native-only/full-parity limits remain unchanged.
 
+#### Verified409 cleaned-source integration and original exact-main acceptance
+
+This completed receipt supersedes the previous pending409 checkpoint; no future
+source is accepted by it. Cleaned reviewed source
+35f82fa5fd14b6fd53e9573ffaa07165b277fea0/tree
+f66a67f55aa010d5b474c982f6e54c9aabe06069 retained exact TWO independent FULL17
+union clears and BOTH affected407 full7+provenance-guard rechecks, no findings.
+After those four exact clears, pinned format-CHECK and strict locked workspace/
+all-target Clippy passed0 in2.03s. No second formatter or local Kotlin runtime.
+
+OWN ORIGINAL Native38995562257/attempt1 and platform38995562244/attempt1
+passed all mandatory pinned format, strict Clippy and unfiltered full workspace
+tests (platforms RELEASE). Actual checkout/testmerge
+6e9a5bda87fc5d9d6880b1a77cbbf469a1fc4be1 has exacttreef66a67 and orderedparents
+[608437dc64007bdfecd472cfb97a646242fec41b,35f82fa5fd14b6fd53e9573ffaa07165b277fea0].
+
+| Final original host/job | Ordinary passes | Doctests | Total passes | Result rows |
+|---|---:|---:|---:|---:|
+| Linux117287233063 |1170|32|1202|140|
+| macOS117287233168 |1168|32|1200|140|
+| Windows117287233162 |1117|32|1149|140|
+
+Each0failed/3ignored/0measured/0filtered, separate22faultCASE harness passed.
+Both observation markers are absent. Native independent TypeScopeUnionFunction
+and platform independent TypeScopeUnionAdversary freshly authenticated original
+run/job/source APIs and byte-equal raw/ZIP downloads, completely read original
+logs and all18 members per archive. ROOT fully read Native3239lines, and audited
+complete platform output through exact common-line comparisons to that Native
+log, every noncommon actual outcome/output, every small member/full preflight
+and complete result-row parsing—not a literal full-platform-raw manual read.
+Every archived workspace line matches original raw in order after only timestamp/
+ANSI/outer-whitespace removal, including duplicate and empty lines:
+Windows3402/3402, Mac3639/3639. All18 unique members/CRC/API digest/bytes/
+nonexpiration, complete3native+14PowerShell command receipts, clean source/tree/
+status, effectiveLF/raw sample IDs, ordered parents/toolchains/three0exits passed.
+
+Final original raw bytes/SHA256:
+Linux297426/6017d4c56a66a5bf71fc2fca612a5ccce46d34ce7f8c1379d62890989c10c7c6;
+Windows366059/a8602dddb808b9c52f1ce66632193e7db866c53a570dfe94db6e7667d69f7b79;
+Mac410125/fbf6d9766f32deb5d4725fc904e40be799e48cd7303acb4aada4d4329f4e44cd.
+Windowsartifact12087560298/43060bytes SHA256
+6cd53e12c64f39c23ce286d21e8299f52344fc931742c81f95d3bddabd6ea008;
+Macartifact12086539868/48206bytes SHA256
+95f9ed881e822a5d98a3a07cffcb83d5b2d9ae20c92c07df92d37784956fe6c6.
+Custody `/private/tmp/ktlsp-409-final-platform-38995562244/`.
+Observational event pr_merge_sha still names earlierf1e051 and was NOT source
+authority; actual checkout/workflow/source6e9/tree/parents establish final35.
+Mac PowerShell7.6.5/image20260907 differs from first-source host, not an identical
+image or timing comparison. No unchanged retry/dispatch or relaxed bound.
+
+ROOT made PR409 ready ONLY after final acceptance. Separate fresh STRICTLY
+read-only complete guard process0 AND parsedexit0 confirmed active exclusive
+base608/head35/treeF66/exact17scope/config4/checknames3/all-success/zero commit
+statuses/exact2original workflows/3jobs/2artifacts/actualtestmerge orderedparents/
+clean remote and local reviewed identity. ROOT explicitly inspected complete
+facts before SEPARATE ordinary `--squash --match-head-commit35f82...` merge.
+
+Actual [PR409](https://github.com/anilbeesetti/ktlsp/pull/409) squash/current main
+**df6b02953d22e520ef1b0acaae691471a1666287**, exacttree
+**f66a67f55aa010d5b474c982f6e54c9aabe06069**, soleparent
+**608437dc64007bdfecd472cfb97a646242fec41b** independently confirmed by ROOT+OWNER.
+OWN ORIGINAL exact-main [38996439150/attempt1/job117289940398](https://github.com/anilbeesetti/ktlsp/actions/runs/38996439150/job/117289940398)
+push/main passed actual exactcheckout/pinned Rust1.99.0/workflow
+fc6202e6d32a00d430f4d4e12b502b6ca538edab/ubuntu-latest mandatory format, strict
+locked workspace/all-target Clippy and unfiltered locked full workspace tests:
+1202=1170ordinary+32doc/140rows,0failed3ignored0measured0filtered plus22separate
+faultCASES. Original raw296355bytes/3223lines SHA256
+ab42e6ca988b85b412f582e89a52da5db0dd932dd589ae048e15e39cc741a62b.
+Independent OWNER TypeScopeUnionFunction freshly downloaded/authenticated and
+read ALL3223 lines; ROOT scanned all lines, compared every actual test outcome
+by exacttext to its fully read final Native log, and read all noncommon actual
+main output/source/commands. No prior-PR CI carryforward or unread-literal claim.
+Lease409 CLEARED only after both exact-main acceptances.407/408 delivered.
+
+B3 original Timeout/deadline_selectedtrue/decision_sendOk16/receiptMissing is
+INCONCLUSIVE/B3-HOLD despite healthy followupPASS.96/#395/#377 original unknown
+causes/oracle live-step-custody HOLD remain; no full official parity.
+Only older draft384 remains open; diagnostic observation is not proven fix.
+
+New independent tickets410/411 start from SAME VERIFIEDdf6b in isolated WTs:
+recursive ordinary-function lexical type-scope proof including lowering/regions,
+and selected Function values plus finite nominal return/scoped argument identity.
+Each owner has two independent static review slots; ROOT successor integration
+`/private/tmp/ktlsp-330-recursive-signature-integration` owns common docs/config.
+Saved read-only research `agent://NestedTypeScopeNext` and
+`agent://MetadataSignatureNext` is investigation, not new source/runtime evidence.
+Existing direct-local/public parameter-only/self-return boundaries stay honest
+until new complete original consumer evidence and independent acceptance.
+

@@ -8,59 +8,47 @@ decisions or phase boundaries. **Full official Kotlin LSP parity is NOT achieved
 Use the actual session capacity; the historical 32-concurrent instruction below
 is not a new limit. Do not manufacture hundreds of overlapping/blocked tasks.
 
-Verified incoming main is **608437dc64007bdfecd472cfb97a646242fec41b**, tree
-**4c66e332adf5102f995c8c8a5ab7c346b359dcf0**, sole parent
-**3920ab7d22ce4d89023291f2801500e598e24bb0**.
-[PR406](https://github.com/anilbeesetti/ktlsp/pull/406) delivered402/403/404/405:
-original selected Class Function value-parameter data, original call/selected
-parameter syntax, bounded immutable positions and exact single-pass identifiers.
-Exact capture-free reviewedeefd06d5b2002d5aa8fe13929712631714149de8 received
-two full19 union reviews, affected reviews, strict compile and OWN original
-Native38979650322/platform38979650359 full CI. Actual squash tree/sole parent
-and original exact-main38980985939/job117241549331 were independently accepted
-by OWNER and ROOT:1190=1158ordinary+32doc/140rows,0failed3ignored0filtered,
-plus22 SEPARATE protocol fault cases. Main raw294956bytes has SHA256
-40c5ae2b377469c5ac97e642478c7ef4c0cf9732b47b9dbc4f1b085dc756f580.
-Lease406 is CLEARED. [Full current evidence ledger](status/development.md)
-retains first actual403 source/CST/byte-edit readback and precise timing limits.
+Verified incoming main is **df6b02953d22e520ef1b0acaae691471a1666287**, tree
+**f66a67f55aa010d5b474c982f6e54c9aabe06069**, sole parent
+**608437dc64007bdfecd472cfb97a646242fec41b**.
+[PR409](https://github.com/anilbeesetti/ktlsp/pull/409) delivered407/408:
+complete finite original outer type binding in direct-local annotations and
+original Function-owned metadata declarations/scoped value identities.
+Cleaned reviewed35f82fa5fd14b6fd53e9573ffaa07165b277fea0 received BOTH exact
+FULL17 union reviews, BOTH affected407 rechecks, strict format-CHECK/Clippy0,
+OWN ORIGINAL Native38995562257/platform38995562244 full three-host success.
+ROOT and independent reviewers authenticated complete original source/commands/
+raw/archive custody, not earlier-source CI substitution. Actual squash tree
+and sole parent above match; independent OWNER+ROOT accepted ORIGINAL exact-main
+[38996439150/job117289940398](https://github.com/anilbeesetti/ktlsp/actions/runs/38996439150/job/117289940398):
+1202=1170ordinary+32doc/140rows,0failed3ignored0measured0filtered, plus22
+SEPARATE protocol fault CASES. Main raw296355bytes/3223lines SHA256
+ab42e6ca988b85b412f582e89a52da5db0dd932dd589ae048e15e39cc741a62b.
+Fresh separate read-only process0+parsedexit0 complete lease guard preceded
+separate ordinary expected-head squash. Lease409 is CLEARED only after both
+original exact-main acceptances. [Full evidence ledger](status/development.md)
+retains first actual smoke, complete data applications and final CI receipts.
 
-Current ROOT integration WT: `/private/tmp/ktlsp-330-type-scope-integration`,
-branch `omp/330-type-scope-integration`, based on that SAME verified608 main.
-Draft [PR409](https://github.com/anilbeesetti/ktlsp/pull/409)'s first reviewed
-8285763/245736 source has OWN ORIGINAL full three-host success and completed
-OWNER+ROOT actual producer/CLI full-read/edit-application gates. ONLY observation
-writers/bookkeeping were then removed; cleaned-source exact reviews/OWN original
-CI and guarded integration remain PENDING. Prior406 CI is not its acceptance.
-ROOT owns common docs/Cargo/lock/workflows,
-source/runtime admission, two union reviews, CI, exclusive leases and merging.
-Preserve all original/user/old/delivered/component WTs, including frozen406 WT
-`/private/tmp/ktlsp-330-call-parameter-integration`.
+ROOT integration WT: `/private/tmp/ktlsp-330-recursive-signature-integration`,
+branch `omp/330-recursive-signature-integration`, based on SAME verifieddf6b.
+ROOT owns common docs/Cargo/lock/workflows, source/runtime admission, two union
+reviews, CI, exclusive leases and merging. Preserve ALL old/user/delivered/
+component WTs, including frozen409 `/private/tmp/ktlsp-330-type-scope-integration`.
 
-Two newly admitted independent owners work from608, each with two distinct
-functionality/adversarial static review slots:
-- [407](https://github.com/anilbeesetti/ktlsp/issues/407):
-  `/private/tmp/ktlsp-407-type-namespace`, `omp/407-type-namespace`.
-  Complete original lexical type binding/occurrences/capture-safe rename for
-  direct-local parameter annotations. Value/callee whole-body guards stay strict.
-- [408](https://github.com/anilbeesetti/ktlsp/issues/408):
-  `/private/tmp/ktlsp-408-function-own-scope`, `omp/408-function-own-scope`.
-  Original selected Function declarations, ID own-before-Class and NAME OWN-only.
-  Genuine Result.Companion.success encodes NAME6 (`48 06`), NOT declaration ID1.
-  Original raw observation `/private/tmp/ktlsp-next-function-local-data/` remains.
-  Subsequent REAL public composed native smoke at reviewed0a0d802/e3ec94
-  compiled/ran0 with empty stderr; OWNER+ROOT fully read all177 source/9 output
-  lines before only its throwaway Rust source was removed. Genuine NAME9→own0,
-  original pointers/ranges, distinct Throwable/Pair controls and labelled
-  authored shadow/refusal/query-boundary controls passed; all537 binary-data
-  tests passed. Full proof `/private/tmp/ktlsp-408-composed-native/`.
-  Genuine Function-ID positive remains GAP.407's30producer/57CLI packets PER
-  original host were FULLY read by OWNER+ROOT; each independently applied all
-  171 actual version7 UTF16 batches/495edits and verified version8 replay.
-  Original Native38994222653/1 and platform38994222817/1 used actualmergef1e051a,
-  tree245736, orderedparents[608,828]. Full proof
-  `/private/tmp/ktlsp-409-first-platform-38994222817/`; independent OWNER receipt
-  `/private/tmp/ktlsp-407-owner-first-hosted/owner-three-host-full-read-and-actual-apply-receipt.json`.
-  Cleaned-source reviews/OWN original CI and guarded exact-main remain PENDING.
+Two admitted independent implementation owners use SAME verifieddf6b, each
+with TWO separate functionality/adversarial review slots:
+- [410](https://github.com/anilbeesetti/ktlsp/issues/410):
+  `/private/tmp/ktlsp-410-recursive-type-scope`, `omp/410-recursive-type-scope`.
+  Complete recursively nested ordinary-function original lexical type scopes,
+  identity partitions and capture-safe rename, including lowering/region proof.
+- [411](https://github.com/anilbeesetti/ktlsp/issues/411):
+  `/private/tmp/ktlsp-411-function-signature`, `omp/411-function-signature`.
+  One-budget selected Function values plus explicit finite nominal return and
+  original own/Class argument identities; existing opaque-return/self-return
+  consumers retain their separate contracts. Genuine return target/bindings
+  are future observations, NOT inferred from earlier408 parameter smoke.
+No new410/411 source, nested producer outcome, composed return observation,
+compile/runtime/hosted acceptance or integration is claimed by this admission.
 
 ALL LOCAL Kotlin parser/server/Session/worker/peer/supervision runtime remains
 FORBIDDEN under96, including fake peers and parser-free Session. This overrides

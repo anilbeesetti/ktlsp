@@ -4464,12 +4464,12 @@ fn recursive_type_scope_actual_paired_cli_all_anchors_and_full_version8_replay()
             assert_eq!(rebound.iter().find(|r|r["id"]==format!("refs-{j}")).unwrap()["result"],
                 json!(partition.iter().map(|r|json!({"uri":URI,"range":references_range(&edited,r.start,r.len())})).collect::<Vec<_>>()));
         }
-        println!("RECURSIVE_TYPE_CLI={}",json!({
+        writeln!(std::io::stdout().lock(), "RECURSIVE_TYPE_CLI={}",json!({
             "anchor":i,"target":target,"original_producer":original_producer,
             "requests":requests,"responses":replies,"actual_rename":actual_rename,
             "edited_source":edited,"edited_producer":recursive_cli_producer(&edited,8),
             "replay_requests":replay,"replay_responses":rebound
-        }));
+        })).unwrap();
     }
     for id in ["outer-capture","unused-capture","inner-capture","unmatched","callee","label","value"] {
         assert_eq!(reply(id)["error"]["code"],-32803,"{id}");
@@ -4536,19 +4536,19 @@ fn recursive_type_capture_unused_inner_and_safe_sibling_actual_cli() {
                         {"uri":URI,"range":references_range(&edited,*annotation,1)}
                     ]));
             }
-            println!("RECURSIVE_TYPE_CAPTURE_CLI={}",json!({
+            writeln!(std::io::stdout().lock(), "RECURSIVE_TYPE_CAPTURE_CLI={}",json!({
                 "source":source,"requests":requests,"responses":replies,
                 "edited_source":edited,"original_producer":recursive_cli_producer(source,7),
                 "edited_producer":recursive_cli_producer(&edited,8),
                 "replay_requests":replay,"replay_responses":rebound
-            }));
+            })).unwrap();
         } else {
             assert_eq!(response["error"]["code"],-32803);
             assert!(response.get("result").is_none());
-            println!("RECURSIVE_TYPE_CAPTURE_CLI={}",json!({
+            writeln!(std::io::stdout().lock(), "RECURSIVE_TYPE_CAPTURE_CLI={}",json!({
                 "source":source,"requests":requests,"responses":replies,
                 "original_producer":recursive_cli_producer(source,7)
-            }));
+            })).unwrap();
         }
     }
 }

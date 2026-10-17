@@ -2306,3 +2306,10 @@ unchanged64MiB carrier admission. No JDK program/probe/recapture or limit increa
 was performed. Genuine compact payload/independent expected bytes/provenance
 remain the precise prerequisite, not another speculative codec-only ticket.
 
+ROOT pre-hosted read found410 observation writers used println!, which default
+Native libtest capture would hide on passing tests. Before any check/runtime,
+ONLY the four temporary emitter calls were changed to direct stdout Write/
+writeln!, preserving complete payloads and all permanent behavior assertions.
+No workflow/nocapture override or rerun was added; renewed exact union/affected
+static clears are required before first formatting/compile admission.
+

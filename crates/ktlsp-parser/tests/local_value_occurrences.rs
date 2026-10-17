@@ -2498,6 +2498,7 @@ fn recursive_type_scopes_preserve_complete_original_identity_partitions_and_repl
         TypeParameterAnchor, bind_lexical_type_parameter, guarded_type_parameter_rename,
         type_parameter_occurrences,
     };
+    use std::io::Write;
     let _serial = functional::serial();
     let ordinary = "// 😀\r\nfun <T, Spare> outer(root:T){ val before:T=root; fun <U> inner(a:`T`,b:U){ val inherited:T=a; fun middle(c:T){ fun <`T`> deep(d:T,e:U,f:Missing){ val own:T=d; unknown(noSuch=d); }; fun side(g:T){} }; fun <U> peer(h:U,i:T){} }; fun <T> shadow(j:T){}; fun after(k:T){}; val last:T=root }\r\nfun <T> other(z:T){}\r\n";
     for original in [
@@ -2607,10 +2608,10 @@ fn recursive_type_scopes_preserve_complete_original_identity_partitions_and_repl
                 let new=&rebound_tree.elements()[index];
                 assert_eq!(&edited[new.start..new.end],if expected_target==Some(ordinal) {"Fresh"} else {&original[old.start..old.end]});
             }
-            println!("RECURSIVE_TYPE_PRODUCER={}",serde_json::json!({
+            writeln!(std::io::stdout().lock(), "RECURSIVE_TYPE_PRODUCER={}",serde_json::json!({
                 "selected_ordinal":ordinal,"original":recursive_type_observation(&result),
                 "edited":recursive_type_observation(&rebound)
-            }));
+            })).unwrap();
         }
         // Broader lowering is not authority for existing value/callee semantics.
         for (i,e) in tree.elements().iter().enumerate().filter(|(_,e)|e.kind=="REFERENCE_EXPRESSION") {

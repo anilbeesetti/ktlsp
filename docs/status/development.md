@@ -4870,3 +4870,25 @@ guarded source/main gates and separately admitted exact-source three-host
 packaging/actual extracted acceptance;96/B3/oracle/T004/native-only and older
 431/395/377/417 UNKNOWN holds remain. Full official parity is NOT achieved.
 
+
+#### Bounded433 full source authorities and original formatter refusal
+
+Composed70ba7c5b339e0310b1a774c4bb75d3301ecf4fe2/
+treefc5cb993bcad6793f12205caad7f6d1d95296866 received ALL FOUR independent
+complete15path source reviews0.96, no findings. Every13 changed path was directly
+renewed; only exact unchanged binary README/document_symbols test carried their
+explicit prior full9 authorities. ROOT read all four full reports; one report's
+244-versus-requested270 source-line metadata correction has its own immutable
+complete receipt and leaves source/verdict unchanged.
+
+Separate compiler-only admission ran fmtCHECK ONCE: FAILED1/1.237061208s,
+stdout2445B SHA0be54713cf16a8a4964138072e113789640124ae4d6a3944bb3dcff378dd3dd0,
+stderr0. Strict Clippy/NoRun were NOT attempted after refusal. ROOT manually
+applied ONLY the five displayed formatter blocks: ReaderJoin tuple and format
+expression expansion plus two cfg-import moves. All API/conditions/real calls/
+assertions/fixtures/edit text/frequency/ownership/deadline/bounds remain.
+No formatter mutation, lint suppression, local product execution or unchanged
+retry. ALL FOUR full CURRENT15path authorities must renew before a separate
+changed-source compiler-only admission. Own original hosted/runtime/publication/
+integration/exact-main/packaging gates remain; original Windows failure UNKNOWN.
+

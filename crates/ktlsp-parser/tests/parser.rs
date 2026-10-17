@@ -1,9 +1,9 @@
 #[path = "support/functional.rs"]
 mod functional;
 
-use ktlsp_parser::{FileKind, MAX_NESTING, MAX_SOURCE_BYTES, Parser, ParserError};
 #[cfg(not(unix))]
 use ktlsp_parser::PipedTimeoutSite;
+use ktlsp_parser::{FileKind, MAX_NESTING, MAX_SOURCE_BYTES, Parser, ParserError};
 use std::{
     io::Write,
     path::PathBuf,

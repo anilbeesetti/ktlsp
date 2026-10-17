@@ -602,7 +602,10 @@ fn piped_timeout_annotation_respects_actual_escaped_frame_boundary() {
         // Encoded ID includes two quotes and a two-byte escaped backslash.
         // With the 131-byte poll envelope, the first fits exactly; the next
         // byte must omit only optional data, not break the existing response.
-        let id = format!("{}\\", "a".repeat(ktlsp_protocol::MAX_PAYLOAD_BYTES - padding));
+        let id = format!(
+            "{}\\",
+            "a".repeat(ktlsp_protocol::MAX_PAYLOAD_BYTES - padding)
+        );
         client.send(symbols(json!(&id)));
         let response = client.reply();
         assert_eq!(response["id"].as_str(), Some(id.as_str()));

@@ -3085,7 +3085,10 @@ mod tests {
     #[test]
     fn output_receipt_does_not_mean_reader_thread_finished() {
         for (cancel, expected) in [
-            (false, ParserError::PipedTimeout(PipedTimeoutSite::ReaderJoin)),
+            (
+                false,
+                ParserError::PipedTimeout(PipedTimeoutSite::ReaderJoin),
+            ),
             (true, ParserError::Cancelled),
         ] {
             let (sender, receiver) = mpsc::sync_channel(1);

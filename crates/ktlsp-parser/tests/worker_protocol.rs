@@ -2,12 +2,12 @@
 #[path = "support/functional.rs"]
 mod functional;
 
+#[cfg(not(unix))]
+use ktlsp_parser::PipedTimeoutSite;
 use ktlsp_parser::{
     Diagnostic, Element, FileKind, MAX_ALLOCATION_BYTES, MAX_OUTPUT_BYTES, Parser, ParserError,
     Reply, SnapshotResult, SourceSnapshot,
 };
-#[cfg(not(unix))]
-use ktlsp_parser::PipedTimeoutSite;
 use std::{
     alloc::{GlobalAlloc, Layout},
     io::{Read, Write},

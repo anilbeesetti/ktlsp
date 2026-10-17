@@ -5832,42 +5832,55 @@ fn signature_producer_packet(source: &str, revision: i64, cursor: usize) -> Valu
         lowering::lower_declarations, structural_regions::build_regions,
     };
     let snapshot = SourceSnapshot::new(URI, revision, FileKind::Source, source).unwrap();
-    let (parsed, clean) = Parser::new(worker()).unwrap().parse_snapshot_with_cleanup(
-        &snapshot, &std::sync::atomic::AtomicBool::new(false),
-    );
+    let (parsed, clean) = Parser::new(worker())
+        .unwrap()
+        .parse_snapshot_with_cleanup(&snapshot, &std::sync::atomic::AtomicBool::new(false));
     let mut packet = json!({"source":source,"revision":revision,"cursor":cursor,
         "snapshot":format!("{snapshot:?}"),"parseError":format!("{:?}",parsed.as_ref().err()),"cleanup":clean});
-    if parsed.is_err() { signature_observation("PRODUCER_PARSE_ERROR", &packet); }
+    if parsed.is_err() {
+        signature_observation("PRODUCER_PARSE_ERROR", &packet);
+    }
     let result = parsed.unwrap();
     let tree = result.tree_for(&snapshot).unwrap();
     packet["elements"] = json!(tree.elements());
     packet["diagnostics"] = json!(tree.diagnostics());
     signature_observation("PRODUCER_PARSE", &packet);
     let lowered = lower_declarations(&result, &snapshot);
-    packet["loweringError"] = json!(format!("{:?}",lowered.as_ref().err()));
+    packet["loweringError"] = json!(format!("{:?}", lowered.as_ref().err()));
     let Ok(lowered) = lowered else {
         signature_observation("PRODUCER_LOWER_ERROR", &packet);
         return packet;
     };
-    packet["loweredErrors"] = json!(format!("{:?}",lowered.errors()));
-    packet["declarations"] = json!(lowered.declarations().iter().map(|d| json!({
+    packet["loweredErrors"] = json!(format!("{:?}", lowered.errors()));
+    packet["declarations"] =
+        json!(lowered.declarations().iter().map(|d| json!({
         "kind":d.kind(),"name":d.raw_name(),"range":d.range(),"nameRange":d.name_range(),
         "owner":d.owner(),"cst":d.cst_index(),"parent":d.cst_parent_index(),
         "incomplete":d.incomplete()
     })).collect::<Vec<_>>());
     let directory = build_regions(&lowered, &result, &snapshot);
-    packet["regionsError"] = json!(format!("{:?}",directory.as_ref().err()));
+    packet["regionsError"] = json!(format!("{:?}", directory.as_ref().err()));
     let Ok(directory) = directory else {
         signature_observation("PRODUCER_REGIONS_ERROR", &packet);
         return packet;
     };
-    packet["memberships"] = json!(directory.memberships().iter().map(|m| m.region()).collect::<Vec<_>>());
+    packet["memberships"] = json!(
+        directory
+            .memberships()
+            .iter()
+            .map(|m| m.region())
+            .collect::<Vec<_>>()
+    );
     packet["regions"] = json!(directory.regions().iter().map(|r| json!({
         "cst":r.cst_index(),"kind":r.kind(),"range":r.range(),"parent":r.parent(),"introducer":r.introducer()
     })).collect::<Vec<_>>());
     let proof = local_call_signature(&directory, &result, &snapshot, cursor);
-    packet["signatureError"] = json!(format!("{:?}",proof.as_ref().err()));
-    packet["signatureStatus"] = json!(match &proof { Ok(Some(_))=>"some",Ok(None)=>"none",Err(_)=>"error" });
+    packet["signatureError"] = json!(format!("{:?}", proof.as_ref().err()));
+    packet["signatureStatus"] = json!(match &proof {
+        Ok(Some(_)) => "some",
+        Ok(None) => "none",
+        Err(_) => "error",
+    });
     if let Ok(Some(proof)) = proof {
         let binding = proof.binding();
         let call = binding.call();
@@ -5875,10 +5888,17 @@ fn signature_producer_packet(source: &str, revision: i64, cursor: usize) -> Valu
         let arg = &call.arguments()[0];
         let label = arg.label().unwrap();
         let declaration = |d: &ktlsp_parser::lowering::Declaration<'_>| {
-            lowered.declarations().iter().position(|original| std::ptr::eq(original, d)).unwrap()
+            lowered
+                .declarations()
+                .iter()
+                .position(|original| std::ptr::eq(original, d))
+                .unwrap()
         };
         let element = |e: &ktlsp_parser::Element| {
-            tree.elements().iter().position(|original| std::ptr::eq(original, e)).unwrap()
+            tree.elements()
+                .iter()
+                .position(|original| std::ptr::eq(original, e))
+                .unwrap()
         };
         packet["proof"] = json!({
             "function":declaration(parameters.function()),"outer":declaration(call.function()),
@@ -5924,13 +5944,31 @@ struct SignatureWire {
 }
 impl SignatureWire {
     fn new(package: &Package) -> Self {
-        let mut child = Command::new(package.0.join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX)))
-            .arg("--stdio").env("PATH", "").env_remove("JAVA_HOME").env_remove("JDK_HOME")
-            .current_dir(&package.0).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped())
-            .spawn().unwrap();
+        let mut child = Command::new(
+            package
+                .0
+                .join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX)),
+        )
+        .arg("--stdio")
+        .env("PATH", "")
+        .env_remove("JAVA_HOME")
+        .env_remove("JDK_HOME")
+        .current_dir(&package.0)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
         let input = child.stdin.take();
         let reader = std::io::BufReader::new(child.stdout.take().unwrap());
-        Self { child: Some(child), input, reader, messages: Vec::new(), responses: Vec::new(), raw: Vec::new() }
+        Self {
+            child: Some(child),
+            input,
+            reader,
+            messages: Vec::new(),
+            responses: Vec::new(),
+            raw: Vec::new(),
+        }
     }
     fn send(&mut self, message: Value) -> Value {
         self.messages.push(message.clone());
@@ -5940,13 +5978,17 @@ impl SignatureWire {
         input.flush().unwrap();
         if let Some(id) = message.get("id") {
             loop {
-                let frame = ktlsp_protocol::read_frame(&mut self.reader).unwrap().unwrap();
+                let frame = ktlsp_protocol::read_frame(&mut self.reader)
+                    .unwrap()
+                    .unwrap();
                 signature_observation("CLI_FRAME", &json!({"bytes":frame}));
                 self.raw.push(frame.clone());
                 let response: Value = serde_json::from_slice(&frame).unwrap();
                 let matched = response.get("id") == Some(id);
                 self.responses.push(response.clone());
-                if matched { return response; }
+                if matched {
+                    return response;
+                }
             }
         }
         Value::Null
@@ -5961,11 +6003,18 @@ impl SignatureWire {
             self.raw.push(frame);
         }
         let output = self.child.take().unwrap().wait_with_output().unwrap();
-        signature_observation("CLI_COMPLETE", &json!({"messages":self.messages,"responses":self.responses,
+        signature_observation(
+            "CLI_COMPLETE",
+            &json!({"messages":self.messages,"responses":self.responses,
             "wirePayloads":self.raw,"exit":format!("{:?}",output.status),"stderr":output.stderr,
-            "filesystemSourceInputs":[]}));
+            "filesystemSourceInputs":[]}),
+        );
         assert!(output.status.success(), "{:?}", output.status);
-        assert!(output.stderr.is_empty(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert!(
+            output.stderr.is_empty(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
         std::mem::take(&mut self.responses)
     }
 }
@@ -5974,8 +6023,11 @@ impl Drop for SignatureWire {
         if let Some(child) = self.child.take() {
             self.input.take(); // EOF retains the server's ordinary owned cleanup.
             let output = child.wait_with_output().unwrap();
-            signature_observation("CLI_ABORT", &json!({"messages":self.messages,"responses":self.responses,
-                "wirePayloads":self.raw,"exit":format!("{:?}",output.status),"stderr":output.stderr}));
+            signature_observation(
+                "CLI_ABORT",
+                &json!({"messages":self.messages,"responses":self.responses,
+                "wirePayloads":self.raw,"exit":format!("{:?}",output.status),"stderr":output.stderr}),
+            );
         }
     }
 }
@@ -5986,14 +6038,26 @@ fn signature_open(wire: &mut SignatureWire, source: &str, profile: Value) -> Val
         "textDocument":{"diagnostic":{},"rename":{"prepareSupport":true},"signatureHelp":profile}
     }}}));
     wire.send(json!({"jsonrpc":"2.0","method":"initialized","params":{}}));
-    wire.send(json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{
-        "textDocument":{"uri":URI,"languageId":"kotlin","version":7,"text":source}}}));
+    wire.send(
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{
+        "textDocument":{"uri":URI,"languageId":"kotlin","version":7,"text":source}}}),
+    );
     initialize
 }
-fn signature_request(wire: &mut SignatureWire, id: Value, source: &str, cursor: usize, context: Option<Value>) -> Value {
+fn signature_request(
+    wire: &mut SignatureWire,
+    id: Value,
+    source: &str,
+    cursor: usize,
+    context: Option<Value>,
+) -> Value {
     let mut params = navigation_params(source, cursor);
-    if let Some(context) = context { params["context"] = context; }
-    wire.send(json!({"jsonrpc":"2.0","id":id,"method":"textDocument/signatureHelp","params":params}))
+    if let Some(context) = context {
+        params["context"] = context;
+    }
+    wire.send(
+        json!({"jsonrpc":"2.0","id":id,"method":"textDocument/signatureHelp","params":params}),
+    )
 }
 fn signature_element<'a>(packet: &'a Value, role: &str) -> &'a Value {
     &packet["elements"][packet["proof"][role].as_u64().unwrap() as usize]
@@ -6010,16 +6074,40 @@ fn signature_assert_source(packet: &Value, response: &Value) {
     };
     let signature = range("signatureRange");
     let formal = range("parameterRange");
-    assert_eq!(response["result"]["signatures"][0]["label"], &source[signature.clone()]);
-    assert_eq!(response["result"]["signatures"][0]["parameters"][0]["label"], &source[formal.clone()]);
+    assert_eq!(
+        response["result"]["signatures"][0]["label"],
+        &source[signature.clone()]
+    );
+    assert_eq!(
+        response["result"]["signatures"][0]["parameters"][0]["label"],
+        &source[formal.clone()]
+    );
     let function = &packet["declarations"][packet["proof"]["function"].as_u64().unwrap() as usize];
     let parameter = &packet["declarations"][packet["proof"]["formal"].as_u64().unwrap() as usize];
-    assert_eq!(signature.start, function["nameRange"]["start"].as_u64().unwrap() as usize);
-    assert_eq!(signature.end, signature_element(packet,"formalClose")["end"].as_u64().unwrap() as usize);
-    assert_eq!(formal.start, parameter["range"]["start"].as_u64().unwrap() as usize);
-    assert_eq!(formal.end, parameter["range"]["end"].as_u64().unwrap() as usize);
+    assert_eq!(
+        signature.start,
+        function["nameRange"]["start"].as_u64().unwrap() as usize
+    );
+    assert_eq!(
+        signature.end,
+        signature_element(packet, "formalClose")["end"]
+            .as_u64()
+            .unwrap() as usize
+    );
+    assert_eq!(
+        formal.start,
+        parameter["range"]["start"].as_u64().unwrap() as usize
+    );
+    assert_eq!(
+        formal.end,
+        parameter["range"]["end"].as_u64().unwrap() as usize
+    );
     assert!(signature.start <= formal.start && formal.end <= signature.end);
-    assert!(response["result"]["signatures"][0].get("documentation").is_none());
+    assert!(
+        response["result"]["signatures"][0]
+            .get("documentation")
+            .is_none()
+    );
     assert!(response["result"].get("range").is_none());
 }
 
@@ -6028,14 +6116,46 @@ fn manual_signature_help_actual_source_cursor_profiles_and_same_session_type_edi
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let package = Package::new(true);
     for (source, marker, profile) in [
-        ("fun <T> outer(p: T) {\n fun send(to: T) {}\n send(to = p)\n}\n", "send(", json!({})),
-        ("fun <T> outer(p:T){ fun send(to: /* quote \" slash \\ tab \t */ T){}; send(to=p) }", "send(", json!({})),
-        ("fun <`T`> outer(`p`:T){ fun `send`(`to`:`T`){}; send(to=p) }", "send(", json!({"signatureInformation":{"parameterInformation":{"labelOffsetSupport":false}}})),
-        ("// 😀\r\nfun <`T🦀`> outer(`p😀`:`T🦀`){\r\n fun `send🦀`(\r\n /* formal */ `to😀` : /* type */ `T🦀`,\r\n ){}\r\n `send🦀`(/* label */ `to😀` /* eq */ = /* value */ `p😀`)\r\n}\r\n", "`send🦀`(", json!({"signatureInformation":{"parameterInformation":{"labelOffsetSupport":true},"activeParameterSupport":true}})),
-        ("fun <T> outer(p:T){\r fun send(\r to:T\r ){}\r send(\r to=p\r )\r}\r", "send(", json!({})),
-        ("fun <T> outer(p:T){ fun send(to:T,){}; send(to=p, /* next */) }", "send(", json!({})),
-        ("fun <T> outer(p:T){ fun <U,send,p> unused(){}; fun send(to:T){}; send(to=p) }", "send(", json!({})),
-        ("import elsewhere.send\nclass send {}\nfun send(){}\nfun <Int> outer(p:Int){ fun send(to:`Int`){}; send(to=p) }", "send(", json!({})),
+        (
+            "fun <T> outer(p: T) {\n fun send(to: T) {}\n send(to = p)\n}\n",
+            "send(",
+            json!({}),
+        ),
+        (
+            "fun <T> outer(p:T){ fun send(to: /* quote \" slash \\ tab \t */ T){}; send(to=p) }",
+            "send(",
+            json!({}),
+        ),
+        (
+            "fun <`T`> outer(`p`:T){ fun `send`(`to`:`T`){}; send(to=p) }",
+            "send(",
+            json!({"signatureInformation":{"parameterInformation":{"labelOffsetSupport":false}}}),
+        ),
+        (
+            "// 😀\r\nfun <`T🦀`> outer(`p😀`:`T🦀`){\r\n fun `send🦀`(\r\n /* formal */ `to😀` : /* type */ `T🦀`,\r\n ){}\r\n `send🦀`(/* label */ `to😀` /* eq */ = /* value */ `p😀`)\r\n}\r\n",
+            "`send🦀`(",
+            json!({"signatureInformation":{"parameterInformation":{"labelOffsetSupport":true},"activeParameterSupport":true}}),
+        ),
+        (
+            "fun <T> outer(p:T){\r fun send(\r to:T\r ){}\r send(\r to=p\r )\r}\r",
+            "send(",
+            json!({}),
+        ),
+        (
+            "fun <T> outer(p:T){ fun send(to:T,){}; send(to=p, /* next */) }",
+            "send(",
+            json!({}),
+        ),
+        (
+            "fun <T> outer(p:T){ fun <U,send,p> unused(){}; fun send(to:T){}; send(to=p) }",
+            "send(",
+            json!({}),
+        ),
+        (
+            "import elsewhere.send\nclass send {}\nfun send(){}\nfun <Int> outer(p:Int){ fun send(to:`Int`){}; send(to=p) }",
+            "send(",
+            json!({}),
+        ),
     ] {
         let call_start = source.rfind(marker).unwrap() + marker.len();
         // '=' ends before value trivia, never at the opening slash of the
@@ -6048,70 +6168,139 @@ fn manual_signature_help_actual_source_cursor_profiles_and_same_session_type_edi
         let context = json!({"triggerKind":3,"isRetrigger":true,"triggerCharacter":",",
             "activeSignatureHelp":{"signatures":[{"label":"FOREIGN","parameters":[{"label":[0,7]}],"activeParameter":99}],
                 "activeSignature":99,"activeParameter":99}});
-        let retrigger = signature_request(&mut wire, json!("retrigger"), source, cursor, Some(context));
+        let retrigger =
+            signature_request(&mut wire, json!("retrigger"), source, cursor, Some(context));
         let mut positions = vec![0, source.len()];
-        for role in ["calleeName","open","labelName","equals","valueToken","close"] {
+        for role in [
+            "calleeName",
+            "open",
+            "labelName",
+            "equals",
+            "valueToken",
+            "close",
+        ] {
             let token = signature_element(&original, role);
             positions.push(token["start"].as_u64().unwrap() as usize);
             positions.push(token["end"].as_u64().unwrap() as usize);
         }
         if let Some(comma) = original["proof"]["comma"].as_u64() {
             let token = &original["elements"][comma as usize];
-            positions.extend([token["start"].as_u64().unwrap() as usize, token["end"].as_u64().unwrap() as usize]);
+            positions.extend([
+                token["start"].as_u64().unwrap() as usize,
+                token["end"].as_u64().unwrap() as usize,
+            ]);
         }
         for token in original["elements"].as_array().unwrap().iter().filter(|e| {
-            e["token"] == true && matches!(e["kind"].as_str(), Some("EOL_COMMENT" | "BLOCK_COMMENT"))
+            e["token"] == true
+                && matches!(e["kind"].as_str(), Some("EOL_COMMENT" | "BLOCK_COMMENT"))
         }) {
             let start = token["start"].as_u64().unwrap() as usize;
             let end = token["end"].as_u64().unwrap() as usize;
-            if call_start <= start { positions.extend([start, start + 1, end]); }
+            if call_start <= start {
+                positions.extend([start, start + 1, end]);
+            }
         }
         positions.sort_unstable();
         positions.dedup();
         let mut selected = Vec::new();
         for (index, offset) in positions.into_iter().enumerate() {
             if offset_to_position(source, offset).is_ok() {
-                selected.push((offset, signature_request(&mut wire, json!(format!("cursor-{index}")), source, offset, None)));
+                selected.push((
+                    offset,
+                    signature_request(
+                        &mut wire,
+                        json!(format!("cursor-{index}")),
+                        source,
+                        offset,
+                        None,
+                    ),
+                ));
             }
         }
-        let rename = wire.send(json!({"jsonrpc":"2.0","id":"rename","method":"textDocument/rename",
-            "params":rename_params(source, source.find('<').unwrap()+1, "Fresh")}));
+        let rename = wire.send(
+            json!({"jsonrpc":"2.0","id":"rename","method":"textDocument/rename",
+            "params":rename_params(source, source.find('<').unwrap()+1, "Fresh")}),
+        );
         // Every returned original-coordinate edit is applied independently, in
         // reverse order for sequential didChange coordinates, to actual v7.
         let edited = apply_original_rename(source, &rename, URI, 7);
-        let edits = rename["result"]["documentChanges"][0]["edits"].as_array().unwrap();
-        let content_changes = edits.iter().rev().map(|edit| json!({"range":edit["range"],"text":edit["newText"]})).collect::<Vec<_>>();
-        wire.send(json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{
-            "textDocument":{"uri":URI,"version":8},"contentChanges":content_changes}}));
+        let edits = rename["result"]["documentChanges"][0]["edits"]
+            .as_array()
+            .unwrap();
+        let content_changes = edits
+            .iter()
+            .rev()
+            .map(|edit| json!({"range":edit["range"],"text":edit["newText"]}))
+            .collect::<Vec<_>>();
+        wire.send(
+            json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{
+            "textDocument":{"uri":URI,"version":8},"contentChanges":content_changes}}),
+        );
         let edited_cursor = edited.rfind('=').unwrap() + 1;
         let edited_producer = signature_producer_packet(&edited, 8, edited_cursor);
-        let after = signature_request(&mut wire, json!("edited"), &edited, edited_cursor, Some(json!({"triggerKind":2,"triggerCharacter":"(","isRetrigger":false})));
+        let after = signature_request(
+            &mut wire,
+            json!("edited"),
+            &edited,
+            edited_cursor,
+            Some(json!({"triggerKind":2,"triggerCharacter":"(","isRetrigger":false})),
+        );
         let responses = wire.finish();
-        assert_eq!(initialized["result"]["capabilities"]["signatureHelpProvider"], json!({}));
-        assert_eq!(initialized["result"]["capabilities"]["positionEncoding"], "utf-16");
+        assert_eq!(
+            initialized["result"]["capabilities"]["signatureHelpProvider"],
+            json!({})
+        );
+        assert_eq!(
+            initialized["result"]["capabilities"]["positionEncoding"],
+            "utf-16"
+        );
         signature_assert_source(&original, &first);
         signature_assert_source(&original, &retrigger);
-        let open = signature_element(&original,"open")["end"].as_u64().unwrap() as usize;
-        let close = signature_element(&original,"close")["start"].as_u64().unwrap() as usize;
-        let comma_end = original["proof"]["comma"].as_u64().map(|index|
-            original["elements"][index as usize]["end"].as_u64().unwrap() as usize);
+        let open = signature_element(&original, "open")["end"]
+            .as_u64()
+            .unwrap() as usize;
+        let close = signature_element(&original, "close")["start"]
+            .as_u64()
+            .unwrap() as usize;
+        let comma_end = original["proof"]["comma"].as_u64().map(|index| {
+            original["elements"][index as usize]["end"]
+                .as_u64()
+                .unwrap() as usize
+        });
         for (offset, response) in selected {
-            let comment = original["elements"].as_array().unwrap().iter().any(|e| e["token"] == true
-                && matches!(e["kind"].as_str(), Some("EOL_COMMENT" | "BLOCK_COMMENT"))
-                && e["start"].as_u64().unwrap() as usize <= offset && offset < e["end"].as_u64().unwrap() as usize);
-            if open <= offset && offset <= close && !comment && comma_end.is_none_or(|end| offset < end) {
+            let comment = original["elements"].as_array().unwrap().iter().any(|e| {
+                e["token"] == true
+                    && matches!(e["kind"].as_str(), Some("EOL_COMMENT" | "BLOCK_COMMENT"))
+                    && e["start"].as_u64().unwrap() as usize <= offset
+                    && offset < e["end"].as_u64().unwrap() as usize
+            });
+            if open <= offset
+                && offset <= close
+                && !comment
+                && comma_end.is_none_or(|end| offset < end)
+            {
                 signature_assert_source(&original, &response);
             } else {
-                assert_eq!(response["result"], Value::Null, "cursor={offset}: {response}");
+                assert_eq!(
+                    response["result"],
+                    Value::Null,
+                    "cursor={offset}: {response}"
+                );
                 assert!(response.get("error").is_none());
             }
         }
         signature_assert_source(&edited_producer, &after);
         let type_ordinal = edited_producer["proof"]["typeParameter"].as_u64().unwrap() as usize;
-        assert_eq!(edited_producer["declarations"][type_ordinal]["name"], "Fresh");
+        assert_eq!(
+            edited_producer["declarations"][type_ordinal]["name"],
+            "Fresh"
+        );
         assert_ne!(first["result"], after["result"]);
         assert_eq!(edits.len(), 3);
-        let ids = responses.iter().filter_map(|r| r.get("id")).collect::<Vec<_>>();
+        let ids = responses
+            .iter()
+            .filter_map(|r| r.get("id"))
+            .collect::<Vec<_>>();
         let mut unique = ids.clone();
         unique.sort_by_key(|id| id.to_string());
         unique.dedup();
@@ -6127,75 +6316,144 @@ fn manual_signature_help_actual_adversarial_changes_and_unsupported_families() {
     let cursor = source.rfind("send(").unwrap() + 5;
     let original = signature_producer_packet(source, 7, cursor);
     for (name, start, end, replacement) in [
-        ("distinct-formal", source.find("to:T").unwrap()+3, source.find("to:T").unwrap()+4, "U"),
-        ("future-argument-shadow", source.rfind('}').unwrap(), source.rfind('}').unwrap(), "; val p=1 "),
-        ("other-arity-competitor", source.rfind("send(").unwrap(), source.rfind("send(").unwrap(), "fun send(){}; "),
-        ("damaged-call", source.rfind("=p").unwrap()+1, source.rfind("=p").unwrap()+2, ""),
+        (
+            "distinct-formal",
+            source.find("to:T").unwrap() + 3,
+            source.find("to:T").unwrap() + 4,
+            "U",
+        ),
+        (
+            "future-argument-shadow",
+            source.rfind('}').unwrap(),
+            source.rfind('}').unwrap(),
+            "; val p=1 ",
+        ),
+        (
+            "other-arity-competitor",
+            source.rfind("send(").unwrap(),
+            source.rfind("send(").unwrap(),
+            "fun send(){}; ",
+        ),
+        (
+            "damaged-call",
+            source.rfind("=p").unwrap() + 1,
+            source.rfind("=p").unwrap() + 2,
+            "",
+        ),
     ] {
-        let range = references_range(source,start,end-start);
+        let range = references_range(source, start, end - start);
         let mut edited = source.to_owned();
-        edited.replace_range(start..end,replacement);
-        let edited_cursor = edited.rfind("send(").unwrap()+5;
-        let producer = signature_producer_packet(&edited,8,edited_cursor);
+        edited.replace_range(start..end, replacement);
+        let edited_cursor = edited.rfind("send(").unwrap() + 5;
+        let producer = signature_producer_packet(&edited, 8, edited_cursor);
         let mut wire = SignatureWire::new(&package);
-        signature_open(&mut wire,source,json!({}));
-        let before = signature_request(&mut wire,json!("before"),source,cursor,None);
+        signature_open(&mut wire, source, json!({}));
+        let before = signature_request(&mut wire, json!("before"), source, cursor, None);
         wire.send(json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{
             "textDocument":{"uri":URI,"version":8},"contentChanges":[{"range":range,"text":replacement}]}}));
-        let after = signature_request(&mut wire,json!("after"),&edited,edited_cursor,None);
+        let after = signature_request(&mut wire, json!("after"), &edited, edited_cursor, None);
         wire.finish();
-        signature_assert_source(&original,&before);
-        assert_eq!(after["error"]["code"],-32803,"{name}: {after}");
+        signature_assert_source(&original, &before);
+        assert_eq!(after["error"]["code"], -32803, "{name}: {after}");
         assert!(after.get("result").is_none());
-        assert!(producer.get("result").is_none(),"{producer}");
+        assert!(producer.get("result").is_none(), "{producer}");
     }
     let canonical = "fun <T> outer(p:T){ fun send(to:T){}; send(to=p) }";
     let mut unsupported = vec![
-        ("nominal", "fun outer(p:Int){ fun send(to:Int){}; send(to=p) }".to_owned(), "send("),
-        ("same-spelled-distinct-binder", "fun <T> outer(p:T){ fun <`T`> send(to:T){}; send(to=p) }".to_owned(), "send("),
-        ("future-target", "fun <T> outer(p:T){ send(to=p); fun send(to:T){} }".to_owned(), "send("),
-        ("member-owner", "class C{ fun <T> outer(p:T){ fun send(to:T){}; send(to=p) } }".to_owned(), "send("),
-        ("nested-call-owner", "fun <T> outer(p:T){ fun nested(){ fun send(to:T){}; send(to=p) } }".to_owned(), "send("),
-        ("local-val-argument", "fun <T> outer(p:T){ fun send(to:T){}; val q:T=p; send(to=q) }".to_owned(), "send("),
-        ("constructor", canonical.replace("fun send(to:T){}", "class send"), "send("),
+        (
+            "nominal",
+            "fun outer(p:Int){ fun send(to:Int){}; send(to=p) }".to_owned(),
+            "send(",
+        ),
+        (
+            "same-spelled-distinct-binder",
+            "fun <T> outer(p:T){ fun <`T`> send(to:T){}; send(to=p) }".to_owned(),
+            "send(",
+        ),
+        (
+            "future-target",
+            "fun <T> outer(p:T){ send(to=p); fun send(to:T){} }".to_owned(),
+            "send(",
+        ),
+        (
+            "member-owner",
+            "class C{ fun <T> outer(p:T){ fun send(to:T){}; send(to=p) } }".to_owned(),
+            "send(",
+        ),
+        (
+            "nested-call-owner",
+            "fun <T> outer(p:T){ fun nested(){ fun send(to:T){}; send(to=p) } }".to_owned(),
+            "send(",
+        ),
+        (
+            "local-val-argument",
+            "fun <T> outer(p:T){ fun send(to:T){}; val q:T=p; send(to=q) }".to_owned(),
+            "send(",
+        ),
+        (
+            "constructor",
+            canonical.replace("fun send(to:T){}", "class send"),
+            "send(",
+        ),
     ];
     for (name, argument) in [
-        ("zero",""),("positional","p"),("multiple","to=p,to=p"),("unknown-label","wrong=p"),
-        ("mixed","to=p,p"),("literal","to=1"),("long-literal","to=2L"),("spread","to=*p"),
-        ("unresolved","to=missing"),("parenthesized","to=(p)"),("nested-expression","to=send()"),
+        ("zero", ""),
+        ("positional", "p"),
+        ("multiple", "to=p,to=p"),
+        ("unknown-label", "wrong=p"),
+        ("mixed", "to=p,p"),
+        ("literal", "to=1"),
+        ("long-literal", "to=2L"),
+        ("spread", "to=*p"),
+        ("unresolved", "to=missing"),
+        ("parenthesized", "to=(p)"),
+        ("nested-expression", "to=send()"),
     ] {
-        unsupported.push((name,canonical.replace("send(to=p)",&format!("send({argument})")),"send("));
+        unsupported.push((
+            name,
+            canonical.replace("send(to=p)", &format!("send({argument})")),
+            "send(",
+        ));
     }
     for (name, header) in [
-        ("two-formals","fun send(to:T,other:T){}"),("default","fun send(to:T=p){}"),
-        ("vararg","fun send(vararg to:T){}"),("generic","fun <U> send(to:T){}"),
-        ("extension","fun T.send(to:T){}"),("return","fun send(to:T):T{}"),
-        ("nonempty","fun send(to:T){ val q=1 }"),("modifier","suspend fun send(to:T){}"),
+        ("two-formals", "fun send(to:T,other:T){}"),
+        ("default", "fun send(to:T=p){}"),
+        ("vararg", "fun send(vararg to:T){}"),
+        ("generic", "fun <U> send(to:T){}"),
+        ("extension", "fun T.send(to:T){}"),
+        ("return", "fun send(to:T):T{}"),
+        ("nonempty", "fun send(to:T){ val q=1 }"),
+        ("modifier", "suspend fun send(to:T){}"),
     ] {
-        unsupported.push((name,canonical.replace("fun send(to:T){}",header),"send("));
+        unsupported.push((name, canonical.replace("fun send(to:T){}", header), "send("));
     }
     for (name, call, marker) in [
-        ("qualified","obj.send(to=p)","send("),("safe","obj?.send(to=p)","send("),
-        ("type-arguments","send<T>(to=p)","send<T>("),("chained","send(to=p)()","send("),
-        ("incomplete-open","send(","send("),("incomplete-value","send(to=","send("),
+        ("qualified", "obj.send(to=p)", "send("),
+        ("safe", "obj?.send(to=p)", "send("),
+        ("type-arguments", "send<T>(to=p)", "send<T>("),
+        ("chained", "send(to=p)()", "send("),
+        ("incomplete-open", "send(", "send("),
+        ("incomplete-value", "send(to=", "send("),
     ] {
-        unsupported.push((name,canonical.replace("send(to=p)",call),marker));
+        unsupported.push((name, canonical.replace("send(to=p)", call), marker));
     }
     for (name, source, marker) in unsupported {
         // For a nested unsupported invocation select the outer argument list,
         // never accidentally ask about the inner empty call.
-        let call = source.find("; send(").map(|offset|offset+2)
-            .or_else(||source.find("send(to=p)"))
-            .unwrap_or_else(||source.rfind(marker).unwrap());
+        let call = source
+            .find("; send(")
+            .map(|offset| offset + 2)
+            .or_else(|| source.find("send(to=p)"))
+            .unwrap_or_else(|| source.rfind(marker).unwrap());
         let cursor = call + marker.len();
-        let producer = signature_producer_packet(&source,7,cursor);
+        let producer = signature_producer_packet(&source, 7, cursor);
         let mut wire = SignatureWire::new(&package);
-        signature_open(&mut wire,&source,json!({}));
-        let response = signature_request(&mut wire,json!(name),&source,cursor,None);
+        signature_open(&mut wire, &source, json!({}));
+        let response = signature_request(&mut wire, json!(name), &source, cursor, None);
         wire.finish();
-        assert_eq!(response["error"]["code"],-32803,"{name}: {response}");
+        assert_eq!(response["error"]["code"], -32803, "{name}: {response}");
         assert!(response.get("result").is_none());
-        assert!(producer.get("result").is_none(),"{name}: {producer}");
+        assert!(producer.get("result").is_none(), "{name}: {producer}");
     }
 }
 
@@ -6204,10 +6462,10 @@ fn manual_signature_help_validates_context_utf16_and_open_source_authority() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let package = Package::new(true);
     let source = "// 😀\r\nfun <T> outer(p:T){ fun send(to:T){}; send(to=p) }\r\n";
-    let cursor = source.rfind("send(").unwrap()+5;
-    let original = signature_producer_packet(source,7,cursor);
+    let cursor = source.rfind("send(").unwrap() + 5;
+    let original = signature_producer_packet(source, 7, cursor);
     let mut wire = SignatureWire::new(&package);
-    signature_open(&mut wire,source,json!({}));
+    signature_open(&mut wire, source, json!({}));
     let mut invalid = Vec::new();
     for (i, context) in [
         Value::Null,json!([]),json!({}),json!({"triggerKind":0,"isRetrigger":false}),
@@ -6222,40 +6480,56 @@ fn manual_signature_help_validates_context_utf16_and_open_source_authority() {
         invalid.push(signature_request(&mut wire,json!(format!("context-{i}")),source,cursor,Some(context)));
     }
     for (id, position) in [
-        ("split",json!({"line":0,"character":4})),("crlf",json!({"line":0,"character":6})),
-        ("line",json!({"line":99,"character":0})),("negative",json!({"line":-1,"character":0})),
+        ("split", json!({"line":0,"character":4})),
+        ("crlf", json!({"line":0,"character":6})),
+        ("line", json!({"line":99,"character":0})),
+        ("negative", json!({"line":-1,"character":0})),
     ] {
-        invalid.push(wire.send(json!({"jsonrpc":"2.0","id":id,"method":"textDocument/signatureHelp",
-            "params":{"textDocument":{"uri":URI},"position":position}})));
+        invalid.push(wire.send(
+            json!({"jsonrpc":"2.0","id":id,"method":"textDocument/signatureHelp",
+            "params":{"textDocument":{"uri":URI},"position":position}}),
+        ));
     }
-    let unchanged = signature_request(&mut wire,json!("unchanged"),source,cursor,None);
-    let mut foreign = navigation_params(source,cursor);
+    let unchanged = signature_request(&mut wire, json!("unchanged"), source, cursor, None);
+    let mut foreign = navigation_params(source, cursor);
     foreign["textDocument"]["uri"] = json!("untitled:foreign");
     let foreign = wire.send(json!({"jsonrpc":"2.0","id":"foreign","method":"textDocument/signatureHelp","params":foreign}));
     wire.send(json!({"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":URI}}}));
-    let closed = signature_request(&mut wire,json!("closed"),source,cursor,None);
+    let closed = signature_request(&mut wire, json!("closed"), source, cursor, None);
     wire.finish();
-    for response in invalid.into_iter().chain([foreign,closed]) {
-        assert_eq!(response["error"]["code"],-32602,"{response}");
+    for response in invalid.into_iter().chain([foreign, closed]) {
+        assert_eq!(response["error"]["code"], -32602, "{response}");
         assert!(response.get("result").is_none());
     }
-    signature_assert_source(&original,&unchanged);
+    signature_assert_source(&original, &unchanged);
     let package = Package::new(false);
     let mut wire = SignatureWire::new(&package);
-    let initialized = signature_open(&mut wire,source,json!({}));
-    let unavailable = signature_request(&mut wire,json!("unavailable"),source,cursor,None);
+    let initialized = signature_open(&mut wire, source, json!({}));
+    let unavailable = signature_request(&mut wire, json!("unavailable"), source, cursor, None);
     wire.finish();
-    assert!(initialized["result"]["capabilities"].get("signatureHelpProvider").is_none());
-    assert_eq!(unavailable["error"]["code"],-32601);
+    assert!(
+        initialized["result"]["capabilities"]
+            .get("signatureHelpProvider")
+            .is_none()
+    );
+    assert_eq!(unavailable["error"]["code"], -32601);
 }
 
 #[test]
 fn manual_signature_help_actual_pending_work_keeps_owned_join_and_incarnation_guards() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
     let source = "fun <T> outer(p:T){ fun send(to:T){}; send(to=p) }";
-    let cursor = source.rfind("send(").unwrap()+5;
-    let producer = signature_producer_packet(source,7,cursor);
-    for action in ["cancel","change","reopen","rejected-change","rejected-range","shutdown","close"] {
+    let cursor = source.rfind("send(").unwrap() + 5;
+    let producer = signature_producer_packet(source, 7, cursor);
+    for action in [
+        "cancel",
+        "change",
+        "reopen",
+        "rejected-change",
+        "rejected-range",
+        "shutdown",
+        "close",
+    ] {
         let mut session = running_rename();
         let open_message = json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{
             "textDocument":{"uri":URI,"languageId":"kotlin","version":7,"text":source}}});
@@ -6265,66 +6539,105 @@ fn manual_signature_help_actual_pending_work_keeps_owned_join_and_incarnation_gu
         let initial = session.handle(request_message.clone());
         let before = session.pending_requests();
         let mutation = match action {
-            "cancel" => json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":"help-owned"}}),
-            "change" | "rejected-change" | "rejected-range" => json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{
+            "cancel" => {
+                json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":"help-owned"}})
+            }
+            "change" | "rejected-change" | "rejected-range" => {
+                json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{
                 "textDocument":{"uri":URI,"version":if action=="rejected-change"{7}else{8}},
                 "contentChanges":if action=="rejected-range" {
                     json!([{"range":{"start":{"line":99,"character":0},"end":{"line":99,"character":1}},"text":"bad"}])
-                } else { json!([{"text":source}]) }}}),
-            "reopen" => json!({"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":URI}}}),
+                } else { json!([{"text":source}]) }}})
+            }
+            "reopen" => {
+                json!({"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":URI}}})
+            }
             "shutdown" => json!({"jsonrpc":"2.0","id":"shutdown","method":"shutdown"}),
             _ => Value::Null,
         };
-        let mut responses = if action=="close" { Vec::new() } else { session.handle(mutation.clone()) };
+        let mut responses = if action == "close" {
+            Vec::new()
+        } else {
+            session.handle(mutation.clone())
+        };
         let retained = session.pending_requests();
-        let reopened = if action=="reopen" { session.handle(open_message.clone()) } else { Vec::new() };
+        let reopened = if action == "reopen" {
+            session.handle(open_message.clone())
+        } else {
+            Vec::new()
+        };
         let fresh_request = json!({"jsonrpc":"2.0","id":"help-reopened","method":"textDocument/signatureHelp",
             "params":navigation_params(source,cursor)});
         let mut fresh = Vec::new();
-        if action=="reopen" {
+        if action == "reopen" {
             fresh.extend(session.handle(fresh_request.clone()));
-            let deadline = Instant::now()+Duration::from_secs(3);
-            while fresh.is_empty() && Instant::now()<deadline {
+            let deadline = Instant::now() + Duration::from_secs(3);
+            while fresh.is_empty() && Instant::now() < deadline {
                 fresh.extend(session.poll());
-                if fresh.is_empty() { std::thread::sleep(Duration::from_millis(2)); }
+                if fresh.is_empty() {
+                    std::thread::sleep(Duration::from_millis(2));
+                }
             }
         }
         let (closing, clean) = if action.starts_with("rejected-") {
-            let deadline = Instant::now()+Duration::from_secs(3);
-            while session.pending_requests()!=0 && Instant::now()<deadline {
+            let deadline = Instant::now() + Duration::from_secs(3);
+            while session.pending_requests() != 0 && Instant::now() < deadline {
                 responses.extend(session.poll());
-                if session.pending_requests()!=0 { std::thread::sleep(Duration::from_millis(2)); }
+                if session.pending_requests() != 0 {
+                    std::thread::sleep(Duration::from_millis(2));
+                }
             }
             session.close()
-        } else { session.close() };
+        } else {
+            session.close()
+        };
         responses.extend(closing);
         let after = session.pending_requests();
-        signature_observation("SESSION_OWNED", &json!({"source":source,"action":action,
+        signature_observation(
+            "SESSION_OWNED",
+            &json!({"source":source,"action":action,
             "open":open_message,"opened":opened,"request":request_message,"initial":initial,
             "mutation":mutation,"reopened":reopened,"responses":responses,
             "freshRequest":if action=="reopen" { fresh_request } else { Value::Null },"freshResponses":fresh,
             "ownedBefore":before,"ownedAfterMutation":retained,"ownedAfterClose":after,"clean":clean,
-            "errors":session.drain_errors()}));
+            "errors":session.drain_errors()}),
+        );
         assert!(initial.is_empty());
-        assert_eq!(before,1);
-        assert_eq!(retained,1,"work remains owned until actual join");
+        assert_eq!(before, 1);
+        assert_eq!(retained, 1, "work remains owned until actual join");
         assert!(clean);
-        assert_eq!(after,0);
-        let help = responses.iter().filter(|response| response["id"]=="help-owned").collect::<Vec<_>>();
-        assert_eq!(help.len(),1,"{responses:?}");
+        assert_eq!(after, 0);
+        let help = responses
+            .iter()
+            .filter(|response| response["id"] == "help-owned")
+            .collect::<Vec<_>>();
+        assert_eq!(help.len(), 1, "{responses:?}");
         if action.starts_with("rejected-") {
-            signature_assert_source(&producer,help[0]);
+            signature_assert_source(&producer, help[0]);
         } else {
-            assert_eq!(help[0]["error"]["code"],if matches!(action,"change"|"reopen"){-32801}else{-32800});
+            assert_eq!(
+                help[0]["error"]["code"],
+                if matches!(action, "change" | "reopen") {
+                    -32801
+                } else {
+                    -32800
+                }
+            );
             assert!(help[0].get("result").is_none());
         }
-        if action=="shutdown" {
-            assert_eq!(responses.iter().filter(|response|response["id"]=="shutdown").count(),1);
+        if action == "shutdown" {
+            assert_eq!(
+                responses
+                    .iter()
+                    .filter(|response| response["id"] == "shutdown")
+                    .count(),
+                1
+            );
         }
-        if action=="reopen" {
-            assert_eq!(fresh.len(),1,"{fresh:?}");
-            assert_eq!(fresh[0]["id"],"help-reopened");
-            signature_assert_source(&producer,&fresh[0]);
+        if action == "reopen" {
+            assert_eq!(fresh.len(), 1, "{fresh:?}");
+            assert_eq!(fresh[0]["id"], "help-reopened");
+            signature_assert_source(&producer, &fresh[0]);
         }
     }
 }

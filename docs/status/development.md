@@ -3796,3 +3796,45 @@ separate readonly complete guard/expected-head squash/tree/SOLEparent/dualmain
 remain required. Full parity NOT achieved; native-only/T004/96, B3/oracle HOLD
 and original417/395/377 UNKNOWN/OPEN unchanged. Every old/user/review WT retained.
 
+
+#### Composed423/424 full initial ROOT static gates and ONE formatter
+
+ROOT froze the complete23path composition at
+**25c3ea5b80b6ca412bda3874c39e6980fc31c81b**,
+tree **49c699eb44309170ab6d401d956f8d2efb16260b**,
+sole parent9157b5050aba22446ed9be7e86e0082aaad1a6dd, comparison verified1ddf.
+Two distinct isolated READONLY ROOT reviewers independently read every changed
+Rust source/test file, relevant complete helpers/callers/consumers, all changed/
+current documentation sections, frozen314line native consumer and external
+guard/config/historical-proof contracts. Both independently authenticated
+complete-leaf composition and BOTH current BASE/HEAD config dictionaries with
+Cargo.lockb58f0db, not prior PR422's older BASElock. Neither ran any program or
+substituted component approvals for whole-union review. No actionable findings.
+
+ROOT FULL-read all226 functionality and203 adversarial receipt lines, including
+all custody/scope/inference/resource/guard/no-runtime qualifications, then
+persisted their complete returned texts because reviewers lacked write tools:
+- `/private/tmp/ktlsp-423-424-root-function-initial-25c3ea5.txt`,17576B,
+  SHA7cb5a0c4130958f148cf6003ee6e84b76104d5fac6b24ccb05248f8dabf6934a.
+- `/private/tmp/ktlsp-423-424-root-adversary-initial-25c3ea5.txt`,16222B,
+  SHA2042d99eb375cd9f4f81cb705fd338dbe907ffdb63429018cd71a3410473e3f6.
+These are initial UNFORMATTED full-source STATIC clearances ONLY, not compiler/
+runtime/CI/edit-application/merge/parity acceptance.
+
+Only AFTER both complete gates, actual readonly tracked-diff0/exactHEAD25
+identity and explicit separate admission, ROOT invoked the ONE pinned
+`cargo +1.99.0 fmt --all`: actual0/1.381568042s, empty stdout/stderr.
+The formatter call is SPENT even on any later source change; NEVER rerun it.
+Actual formatting delta touched eight Rust files: native decoder/tests, parser
+local binding/lowering/call-syntax/occurrence tests, server semantic renderer
+and actual CLI/Session integration tests. No Cargo/lock/dependency/workflow or
+external frozen consumer change. Invocation/admission/output/actual elapsed
+records stay `/private/tmp/ktlsp-423-424-root-evidence/one-union-formatter*`.
+
+Formatted source/docs must now receive renewed EXACT changed-head authority
+from BOTH affected component pairs and BOTH full ROOT reviewers before compiler
+admission. No compiler/check/Clippy/test/native consumer/Kotlin/parser/server/
+Session/worker/peer/runtime/CI/push/PR has occurred for this union. TEMP424,
+frozen native consumer/source/fixtures and every failed original remain intact.
+No full parity or relaxed #96/native/T004/B3/oracle/original-UNKNOWN limit.
+

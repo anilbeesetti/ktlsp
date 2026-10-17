@@ -544,7 +544,9 @@ pub(super) fn argument_label_with_budget<'a>(
     )?;
     b.charge(call.arguments().len())?;
     if !call.arguments().iter().any(|argument| {
-        argument.label().is_some_and(|label| std::ptr::eq(label.reference(), reference))
+        argument
+            .label()
+            .is_some_and(|label| std::ptr::eq(label.reference(), reference))
     }) {
         return Err(LocalBindingError::UnsupportedContext);
     }
@@ -688,20 +690,31 @@ impl<'a> LocalCallSignature<'a> {
     pub fn into_labels(mut self, response_id_bound: usize) -> Result<(String, String)> {
         self.labels_with_budget(response_id_bound)
     }
-    pub(super) fn labels_with_budget(&mut self, response_id_bound: usize) -> Result<(String, String)> {
+    pub(super) fn labels_with_budget(
+        &mut self,
+        response_id_bound: usize,
+    ) -> Result<(String, String)> {
         let source = self.binding.call.origin().parsed().source();
-        let signature = source.get(self.signature_range.clone()).ok_or(LocalBindingError::InvalidOrigin)?;
-        let parameter = source.get(self.parameter_range.clone()).ok_or(LocalBindingError::InvalidOrigin)?;
+        let signature = source
+            .get(self.signature_range.clone())
+            .ok_or(LocalBindingError::InvalidOrigin)?;
+        let parameter = source
+            .get(self.parameter_range.clone())
+            .ok_or(LocalBindingError::InvalidOrigin)?;
         // Fixed result keys, arrays, zero indices, JSON-RPC and framing fit 256.
-        let mut escaped = response_id_bound.checked_add(256).ok_or(LocalBindingError::Resource)?;
+        let mut escaped = response_id_bound
+            .checked_add(256)
+            .ok_or(LocalBindingError::Resource)?;
         for text in [signature, parameter] {
             for byte in text.bytes() {
                 self.budget.charge(1)?;
-                escaped = escaped.checked_add(match byte {
-                    b'"' | b'\\' | b'\x08' | b'\x0c' | b'\n' | b'\r' | b'\t' => 2,
-                    0..=0x1f => 6,
-                    _ => 1,
-                }).ok_or(LocalBindingError::Resource)?;
+                escaped = escaped
+                    .checked_add(match byte {
+                        b'"' | b'\\' | b'\x08' | b'\x0c' | b'\n' | b'\r' | b'\t' => 2,
+                        0..=0x1f => 6,
+                        _ => 1,
+                    })
+                    .ok_or(LocalBindingError::Resource)?;
             }
         }
         self.budget.charge(escaped)?;
@@ -730,7 +743,13 @@ pub fn local_call_signature<'a>(
     current: &SourceSnapshot,
     cursor: usize,
 ) -> Result<Option<LocalCallSignature<'a>>> {
-    signature_with_budget(directory, result, current, cursor, ReferenceBudget::default())
+    signature_with_budget(
+        directory,
+        result,
+        current,
+        cursor,
+        ReferenceBudget::default(),
+    )
 }
 
 pub(super) fn signature_with_budget<'a>(
@@ -751,7 +770,8 @@ pub(super) fn signature_with_budget<'a>(
         let node = b.element(parsed, index)?;
         if node.start <= cursor && cursor < node.end {
             if node.token {
-                comment |= b.equal(&node.kind, "EOL_COMMENT")? || b.equal(&node.kind, "BLOCK_COMMENT")?;
+                comment |=
+                    b.equal(&node.kind, "EOL_COMMENT")? || b.equal(&node.kind, "BLOCK_COMMENT")?;
             } else if b.equal(&node.kind, "VALUE_ARGUMENT_LIST")? {
                 let parent = node.parent.ok_or(LocalBindingError::UnsupportedContext)?;
                 let call = b.element(parsed, parent)?;
@@ -764,9 +784,15 @@ pub(super) fn signature_with_budget<'a>(
     if comment {
         return Ok(None);
     }
-    let Some(index) = selected else { return Ok(None); };
+    let Some(index) = selected else {
+        return Ok(None);
+    };
     let call = crate::call_syntax::call_site_with_budget(
-        directory.lowered(), result, current, index, &mut b,
+        directory.lowered(),
+        result,
+        current,
+        index,
+        &mut b,
     )?;
     b.charge(3)?;
     if cursor < call.open_paren().end || cursor > call.close_paren().start {
@@ -774,20 +800,30 @@ pub(super) fn signature_with_budget<'a>(
     }
     let binding = applicable_named_call(directory, result, current, parsed, call, &mut b)?;
     b.charge(4)?;
-    if binding.call.arguments()[0].comma().is_some_and(|comma| cursor >= comma.end) {
+    if binding.call.arguments()[0]
+        .comma()
+        .is_some_and(|comma| cursor >= comma.end)
+    {
         return Ok(None);
     }
-    let signature_range = binding.parameters.function().name_range().start
-        ..binding.parameters.close_paren().end;
+    let signature_range =
+        binding.parameters.function().name_range().start..binding.parameters.close_paren().end;
     let parameter_range = binding.target().range();
     b.charge(5)?;
-    if signature_range.start > parameter_range.start || parameter_range.end > signature_range.end
+    if signature_range.start > parameter_range.start
+        || parameter_range.end > signature_range.end
         || parsed.source().get(signature_range.clone()).is_none()
         || parsed.source().get(parameter_range.clone()).is_none()
     {
         return Err(LocalBindingError::InvalidOrigin);
     }
-    Ok(Some(LocalCallSignature { binding, cursor, signature_range, parameter_range, budget: b }))
+    Ok(Some(LocalCallSignature {
+        binding,
+        cursor,
+        signature_range,
+        parameter_range,
+        budget: b,
+    }))
 }
 
 // Called only after the one closed-root proof. Authenticate the original

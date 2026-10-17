@@ -491,12 +491,20 @@ impl ReferenceBudget {
         if output.capacity() != 0 {
             return Err(ReferenceSiteError::Resource);
         }
-        self.requested = self.requested.checked_add(bytes).ok_or(ReferenceSiteError::Resource)?;
+        self.requested = self
+            .requested
+            .checked_add(bytes)
+            .ok_or(ReferenceSiteError::Resource)?;
         if self.requested > REQUESTED {
             return Err(ReferenceSiteError::Resource);
         }
-        output.try_reserve_exact(bytes).map_err(|_| ReferenceSiteError::Resource)?;
-        self.retained = self.retained.checked_add(output.capacity()).ok_or(ReferenceSiteError::Resource)?;
+        output
+            .try_reserve_exact(bytes)
+            .map_err(|_| ReferenceSiteError::Resource)?;
+        self.retained = self
+            .retained
+            .checked_add(output.capacity())
+            .ok_or(ReferenceSiteError::Resource)?;
         if self.retained > RETAINED {
             return Err(ReferenceSiteError::Resource);
         }
@@ -2655,40 +2663,80 @@ mod tests {
         let cursor = binding.call().open_paren().end;
         let run = |budget, id| {
             let mut proof = crate::local_value_binding::signature_with_budget(
-                &directory, &result, result.snapshot(), cursor, budget,
-            )?.ok_or(LocalBindingError::UnsupportedContext)?;
+                &directory,
+                &result,
+                result.snapshot(),
+                cursor,
+                budget,
+            )?
+            .ok_or(LocalBindingError::UnsupportedContext)?;
             let labels = proof.labels_with_budget(id)?;
             Ok::<_, LocalBindingError>((labels, proof.budget))
         };
         let ((signature, formal), all) = run(ReferenceBudget::default(), 20).unwrap();
         assert_eq!(signature, "send(to:/* \"\\\t */T)");
         assert_eq!(formal, "to:/* \"\\\t */T");
-        assert_eq!(all.requested, measured.requested + signature.len() + formal.len());
+        assert_eq!(
+            all.requested,
+            measured.requested + signature.len() + formal.len()
+        );
         assert!(all.work > measured.work && all.retained > measured.retained);
-        let (_, exact) = run(ReferenceBudget {
-            work: WORK - all.work,
-            requested: REQUESTED - all.requested,
-            retained: RETAINED - all.retained,
-        }, 20).unwrap();
-        assert_eq!((exact.work, exact.requested, exact.retained), (WORK, REQUESTED, RETAINED));
+        let (_, exact) = run(
+            ReferenceBudget {
+                work: WORK - all.work,
+                requested: REQUESTED - all.requested,
+                retained: RETAINED - all.retained,
+            },
+            20,
+        )
+        .unwrap();
+        assert_eq!(
+            (exact.work, exact.requested, exact.retained),
+            (WORK, REQUESTED, RETAINED)
+        );
         for budget in [
-            ReferenceBudget { work: WORK - all.work + 1, ..ReferenceBudget::default() },
-            ReferenceBudget { requested: REQUESTED - all.requested + 1, ..ReferenceBudget::default() },
-            ReferenceBudget { retained: RETAINED - all.retained + 1, ..ReferenceBudget::default() },
-            ReferenceBudget { work: usize::MAX, ..ReferenceBudget::default() },
-            ReferenceBudget { requested: usize::MAX, ..ReferenceBudget::default() },
-            ReferenceBudget { retained: usize::MAX, ..ReferenceBudget::default() },
+            ReferenceBudget {
+                work: WORK - all.work + 1,
+                ..ReferenceBudget::default()
+            },
+            ReferenceBudget {
+                requested: REQUESTED - all.requested + 1,
+                ..ReferenceBudget::default()
+            },
+            ReferenceBudget {
+                retained: RETAINED - all.retained + 1,
+                ..ReferenceBudget::default()
+            },
+            ReferenceBudget {
+                work: usize::MAX,
+                ..ReferenceBudget::default()
+            },
+            ReferenceBudget {
+                requested: usize::MAX,
+                ..ReferenceBudget::default()
+            },
+            ReferenceBudget {
+                retained: usize::MAX,
+                ..ReferenceBudget::default()
+            },
         ] {
             assert_eq!(run(budget, 20).unwrap_err(), LocalBindingError::Resource);
         }
         // Independent actual JSON serializer, including quote/slash/tab escapes.
         let escaped = serde_json::to_vec(&signature).unwrap().len()
-            + serde_json::to_vec(&formal).unwrap().len() - 4;
+            + serde_json::to_vec(&formal).unwrap().len()
+            - 4;
         assert!(escaped > signature.len() + formal.len());
         let id = 1_048_576 - 256 - escaped;
-        assert_eq!(run(ReferenceBudget::default(), id).unwrap().0, (signature, formal));
+        assert_eq!(
+            run(ReferenceBudget::default(), id).unwrap().0,
+            (signature, formal)
+        );
         for id in [id + 1, usize::MAX] {
-            assert_eq!(run(ReferenceBudget::default(), id).unwrap_err(), LocalBindingError::Resource);
+            assert_eq!(
+                run(ReferenceBudget::default(), id).unwrap_err(),
+                LocalBindingError::Resource
+            );
         }
     }
 

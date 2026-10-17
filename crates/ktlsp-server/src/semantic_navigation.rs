@@ -5,8 +5,8 @@ use ktlsp_parser::{
     local_value_binding::{
         LocalValueAnchor, TypeParameterAnchor, bind_lexical_type_parameter,
         bind_local_argument_label, bind_local_function_callee, bind_local_value,
-        guarded_local_value_rename, guarded_type_parameter_rename, local_value_occurrences,
-        local_call_signature, type_parameter_occurrences, visible_local_values,
+        guarded_local_value_rename, guarded_type_parameter_rename, local_call_signature,
+        local_value_occurrences, type_parameter_occurrences, visible_local_values,
     },
     lowering::{Declaration, lower_declarations, reference_site},
     structural_regions::build_regions,
@@ -84,45 +84,73 @@ impl RenameClient {
 // Context is wire shape only. Even plausible previous help never authenticates
 // a declaration, an active formal or a current source snapshot.
 pub(crate) fn signature_context(context: Option<&Value>) -> Result<(), &'static str> {
-    let Some(context) = context else { return Ok(()); };
-    let context = context.as_object().ok_or("invalid signature help context")?;
-    if !context.get("triggerKind").and_then(Value::as_u64).is_some_and(|kind| (1..=3).contains(&kind))
+    let Some(context) = context else {
+        return Ok(());
+    };
+    let context = context
+        .as_object()
+        .ok_or("invalid signature help context")?;
+    if !context
+        .get("triggerKind")
+        .and_then(Value::as_u64)
+        .is_some_and(|kind| (1..=3).contains(&kind))
         || !context.get("isRetrigger").is_some_and(Value::is_boolean)
-        || context.get("triggerCharacter").is_some_and(|value| !value.is_string())
+        || context
+            .get("triggerCharacter")
+            .is_some_and(|value| !value.is_string())
     {
         return Err("invalid signature help context");
     }
     fn index(object: &serde_json::Map<String, Value>, key: &str) -> bool {
-        object.get(key).is_none_or(|value| value.as_u64().is_some_and(|n| u32::try_from(n).is_ok()))
+        object
+            .get(key)
+            .is_none_or(|value| value.as_u64().is_some_and(|n| u32::try_from(n).is_ok()))
     }
     fn documentation(value: Option<&Value>) -> bool {
-        value.is_none_or(|value| value.is_string() || value.as_object().is_some_and(|value| {
-            value.get("kind").and_then(Value::as_str).is_some_and(|kind| matches!(kind, "plaintext" | "markdown"))
-                && value.get("value").is_some_and(Value::is_string)
-        }))
+        value.is_none_or(|value| {
+            value.is_string()
+                || value.as_object().is_some_and(|value| {
+                    value
+                        .get("kind")
+                        .and_then(Value::as_str)
+                        .is_some_and(|kind| matches!(kind, "plaintext" | "markdown"))
+                        && value.get("value").is_some_and(Value::is_string)
+                })
+        })
     }
     if let Some(help) = context.get("activeSignatureHelp") {
         let help = help.as_object().ok_or("invalid previous signature help")?;
-        let signatures = help.get("signatures").and_then(Value::as_array).ok_or("invalid previous signatures")?;
+        let signatures = help
+            .get("signatures")
+            .and_then(Value::as_array)
+            .ok_or("invalid previous signatures")?;
         if !index(help, "activeSignature") || !index(help, "activeParameter") {
             return Err("invalid previous active signature index");
         }
         for signature in signatures {
             let signature = signature.as_object().ok_or("invalid previous signature")?;
             if !signature.get("label").is_some_and(Value::is_string)
-                || !documentation(signature.get("documentation")) || !index(signature, "activeParameter")
+                || !documentation(signature.get("documentation"))
+                || !index(signature, "activeParameter")
             {
                 return Err("invalid previous signature");
             }
             if let Some(parameters) = signature.get("parameters") {
                 for parameter in parameters.as_array().ok_or("invalid previous parameters")? {
                     let parameter = parameter.as_object().ok_or("invalid previous parameter")?;
-                    let label = parameter.get("label").ok_or("previous parameter label missing")?;
+                    let label = parameter
+                        .get("label")
+                        .ok_or("previous parameter label missing")?;
                     let offsets = label.as_array().is_some_and(|offsets| {
-                        offsets.len() == 2 && offsets.iter().all(|offset| offset.as_u64().is_some_and(|n| u32::try_from(n).is_ok()))
+                        offsets.len() == 2
+                            && offsets.iter().all(|offset| {
+                                offset.as_u64().is_some_and(|n| u32::try_from(n).is_ok())
+                            })
                             && offsets[0].as_u64() <= offsets[1].as_u64()
                     });
-                    if (!label.is_string() && !offsets) || !documentation(parameter.get("documentation")) {
+                    if (!label.is_string() && !offsets)
+                        || !documentation(parameter.get("documentation"))
+                    {
                         return Err("invalid previous parameter");
                     }
                 }
@@ -171,16 +199,22 @@ pub(crate) fn render(
     response_id_bound: usize,
 ) -> Result<Value, &'static str> {
     if let Query::SignatureHelp { offset } = query {
-        if response_id_bound.checked_add(256).is_none_or(|bytes| bytes > 1_048_576) {
+        if response_id_bound
+            .checked_add(256)
+            .is_none_or(|bytes| bytes > 1_048_576)
+        {
             return Err("signature help response limit exceeded");
         }
         let lowered = lower_declarations(result, snapshot).map_err(|_| UNSUPPORTED)?;
         let directory = build_regions(&lowered, result, snapshot).map_err(|_| UNSUPPORTED)?;
-        let Some(proof) = local_call_signature(&directory, result, snapshot, offset)
-            .map_err(|_| UNSUPPORTED)? else {
+        let Some(proof) =
+            local_call_signature(&directory, result, snapshot, offset).map_err(|_| UNSUPPORTED)?
+        else {
             return Ok(Value::Null);
         };
-        let (label, parameter) = proof.into_labels(response_id_bound).map_err(|_| UNSUPPORTED)?;
+        let (label, parameter) = proof
+            .into_labels(response_id_bound)
+            .map_err(|_| UNSUPPORTED)?;
         let mut value = json!({"signatures":[{"label":null,"parameters":[{"label":null}]}],
             "activeSignature":0,"activeParameter":0});
         value["signatures"][0]["label"] = Value::String(label);

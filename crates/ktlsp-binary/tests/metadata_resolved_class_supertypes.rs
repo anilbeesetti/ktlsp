@@ -1,21 +1,27 @@
 use ktlsp_binary::metadata::{
-    self, class_context, name_resolver,
-    resolved_class_function_parameters as classifier,
+    self, class_context, name_resolver, resolved_class_function_parameters as classifier,
     resolved_class_supertypes::{Error, ErrorKind, Limits, decode},
-    type_parameter::Variance, wire,
+    type_parameter::Variance,
+    wire,
 };
 use std::ops::Range;
 
 const UNIT: &[u8] = include_bytes!("../fixtures/t017c2/Unit.class");
 const RESULT: &[u8] = include_bytes!("fixtures/metadata_constructor/Result$Companion.class.bin");
 const PAIR: &[u8] = include_bytes!("fixtures/metadata_constructor/Pair.class.bin");
-fn units(text: &str) -> Vec<u16> { text.encode_utf16().collect() }
+fn units(text: &str) -> Vec<u16> {
+    text.encode_utf16().collect()
+}
 fn bytes<'a>(input: &'a metadata::Outcome<'_>) -> &'a [u8] {
-    let metadata::Outcome::Decoded { bytes, .. } = input else { panic!("decoded Class") };
+    let metadata::Outcome::Decoded { bytes, .. } = input else {
+        panic!("decoded Class")
+    };
     bytes
 }
 fn bytes_mut<'a>(input: &'a mut metadata::Outcome<'_>) -> &'a mut Vec<u8> {
-    let metadata::Outcome::Decoded { bytes, .. } = input else { panic!("decoded Class") };
+    let metadata::Outcome::Decoded { bytes, .. } = input else {
+        panic!("decoded Class")
+    };
     bytes
 }
 fn borrowed(raw: &[u8], input: &[u8], span: Range<usize>) {
@@ -27,7 +33,12 @@ fn identity(id: &metadata::class_id::ClassId, package: &str, relative: &str, loc
     assert_eq!(id.relative_class_name(), units(relative));
     assert_eq!(id.local, local);
 }
-fn genuine(input: &metadata::Outcome<'_>, owner: &str, class_span: Range<usize>, outer: Range<usize>) {
+fn genuine(
+    input: &metadata::Outcome<'_>,
+    owner: &str,
+    class_span: Range<usize>,
+    outer: Range<usize>,
+) {
     let out = decode(input, Limits::default()).unwrap();
     identity(&out.owner.class_id, "kotlin", owner, false);
     assert_eq!(out.owner.header.fq_name, 0);
@@ -43,13 +54,22 @@ fn genuine(input: &metadata::Outcome<'_>, owner: &str, class_span: Range<usize>,
     borrowed(s.header.raw, bytes(input), s.body_span.clone());
     assert_eq!(s.header.raw, &[0x30, 1]);
     identity(&s.class_id, "kotlin", "Any", false);
-    assert_eq!(s.header, metadata::type_header::TypeHeader {
-        raw: &[0x30, 1], flags: None, nullable: None,
-        flexible_type_capabilities_id: None, class_name: Some(1),
-        type_parameter: None, flexible_upper_bound_id: None,
-        type_parameter_name: None, outer_type_id: None,
-        type_alias_name: None, abbreviated_type_id: None,
-    });
+    assert_eq!(
+        s.header,
+        metadata::type_header::TypeHeader {
+            raw: &[0x30, 1],
+            flags: None,
+            nullable: None,
+            flexible_type_capabilities_id: None,
+            class_name: Some(1),
+            type_parameter: None,
+            flexible_upper_bound_id: None,
+            type_parameter_name: None,
+            outer_type_id: None,
+            type_alias_name: None,
+            abbreviated_type_id: None,
+        }
+    );
 }
 
 #[test]
@@ -69,14 +89,21 @@ fn original_genuine_unit_and_result_companion_are_interpreted_not_echoed() {
     }
 }
 
-fn pair_parameters(owner: &class_context::Owner<'_>, parameters: &[class_context::Parameter<'_>], input: &metadata::Outcome<'_>) {
+fn pair_parameters(
+    owner: &class_context::Owner<'_>,
+    parameters: &[class_context::Parameter<'_>],
+    input: &metadata::Outcome<'_>,
+) {
     identity(&owner.class_id, "kotlin", "Pair", false);
     assert_eq!(parameters.len(), 2);
     for (ordinal, (name, span)) in [("A", 54..60), ("B", 62..68)].into_iter().enumerate() {
         let p = &parameters[ordinal];
         assert_eq!(p.body_span, span);
         borrowed(p.parameter.raw, bytes(input), span);
-        assert_eq!(p.parameter.raw, &[8, ordinal as u8, 16, ordinal as u8 + 1, 32, 1]);
+        assert_eq!(
+            p.parameter.raw,
+            &[8, ordinal as u8, 16, ordinal as u8 + 1, 32, 1]
+        );
         assert_eq!(p.parameter.id, ordinal as i32);
         assert_eq!(p.parameter.name, ordinal as i32 + 1);
         assert_eq!(p.name, units(name));
@@ -92,9 +119,13 @@ fn original_pair_abbreviation_refuses_and_original_declarations_stay_opaque() {
     let class = ktlsp_binary::parse_class(PAIR).unwrap();
     let annotations = ktlsp_binary::annotations::decode(&class).unwrap();
     let mut input = metadata::decode(&annotations, Default::default()).unwrap();
-    assert_eq!(decode(&input, Limits::default()).unwrap_err(), Error {
-        offset: 72, kind: ErrorKind::Classifier(classifier::ErrorKind::UnsupportedType),
-    });
+    assert_eq!(
+        decode(&input, Limits::default()).unwrap_err(),
+        Error {
+            offset: 72,
+            kind: ErrorKind::Classifier(classifier::ErrorKind::UnsupportedType),
+        }
+    );
     // An independently bounded EXISTING consumer retains original A/B declarations;
     // no failed new operation exposes a partial result or interpreted empty bounds.
     let old = metadata::resolved_class_properties::decode(&input, Limits::default()).unwrap();
@@ -105,7 +136,12 @@ fn original_pair_abbreviation_refuses_and_original_declarations_stay_opaque() {
     let mutated = decode(&input, Limits::default()).unwrap();
     pair_parameters(&mutated.owner, &mutated.parameters, &input);
     assert_eq!(mutated.supertypes[0].span, 68..72);
-    identity(&mutated.supertypes[0].class_id, "java.io", "Serializable", false);
+    identity(
+        &mutated.supertypes[0].class_id,
+        "java.io",
+        "Serializable",
+        false,
+    );
 }
 
 fn replace_unit_type(input: &mut metadata::Outcome<'_>, ty: &[u8]) {
@@ -115,8 +151,16 @@ fn replace_unit_type(input: &mut metadata::Outcome<'_>, ty: &[u8]) {
     let end = 26 + usize::from(bytes(input)[25]);
     bytes_mut(input).splice(24..end, outer);
 }
-fn name_error(label: &'static str, index: Option<i32>, record: Option<usize>) -> name_resolver::Error {
-    name_resolver::Error { kind: name_resolver::ErrorKind::Limit(label), index, record }
+fn name_error(
+    label: &'static str,
+    index: Option<i32>,
+    record: Option<usize>,
+) -> name_resolver::Error {
+    name_resolver::Error {
+        kind: name_resolver::ErrorKind::Limit(label),
+        index,
+        record,
+    }
 }
 
 #[test]
@@ -131,18 +175,26 @@ fn mutations_resolve_real_indices_and_keep_repetitions_order_spans_and_options()
     assert_eq!(out.supertypes[0].class_id, out.owner.class_id);
     drop(out); // This does NOT establish legal self-inheritance.
     bytes_mut(&mut input)[27] = 127;
-    assert_eq!(decode(&input, Limits::default()).unwrap_err(), Error {
-        offset: 26, kind: ErrorKind::Classifier(classifier::ErrorKind::Name(name_resolver::Error {
-            kind: name_resolver::ErrorKind::InvalidIndex, index: Some(127), record: None,
-        })),
-    });
+    assert_eq!(
+        decode(&input, Limits::default()).unwrap_err(),
+        Error {
+            offset: 26,
+            kind: ErrorKind::Classifier(classifier::ErrorKind::Name(name_resolver::Error {
+                kind: name_resolver::ErrorKind::InvalidIndex,
+                index: Some(127),
+                record: None,
+            })),
+        }
+    );
     bytes_mut(&mut input)[27] = 1;
     // Distinct followed by equal repeats, separated from the original by other fields.
     bytes_mut(&mut input).extend([0x32, 2, 0x30, 0, 0x32, 2, 0x30, 1]);
     let out = decode(&input, Limits::default()).unwrap();
     assert_eq!(out.supertypes.len(), 3);
     for (s, (ordinal, span, target, index)) in out.supertypes.iter().zip([
-        (2, 24..28, "Any", 1), (6, 52..56, "Unit", 0), (7, 56..60, "Any", 1),
+        (2, 24..28, "Any", 1),
+        (6, 52..56, "Unit", 0),
+        (7, 56..60, "Any", 1),
     ]) {
         assert_eq!(s.ordinal, ordinal);
         assert_eq!(s.span, span);
@@ -162,7 +214,9 @@ fn mutations_resolve_real_indices_and_keep_repetitions_order_spans_and_options()
     drop(out);
     for nullable in [None, Some(0), Some(1), Some(2)] {
         let mut ty = vec![0x30, 1, 8, 0];
-        if let Some(value) = nullable { ty.extend([0x18, value]); }
+        if let Some(value) = nullable {
+            ty.extend([0x18, value]);
+        }
         // Unknown extension remains opaque but fully borrowed and wire-bounded.
         ty.extend([0x7a, 1, 0xff]);
         replace_unit_type(&mut input, &ty);
@@ -188,14 +242,23 @@ fn mutations_preserve_lossless_utf16_local_membership_without_function_scope_hac
     let annotations = ktlsp_binary::annotations::decode(&class).unwrap();
     let mut input = metadata::decode(&annotations, Default::default()).unwrap();
     let target = [112, 47, 113, 47, 96, 88, 47, 0xd800, 96, 46, 0xdc00];
-    let metadata::Outcome::Decoded { header, bytes: data } = &mut input else { unreachable!() };
+    let metadata::Outcome::Decoded {
+        header,
+        bytes: data,
+    } = &mut input
+    else {
+        unreachable!()
+    };
     header.d2[1] = &target;
     data[8] = 44; // Unknown predefined index falls back to this actual d2 entry.
     data.splice(19..19, [0x28, 1]); // Class starts two bytes later; local-name membership.
     data[0] += 2;
     let out = decode(&input, Limits::default()).unwrap();
     assert_eq!(out.supertypes[0].class_id.package_name(), &[112, 46, 113]);
-    assert_eq!(out.supertypes[0].class_id.relative_class_name(), &[88, 47, 0xd800, 46, 0xdc00]);
+    assert_eq!(
+        out.supertypes[0].class_id.relative_class_name(),
+        &[88, 47, 0xd800, 46, 0xdc00]
+    );
     assert!(out.supertypes[0].class_id.local);
     assert!(!out.owner.class_id.local);
     assert_eq!(out.supertypes[0].body_span, 28..30);
@@ -213,53 +276,91 @@ fn mutations_refuse_every_significant_shape_wrong_wire_and_table_role_atomically
         ty.extend([number * 8, 0]);
         replace_unit_type(&mut input, &ty);
         let expected = if matches!(number, 7 | 9) {
-            Error { offset: 26, kind: ErrorKind::UnsupportedType }
+            Error {
+                offset: 26,
+                kind: ErrorKind::UnsupportedType,
+            }
         } else {
-            Error { offset: 28, kind: ErrorKind::Classifier(classifier::ErrorKind::UnsupportedType) }
+            Error {
+                offset: 28,
+                kind: ErrorKind::Classifier(classifier::ErrorKind::UnsupportedType),
+            }
         };
-        assert_eq!(decode(&input, Limits::default()).unwrap_err(), expected, "field {number}");
+        assert_eq!(
+            decode(&input, Limits::default()).unwrap_err(),
+            expected,
+            "field {number}"
+        );
         let mut ty = vec![0x30, 1];
         ty.extend([number * 8 + 2, 0]);
         replace_unit_type(&mut input, &ty);
-        assert_eq!(decode(&input, Limits::default()).unwrap_err(), Error {
-            offset: 28, kind: ErrorKind::Classifier(classifier::ErrorKind::UnsupportedType),
-        }, "inline/wrong-wire {number}");
+        assert_eq!(
+            decode(&input, Limits::default()).unwrap_err(),
+            Error {
+                offset: 28,
+                kind: ErrorKind::Classifier(classifier::ErrorKind::UnsupportedType),
+            },
+            "inline/wrong-wire {number}"
+        );
     }
     for number in [1u8, 3, 6] {
         let mut input = metadata::decode(&annotations, Default::default()).unwrap();
         replace_unit_type(&mut input, &[0x30, 1, number * 8 + 2, 0]);
-        assert_eq!(decode(&input, Limits::default()).unwrap_err(), Error {
-            offset: 28, kind: ErrorKind::Classifier(classifier::ErrorKind::UnsupportedType),
-        });
+        assert_eq!(
+            decode(&input, Limits::default()).unwrap_err(),
+            Error {
+                offset: 28,
+                kind: ErrorKind::Classifier(classifier::ErrorKind::UnsupportedType),
+            }
+        );
     }
     for ty in [&[8, 1, 0x30, 1][..], &[][..]] {
         let mut input = metadata::decode(&annotations, Default::default()).unwrap();
         replace_unit_type(&mut input, ty);
-        assert_eq!(decode(&input, Limits::default()).unwrap_err(), Error {
-            offset: 26,
-            kind: if ty.is_empty() { ErrorKind::UnsupportedType }
-                else { ErrorKind::Classifier(classifier::ErrorKind::UnsupportedType) },
-        });
+        assert_eq!(
+            decode(&input, Limits::default()).unwrap_err(),
+            Error {
+                offset: 26,
+                kind: if ty.is_empty() {
+                    ErrorKind::UnsupportedType
+                } else {
+                    ErrorKind::Classifier(classifier::ErrorKind::UnsupportedType)
+                },
+            }
+        );
     }
     for tail in [
-        vec![0x10, 0], vec![0x12, 0], vec![0x12, 1, 0x80],
-        vec![0x15, 0, 0, 0, 0], vec![0x32, 0, 0x12, 0],
+        vec![0x10, 0],
+        vec![0x12, 0],
+        vec![0x12, 1, 0x80],
+        vec![0x15, 0, 0, 0, 0],
+        vec![0x32, 0, 0x12, 0],
     ] {
         let mut input = metadata::decode(&annotations, Default::default()).unwrap();
         // Insert before the original supertype: every ID representation refuses,
         // even an empty packed list or malformed packed interior, with mixed roles.
         bytes_mut(&mut input).splice(24..24, tail);
-        assert_eq!(decode(&input, Limits::default()).unwrap_err(), Error {
-            offset: if bytes(&input)[24] == 0x32 { 26 } else { 24 },
-            kind: if bytes(&input)[24] == 0x32 { ErrorKind::UnsupportedType }
-                else { ErrorKind::UnsupportedTableRole },
-        });
+        assert_eq!(
+            decode(&input, Limits::default()).unwrap_err(),
+            Error {
+                offset: if bytes(&input)[24] == 0x32 { 26 } else { 24 },
+                kind: if bytes(&input)[24] == 0x32 {
+                    ErrorKind::UnsupportedType
+                } else {
+                    ErrorKind::UnsupportedTableRole
+                },
+            }
+        );
     }
     let mut input = metadata::decode(&annotations, Default::default()).unwrap();
     bytes_mut(&mut input).splice(24..28, [0x30, 1]);
-    assert_eq!(decode(&input, Limits::default()).unwrap_err(), Error {
-        offset: 24, kind: ErrorKind::UnsupportedClass,
-    });
+    assert_eq!(
+        decode(&input, Limits::default()).unwrap_err(),
+        Error {
+            offset: 24,
+            kind: ErrorKind::UnsupportedClass,
+        }
+    );
 }
 
 #[test]
@@ -268,39 +369,62 @@ fn mutations_malformed_late_parent_and_unsupported_admission_never_return_prefix
     let annotations = ktlsp_binary::annotations::decode(&class).unwrap();
     let mut input = metadata::decode(&annotations, Default::default()).unwrap();
     bytes_mut(&mut input).push(0x80);
-    assert_eq!(decode(&input, Limits::default()).unwrap_err(), Error {
-        offset: 53, kind: ErrorKind::Context(class_context::ErrorKind::Class(
-            metadata::class_header::ErrorKind::Wire(wire::ErrorKind::Truncated))),
-    });
+    assert_eq!(
+        decode(&input, Limits::default()).unwrap_err(),
+        Error {
+            offset: 53,
+            kind: ErrorKind::Context(class_context::ErrorKind::Class(
+                metadata::class_header::ErrorKind::Wire(wire::ErrorKind::Truncated)
+            )),
+        }
+    );
     for (kind, version) in [(2, vec![2, 3, 0]), (1, vec![2, 2, 0]), (1, vec![2, 3])] {
         let mut input = metadata::decode(&annotations, Default::default()).unwrap();
-        let metadata::Outcome::Decoded { header, .. } = &mut input else { unreachable!() };
+        let metadata::Outcome::Decoded { header, .. } = &mut input else {
+            unreachable!()
+        };
         header.k = kind;
         header.mv = version;
-        assert_eq!(decode(&input, Limits::default()).unwrap_err(), Error {
-            offset: 0, kind: ErrorKind::Context(class_context::ErrorKind::UnsupportedContainer),
-        });
+        assert_eq!(
+            decode(&input, Limits::default()).unwrap_err(),
+            Error {
+                offset: 0,
+                kind: ErrorKind::Context(class_context::ErrorKind::UnsupportedContainer),
+            }
+        );
     }
 }
 
 type Set = fn(&mut Limits, usize);
 const DIMENSIONS: [(&str, Set); 9] = [
-    ("bytes", |l, n| l.bytes = n), ("records", |l, n| l.records = n),
-    ("nodes", |l, n| l.nodes = n), ("work", |l, n| l.work = n),
-    ("owned_bytes", |l, n| l.owned_bytes = n), ("queries", |l, n| l.queries = n),
-    ("output_units", |l, n| l.output_units = n), ("entries", |l, n| l.entries = n),
+    ("bytes", |l, n| l.bytes = n),
+    ("records", |l, n| l.records = n),
+    ("nodes", |l, n| l.nodes = n),
+    ("work", |l, n| l.work = n),
+    ("owned_bytes", |l, n| l.owned_bytes = n),
+    ("queries", |l, n| l.queries = n),
+    ("output_units", |l, n| l.output_units = n),
+    ("entries", |l, n| l.entries = n),
     ("range_slots", |l, n| l.range_slots = n),
 ];
 fn minimum(input: &metadata::Outcome<'_>, set: Set) -> usize {
     // Existing aggregate-boundary test convention; these minima are not copied from
     // another consumer or claimed observed before this test actually executes.
-    let accepted = |n| { let mut l = Limits::default(); set(&mut l, n); decode(input, l).is_ok() };
+    let accepted = |n| {
+        let mut l = Limits::default();
+        set(&mut l, n);
+        decode(input, l).is_ok()
+    };
     let (mut low, mut high) = (0, 1_000_000);
     assert!(!accepted(low));
     assert!(accepted(high));
     while high - low > 1 {
         let middle = low + (high - low) / 2;
-        if accepted(middle) { high = middle; } else { low = middle; }
+        if accepted(middle) {
+            high = middle;
+        } else {
+            low = middle;
+        }
     }
     high
 }
@@ -310,42 +434,120 @@ fn genuine_unit_uses_joint_exact_allowances_and_repeated_children_never_reset() 
     let class = ktlsp_binary::parse_class(UNIT).unwrap();
     let annotations = ktlsp_binary::annotations::decode(&class).unwrap();
     let mut input = metadata::decode(&annotations, Default::default()).unwrap();
-    let mut exact = Limits { depth: 2, ..Default::default() };
+    let mut exact = Limits {
+        depth: 2,
+        ..Default::default()
+    };
     let mut minima = Vec::new();
     for (_, set) in DIMENSIONS {
         let n = minimum(&input, set);
         minima.push(n);
         set(&mut exact, n);
     }
-    assert_eq!(decode(&input, exact).unwrap(), decode(&input, Limits::default()).unwrap());
+    assert_eq!(
+        decode(&input, exact).unwrap(),
+        decode(&input, Limits::default()).unwrap()
+    );
     let errors = [
-        Error { offset: 0, kind: ErrorKind::Context(class_context::ErrorKind::Wire(wire::ErrorKind::Limit("bytes"))) },
-        Error { offset: 49, kind: ErrorKind::Wire(wire::ErrorKind::Limit("records")) },
-        Error { offset: 26, kind: ErrorKind::Wire(wire::ErrorKind::Limit("nodes")) },
-        Error { offset: 49, kind: ErrorKind::Wire(wire::ErrorKind::Limit("work")) },
-        Error { offset: 24, kind: ErrorKind::Wire(wire::ErrorKind::Limit("owned_bytes")) },
-        Error { offset: 26, kind: ErrorKind::Classifier(classifier::ErrorKind::Name(name_error("queries", Some(1), None))) },
-        Error { offset: 26, kind: ErrorKind::Classifier(classifier::ErrorKind::Name(name_error("output_units", Some(1), Some(1)))) },
-        Error { offset: 1, kind: ErrorKind::Context(class_context::ErrorKind::Name(name_error("entries", None, None))) },
-        Error { offset: 1, kind: ErrorKind::Context(class_context::ErrorKind::Name(name_error("range_slots", None, Some(4)))) },
+        Error {
+            offset: 0,
+            kind: ErrorKind::Context(class_context::ErrorKind::Wire(wire::ErrorKind::Limit(
+                "bytes",
+            ))),
+        },
+        Error {
+            offset: 49,
+            kind: ErrorKind::Wire(wire::ErrorKind::Limit("records")),
+        },
+        Error {
+            offset: 26,
+            kind: ErrorKind::Wire(wire::ErrorKind::Limit("nodes")),
+        },
+        Error {
+            offset: 49,
+            kind: ErrorKind::Wire(wire::ErrorKind::Limit("work")),
+        },
+        Error {
+            offset: 24,
+            kind: ErrorKind::Wire(wire::ErrorKind::Limit("owned_bytes")),
+        },
+        Error {
+            offset: 26,
+            kind: ErrorKind::Classifier(classifier::ErrorKind::Name(name_error(
+                "queries",
+                Some(1),
+                None,
+            ))),
+        },
+        Error {
+            offset: 26,
+            kind: ErrorKind::Classifier(classifier::ErrorKind::Name(name_error(
+                "output_units",
+                Some(1),
+                Some(1),
+            ))),
+        },
+        Error {
+            offset: 1,
+            kind: ErrorKind::Context(class_context::ErrorKind::Name(name_error(
+                "entries", None, None,
+            ))),
+        },
+        Error {
+            offset: 1,
+            kind: ErrorKind::Context(class_context::ErrorKind::Name(name_error(
+                "range_slots",
+                None,
+                Some(4),
+            ))),
+        },
     ];
     for (((label, set), n), expected) in DIMENSIONS.into_iter().zip(&minima).zip(errors) {
         let mut below = exact;
         set(&mut below, n - 1);
-        assert_eq!(decode(&input, below).unwrap_err(), expected, "one below {label}");
+        assert_eq!(
+            decode(&input, below).unwrap_err(),
+            expected,
+            "one below {label}"
+        );
     }
     assert_eq!(exact.queries, 4);
     assert_eq!(exact.output_units, 21);
-    assert_eq!(decode(&input, Limits { depth: 1, ..exact }).unwrap_err(), Error {
-        offset: 3, kind: ErrorKind::Wire(wire::ErrorKind::Limit("depth")),
-    });
-    assert_eq!(decode(&input, Limits { depth: usize::MAX, ..exact }).unwrap(), decode(&input, exact).unwrap());
+    assert_eq!(
+        decode(&input, Limits { depth: 1, ..exact }).unwrap_err(),
+        Error {
+            offset: 3,
+            kind: ErrorKind::Wire(wire::ErrorKind::Limit("depth")),
+        }
+    );
+    assert_eq!(
+        decode(
+            &input,
+            Limits {
+                depth: usize::MAX,
+                ..exact
+            }
+        )
+        .unwrap(),
+        decode(&input, exact).unwrap()
+    );
     // Owner-only mutation admits the original context with two queries. Adding the
     // selected target cannot obtain a new resolver's allowance or return a prefix.
-    let late = Limits { queries: 2, ..Default::default() };
-    assert_eq!(decode(&input, late).unwrap_err(), Error {
-        offset: 26, kind: ErrorKind::Classifier(classifier::ErrorKind::Name(name_error("queries", Some(1), None))),
-    });
+    let late = Limits {
+        queries: 2,
+        ..Default::default()
+    };
+    assert_eq!(
+        decode(&input, late).unwrap_err(),
+        Error {
+            offset: 26,
+            kind: ErrorKind::Classifier(classifier::ErrorKind::Name(name_error(
+                "queries",
+                Some(1),
+                None
+            ))),
+        }
+    );
     bytes_mut(&mut input).drain(24..28);
     let owner = decode(&input, late).unwrap();
     identity(&owner.owner.class_id, "kotlin", "Unit", false);
@@ -364,14 +566,19 @@ fn genuine_unit_uses_joint_exact_allowances_and_repeated_children_never_reset() 
         let error = decode(&input, limited).unwrap_err();
         // The last-child query/output/node checks have exact target offsets. Record
         // and work boundaries may occur earlier in the charged repeated parent scan.
-        if matches!(dimension, 2 | 4 | 5 | 6) { assert_eq!(error.offset, offset, "{label}"); }
+        if matches!(dimension, 2 | 4 | 5 | 6) {
+            assert_eq!(error.offset, offset, "{label}");
+        }
         match error.kind {
             ErrorKind::Wire(wire::ErrorKind::Limit(found)) => assert_eq!(found, label),
             ErrorKind::Classifier(classifier::ErrorKind::Name(e)) => {
                 assert_eq!(e.kind, name_resolver::ErrorKind::Limit(label));
                 assert_eq!(e.index, Some(1));
             }
-            other => panic!("unexpected repeated-child {label}: {other:?} at {}", error.offset),
+            other => panic!(
+                "unexpected repeated-child {label}: {other:?} at {}",
+                error.offset
+            ),
         }
     }
 }
@@ -383,7 +590,9 @@ fn explicitly_mutated_pair_retains_encoded_opaque_bounds_and_complete_declaratio
     let mut input = metadata::decode(&annotations, Default::default()).unwrap();
     // Mutation controls, NOT genuine nonempty-bound or bare-Pair evidence.
     bytes_mut(&mut input).splice(68..76, [0x32, 2, 0x30, 3]);
-    let extra = [0x18, 0, 0x20, 99, 0x2a, 2, 0xff, 0x80, 0x30, 7, 0x32, 2, 8, 9, 0x32, 0];
+    let extra = [
+        0x18, 0, 0x20, 99, 0x2a, 2, 0xff, 0x80, 0x30, 7, 0x32, 2, 8, 9, 0x32, 0,
+    ];
     bytes_mut(&mut input).splice(60..60, extra);
     bytes_mut(&mut input)[53] += extra.len() as u8;
     let out = decode(&input, Limits::default()).unwrap();
@@ -419,13 +628,21 @@ fn late_id_role_and_bad_late_child_refuse_after_an_admitted_original_target() {
     for tail in [vec![0x10, 1], vec![0x12, 0], vec![0x12, 1, 0x80]] {
         let mut input = metadata::decode(&annotations, Default::default()).unwrap();
         bytes_mut(&mut input).extend(tail);
-        assert_eq!(decode(&input, Limits::default()).unwrap_err(), Error {
-            offset: 52, kind: ErrorKind::UnsupportedTableRole,
-        });
+        assert_eq!(
+            decode(&input, Limits::default()).unwrap_err(),
+            Error {
+                offset: 52,
+                kind: ErrorKind::UnsupportedTableRole,
+            }
+        );
     }
     let mut input = metadata::decode(&annotations, Default::default()).unwrap();
     bytes_mut(&mut input).extend([0x32, 1, 0x80]);
-    assert_eq!(decode(&input, Limits::default()).unwrap_err(), Error {
-        offset: 55, kind: ErrorKind::Wire(wire::ErrorKind::Truncated),
-    });
+    assert_eq!(
+        decode(&input, Limits::default()).unwrap_err(),
+        Error {
+            offset: 55,
+            kind: ErrorKind::Wire(wire::ErrorKind::Truncated),
+        }
+    );
 }

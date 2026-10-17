@@ -77,7 +77,17 @@ obtain TWO independent UNION clears, run ONE formatter then exact affected
 rechecks/compiler-only gates and separately admit pure data/full original hosted
 actual-value/genuine-edit evidence. No initial rejected source is retroapproved.
 No423/424 compiler/runtime/CI/merge acceptance yet, no active integration lease.
-The next union's ONE formatter is not yet spent; NEVER rerun421's spent one.
+The423/424 union's ONE formatter is now SPENT: pinned Rust1.99 fmt0/1.381568042s,
+stdout/stderr empty. NEVER another mutating formatter (including421's spent one).
+BOTH independent ROOT full23path initial static reviews accepted exact25c3ea5
+/tree49c699. ROOT FULL-read both complete returned226/203line receipts and
+persisted them honestly (reviewers lacked write tools): function
+7cb5a0c4130958f148cf6003ee6e84b76104d5fac6b24ccb05248f8dabf6934a,
+adversary2042d99eb375cd9f4f81cb705fd338dbe907ffdb63429018cd71a3410473e3f6.
+Formatting touched EIGHT Rust source/test files only, before this status update.
+Freeze formatted source/docs, renew BOTH affected component pairs and BOTH ROOT
+exact changed-head reviews BEFORE any compiler/data/runtime/CI admission.
+No runtime/compiler/CI result follows merely from static clearance or formatting.
 ALL local parser/server/Session/worker runtime remains forbidden under96;
 pure binary-data runtime also needs separate exact ROOT admission. Actual
 packets stay until BOTH full independent actual-value/genuine-edit gates.

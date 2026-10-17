@@ -57,12 +57,18 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {}
 impl From<wire::Error> for Error {
     fn from(e: wire::Error) -> Self {
-        Self { offset: e.offset, kind: ErrorKind::Wire(e.kind) }
+        Self {
+            offset: e.offset,
+            kind: ErrorKind::Wire(e.kind),
+        }
     }
 }
 impl From<class_context::Error> for Error {
     fn from(e: class_context::Error) -> Self {
-        Self { offset: e.offset, kind: ErrorKind::Context(e.kind) }
+        Self {
+            offset: e.offset,
+            kind: ErrorKind::Context(e.kind),
+        }
     }
 }
 
@@ -100,35 +106,64 @@ pub fn decode<'a>(metadata: &'a Outcome<'_>, limits: Limits) -> Result<ClassSupe
         let offset = field.span.start;
         budget.wire.work(1, offset)?;
         match (field.number, field.value) {
-            (2, _) => return Err(Error { offset, kind: ErrorKind::UnsupportedTableRole }),
+            (2, _) => {
+                return Err(Error {
+                    offset,
+                    kind: ErrorKind::UnsupportedTableRole,
+                });
+            }
             (6, wire::Value::Bytes(body)) => {
                 let start = field.span.end - body.len();
                 // Fixed flat selected slices, not a recursive Type graph.
                 budget.node(2, start)?;
-                let header = type_header::decode_with_budget(body, &mut budget.wire)
-                    .map_err(|e| Error { offset: start + e.offset, kind: ErrorKind::Wire(e.kind) })?;
+                let header =
+                    type_header::decode_with_budget(body, &mut budget.wire).map_err(|e| Error {
+                        offset: start + e.offset,
+                        kind: ErrorKind::Wire(e.kind),
+                    })?;
                 // Do not reinterpret Class declarations as Function-own NAME scope.
                 if header.class_name.is_none()
                     || header.type_parameter.is_some()
                     || header.type_parameter_name.is_some()
                 {
-                    return Err(Error { offset: start, kind: ErrorKind::UnsupportedType });
+                    return Err(Error {
+                        offset: start,
+                        kind: ErrorKind::UnsupportedType,
+                    });
                 }
                 let classifier = parameters::classifier(
-                    &header, start, &context, &[], &mut resolver, &mut budget,
-                ).map_err(|e| Error { offset: e.offset, kind: ErrorKind::Classifier(e.kind) })?;
+                    &header,
+                    start,
+                    &context,
+                    &[],
+                    &mut resolver,
+                    &mut budget,
+                )
+                .map_err(|e| Error {
+                    offset: e.offset,
+                    kind: ErrorKind::Classifier(e.kind),
+                })?;
                 let Classifier::Class(class_id) = classifier else {
                     unreachable!("only nominal classifiers admitted above")
                 };
-                budget.push(&mut supertypes, Supertype {
-                    ordinal,
-                    span: field.span.clone(),
-                    body_span: start..field.span.end,
-                    header,
-                    class_id,
-                }, offset)?;
+                budget.push(
+                    &mut supertypes,
+                    Supertype {
+                        ordinal,
+                        span: field.span.clone(),
+                        body_span: start..field.span.end,
+                        header,
+                        class_id,
+                    },
+                    offset,
+                )?;
             }
-            (6, _) => return Err(Error { offset, kind: ErrorKind::UnsupportedClass }),
+            (6, _) => {
+                return Err(Error {
+                    offset,
+                    kind: ErrorKind::UnsupportedClass,
+                });
+            }
             _ => {}
         }
         ordinal += 1;

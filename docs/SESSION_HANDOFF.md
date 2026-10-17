@@ -39,6 +39,16 @@ Its OWN original three-host CI/guarded integration/exact-main gates remain;
 never reuse capture-bearing4b3429c CI as clean-source CI. No local Kotlin runtime.
 Basic430 remains prepared, not integrated/run.
 
+Changed clean headbdd5de2/tree39954fc5 received BOTH full renewals0.96/0.97;
+fmtCHECK then passed0, but strict FULL Clippy FAILED101 on while_let_loop in
+the final raw-frame EOF drain. Original stderr1242B
+SHA39375fc257ddc9518719f23aa6e872705efd3967df20ba21893c23bcb3a7d7c0
+is retained; NoRun was NOT attempted. ROOT changed only that loop to the same
+`while let Some(...) = read_frame(...).unwrap()` pattern already used by the
+real shared wire helpers, preserving one read per iteration/EOF/wait/cleanup.
+No lint suppression, unchanged retry or runtime. Renew BOTH full exact-source
+authorities before fresh separate changed-source compiler-only admission.
+
 ### Capture-bearing PR429 r6: original feature gates accepted before retirement
 
 Verified incoming main remains7afdc68dd2e283379ebaa99073b068339df84bdd.

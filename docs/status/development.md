@@ -4675,3 +4675,23 @@ separate compiler-only admission. OWN original clean-source three-host CI and
 all integration/exact-main gates remain separate. All prior failed evidence and
 semantic/runtime holds are unchanged.
 
+
+#### Changed clean-source strict compiler refusal retained; canonical EOF loop
+
+Changed headbdd5de2fa8475f1ee92ac96ce3709638488c24f0/
+tree39954fc59520ba457bc236f16f65295b2d49d405 received BOTH full ROOT renewals
+0.96/0.97, with explicit28 unchanged own-acb blobs and full three-path renewal.
+New fmtCHECK passed0/1.191793333s, stdout/stderr0. Strict locked keep-going FULL
+workspace/all-target/all-feature Clippy then failed101/0.920475708s, stdout0,
+stderr1242B SHA39375fc257ddc9518719f23aa6e872705efd3967df20ba21893c23bcb3a7d7c0.
+The sole diagnostic is while_let_loop in the final framed stdout EOF drain:
+removal of the observer wrapper exposed the existing loop's first let/else.
+NoRun was NOT attempted after failure. ROOT replaced only that opener with
+the canonical while-let form already used by the same real wire helpers.
+One read per iteration, actual reply retention, EOF termination, subsequent
+child wait/status/stderr and owned cleanup remain unchanged. No lint suppression,
+raised bound, changed assertion, local product runtime or unchanged retry.
+The prior failed check remains failed. BOTH full source authorities must renew
+on this changed source before a new separate compiler-only admission; OWN
+original clean-source full three-host CI/integration/exact-main gates remain.
+

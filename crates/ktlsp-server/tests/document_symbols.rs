@@ -8192,10 +8192,7 @@ mod workspace_symbols {
         let exit = json!({"jsonrpc":"2.0","method":"exit"});
         framed_send(&mut wire, &exit);
         wire.input.take();
-        loop {
-            let Some(payload) = ktlsp_protocol::read_frame(&mut wire.reader).unwrap() else {
-                break;
-            };
+        while let Some(payload) = ktlsp_protocol::read_frame(&mut wire.reader).unwrap() {
             wire.responses
                 .push(serde_json::from_slice(&payload).unwrap());
         }

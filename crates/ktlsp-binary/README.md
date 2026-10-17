@@ -633,33 +633,51 @@ are source coverage, not an execution receipt. ROOT's separate public-API smoke
 and native-data admission remain required. No JVM/compiler, parser/server runtime,
 general Kotlin linkage/overload engine or official Kotlin LSP parity is claimed.
 
-## Original bare nominal Class supertypes (#423)
+## Original Class inline bounds and finite nominal supertypes (#423 / #427)
 
-`metadata::resolved_class_supertypes::decode(&outcome, limits)` internally selects
-ALL original Class field6/wire2 occurrences from the SAME supported kind1/mv2.3.0
-Outcome. `ClassSupertypes` retains the original `Owner`, complete ordered original
-Class parameter declarations/opaque bounds and ordered `Supertype` occurrences.
-Each occurrence carries its ordinal among ALL Class fields, decoded-d1 outer/body
-spans, borrowed Type header/raw scalar Options and resolver-derived nominal
-ClassId/local membership. Repetitions remain separate; nothing is sorted/deduped.
+`metadata::resolved_class_supertypes::decode(&outcome, limits)` is extended in
+place by the composed #427 source below, with the separately admitted original
+native and hosted execution receipts recorded below. It interprets ALL original
+Class parameter inline bounds and Class field6/wire2 supertypes from the SAME
+supported kind1/mv2.3.0 Outcome.
+`ClassSupertypes` retains the original `Owner`, complete ordered original
+`parameters`, flat ordered `bounds` and ordered `supertypes`. Absence of an
+encoded bound never supplies implicit Any? or effective nullability.
 
-Only bare nominal Types are interpreted. Any Class supertype-ID field2,
-including empty/malformed packed interiors or mixed inline/ID lists, refuses the
-WHOLE operation. Parameter ID/NAME classifiers, significant wrong wires, nonzero
-flags, arguments, flexible/outer/alias/abbreviated Types and malformed late
-parent/selected children refuse without a partial result. Class declarations are
-never passed as Function-own NAME scope. Unknown extensions and unused tables
-stay bounded opaque data, not semantically validated overlays.
+Each `Bound` identifies its original Class declaration by checked `parameter`
+ordinal and carries `ty: Supertype`. Bounds retain declaration order then encoded
+bound order. Every `Supertype` carries its original outer/body decoded-d1 spans,
+borrowed Type header/raw scalar Options, one resolver-derived nominal ClassId/
+local membership and ordered `arguments`. Its `ordinal` counts ALL original
+Class fields for a supertype or ALL original TypeParameter fields for a bound.
+Repetitions remain separate; nothing is sorted or deduplicated.
 
-One monotonic existing allowance covers combined decoded d1+d2, framing/schema,
-one resolver, complete owner/declarations/selection scans, Type/classifier/name
-work and output reservations, including repeated occurrences. Earlier classfile/
-annotation/Metadata decoding has separate budgets. No child reset/refund, second
-resolver, copied raw metadata, target loading or general type graph is added.
-Bounds stay original opaque bodies/IDs; absence is not an interpreted implicit
-Any? bound or effective nullability. Same-Outcome custody is NOT authentication
-of caller-constructible models, retained archive bytes or classfile `this_class`.
-No legal inheritance, subtype/hierarchy/classpath/server or full-parity claim.
+Roots are bare nominal Types or nominal Types with invariant/default single-
+inline Class-parameter leaves. Arguments reuse the existing signature
+representation. Immediate-Class NAME lookup returns a checked original
+`ClassParameter` ordinal; signed-ID lookup searches original IDs, never positions.
+Callable helper callers explicitly retain their separate immediate-own NAME
+scopes, including empty scopes. Root ClassIds are moved, not duplicated.
+
+ANY selected Class supertype-ID field2, parameter bound-ID field6, argument-ID
+role, mixed inline/ID representation, significant wrong wire, malformed late
+parent/selected child, conflicting classifier, unsupported projection, nonzero
+flags or richer flexible/outer/alias/abbreviated/nested-nominal shape refuses the
+WHOLE operation. Unknown extensions, unused tables and unrelated nested
+declarations remain bounded opaque custody, not semantically validated overlays.
+
+ONE monotonic existing allowance covers combined decoded d1+d2, framing/schema,
+one context/resolver, complete owner/declarations/selection, ALL bounds,
+supertypes/arguments, classifier/name work and output reservations, including
+repetitions. Earlier classfile/annotation/Metadata decoding has separate budgets.
+No child reset/refund, copied raw metadata, recursive bound expansion or target
+loading is added. These are logical work/requested-storage bounds, not CPU/RSS/
+allocator guarantees. Same-Outcome custody is NOT authentication of caller-
+constructible models, retained archive bytes or classfile `this_class`.
+No legal inheritance, substitution, subtype/hierarchy/classpath/server or
+full-parity claim follows.
+
+### Earlier bare-only #423 execution receipt
 
 All six independent component/union static reviews and pinned compiler-only
 gates passed at9cc1823. Separately admitted unfiltered binary/import execution
@@ -684,7 +702,51 @@ authentication or semantic inheritance. Genuine nonempty-bound interpretation
 in this public consumer remains unobserved; its positive coverage is labelled
 mutated data. BOTH independent OWNER+ROOT full actual-value gates accepted
 these original values. Full consumer source/executable/rlib/fixtures/outputs
-and both receipts remain preserved. PR425's original full three-host composition
-also passed; cleaned-source own reviews/CI and guarded integration are separate.
-No local parser/server/Session runtime is authorized.
+and both receipts remain preserved. Cleaned reviewed0f4f043 received BOTH
+complete ROOT union reviews, compiler gates and its OWN full original three-host
+CI, then PR425's separate guarded integration7afdc68/tree93eee/SOLE1ddf parent.
+Both feature OWNERS and ROOT independently accepted OWN original exact-main
+39045022100 before lease clearance; this data scope is delivered.
+
+### #427 accepted native/hosted actual values; clean integration pending
+
+ROOT composed the complete nine-path binary-only leaf
+`1a88ccc483773c148113a832f76af1e1d8f6661a`, tree
+`c1c06a542b9734443e3cf50e1688c416d9fff86a`, sole verified base7afdc68.
+Both independent component reviews renewed on that exact head with no remaining
+findings; their earlier absent-`bv` assertion defect was repaired to preserve the
+existing `[1,0,3]` default AND the absent-field presence bit. Both complete final
+reports were recovered from immutable histories because direct revived-agent
+URIs returned the earlier rejected review. No old review was promoted.
+
+Portable tests and the standalone external consumer source retain COMPLETE
+unchanged ClosedRange1033-byte and ClosedFloatingPointRange1194-byte carriers from
+the checksummed original2.3.20 archive, with existing Kotlin/protobuf notices.
+Original encoded Class-owned NAME leaves and generic bound/supertype shapes were
+fully interpreted by the native public consumer, with labelled mutation controls.
+Selected original TypeTable-ID evidence remains unobserved.
+
+The source includes whole-operation exact/joint-one-short/cumulative resource
+and original pointer/span/Options/NAME/scope controls. BOTH OWNER+ROOT accepted
+the complete separately admitted c03523a native public-pipeline and standalone
+consumer outputs, every original raw CP/metadata/name field and all actual
+minimum/one-short/isolated/repeated values. Both independently reviewed full-union
+source and compiler gates passed; capture-bearing `4b3429c` passed its OWN
+original full Linux/macOS/Windows CI. Both of that head's full platform Class
+payloads match the accepted native values, including73 original same-buffer
+pointer pairs per host; at that capture-bearing head all814 binary files and
+build inputs are byte-identical to the accepted native source. Linux default
+capture does not expose those full
+payloads; no new local r6 native execution is invented.
+
+Observation-only retirement followed separate admission after BOTH current
+OWNER+ROOT actual-value gates. All genuine producer/consumer calls, measured
+minimum probes, mutations/restoration, borrowing and substantive assertions
+remain in the shared proof and separate13-test mutation target. Standalone
+executes the shared genuine/resource proof, not that separate registered target.
+The cleaned union's OWN full source reviews/original three-host CI and guarded
+integration remain pending. Earlier #423 values above remain historical scope
+evidence, not substitute #427 acceptance.
+No local parser/server/Session runtime is authorized. [Exact current evidence
+and limits](../../docs/status/development.md#pr429-r6-original-full-three-host-and-all-feature-actual-gates-accepted).
 

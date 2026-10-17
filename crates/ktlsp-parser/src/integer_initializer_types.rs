@@ -1,6 +1,6 @@
 //! Positive, untyped, direct local integer initializers; not a Kotlin type engine.
 use crate::{
-    Element, SourceSnapshot,
+    Element, Parsed, SourceSnapshot,
     local_value_binding::LocalValueBinding,
     lowering::{ReferenceBudget, ReferenceSiteError},
 };
@@ -87,7 +87,30 @@ fn infer_with_budget<'a>(
     budget: &mut ReferenceBudget,
 ) -> Result<IntegerInitializer<'a>> {
     let tree = binding.site().tree(current, budget)?;
-    let target_index = binding.target().cst_index();
+    let leaf = original_integer_leaf(tree, binding.target().cst_index(), budget)?;
+    Ok(IntegerInitializer {
+        binding,
+        literal: leaf.literal,
+        raw: leaf.raw,
+        value: leaf.value,
+        default_type: leaf.default_type,
+    })
+}
+
+// Only after the caller authenticates the original tree and strict value body.
+// This is literal witness data, not a binding or a propagated constant value.
+#[derive(Debug)]
+pub(crate) struct OriginalIntegerLeaf<'a> {
+    pub(crate) literal: &'a Element,
+    pub(crate) raw: &'a str,
+    pub(crate) value: u64,
+    pub(crate) default_type: IntegerType,
+}
+pub(crate) fn original_integer_leaf<'a>(
+    tree: &'a Parsed,
+    target_index: usize,
+    budget: &mut ReferenceBudget,
+) -> Result<OriginalIntegerLeaf<'a>> {
     let target = budget.element(tree, target_index)?;
     if !budget.equal(&target.kind, "PROPERTY")? {
         return Err(IntegerInitializerError::UnsupportedContext);
@@ -126,8 +149,7 @@ fn infer_with_budget<'a>(
                 .get(literal.start..literal.end)
                 .ok_or(IntegerInitializerError::UnsupportedContext)?;
             let (value, default_type) = decode(raw, budget)?;
-            return Ok(IntegerInitializer {
-                binding,
+            return Ok(OriginalIntegerLeaf {
                 literal,
                 raw,
                 value,

@@ -156,7 +156,7 @@ types, cross-file resolution, official navigation evidence or an advertised
 semantic server capability. The historical matrix and cutoffs above are unchanged.
 
 
-## Verified source-authority continuation through1ddf69a
+## Prior verified source-authority checkpoint through1ddf69a
 
 The whole historical matrix/cutoffs above remain unchanged; their pending
 statements are not a fresh assessment of current main. [PR422](https://github.com/anilbeesetti/ktlsp/pull/422)
@@ -179,4 +179,69 @@ effective classpath, workspace symbols, watchers, build-tool orchestration,
 fresh official oracle or general platform/latency/RSS proof is claimed.
 Native-only/T004/96, B3 INCONCLUSIVE/HOLD, oracle HOLD and original417/395/377
 causes UNKNOWN/OPEN remain unchanged.
+
+## Verified finite signature help and Class data through7afdc68
+
+The historical assessed matrix and cutoffs above remain unchanged.
+[PR425](https://github.com/anilbeesetti/ktlsp/pull/425) delivered423 bare nominal
+Class supertype interpretation and424 manual source-owned signature help at
+`7afdc68dd2e283379ebaa99073b068339df84bdd`, reviewed tree93eee1d and SOLE
+original base1ddf69a. BOTH complete actual-value/genuine-edit gates preceded
+observation retirement; cleaned source received its OWN independent reviews,
+original full Linux/macOS/Windows CI, separate fresh complete read-only guard,
+ordinary expected-head squash/tree/sole-parent proof and independent BINARY
+OWNER+SIGNATURE OWNER+ROOT OWN original exact-main39045022100 acceptance.
+The exclusive lease cleared only afterward. [Complete proof and residual
+limits](development.md#verified425-cleaned-source-integration-and-original-exact-main-acceptance).
+
+This is not general call applicability/typing/overloads/incomplete signature
+help/official rendering, effective metadata hierarchy/classpath or full parity.
+426 eager native workspace declaration search,427 inline Class bounds/generic
+supertypes and428 snapshot-owned immutable-local type propagation use this SAME
+verified main. All THREE complete source leaves have BOTH independent component
+reviews and are composed in ROOT's branch. Full CURRENT union/compiler/original
+hosted actual-value gates and guarded integration remain pending. The first
+native-only2711142 Clippy101 test-source failure is retained/repaired, not
+promoted to a pass.428 is library-only, not general inference;426 has an explicit
+AT-MOST42 tiny-delegation work ceiling, not1,024 successful-file-query coverage.
+None is a verified new provider/data output or delivered feature yet.
+No persistent semantic index/official matcher, source/library completeness,
+watcher/build-tool/oracle/platform/performance promotion follows.
+Native-only/T004/96/B3 INCONCLUSIVE/oracle HOLD and original417395377
+causes UNKNOWN/OPEN remain unchanged.
+
+## PR429 capture-bearing gates accepted; new clean integration pending
+
+This supersedes the pending compiler/actual-value stage immediately above, not
+the historical assessment matrix or verified-main cutoff7afdc68.
+[Draft PR429](https://github.com/anilbeesetti/ktlsp/pull/429) capture-bearing
+head4b3429ca9bb49a8cd8150df38e6f4081c6b0082e/treeb1db1481b23be1ae29b581a2a09fd686225ef2b0
+has BOTH independent full cumulative source reviews, admitted fmtCHECK/strict
+FULL compiler gates, its OWN original Linux/macOS/Windows CI and BOTH
+feature OWNER+ROOT complete actual-value/genuine-edit acceptance for426/427/428.
+No new main merge has occurred. Observation-only retirement now has a separate
+admission; the cleaned union still needs its OWN reviews/CI and guarded
+integration followed by independent original exact-main acceptance.
+[Full original identities, actual values and evidence qualifications](development.md#pr429-r6-original-full-three-host-and-all-feature-actual-gates-accepted).
+
+The original c03523a runs remain FAILED. Their Windows typed-definition deadline
+is [#431](https://github.com/anilbeesetti/ktlsp/issues/431), UNKNOWN/OPEN:
+full original retained log/member/source review cannot identify its selected
+phase or root cause; the later pass is not a diagnosis. Basic candidate430 is
+source-prepared and independently reviewed, not a current downloadable release.
+No official oracle, full parity, general inference, semantic index, native
+deadline reliability, licensed first-party distribution or visual-editor
+certification is claimed. All96/T004/B3/oracle/original395377417 holds remain.
+
+### Observation-only retirement composed
+
+The three current feature components now have BOTH independent complete
+retirement reviews and are composed in ROOT's integration branch. Every genuine
+producer/consumer invocation, mutation, returned-edit application, assertion,
+resource boundary and owned cleanup remains. Temporary observation output,
+collection, recording, cache warm-up and observer-only copies are removed.
+This is a clean-source checkpoint, not new runtime/integration acceptance.
+The clean union requires its OWN full-source/compiler/original three-host CI,
+then the separate guard/expected-head/tree/sole-base and original exact-main
+gates. The already accepted capture-bearing actual values remain distinct.
 

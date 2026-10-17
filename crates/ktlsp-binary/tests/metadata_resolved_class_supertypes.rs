@@ -45,8 +45,10 @@ fn genuine(
     assert_eq!(out.owner.body_span, class_span);
     borrowed(out.owner.header.raw, bytes(input), class_span);
     assert!(out.parameters.is_empty());
+    assert!(out.bounds.is_empty());
     assert_eq!(out.supertypes.len(), 1);
     let s = &out.supertypes[0];
+    assert!(s.arguments.is_empty());
     assert_eq!(s.ordinal, 2);
     assert_eq!(s.span, outer);
     assert_eq!(s.body_span, outer.start + 2..outer.end);
@@ -115,7 +117,7 @@ fn pair_parameters(
 }
 
 #[test]
-fn original_pair_abbreviation_refuses_and_original_declarations_stay_opaque() {
+fn original_pair_abbreviation_refuses_and_original_declarations_retain_custody() {
     let class = ktlsp_binary::parse_class(PAIR).unwrap();
     let annotations = ktlsp_binary::annotations::decode(&class).unwrap();
     let mut input = metadata::decode(&annotations, Default::default()).unwrap();
@@ -123,7 +125,7 @@ fn original_pair_abbreviation_refuses_and_original_declarations_stay_opaque() {
         decode(&input, Limits::default()).unwrap_err(),
         Error {
             offset: 72,
-            kind: ErrorKind::Classifier(classifier::ErrorKind::UnsupportedType),
+            kind: ErrorKind::UnsupportedType,
         }
     );
     // An independently bounded EXISTING consumer retains original A/B declarations;
@@ -135,6 +137,7 @@ fn original_pair_abbreviation_refuses_and_original_declarations_stay_opaque() {
     bytes_mut(&mut input).splice(68..76, [0x32, 2, 0x30, 3]);
     let mutated = decode(&input, Limits::default()).unwrap();
     pair_parameters(&mutated.owner, &mutated.parameters, &input);
+    assert!(mutated.bounds.is_empty());
     assert_eq!(mutated.supertypes[0].span, 68..72);
     identity(
         &mutated.supertypes[0].class_id,
@@ -269,22 +272,15 @@ fn mutations_preserve_lossless_utf16_local_membership_without_function_scope_hac
 fn mutations_refuse_every_significant_shape_wrong_wire_and_table_role_atomically() {
     let class = ktlsp_binary::parse_class(UNIT).unwrap();
     let annotations = ktlsp_binary::annotations::decode(&class).unwrap();
-    // Significant unsupported fields, including empty arguments/inline bodies and IDs.
+    // Unsupported scalar/richer shapes; inline arguments now have a finite grammar.
     for number in [2u8, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14] {
         let mut input = metadata::decode(&annotations, Default::default()).unwrap();
         let mut ty = vec![0x30, 1];
         ty.extend([number * 8, 0]);
         replace_unit_type(&mut input, &ty);
-        let expected = if matches!(number, 7 | 9) {
-            Error {
-                offset: 26,
-                kind: ErrorKind::UnsupportedType,
-            }
-        } else {
-            Error {
-                offset: 28,
-                kind: ErrorKind::Classifier(classifier::ErrorKind::UnsupportedType),
-            }
+        let expected = Error {
+            offset: 28,
+            kind: ErrorKind::UnsupportedType,
         };
         assert_eq!(
             decode(&input, Limits::default()).unwrap_err(),
@@ -297,8 +293,12 @@ fn mutations_refuse_every_significant_shape_wrong_wire_and_table_role_atomically
         assert_eq!(
             decode(&input, Limits::default()).unwrap_err(),
             Error {
-                offset: 28,
-                kind: ErrorKind::Classifier(classifier::ErrorKind::UnsupportedType),
+                offset: if number == 2 { 30 } else { 28 },
+                kind: if number == 2 {
+                    ErrorKind::MissingRole
+                } else {
+                    ErrorKind::UnsupportedType
+                },
             },
             "inline/wrong-wire {number}"
         );
@@ -310,7 +310,7 @@ fn mutations_refuse_every_significant_shape_wrong_wire_and_table_role_atomically
             decode(&input, Limits::default()).unwrap_err(),
             Error {
                 offset: 28,
-                kind: ErrorKind::Classifier(classifier::ErrorKind::UnsupportedType),
+                kind: ErrorKind::UnsupportedType,
             }
         );
     }
@@ -321,11 +321,7 @@ fn mutations_refuse_every_significant_shape_wrong_wire_and_table_role_atomically
             decode(&input, Limits::default()).unwrap_err(),
             Error {
                 offset: 26,
-                kind: if ty.is_empty() {
-                    ErrorKind::UnsupportedType
-                } else {
-                    ErrorKind::Classifier(classifier::ErrorKind::UnsupportedType)
-                },
+                kind: ErrorKind::UnsupportedType,
             }
         );
     }
@@ -448,68 +444,23 @@ fn genuine_unit_uses_joint_exact_allowances_and_repeated_children_never_reset() 
         decode(&input, exact).unwrap(),
         decode(&input, Limits::default()).unwrap()
     );
-    let errors = [
-        Error {
-            offset: 0,
-            kind: ErrorKind::Context(class_context::ErrorKind::Wire(wire::ErrorKind::Limit(
-                "bytes",
-            ))),
-        },
-        Error {
-            offset: 49,
-            kind: ErrorKind::Wire(wire::ErrorKind::Limit("records")),
-        },
-        Error {
-            offset: 26,
-            kind: ErrorKind::Wire(wire::ErrorKind::Limit("nodes")),
-        },
-        Error {
-            offset: 49,
-            kind: ErrorKind::Wire(wire::ErrorKind::Limit("work")),
-        },
-        Error {
-            offset: 24,
-            kind: ErrorKind::Wire(wire::ErrorKind::Limit("owned_bytes")),
-        },
-        Error {
-            offset: 26,
-            kind: ErrorKind::Classifier(classifier::ErrorKind::Name(name_error(
-                "queries",
-                Some(1),
-                None,
-            ))),
-        },
-        Error {
-            offset: 26,
-            kind: ErrorKind::Classifier(classifier::ErrorKind::Name(name_error(
-                "output_units",
-                Some(1),
-                Some(1),
-            ))),
-        },
-        Error {
-            offset: 1,
-            kind: ErrorKind::Context(class_context::ErrorKind::Name(name_error(
-                "entries", None, None,
-            ))),
-        },
-        Error {
-            offset: 1,
-            kind: ErrorKind::Context(class_context::ErrorKind::Name(name_error(
-                "range_slots",
-                None,
-                Some(4),
-            ))),
-        },
-    ];
-    for (((label, set), n), expected) in DIMENSIONS.into_iter().zip(&minima).zip(errors) {
+    // These are this operation's dynamically observed boundaries, not historical
+    // bare-only counts. Each joint one-short allowance must refuse atomically.
+    for ((label, set), n) in DIMENSIONS.into_iter().zip(&minima) {
         let mut below = exact;
         set(&mut below, n - 1);
-        assert_eq!(
-            decode(&input, below).unwrap_err(),
-            expected,
-            "one below {label}"
-        );
+        let error = decode(&input, below).unwrap_err();
+        match error.kind {
+            ErrorKind::Wire(wire::ErrorKind::Limit(found)) => assert_eq!(found, label),
+            ErrorKind::Context(class_context::ErrorKind::Wire(wire::ErrorKind::Limit(found))) => {
+                assert_eq!(found, label);
+            }
+            ErrorKind::Context(class_context::ErrorKind::Name(e))
+            | ErrorKind::Classifier(classifier::ErrorKind::Name(e)) => {
+                assert_eq!(e.kind, name_resolver::ErrorKind::Limit(label));
+            }
+            other => panic!("unexpected joint one-short {label}: {other:?}"),
+        }
     }
     assert_eq!(exact.queries, 4);
     assert_eq!(exact.output_units, 21);
@@ -584,7 +535,7 @@ fn genuine_unit_uses_joint_exact_allowances_and_repeated_children_never_reset() 
 }
 
 #[test]
-fn explicitly_mutated_pair_retains_encoded_opaque_bounds_and_complete_declarations() {
+fn explicitly_mutated_pair_bound_is_interpreted_or_the_whole_call_refuses() {
     let class = ktlsp_binary::parse_class(PAIR).unwrap();
     let annotations = ktlsp_binary::annotations::decode(&class).unwrap();
     let mut input = metadata::decode(&annotations, Default::default()).unwrap();
@@ -595,30 +546,28 @@ fn explicitly_mutated_pair_retains_encoded_opaque_bounds_and_complete_declaratio
     ];
     bytes_mut(&mut input).splice(60..60, extra);
     bytes_mut(&mut input)[53] += extra.len() as u8;
-    let out = decode(&input, Limits::default()).unwrap();
-    assert_eq!(out.parameters.len(), 2);
-    let p = &out.parameters[0];
+    assert!(decode(&input, Limits::default()).is_err());
+    // The separately bounded existing property operation deliberately retains its
+    // original opaque-bound contract; extending this consumer must not change it.
+    let old = metadata::resolved_class_properties::decode(&input, Limits::default()).unwrap();
+    assert_eq!(old.parameters.len(), 2);
+    let p = &old.parameters[0];
     assert_eq!(p.body_span, 54..76);
     borrowed(p.parameter.raw, bytes(&input), 54..76);
     assert_eq!(p.parameter.id, 0);
     assert_eq!(p.parameter.name, 1);
     assert_eq!(p.name, units("A"));
     assert_eq!(p.parameter.reified, Some(false));
-    assert_eq!(p.parameter.variance, Some(Variance::Out)); // Unknown99 does not replace Out.
+    assert_eq!(p.parameter.variance, Some(Variance::Out));
     assert_eq!(p.parameter.upper_bound.len(), 1);
     assert_eq!(p.parameter.upper_bound[0].span, 12..14);
     borrowed(p.parameter.upper_bound[0].raw, p.parameter.raw, 12..14);
-    assert_eq!(p.parameter.upper_bound[0].raw, &[0xff, 0x80]); // Intentionally opaque, not parsed.
+    assert_eq!(p.parameter.upper_bound[0].raw, &[0xff, 0x80]);
     assert_eq!(p.parameter.upper_bound_id, [7, 8, 9]);
-    let second = &out.parameters[1];
-    assert_eq!(second.body_span, 78..84);
-    borrowed(second.parameter.raw, bytes(&input), 78..84);
-    assert_eq!(second.name, units("B"));
-    assert_eq!(second.parameter.id, 1);
-    assert!(second.parameter.upper_bound.is_empty());
-    assert!(second.parameter.upper_bound_id.is_empty());
-    assert_eq!(out.supertypes[0].ordinal, 4);
-    assert_eq!(out.supertypes[0].span, 84..88);
+    assert_eq!(old.parameters[1].body_span, 78..84);
+    borrowed(old.parameters[1].parameter.raw, bytes(&input), 78..84);
+    assert_eq!(old.parameters[1].name, units("B"));
+    assert_eq!(old.parameters[1].parameter.id, 1);
 }
 
 #[test]

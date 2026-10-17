@@ -130,7 +130,10 @@ fn conflicts_external_paths_and_full_physical_aliases_refuse() {
     let external = Project::new();
     fs::create_dir(external.0.join("src")).unwrap();
     let mut value = model(&[("src", "kotlin-source")]);
-    value["modules"][0]["contentRoots"][0]["sourceRoots"][0]["path"] = json!(external.0.join("src"));
+    let external_path = external.0.join("src");
+    let external_text = external_path.to_str().unwrap();
+    value["modules"][0]["contentRoots"][0]["sourceRoots"][0]["path"] =
+        json!(external_text.strip_prefix("\\\\?\\").unwrap_or(external_text).replace('\\', "/"));
     project.put("workspace.json", &serde_json::to_vec(&value).unwrap());
     assert!(matches!(project.load(), Err(Error::UnsafePath(_))));
     project.model(&[("src", "kotlin-source")]);
@@ -296,4 +299,124 @@ fn oversized_or_malformed_model_and_missing_original_source_refuse_read_only() {
     fs::remove_file(project.0.join("src/A.kt")).unwrap();
     assert!(matches!(inventory.verify_source(source_index(&inventory), &mut Budget::default(), &AtomicBool::new(false)), Err(Error::Io(_))));
     assert!(!project.0.join("src/A.kt").exists());
+}
+
+fn minimum_path_bytes(project: &Project) -> usize {
+    let mut low = 0;
+    let mut high = Limits::default().path_bytes;
+    while low < high {
+        let mid = low + (high-low)/2;
+        if with_limits(project, Limits { path_bytes: mid, ..Limits::default() }).is_ok() {
+            high = mid;
+        } else { low = mid+1; }
+    }
+    low
+}
+
+#[test]
+fn source_free_content_library_and_projection_paths_are_all_charged() {
+    let project = Project::new();
+    project.model(&[]);
+    let baseline = minimum_path_bytes(&project);
+    let mut value = model(&[]);
+    let extra = project.0.join("unopened-content");
+    value["modules"][0]["contentRoots"].as_array_mut().unwrap()
+        .push(json!({"path":"<WORKSPACE>/unopened-content","sourceRoots":[]}));
+    project.put("workspace.json", &serde_json::to_vec(&value).unwrap());
+    assert_eq!(minimum_path_bytes(&project), baseline + extra.to_str().unwrap().len());
+    let with_content = minimum_path_bytes(&project);
+    let archive = project.0.join("not-opened.jar");
+    value["libraries"] = json!([{"name":"data","type":null,"roots":[{"path":"<WORKSPACE>/not-opened.jar"}]}]);
+    project.put("workspace.json", &serde_json::to_vec(&value).unwrap());
+    assert_eq!(minimum_path_bytes(&project), with_content + 2*archive.to_str().unwrap().len());
+    let second = Project::new();
+    second.model(&[]);
+    let second_cost = minimum_path_bytes(&second);
+    let first_cost = minimum_path_bytes(&project);
+    for (path_bytes, success) in [(first_cost+second_cost, true), (first_cost+second_cost-1, false)] {
+        let mut budget = Budget::new(Limits { path_bytes, ..Limits::default() }).unwrap();
+        let cancelled = AtomicBool::new(false);
+        source_inventory::load(&project.0, &mut budget, &cancelled).unwrap();
+        assert_eq!(source_inventory::load(&second.0, &mut budget, &cancelled).is_ok(), success);
+    }
+    let long = format!("<WORKSPACE>/{}", "x".repeat(4097));
+    value["modules"][0]["contentRoots"][1]["path"] = json!(long);
+    project.put("workspace.json", &serde_json::to_vec(&value).unwrap());
+    assert!(matches!(project.load(), Err(Error::Budget("per-path bytes"))));
+    value["modules"][0]["contentRoots"].as_array_mut().unwrap().pop();
+    value["libraries"][0]["roots"][0]["path"] = json!(long);
+    project.put("workspace.json", &serde_json::to_vec(&value).unwrap());
+    assert!(matches!(project.load(), Err(Error::Budget("per-path bytes"))));
+}
+
+#[test]
+fn model_source_and_model_model_hardlinks_refuse_in_both_load_orders() {
+    let first = Project::new();
+    first.model(&[("src", "kotlin-source")]);
+    first.put("src/Model.kt", b"{}");
+    let second = Project::new();
+    fs::hard_link(first.0.join("src/Model.kt"), second.0.join("workspace.json")).unwrap();
+    for reverse in [false, true] {
+        let mut budget = Budget::default();
+        let cancelled = AtomicBool::new(false);
+        let (a,b) = if reverse { (&second, &first) } else { (&first, &second) };
+        source_inventory::load(&a.0, &mut budget, &cancelled).unwrap();
+        assert!(matches!(source_inventory::load(&b.0, &mut budget, &cancelled), Err(Error::UnsafePath(_))));
+    }
+    let third = Project::new();
+    fs::hard_link(second.0.join("workspace.json"), third.0.join("workspace.json")).unwrap();
+    for reverse in [false, true] {
+        let mut budget = Budget::default();
+        let cancelled = AtomicBool::new(false);
+        let (a,b) = if reverse { (&third, &second) } else { (&second, &third) };
+        source_inventory::load(&a.0, &mut budget, &cancelled).unwrap();
+        assert!(matches!(source_inventory::load(&b.0, &mut budget, &cancelled), Err(Error::UnsafePath(_))));
+    }
+    // The same actual model pathname is legitimate when the root is the project.
+    first.model(&[("", "kotlin-source")]);
+    assert!(first.load().is_ok());
+    fs::hard_link(first.0.join("workspace.json"), first.0.join("src/ModelAlias.kt")).unwrap();
+    assert!(matches!(first.load(), Err(Error::UnsafePath(_))));
+}
+
+#[test]
+fn selected_root_depth_is_admitted_before_any_missing_root_io() {
+    let project = Project::new();
+    project.model(&[("a/b/missing", "kotlin-source")]);
+    assert!(matches!(with_limits(&project, Limits { depth: 2, ..Limits::default() }), Err(Error::Budget("depth"))));
+    project.model(&[("a/b", "kotlin-source")]);
+    fs::create_dir_all(project.0.join("a/b")).unwrap();
+    assert!(with_limits(&project, Limits { depth: 2, ..Limits::default() }).is_ok());
+    assert!(matches!(with_limits(&project, Limits { depth: 1, ..Limits::default() }), Err(Error::Budget("depth"))));
+}
+
+#[test]
+fn delegated_work_accounts_for_long_base_macro_amplification() {
+    let project = Project::new();
+    let mut deep = project.0.clone();
+    for _ in 0..20 { deep.push("a".repeat(95)); }
+    fs::create_dir_all(&deep).unwrap();
+    let roots = (0..512).map(|_| json!({"path":"<WORKSPACE>/","sourceRoots":[]})).collect::<Vec<_>>();
+    let value = json!({"modules":[{"name":"app","contentRoots":roots}]});
+    let bytes = serde_json::to_vec(&value).unwrap();
+    fs::write(deep.join("workspace.json"), bytes).unwrap();
+    let mut budget = Budget::new(Limits { work: 1024*1024, ..Limits::default() }).unwrap();
+    assert!(matches!(source_inventory::load(&deep, &mut budget, &AtomicBool::new(false)), Err(Error::Budget("work"))));
+}
+
+#[cfg(windows)]
+#[test]
+fn ordinary_absolute_drive_roots_match_canonical_verbatim_projects() {
+    let project = Project::new();
+    project.put("src/A.kt", b"fun a() = 1");
+    let canonical = project.0.join("src");
+    let ordinary = canonical.to_str().unwrap().strip_prefix("\\\\?\\").unwrap().replace('\\', "/");
+    let mut value = model(&[]);
+    value["modules"][0]["contentRoots"][0]["sourceRoots"] =
+        json!([{"path":ordinary,"type":"kotlin-source"}]);
+    project.put("workspace.json", &serde_json::to_vec(&value).unwrap());
+    let inventory = project.load().unwrap();
+    assert_eq!(inventory.entries()[source_index(&inventory)].path(), canonical.join("A.kt"));
+    let original = &inventory.imported().modules()[0].content_roots[0].source_roots[0].path;
+    assert!(matches!(original.components().next(), Some(std::path::Component::Prefix(p)) if matches!(p.kind(), std::path::Prefix::Disk(_))));
 }

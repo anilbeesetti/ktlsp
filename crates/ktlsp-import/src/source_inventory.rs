@@ -13,6 +13,22 @@ use std::{
     sync::{Arc, atomic::{AtomicBool, Ordering}},
 };
 
+// Match the existing dependency-class boundary's Disk/VerbatimDisk equivalence,
+// without case folding or accepting UNC/device paths.
+fn native_path(path: &Path) -> PathBuf {
+    #[cfg(windows)]
+    {
+        use std::path::Prefix;
+        if let Some(Component::Prefix(prefix)) = path.components().next()
+            && let Prefix::Disk(drive) = prefix.kind() {
+            let mut native = PathBuf::from(format!("\\\\?\\{}:\\", char::from(drive)));
+            native.extend(path.components().skip(2));
+            return native;
+        }
+    }
+    path.to_path_buf()
+}
+
 /// Aggregate candidate ceilings. Callers may reduce, but cannot raise, defaults.
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
@@ -291,6 +307,7 @@ struct Root { path: PathBuf, membership: Membership, test: bool }
 struct Builder<'a> {
     budget: &'a mut Budget,
     cancelled: &'a AtomicBool,
+    model: Option<(Identity, PathBuf)>,
     owner: usize,
     ancestors: BTreeMap<PathBuf, Identity>,
     identities: HashSet<Identity>,
@@ -320,6 +337,9 @@ impl Builder<'_> {
         let metadata = self.inspect(&path)?;
         let id = identity(&path, &metadata)?;
         if !self.identities.insert(id) { return Err(Error::UnsafePath("physical alias")); }
+        if self.model.as_ref().is_some_and(|(model_id, model_path)| *model_id == id && *model_path != path) {
+            return Err(Error::UnsafePath("model physical alias"));
+        }
         self.budget.physical(id, self.owner)?;
         let kind = if metadata.is_dir() { EntryKind::Directory } else {
             match path.extension().and_then(|s| s.to_str()) {
@@ -368,7 +388,7 @@ pub fn load(project_directory: impl AsRef<Path>, budget: &mut Budget, cancelled:
     let owner = budget.used[Count::Projects as usize];
     let input = project_directory.as_ref();
     budget.path(input, false, cancelled)?;
-    let mut builder = Builder { budget, cancelled, owner, ancestors: BTreeMap::new(),
+    let mut builder = Builder { budget, cancelled, owner, model: None, ancestors: BTreeMap::new(),
         identities: HashSet::new(), entries: Vec::new(), roots: Vec::new() };
     if !builder.inspect(input)?.is_dir() { return Err(Error::UnsafePath("project is not a directory")); }
     builder.budget.work(1, cancelled)?;
@@ -383,31 +403,73 @@ pub fn load(project_directory: impl AsRef<Path>, budget: &mut Budget, cancelled:
     builder.budget.path(&project, true, cancelled)?;
     builder.ancestors.insert(project.clone(), project_id);
     let model_path = project.join("workspace.json");
-    builder.budget.path(&model_path, false, cancelled)?;
+    builder.budget.path(&model_path, true, cancelled)?;
     let model_metadata = builder.inspect(&model_path)?;
     if !model_metadata.is_file() { return Err(Error::UnsafePath("workspace.json is not a file")); }
     let model_id = identity(&model_path, &model_metadata)?;
+    builder.budget.physical(model_id, owner)?;
     let bytes = read_file(&model_path, &model_metadata, model_id, false, builder.budget, cancelled)?;
-    // The importer's bounded depth is 32; charge all bounded validation passes up front.
-    builder.budget.work(bytes.len().checked_mul(32).ok_or(Error::Budget("work"))?, cancelled)?;
+    // Each WORKSPACE macro consumes at least 12 input bytes (escaping cannot
+    // shorten it). Bound caller-base amplification before unchanged v2 allocates.
+    // Its own expanded-path cap and depth/collection bounds constrain the
+    // normalization, projection, sorted ownership and validation passes.
+    let expansion = (bytes.len() / 12).checked_mul(project.as_os_str().as_encoded_bytes().len())
+        .and_then(|n| n.checked_add(bytes.len())).ok_or(Error::Budget("work"))?
+        .min(crate::MAX_EXPANDED_PATH_BYTES);
+    let delegated = bytes.len().checked_add(expansion).and_then(|n| n.checked_mul(32))
+        .ok_or(Error::Budget("work"))?;
+    builder.budget.work(delegated, cancelled)?;
     let imported = v2::from_json(&project, &bytes).map_err(Error::Import)?;
+    builder.model = Some((model_id, model_path));
+    // Retain the ENTIRE model, accounting every stored path, including the
+    // separate native projection; SDK URL/home spellings remain data-only.
+    for module in imported.modules() {
+        for content in &module.content_roots {
+            builder.budget.path(&content.path, true, cancelled)?;
+            for source in &content.source_roots {
+                builder.budget.path(&source.path, true, cancelled)?;
+            }
+        }
+    }
+    for library in imported.libraries() {
+        for root in &library.roots { builder.budget.path(&root.path, true, cancelled)?; }
+    }
+    let projection = imported.project_projection();
+    for module in &projection.modules {
+        for root in &module.source_roots { builder.budget.path(&root.path, true, cancelled)?; }
+    }
+    for library in &projection.libraries {
+        for path in library.binaries.iter().chain(&library.sources) { builder.budget.path(path, true, cancelled)?; }
+    }
+    for path in &projection.sdk_archives { builder.budget.path(path, true, cancelled)?; }
+    for sdk in imported.sdks() {
+        for spelling in sdk.home_path.iter().map(String::as_str)
+            .chain(sdk.roots.iter().flatten().map(|root| root.url.as_str())) {
+            builder.budget.work(spelling.len(), cancelled)?;
+            if spelling.len() > builder.budget.limits.path_file_bytes { return Err(Error::Budget("per-path bytes")); }
+            builder.budget.charge(Count::Paths, spelling.len())?;
+        }
+    }
     for (module_index, module) in imported.modules().iter().enumerate() {
         for (content_root_index, content) in module.content_roots.iter().enumerate() {
             for (source_root_index, source) in content.source_roots.iter().enumerate() {
-                builder.budget.path(&source.path, true, cancelled)?;
-                if !source.path.starts_with(&project) { return Err(Error::UnsafePath("external source root")); }
-                if !builder.inspect(&source.path)?.is_dir() { return Err(Error::UnsafePath("source root is not a directory")); }
-                builder.budget.work(source.path.as_os_str().as_encoded_bytes().len(), cancelled)?;
-                if fs::canonicalize(&source.path)? != source.path { return Err(Error::UnsafePath("noncanonical source root alias")); }
+                builder.budget.path(&source.path, false, cancelled)?;
+                let physical = native_path(&source.path);
+                builder.budget.path(&physical, true, cancelled)?;
+                let relative = physical.strip_prefix(&project).map_err(|_| Error::UnsafePath("external source root"))?;
+                if relative.components().count() > builder.budget.limits.depth { return Err(Error::Budget("depth")); }
+                if !builder.inspect(&physical)?.is_dir() { return Err(Error::UnsafePath("source root is not a directory")); }
+                builder.budget.work(physical.as_os_str().as_encoded_bytes().len(), cancelled)?;
+                if fs::canonicalize(&physical)? != physical { return Err(Error::UnsafePath("noncanonical source root alias")); }
                 let test = source.root_type.ends_with("-test");
                 for prior in &builder.roots {
-                    builder.budget.work(source.path.as_os_str().as_encoded_bytes().len().saturating_add(prior.path.as_os_str().as_encoded_bytes().len()), cancelled)?;
-                    if (source.path.starts_with(&prior.path) || prior.path.starts_with(&source.path))
+                    builder.budget.work(physical.as_os_str().as_encoded_bytes().len().saturating_add(prior.path.as_os_str().as_encoded_bytes().len()), cancelled)?;
+                    if (physical.starts_with(&prior.path) || prior.path.starts_with(&physical))
                         && (prior.membership.module_index != module_index || prior.test != test) {
                         return Err(Error::UnsafePath("conflicting source root ownership or kind"));
                     }
                 }
-                builder.roots.push(Root { path: source.path.clone(), test,
+                builder.roots.push(Root { path: physical, test,
                     membership: Membership { module_index, content_root_index, source_root_index } });
             }
         }

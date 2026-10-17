@@ -54,17 +54,22 @@ real CLI4fb07cd and real native-model state6b72251. ROOT additionally wires
 owned cancellation/waiters/config invalidation and real behavior checks.
 Borrowed roots are never cleaned; all old/user/delivered/component WTs remain.
 
-Current421 composed source is UNVERIFIED: no formatter/check/compiler/import/
-server/parser/test runtime or hosted CI has run. Only Cargo metadata resolution
-and system `getconf PATH_MAX /private/tmp`=1024 ran. ROOT fixed the authored
-long-base fixture to stay below Darwin's ceiling without changing512macros,
-the1MiB work limit or production bounds; removed incidental getter/Arc echoes.
-Temporary ACTUAL421 writers use direct stdout Write (not captured println) and
-stay until BOTH independent OWNER+ROOT FULL actual values/genuine edit gates.
-ROOT's ONE421 formatter is UNUSED;420's already-used formatter is historical.
-Two full ROOT union static reviewers must clear exact complete code/docs/guard
-before compile admission; then real native data smoke, OWN original full3host CI,
-capture-only cleanup/renewed source acceptance and guarded integration/main.
+Current421 source remains runtime-UNVERIFIED: no source compilation/check/test/
+import/server/parser/CLI runtime or hosted CI has run. Both full20-path ROOT
+reviews CLEAR exact3a4cb4f/treea805884d, including the complete config-aware guard.
+ROOT FULL-read both actual receipts and authenticated their full hashes.
+`/private/tmp/ktlsp-421-root-evidence/preformat-full-union-static-acceptance.json`
+then admitted ONE `cargo +1.99.0 fmt --all`, completed successfully/1.36s.
+ONE421formatter is now SPENT; no second formatter is allowed.
+Formatted successor needs exact affected ROOT/component clears before compile.
+Temporary complete ACTUAL421 CLI packets now emit after the actual exchange
+BEFORE result assertions, preserving unexpected complete replies without changing
+permanent calls/assertions/frequency. Writers stay until BOTH complete actual
+OWNER+ROOT read/apply gates. The outside native consumer now additionally writes/
+refuses/restores a real same-length selected-source change; the unmeasured zero
+invocation output was removed. Its changed source also needs exact rechecks.
+Then compile/native-data smoke, OWN original full3host CI, observation-only cleanup
+and its OWN source acceptance, fresh guarded integration and dual main proof.
 
 ROOT owns Cargo/workspace/lock/docs/config/CI/publication. Windows-target-only
 file-id0.2.3 and server->import path dependency are resolved; all existing registry

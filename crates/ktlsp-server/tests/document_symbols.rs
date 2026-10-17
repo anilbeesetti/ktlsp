@@ -459,10 +459,16 @@ fn source_project(package: &Package, name: &str, roots: &[&str]) -> PathBuf {
 // escaped suffixes below, not a second implementation of the production codec.
 fn source_directory_uri(directory: &Path) -> String {
     let native = directory.to_str().unwrap();
-    let path = native.strip_prefix("\\\\?\\").unwrap_or(native).replace('\\', "/");
+    let path = native
+        .strip_prefix("\\\\?\\")
+        .unwrap_or(native)
+        .replace('\\', "/");
     assert!(path.is_ascii());
     let path = path.replace(' ', "%20");
-    format!("file://{}{path}", if path.starts_with('/') { "" } else { "/" })
+    format!(
+        "file://{}{path}",
+        if path.starts_with('/') { "" } else { "/" }
+    )
 }
 
 fn source_options(projects: &[&str]) -> Value {
@@ -485,7 +491,9 @@ fn source_reload(id: i32, options: &Value) -> Value {
 
 fn source_reply(replies: &[Value], id: i32) -> &Value {
     let mut matching = replies.iter().filter(|reply| reply["id"] == id);
-    let reply = matching.next().unwrap_or_else(|| panic!("missing {id}: {replies:?}"));
+    let reply = matching
+        .next()
+        .unwrap_or_else(|| panic!("missing {id}: {replies:?}"));
     assert!(matching.next().is_none(), "duplicate {id}: {replies:?}");
     reply
 }
@@ -493,11 +501,17 @@ fn source_reply(replies: &[Value], id: i32) -> &Value {
 fn assert_source_class(replies: &[Value], id: i32, source: &str, name: &str) {
     let reply = source_reply(replies, id);
     assert!(reply.get("error").is_none(), "{reply}");
-    let symbols = reply["result"].as_array().unwrap_or_else(|| panic!("{reply}"));
+    let symbols = reply["result"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{reply}"));
     assert_eq!(symbols.len(), 1, "{reply}");
     assert_eq!(symbols[0]["name"], name, "{reply}");
     assert_eq!(symbols[0]["kind"], 5, "{reply}");
-    assert_eq!(symbols[0]["range"], span(source, source.trim_end()), "{reply}");
+    assert_eq!(
+        symbols[0]["range"],
+        span(source, source.trim_end()),
+        "{reply}"
+    );
     assert_eq!(symbols[0]["selectionRange"], span(source, name), "{reply}");
 }
 
@@ -514,9 +528,11 @@ fn source_checkpoint(paths: &[PathBuf]) -> Value {
         paths
             .iter()
             .map(|path| {
-                let bytes = std::fs::read(path).map(|bytes| String::from_utf8(bytes).unwrap())
+                let bytes = std::fs::read(path)
+                    .map(|bytes| String::from_utf8(bytes).unwrap())
                     .map_err(|error| error.to_string());
-                let metadata = std::fs::metadata(path).map(|metadata| format!("{metadata:?}"))
+                let metadata = std::fs::metadata(path)
+                    .map(|metadata| format!("{metadata:?}"))
                     .map_err(|error| error.to_string());
                 json!({"path":path,"read":bytes,"metadata":metadata})
             })
@@ -526,9 +542,14 @@ fn source_checkpoint(paths: &[PathBuf]) -> Value {
 
 fn source_capture(marker: &str, messages: &[Value], replies: &[Value], checkpoints: &[Value]) {
     let mut output = std::io::stdout().lock();
-    writeln!(output, "{marker}={}", json!({
-        "requests":messages,"responses":replies,"filesystemCheckpoints":checkpoints
-    })).unwrap();
+    writeln!(
+        output,
+        "{marker}={}",
+        json!({
+            "requests":messages,"responses":replies,"filesystemCheckpoints":checkpoints
+        })
+    )
+    .unwrap();
 }
 
 #[test]
@@ -560,9 +581,13 @@ fn json_import_cancel_replies_once_reuses_ids_and_retains_owned_work() {
     replies.extend(session.handle(messages[1].clone()));
     replies.extend(session.handle(messages[2].clone()));
     // The invalid final addition must not remove the old folder or retain a prefix.
-    assert_eq!(session.configuration().workspace_folders, vec![ktlsp_server::WorkspaceFolder {
-        uri: project_uri, name: "owned".into(),
-    }]);
+    assert_eq!(
+        session.configuration().workspace_folders,
+        vec![ktlsp_server::WorkspaceFolder {
+            uri: project_uri,
+            name: "owned".into(),
+        }]
+    );
     let errors = session.drain_errors();
     assert!(session.handle(messages[3].clone()).is_empty());
     assert!(session.handle(messages[4].clone()).is_empty());
@@ -584,12 +609,20 @@ fn json_import_cancel_replies_once_reuses_ids_and_retains_owned_work() {
     replies.extend(reused);
     let (late, clean) = session.close();
     assert!(clean, "cancelled native import did not prove owned closure");
-    assert!(late.is_empty(), "cancelled requests published twice: {late:?}");
+    assert!(
+        late.is_empty(),
+        "cancelled requests published twice: {late:?}"
+    );
     assert_eq!(session.pending_requests(), 0);
-    source_capture("ACTUAL421_JSON_CANCELLED_IMPORT", &messages, &replies, &[json!({
-        "files":source_checkpoint(&[project.join("workspace.json"),project.join("src/A.kt")]),
-        "notificationErrors":errors,"closeResponses":late,"cleanupConfirmed":clean,
-    })]);
+    source_capture(
+        "ACTUAL421_JSON_CANCELLED_IMPORT",
+        &messages,
+        &replies,
+        &[json!({
+            "files":source_checkpoint(&[project.join("workspace.json"),project.join("src/A.kt")]),
+            "notificationErrors":errors,"closeResponses":late,"cleanupConfirmed":clean,
+        })],
+    );
 }
 
 #[test]
@@ -640,6 +673,15 @@ fn packaged_json_initial_unopened_symbols_alias_overlay_edits_close_and_outside_
         json!({"jsonrpc":"2.0","method":"exit"}),
     ];
     let replies = package.exchange(&messages);
+    source_capture(
+        "ACTUAL421_JSON_ALIAS_OVERLAY",
+        &messages,
+        &replies,
+        &[
+            json!({"beforeRequest":1,"files":initial}),
+            json!({"afterResponse":13,"files":source_checkpoint(&files)}),
+        ],
+    );
     assert_eq!(replies.len(), 13, "{replies:?}");
     assert_eq!(
         source_reply(&replies, 1)["result"]["capabilities"]["documentSymbolProvider"],
@@ -656,17 +698,11 @@ fn packaged_json_initial_unopened_symbols_alias_overlay_edits_close_and_outside_
         assert_source_refused(&replies, id, -32803);
     }
     assert_source_class(&replies, 11, "class OutsideOverlay\n", "OutsideOverlay");
-    assert_eq!(std::fs::read_to_string(project.join("src/空 😀.kt")).unwrap(), disk);
-    assert_eq!(source_reply(&replies, 13)["result"], Value::Null);
-    source_capture(
-        "ACTUAL421_JSON_ALIAS_OVERLAY",
-        &messages,
-        &replies,
-        &[
-            json!({"beforeRequest":1,"files":initial}),
-            json!({"afterResponse":13,"files":source_checkpoint(&files)}),
-        ],
+    assert_eq!(
+        std::fs::read_to_string(project.join("src/空 😀.kt")).unwrap(),
+        disk
     );
+    assert_eq!(source_reply(&replies, 13)["result"], Value::Null);
 }
 
 #[test]
@@ -728,39 +764,48 @@ fn packaged_json_disk_and_model_mutation_require_reload_to_successor_authority()
     ];
     let replies = exchange_directory(
         &package.0,
-        messages.iter().inspect(|message| match message["id"].as_i64() {
-            // Iterator advancement occurs only after the preceding request's
-            // matching actual response; no sleeps, polling or fake acknowledgments.
-            Some(3) => {
-                std::fs::write(project.join("src/A.kt"), changed).unwrap();
-                checkpoints.push(json!({
-                    "afterResponse":2,"beforeRequest":3,"files":source_checkpoint(&files)
-                }));
-            }
-            Some(8) => {
-                std::fs::write(
-                    project.join("workspace.json"),
-                    serde_json::to_vec(&source_model(&["next"])).unwrap(),
-                )
-                .unwrap();
-                checkpoints.push(json!({
-                    "afterResponse":7,"beforeRequest":8,"files":source_checkpoint(&files)
-                }));
-            }
-            Some(16) => {
-                std::fs::write(project.join("next/Added.kt"), added).unwrap();
-                checkpoints.push(json!({
-                    "afterResponse":15,"beforeRequest":16,"files":source_checkpoint(&files)
-                }));
-            }
-            Some(19) => {
-                std::fs::remove_file(project.join("next/Added.kt")).unwrap();
-                checkpoints.push(json!({
-                    "afterResponse":18,"beforeRequest":19,"files":source_checkpoint(&files)
-                }));
-            }
-            _ => {}
-        }),
+        messages
+            .iter()
+            .inspect(|message| match message["id"].as_i64() {
+                // Iterator advancement occurs only after the preceding request's
+                // matching actual response; no sleeps, polling or fake acknowledgments.
+                Some(3) => {
+                    std::fs::write(project.join("src/A.kt"), changed).unwrap();
+                    checkpoints.push(json!({
+                        "afterResponse":2,"beforeRequest":3,"files":source_checkpoint(&files)
+                    }));
+                }
+                Some(8) => {
+                    std::fs::write(
+                        project.join("workspace.json"),
+                        serde_json::to_vec(&source_model(&["next"])).unwrap(),
+                    )
+                    .unwrap();
+                    checkpoints.push(json!({
+                        "afterResponse":7,"beforeRequest":8,"files":source_checkpoint(&files)
+                    }));
+                }
+                Some(16) => {
+                    std::fs::write(project.join("next/Added.kt"), added).unwrap();
+                    checkpoints.push(json!({
+                        "afterResponse":15,"beforeRequest":16,"files":source_checkpoint(&files)
+                    }));
+                }
+                Some(19) => {
+                    std::fs::remove_file(project.join("next/Added.kt")).unwrap();
+                    checkpoints.push(json!({
+                        "afterResponse":18,"beforeRequest":19,"files":source_checkpoint(&files)
+                    }));
+                }
+                _ => {}
+            }),
+    );
+    checkpoints.push(json!({"afterResponse":23,"files":source_checkpoint(&files)}));
+    source_capture(
+        "ACTUAL421_JSON_DISK_MODEL_RELOAD",
+        &messages,
+        &replies,
+        &checkpoints,
     );
     assert_eq!(replies.len(), 23, "{replies:?}");
     assert_source_class(&replies, 2, before, "Before");
@@ -782,8 +827,6 @@ fn packaged_json_disk_and_model_mutation_require_reload_to_successor_authority()
     }
     assert_source_class(&replies, 18, added, "Added");
     assert_eq!(source_reply(&replies, 23)["result"], Value::Null);
-    checkpoints.push(json!({"afterResponse":23,"files":source_checkpoint(&files)}));
-    source_capture("ACTUAL421_JSON_DISK_MODEL_RELOAD", &messages, &replies, &checkpoints);
 }
 
 #[test]
@@ -843,6 +886,15 @@ fn packaged_json_late_root_and_meaningful_unsupported_import_never_publish_prefi
         json!({"jsonrpc":"2.0","method":"exit"}),
     ];
     let replies = package.exchange(&messages);
+    source_capture(
+        "ACTUAL421_JSON_ATOMIC_FAILURE",
+        &messages,
+        &replies,
+        &[
+            json!({"beforeRequest":1,"files":initial}),
+            json!({"afterResponse":13,"files":source_checkpoint(&files)}),
+        ],
+    );
     assert_eq!(replies.len(), 13, "{replies:?}");
     for id in [3, 4, 5, 8, 9, 10] {
         assert_source_refused(&replies, id, -32803);
@@ -856,17 +908,11 @@ fn packaged_json_late_root_and_meaningful_unsupported_import_never_publish_prefi
         assert_source_class(&replies, id, "class Historical\n", "Historical");
     }
     assert_source_class(&replies, 12, "class Candidate\n", "Candidate");
-    assert_eq!(std::fs::read(unsupported.join("workspace.json")).unwrap(), unsupported_bytes);
-    assert_eq!(source_reply(&replies, 13)["result"], Value::Null);
-    source_capture(
-        "ACTUAL421_JSON_ATOMIC_FAILURE",
-        &messages,
-        &replies,
-        &[
-            json!({"beforeRequest":1,"files":initial}),
-            json!({"afterResponse":13,"files":source_checkpoint(&files)}),
-        ],
+    assert_eq!(
+        std::fs::read(unsupported.join("workspace.json")).unwrap(),
+        unsupported_bytes
     );
+    assert_eq!(source_reply(&replies, 13)["result"], Value::Null);
 }
 
 #[test]

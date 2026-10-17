@@ -71,8 +71,16 @@ impl ParserFailure {
         match self {
             Self::Protocol(code, message) => response_error(id, code, message),
             Self::Source(error) => {
-                let code = if matches!(error, ktlsp_import::source_inventory::Error::Cancelled) { -32800 } else { -32801 };
-                let mut response = response_error(id, code, "workspace source snapshot is stale or unavailable; reload required");
+                let code = if matches!(error, ktlsp_import::source_inventory::Error::Cancelled) {
+                    -32800
+                } else {
+                    -32801
+                };
+                let mut response = response_error(
+                    id,
+                    code,
+                    "workspace source snapshot is stale or unavailable; reload required",
+                );
                 response["error"]["data"] = json!({"reason":null});
                 response["error"]["data"]["reason"] = error.to_string().into();
                 response
@@ -83,13 +91,25 @@ impl ParserFailure {
 
 #[derive(Debug, Clone)]
 enum ParserAuthority {
-    Open { incarnation: u64 },
-    Imported { snapshot: Arc<workspace::Snapshot>, key: workspace::SourceKey, epoch: u64 },
+    Open {
+        incarnation: u64,
+    },
+    Imported {
+        snapshot: Arc<workspace::Snapshot>,
+        key: workspace::SourceKey,
+        epoch: u64,
+    },
 }
 impl ParserAuthority {
-    fn verify(&self, budget: &mut ktlsp_import::source_inventory::Budget, cancelled: &AtomicBool) -> Result<(), ParserFailure> {
+    fn verify(
+        &self,
+        budget: &mut ktlsp_import::source_inventory::Budget,
+        cancelled: &AtomicBool,
+    ) -> Result<(), ParserFailure> {
         if let Self::Imported { snapshot, key, .. } = self {
-            snapshot.verify(*key, budget, cancelled).map_err(ParserFailure::Source)?;
+            snapshot
+                .verify(*key, budget, cancelled)
+                .map_err(ParserFailure::Source)?;
         }
         Ok(())
     }
@@ -346,8 +366,14 @@ impl Session {
         if !valid_id(id) {
             return invalid(self);
         }
-        if self.pending_parser.iter().any(|pending| pending.id.as_ref() == Some(id))
-            || self.pending_import.as_ref().is_some_and(|pending| pending.id.as_ref() == Some(id))
+        if self
+            .pending_parser
+            .iter()
+            .any(|pending| pending.id.as_ref() == Some(id))
+            || self
+                .pending_import
+                .as_ref()
+                .is_some_and(|pending| pending.id.as_ref() == Some(id))
             || self.waiting_symbols.iter().any(|pending| &pending.id == id)
         {
             return vec![response_error(
@@ -357,7 +383,9 @@ impl Session {
             )];
         }
         if method == "intellij/reloadWorkspace" && self.state == State::Running {
-            let projects = params.ok_or("reload params missing").and_then(object)
+            let projects = params
+                .ok_or("reload params missing")
+                .and_then(object)
                 .and_then(|map| required(map, "initializationOptions"))
                 .and_then(|options| workspace::projects(Some(options)));
             return match projects {
@@ -653,21 +681,28 @@ impl Session {
     ) -> Result<(), (i32, &'static str)> {
         let document_uri = if method == "textDocument/documentSymbol" {
             self.workspace.overlay_uri(uri).unwrap_or(uri)
-        } else { uri };
+        } else {
+            uri
+        };
         let document = self.documents.get(document_uri);
         if document.is_some_and(|document| document.text().len() > ktlsp_parser::MAX_SOURCE_BYTES) {
             return Err((-32803, "request exceeds the parser's 64 KiB source limit"));
         }
-        if document.is_none() && method == "textDocument/documentSymbol"
-            && self.pending_import.as_ref().is_some_and(|pending| !pending.cancelled.load(Ordering::Relaxed)
-                && pending.attempt == self.workspace.attempt)
+        if document.is_none()
+            && method == "textDocument/documentSymbol"
+            && self.pending_import.as_ref().is_some_and(|pending| {
+                !pending.cancelled.load(Ordering::Relaxed)
+                    && pending.attempt == self.workspace.attempt
+            })
         {
             if self.pending_requests() >= MAX_PENDING_PARSER_REQUESTS {
                 return Err((-32803, "native analysis capacity exhausted"));
             }
             let canonical = workspace::canonical_uri(uri).map_err(|e| (-32803, e))?;
             self.waiting_symbols.push(WaitingSymbol {
-                id, uri: canonical.into(), attempt: self.workspace.attempt,
+                id,
+                uri: canonical.into(),
+                attempt: self.workspace.attempt,
             });
             return Ok(());
         }
@@ -675,7 +710,8 @@ impl Session {
             None
         } else {
             let map = map.ok_or((-32602, "parser request params missing"))?;
-            let document = document.ok_or((-32602, "parser request refers to unopened document"))?;
+            let document =
+                document.ok_or((-32602, "parser request refers to unopened document"))?;
             let position = map
                 .get("position")
                 .ok_or((-32602, "position missing"))
@@ -740,21 +776,43 @@ impl Session {
             .position(Option::is_none)
             .ok_or((-32803, "parser worker capacity exhausted"))?;
         let (snapshot, authority) = if let Some(document) = document {
-            (SourceSnapshot::new(document_uri, i64::from(document.version()), FileKind::Source, document.text())
+            (
+                SourceSnapshot::new(
+                    document_uri,
+                    i64::from(document.version()),
+                    FileKind::Source,
+                    document.text(),
+                )
                 .map_err(|_| (-32803, "snapshot exceeds parser limits"))?,
-             ParserAuthority::Open { incarnation: self.incarnations[document_uri] })
+                ParserAuthority::Open {
+                    incarnation: self.incarnations[document_uri],
+                },
+            )
         } else {
             if self.workspace.attempt == 0 {
                 return Err((-32602, "parser request refers to unopened document"));
             }
-            let (catalog, key, canonical, source) = self.workspace.capture(uri).map_err(|e| (-32803, e))?;
-            let snapshot = SourceSnapshot::new(canonical, catalog.generation, FileKind::Source, source)
-                .map_err(|_| (-32803, "snapshot exceeds parser limits"))?;
-            (snapshot, ParserAuthority::Imported { snapshot: catalog, key, epoch: self.workspace.epoch })
+            let (catalog, key, canonical, source) =
+                self.workspace.capture(uri).map_err(|e| (-32803, e))?;
+            let snapshot =
+                SourceSnapshot::new(canonical, catalog.generation, FileKind::Source, source)
+                    .map_err(|_| (-32803, "snapshot exceeds parser limits"))?;
+            (
+                snapshot,
+                ParserAuthority::Imported {
+                    snapshot: catalog,
+                    key,
+                    epoch: self.workspace.epoch,
+                },
+            )
         };
         let worker_snapshot = snapshot.clone();
         let worker_authority = authority.clone();
-        let provider = Arc::clone(self.parser_provider.as_ref().ok_or((-32601, "Method not found"))?);
+        let provider = Arc::clone(
+            self.parser_provider
+                .as_ref()
+                .ok_or((-32601, "Method not found"))?,
+        );
         let client = self.symbol_client.clone();
         // Bound the complete response envelope without copying or serializing
         // the arbitrary client id. A JSON string byte needs at most six bytes.
@@ -773,33 +831,38 @@ impl Session {
             .name("ktlsp-parser".into())
             .spawn(move || {
                 let mut cleanup_confirmed = true;
-                let mut import_budget = matches!(&worker_authority, ParserAuthority::Imported { .. })
-                    .then(ktlsp_import::source_inventory::Budget::default);
+                let mut import_budget =
+                    matches!(&worker_authority, ParserAuthority::Imported { .. })
+                        .then(ktlsp_import::source_inventory::Budget::default);
                 let result = (|| {
                     if let Some(budget) = import_budget.as_mut() {
                         worker_authority.verify(budget, &worker_cancelled)?;
                     }
                     let (parsed, clean) = provider.parse(&worker_snapshot, &worker_cancelled);
                     cleanup_confirmed &= clean;
-                    let parsed = parsed.map_err(|error| match error {
-                        ParserError::Cancelled => (-32800, "Request cancelled"),
-                        ParserError::InputLimit => (-32803, "parser input limit exceeded"),
-                        ParserError::NestingLimit => (-32803, "parser nesting limit exceeded"),
-                        ParserError::OutputLimit => (-32803, "parser output limit exceeded"),
-                        ParserError::AllocationLimit => {
-                            (-32803, "parser worker allocation limit exceeded")
-                        }
-                        ParserError::Coverage => {
-                            (-32803, "parser output coverage validation failed")
-                        }
-                        ParserError::InvalidTree => {
-                            (-32803, "parser output tree validation failed")
-                        }
-                        ParserError::Timeout => (-32803, "parser deadline exceeded"),
-                        ParserError::WorkerFailed => (-32803, "parser worker failed"),
-                        ParserError::Io => (-32803, "parser I/O or cleanup failed"),
-                        ParserError::StaleSnapshot => (-32803, "parser output snapshot mismatch"),
-                    }).map_err(|(code, message)| ParserFailure::Protocol(code, message))?;
+                    let parsed = parsed
+                        .map_err(|error| match error {
+                            ParserError::Cancelled => (-32800, "Request cancelled"),
+                            ParserError::InputLimit => (-32803, "parser input limit exceeded"),
+                            ParserError::NestingLimit => (-32803, "parser nesting limit exceeded"),
+                            ParserError::OutputLimit => (-32803, "parser output limit exceeded"),
+                            ParserError::AllocationLimit => {
+                                (-32803, "parser worker allocation limit exceeded")
+                            }
+                            ParserError::Coverage => {
+                                (-32803, "parser output coverage validation failed")
+                            }
+                            ParserError::InvalidTree => {
+                                (-32803, "parser output tree validation failed")
+                            }
+                            ParserError::Timeout => (-32803, "parser deadline exceeded"),
+                            ParserError::WorkerFailed => (-32803, "parser worker failed"),
+                            ParserError::Io => (-32803, "parser I/O or cleanup failed"),
+                            ParserError::StaleSnapshot => {
+                                (-32803, "parser output snapshot mismatch")
+                            }
+                        })
+                        .map_err(|(code, message)| ParserFailure::Protocol(code, message))?;
                     if worker_cancelled.load(Ordering::Relaxed) {
                         return Err(ParserFailure::Protocol(-32800, "Request cancelled"));
                     }
@@ -813,9 +876,9 @@ impl Session {
                         )
                         .map_err(|error| ParserFailure::Protocol(-32803, error))
                     } else {
-                        let tree = parsed
-                            .tree_for(&worker_snapshot)
-                            .map_err(|_| ParserFailure::Protocol(-32801, "parser snapshot is stale"))?;
+                        let tree = parsed.tree_for(&worker_snapshot).map_err(|_| {
+                            ParserFailure::Protocol(-32801, "parser snapshot is stale")
+                        })?;
                         document_symbols::render(tree, &client, worker_snapshot.document())
                             .map_err(|error| ParserFailure::Protocol(-32803, error))
                     }?;
@@ -851,14 +914,18 @@ impl Session {
                 Some(response)
             }
             (Some(id), Err(reason)) => {
-                let mut response = response_error(id, -32803, "workspace import failed; reload required");
+                let mut response =
+                    response_error(id, -32803, "workspace import failed; reload required");
                 response["error"]["data"] = json!({"reason":null});
                 response["error"]["data"]["reason"] = reason.into();
                 Some(response)
             }
             (None, Err(reason)) => {
                 // Native model identifiers are untrusted terminal text.
-                self.record(serde_json::to_string(&reason).expect("String JSON serialization is infallible"));
+                self.record(
+                    serde_json::to_string(&reason)
+                        .expect("String JSON serialization is infallible"),
+                );
                 None
             }
             (None, Ok(())) => None,
@@ -869,10 +936,20 @@ impl Session {
         let mut responses = self.cancel_import(-32800, "Workspace import superseded");
         responses.extend(self.cancel_imported(-32801, "workspace snapshot is stale"));
         let admission = (|| {
-            let (attempt, generation) = self.workspace.begin(projects.is_empty()).map_err(str::to_owned)?;
-            let Some(generation) = generation else { return Ok(None); };
-            if projects.iter().any(|p| matches!(p, workspace::Project::Unsupported)) {
-                return Err("only explicit JSON projects with type/path fields are supported".into());
+            let (attempt, generation) = self
+                .workspace
+                .begin(projects.is_empty())
+                .map_err(str::to_owned)?;
+            let Some(generation) = generation else {
+                return Ok(None);
+            };
+            if projects
+                .iter()
+                .any(|p| matches!(p, workspace::Project::Unsupported))
+            {
+                return Err(
+                    "only explicit JSON projects with type/path fields are supported".into(),
+                );
             }
             if self.pending_import.is_some() {
                 return Err("previous workspace import is still owned; capacity exhausted".into());
@@ -880,21 +957,45 @@ impl Session {
             if self.pending_requests() >= MAX_PENDING_PARSER_REQUESTS {
                 return Err("native analysis capacity exhausted".into());
             }
-            let mut threads = PARSER_THREADS.try_lock().map_err(|_| "native worker admission unavailable".to_owned())?;
+            let mut threads = PARSER_THREADS
+                .try_lock()
+                .map_err(|_| "native worker admission unavailable".to_owned())?;
             reap_parser_threads(&mut threads);
-            let slot = threads.iter().position(Option::is_none).ok_or_else(|| "native worker capacity exhausted".to_owned())?;
+            let slot = threads
+                .iter()
+                .position(Option::is_none)
+                .ok_or_else(|| "native worker capacity exhausted".to_owned())?;
             let cancelled = Arc::new(AtomicBool::new(false));
             let worker_cancelled = Arc::clone(&cancelled);
             let (sender, result) = mpsc::sync_channel(1);
-            let thread = thread::Builder::new().name("ktlsp-json-import".into()).spawn(move || {
-                let _ = sender.send(workspace::Snapshot::load(projects, generation, &worker_cancelled));
-            }).map_err(|error| format!("workspace import thread could not start: {error}"))?;
+            let thread = thread::Builder::new()
+                .name("ktlsp-json-import".into())
+                .spawn(move || {
+                    let _ = sender.send(workspace::Snapshot::load(
+                        projects,
+                        generation,
+                        &worker_cancelled,
+                    ));
+                })
+                .map_err(|error| format!("workspace import thread could not start: {error}"))?;
             let outcome = Arc::new(AtomicU8::new(0));
-            threads[slot] = Some(ParserThread { handle: thread, outcome: Arc::clone(&outcome) });
-            Ok(Some(PendingImport { id: None, attempt, cancelled, result, outcome }))
+            threads[slot] = Some(ParserThread {
+                handle: thread,
+                outcome: Arc::clone(&outcome),
+            });
+            Ok(Some(PendingImport {
+                id: None,
+                attempt,
+                cancelled,
+                result,
+                outcome,
+            }))
         })();
         match admission {
-            Ok(Some(mut pending)) => { pending.id = id; self.pending_import = Some(pending); }
+            Ok(Some(mut pending)) => {
+                pending.id = id;
+                self.pending_import = Some(pending);
+            }
             result => {
                 let result = result.map(|_| ());
                 responses.extend(self.import_response(id, result));
@@ -904,21 +1005,36 @@ impl Session {
     }
 
     fn cancel_import(&mut self, code: i32, message: &str) -> Vec<Value> {
-        self.pending_import.as_mut().and_then(|pending| pending.cancel(code, message)).into_iter().collect()
+        self.pending_import
+            .as_mut()
+            .and_then(|pending| pending.cancel(code, message))
+            .into_iter()
+            .collect()
     }
 
     fn cancel_imported(&mut self, code: i32, message: &str) -> Vec<Value> {
-        let mut responses: Vec<_> = self.pending_parser.iter_mut()
+        let mut responses: Vec<_> = self
+            .pending_parser
+            .iter_mut()
             .filter(|pending| matches!(&pending.authority, ParserAuthority::Imported { .. }))
-            .filter_map(|pending| pending.cancel(code, message)).collect();
-        responses.extend(self.waiting_symbols.drain(..).map(|pending| response_error(pending.id, code, message)));
+            .filter_map(|pending| pending.cancel(code, message))
+            .collect();
+        responses.extend(
+            self.waiting_symbols
+                .drain(..)
+                .map(|pending| response_error(pending.id, code, message)),
+        );
         responses
     }
 
     fn cancel_all(&mut self, code: i32, message: &str) -> Vec<Value> {
         let mut responses = self.cancel_parser(None, code, message);
         responses.extend(self.cancel_import(code, message));
-        responses.extend(self.waiting_symbols.drain(..).map(|pending| response_error(pending.id, code, message)));
+        responses.extend(
+            self.waiting_symbols
+                .drain(..)
+                .map(|pending| response_error(pending.id, code, message)),
+        );
         responses
     }
 
@@ -929,8 +1045,15 @@ impl Session {
             reap_parser_threads(&mut threads);
         }
         let mut responses = Vec::new();
-        if self.pending_import.as_ref().is_some_and(|pending| pending.outcome.load(Ordering::Relaxed) != 0) {
-            let mut pending = self.pending_import.take().expect("completed import checked");
+        if self
+            .pending_import
+            .as_ref()
+            .is_some_and(|pending| pending.outcome.load(Ordering::Relaxed) != 0)
+        {
+            let mut pending = self
+                .pending_import
+                .take()
+                .expect("completed import checked");
             let result = if pending.outcome.load(Ordering::Relaxed) != 1 {
                 self.cleanup_confirmed = false;
                 Err("workspace import worker panicked".to_owned())
@@ -940,26 +1063,51 @@ impl Session {
                     Err("workspace import worker returned no result".into())
                 })
             };
-            if self.state == State::Running && pending.attempt == self.workspace.attempt
+            if self.state == State::Running
+                && pending.attempt == self.workspace.attempt
                 && !pending.cancelled.load(Ordering::Relaxed)
             {
-                let result = result.and_then(|snapshot| self.workspace.commit(snapshot,
-                    self.incarnations.iter().map(|(uri, incarnation)| (uri.as_str(), *incarnation)))
-                    .map_err(str::to_owned));
+                let result = result.and_then(|snapshot| {
+                    self.workspace
+                        .commit(
+                            snapshot,
+                            self.incarnations
+                                .iter()
+                                .map(|(uri, incarnation)| (uri.as_str(), *incarnation)),
+                        )
+                        .map_err(str::to_owned)
+                });
                 let committed = result.is_ok();
-                let failure = if self.waiting_symbols.is_empty() { None } else { result.as_ref().err().cloned() };
+                let failure = if self.waiting_symbols.is_empty() {
+                    None
+                } else {
+                    result.as_ref().err().cloned()
+                };
                 responses.extend(self.import_response(pending.id.take(), result));
                 let waiting = std::mem::take(&mut self.waiting_symbols);
                 for request in waiting {
                     if committed && request.attempt == pending.attempt {
                         let id = request.id;
-                        if let Err((code, message)) = self.start_parser_uri(id.clone(), "textDocument/documentSymbol", &request.uri, None) {
+                        if let Err((code, message)) = self.start_parser_uri(
+                            id.clone(),
+                            "textDocument/documentSymbol",
+                            &request.uri,
+                            None,
+                        ) {
                             responses.push(response_error(id, code, message));
                         }
                     } else if request.attempt != pending.attempt {
-                        responses.push(response_error(request.id, -32801, "workspace snapshot is stale"));
+                        responses.push(response_error(
+                            request.id,
+                            -32801,
+                            "workspace snapshot is stale",
+                        ));
                     } else {
-                        let mut response = response_error(request.id, -32803, "workspace source inventory unavailable; reload required");
+                        let mut response = response_error(
+                            request.id,
+                            -32803,
+                            "workspace source inventory unavailable; reload required",
+                        );
                         if let Some(reason) = failure.as_deref() {
                             response["error"]["data"] = json!({"reason":reason});
                         }
@@ -967,10 +1115,15 @@ impl Session {
                     }
                 }
             } else {
-                let code = if pending.cancelled.load(Ordering::Relaxed) { -32800 } else { -32801 };
+                let code = if pending.cancelled.load(Ordering::Relaxed) {
+                    -32800
+                } else {
+                    -32801
+                };
                 responses.extend(pending.cancel(code, "workspace import cancelled or superseded"));
-                responses.extend(self.waiting_symbols.drain(..)
-                    .map(|request| response_error(request.id, code, "workspace import cancelled or superseded")));
+                responses.extend(self.waiting_symbols.drain(..).map(|request| {
+                    response_error(request.id, code, "workspace import cancelled or superseded")
+                }));
             }
         }
         let mut index = 0;
@@ -996,21 +1149,31 @@ impl Session {
                     }
                 }
             };
-            let Some(id) = pending.id.take() else { continue; };
+            let Some(id) = pending.id.take() else {
+                continue;
+            };
             let fresh = match &pending.authority {
                 ParserAuthority::Open { incarnation } => {
                     self.incarnations.get(pending.snapshot.document()) == Some(incarnation)
-                        && self.documents.get(pending.snapshot.document()).is_some_and(|document|
-                            i64::from(document.version()) == pending.snapshot.revision()
-                                && document.text() == pending.snapshot.source())
+                        && self
+                            .documents
+                            .get(pending.snapshot.document())
+                            .is_some_and(|document| {
+                                i64::from(document.version()) == pending.snapshot.revision()
+                                    && document.text() == pending.snapshot.source()
+                            })
                 }
-                ParserAuthority::Imported { snapshot, epoch, .. } => self.workspace.fresh(snapshot, *epoch),
+                ParserAuthority::Imported {
+                    snapshot, epoch, ..
+                } => self.workspace.fresh(snapshot, *epoch),
             };
             let result = if !fresh {
                 Err(ParserFailure::Protocol(-32801, "parser snapshot is stale"))
             } else if pending.cancelled.load(Ordering::Relaxed) {
                 Err(ParserFailure::Protocol(-32800, "Request cancelled"))
-            } else { result };
+            } else {
+                result
+            };
             responses.push(match result {
                 Ok(result) => {
                     // Move source-sized values without serializing a borrowed Value.
@@ -1027,7 +1190,9 @@ impl Session {
 
     /// Retained jobs, including cancelled jobs awaiting actual thread completion.
     pub fn pending_requests(&self) -> usize {
-        self.pending_parser.len() + usize::from(self.pending_import.is_some()) + self.waiting_symbols.len()
+        self.pending_parser.len()
+            + usize::from(self.pending_import.is_some())
+            + self.waiting_symbols.len()
     }
 
     fn cancel_parser(&mut self, uri: Option<&str>, code: i32, message: &str) -> Vec<Value> {
@@ -1093,7 +1258,11 @@ impl Session {
             }
             self.state = State::Running;
             let projects = std::mem::take(&mut self.workspace.initial);
-            return if projects.is_empty() { Vec::new() } else { self.start_import(None, projects) };
+            return if projects.is_empty() {
+                Vec::new()
+            } else {
+                self.start_import(None, projects)
+            };
         }
         if !matches!(
             method,
@@ -1114,13 +1283,21 @@ impl Session {
             return match self.did_change_folders(params) {
                 Ok(false) => Vec::new(),
                 Ok(true) => {
-                    let invalidate = self.workspace.snapshot.is_some() || self.pending_import.is_some();
-                    let mut responses = self.cancel_import(-32801, "workspace configuration changed");
-                    responses.extend(self.cancel_imported(-32801, "workspace configuration changed"));
-                    if invalidate && let Err(error) = self.workspace.invalidate() { self.record(error); }
+                    let invalidate =
+                        self.workspace.snapshot.is_some() || self.pending_import.is_some();
+                    let mut responses =
+                        self.cancel_import(-32801, "workspace configuration changed");
+                    responses
+                        .extend(self.cancel_imported(-32801, "workspace configuration changed"));
+                    if invalidate && let Err(error) = self.workspace.invalidate() {
+                        self.record(error);
+                    }
                     responses
                 }
-                Err(error) => { self.record(error); Vec::new() }
+                Err(error) => {
+                    self.record(error);
+                    Vec::new()
+                }
             };
         }
         if method == "$/cancelRequest" {
@@ -1131,19 +1308,35 @@ impl Session {
                 .and_then(|id| valid_id(id).then_some(id).ok_or("invalid cancellation id"));
             return match id {
                 Ok(id) => {
-                    if let Some(response) = self.pending_parser.iter_mut()
+                    if let Some(response) = self
+                        .pending_parser
+                        .iter_mut()
                         .find(|pending| pending.id.as_ref() == Some(id))
-                        .and_then(|pending| pending.cancel(-32800, "Request cancelled")) {
+                        .and_then(|pending| pending.cancel(-32800, "Request cancelled"))
+                    {
                         return vec![response];
                     }
-                    if self.pending_import.as_ref().is_some_and(|pending| pending.id.as_ref() == Some(id)) {
+                    if self
+                        .pending_import
+                        .as_ref()
+                        .is_some_and(|pending| pending.id.as_ref() == Some(id))
+                    {
                         let mut responses = self.cancel_import(-32800, "Request cancelled");
                         responses.extend(self.cancel_imported(-32800, "Request cancelled"));
                         return responses;
                     }
-                    self.waiting_symbols.iter().position(|pending| &pending.id == id)
-                        .map(|index| response_error(self.waiting_symbols.swap_remove(index).id, -32800, "Request cancelled"))
-                        .into_iter().collect()
+                    self.waiting_symbols
+                        .iter()
+                        .position(|pending| &pending.id == id)
+                        .map(|index| {
+                            response_error(
+                                self.waiting_symbols.swap_remove(index).id,
+                                -32800,
+                                "Request cancelled",
+                            )
+                        })
+                        .into_iter()
+                        .collect()
                 }
                 Err(error) => {
                     self.record(error);
@@ -1151,9 +1344,12 @@ impl Session {
                 }
             };
         }
-        let closing_open = method == "textDocument/didClose" && params
-            .and_then(|p| p.get("textDocument")).and_then(|d| d.get("uri"))
-            .and_then(Value::as_str).is_some_and(|uri| self.documents.contains_key(uri));
+        let closing_open = method == "textDocument/didClose"
+            && params
+                .and_then(|p| p.get("textDocument"))
+                .and_then(|d| d.get("uri"))
+                .and_then(Value::as_str)
+                .is_some_and(|uri| self.documents.contains_key(uri));
         let result = match method {
             "textDocument/didOpen" => self.did_open(params),
             "textDocument/didChange" => self.did_change(params),
@@ -1211,22 +1407,32 @@ impl Session {
         let event = object(required(map, "event")?)?;
         let added = parse_workspace_folders(required(event, "added")?)?;
         let removed = parse_workspace_folders(required(event, "removed")?)?;
-        if added.is_empty() && removed.is_empty() { return Ok(false); }
+        if added.is_empty() && removed.is_empty() {
+            return Ok(false);
+        }
         // ponytail: at most 128 folders; use a URI set if this cap grows.
-        let retained = self.configuration.workspace_folders.iter()
-            .filter(|folder| !removed.iter().any(|removed| removed.uri == folder.uri)).count();
+        let retained = self
+            .configuration
+            .workspace_folders
+            .iter()
+            .filter(|folder| !removed.iter().any(|removed| removed.uri == folder.uri))
+            .count();
         if retained + added.len() > MAX_WORKSPACE_FOLDERS {
             return Err("workspace folder count limit exceeded");
         }
         for (index, folder) in added.iter().enumerate() {
             if added[..index].iter().any(|prior| prior.uri == folder.uri)
-                || self.configuration.workspace_folders.iter().any(|prior| prior.uri == folder.uri
-                    && !removed.iter().any(|removed| removed.uri == prior.uri))
+                || self.configuration.workspace_folders.iter().any(|prior| {
+                    prior.uri == folder.uri
+                        && !removed.iter().any(|removed| removed.uri == prior.uri)
+                })
             {
                 return Err("added workspace folder URI is already configured");
             }
         }
-        self.configuration.workspace_folders.retain(|folder| !removed.iter().any(|removed| removed.uri == folder.uri));
+        self.configuration
+            .workspace_folders
+            .retain(|folder| !removed.iter().any(|removed| removed.uri == folder.uri));
         self.configuration.workspace_folders.extend(added);
         Ok(true)
     }
@@ -1497,7 +1703,9 @@ fn code_action_context(value: &Value) -> Result<bool, &'static str> {
 }
 
 fn parse_workspace_folders(value: &Value) -> Result<Vec<WorkspaceFolder>, &'static str> {
-    let folders = value.as_array().ok_or("workspaceFolders must be an array")?;
+    let folders = value
+        .as_array()
+        .ok_or("workspaceFolders must be an array")?;
     if folders.len() > MAX_WORKSPACE_FOLDERS {
         return Err("workspace folder count limit exceeded");
     }
@@ -1505,9 +1713,16 @@ fn parse_workspace_folders(value: &Value) -> Result<Vec<WorkspaceFolder>, &'stat
     for folder in folders {
         let folder = object(folder)?;
         let uri = uri_value(required(folder, "uri")?)?;
-        let name = required(folder, "name")?.as_str().ok_or("workspace folder name must be a string")?;
-        if name.len() > MAX_URI_BYTES { return Err("workspace folder name is too long"); }
-        parsed.push(WorkspaceFolder { uri: uri.into(), name: name.into() });
+        let name = required(folder, "name")?
+            .as_str()
+            .ok_or("workspace folder name must be a string")?;
+        if name.len() > MAX_URI_BYTES {
+            return Err("workspace folder name is too long");
+        }
+        parsed.push(WorkspaceFolder {
+            uri: uri.into(),
+            name: name.into(),
+        });
     }
     Ok(parsed)
 }

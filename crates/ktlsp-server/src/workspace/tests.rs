@@ -63,7 +63,9 @@ impl Fixture {
             generation.unwrap(),
             &AtomicBool::new(false),
         )?;
-        workspace.commit(snapshot, documents.iter().copied()).map_err(str::to_owned)
+        workspace
+            .commit(snapshot, documents.iter().copied())
+            .map_err(str::to_owned)
     }
 }
 
@@ -76,7 +78,8 @@ impl Drop for Fixture {
 fn alias(uri: &str) -> String {
     // Both forms are native codec aliases on Unix and Windows; no physical
     // case-folding, symlink or foreign-platform path assumptions are involved.
-    uri.replacen("file://", "FILE://localhost", 1).replace("/A.kt", "/%41.kt")
+    uri.replacen("file://", "FILE://localhost", 1)
+        .replace("/A.kt", "/%41.kt")
 }
 
 #[test]
@@ -101,7 +104,10 @@ fn captured_historical_generation_refuses_third_until_released() {
     assert!(workspace.begin(false).is_err());
     assert!(workspace.capture(&uri).is_err());
     assert!(!workspace.fresh(&second, second_epoch));
-    assert_eq!(second.capture(&uri).unwrap().2.as_ref(), "fun second() = 2\n");
+    assert_eq!(
+        second.capture(&uri).unwrap().2.as_ref(),
+        "fun second() = 2\n"
+    );
 
     drop(first);
     fixture.reload(&mut workspace, &[]).unwrap();
@@ -110,7 +116,10 @@ fn captured_historical_generation_refuses_third_until_released() {
     assert!(workspace.fresh(&third, workspace.epoch));
     // The second request is still retained: admission was restored by releasing
     // the historical whole model, not by discarding every in-flight capture.
-    assert_eq!(second.capture(&uri).unwrap().2.as_ref(), "fun second() = 2\n");
+    assert_eq!(
+        second.capture(&uri).unwrap().2.as_ref(),
+        "fun second() = 2\n"
+    );
     assert!(!workspace.fresh(&second, workspace.epoch));
 }
 
@@ -160,7 +169,8 @@ fn close_reopen_invalidates_incarnation_and_requires_original_disk_validation() 
     let (disk, key, canonical, source) = workspace.capture(&alias).unwrap();
     assert_eq!(canonical.as_ref(), uri);
     assert_eq!(source.as_ref(), "fun diskA() = 1\n");
-    disk.verify(key, &mut Budget::default(), &AtomicBool::new(false)).unwrap();
+    disk.verify(key, &mut Budget::default(), &AtomicBool::new(false))
+        .unwrap();
 
     workspace.check_open(&uri).unwrap();
     workspace.opened(&uri, 22);
@@ -171,12 +181,18 @@ fn close_reopen_invalidates_incarnation_and_requires_original_disk_validation() 
     workspace.closed(&uri, 22);
     assert_eq!(workspace.overlay_uri(&alias), None);
     let (old_disk, old_key, _, _) = workspace.capture(&uri).unwrap();
-    assert!(old_disk.verify(old_key, &mut Budget::default(), &AtomicBool::new(false)).is_err());
+    assert!(
+        old_disk
+            .verify(old_key, &mut Budget::default(), &AtomicBool::new(false))
+            .is_err()
+    );
 
     fixture.reload(&mut workspace, &[]).unwrap();
     let (reloaded, key, _, source) = workspace.capture(&uri).unwrap();
     assert_eq!(source.as_ref(), "fun changedOnDisk() = 3\n");
-    reloaded.verify(key, &mut Budget::default(), &AtomicBool::new(false)).unwrap();
+    reloaded
+        .verify(key, &mut Budget::default(), &AtomicBool::new(false))
+        .unwrap();
     assert!(workspace.fresh(&reloaded, workspace.epoch));
 }
 
@@ -190,10 +206,24 @@ fn competing_aliases_refuse_candidate_without_republishing_last_good() {
     let (last_good, _, _, _) = workspace.capture(&uri).unwrap();
     let epoch = workspace.epoch;
 
-    assert!(fixture.reload(&mut workspace, &[(&uri, 31), (&alias, 32)]).is_err());
+    assert!(
+        fixture
+            .reload(&mut workspace, &[(&uri, 31), (&alias, 32)])
+            .is_err()
+    );
     assert!(workspace.capture(&uri).is_err());
     assert!(!workspace.fresh(&last_good, epoch));
-    assert_eq!(workspace.snapshot.as_ref().unwrap().capture(&uri).unwrap().2.as_ref(), "fun diskA() = 1\n");
+    assert_eq!(
+        workspace
+            .snapshot
+            .as_ref()
+            .unwrap()
+            .capture(&uri)
+            .unwrap()
+            .2
+            .as_ref(),
+        "fun diskA() = 1\n"
+    );
     assert_eq!(workspace.overlay_uri(&uri), None);
 
     fixture.reload(&mut workspace, &[(&alias, 32)]).unwrap();
@@ -228,7 +258,9 @@ fn unknown_file_overlays_block_until_last_close_but_custom_documents_do_not() {
     workspace.closed(&other_unknown, 44);
     let (restored, key, _, source) = workspace.capture(&uri).unwrap();
     assert_eq!(source.as_ref(), "fun diskA() = 1\n");
-    restored.verify(key, &mut Budget::default(), &AtomicBool::new(false)).unwrap();
+    restored
+        .verify(key, &mut Budget::default(), &AtomicBool::new(false))
+        .unwrap();
     assert!(workspace.fresh(&restored, workspace.epoch));
     assert!(!workspace.fresh(&before_open, epoch));
 }
@@ -247,7 +279,17 @@ fn failed_real_import_keeps_historical_model_unavailable_until_successful_reload
     assert!(fixture.reload(&mut workspace, &[]).is_err());
     assert!(workspace.capture(&uri).is_err());
     assert!(!workspace.fresh(&last_good, epoch));
-    assert_eq!(workspace.snapshot.as_ref().unwrap().capture(&uri).unwrap().2.as_ref(), "fun diskA() = 1\n");
+    assert_eq!(
+        workspace
+            .snapshot
+            .as_ref()
+            .unwrap()
+            .capture(&uri)
+            .unwrap()
+            .2
+            .as_ref(),
+        "fun diskA() = 1\n"
+    );
 
     fixture.model();
     fixture.reload(&mut workspace, &[]).unwrap();

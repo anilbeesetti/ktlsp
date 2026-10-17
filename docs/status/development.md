@@ -3329,9 +3329,19 @@ config dictionaries for legitimate reviewed Cargo.lock differences; historical
 executed420 guard is retained and BOTH ROOT reviewers must inspect the new delta.
 No active421 lease exists.
 
-Current source is **unverified**: no421formatter/compiler/check/test/import/
-server/parser/CLI runtime or hosted CI ran. ONE421formatter remains UNUSED.
-Next: BOTH exact complete ROOT union reviews, the one formatter/renewed clears,
+Current source remains **runtime-unverified**: no source compilation/check/test/
+import/server/parser/CLI runtime or hosted CI ran. BOTH full20-path ROOT reviews
+CLEAR exact3a4cb4f7859e30a72f66e661625a084493873f98/treea805884d, including complete
+external config-aware guard and old consumer source. ROOT FULL-read both complete
+receipts and authenticated SHA2565e53a8861668be7ea4bb807f2c5f4b73523f22048f926ce12282dffc383de750
+and5176b8e732f581015fb2dacf1e1bdf0068b2f4e6dc6df5fedaffe28faaa6d25b.
+Only then ROOT used ONE pinned `cargo +1.99.0 fmt --all`, success/1.36s.
+No second formatter. Complete CLI packets move before result assertions so
+unexpected complete replies remain retained without weakening any assertion or
+changing actual consumer frequency. The native consumer adds actual same-length
+source-byte mutation/refusal/restoration, resolving the adversarial attribution
+caveat; unmeasured zero-invocation output is deleted. All changed source needs
+exact affected rechecks. Next: renewed ROOT/component static clears,
 compile/native-data smoke admission, OWN original full three-host CI with
 complete actual gates, observation-only cleanup plus its OWN source acceptance,
 then fresh guarded integration and dual original exact-main proof. No local

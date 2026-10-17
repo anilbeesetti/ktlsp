@@ -24,7 +24,9 @@ pub(crate) fn decode(uri: &str) -> Result<PathBuf, &'static str> {
         return Err("expected local file URI");
     }
     let path = if let Some(hierarchy) = remainder.strip_prefix("//") {
-        let (authority, _) = hierarchy.split_once('/').ok_or("missing absolute file path")?;
+        let (authority, _) = hierarchy
+            .split_once('/')
+            .ok_or("missing absolute file path")?;
         if !authority.is_empty() && authority != "localhost" {
             return Err("nonlocal file URI authority");
         }
@@ -207,7 +209,9 @@ fn windows_components<'a>(parts: impl Iterator<Item = &'a str>) -> Result<(), &'
             continue;
         }
         if part.ends_with(['.', ' '])
-            || part.chars().any(|c| c <= '\u{1f}' || "<>:\"/\\|?*".contains(c))
+            || part
+                .chars()
+                .any(|c| c <= '\u{1f}' || "<>:\"/\\|?*".contains(c))
         {
             return Err("ambiguous or invalid Windows file component");
         }
@@ -217,7 +221,10 @@ fn windows_components<'a>(parts: impl Iterator<Item = &'a str>) -> Result<(), &'
             .any(|name| base.eq_ignore_ascii_case(name))
             || (base.get(..3).is_some_and(|prefix| {
                 prefix.eq_ignore_ascii_case("COM") || prefix.eq_ignore_ascii_case("LPT")
-            }) && matches!(base.get(3..), Some("1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³")))
+            }) && matches!(
+                base.get(3..),
+                Some("1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³")
+            ))
         {
             return Err("reserved Windows device component");
         }
@@ -245,16 +252,50 @@ mod tests {
     #[test]
     fn refuses_invalid_wire_paths_without_panics() {
         for uri in [
-            "", "file:", "file:relative", "file://", "file://localhost", "file://remote/a",
-            "file://LOCALHOST/a", "file://localhost:80/a", "file://user@localhost/a",
-            "file://%6cocalhost/a", "file:////host/share", "file://[::1]/a", "https:///a",
+            "",
+            "file:",
+            "file:relative",
+            "file://",
+            "file://localhost",
+            "file://remote/a",
+            "file://LOCALHOST/a",
+            "file://localhost:80/a",
+            "file://user@localhost/a",
+            "file://%6cocalhost/a",
+            "file:////host/share",
+            "file://[::1]/a",
+            "https:///a",
         ] {
             assert!(decode(uri).is_err(), "accepted {uri:?}");
         }
         for suffix in [
-            "%", "%0", "%GG", "%0g", "%00", "%2f", "%2F", "%5c", "%5C", "%FF",
-            "%C0%AF", "%ED%A0%80", "%F4%90%80%80", "%E2%82", "a?x", "a#x", "a\\b",
-            "a b", "é", "\n", "\0", ".", "..", "%2e", "%2E%2e", "a/../b", "a/./b",
+            "%",
+            "%0",
+            "%GG",
+            "%0g",
+            "%00",
+            "%2f",
+            "%2F",
+            "%5c",
+            "%5C",
+            "%FF",
+            "%C0%AF",
+            "%ED%A0%80",
+            "%F4%90%80%80",
+            "%E2%82",
+            "a?x",
+            "a#x",
+            "a\\b",
+            "a b",
+            "é",
+            "\n",
+            "\0",
+            ".",
+            "..",
+            "%2e",
+            "%2E%2e",
+            "a/../b",
+            "a/./b",
         ] {
             let uri = file(suffix);
             assert!(decode(&uri).is_err(), "accepted {uri:?}");
@@ -264,12 +305,22 @@ mod tests {
     #[test]
     fn canonical_aliases_and_exactly_once_percent_decoding() {
         let canonical = file("a%20b/%C3%A9%F0%9F%98%80%25.kt");
-        let alias = canonical.replacen("file:///", "FiLe://localhost/", 1)
+        let alias = canonical
+            .replacen("file:///", "FiLe://localhost/", 1)
             .replace("%C3%A9", "%c3%a9");
         assert_eq!(encode(&decode(&alias).unwrap()).unwrap(), canonical);
-        assert_eq!(encode(&decode(&file("%252e%252e.kt")).unwrap()).unwrap(), file("%252e%252e.kt"));
-        assert_eq!(encode(&decode(&file("%252F%255c%2500")).unwrap()).unwrap(), file("%252F%255c%2500"));
-        assert_eq!(encode(&decode(&file("%61//b/")).unwrap()).unwrap(), file("a/b"));
+        assert_eq!(
+            encode(&decode(&file("%252e%252e.kt")).unwrap()).unwrap(),
+            file("%252e%252e.kt")
+        );
+        assert_eq!(
+            encode(&decode(&file("%252F%255c%2500")).unwrap()).unwrap(),
+            file("%252F%255c%2500")
+        );
+        assert_eq!(
+            encode(&decode(&file("%61//b/")).unwrap()).unwrap(),
+            file("a/b")
+        );
         assert_eq!(encode(&decode(ROOT_URI).unwrap()).unwrap(), ROOT_URI);
     }
 
@@ -295,11 +346,34 @@ mod tests {
     #[cfg(not(windows))]
     #[test]
     fn posix_literal_paths_and_foreign_forms() {
-        assert_eq!(decode("file:/tmp/a%20b/%C3%A9%F0%9F%98%80%25.kt").unwrap(), PathBuf::from("/tmp/a b/é😀%.kt"));
-        assert_eq!(encode(Path::new("/tmp/a b/é😀%.kt")).unwrap(), "file:///tmp/a%20b/%C3%A9%F0%9F%98%80%25.kt");
-        assert_eq!(encode(Path::new("/tmp/a:b?#\n.kt")).unwrap(), "file:///tmp/a%3Ab%3F%23%0A.kt");
-        assert_eq!(decode("file:///tmp/a%3Ab%3F%23%0A.kt").unwrap(), PathBuf::from("/tmp/a:b?#\n.kt"));
-        for path in ["relative", "C:/x", "/C:/x", "/c:relative", "/C|/x", "//host/share", "/a/../b", "/a/./b", "/a\\b", "/a\0b"] {
+        assert_eq!(
+            decode("file:/tmp/a%20b/%C3%A9%F0%9F%98%80%25.kt").unwrap(),
+            PathBuf::from("/tmp/a b/é😀%.kt")
+        );
+        assert_eq!(
+            encode(Path::new("/tmp/a b/é😀%.kt")).unwrap(),
+            "file:///tmp/a%20b/%C3%A9%F0%9F%98%80%25.kt"
+        );
+        assert_eq!(
+            encode(Path::new("/tmp/a:b?#\n.kt")).unwrap(),
+            "file:///tmp/a%3Ab%3F%23%0A.kt"
+        );
+        assert_eq!(
+            decode("file:///tmp/a%3Ab%3F%23%0A.kt").unwrap(),
+            PathBuf::from("/tmp/a:b?#\n.kt")
+        );
+        for path in [
+            "relative",
+            "C:/x",
+            "/C:/x",
+            "/c:relative",
+            "/C|/x",
+            "//host/share",
+            "/a/../b",
+            "/a/./b",
+            "/a\\b",
+            "/a\0b",
+        ] {
             assert!(encode(Path::new(path)).is_err(), "accepted {path:?}");
         }
         for uri in ["file:///C:/x", "file:///c%3A/x", "file:///C%7C/x"] {
@@ -321,14 +395,38 @@ mod tests {
         let expected = "file:///C:/a%20b/%C3%A9%F0%9F%98%80%25.kt";
         assert_eq!(decode(expected).unwrap(), PathBuf::from("C:\\a b\\é😀%.kt"));
         assert_eq!(encode(Path::new("c:\\a b\\é😀%.kt")).unwrap(), expected);
-        assert_eq!(encode(Path::new("\\\\?\\C:\\a b\\é😀%.kt")).unwrap(), expected);
+        assert_eq!(
+            encode(Path::new("\\\\?\\C:\\a b\\é😀%.kt")).unwrap(),
+            expected
+        );
         assert_eq!(encode(Path::new("C:/a//b/")).unwrap(), "file:///C:/a/b");
-        assert_eq!(encode(&decode("file:/c%3a/a").unwrap()).unwrap(), "file:///C:/a");
+        assert_eq!(
+            encode(&decode("file:/c%3a/a").unwrap()).unwrap(),
+            "file:///C:/a"
+        );
         assert_eq!(encode(Path::new(r"\\?\C:\")).unwrap(), "file:///C:/");
-        for uri in ["file:///tmp/a", "file:///C:relative", "file:///C|/a", "file:///C:/a:b", "file:///C:/a%3Ab", "file:///C:/a%3Fb", "file:///C:/a%00b"] {
+        for uri in [
+            "file:///tmp/a",
+            "file:///C:relative",
+            "file:///C|/a",
+            "file:///C:/a:b",
+            "file:///C:/a%3Ab",
+            "file:///C:/a%3Fb",
+            "file:///C:/a%00b",
+        ] {
             assert!(decode(uri).is_err(), "accepted {uri:?}");
         }
-        for path in [r"C:relative", r"\rooted", r"\\host\share\a", r"\\?\UNC\host\share\a", r"\\.\C:\a", r"\\?\GLOBALROOT\a", r"\\?\C:\a/b", r"C:\a\..\b", r"C:\a\.\b"] {
+        for path in [
+            r"C:relative",
+            r"\rooted",
+            r"\\host\share\a",
+            r"\\?\UNC\host\share\a",
+            r"\\.\C:\a",
+            r"\\?\GLOBALROOT\a",
+            r"\\?\C:\a/b",
+            r"C:\a\..\b",
+            r"C:\a\.\b",
+        ] {
             assert!(encode(Path::new(path)).is_err(), "accepted {path:?}");
         }
     }
@@ -336,13 +434,56 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn windows_refuses_devices_ads_and_ambiguous_components() {
-        for component in ["CON", "con.kt", "CON .txt", "NUL", "AUX.txt", "PRN", "COM1", "Lpt9.kt", "COM¹", "LPT².txt", "COM³", "CLOCK$", "CONIN$", "CONOUT$", "a.", "a ", ".", "..", "a:b", "a<", "a>", "a\"", "a|", "a?", "a*", "a\u{1f}"] {
-            assert!(encode(&Path::new(ROOT).join(component)).is_err(), "accepted {component:?}");
+        for component in [
+            "CON",
+            "con.kt",
+            "CON .txt",
+            "NUL",
+            "AUX.txt",
+            "PRN",
+            "COM1",
+            "Lpt9.kt",
+            "COM¹",
+            "LPT².txt",
+            "COM³",
+            "CLOCK$",
+            "CONIN$",
+            "CONOUT$",
+            "a.",
+            "a ",
+            ".",
+            "..",
+            "a:b",
+            "a<",
+            "a>",
+            "a\"",
+            "a|",
+            "a?",
+            "a*",
+            "a\u{1f}",
+        ] {
+            assert!(
+                encode(&Path::new(ROOT).join(component)).is_err(),
+                "accepted {component:?}"
+            );
         }
-        for suffix in ["con.kt", "CON%20.txt", "COM%C2%B9", "a%20", "a.", "a%3Ab", "a%3F", "a%01", "x/NUL/y"] {
+        for suffix in [
+            "con.kt",
+            "CON%20.txt",
+            "COM%C2%B9",
+            "a%20",
+            "a.",
+            "a%3Ab",
+            "a%3F",
+            "a%01",
+            "x/NUL/y",
+        ] {
             assert!(decode(&file(suffix)).is_err(), "accepted {suffix:?}");
         }
-        assert_eq!(encode(Path::new(r"C:\COM10\console.kt")).unwrap(), "file:///C:/COM10/console.kt");
+        assert_eq!(
+            encode(Path::new(r"C:\COM10\console.kt")).unwrap(),
+            "file:///C:/COM10/console.kt"
+        );
         use std::ffi::OsString;
         use std::os::windows::ffi::OsStringExt;
         let invalid = OsString::from_wide(&[67, 58, 92, 0xd800]);

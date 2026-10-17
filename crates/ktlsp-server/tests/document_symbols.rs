@@ -7645,6 +7645,67 @@ mod workspace_symbols {
             &messages,&all,json!({"observation":"real concurrent import/cancel/consumer replies; Session separately proves same-attempt waiter ownership"}));
     }
 
+    // Test-only observation of bytes actually written/consumed by the existing
+    // framed transport. Runs preserve complete raw headers AND payloads.
+    fn record_runs(runs: &mut Vec<(u8, usize)>, bytes: &[u8]) {
+        for &byte in bytes {
+            match runs.last_mut() {
+                Some((prior, count)) if *prior == byte => *count += 1,
+                _ => runs.push((byte, 1)),
+            }
+        }
+    }
+    struct RecordedIo<'a, T> {
+        inner: &'a mut T,
+        runs: Vec<(u8, usize)>,
+    }
+    impl<T: std::io::Read> std::io::Read for RecordedIo<'_, T> {
+        fn read(&mut self, bytes: &mut [u8]) -> std::io::Result<usize> {
+            let count = self.inner.read(bytes)?;
+            record_runs(&mut self.runs, &bytes[..count]);
+            Ok(count)
+        }
+    }
+    impl<T: std::io::BufRead> std::io::BufRead for RecordedIo<'_, T> {
+        fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+            self.inner.fill_buf()
+        }
+        fn consume(&mut self, count: usize) {
+            let bytes = self.inner.fill_buf().expect("previously observed frame buffer");
+            record_runs(&mut self.runs, &bytes[..count]);
+            self.inner.consume(count);
+        }
+    }
+    impl<T: Write> Write for RecordedIo<'_, T> {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            let count = self.inner.write(bytes)?;
+            record_runs(&mut self.runs, &bytes[..count]);
+            Ok(count)
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            self.inner.flush()
+        }
+    }
+    fn recorded_send(wire: &mut super::SignatureWire, message: &Value, frames: &mut Vec<Value>) -> Value {
+        let payload = serde_json::to_vec(message).unwrap();
+        let mut input = RecordedIo { inner: wire.input.as_mut().unwrap(), runs: Vec::new() };
+        ktlsp_protocol::write_frame(&mut input, &payload).unwrap();
+        input.flush().unwrap();
+        frames.push(json!({"direction":"stdin","rawFrameUtf8Runs":input.runs,"payloadBytes":payload.len()}));
+        if let Some(id) = message.get("id") {
+            loop {
+                let mut reader = RecordedIo { inner: &mut wire.reader, runs: Vec::new() };
+                let payload = ktlsp_protocol::read_frame(&mut reader).unwrap().unwrap();
+                frames.push(json!({"direction":"stdout","rawFrameUtf8Runs":reader.runs,"payloadBytes":payload.len()}));
+                let response: Value = serde_json::from_slice(&payload).unwrap();
+                let matched = response.get("id") == Some(id);
+                wire.responses.push(response.clone());
+                if matched { return response; }
+            }
+        }
+        Value::Null
+    }
+
     #[test]
     fn packaged_actual_id_failure_envelopes_preserve_stale_refusal_and_recovery() {
         let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
@@ -7660,13 +7721,14 @@ mod workspace_symbols {
         // Use the unchanged shared wire owner. This test's giant literal IDs
         // are captured losslessly below instead of repeating megabytes in logs.
         let mut wire = super::SignatureWire::new(&package);
+        let mut raw_frames = Vec::new();
         let mut requests = vec![
             initialization(&options, full_profile()),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
             query(json!("baseline"), ""),
         ];
         for message in &requests {
-            let response = wire.send(message.clone());
+            let response = recorded_send(&mut wire, message, &mut raw_frames);
             if message["id"] == "baseline" {
                 result(&response, &single(before, &uri, "Before"));
             }
@@ -7677,13 +7739,13 @@ mod workspace_symbols {
         let id = "s".repeat(ktlsp_protocol::MAX_PAYLOAD_BYTES - 512 - 2);
         let message = query(json!(id), "NeverMatches");
         assert!(serde_json::to_vec(&message).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
-        let response = wire.send(message.clone());
+        let response = recorded_send(&mut wire, &message, &mut raw_frames);
         assert_eq!(response["id"], message["id"]);
         refused(&response, -32801);
         assert!(serde_json::to_vec(&response).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
         requests.push(message);
         let reload_message = source_reload(2, &options);
-        result(&wire.send(reload_message.clone()), &Value::Null);
+        result(&recorded_send(&mut wire, &reload_message, &mut raw_frames), &Value::Null);
         requests.push(reload_message);
         let before_model = std::fs::read(project.join("workspace.json")).unwrap();
         let mut after_model = before_model.clone();
@@ -7691,7 +7753,7 @@ mod workspace_symbols {
         std::fs::write(project.join("workspace.json"), &after_model).unwrap();
         let message = query(json!("m".repeat(ktlsp_protocol::MAX_PAYLOAD_BYTES - 512 - 2)), "NeverMatches");
         assert!(serde_json::to_vec(&message).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
-        let response = wire.send(message.clone());
+        let response = recorded_send(&mut wire, &message, &mut raw_frames);
         assert_eq!(response["id"], message["id"]);
         refused(&response, -32801);
         assert!(serde_json::to_vec(&response).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
@@ -7700,21 +7762,35 @@ mod workspace_symbols {
         // work, with a compact error that can echo the complete original ID.
         let message = query(json!("r".repeat(ktlsp_protocol::MAX_PAYLOAD_BYTES - 128)), "");
         assert!(serde_json::to_vec(&message).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
-        let response = wire.send(message.clone());
+        let response = recorded_send(&mut wire, &message, &mut raw_frames);
         assert_eq!(response["id"], message["id"]);
         refused(&response, -32803);
         assert_eq!(response["error"]["message"], "limit");
         assert!(serde_json::to_vec(&response).unwrap().len() <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
         requests.push(message);
         let reload_message = source_reload(3, &options);
-        result(&wire.send(reload_message.clone()), &Value::Null);
+        result(&recorded_send(&mut wire, &reload_message, &mut raw_frames), &Value::Null);
         requests.push(reload_message);
         let recovery = query(json!("same-session-recovery"), "");
-        result(&wire.send(recovery.clone()), &single(after, &uri, "Changed"));
+        result(&recorded_send(&mut wire, &recovery, &mut raw_frames), &single(after, &uri, "Changed"));
         requests.push(recovery);
-        requests.push(json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}));
-        requests.push(json!({"jsonrpc":"2.0","method":"exit"}));
-        let mut responses = wire.finish();
+        let stop = json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"});
+        result(&recorded_send(&mut wire, &stop, &mut raw_frames), &Value::Null);
+        requests.push(stop);
+        let exit = json!({"jsonrpc":"2.0","method":"exit"});
+        recorded_send(&mut wire, &exit, &mut raw_frames);
+        requests.push(exit);
+        wire.input.take();
+        loop {
+            let mut reader = RecordedIo { inner: &mut wire.reader, runs: Vec::new() };
+            let Some(payload) = ktlsp_protocol::read_frame(&mut reader).unwrap() else { break; };
+            raw_frames.push(json!({"direction":"stdout","rawFrameUtf8Runs":reader.runs,"payloadBytes":payload.len()}));
+            wire.responses.push(serde_json::from_slice(&payload).unwrap());
+        }
+        let output = wire.child.take().unwrap().wait_with_output().unwrap();
+        assert!(output.status.success(), "{:?}", output.status);
+        assert!(output.stderr.is_empty(), "{}", String::from_utf8_lossy(&output.stderr));
+        let mut responses = std::mem::take(&mut wire.responses);
         // Observation-only lossless encoding of ACTUAL large ID values on both
         // sides. Every byte/run is retained; no digest/sample/expected label is
         // substituted. All non-ID protocol fields remain their actual values.
@@ -7722,13 +7798,8 @@ mod workspace_symbols {
             if let Some(id) = message.get("id").and_then(Value::as_str)
                 && id.len() > 1024 * 1024
             {
-                let mut runs: Vec<(u8, usize)> = Vec::new();
-                for byte in id.bytes() {
-                    match runs.last_mut() {
-                        Some((prior, count)) if *prior == byte => *count += 1,
-                        _ => runs.push((byte, 1)),
-                    }
-                }
+                let mut runs = Vec::new();
+                record_runs(&mut runs, id.as_bytes());
                 message["id"] = json!({"originalType":"string","losslessUtf8Runs":runs});
             }
         }
@@ -7736,6 +7807,7 @@ mod workspace_symbols {
             "modelBefore":before_model,"modelAfter":after_model,
             "sourceBefore":before,"sourceAfter":after,"uri":uri,
             "largeIdEncoding":"original JSON string UTF8 bytes as ordered [byte,count] runs; complete lossless values"
-        }), &requests, &responses, json!({"transport":"packaged-stdio","sameSessionRecovery":true}));
+        }), &requests, &responses, json!({"transport":"packaged-stdio","sameSessionRecovery":true,
+            "rawFrames":raw_frames,"stdoutEof":true,"status":output.status.code(),"stderr":output.stderr}));
     }
 }

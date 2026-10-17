@@ -16,7 +16,7 @@ Test Rust subprocess framed exchanges with non-BMP changes and every lifecycle e
 
 Absolute URI validation uses RFC 3986 generic ASCII syntax (including percent encoding, authority and IPv6/IPvFuture literals), accepts all schemes and preserves the exact spelling. Raw IRIs/non-ASCII paths must be percent encoded. It does not interpret scheme-specific filesystem semantics, normalize URI spelling, resolve filesystem paths, read files or import projects.
 
-Additional bounds: 8 KiB per URI/workspace-folder name, 128 workspace folders, 128 retained notification-error records (then an explicit suppression record). Errors never quote document content, URI strings or method strings. Wire JSON uses serde_json's default recursion limit; framing limits apply before JSON decode. Parser-backed providers run as bounded cancellable work, as specified below; progress/project/file-watch providers, full semantics, persistence and official differential verification remain unsupported.
+Additional bounds: 8 KiB per URI/workspace-folder name, 128 workspace folders, 128 retained notification-error records (then an explicit suppression record). Legacy protocol/lexical errors do not quote document content, URI strings or method strings. Explicit JSON import diagnostics can carry bounded original native/model reasons; wire serialization escapes them and initial notification records JSON-quote untrusted terminal text. Framing limits apply before JSON decode. The finite #421 authority below does not establish full progress/project/file-watch providers, semantics, persistence or official differential verification.
 
 Run the native binary as `cargo run --locked -p ktlsp-server --bin ktlsp`; with no arguments or explicit `--stdio` it uses framed LSP on stdio. `--help` and `--version` print CLI output. Other arguments, including combinations of launch flags, fail with exit status 2 and stderr only. Core operation does not execute or require Java or project build tools. Optional tooling policy is defined in the current repository parity specification.
 
@@ -28,9 +28,9 @@ Pull requests read the current open document through the existing bounded lexica
 
 ## Deferred parser consumers and native input
 
-`Session::handle(Value) -> Vec<Value>` remains the sole protocol validator and single owner of lifecycle/document state. Accepted parser-backed requests defer their response; callers must service input and `Session::poll() -> Vec<Value>` until completion. `pending_requests() -> usize` counts retained jobs, including cancelled generations awaiting real thread completion. `close() -> (Vec<Value>, bool)` terminates the Session and returns remaining cancellation responses. Its boolean requires joined owned threads and original request-specific Parser closure proof, not merely thread completion. Drop cancels without joining or reporting success.
+`Session::handle(Value) -> Vec<Value>` remains the sole protocol validator and lifecycle/document owner. Accepted parser requests and explicit native imports defer responses; service input and `poll()` until completion. `pending_requests()` counts parser/import jobs, bounded initial-symbol waiters and cancelled generations awaiting actual completion. Terminal `close() -> (Vec<Value>, bool)` returns remaining cancellation responses and requires joined owned threads plus original request-specific Parser closure proof. Drop cancels without reporting success.
 
-At most eight jobs per Session and eight owned symbol thread handles across the process are admitted, with no waiting queue. Every job shares one immutable URI/version/source snapshot, one cancellation flag and one bounded single-result channel. A bounded global registry retains unfinished handles after Session drop; admission/poll join only handles whose is_finished() is true, then free capacity. Session completion requires its handle actually joined. This preserves the existing bounded Parser supervision. Capacity failure is RequestFailed (`-32803`), not an empty outline. All threads enter the existing validated-CST provider directly, not the binding kernel. The cleanup grace excludes time inside OS operations, including join of an already-finished handle.
+At most eight retained parser/import/waiting requests per Session and eight owned parser/import thread handles process-wide are admitted; at most one retained native import exists per Session. Initial unopened-symbol waiters share, not extend, capacity. The bounded global registry retains unfinished handles after drop and joins only finished handles before releasing slots. Parser jobs still enter the existing validated-CST provider; native import jobs perform only bounded read-only filesystem/model discovery. Exhaustion is `-32803`, not an empty outline. No second parser pool or supervision/deadline relaxation is added; cleanup grace excludes OS calls.
 
 The provider uses `Parser::parse_snapshot_with_cleanup -> (Result<SnapshotResult, ParserError>, bool)` through the same existing parse/supervise/admission/reaper pipeline. True proves no child ownership/spawn attempt, or same-child reaping before return and non-Unix scoped-I/O exit. False is unproved closure, not an assertion that a child remains alive. A false report or thread panic permanently latches the Session's terminal cleanup failure; later/global state cannot turn it into proof, and original Cancelled/Timeout errors remain unchanged. Limits, deadlines and the Unix 20 ms observation grace are unchanged. This conservative status-1 limit is intentional; successful symbol-thread joins alone do not prove graceful cleanup.
 
@@ -41,4 +41,34 @@ An active request's exact string/integer ID receives exactly one normal/error re
 The existing `run(&mut BufRead, &mut Write, &mut Write) -> i32` now drives the shared resumable `FrameReader` and deferred Session completions. A supplied library reader must yield WouldBlock periodically while idle; an arbitrary blocking reader delays completions. The CLI uses an owned duplicated stdin handle with Unix poll or Windows redirected-pipe PeekNamedPipe, with 10 ms idle readiness ticks, no reader thread and no frame queue. The globally buffered std::io::Stdin is not read after readiness polling. Partial/back-to-back framing uses the same canonical grammar as blocking `read_frame`; fatal framing remains fatal.
 
 Shutdown/exit/EOF/fatal input/output errors cancel owned work. Clean shutdown/exit or shutdown/EOF returns success only after confirmed job cleanup. Broken output is never retried, and undeliverable responses are not claimed delivered. Incomplete cleanup is controlled failure; no unfinished thread is joined. Output writes/flushes, OS scheduling, handle/file operations, and OS spawn/cleanup calls can block and are not hard real-time guarantees. See the server README for actual ownership and resource limits.
+
+
+## Explicit JSON source authority (#421)
+
+Capture-bearing composition passed original full Linux/macOS/Windows CI and
+independent actual-value/edit gates; capture-free integration still needs its own
+reviewed CI. [Exact evidence and limits](../status/development.md#pr422-original-hosted-actual-gates-and-capture-only-retirement)
+remain narrower than official project equivalence. Explicit
+`initialize.initializationOptions.projects` entries `{type:"json",path:fileURI}`
+load actual `workspace.json` through unchanged immutable v2 import and a separate
+native source-inventory layer. An immediate unopened `documentSymbol` can await
+that same initial attempt without readiness probes. `intellij/reloadWorkspace`
+requires `initializationOptions` and returns `null` only after complete current
+commit; empty projects clear authority, failure leaves prior data historical.
+
+Known membership, original model/source byte/native-identity checks before and
+after successful parsing, whole-model generation, overlay epoch and exact
+open-document incarnation/version/content guard publication. Native URI aliases
+map one member/overlay for symbol queries; synchronization keeps its existing
+exact wire identity. Unknown file overlays block closed publication without
+outside-path probes. Accepted synchronization/reload/folder changes stale
+affected work; rejected edits and whole folder batches preserve prior authority.
+At most two whole retained generations include candidate/historical captures.
+Cancelled work stays owned until join and receives no late success.
+
+Generic URI validation, T004 and original JSON/JPS/Maven data producers remain
+data-only. The explicit I/O layer has stricter trusted-quiescent-local filesystem,
+physical ownership and aggregate bounds documented in the import/server READMEs.
+No watcher, status/FINISHED signal, effective classpath, build-tool orchestration,
+workspace-symbol or official project/URI/semantic equivalence is claimed.
 

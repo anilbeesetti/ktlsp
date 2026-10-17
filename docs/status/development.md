@@ -3242,3 +3242,363 @@ is not repaired by a later pass. B3 INCONCLUSIVE/HOLD, #417UNKNOWN, oracle custo
 HOLD, #96/no local Kotlin runtime/native-only/T004/provenance/full-parity limits
 remain. No second formatter, unchanged retry or general platform/parity claim.
 
+
+#### Verified420 capture-free integration and original exact-main acceptance
+
+Capture-free reviewedf9beb55ac150cebfa71296005f31933fd3400922,
+tree49e47082f68c0093fd379397e3f72a06b1253e8d, received BOTH exact complete ROOT
+and BOTH affected419 cleanup clears;418 production/data/tests stayed exact.
+CHECK0/1.283004s and strict locked workspace/all-target Clippy0/0.733628s.
+OWN ORIGINAL Native39017168841/1/job117351574887 and platform39017168914/1
+(Mac117351575097,Win117351575031) ALL SUCCEEDED unchanged full runs.
+Actual checkout0d1ad7e0e4af08df307887328e0e9cbf7e3ec3ca has reviewed tree49
+and ordered[0d7d21923246f75969e6b8d52da71e1aeec086ce,f9beb55ac150cebfa71296005f31933fd3400922].
+Eventde044 remained stale observational metadata, not executed source authority.
+
+| Original cleaned host | Passed including39 docs | Ordinary | Rows | Ignored | Failed |
+|---|---:|---:|---:|---:|---:|
+| Native39017168841 | 1252 | 1213 | 142 | 3 | 0 |
+| macOS39017168914 | 1250 | 1211 | 142 | 3 | 0 |
+| Windows39017168914 | 1199 | 1160 | 142 | 3 | 0 |
+
+Every run has zero measured/filtered, plus22 separately retained worker fault
+cases and3same-owned-Child code86 confirmations. ROOT accepted every new complete
+current value by full reads plus exact whole-value/occurrence correspondence to
+personally FULL-read accepted bases; all142 declared/case/outcome multisets,
+steps/source/config and18CRC-valid archive members per platform reconcile.
+Independent auditors directly fetched byte-equal complete originals.
+Native303997B/3301L SHA2565244f8709e88cc87ea8b67226e796087823a3b7d38362ee558842642f4b7a1c1;
+Mac421320B/4231L SHA256ccdaeb8cede48cab5db1c1624d85f5bfd311fb4fe86fc075134db7a9f82270f1;
+Win380835B/4008L SHA25695eae3695b3b081feacd6db1d65f5e13cba2dfc3c2f93352206f6d8859d5de5a.
+Full acceptance `/private/tmp/ktlsp-420-cleaned-original/ROOT-all-original-cleaned-CI-acceptance.json`.
+
+Fresh strictly-readonly complete guard ran in a SEPARATE call: actual outer0,
+complete valid parsedexit0, exact active exclusive main/base/head/tree/scope/
+HEAD+BASE config/status/workflow/job/artifact/clean reviewed identity inspected.
+Only then SEPARATE ordinary expected-head squash of [PR420](https://github.com/anilbeesetti/ktlsp/pull/420).
+Actual main18733fe9f1233e0671ef765b1c2295d3f7fbb39e has exact reviewed tree49
+and SOLEparent0d7d219. Independent OWNER+ROOT verified tree/parent and OWN ORIGINAL
+[main39018036957/1/job117354061005](https://github.com/anilbeesetti/ktlsp/actions/runs/39018036957/job/117354061005):
+1252=1213ordinary+39docs/142rows/1255cases,0failed3ignored0measured0filtered,
+plus22separatefaultcases/3raw86 confirmations, retired observation markers0.
+Raw302925B/3285L SHA2567c665b24796607bc502924ae32f67e1b808804d913a89dd929f9fbdbefd251ed.
+OWNER FULL-read all2638 cleaned body values and100new main body values with
+complete3301/3285 maps; ROOT FULL-read all101 new complete main values and exact
+whole-value/case maps, then BOTH complete OWNER receipts. Independent raw bytes
+match. Only AFTER both main gates was lease420 CLEARED. Full proof
+`/private/tmp/ktlsp-420-original-main-39018036957/ROOT-exact-main-acceptance.json`.
+Public delivery [6231923063](https://github.com/anilbeesetti/ktlsp/pull/420#issuecomment-6231923063);
+418/419 CLOSED completed, old source failures NEVER retroactively accepted.
+
+#### Next421 explicit JSON authority composition, no runtime acceptance yet
+
+[Issue421](https://github.com/anilbeesetti/ktlsp/issues/421) reuses completed218line
+`/private/tmp/ktlsp-next-session-json-authority-research.md` and frozen
+`local://ktlsp421-implementation-contract.md`. ROOT and every independent owner WT
+start from the SAME verified18733, preserving every old/user/delivered WT.
+ROOT WT `/private/tmp/ktlsp-421-json-authority-integration`,
+branchomp/421-json-authority-integration, owns shared source/docs/Cargo/config/
+publication/CI/guarded integration.
+
+Native inventory7edf2e1155af2d763ab416290e13c09c09c36f57/treeea5d9675 has BOTH
+complete independent static reviews, as does strict pure URI764fb72c4cc2ea6b08e8fc65116e9a23310a0256/tree086b721d.
+ROOT FULL-read all540 inventory and481 behavioral-test lines, both receipts,
+all351 URI lines and both URI receipts before composing. COMPLETE inventory
+051b/bb93/5f41/7edf range was integrated, not only the final fix.
+Two further isolated owners supplied actual CLI4fb07cd and model-state6b72251
+behavior checks. ROOT composes Session-owned import/reload, original immutable
+sources, alias/overlay guards, whole-model generations, exact cancellation and
+bounded waiters sharing the original eight handles. No extra parser pool.
+
+ROOT found and corrected the authored20*95-byte long-base fixture exceeding
+observed Darwin `getconf PATH_MAX /private/tmp`=1024: eight components retain
+512macros,1MiB work refusal and every production bound. Incidental getter echoes
+and a std Arc-clone tautology were deleted. Complete original data remain in
+`/private/tmp/ktlsp-421-root-evidence/`; historical leaf receipts are not falsely
+claimed for changed ROOT source. Real owned CLI cases retain actual requests/
+responses/raw model/source/metadata checkpoints, physical add/remove, genuine
+ranged overlay edits, stale/refusal/reload/config/cancellation behavior.
+Temporary ACTUAL421 writers bypass libtest capture via direct stdout Write and
+remain until BOTH independent OWNER+ROOT complete actual read/apply gates.
+
+Windows-only file-id0.2.3 and server->import are ROOT-admitted Cargo changes;
+metadata resolution adds only the12 native Windows registry packages while ALL
+existing package records stay exact. Native boundary/T004 data-only producers
+remain unchanged. Future complete guard must bind separate exact HEAD and BASE
+config dictionaries for legitimate reviewed Cargo.lock differences; historical
+executed420 guard is retained and BOTH ROOT reviewers must inspect the new delta.
+No active421 lease exists.
+
+Current source remains **runtime-unverified**: no source compilation/check/test/
+import/server/parser/CLI runtime or hosted CI ran. BOTH full20-path ROOT reviews
+CLEAR exact3a4cb4f7859e30a72f66e661625a084493873f98/treea805884d, including complete
+external config-aware guard and old consumer source. ROOT FULL-read both complete
+receipts and authenticated SHA2565e53a8861668be7ea4bb807f2c5f4b73523f22048f926ce12282dffc383de750
+and5176b8e732f581015fb2dacf1e1bdf0068b2f4e6dc6df5fedaffe28faaa6d25b.
+Only then ROOT used ONE pinned `cargo +1.99.0 fmt --all`, success/1.36s.
+No second formatter. Complete CLI packets move before result assertions so
+unexpected complete replies remain retained without weakening any assertion or
+changing actual consumer frequency. The native consumer adds actual same-length
+source-byte mutation/refusal/restoration, resolving the adversarial attribution
+caveat; unmeasured zero-invocation output is deleted. All changed source needs
+exact affected rechecks. Next: renewed ROOT/component static clears,
+compile/native-data smoke admission, OWN original full three-host CI with
+complete actual gates, observation-only cleanup plus its OWN source acceptance,
+then fresh guarded integration and dual original exact-main proof. No local
+Kotlin/Session runtime, unchanged retry or widened capability. Full parity NOT
+achieved; B3 INCONCLUSIVE/HOLD, original417/395/377 causes UNKNOWN/OPEN, oracle
+HOLD and #96/native-only/provenance limits remain.
+
+
+#### Original421 strict compile failure and minimal derived-default correction
+
+After ROOT fully read/authenticated all SIX exact current formatted clears,
+compile-only admission bound6d43de4ad57cab4411cfec7a5a7f3ed031470f51/tree53500bb.
+Pinned format-CHECK exited0/1.229607750s with empty stdout/stderr. FIRST strict
+locked workspace/all-target Clippy exited101/5.258058s: sole reported diagnostic
+clippy::derivable_impls at import/source_inventory.rs207, the manual Budget
+Default can derive. Full actual stderr59lines/2612B SHA256
+4841158a5eda3db5d722aeeb7b6f723f1b16fad796b5ff5b09f6cd99ffcfdab9 was ROOT-read
+completely and retained in `/private/tmp/ktlsp-421-root-evidence/strict-clippy.stderr`.
+Sequence STOPPED immediately: no workspace--no-run, tests, native consumer,
+server/Session/parser/worker or hosted CI execution. Original failure remains.
+
+ROOT adds Default to Budget's existing derive and removes ONLY its identical
+manual implementation. The existing custom Limits::default remains the source
+of every frozen ceiling; array default is zero, HashMap default empty, no caller/
+API/charge/identity/cancellation/semantic/bound/deadline/assertion changes.
+No suppression or second formatter. Required Budget LSP reference lookup failed
+with unexpected serverexit0 and was reported; exact native caller/source grep/
+read fallback, including recovered later matches, is not successful LSP refs.
+Changed exact affected reviews must clear before the next CHECK/strict Clippy.
+No unchanged retry, native runtime, current CI or full-parity claim.
+
+
+#### Successor421 strict type-complexity failure and private capture alias
+
+All SIX exact derived-default clears accepted871c82e44564228c304ef7905269c9138e21ded9
+/tree0bbba4ed0f225b784d8f8163c923b1c3c483e78a. ROOT fully read current prefixes/
+trailers and authenticated complete historical appendices by actual whole-byte
+embedding in already FULL-read originals. Pinned format-CHECK exited0/1.145952s.
+Successor strict locked workspace/all-target Clippy exited101/1.144165s, sole
+reported diagnostic type_complexity at workspace.rs343: the existing capture
+return Result of four-element tuple. Complete1203B actual stderr SHA256
+9fcf8848aaf87013d977d9d7447b2fc6da9bdc25bee43d1fdf46722e5cf1bc66 is retained
+separately in root-evidence/corrected-strict-clippy.stderr and FULL ROOT-read.
+Original derivable_impls failure remains preserved. Sequence STOPPED; no
+workspace--no-run/test/native consumer/Kotlin/Session/parser/hosted CI ran.
+
+ROOT adds ONLY private CapturedSource alias for the SAME Arc<Snapshot>, SourceKey,
+Arc<str>, Arc<str> tuple and uses it in capture's return signature, following
+the existing private named-result pattern. Body, all concrete callers, immutable
+model lifetime, key/URI/source order and all counters/freshness/IO are unchanged;
+no extra allocation/copy or wrapper, public export, suppression, changed bound,
+test or runtime behavior. Complete concrete caller fallback included later
+matches251-321 omitted by the search tool's cap; unavailable LSP is not success.
+No second formatter or unchanged retry. Renew exact affected clears before
+changed-source CHECK/strictClippy/compile-only; subsequent native and hosted
+gates remain separate. No full-parity claim or native/#96/B3/oracle boundary change.
+
+#### Native421 fixture failure after successful strict compile-only gates
+
+After all SIX exact current clears at3464d6fc1dce31e05b39a6a60d57b33523e1af5d
+/treee9f3ff5a4210bd7686dea2291f4c848e076cf99c were FULL ROOT-read/authenticated,
+pinned format-CHECK0/1.146082s, strict locked workspace/all-target Clippy0/1.091233s
+and workspace test--no-run0/13.945685s passed. All195 compiler JSON records were
+parsed: no compiler-message record; terminal build-finished success true.
+This compiles but NEVER executes Kotlin/parser/server/Session/worker code.
+Both distinct earlier Clippy failures remain preserved with original source IDs.
+
+ROOT separately admitted ONLY unfiltered binary/import data packages and the
+exact already-reviewed public native consumer52556b8d. Actual package command
+exited101/59.323599s, stdout52635B SHA33c1c271920581abafe1a1e7a32fb91a58b9f47ad9b64caea2919d821f3d7046
+and stderr8870B SHA887f48e1cc59efc1340515a03be837ba4d278505d8dd5753b1c0ba683620893f.
+Final source_inventory row16passed/1failed: composite Unix unsafe-path fixture
+panicked at source_inventory.rs487 because fs::write invalid0xff filename itself
+returns Darwin92 Illegal byte sequence, before any loader discovery. Full
+actual failing body/diagnostic and complete stderr were ROOT-read; no rerun.
+Doctests were NOT reached. Native consumer compiled0/0.217723s with empty streams
+but runtime was deliberately NOT run after the failed package prerequisite;
+its executable/source/provenance retained and exclusive fixture root not created.
+
+ROOT changes ONLY the offending fixture: public load(non-UTF8 Path) must refuse
+UnsafePath on EVERY Unix target, without constructing an impossible APFS entry.
+Original invalid-name creation/discovery/refusal/removal remains under non-macOS
+cfg; all symlink, cycle, socket and ancestor assertions stay unconditional Unix.
+No exception catch, blanket skip, source whitelist, production/bound/default/
+deadline/cleanup/assertion relaxation or second formatter. This is an observed
+fixture-platform correction, NOT a production security fix or completed smoke.
+Affected exact source reviews/checks and full native packages must pass before
+actual consumer runtime; original full hosted3host CI remains required for the
+composed LSP surface. #96/native-only/B3/oracle/unknown-original-failure/full-parity
+limits remain unchanged; no push/PR/lease/merge acceptance exists.
+
+#### Native421 complete actual-data acceptance, hosted composed surface still pending
+
+Reviewed71040c8435e6835895ee06aa56cf86362f378782/treef9ac3eaf7d17f0ef963551977bed89c6236053b2
+received both full20path/external-control ROOT clears, both affected inventory
+component clears and unchanged strict URI2 byte-pinned authority. ROOT FULL-read
+all new meaningful receipt values and losslessly authenticated complete prior
+appendices. Pinned format-CHECK0/1.162872s, strict locked workspace/all-target
+Clippy0/.307181s, full workspace test--no-run0/.381838s; all195 actual compiler
+records parsed with terminal success and no compiler-message. This executes
+NO Kotlin/parser/server/Session/worker code.
+
+Entire unfiltered native binary/import packages0/15.404715s:665passed across
+68 result rows,657ordinary+8privacy compile-fail doctests,0fail/ignored/measured/
+filtered. All17 actual inventory cases passed, including all-Unix public nonUTF8
+input refusal and original unconditional symlink/socket/ancestor assertions.
+Actual invalid-filename discovery remains active on Linux; macOS cannot create
+the observed0xff fixture. Original3464 native101/16pass1fail remains retained;
+the two earlier source-specific strict Clippy failures are not erased.
+
+The actual public inventory consumer ran ONCE0/.454531917s with empty PATH and
+6Java environment names removed. Full stdout53817B SHA256
+fa17752d1590bd6893060cae28dc7c76a4121f7fd79f498213ce81f9f7f097f2; stderr empty.
+All17 complete actual packets were independently FULL-read/validated by OWNER
+and ROOT, not count summaries: original immutable model/projection, every entry/
+kind/source/original membership ordinal, true10byte Ω->Ψ source and790byte
+app->new model writes, stale refusal/original retained data, source-byte/source-ID
+restoration, equal-byte real source/model replacements, shared project refusal,
+data-only v2 success versus late missing-root atomic physical refusal, and
+unknown/non-source refusal with original project absent. Root879-line and
+Owner2478-line saved lossless readers EACH reconstruct ALL53817 original bytes.
+
+Original stdout Metadata Debug omits numerical native IDs. Separate post-run
+read-only observations on retained original/replacement files corroborated
+device16777229, source inodes31317540/31317546 with identical10byte contents,
+model inodes31317539/31317547 with identical790byte contents. These are NOT
+backfilled stdout fields or invented private Inventory maps. No returned
+WorkspaceEdit, model-identity restoration success, zero-Java process counter,
+parser-between-verifications or full LSP/platform/oracle/sandbox/latency proof
+is claimed. Actual source/model writes are authored native data, not official
+oracle or LSP returned edits; genuine client ranged-edit application stays hosted.
+
+Both complete gates are recorded in
+`/private/tmp/ktlsp-421-native/ROOT-complete-native-data-acceptance.json`,
+SHAae083d1524048325f6923962a84a013a79abd1a14073d434090b9c24b96505ab,
+and independent OWNER JSON2daabf7416c18eb245cb7d55eefcdb2ec87eae3bfddf6073393051e2debfd2fa
+/TXTdf0c58c94daacb40e4b96d1f4cf44ae91dbbb3ef12ab1a29299580c2bc5ed742.
+ROOT FULL-read all owner new proof/observation/limit fields; complete embedded
+original packets and source/compiler provenance matched already FULL Root-read
+values exactly. ONLY AFTER BOTH accepted gates, temporary standalone consumer.rs
+was removed; complete152line executed source remains in native-consumer-executed-
+source.json at original52556b8d hash, plus executable/rlibs/fixtures/all outputs/
+readers/full evidence retained. The FOUR committed ACTUAL421 writers stay until
+both FULL actual original hosted gates; then observation-only cleanup requires
+its OWN exact source review/CI. No second formatter, retry/probe or local Kotlin/
+Session runtime. Next docs-only ROOT2 review/publication/original full3host CI,
+fresh leased read-only guards/ordinary expected-head merge/actual tree+soleparent
+and dual original exact-main proof. Full parity NOT achieved; B3/oracle/native/
+T004/#96 and original417/395/377 UNKNOWN limits unchanged; no active lease.
+
+#### PR422 original hosted failure: state-test mixed captured/current identity
+
+Draft [PR422](https://github.com/anilbeesetti/ktlsp/pull/422) published reviewed
+b90e5bde07cee303dc800df44d8318ef3127da07/treedc670cb88d75d6c999303e8f6d14ad3dffd75041
+against stable18733. Independent full-union publication receipts were FULL
+ROOT-read; corrected external PR body distinguishes cancellation ID release from
+owned work join and waiter capacity. Native original-data gates remain accepted,
+not composed LSP acceptance. No active merge lease.
+
+ORIGINAL Native39028446315/attempt1/job117383963569 completed FAILURE: format and
+strict Clippy success, Tests exit101; server library24passed/1failed at
+workspace::tests::close_reopen_invalidates_incarnation_and_requires_original_disk_validation,
+workspace/tests.rs179: !workspace.fresh(&before_close,workspace.epoch).
+Actual original checkout946204298781ecc9c75c6d82800b30f5fe14965d, Git tree
+dc670cb88d75d6c999303e8f6d14ad3dffd75041, parents exact[18733,b90e].
+Complete279781B raw original log SHA256
+d576c524a2306ed58957ea8227cd993dd89d76a052f31c4579704915018d28bb and full
+job/commit metadata retained under `/private/tmp/ktlsp-422-original-b90e-native/`.
+Initial administrative gh log retrieval refused terminal escapes before emitting
+bytes; explicit raw escape-preserving fetch0 retained the complete log. This is
+NOT CI rerun. Full failing body and actual current state test/source/producer/
+consumer were read. Four ACTUAL421 marker counts are all0; CLI integration was
+not reached, so no actual wire gate or observation-only cleanup is accepted.
+
+Root cause is a test consumer identity error: the SAME immutable model can be
+current for a new request, so pairing its old Arc with the newly CURRENT epoch
+does not represent the earlier request. Real Session stores epoch with Imported
+authority at capture and consumes THAT same epoch at publication. Both sides
+were directly read; all freshness callers including later tests were traced.
+ROOT saves disk_epoch beside the real disk capture AFTER first close and checks
+that captured request stale after reopen/old-incarnation close. The prior
+before-close captured-epoch assertion, reopened-overlay incarnation check and
+all real disk mutation/reload verification remain. This is a distinct meaningful
+transition, not deleting the failure, swapping expected boolean, repinning an
+incidental default or modifying production semantics. Only2 test lines change.
+
+Changed exact reviews/format-CHECK/strictClippy/workspace compile-only remain
+required before changed-head OWN original hosted fullCI. No local Kotlin/
+Session/parser/worker/fake-runtime test admitted; no second formatter or retry
+of failed b90e. Independent platform39028446301 originals must be retained;
+do not cancel or retry them. Native665 package/standalone data source remains
+unchanged and accepted separately. Fourwriters remain. Full parity/B3/oracle/
+native/T004/#96/original417/395/377 UNKNOWN gates remain unchanged.
+
+#### PR422 original hosted actual gates and capture-only retirement
+
+Changed reviewed source `cffc4b6a04c2c2f96633a93e43eb95deb5227780`,
+tree `24390aa793df4c0a1667f5f6e760e57a5a1da00d`, received BOTH exact full20path
+ROOT clears with unchanged native/URI component authority. Pinned format-CHECK,
+strict locked workspace/all-target Clippy and workspace test--no-run all passed;
+NO local Kotlin/parser/server/Session/worker runtime. The separate native665/
+standalone complete-data gates above remain accepted, not inferred from CLI.
+
+Its OWN original [Native39029144408/1/job117385919987](https://github.com/anilbeesetti/ktlsp/actions/runs/39029144408/job/117385919987)
+and [platform39029144406/1](https://github.com/anilbeesetti/ktlsp/actions/runs/39029144406)
+(macOS117385919954, Windows117385920112) ALL SUCCEEDED, every required step.
+Actual executed checkout `7dbb104d4f59496c0f27d8bf6c9f1eaf92b66306` has exact
+reviewed tree and ordered parents `[18733fe9f1233e0671ef765b1c2295d3f7fbb39e,cffc4b6a04c2c2f96633a93e43eb95deb5227780]`.
+Stale observational event946204 is NOT checkout authority. Full original source
+preflights, clean identities, zero format/Clippy/full-test exits and manifest-bound
+artifact digests verified; all18 members retained per archive, complete raw/ZIP
+packet values equal. Original b90e platform Mac117383963655/Win117383963413 also
+FAILED the same captured/current-epoch test. Its no-fail-fast CLI passes remain
+diagnostic only; no unchanged original was retried or failure hidden.
+
+| Original evidence | Bytes | SHA256 |
+|---|---:|---|
+| Native raw |357110|dfb0368c380c664240421bb7873cc3c6cff58ce16d780800a4c6371e0a81bde9|
+| macOS raw |485233|66f6f7d084338fc9da37b21c6cd6e8b32e6c80bde54a214417727a0bf9b6ea41|
+| Windows raw |438786|933cd5295e26487919b5137f89dca7b8a4cd25ae822c161d3c87002d7cfa06f3|
+| macOS artifact12099686872 |54455|e17eb7068c6a4e3c336df4a5b95767afb52de0c08f210c9e19a90d684d91e775|
+| Windows artifact12099279486 |49253|14e08e7bb61251de1f2956a848d5b67c0e29f7d2729102add4da5266484e2bb1|
+
+OWNER and ROOT independently FULL-read ALL12 complete CURRENT actual packets:
+original models/source bytes/debug metadata/read errors, all requests/replies,
+filesystem checkpoints and stale/refusal/reload/atomic/cancellation transitions.
+ROOT read6720lossless packet lines and reconstructed original raw payloads exactly.
+Both independently genuinely applied each actual UTF16 didChange v1->v2,
+range0:6..0:13/rangeLength7, to `class Overlay\r\n`, producing the entire actual
+`class OverlayEdited\r\n`; actual canonical/alias ids5/6 match name/kind/full
+range0:0..0:19/selection0:6..0:19. Original Ω disk is unchanged. No returned
+WorkspaceEdit exists. Mutation iterator still waits for each preceding actual
+response; disk/model/add/delete/failed-last-root/unsupported-project refusal and
+recovery outcomes are genuine consumer evidence, not invented parser echoes.
+Cancellation packet is hosted real Session integration, not packaged stdio;
+owned-before-collection/zero-after-close are passing source assertions, not
+explicit packet counters or measured eight-slot saturation.
+
+ROOT combined gate `/private/tmp/ktlsp-422-original-cffc-platform/ROOT-all-current-hosted-actual-gates.json`
+SHA78aed8e5c473c13ca0a8dd6d7c153a160d4e321c235caf388dc3b3168cab7063;
+independent OWNER JSONa2c75cfeb10ee631209b0e3164f6fbb5d1934d14f9bdf876306082d4b834683b
+and TXT155164316f1254b8f709c778a0ce9509470749e58b523637ddb0041c131649aa.
+Root fully read both complete Owner texts and all gate/custody/transition/limit
+metadata; all12 embedded packet values equal already independently FULL Root-read
+values. ONLY AFTER BOTH complete gates Root removed four temporary ACTUAL421
+writers and solely observation-owned helpers/data. EVERY real consumer call,
+assertion, frequency, owned closure and iterator FS-mutation placement remains.
+Original source/captures/archives/readers/fixtures/full proofs stay retained.
+
+Capture-free source still needs its OWN exact full2ROOT source review, pinned
+compiler-only checks and OWN original unfiltered full Linux/macOS/Windows CI,
+then fresh separate strictly-readonly complete guards, ordinary expected-head
+squash, actual tree/sole-parent verification and dual original exact-main proof.
+No lease/merge acceptance, local Kotlin runtime, second formatter or retry/probe.
+No private native-ID graph dump, syscall/no-outside-IO trace, hostileFS/latency/
+arbitrary stale-schedule/full-eight-slot/nonBMP-edit/official-equivalence proof.
+Full parity NOT achieved; native-only/T004/#96/B3/oracle and original417/395/377
+UNKNOWN/OPEN limits stay unchanged. Legitimate Cargo.lock change still requires
+separate exact BASE and HEAD config dictionaries in the future exclusive lease.
+

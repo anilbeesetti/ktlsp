@@ -12,5 +12,8 @@ ktlsp-artifacts = { path = "../ktlsp-artifacts" }
 ktlsp-binary = { path = "../ktlsp-binary" }
 quick-xml = { version = "=0.41.0", default-features = false }
 
+[target.'cfg(windows)'.dependencies]
+file-id = "=0.2.3"
+
 [dev-dependencies]
 sha2 = "=0.10.9"

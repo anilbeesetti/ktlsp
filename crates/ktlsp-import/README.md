@@ -1,6 +1,6 @@
 # T021a: pinned workspace.json subset
 
-Child [#63](https://github.com/anilbeesetti/ktlsp/issues/63) of T021/#21. Data-only Rust library, not wired into server initialization or advertised as an LSP provider. This is native-tested source-contract compatibility; no official runtime comparison or build tool was run. T021 remains open.
+Child [#63](https://github.com/anilbeesetti/ktlsp/issues/63) of T021/#21. Existing JSON/JPS/Maven model producers remain data-only Rust APIs. The separate opt-in `source_inventory` API below adds bounded read-only native filesystem discovery for #421; it does not change `from_json` or invent effective import/build semantics. This is source-contract compatibility, not official runtime equivalence. T021 remains open.
 
 ## Provenance
 
@@ -274,3 +274,69 @@ runtime observation is asserted by these source fixtures. Supplementary IntelliJ
 `188b7ef96f72c032b7ee232ba6f5ec3dac9448f8` research is not proven release-matched.
 Full JPS dependencies/SDK/compiler/resource/exclusion/facet/build integration and
 official runtime parity remain required work.
+
+## Bounded read-only source inventory (#421)
+
+**Native data runtime and the capture-bearing composed consumer are verified within
+the [recorded scope](../../docs/status/development.md#pr422-original-hosted-actual-gates-and-capture-only-retirement);
+capture-free integration still requires its own reviewed full CI.** This separate API
+performs explicit native I/O; JSON-v1/v2, JPS, Maven and T004 producers keep their
+existing data-only contracts. No Java, build tool, compiler or C/C++ analyzer is
+required. Windows uses target-only pinned `file-id = 0.2.3` Rust OS bindings for
+full native file identity, not a semantic engine.
+
+`source_inventory::load(project_directory, &mut Budget, &AtomicBool)` returns a
+complete immutable `Inventory` or one error, never a usable prefix. Borrow
+`project_directory()`, the ENTIRE original v2 `imported()` model,
+`workspace_json()` exact bytes and `entries()`. Each entry retains its native
+path, `EntryKind`, original Kotlin `Arc<str>` when applicable, and ordered
+module/content-root/source-root membership indices into that same model.
+Nested same-module roots retain every matching association; Java, scripts,
+other files and directories remain classifications, not ordinary Kotlin parses.
+Hidden/build/.git entries are not silently excluded.
+
+Use ONE monotonic `Budget` for ALL configured projects, roots, entries and
+consumer URI reservations. `Limits` may reduce, never raise, these ceilings:
+
+| Resource | Whole candidate ceiling |
+|---|---:|
+| Projects | 16 |
+| Original model bytes | 2 MiB |
+| Visited entries, including nonsource files | 16,384 |
+| Directories | 4,096 |
+| Project-relative depth | 32 |
+| Kotlin sources | 1,024 |
+| Retained source bytes | 16 MiB |
+| Individual source bytes | 64 KiB |
+| Retained native/model/consumer URI path bytes | 2 MiB |
+| Individual native/model path bytes | 4,096 |
+| Original membership associations | 16,384 |
+| Counted logical work | 256 Mi units |
+
+Charges precede bounded reads/storage/delegation; failures do not refund work.
+Model path expansion is admitted before unchanged v2 allocation. URI consumers
+use `reserve_path_bytes` on that SAME budget. These are logical resource bounds,
+not allocator/RSS/OOM or OS-I/O-latency guarantees.
+
+The filesystem assumption is trusted, quiescent and LOCAL, as for existing
+artifact readers: not a hostile replacement/mount/hardlink sandbox. Every
+ancestor/leaf is checked; symlinks, junctions/reparse points, special entries,
+external selected roots, physical aliases and contradictory ownership/kinds
+refuse the whole candidate. Unix identities retain full device/inode pairs;
+Windows requires full high-resolution native IDs without low-resolution/hash
+fallback. IDs can be reused; no hostile-race guarantee is implied. No per-entry
+descriptor remains open.
+
+`Inventory::verify_source(index, &mut Budget, &AtomicBool)` accepts only an
+original recorded Kotlin source. It rechecks original model AND selected source
+bytes, full identities, ancestors, size and EOF, using bounded streaming reads.
+Unknown/nonsource indices cause no filesystem reads. Model comparison charges
+work, not retained-model storage again. The Session calls it before parsing and
+before publishing a successful render with the SAME request budget.
+
+Source and model changes require explicit reload; no automatic watcher,
+discovery outside configured roots, source mutation, archive/SDK traversal,
+environment lookup or tool invocation is added. Existing meaningful unsupported
+v2 fields still refuse without rewriting input. Complete actual native data,
+hosted CLI/overlay/reload proof and guarded integration remain separate gates.
+

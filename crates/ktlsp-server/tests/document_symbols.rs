@@ -379,7 +379,10 @@ impl Package {
     }
 }
 // This directory is borrowed: only Package owns cleanup of its exclusive creation.
-fn exchange_directory(directory: &Path, messages: &[Value]) -> Vec<Value> {
+fn exchange_directory<'a>(
+    directory: &Path,
+    messages: impl IntoIterator<Item = &'a Value>,
+) -> Vec<Value> {
     let mut child = Command::new(directory.join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX)))
         .arg("--stdio")
         .env("PATH", "")
@@ -429,6 +432,384 @@ impl Drop for Package {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.0);
     }
+}
+
+fn source_model(roots: &[&str]) -> Value {
+    json!({"modules":[{"name":"app","dependencies":[{"type":"moduleSource"}],
+        "contentRoots":[{"path":"<WORKSPACE>/","sourceRoots":roots.iter().map(|root|
+            json!({"path":format!("<WORKSPACE>/{root}"),"type":"kotlin-source"})).collect::<Vec<_>>()}]}],
+        "libraries":[]})
+}
+
+fn source_project(package: &Package, name: &str, roots: &[&str]) -> PathBuf {
+    let project = package.0.join(name);
+    std::fs::create_dir(&project).unwrap();
+    for root in roots {
+        std::fs::create_dir_all(project.join(root)).unwrap();
+    }
+    std::fs::write(
+        project.join("workspace.json"),
+        serde_json::to_vec(&source_model(roots)).unwrap(),
+    )
+    .unwrap();
+    std::fs::canonicalize(project).unwrap()
+}
+
+// Only our existing ASCII fixture directories; Unicode leaf names are literal
+// escaped suffixes below, not a second implementation of the production codec.
+fn source_directory_uri(directory: &Path) -> String {
+    let native = directory.to_str().unwrap();
+    let path = native
+        .strip_prefix("\\\\?\\")
+        .unwrap_or(native)
+        .replace('\\', "/");
+    assert!(path.is_ascii());
+    let path = path.replace(' ', "%20");
+    format!(
+        "file://{}{path}",
+        if path.starts_with('/') { "" } else { "/" }
+    )
+}
+
+fn source_options(projects: &[&str]) -> Value {
+    json!({"projects":projects.iter().map(|path| json!({"type":"json","path":path})).collect::<Vec<_>>()})
+}
+
+fn source_initialize(options: &Value) -> Value {
+    json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{
+        "initializationOptions":options,"capabilities":{"textDocument":{
+            "documentSymbol":{"hierarchicalDocumentSymbolSupport":true},"diagnostic":{}}}}})
+}
+
+fn source_symbols(id: i32, uri: &str) -> Value {
+    json!({"jsonrpc":"2.0","id":id,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":uri}}})
+}
+
+fn source_reload(id: i32, options: &Value) -> Value {
+    json!({"jsonrpc":"2.0","id":id,"method":"intellij/reloadWorkspace","params":{"initializationOptions":options}})
+}
+
+fn source_reply(replies: &[Value], id: i32) -> &Value {
+    let mut matching = replies.iter().filter(|reply| reply["id"] == id);
+    let reply = matching
+        .next()
+        .unwrap_or_else(|| panic!("missing {id}: {replies:?}"));
+    assert!(matching.next().is_none(), "duplicate {id}: {replies:?}");
+    reply
+}
+
+fn assert_source_class(replies: &[Value], id: i32, source: &str, name: &str) {
+    let reply = source_reply(replies, id);
+    assert!(reply.get("error").is_none(), "{reply}");
+    let symbols = reply["result"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{reply}"));
+    assert_eq!(symbols.len(), 1, "{reply}");
+    assert_eq!(symbols[0]["name"], name, "{reply}");
+    assert_eq!(symbols[0]["kind"], 5, "{reply}");
+    assert_eq!(
+        symbols[0]["range"],
+        span(source, source.trim_end()),
+        "{reply}"
+    );
+    assert_eq!(symbols[0]["selectionRange"], span(source, name), "{reply}");
+}
+
+fn assert_source_refused(replies: &[Value], id: i32, code: i32) {
+    let reply = source_reply(replies, id);
+    assert_eq!(reply["error"]["code"], code, "{reply}");
+    assert!(reply.get("result").is_none(), "{reply}");
+}
+
+#[test]
+fn json_import_cancel_replies_once_reuses_ids_and_retains_owned_work() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let package = Package::new(true);
+    let project = source_project(&package, "cancelled", &["src"]);
+    std::fs::write(project.join("src/A.kt"), "class Candidate\n").unwrap();
+    let project_uri = source_directory_uri(&project);
+    let uri = format!("{project_uri}/src/A.kt");
+    let mut init = source_initialize(&json!({}));
+    init["params"]["workspaceFolders"] = json!([{"uri":project_uri,"name":"owned"}]);
+    let messages = [
+        init,
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"workspace/didChangeWorkspaceFolders","params":{"event":{
+            "removed":[{"uri":project_uri,"name":"owned"}],
+            "added":[{"uri":format!("{project_uri}/future"),"name":"future"},{"uri":"relative","name":"invalid"}]
+        }}}),
+        source_reload(2, &source_options(&[&project_uri])),
+        source_symbols(3, &uri),
+        source_symbols(3, &uri),
+        json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":2}}),
+        source_symbols(3, &uri),
+    ];
+    let mut session = Session::with_parser(worker()).unwrap();
+    let replies = session.handle(messages[0].clone());
+    assert!(replies[0].get("error").is_none(), "{replies:?}");
+    session.handle(messages[1].clone());
+    session.handle(messages[2].clone());
+    // The invalid final addition must not remove the old folder or retain a prefix.
+    assert_eq!(
+        session.configuration().workspace_folders,
+        vec![ktlsp_server::WorkspaceFolder {
+            uri: project_uri,
+            name: "owned".into(),
+        }]
+    );
+    session.drain_errors();
+    assert!(session.handle(messages[3].clone()).is_empty());
+    assert!(session.handle(messages[4].clone()).is_empty());
+    let duplicate = session.handle(messages[5].clone());
+    assert_eq!(duplicate.len(), 1, "{duplicate:?}");
+    assert_eq!(duplicate[0]["id"], Value::Null);
+    assert_eq!(duplicate[0]["error"]["code"], -32600);
+    let cancelled = session.handle(messages[6].clone());
+    assert_eq!(cancelled.len(), 2, "{cancelled:?}");
+    assert_source_refused(&cancelled, 2, -32800);
+    assert_source_refused(&cancelled, 3, -32800);
+    // Completion may be ready, but the import remains owned until collected/joined.
+    assert_eq!(session.pending_requests(), 1);
+    let reused = session.handle(messages[7].clone());
+    assert_eq!(reused.len(), 1, "{reused:?}");
+    assert_source_refused(&reused, 3, -32803);
+    let (late, clean) = session.close();
+    assert!(clean, "cancelled native import did not prove owned closure");
+    assert!(
+        late.is_empty(),
+        "cancelled requests published twice: {late:?}"
+    );
+    assert_eq!(session.pending_requests(), 0);
+}
+
+#[test]
+fn packaged_json_initial_unopened_symbols_alias_overlay_edits_close_and_outside_refusal() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let package = Package::new(true);
+    let project = source_project(&package, "project", &["src"]);
+    let disk = "class Ω\r\n";
+    let overlay = "class Overlay\r\n";
+    let edited = "class OverlayEdited\r\n";
+    std::fs::write(project.join("src/空 😀.kt"), disk).unwrap();
+    std::fs::write(package.0.join("Outside.kt"), "class OutsideDisk\n").unwrap();
+    let project_uri = source_directory_uri(&project);
+    let uri = format!("{project_uri}/src/%E7%A9%BA%20%F0%9F%98%80.kt");
+    let alias = uri.replace("%E7", "%e7");
+    let outside = format!(
+        "{}/Outside.kt",
+        source_directory_uri(&std::fs::canonicalize(&package.0).unwrap())
+    );
+    let options = source_options(&[&project_uri]);
+    let messages = [
+        source_initialize(&options),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        // The first consumer is immediate, not a status/readiness probe.
+        source_symbols(2, &uri),
+        source_symbols(3, &alias),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":alias,"languageId":"kotlin","version":1,"text":overlay}}}),
+        source_symbols(4, &uri),
+        json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":alias,"version":2},"contentChanges":[{"range":span(overlay,"Overlay"),"rangeLength":7,"text":"OverlayEdited"}]}}),
+        source_symbols(5, &uri),
+        source_symbols(6, &alias),
+        json!({"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":alias}}}),
+        source_symbols(7, &uri),
+        source_symbols(8, &outside),
+        source_symbols(9, "untitled:unopened"),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":outside,"languageId":"kotlin","version":1,"text":"class OutsideOverlay\n"}}}),
+        source_symbols(10, &uri),
+        source_symbols(11, &outside),
+        json!({"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":outside}}}),
+        source_symbols(12, &uri),
+        json!({"jsonrpc":"2.0","id":13,"method":"shutdown"}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ];
+    let replies = package.exchange(&messages);
+    assert_eq!(replies.len(), 13, "{replies:?}");
+    assert_eq!(
+        source_reply(&replies, 1)["result"]["capabilities"]["documentSymbolProvider"],
+        true
+    );
+    for id in [2, 3, 7, 12] {
+        assert_source_class(&replies, id, disk, "Ω");
+    }
+    assert_source_class(&replies, 4, overlay, "Overlay");
+    for id in [5, 6] {
+        assert_source_class(&replies, id, edited, "OverlayEdited");
+    }
+    for id in [8, 9, 10] {
+        assert_source_refused(&replies, id, -32803);
+    }
+    assert_source_class(&replies, 11, "class OutsideOverlay\n", "OutsideOverlay");
+    assert_eq!(
+        std::fs::read_to_string(project.join("src/空 😀.kt")).unwrap(),
+        disk
+    );
+    assert_eq!(source_reply(&replies, 13)["result"], Value::Null);
+}
+
+#[test]
+fn packaged_json_disk_and_model_mutation_require_reload_to_successor_authority() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let package = Package::new(true);
+    let project = source_project(&package, "project", &["src"]);
+    std::fs::create_dir(project.join("next")).unwrap();
+    let before = "class Before\n";
+    let changed = "class DiskChanged\n";
+    let successor = "class Successor\n";
+    let added = "class Added\n";
+    std::fs::write(project.join("src/A.kt"), before).unwrap();
+    std::fs::write(project.join("next/B.kt"), successor).unwrap();
+    let project_uri = source_directory_uri(&project);
+    let old_uri = format!("{project_uri}/src/A.kt");
+    let next_uri = format!("{project_uri}/next/B.kt");
+    let added_uri = format!("{project_uri}/next/Added.kt");
+    let options = source_options(&[&project_uri]);
+    let mut init = source_initialize(&options);
+    init["params"]["workspaceFolders"] = json!([{"uri":project_uri,"name":"owned"}]);
+    let messages = [
+        init,
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        source_symbols(2, &old_uri),
+        source_symbols(3, &old_uri),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":old_uri,"languageId":"kotlin","version":1,"text":"class Unsaved\n"}}}),
+        source_symbols(4, &old_uri),
+        json!({"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":old_uri}}}),
+        source_symbols(5, &old_uri),
+        source_reload(6, &options),
+        source_symbols(7, &old_uri),
+        source_symbols(8, &old_uri),
+        source_symbols(9, &next_uri),
+        source_reload(10, &options),
+        source_symbols(11, &old_uri),
+        source_symbols(12, &next_uri),
+        json!({"jsonrpc":"2.0","method":"workspace/didChangeWorkspaceFolders","params":{"event":{
+            "added":[],"removed":[{"uri":project_uri,"name":"owned"}]}}}),
+        source_symbols(13, &next_uri),
+        source_reload(14, &options),
+        source_symbols(15, &next_uri),
+        source_symbols(16, &added_uri),
+        source_reload(17, &options),
+        source_symbols(18, &added_uri),
+        source_symbols(19, &added_uri),
+        source_reload(20, &options),
+        source_symbols(21, &added_uri),
+        source_symbols(22, &next_uri),
+        json!({"jsonrpc":"2.0","id":23,"method":"shutdown"}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ];
+    let replies = exchange_directory(
+        &package.0,
+        messages
+            .iter()
+            .inspect(|message| match message["id"].as_i64() {
+                // Iterator advancement occurs only after the preceding request's
+                // matching actual response; no sleeps, polling or fake acknowledgments.
+                Some(3) => {
+                    std::fs::write(project.join("src/A.kt"), changed).unwrap();
+                }
+                Some(8) => {
+                    std::fs::write(
+                        project.join("workspace.json"),
+                        serde_json::to_vec(&source_model(&["next"])).unwrap(),
+                    )
+                    .unwrap();
+                }
+                Some(16) => {
+                    std::fs::write(project.join("next/Added.kt"), added).unwrap();
+                }
+                Some(19) => {
+                    std::fs::remove_file(project.join("next/Added.kt")).unwrap();
+                }
+                _ => {}
+            }),
+    );
+    assert_eq!(replies.len(), 23, "{replies:?}");
+    assert_source_class(&replies, 2, before, "Before");
+    assert_source_class(&replies, 4, "class Unsaved\n", "Unsaved");
+    for id in [3, 5, 8, 19] {
+        assert_source_refused(&replies, id, -32801);
+    }
+    for id in [6, 10, 14, 17, 20] {
+        let reply = source_reply(&replies, id);
+        assert!(reply.get("error").is_none(), "{reply}");
+        assert_eq!(reply["result"], Value::Null);
+    }
+    assert_source_class(&replies, 7, changed, "DiskChanged");
+    for id in [9, 11, 13, 16, 21] {
+        assert_source_refused(&replies, id, -32803);
+    }
+    for id in [12, 15, 22] {
+        assert_source_class(&replies, id, successor, "Successor");
+    }
+    assert_source_class(&replies, 18, added, "Added");
+    assert_eq!(source_reply(&replies, 23)["result"], Value::Null);
+}
+
+#[test]
+fn packaged_json_late_root_and_meaningful_unsupported_import_never_publish_prefix_or_history() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let package = Package::new(true);
+    let late = source_project(&package, "late", &["first"]);
+    std::fs::write(late.join("first/Prefix.kt"), "class Prefix\n").unwrap();
+    std::fs::write(
+        late.join("workspace.json"),
+        serde_json::to_vec(&source_model(&["first", "missing-last"])).unwrap(),
+    )
+    .unwrap();
+    let historical = source_project(&package, "historical", &["src"]);
+    std::fs::write(historical.join("src/Old.kt"), "class Historical\n").unwrap();
+    let candidate = source_project(&package, "candidate", &["src"]);
+    std::fs::write(candidate.join("src/New.kt"), "class Candidate\n").unwrap();
+    let unsupported = source_project(&package, "unsupported", &["src"]);
+    let mut unsupported_model = source_model(&["src"]);
+    unsupported_model["modules"][0]["externalProjectPath"] = json!("/meaningful/original");
+    let unsupported_bytes = serde_json::to_vec(&unsupported_model).unwrap();
+    std::fs::write(unsupported.join("workspace.json"), &unsupported_bytes).unwrap();
+    let late_uri = source_directory_uri(&late);
+    let historical_uri = source_directory_uri(&historical);
+    let candidate_uri = source_directory_uri(&candidate);
+    let unsupported_uri = source_directory_uri(&unsupported);
+    let prefix = format!("{late_uri}/first/Prefix.kt");
+    let old = format!("{historical_uri}/src/Old.kt");
+    let new = format!("{candidate_uri}/src/New.kt");
+    let late_options = source_options(&[&late_uri]);
+    let historical_options = source_options(&[&historical_uri]);
+    let messages = [
+        source_initialize(&historical_options),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        source_symbols(2, &old),
+        source_reload(3, &late_options),
+        source_symbols(4, &prefix),
+        source_symbols(5, &old),
+        source_reload(6, &historical_options),
+        source_symbols(7, &old),
+        source_reload(8, &source_options(&[&candidate_uri, &unsupported_uri])),
+        source_symbols(9, &new),
+        source_symbols(10, &old),
+        source_reload(11, &source_options(&[&candidate_uri])),
+        source_symbols(12, &new),
+        json!({"jsonrpc":"2.0","id":13,"method":"shutdown"}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ];
+    let replies = package.exchange(&messages);
+    assert_eq!(replies.len(), 13, "{replies:?}");
+    for id in [3, 4, 5, 8, 9, 10] {
+        assert_source_refused(&replies, id, -32803);
+    }
+    for id in [6, 11] {
+        let reply = source_reply(&replies, id);
+        assert!(reply.get("error").is_none(), "{reply}");
+        assert_eq!(reply["result"], Value::Null);
+    }
+    for id in [2, 7] {
+        assert_source_class(&replies, id, "class Historical\n", "Historical");
+    }
+    assert_source_class(&replies, 12, "class Candidate\n", "Candidate");
+    assert_eq!(
+        std::fs::read(unsupported.join("workspace.json")).unwrap(),
+        unsupported_bytes
+    );
+    assert_eq!(source_reply(&replies, 13)["result"], Value::Null);
 }
 
 #[test]

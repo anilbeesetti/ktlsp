@@ -45,8 +45,8 @@ with TWO separate functionality/adversarial review slots:
   `/private/tmp/ktlsp-411-function-signature`, `omp/411-function-signature`.
   One-budget selected Function values plus explicit finite nominal return and
   original own/Class argument identities; existing opaque-return/self-return
-  consumers retain their separate contracts. Genuine return target/bindings
-  are future observations, NOT inferred from earlier408 parameter smoke.
+  consumers retain their separate contracts. Actual admitted public native smoke
+  observed both genuine returns as kotlin.Result, distinct original own-T bindings.
 Both410 and411 source components are implemented and independently statically
 reviewed:410 head865396234376c82d36a1a31695a1520cd410879e/treec8845584;
 411 head4a1566db040fa928ac748fc2cdb11d140efa1d74/tree700ba507.
@@ -58,10 +58,19 @@ static clears after fixing the one reported unmigrated chained library read.
 No existing dependency visibility bypass is claimed: its query already trusted
 the private projection; this closes mutable sidecar/projection divergence.
 All THREE reviewed components are composed into ROOT's successor WT.
-Full union reviews, compile/format/lint, new original nested producer outcomes,
-composed-return/import data smoke, hosted CI and guarded integration remain
-UNVERIFIED. Temporary410 writers are retained; external411/412 public native
-consumer sources await ROOT admission and complete independent actual readback.
+Both full27 union reviews and all SIX affected reviews cleared the formatted
+source. Strict compilation found two test-only type/complexity errors; minimal
+fixes received renewed exact union/affected clears, then pinned format-CHECK
+and strict locked workspace/all-target Clippy passed0(1.70s) at
+2b73959786edcad2e87e00a3a5cf94adff322b27/treea0c514f9.
+Separately admitted pure binary/import native consumers compiled0/ran0 with
+empty stderr/PATH; OWNER+ROOT fully read actual source/output/original identities
+and9 exact authored budget boundaries. All630=623ordinary+7authoritydoctests
+passed/66rows/0failed0ignored0filtered. Complete custody
+`/private/tmp/ktlsp-411-412-native/`; ONLY throwaway Rust sources were then removed,
+with full original source/output/exe/commands retained. Temporary410 hosted
+writers remain. First original recursive producer/CLI/full hosted three-host
+CI, final writer-only cleanup/reviews/OWN CI and guarded integration are PENDING.
 
 ALL LOCAL Kotlin parser/server/Session/worker/peer/supervision runtime remains
 FORBIDDEN under96, including fake peers and parser-free Session. This overrides

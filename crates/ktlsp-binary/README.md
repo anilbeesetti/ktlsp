@@ -429,13 +429,20 @@ nominal/bare parameter-root/recursive/richer leaves and varargs refuse.
 
 Permanent source regressions use unchanged genuine licensed Result$Companion
 (success4/failure5) and Pair.copy9 fixtures, with same-Outcome pointers and
-separate sibling-own identities. Result's raw return index5 is checked against
-the actual public resolver, not an assumed owner/target spelling. Prospective
-return spans55..63/92..100 and NAME6 leaves59..61/96..98 are **unexecuted new-API
-assertions**, not observations. Previous #408 parameter smoke did not observe
-return semantics. Fixture custody/notices remain unchanged; compiler provenance
-is unverified. Genuine Function-own ID/shadow/ambiguous-NAME emission, table-only
-roles and richer generic returns remain gaps; their authored controls are labelled.
+separate sibling-own identities. ROOT's separately admitted real public native
+consumer at reviewed2b739597/treea0c514f9 compiled0/ran0 with empty stderr/PATH.
+It ACTUALLY resolved index5 to kotlin.Result, not ownerkotlin.Result.Companion:
+returns55..63/92..100, NAME6 leaves59..61/96..98 bind their distinct original
+ownT65..69/102..106. Pair.copy retains kotlin.Pair target and original A/B.
+OWNER+ROOT fully read original class bytes/annotations/Header/d1/d2, every actual
+signature/span/pointer/binding/refusal and all9 authored exact/one-below limits.
+Both independently checked all56 printed pointer/raw-original slice pairs;
+full output/source/proof remain `/private/tmp/ktlsp-411-412-native/`.
+Only then was the throwaway source removed. All630 binary/import data tests
+passed, including all11 new signature tests. Previous408 value smoke is NOT
+this return evidence. Fixture custody/notices unchanged; compiler provenance
+and genuine Function-own ID/shadow/ambiguous-NAME/table/richer-return emission
+remain gaps, with authored controls labelled.
 
 The parameter-only API still leaves returns opaque and has unchanged allowances;
 the old self-return API still refuses Function-own declarations and retains its

@@ -2322,3 +2322,78 @@ changed ONLY that argument to original.as_str() and named the existing test-only
 layout tuple; no suppression, semantic fallback, second formatter or new
 allocation. Changed-scope exact reviews must renew before the next strict check.
 
+#### Actual411/412 native public consumers and complete data-suite acceptance
+
+After BOTH current full27 and affected410 corrective clears, ROOT's pinned
+format-CHECK + strict locked workspace/all-target Clippy passed0/1.70s at
+2b73959786edcad2e87e00a3a5cf94adff322b27/tree
+a0c514f96bf852831daae8faec25c70cdeec9a56. Only ONE formatter mutation occurred.
+Separate ROOT admission then allowed PURE binary/import data—not Kotlin runtime.
+`cargo +1.99.0 build --locked --lib -p ktlsp-binary -p ktlsp-import --message-format=json`
+passed0/2.46s; actual Cargo compiler-artifact records supply every linked rlib,
+all six relevant artifacts markedfresh:false, not guessed/stale library paths.
+
+| Real public consumer | Compiler exit | Run exit | Complete stdout bytes |
+|---|---:|---:|---:|
+| 411 finite composed signature |0|0|478613|
+| 412 immutable import/query |0|0|13593|
+
+Both actual executables ran with empty PATH and removed Java-home variables;
+compiler output and run stderr were empty. Full source/commands/actual rlibs/
+executables/original output/proof remain `/private/tmp/ktlsp-411-412-native/`.
+These are actual API consumers, not a substituted unit-test count.
+
+411 FIRST actual observation resolves both genuine Result.Companion Functions'
+return index5 to **kotlin.Result**, NOT ownerkotlin.Result.Companion.
+Success4 returnbody55..63/Argument57..61/NAME6leaf59..61 binds original ownT65..69;
+failure5 body92..100/Argument94..98/leaf96..98 binds DISTINCT original ownT102..106.
+Genuine Pair.copy9 retains explicit kotlin.Pair and original ClassA54..60/B62..68
+with value/return partitions. OWNER+ROOT each independently checked ALL emitted
+originalclass bytes against retained1682/2983-byte fixtures and all56 printed
+pointer pairs against actual same-Outcome raw slices, preserving original spans.
+Complete annotations/Header/d1/d2/results/nullable-projection Options/scopes/
+arguments/refusal inputs/errors were fully read. ROOT read ALL248 full-value
+reader lines covering128actual records; only pretty whitespace outside quoted
+strings was compacted, with all9 actualSuccess fields complete-exact-text equal
+to fully shown record95. OWNER used an independently reconstructable exact-
+repeat dictionary for whole16132-line original stdout. No preview/hash/count
+substitutes for full payload or original pointer proof were accepted.
+
+Actual LABELLED authored exact minima, each with typed one-below refusal:
+
+| Bytes | Records | Nodes | Work | Owned bytes | Queries | Output units | Entries | Range slots |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+|107|45|10|1485|930|9|29|8|7|
+
+These boundaries describe that authored combined value+return input, not genuine
+compiler emission or every operation. Own/Class signed shadow, immediate-own
+NAME/no-parent/ambiguity, late duplicate, unknown ID, missing/table/duplicate
+return and nominal-leaf refusal output were inspected in full. Genuine own-ID/
+shadow/ambiguity/table/richer-return/compiler-provenance gaps remain explicit.
+
+412 OWNER ImmutableImportsFunction and ROOT fully read all original13593 output
+bytes/seven complete records plus entire source/Cargo identity/proof:
+JSONv1/v2 ordered sidecars and distinct projections, invalid detached model
+retaining commons edge with empty libraries→actual typed UnknownReference,
+subsequent original genuine Commons Builder52.0/root0/ordinal31/Base and original
+owner/library/artifact pointers/provenance, ALL JPS/Maven XML inputs and retained
+module/root/source/declaration/dependency ranges/order/flags/source-only models.
+No malformed clone can replace original import authority; no existing dependency
+visibility bypass or new server workspace import/classpath provider is implied.
+
+Full `cargo +1.99.0 test --locked -p ktlsp-binary -p ktlsp-import` passed0/49.32s:
+**630=623ordinary+7compile-fail authority doctests,66resultrows,
+0failed0ignored0measured0filtered**. Binary548ordinary includes all11 new signature
+cases; import75ordinary retains genuine source-attachment/query/roundtrip controls.
+ROOT read ALL1032 output lines in four bounded ranges; complete reader custody
+and exact census retained, with pagination-text versus raw-byte limits explicit.
+
+ONLY AFTER BOTH OWNER+ROOT complete source/output/identity read gates, ROOT
+removed the two outside-repo throwaway Rust source files. Their FULL source
+remains embedded in proof JSON with original SHA/commands; output/exe retained.
+No product source/tests/writers were removed. FIRST original hosted410 recursive
+producer/paired-CLI/full-workspace three-host acceptance remains PENDING; all
+four direct-stdout writers stay through complete actual read+edit application.
+Common/evidence-document delta will be independently rechecked before publication.
+All96/B3/unknown-original-causes/oracle/full-parity/native-only limits unchanged.
+

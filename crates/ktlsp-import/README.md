@@ -26,6 +26,17 @@ order, roots or provenance independently of the validated projection. Standalone
 project-model clones remain mutable and must pass the normal loader validation
 before reuse. No replacement API, duplicate catalog or workspace provider is added.
 
+A separately admitted external native public consumer at reviewed2b739597/
+treea0c514f9 compiled0/ran0 with empty stderr/PATH. OWNER+ROOT fully read actual
+JSON-v1/v2 records/projections, invalid detached-clone input and real
+UnknownReference refusal, subsequent genuine Commons Lang class selection with
+original owner/library/artifact pointers, and complete JPS/Maven XML/records/
+provenance/source-only projections. All630 binary/import data tests passed,
+including seven compile-fail import authority checks. Full original consumer
+source/output/commands/executable remain `/private/tmp/ktlsp-411-412-native/`;
+only its throwaway Rust source was removed after both complete readbacks.
+This is neither a prior dependency visibility bypass nor server workspace parity.
+
 Supported fields/defaults follow the source contract:
 
 - Workspace modules/libraries default empty. sdks/kotlinSettings/javaSettings may be absent or empty; externalSystem absent/null.

@@ -493,8 +493,7 @@ pub(crate) fn callable_parameters_with_budget<'a>(
     })
 }
 
-// The same allocation-free local header/body validation serves syntax projection
-// and the complete classifier namespace proof. No callable is selected here.
+// Restricted public callable projection: nongeneric and empty-bodied.
 fn local_parameter_layout<'a>(
     cursor: &mut Cursor<'a, '_>,
     lowered: &'a LoweredDeclarations<'a>,
@@ -612,7 +611,7 @@ pub(crate) fn validate_type_namespace<'a>(
         return Err(UNSUPPORTED);
     }
     let node = b.element(parsed, function.cst_index())?;
-    if function.incomplete() || function.owner().is_some() || node.parent != Some(0) {
+    if function.incomplete() {
         return Err(UNSUPPORTED);
     }
     let mut cursor = Cursor {
@@ -655,12 +654,14 @@ pub(crate) fn validate_type_namespace<'a>(
             cursor.expect(block, body.subtree_end, "SEMICOLON", true)?;
         } else if cursor.is(block, body.subtree_end, "FUN")? {
             let (index, local) = cursor.expect(block, body.subtree_end, "FUN", false)?;
-            let (ordinal, local_declaration) = declaration(lowered, index, cursor.b)?;
+            let (_, local_declaration) = declaration(lowered, index, cursor.b)?;
             let (outer_ordinal, _) = declaration(lowered, function.cst_index(), cursor.b)?;
             if local_declaration.owner() != Some(outer_ordinal) {
                 return Err(UNSUPPORTED);
             }
-            local_parameter_layout(&mut cursor, lowered, ordinal, local_declaration)?;
+            // Each descendant is independently checked by the iterative
+            // complete-root walk; do not widen local_parameter_layout.
+            cursor.b.charge(local.subtree_end - index)?;
             cursor.at = local.subtree_end;
         } else if cursor.is(block, body.subtree_end, "CALL_EXPRESSION")? {
             let (index, call) = cursor.expect(block, body.subtree_end, "CALL_EXPRESSION", false)?;

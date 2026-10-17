@@ -54,11 +54,11 @@ GRANTED TWO separate complete functionality/adversarial review slots:
   `/private/tmp/ktlsp-415-bare-return-signatures`, `omp/415-bare-return-signatures`.
   Replace nominal-only ReturnType.class_id with EXISTING scoped Classifier;
   no shim/new decoder, one context/resolver/allowance, nominal error ordering
-  preserved. Genuine Pair component roots are static candidates, NOT observed
-  new native positives; Function-root producer evidence remains a gap.
+  preserved. The admitted native smoke now ACTUALLY binds genuine Pair component
+  roots to original Class A/B; genuine Function-root producer evidence remains a gap.
 Completed research `agent://ReturnAnnotationNext` and `agent://BareReturnNext`
-was read in full; continue it, do not restart. Current work is implementation/
-static review only. All mid-flight checks/formatting/runtime are ROOT-gated.
+was read in full; continue it, do not restart. Implementation/static reviews and
+separately admitted native data verification are complete; hosted414 remains pending.
 Root grants TWO further complete composed-union reviews and owns one formatter.
 No first-source/previous-source CI substitutes for a successor's OWN full CI.
 
@@ -69,12 +69,29 @@ Both use soleparent4bbf. Findings were fixed/rechecked:414 stale blanket simple-
 return refusal now proves lowering success plus independent value refusal;
 415 external consumer Range borrow/move and stale declaration field accesses.
 Full receipts `/private/tmp/ktlsp-414-component-static-handoff.json` and
-`/private/tmp/ktlsp-415-native/component-handoff.json`; complete prepared native
-consumer `/private/tmp/ktlsp-415-native/consumer.rs`412B remains UNEXECUTED.
-ROOT composed both plus common admission docs. COMPLETE14 union reviews,
-ONE formatter, exact renewed clears, strict compilation, separately admitted
-native data and original full hosted return producer/CLI CI remain PENDING.
-No temporary writer/consumer cleanup until BOTH OWNER+ROOT fullactual gates.
+`/private/tmp/ktlsp-415-native/component-handoff.json`.
+ROOT composed both plus common admission docs, obtained BOTH complete14 union
+clears, used its ONE formatter, and obtained all SIX exact postformat clears at
+947826cd70c39e75300d6eae72f7929a9034f5b4/tree632897829df1ff0711a4dd85b7140e7ee9b4fb7c.
+Pinned format-CHECK and strict locked workspace/all-target Clippy passed0(7.14s).
+Separately admitted pure binary/import data tests passed637=630ordinary+7doc,
+66rows,0failed0ignored0measured0filtered; all18 signature tests passed.
+Public native415 consumer compiled0/ran0, empty PATH/stderr, and actually bound
+Pair component1/2 to original Class A/B. OWNER+ROOT independently FULLread all477
+actual records/all original fields and checked146 pointer pairs,48 outer slices,
+28 scoped bindings,20 complete parameter-only pairs and all nine-resource
+exact/one-below/joint/depth boundaries. ROOT read all1726 complete semantic reader
+lines; OWNER read all2760 lossless reader lines and reconstructed all1568416 raw
+stdout bytes exactly. Neither claims literal manual55051 repeated pretty lines.
+ONLY AFTER BOTH full gates ROOT removed outside-repo consumer.rs; complete source
+is embedded in actual-consumer-proof.json, with output/executable/custody retained.
+Full proof `/private/tmp/ktlsp-415-native/ROOT-complete-actual-native-acceptance.json`;
+new minima and limits are in the evidence ledger. Initial ROOT-driver E0463 was
+corrected using BOTH actual Cargo artifact dependency directories, with unchanged
+source and no Cargo rebuild; initial failure remains recorded, not suppressed.
+Current docs must receive renewed exact reviews before publication. Original
+hosted414 return producer/paired-CLI full CI remains PENDING. Keep KTLSP414_ACTUAL
+until BOTH OWNER+ROOT FULLactual payload/edit gates; no earlier CI substitutes.
 
 Delivered413 history below retains the original component/source/smoke gates:
 Both full27 union reviews and all SIX affected reviews cleared the formatted

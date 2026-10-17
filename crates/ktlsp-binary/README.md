@@ -446,20 +446,29 @@ this return evidence. Fixture custody/notices unchanged; compiler provenance
 and genuine Function-own ID/shadow/ambiguous-NAME/table/richer-return emission
 remain gaps, with authored controls labelled.
 
-The #415 source cutover replaces `ReturnType.class_id` outright with `classifier`;
+The #415 cutover replaces `ReturnType.class_id` outright with `classifier`;
 nominal callers must match `Classifier::Class`. It stages the original Type once,
 preserves Class-bearing validation/error order, and routes bare parameter roots
-through the existing shared classifier. New authored source controls cover bare
-scope/NAME/UTF-16/markings/roles/atomicity and new nine-dimensional measurement
-checks for exact/one-below limits. Retained Pair component1/2 (all-Class ordinals7/8,
-return bodies121..123=`3800`/138..140=`3801`, Class A54..60/B62..68) are prospective
-static-wire controls selected independently through `class_member_names`, NOT
-newly observed positives. The complete external public consumer is prepared at
-`/private/tmp/ktlsp-415-native/consumer.rs` for future ROOT admission; neither it
-nor the new tests have been compiled or run by this owner. Historical411 evidence
-above remains nominal-only and unchanged. Genuine bare Function-root producer
-emission, actual #415 outcomes and new actual bare resource minima remain
-unobserved, as does exact compiler provenance.
+through the existing shared classifier. At reviewed947826/tree63289782, ROOT's
+separately admitted public native consumer compiled0/ran0 with empty stderr/PATH.
+It ACTUALLY bound genuine Pair component1/2 (all-Class ordinals7/8, return bodies
+121..123=`3800`/138..140=`3801`) to original Class A54..60/B62..68. Full Pair.copy
+and Result controls retain the nominal targets and original scoped arguments above.
+Authored signed-ID/NAME/UTF-16/marking/role/atomicity controls remain labelled
+separately, not represented as compiler emission.
+
+Independent OWNER+ROOT fully read all477 actual records, including complete
+original class bytes/model/annotations/Outcome, every signature,146 pointer pairs,
+48 outer slices,28 scoped declaration bindings and20 complete parameter-only
+comparisons. Five fully read complete success bases cover all45 exact/one-below
+resource boundaries and five joint successes;45 joint one-below and five depth1
+refusals retain actual typed errors/offsets. Late NAME mismatch costs255 extra
+work units. All637 binary/import checks passed, including all18 signature tests.
+Only AFTER both full gates was the throwaway consumer source removed; full source,
+commands, output and proofs remain `/private/tmp/ktlsp-415-native/`. See the
+[complete current evidence](../../docs/status/development.md#reviewed414415-composed-source-and-complete-native-data-acceptance).
+Historical411 evidence remains unchanged. Genuine bare Function-root producer
+emission and exact compiler provenance remain unestablished.
 
 The parameter-only API still leaves returns opaque and has unchanged allowances;
 the old self-return API still refuses Function-own declarations and retains its
@@ -467,8 +476,8 @@ self/Class-ID/count guarantees. Property/context/method-link contracts are
 unchanged. Receiver/context/contracts/JVM extensions/bounds/TypeTables remain
 opaque: this is not a complete Kotlin signature, target loading, substitution,
 applicability, JVM linkage, symbols, server capability or full Kotlin LSP parity.
-No local build/tests/format/lint or new native smoke was run by this source owner;
-ROOT separately admits exact reviewed-source verification and data observation.
+ROOT's exact reviewed-source compilation and separately admitted native data
+observation do not authorize local Kotlin parser/server runtime under #96.
 
 ## Selected self-applied Class Function return (#390)
 

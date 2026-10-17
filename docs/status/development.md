@@ -2735,3 +2735,79 @@ lint/format/runtime/push/PR/CI action has yet run for this new composition.
 Actual return-CST positives, Pair bare-root observations and new native minima
 remain UNOBSERVED; all96/native-only/T004/B3/oracle/unknown-cause limits remain.
 
+#### Reviewed414/415 composed source and complete native data acceptance
+
+ROOT obtained BOTH complete14 union clears, used ONE formatter, and received
+all SIX exact postformat source/affected-consumer clears at
+**947826cd70c39e75300d6eae72f7929a9034f5b4**, tree
+**632897829df1ff0711a4dd85b7140e7ee9b4fb7c**, on verified4bbf.
+Pinned1.99 format-CHECK plus strict locked workspace/all-target Clippy passed0
+in7.14s (compiler5.93s); this is compilation, NOT local Kotlin runtime admission.
+
+Separately admitted unfiltered pure `ktlsp-binary`/`ktlsp-import` data tests
+passed **637=630ordinary+7authoritydoc**,66 result rows,
+0failed0ignored0measured0filtered,49.27s actual wall time (test build4.65s).
+Binary555/import75 ordinary checks include all18 signature regressions; all seven
+import authority compile-fail docs passed. ROOT fully read all1042 output lines.
+This is not a full-workspace or Kotlin parser/server/CLI run.
+
+Separately admitted public native415 consumer used the actual Cargo JSON artifact
+record, pinned native rustc and actual libktlsp_binary.rlib. Build0, compile0,
+run0; empty PATH/stderr and no Java environment/tool dependency. Initial ROOT-driver
+E0463 omitted the actual transitive dependency directory. Adding BOTH directories
+from actual Cargo artifact filenames corrected linking with UNCHANGED source and
+NO Cargo rebuild; the original failure is retained, not suppressed.
+
+Actual genuine Pair.component1 ordinal7 returns119..123/body121..123=`3800` to
+original ClassParameter0/A54..60/ID0; component2 ordinal8 returns136..140/
+body138..140=`3801` to ClassParameter1/B62..68/ID1. Both preserve absent nullable/
+flags and empty arguments/Function-own/value lists. Pair.copy retains nominal
+kotlin.Pair plus original A/B; Result success/failure retain kotlin.Result,
+NOT Companion, and distinct original T65..69/102..106. All20 complete composed
+and parameter-only result pairs agree.
+
+New ACTUAL minima below are not historical411 nominal minima. Dimensions cover
+one complete operation; bytes include admitted metadata, not whole class carriers.
+
+| Resource | Genuine component1 | Genuine component2 | Authored NAME values+return | Early mismatch | Late mismatch |
+|---|---:|---:|---:|---:|---:|
+| bytes | 859 | 859 | 101 | 1607 | 1607 |
+| records | 100 | 100 | 38 | 36 | 36 |
+| nodes | 19 | 19 | 8 | 7 | 7 |
+| work | 4358 | 4359 | 1008 | 4839 | 5094 |
+| owned_bytes | 2590 | 2590 | 574 | 1942 | 1942 |
+| queries | 5 | 5 | 7 | 6 | 6 |
+| output_units | 23 | 23 | 19 | 779 | 779 |
+| entries | 39 | 39 | 8 | 8 | 8 |
+| range_slots | 26 | 26 | 7 | 7 | 7 |
+
+Every45 individual exact success/one-below typed failure, five joint successes,
+45 joint one-below failures and five depth1 refusals were FULLread. All exact/
+joint successes equal their complete original default results; late mismatch
+consumes255 additional work. No bound, corpus, allowance or error was relaxed.
+
+OWNER and ROOT each FULLread all477 actual records, complete original source/
+class bytes/model/annotations/Outcome/options/signatures/declarations/refusals.
+ROOT independently checked all146 pointer pairs and48 outer slices against
+complete same-Outcome bytes/address bases,28 scoped bindings against complete
+original declarations,20 complete parameter-only pairs and both full fixture byte
+vectors. ROOT read all1726 semantic reader lines: five complete success bases and
+every actual differing field, with only pretty whitespace outside quoted literals
+removed. OWNER independently read all2760 lossless reader lines and reconstructed
+ALL1568416bytes/55051rawlines byte-exactly. Neither claims manually rereading every
+repeated pretty raw line. Stdout SHA256:
+`df2e3a50a7fb97d867a3ff5756808c93bc29c6d98e5af2bd9bb49e1f818869ad`.
+Complete custody `/private/tmp/ktlsp-415-native/`, including
+`actual-consumer-proof.json`, `ROOT-complete-actual-native-acceptance.json`,
+`functionality-947826-complete-actual-native-acceptance.json` and
+`full-binary-import-data-tests.json`. ONLY AFTER both full gates ROOT removed
+outside-repo consumer.rs; its full executed source remains embedded in the proof.
+
+New414 original return-CST/paired-CLI positives remain UNOBSERVED until OWN
+original hosted full CI. KTLSP414_ACTUAL remains for both FULLactual gates and
+independent actual returned-edit application. Current doc-only successor needs
+renewed exact source reviews before publication; no second formatter is allowed.
+Genuine bare Function-root producer emission, exact compiler provenance and full
+official parity remain gaps. All96/native-only/T004/B3/oracle/unknown-cause
+restrictions remain; no new server capability or local Kotlin runtime is admitted.
+

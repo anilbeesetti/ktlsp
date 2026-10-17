@@ -335,12 +335,13 @@ was removed. These are native data observations, not official generics or linkag
 `metadata::resolved_class_function_parameters::decode(&outcome,
 class_field_ordinal, limits)` selects an original field9/wire2 by its ordinal
 among **all** Class fields in supported kind1/mv2.3.0 metadata. It returns the
-shared `class_context` owner/original ordered declarations, selected Function
-header/name/outer and body d1 ranges, and every field6 value declaration in order.
-Each value retains its separate value-list ordinal, original outer/body ranges,
-borrowed raw flags/name index, resolver-derived UTF-16 name, borrowed Type header
-and d1 range. Its classifier is exactly a checked owning-Class declaration ordinal
-or an authentic resolver-derived `class_id::ClassId`, not a loaded/global symbol.
+shared `class_context` owner/original ordered Class declarations, selected Function
+header/name/outer and body d1 ranges, its original ordered `type_parameters`, and
+every field6 value declaration in order. Each value retains its separate value-list
+ordinal, original outer/body ranges, borrowed raw flags/name index, resolver-derived
+UTF-16 name, borrowed Type header and d1 range. Its classifier is a checked
+`FunctionParameter`/`ClassParameter` declaration ordinal or an authentic
+resolver-derived `class_id::ClassId`, not a loaded/global symbol.
 All original bodies borrow the **same retained Outcome**, including declarations;
 metadata ranges are not source coordinates.
 
@@ -352,21 +353,26 @@ marking does not establish semantic non-nullness. Original declaration OUT is
 not a use-site projection.
 
 Exactly one inline type3 is interpreted, taking precedence over type-ID5.
-Missing/table-only/duplicate inline Types, Function-local declarations (even
-wrong-wire), parameter-NAME classifiers, unknown/duplicate Class IDs, conflicting
+Selected Function field4 declarations are completed before values, even when
+encoded later. Exact signed ID7 searches own then Class declarations; NAME9 uses
+the same actual resolver and requires exactly one own resolved UTF-16 match,
+never Class fallback. Duplicate IDs refuse within each scope; cross-scope equality
+is valid shadowing. Unqueried duplicate names do not invalidate ID binding.
+Unknown ID, unknown NAME and ambiguous NAME are distinct atomic refusals.
+Missing/table-only/duplicate inline Types, significant wrong wires, conflicting
 classifiers, arguments/aliases/flexible/outer/abbreviated Types, nonzero effective
-Type flags and all vararg4/6 roles refuse atomically. Significant wrong wires
-refuse; unknown fields follow the existing bounded opaque-wire policy.
-Return/receiver/context/contracts/JVM bodies and Class/Function TypeTables stay
-original opaque bytes. Empty results mean the Function actually has no values.
-Signed/reordered IDs bind declarations by exact ID, not names or list positions.
+Type flags and all vararg4/6 roles still refuse. Return/receiver/context/contracts/
+JVM bodies, bounds and Class/Function TypeTables stay opaque. Empty value results
+mean the Function actually has no values. Original reified/variance/bounds and
+nullable Options remain data, not inferred semantics.
 
 One monotonic existing d1+d2/schema/wire/name/output allowance covers complete
-Class framing/context, selected Function/value/leaf scans, comparisons and output
-capacity. No public child decoder resets, detached table/body inputs, duplicated
-declarations or additional resolver are used. Depth remains the hard finite
-flat-leaf depth2, not an extensible recursive type framework; earlier
-class/annotation/d1 decoding retains its separate bounds.
+Class framing/context, selected Function/own declarations/bounds/value/leaf scans,
+scoped ID comparisons, every inspected UTF-16 comparison unit and retained
+capacity. Temporary resolved NAME queries consume output/allocation without refund.
+No public child decoder resets, detached table/body inputs, secondary index/cache
+or additional resolver are used. Depth remains the hard finite flat-leaf depth2,
+not recursive type depth; earlier class/annotation/d1 decoding has separate bounds.
 
 Permanent source tests reuse the unchanged licensed Pair fixture: copy at Class
 ordinal9/body151..198 has first171..179/type177..179 bound to A(ID0, declaration
@@ -375,13 +381,20 @@ Both raw flags are Some(2) and nullable marking is absent. Equals at ordinal10/
 body200..220 has other208..216/type212..216, name index21 and nominal index22:
 the actual resolver supplies kotlin/Any despite empty raw d2, with Some(true)
 nullable marking. These are source-derived expectations, **not newly executed
-smoke evidence**. Compiler provenance remains unverified. Genuine positive
-Function-local/table-ID/array/vararg corpus is absent. No local checks or native
-smoke were run by this source owner; ROOT admits those separately.
+smoke evidence**. Compiler provenance remains unverified. The unchanged licensed
+Result$Companion fixture adds a genuine NAME9 `success` control (Class ordinal4,
+local body65..69 ID1/name6, value71..77/Type75..77 `4806`) and nominal `failure`
+with separate local102..106 and Throwable Type112..114. Original raw-data
+observation had separate budgets and is not new aggregate binding evidence.
+Genuine Function-local ID-leaf/table-ID/array/vararg coverage remains absent.
+No local checks or new native smoke were run by this source owner; ROOT admits
+those separately.
 
-Function-local/enclosing scope, table interpretation, arrays/varargs, substitution,
-bounds, applicability, source-to-JVM parameters, library symbol lookup/source
-attachment, server integration and full Kotlin LSP parity remain unsupported.
+Enclosing scopes beyond owning Class ID lookup, table interpretation, arrays/
+varargs, substitution, bounds interpretation, applicability, source-to-JVM
+parameters, library symbol lookup/source attachment, server integration and full
+Kotlin LSP parity remain unsupported. This extension does not broaden the sibling
+property/return operations' narrower scope/NAME refusals.
 
 ## Selected self-applied Class Function return (#390)
 

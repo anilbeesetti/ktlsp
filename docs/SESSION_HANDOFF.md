@@ -1,5 +1,94 @@
 # Session handoff — native Kotlin LSP continuation
 
+## Current continuation — supersedes the historical checkpoint below
+
+The user reauthorized autonomous implementation, genuine parallel delegation,
+tickets/PRs and reviewed passing merges, and asked not to stop at intermediate
+decisions or phase boundaries. **Full official Kotlin LSP parity is NOT achieved.**
+Use the actual session capacity; the historical 32-concurrent instruction below
+is not a new limit. Do not manufacture hundreds of overlapping/blocked tasks.
+
+Verified incoming main is **608437dc64007bdfecd472cfb97a646242fec41b**, tree
+**4c66e332adf5102f995c8c8a5ab7c346b359dcf0**, sole parent
+**3920ab7d22ce4d89023291f2801500e598e24bb0**.
+[PR406](https://github.com/anilbeesetti/ktlsp/pull/406) delivered402/403/404/405:
+original selected Class Function value-parameter data, original call/selected
+parameter syntax, bounded immutable positions and exact single-pass identifiers.
+Exact capture-free reviewedeefd06d5b2002d5aa8fe13929712631714149de8 received
+two full19 union reviews, affected reviews, strict compile and OWN original
+Native38979650322/platform38979650359 full CI. Actual squash tree/sole parent
+and original exact-main38980985939/job117241549331 were independently accepted
+by OWNER and ROOT:1190=1158ordinary+32doc/140rows,0failed3ignored0filtered,
+plus22 SEPARATE protocol fault cases. Main raw294956bytes has SHA256
+40c5ae2b377469c5ac97e642478c7ef4c0cf9732b47b9dbc4f1b085dc756f580.
+Lease406 is CLEARED. [Full current evidence ledger](status/development.md)
+retains first actual403 source/CST/byte-edit readback and precise timing limits.
+
+Current ROOT integration WT: `/private/tmp/ktlsp-330-type-scope-integration`,
+branch `omp/330-type-scope-integration`, based on that SAME verified608 main.
+Draft [PR409](https://github.com/anilbeesetti/ktlsp/pull/409)'s first reviewed
+8285763/245736 source has OWN ORIGINAL full three-host success and completed
+OWNER+ROOT actual producer/CLI full-read/edit-application gates. ONLY observation
+writers/bookkeeping were then removed; cleaned-source exact reviews/OWN original
+CI and guarded integration remain PENDING. Prior406 CI is not its acceptance.
+ROOT owns common docs/Cargo/lock/workflows,
+source/runtime admission, two union reviews, CI, exclusive leases and merging.
+Preserve all original/user/old/delivered/component WTs, including frozen406 WT
+`/private/tmp/ktlsp-330-call-parameter-integration`.
+
+Two newly admitted independent owners work from608, each with two distinct
+functionality/adversarial static review slots:
+- [407](https://github.com/anilbeesetti/ktlsp/issues/407):
+  `/private/tmp/ktlsp-407-type-namespace`, `omp/407-type-namespace`.
+  Complete original lexical type binding/occurrences/capture-safe rename for
+  direct-local parameter annotations. Value/callee whole-body guards stay strict.
+- [408](https://github.com/anilbeesetti/ktlsp/issues/408):
+  `/private/tmp/ktlsp-408-function-own-scope`, `omp/408-function-own-scope`.
+  Original selected Function declarations, ID own-before-Class and NAME OWN-only.
+  Genuine Result.Companion.success encodes NAME6 (`48 06`), NOT declaration ID1.
+  Original raw observation `/private/tmp/ktlsp-next-function-local-data/` remains.
+  Subsequent REAL public composed native smoke at reviewed0a0d802/e3ec94
+  compiled/ran0 with empty stderr; OWNER+ROOT fully read all177 source/9 output
+  lines before only its throwaway Rust source was removed. Genuine NAME9→own0,
+  original pointers/ranges, distinct Throwable/Pair controls and labelled
+  authored shadow/refusal/query-boundary controls passed; all537 binary-data
+  tests passed. Full proof `/private/tmp/ktlsp-408-composed-native/`.
+  Genuine Function-ID positive remains GAP.407's30producer/57CLI packets PER
+  original host were FULLY read by OWNER+ROOT; each independently applied all
+  171 actual version7 UTF16 batches/495edits and verified version8 replay.
+  Original Native38994222653/1 and platform38994222817/1 used actualmergef1e051a,
+  tree245736, orderedparents[608,828]. Full proof
+  `/private/tmp/ktlsp-409-first-platform-38994222817/`; independent OWNER receipt
+  `/private/tmp/ktlsp-407-owner-first-hosted/owner-three-host-full-read-and-actual-apply-receipt.json`.
+  Cleaned-source reviews/OWN original CI and guarded exact-main remain PENDING.
+
+ALL LOCAL Kotlin parser/server/Session/worker/peer/supervision runtime remains
+FORBIDDEN under96, including fake peers and parser-free Session. This overrides
+historical parser-free local-test suggestions below. Compile only after exact
+static reviews; pure binary/lexical data smoke requires separate ROOT admission.
+Original hosted producer/paired-CLI actual source/request/response/edit evidence
+must be FULLY read by independent OWNER+ROOT before ONLY temporary writers are
+removed; permanent assertions/real edit application stay. Final source needs OWN
+original full CI and a SEPARATE fresh strictly-readonly process0+parsedexit0
+complete exclusive-base guard before SEPARATE ordinary expected-head merge.
+Retain the base lease through actual tree/sole-parent and independent OWNER+ROOT
+original exact-main full CI. No unchanged retry or relaxed source/work/storage/
+depth/deadline/cleanup/corpus. Native engine remains Rust-only; T004 data-only.
+
+The original319/320/packaging/PR306 cleanup-ownership work BELOW is historical,
+not a restart queue; its later reviewed deliveries are retained in the ledger.
+Older draft384 remains diagnostic HOLD, not a proven Windows fix.395/377 original
+causes are UNKNOWN; B3 INCONCLUSIVE/HOLD and96 remain. Oracle adapter/bootstrap/
+receiver prerequisites were delivered, but official START/runtime remains HOLD
+for missing authenticated same-still-running-job AND exact-step log custody;
+do not repeat failed probes/dispatch or weaken custody without fresh admission.
+Language-server refs recently failed unexpectedcode0; actual attempts and
+complete fallback caller maps are `/private/tmp/ktlsp-407-408-caller-proof.json`.
+No successful LSP references, full semantics or official parity is implied.
+
+**Everything below is the preserved historical8b4c7b4 checkpoint, not current
+status/admission/stop authority. Continue the saved work rather than repeat it.**
+
 ## User request and stop condition
 
 The user still wants full official Kotlin LSP functionality in Rust, faster through substantial parallel work and good code quality. **The goal is not finished.** The user explicitly requested this checkpoint and a prompt for a new session; pausing here is authorized, not a claim of completion.

@@ -15,3 +15,12 @@ README pins protobuf2.6.1 and wire caveats; retain those rules and notices.
 LICENSE.txt/NOTICE.txt/PROTOBUF_LICENSE.txt copied byte-identically from metadata_wire.
 Expectations independently frozen before source/runtime; no encoder under test.
 No semantic, full initialization, upstream runtime-equivalence or performance claim.
+
+`Result$Companion.class.bin` is the unchanged original member from the same
+stdlib archive. RESULT_COMPANION_EXTRACTION.json records its exact member/archive
+hashes and ROOT-accepted native raw-data observation receipts. It reuses the
+existing Apache notices and t017c2 provenance, without compiler-provenance claims.
+Success's value Type is genuine NAME9 index6 (`4806`), not ID7; its own declaration
+is ID1/name6. Failure retains a separate T but takes nominal kotlin/Throwable.
+These are intended composed-API assertions, not newly executed binding evidence.
+Genuine Function-local ID-leaf coverage remains GAP; ID regressions are authored.

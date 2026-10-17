@@ -470,9 +470,9 @@ evidence and integration verification remain ROOT-gated under #96.
   chained public-query resets. These finite borrowed syntax views add no target
   selection, argument-to-parameter mapping, applicability, inferred type, active
   parameter/signature, provider or capability. `ReferenceSite` remains initializer-
-  only; complete semantic BodyCheck and non_value_reference are unchanged, so
-  newly admitted rich calls/parameterized local functions still atomically refuse
-  all existing rich-body semantic consumers.
+  only; all four value/callee BodyCheck routes and non_value_reference remain
+  unchanged. Rich bodies still refuse value/callee consumers. The independent
+  closed type-namespace proof below admits syntax without selecting a callable.
   `tests/call_syntax.rs` retains original supervised-worker identity, role,
   ownership, actual edit/reparse/rebinding and foreign/stale/refusal assertions.
   Synthetic accounting tests cover exact/one-over/overflow and call-then-parameter
@@ -571,9 +571,17 @@ evidence and integration verification remain ROOT-gated under #96.
 - `local_value_binding::bind_lexical_type_parameter(directory, result,
   annotation_reference_index, current)` authenticates original snapshot/tree
   association, exact reference/token/USER_TYPE/TYPE_REFERENCE/parameter-or-local
-  ancestry, enclosing function and complete admitted body. It scans the entire
-  same-function type-parameter list under ONE existing 2,097,152-unit reference
-  budget, including spelling/comparison work after the first match. A unique
+  ancestry, type-declaring outer function and complete closed type namespace.
+  Ordinary nongeneric direct-local empty functions may have simple parameter
+  annotations. Their parameter owners remain the original local declarations;
+  returned function/body identify the outer that declares the type parameter.
+  Every annotation and direct-local header/body is authenticated once, including
+  uncalled functions before/after the selected use. Direct calls use the existing
+  identifier/integer/optional-label syntax grammar without resolving callees,
+  names, labels or arity. All local classifiers and unsupported nested/header/
+  type shapes refuse the entire envelope. The complete outer leading type list
+  shares ONE existing 2,097,152-unit reference budget, including spelling/
+  comparison work after the first match. A unique
   semantic spelling returns original borrowed annotated declaration, function,
   body, reference/name token and `TYPE_PARAMETER` target. Matching duplicates
   (including later `T`/backtick-T), no match, foreign/stale snapshots, unsupported
@@ -594,22 +602,37 @@ evidence and integration verification remain ROOT-gated under #96.
   `TypeParameterAnnotation` records retain original annotated declaration,
   reference/name-token identities and source order; no value site is fabricated.
   The existing definition query shares private ancestry/function/list helpers.
-  Each query authenticates its original tree and completes body/callee validation
-  once under one 2,097,152-unit budget, including the complete type list, **all**
-  same-function annotations, borrowed-record reservation/capacity and emission.
+  Each query authenticates its original tree and completes the independent closed
+  type-namespace proof once under one 2,097,152-unit budget, including the complete
+  type list, **all** outer/header/direct-local-function parameter annotations,
+  borrowed-record reservation/capacity and emission.
   Matching semantic duplicates, stale/foreign origins and exhaustion fail atomically.
   Rename checks both edited and unedited annotation identities: another type
   parameter or any unrelated simple annotation with the new spelling refuses
-  capture, including header parameters and unused targets. Value names and proved
-  local function/callee names are separate namespaces, not automatic collisions.
+  capture, including annotations only in another uncalled local function and
+  unused targets. Values and nongeneric local function/callee/label names remain
+  separate namespaces, not automatic collisions.
   Output remains bare ASCII with existing spelling/boundary limits; native
   contextual outputs `where`, `dynamic` and `suspend` refuse before same-name quote
   removal. `out`/`reified` edited-producer/rebinding regressions are included, not
   blanket-classified as invalid modifiers. Storage remains at most 1,024 records
   and 131,072 requested/retained bytes, measured using the actual annotation width.
   This is finite same-function lexical refactoring, not full type resolution,
-  type hover/typeDefinition, workspace rename or official equivalence. New hosted
-  producer/wire observations and checks remain ROOT-gated; no local runtime ran.
+  type hover/typeDefinition, workspace rename or official equivalence. PR409's
+  OWN ORIGINAL native38994222653 and platform38994222817 at8285763 retained
+  all30 original/edited producer packets and57 paired-CLI records PER host.
+  OWNER+ROOT FULLY read complete actual CST/source/owner/region/binding and
+  request/response data, then independently applied every returned version7
+  UTF16 batch:57applications/165edits per host,171/495 total, matching actual
+  appliedSource and version8 replay definitions/full references/unused targets.
+  All original cross-host JSON fields compare equal; repeated initial batches
+  form15 distinct payload groups and replays27, not57 distinct initial sessions.
+  Unicode CLI adds actual leading emoji-comment/CRLF trivia versus its producer
+  fixture; no whole-snapshot/pointer identity is inferred across distinct sources.
+  ONLY AFTER both full gates were observation-only writers/bookkeeping removed;
+  ALL permanent pointer/namespace/capture/budget assertions and real edit/
+  reparse/rebinding paths remain. Final cleaned-source OWN original full CI and
+  guarded exact-main integration remain separate; no local Kotlin runtime ran.
 - `local_value_binding::visible_local_values(directory, result, initializer_index,
   current_snapshot)` authenticates an existing whole-identifier initializer
   reference without requiring its spelling to bind. The owned result retains

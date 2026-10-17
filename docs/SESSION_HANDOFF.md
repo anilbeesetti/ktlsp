@@ -130,6 +130,12 @@ and7 observation-call trailing commas only; Clippy/NoRun were NOT invoked.
 Root manually applied exactly that read diff, no formatter mutation. Preserve
 r2 fmt3344B stdout SHAf420e46b7a7fe389e4ae61d623e03f650d0cbddbb4a5e140217eadbfd678ac30.
 Exact renewed source/compiler gates remain required; no runtime is admitted.
+Both complete r3 source renewals CLEAR4c6077f/tree2a1edfa. Fresh fmtCHECK0;
+strict FULL-workspace Clippy101 caught2 avoidable single-reference Vec clones
+in native mutation tests (stderr2530B SHA ff5c69475e8c6444b59c3920aa549a0bb1f48e3bf21f900766fd1377c3b75fa1).
+Root replaced ONLY those with std::slice::from_ref; no changed assertions or
+production code. NoRun/native runtime not invoked. Preserve failure; renew exact
+source gates and use strict full-scope keep-going compiler diagnostics next.
 No owner formatter/build/check/test/runtime is permitted mid-flight.
 Keep real packaged stdio cancel/ID-reuse observations distinct from complementary
 Session owned-count/retained-until-join proof; no production probe/barrier/delay.

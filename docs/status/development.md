@@ -4383,3 +4383,20 @@ ROOT read that complete original formatting diff and manually applied ONLY
 checked-chain wrapping plus7 observation-call trailing commas in2files. No
 formatter mutator reran; no behavior/assertion/capture/cleanup change. Both
 exact cumulative source renewals and NEW compiler admission remain mandatory.
+
+Both complete30path r3 source renewals cleared4c6077f747c00820b92bd14eba5a04877ed7043b/
+tree2a1edfafd56ad7436f4380a99f190fbea8cb9825, source-only0.96/0.97. ROOT
+personally FULL-read both current rendered receipts: function11718B
+SHA32933721c83ea95e35503be487c637648558f63d4989fcaf4ecbeb9ece5075cc,
+adversary9374B SHA0a9b1676da0bff5d7856c885eff2d19f0bd24936538ebd752dcefefc3cd70acb.
+Separately admitted fmtCHECK0 in1.175207459s, strict full-workspace Clippy101
+in2.908083667s. Complete2530B original stderr
+SHAff5c69475e8c6444b59c3920aa549a0bb1f48e3bf21f900766fd1377c3b75fa1
+identifies ONLY two cloned-reference-to-slice lints in native mutation tests.
+NoRun was NOT invoked and no runtime ran. ROOT read the diagnostics/call
+contexts and replaced the two avoidable Vec clones with std::slice::from_ref;
+production APIs, fixture values/assertions and ownership remain unchanged.
+No lint suppression or formatter mutation was added. Fresh exact source
+renewals remain required. Next strict FULL-workspace Clippy should use
+--keep-going to collect remaining diagnostics without reducing scope or
+weakening -D warnings; no unchanged failure is rerun merely to confirm it.

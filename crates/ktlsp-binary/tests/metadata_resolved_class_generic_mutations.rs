@@ -310,7 +310,7 @@ fn every_significant_wrong_wire_and_richer_type_shape_refuses() {
                         &mut input,
                         carrier,
                         &[parameter(0, 1, &bounds)],
-                        &[ty.clone()],
+                        std::slice::from_ref(&ty),
                     );
                     unsupported_type(&input);
                 });
@@ -441,7 +441,7 @@ fn bounds_are_parameter_major_and_all_original_repetitions_keep_order_and_custod
         with_input(carrier, |mut input| {
             let first = id_type(2, 91);
             let second = id_type(3, 91);
-            let mut p = parameter(91, 1, &[first.clone()]);
+            let mut p = parameter(91, 1, std::slice::from_ref(&first));
             p.extend(scalar(15, 9)); // Counts toward the ALL-TypeParameter-field ordinal.
             p.extend(message(5, &second));
             p.extend(message(5, &first)); // Equal repeated bound is not deduplicated.

@@ -4897,3 +4897,542 @@ fn recursive_type_capture_unused_inner_and_safe_sibling_actual_cli() {
         }
     }
 }
+
+fn label_producer_packet(source: &str, revision: i64, accepted: bool) -> Value {
+    use ktlsp_parser::{
+        FileKind, Parser, SourceSnapshot,
+        local_value_binding::{bind_lexical_type_parameter, bind_local_argument_label},
+        lowering::lower_declarations,
+        structural_regions::build_regions,
+    };
+    let snapshot = SourceSnapshot::new(URI, revision, FileKind::Source, source).unwrap();
+    let result = Parser::new(worker())
+        .unwrap()
+        .parse_snapshot(&snapshot, &std::sync::atomic::AtomicBool::new(false))
+        .unwrap();
+    let tree = result.tree_for(&snapshot).unwrap();
+    assert!(tree.diagnostics().is_empty());
+    let lower = lower_declarations(&result, &snapshot).unwrap();
+    let directory = build_regions(&lower, &result, &snapshot).unwrap();
+    let label_index = tree
+        .elements()
+        .iter()
+        .position(|e| {
+            e.kind == "REFERENCE_EXPRESSION"
+                && e.parent
+                    .is_some_and(|p| tree.elements()[p].kind == "VALUE_ARGUMENT_NAME")
+        })
+        .unwrap();
+    let element_index = |element: &ktlsp_parser::Element| {
+        tree.elements()
+            .iter()
+            .position(|e| std::ptr::eq(e, element))
+            .unwrap()
+    };
+    let declaration_index = |declaration: &ktlsp_parser::lowering::Declaration<'_>| {
+        lower
+            .declarations()
+            .iter()
+            .position(|d| std::ptr::eq(d, declaration))
+            .unwrap()
+    };
+    let binding = bind_local_argument_label(&directory, &result, label_index, &snapshot);
+    let proof = if accepted {
+        let binding = binding.unwrap();
+        let call = binding.call();
+        let parameters = binding.parameters();
+        assert!(std::ptr::eq(call.origin(), &lower));
+        assert!(std::ptr::eq(parameters.origin(), &lower));
+        assert_eq!(call.arguments().len(), 1);
+        assert_eq!(parameters.parameters().len(), 1);
+        let argument = &call.arguments()[0];
+        let label = argument.label().unwrap();
+        assert!(std::ptr::eq(
+            label.reference(),
+            &tree.elements()[label_index]
+        ));
+        assert!(std::ptr::eq(
+            parameters.parameters()[0].declaration(),
+            binding.target()
+        ));
+        assert_eq!(
+            binding.target().owner(),
+            Some(declaration_index(parameters.function()))
+        );
+        assert_eq!(
+            parameters.function().owner(),
+            Some(declaration_index(call.function()))
+        );
+        assert_eq!(
+            binding.argument_parameter().owner(),
+            Some(declaration_index(call.function()))
+        );
+        assert!(std::ptr::eq(
+            binding.formal_annotation().annotated(),
+            binding.target()
+        ));
+        assert!(std::ptr::eq(
+            binding.argument_annotation().annotated(),
+            binding.argument_parameter()
+        ));
+        assert_eq!(binding.type_parameter().kind(), "TYPE_PARAMETER");
+        for annotation in [binding.formal_annotation(), binding.argument_annotation()] {
+            let rebound = bind_lexical_type_parameter(
+                &directory,
+                &result,
+                annotation.reference_index(),
+                &snapshot,
+            )
+            .unwrap();
+            assert!(std::ptr::eq(rebound.reference(), annotation.reference()));
+            assert!(std::ptr::eq(rebound.target(), binding.type_parameter()));
+        }
+        json!({
+            "target":declaration_index(binding.target()),
+            "typeParameter":declaration_index(binding.type_parameter()),
+            "argumentParameter":declaration_index(binding.argument_parameter()),
+            "outerFunction":declaration_index(call.function()),
+            "localFunction":declaration_index(parameters.function()),
+            "call":element_index(call.call()),"callee":element_index(call.callee()),
+            "calleeName":element_index(call.callee_name()),"callBody":element_index(call.body()),
+            "argumentList":element_index(call.argument_list()),
+            "callParens":[element_index(call.open_paren()),element_index(call.close_paren())],
+            "argument":{"ordinal":argument.ordinal(),"node":element_index(argument.node()),
+                "value":element_index(argument.expression()),"valueToken":element_index(argument.value_token()),
+                "comma":argument.comma().map(element_index)},
+            "label":{"node":element_index(label.node()),"reference":element_index(label.reference()),
+                "name":element_index(label.name()),"equals":element_index(label.equals())},
+            "formal":{"ordinal":parameters.parameters()[0].ordinal(),
+                "annotation":element_index(parameters.parameters()[0].annotation()),
+                "comma":parameters.parameters()[0].comma().map(element_index)},
+            "formalList":element_index(parameters.parameter_list()),
+            "formalParens":[element_index(parameters.open_paren()),element_index(parameters.close_paren())],
+            "formalBody":element_index(parameters.body()),
+            "annotations":([binding.formal_annotation(),binding.argument_annotation()].map(|a| json!({
+                "range":a.range()
+            })))
+        })
+    } else {
+        binding.unwrap_err();
+        return Value::Null;
+    };
+    json!({
+        "declarations":lower.declarations().iter().map(|d| json!({
+            "nameRange":d.name_range()
+        })).collect::<Vec<_>>(),
+        "proof":proof
+    })
+}
+
+#[test]
+fn lexical_label_definition_actual_cli_type_rename_replay_and_adversarial_edits() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let package = Package::new(true);
+    let init = json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{"capabilities":{
+        "general":{"positionEncodings":["utf-8"]},
+        "workspace":{"workspaceEdit":{"documentChanges":true}},
+        "textDocument":{"rename":{"prepareSupport":true},"diagnostic":{}}
+    }}});
+    for (source, formal, label, value, callee) in [
+        (
+            "fun <T> outer(p: T) {\n    fun send(to: T) {}\n    send(to = p)\n}\n",
+            "to",
+            "to = p",
+            "p)",
+            "send(to =",
+        ),
+        (
+            "// 😀\r\nfun <`T🦀`> outer(`p😀`: `T🦀`) {\r\n fun send(`to😀`: `T🦀`) {}\r\n send(/* before */ `to😀` /* label */ = /* value */ `p😀`)\r\n}\r\n",
+            "`to😀`",
+            "`to😀` /* label */",
+            "`p😀`)",
+            "send(/*",
+        ),
+    ] {
+        let label_offset = source.find(label).unwrap();
+        let formal_offset = source.find(formal).unwrap();
+        let value_offset = source.find(value).unwrap();
+        let callee_offset = source.find(callee).unwrap();
+        let type_offset = source.find('<').unwrap() + 1;
+        let original = label_producer_packet(source, 7, true);
+        let mut requests = vec![
+            init.clone(),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":7,"text":source}}}),
+            json!({"jsonrpc":"2.0","id":"label","method":"textDocument/definition","params":navigation_params(source,label_offset)}),
+            json!({"jsonrpc":"2.0","id":"type-rename","method":"textDocument/rename","params":rename_params(source,type_offset,"Fresh")}),
+        ];
+        for (i, annotation) in original["proof"]["annotations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .enumerate()
+        {
+            let offset = annotation["range"]["start"].as_u64().unwrap() as usize;
+            requests.push(json!({"jsonrpc":"2.0","id":format!("annotation-{i}"),
+                "method":"textDocument/definition","params":navigation_params(source,offset)}));
+        }
+        for (role, offset) in [
+            ("label", label_offset),
+            ("value", value_offset),
+            ("callee", callee_offset),
+        ] {
+            for method in [
+                "hover",
+                "references",
+                "documentHighlight",
+                "prepareRename",
+                "rename",
+                "completion",
+            ] {
+                let mut params = references_params(source, offset, true);
+                params["newName"] = json!("freshValue");
+                requests.push(json!({"jsonrpc":"2.0","id":format!("{role}-{method}"),
+                    "method":format!("textDocument/{method}"),"params":params}));
+            }
+        }
+        for (role, offset) in [("value", value_offset), ("callee", callee_offset)] {
+            requests.push(json!({"jsonrpc":"2.0","id":format!("{role}-definition"),
+                "method":"textDocument/definition","params":navigation_params(source,offset)}));
+        }
+        for (id, offset) in [
+            ("token-end", label_offset + formal.len()),
+            ("eof", source.len()),
+        ] {
+            requests.push(
+                json!({"jsonrpc":"2.0","id":id,"method":"textDocument/definition",
+                "params":navigation_params(source,offset)}),
+            );
+        }
+        if source.starts_with("//") {
+            for (id, character) in [("split-surrogate", 4), ("interior-crlf", 6)] {
+                requests.push(json!({"jsonrpc":"2.0","id":id,"method":"textDocument/definition",
+                    "params":{"textDocument":{"uri":URI},"position":{"line":0,"character":character}}}));
+            }
+        }
+        requests.extend([
+            json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let responses = package.exchange(&requests);
+        assert!(
+            responses
+                .iter()
+                .filter_map(|r| r.get("id"))
+                .eq(requests.iter().filter_map(|r| r.get("id")))
+        );
+        let reply = |id: &str| responses.iter().find(|r| r["id"] == id).unwrap();
+        assert_eq!(
+            reply("init")["result"]["capabilities"]["positionEncoding"],
+            "utf-16"
+        );
+        assert_eq!(
+            reply("label")["result"],
+            json!({"uri":URI,"range":references_range(source,formal_offset,formal.len())})
+        );
+        let type_declaration = original["proof"]["typeParameter"].as_u64().unwrap() as usize;
+        let type_range = &original["declarations"][type_declaration]["nameRange"];
+        let type_start = type_range["start"].as_u64().unwrap() as usize;
+        let type_end = type_range["end"].as_u64().unwrap() as usize;
+        for i in 0..2 {
+            assert_eq!(
+                reply(&format!("annotation-{i}"))["result"],
+                json!({"uri":URI,"range":references_range(source,type_start,type_end-type_start)})
+            );
+        }
+        for (role, _) in [
+            ("label", label_offset),
+            ("value", value_offset),
+            ("callee", callee_offset),
+        ] {
+            for method in [
+                "hover",
+                "references",
+                "documentHighlight",
+                "prepareRename",
+                "rename",
+                "completion",
+            ] {
+                let response = reply(&format!("{role}-{method}"));
+                assert_eq!(response["error"]["code"], -32803, "{response}");
+                assert!(response.get("result").is_none());
+            }
+        }
+        for id in ["value-definition", "callee-definition"] {
+            assert_eq!(reply(id)["error"]["code"], -32803);
+            assert!(reply(id).get("result").is_none());
+        }
+        for id in ["token-end", "eof"] {
+            assert_eq!(reply(id)["result"], Value::Null);
+            assert!(reply(id).get("error").is_none());
+        }
+        if source.starts_with("//") {
+            for id in ["split-surrogate", "interior-crlf"] {
+                assert_eq!(reply(id)["error"]["code"], -32602);
+            }
+        }
+        let edited = apply_original_rename(source, reply("type-rename"), URI, 7);
+        let type_ranges: Vec<_> =
+            std::iter::once(original["proof"]["typeParameter"].as_u64().unwrap() as usize)
+                .map(|i| original["declarations"][i]["nameRange"].clone())
+                .chain(
+                    original["proof"]["annotations"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|a| a["range"].clone()),
+                )
+                .map(|r| r["start"].as_u64().unwrap() as usize..r["end"].as_u64().unwrap() as usize)
+                .collect();
+        let mut expected = source.to_owned();
+        let mut sorted = type_ranges;
+        sorted.sort_by_key(|r| r.start);
+        assert_eq!(
+            reply("type-rename")["result"]["documentChanges"][0]["edits"],
+            json!(
+                sorted
+                    .iter()
+                    .map(|r| json!({"range":references_range(source,r.start,r.len()),
+                "newText":"Fresh"}))
+                    .collect::<Vec<_>>()
+            )
+        );
+        for range in sorted.into_iter().rev() {
+            expected.replace_range(range, "Fresh");
+        }
+        assert_eq!(edited, expected);
+        let edited_producer = label_producer_packet(&edited, 8, true);
+        for field in [
+            "target",
+            "typeParameter",
+            "argumentParameter",
+            "outerFunction",
+            "localFunction",
+            "call",
+            "callee",
+            "calleeName",
+            "callBody",
+            "argumentList",
+            "callParens",
+            "argument",
+            "label",
+            "formal",
+            "formalList",
+            "formalParens",
+            "formalBody",
+        ] {
+            assert_eq!(
+                edited_producer["proof"][field], original["proof"][field],
+                "{field}"
+            );
+        }
+        let mut replay = vec![
+            init.clone(),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":8,"text":edited}}}),
+            json!({"jsonrpc":"2.0","id":"label","method":"textDocument/definition","params":navigation_params(&edited,edited.find(label).unwrap())}),
+            json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ];
+        for (i, annotation) in edited_producer["proof"]["annotations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .enumerate()
+        {
+            let offset = annotation["range"]["start"].as_u64().unwrap() as usize;
+            replay.insert(
+                4 + i,
+                json!({"jsonrpc":"2.0","id":format!("annotation-{i}"),
+                "method":"textDocument/definition","params":navigation_params(&edited,offset)}),
+            );
+        }
+        let replay_responses = package.exchange(&replay);
+        assert_eq!(
+            replay_responses[1]["result"],
+            json!({"uri":URI,
+            "range":references_range(&edited,edited.find(formal).unwrap(),formal.len())})
+        );
+        for i in 0..2 {
+            let response = replay_responses
+                .iter()
+                .find(|r| r["id"] == format!("annotation-{i}"))
+                .unwrap();
+            assert_eq!(
+                response["result"],
+                json!({"uri":URI,"range":references_range(&edited,type_start,"Fresh".len())})
+            );
+        }
+    }
+    let source = "fun <T, U> outer(p: T) { fun send(to: T) {}; send(to = p) }";
+    for (name, start, end, replacement) in [
+        (
+            "distinct-binder",
+            source.find("to: T").unwrap() + 4,
+            source.find("to: T").unwrap() + 5,
+            "U",
+        ),
+        (
+            "future-shadow",
+            source.rfind('}').unwrap(),
+            source.rfind('}').unwrap(),
+            "; val p = 1 ",
+        ),
+        (
+            "other-arity",
+            source.find("send(to =").unwrap(),
+            source.find("send(to =").unwrap(),
+            "fun send() {}; ",
+        ),
+    ] {
+        let range = references_range(source, start, end - start);
+        let edit = ktlsp_text::TextChange {
+            range: Some(serde_json::from_value(range.clone()).unwrap()),
+            range_length: None,
+            text: replacement.to_owned(),
+        };
+        let mut document = ktlsp_text::Document::new(7, source.to_owned()).unwrap();
+        document.apply_changes(8, &[edit]).unwrap();
+        let edited = document.text();
+        let requests = vec![
+            init.clone(),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":7,"text":source}}}),
+            json!({"jsonrpc":"2.0","id":"before","method":"textDocument/definition","params":navigation_params(source,source.find("to =").unwrap())}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":URI,"version":8},"contentChanges":[{"range":range,"text":replacement}]}}),
+            json!({"jsonrpc":"2.0","id":"after","method":"textDocument/definition","params":navigation_params(edited,edited.find("to =").unwrap())}),
+            json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ];
+        let responses = package.exchange(&requests);
+        assert_eq!(
+            responses[1]["result"],
+            json!({"uri":URI,"range":references_range(source,source.find("to:").unwrap(),2)})
+        );
+        assert_eq!(
+            responses[2]["error"]["code"], -32803,
+            "{name}: {responses:?}"
+        );
+        assert!(responses[2].get("result").is_none());
+        label_producer_packet(edited, 8, false);
+    }
+}
+
+#[test]
+fn lexical_label_definition_keeps_selectors_stale_cancel_and_reopen_guards() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let source = "// 😀\r\nfun <T> outer(p:T){ fun send(`to😀`:T){}; send(`to😀`=p) }\r\n";
+    let label = source.rfind("`to😀`").unwrap();
+    let target = source.find("`to😀`").unwrap();
+    let expected = json!({"uri":URI,"range":references_range(source,target,"`to😀`".len())});
+    let mut session = running_rename();
+    open(&mut session, source);
+    for (within, _) in "`to😀`".char_indices() {
+        let response = request(
+            &mut session,
+            "textDocument/definition",
+            navigation_params(source, label + within),
+        );
+        assert_eq!(response["result"], expected, "{response}");
+    }
+    for offset in [label + "`to😀`".len(), source.len()] {
+        let response = request(
+            &mut session,
+            "textDocument/definition",
+            navigation_params(source, offset),
+        );
+        assert_eq!(response["result"], Value::Null);
+        assert!(response.get("error").is_none());
+    }
+    for character in [4, 6] {
+        let response = request(
+            &mut session,
+            "textDocument/definition",
+            json!({"textDocument":{"uri":URI},"position":{"line":0,"character":character}}),
+        );
+        assert_eq!(response["error"]["code"], -32602);
+    }
+    change(&mut session, 1, "fun stale(){}");
+    notify(
+        &mut session,
+        "textDocument/didChange",
+        json!({"textDocument":{"uri":URI,"version":2},
+        "contentChanges":[{"range":{"start":{"line":0,"character":4},"end":{"line":0,"character":5}},"text":"bad"}]}),
+    );
+    assert_eq!(
+        request(
+            &mut session,
+            "textDocument/definition",
+            navigation_params(source, label)
+        )["result"],
+        expected
+    );
+    notify(
+        &mut session,
+        "textDocument/didClose",
+        json!({"textDocument":{"uri":URI}}),
+    );
+    assert_eq!(
+        request(
+            &mut session,
+            "textDocument/definition",
+            navigation_params(source, label)
+        )["error"]["code"],
+        -32602
+    );
+    open(&mut session, source);
+    assert_eq!(
+        request(
+            &mut session,
+            "textDocument/definition",
+            navigation_params(source, label)
+        )["result"],
+        expected
+    );
+    assert!(session.close().1);
+    for action in ["cancel", "change", "reopen", "rejected-change"] {
+        let mut session = running_rename();
+        open(&mut session, source);
+        assert!(
+            session
+                .handle(json!({"jsonrpc":"2.0","id":"label-pending",
+            "method":"textDocument/definition","params":navigation_params(source,label)}))
+                .is_empty()
+        );
+        let mut replies = match action {
+            "cancel" => session.handle(json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":"label-pending"}})),
+            "change" => session.handle(json!({"jsonrpc":"2.0","method":"textDocument/didChange",
+                "params":{"textDocument":{"uri":URI,"version":2},"contentChanges":[{"text":source}]}})),
+            "reopen" => {
+                let replies = session.handle(json!({"jsonrpc":"2.0","method":"textDocument/didClose",
+                    "params":{"textDocument":{"uri":URI}}}));
+                open(&mut session,source);
+                replies
+            }
+            _ => session.handle(json!({"jsonrpc":"2.0","method":"textDocument/didChange",
+                "params":{"textDocument":{"uri":URI,"version":1},"contentChanges":[{"text":"fun stale(){}"}]}})),
+        };
+        if action == "rejected-change" {
+            let deadline = Instant::now() + Duration::from_secs(3);
+            while replies.is_empty() && Instant::now() < deadline {
+                replies.extend(session.poll());
+                if replies.is_empty() {
+                    std::thread::sleep(Duration::from_millis(2));
+                }
+            }
+            assert_eq!(replies.len(), 1, "{replies:?}");
+            assert_eq!(replies[0]["result"], expected);
+        } else {
+            assert_eq!(replies.len(), 1, "{replies:?}");
+            assert_eq!(
+                replies[0]["error"]["code"],
+                if action == "cancel" { -32800 } else { -32801 }
+            );
+            assert!(replies[0].get("result").is_none());
+        }
+        assert_eq!(replies[0]["id"], "label-pending");
+        let (remaining, clean) = session.close();
+        assert!(clean);
+        assert!(remaining.iter().all(|r| r["id"] != "label-pending"));
+    }
+}

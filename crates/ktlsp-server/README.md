@@ -278,6 +278,46 @@ targets. Sourcee24c011 passed original full Native38941146516 and platform
 38941146673; the earlier failed bad67 run remains immutable. Temporary writers
 were removed afterward; changed completion/rename rebind assertions remain.
 
+## Lexical named-label definition (#419)
+
+Definition alone can resolve the original label in
+`fun <T> outer(p: T) { fun send(to: T) {}; send(to = p) }`
+to the original local formal `to`. One authenticated original direct call must
+have exactly one named plain-reference argument, bound to an original outer
+parameter. The unique preceding same-block local function must be ordinary,
+nongeneric, receiver-free and empty-bodied, with one required simple-typed
+formal and no return annotation. Both original annotations must resolve to the
+same original lexical `TYPE_PARAMETER`: applicability is reflexive `T <: T`,
+not spelling/arity guessing or nominal `Int` inference.
+
+The proof scans competitors of every arity and shape, rejects even future
+argument-name shadows and shares one cumulative parser budget/root proof.
+Definition uses the existing original-name UTF-16 renderer and unchanged
+cancellation/incarnation/version/content publication guards. Semantic backticks,
+non-BMP names, trivia and CRLF retain original target coordinates.
+Value/callee definition, complete occurrences, completion and value rename
+still atomically refuse these richer bodies; type-only rename remains separate.
+No general argument mapping, parameter rename, overload selection, nominal/
+imported applicability, signature help or official parity is claimed.
+
+Permanent genuine paired-CLI tests obtain actual version-7 TYPE rename edits,
+apply them to the original source, reparse version 8 and prove the label/formal/
+argument and both annotation identities again. Real distinct-binder, future
+shadow and other-arity competitor edits refuse. At corrected
+c6c065ba5ff77015fe388bf07ac0ba4c645268cb/tree66d17def, original Native39015889975
+and platform39015890015 passed full three-host checks. Independent OWNER+ROOT
+fully read all15 actual packets, applied all6 genuinely returned TYPE batches/
+18 edits plus9 adversarial changes and matched complete version8 sources and
+replay identities. Only then were temporary KTLSP419_ACTUAL writers and sole
+observation JSON removed; permanent parser/binder/query/edit/reparse/refusal
+assertions remain at their original frequency, including adversarial producer
+calls formerly inside capture output. First-source failed positive used a
+post-name generic sibling outside the existing leading-only contract; its
+fixture-only correction retains all8 cases/U/send/p isolation assertions.
+Original failed union stays rejected. Cleaned-source exact reviews/OWN full CI,
+guarded integration and independent exact-main acceptance remain separate gates.
+No local Kotlin runtime or official equivalence is claimed.
+
 ## Finite function type-parameter references and rename (#392)
 
 References/highlights and negotiated prepare/versioned rename now positively
@@ -343,7 +383,12 @@ First-source Windows full CI separately failed the unchanged long-fence docless
 hover assertion; its complete original response was not retained, so cause is
 UNKNOWN under #417. Added complete-response assertion context changes no input,
 acceptance predicate, cap or deadline and is NOT a behavioral fix or retry.
-Cleaned-source reviews/OWN full CI/guarded exact-main integration remain required.
+Cleaned PR416 merged as `0d7d21923246f75969e6b8d52da71e1aeec086ce`;
+independent OWNER+ROOT accepted original exact-main `39007350276/1`,
+job `117322423948`, and cleared the lease. See the
+[delivery](https://github.com/anilbeesetti/ktlsp/pull/416#issuecomment-6230407655)
+and [verified integration ledger](../../docs/status/development.md#verified416-integration-and-next418419-prerequisite-wave).
+This does not diagnose or close the first Windows #417 failure.
 
 ## Finite local definition and declaration hover
 

@@ -2902,3 +2902,343 @@ full CI and guarded exact-main proof remain mandatory. No current merge lease;
 no source/context/deadline/cleanup weakening or local Kotlin runtime. #417,
 old377/395/B3/oracle/native-only/T004/full-parity limits remain explicit.
 
+#### Verified416 integration and next418419 prerequisite wave
+
+Cleaned **6cc6eb05982ad41d79540020e63c83b0c35e03c3**, tree
+**43dd67ec7be4a40013113eb0a5b98398522b3c9b**, obtained BOTH exact complete14
+ROOT reviews and all FOUR exact full affected component clears. Pinned format-
+CHECK/strict locked workspace-all-target Clippy passed0/1.83s; no second formatter.
+Production Rust/metadata/config stayed unchanged from first64de24; only admitted
+writer cleanup, diagnostic failure context and evidence documentation changed.
+
+Its OWN ORIGINAL Native39006222380/1 and platform39006222397/1 PASSED. Executed
+PR checkout **0907fd614325d7420208c51ae8f50b0e641e054c** has EXACT reviewedtree43
+and ordered parents[4bbf,6cc6]; stale observational eventbf62 is not authority.
+All mandatory pinned format, strict locked all-target workspace Clippy and full
+UNFILTERED workspace steps passed. Platform release invocation retained
+`--no-fail-fast -- --nocapture`; no filtered substitute or failed-source retry.
+
+| Original source/job | Ordinary passed | Docs passed | Failed | Ignored | Measured | Filtered | Result rows |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Cleaned Native117319147052 |1195|39|0|3|0|0|141|
+| Cleaned macOS117319147045 |1193|39|0|3|0|0|141|
+| Cleaned Windows117319146859 |1142|39|0|3|0|0|141|
+| Actual main117322423948 |1195|39|0|3|0|0|141|
+
+Each additionally passed22 SEPARATE fault cases and three same-owned-Child
+allocationcode86 controls, not added to ordinary/doctest totals. Retired
+observation markers0. The unchanged docless-fence assertion passes; this does
+NOT establish the original #417 cause or close/fix its missing-custody failure.
+
+Independent Native/platform auditors and ROOT freshly authenticated source,
+commands, all complete actual values/censuses and all18uniqueCRC-valid members
+per platform. API/upload/download sizes/digests and directly compared separate
+fresh raw/ZIP bytes match. Macartifact12090448498/48836bytes/SHA256
+`b1ec100c64f94140979289034860ecf11bf86d2346eef84863407ad337f4c16b`;
+Winartifact12090734482/44065bytes/SHA256
+`a19ca20f81f92e7611a8f9963356ef68f396d639c67640fbdc873a7311f6e619`.
+Every current workspace value was completely read previously or as a full new
+value: ROOT FULLread all304newworkspace values,34small-member complete field
+differences,67setup/upload differences and89Native differences, with all exact
+occurrence maps. Archived workspace matches contiguous raw3754/3754Mac and
+3533/3533Win. This is complete actual-value read/correspondence, not a literal
+manual repeat of raw bytes. Full custody
+`/private/tmp/ktlsp-416-cleaned-platform-39006222397/ROOT-all-original-cleaned-CI-acceptance.json`.
+
+Only after a SEPARATE fresh strictly-readonly complete guard returned actual
+outerprocess0 and complete parsedexit0 did ROOT explicitly inspect all exact
+active-lease/main/base/head/tree/scope/config/check/workflow/job/artifact/clean
+facts, then issue a SEPARATE ordinary expected-head squash; no admin/force.
+Actual [PR416](https://github.com/anilbeesetti/ktlsp/pull/416) main is
+**0d7d21923246f75969e6b8d52da71e1aeec086ce**, exact reviewedtree43dd, SOLE parent
+**4bbf0f32fd5b4bad276162f927e58ac810cb8014**.
+
+The exclusive base lease stayed held through actual tree/sole-parent proof and
+independent OWNER+ROOT OWN ORIGINAL push/main
+[39007350276/1/job117322423948](https://github.com/anilbeesetti/ktlsp/actions/runs/39007350276/job/117322423948)
+full acceptance. All1237individual case occurrences, including3ignored, and
+all141numeric rows reconcile. OWNER FULLread all2613complete current message
+values and177line full occurrence map over3261rawlines, reconstructing exact
+bytes; an additional functionality reviewer independently read the fullraw.
+ROOT independently accepted3186whole-value occurrences mapped to its personally
+FULLread cleaned Native base plus ALL75new complete actual values8833bytes,
+all cases/rows and direct fault/control receipts. ROOT FULLread all315OWNER
+receiptlines. Independently fetched raw bytes are DIRECTLY equal:
+300407bytes/3261lines/SHA256
+`21760aff2c90d42e236ffd5a762a5b0e20f8032997dec9f1b821efb93f32b2e7`.
+Lease416 CLEARED only AFTER both full gates. Root proof
+`/private/tmp/ktlsp-416-original-main-39007350276/ROOT-exact-main-acceptance.json`;
+independent owner
+`/private/tmp/ktlsp-414-owner-416-main-39007350276/OWNER-original-exact-main-acceptance.json`.
+Public delivery PR416comment6230407655 and parent330comment6230407687.
+
+New genuinely independent prerequisites use ONE stable verified incoming0d7d:
+- [418](https://github.com/anilbeesetti/ktlsp/issues/418), interpreted original
+  selected Class Constructor values, empty own scope/ID-to-Class/NO NAME parent
+  fallback; existing helper/classifier/context/resolver/allowance reused.
+- [419](https://github.com/anilbeesetti/ktlsp/issues/419), Definition-only named
+  label proof by identical original lexical type parameter on the outer
+  argument parameter and sole formal; full competitors before eligibility,
+  one complete root proof/budget, all existing value/callee guards unchanged.
+
+ROOT330-argument-constructor-integration and isolated418/419 worktrees/branches
+were created from EXACT0d7d; all old/user/delivered worktrees preserved. Each
+owner has TWO separate functionality/adversarial review slots; ROOT reserves
+two full union reviews, final exact affected rechecks and one next-union
+formatter. Static implementation is IN PROGRESS, not compiled/runtime accepted.
+Completed full research and admitted contract are retained in the current
+SESSION_HANDOFF; no investigation restart or manufactured concurrency.
+
+#417 originalWindows cause remains UNKNOWN/OPEN, firstsourceCI rejected.
+B3 actualTimeout/deadlineSelectedtrue/sendOk16/receiptMissing remains
+INCONCLUSIVE/HOLD, normal healthy followup separate. #96/no local Kotlin
+runtime, native-only/T004, old377/395unknown causes and oracle authenticated
+same-live-job/exactstep custody HOLD remain. Bare Function-root genuine producer
+emission, exact compiler provenance, general semantics and full parity remain
+unestablished. This delivery adds no capability and no JVM analysis dependency.
+
+#### Composed418419 source — static components, no execution acceptance yet
+
+Both independent owners used SAME verified0d7d and obtained separate full current
+functionality/adversarial component reviews. ROOT read all current receipts and
+independently froze exact head/tree/soleparent/cleanliness/scope/config identities
+before composition; all fact commands exited0.
+
+- 418 **72a8b283022e717d0c85b70de4f6edef8015d6af**,
+  tree38a96cd842c36b628304cc95c77b18fbb6049cb1, five binary paths.
+  ROOT requested immediate dropping of unused opaque Constructor staging before
+  semantic growth; raw-parent validation and monotonic charges stay unchanged.
+  ROOT/reviewers removed permanent raw-helper/forwarding echoes and retained
+  literal genuine owner/Constructor/value/Type/options/pointer assertions.
+  Full current144-line module and437-line/10-test source are static-reviewed,
+  NOT observed test passes or new operation resource minima.
+- 419 **58fd4c42e5cd3959d01165fc4f1a4896d2e8c234**,
+  tree7d99b3a02e4d13fd88b369364d4689262134e199, eight parser/server paths.
+  Independent adversarial review found the canonical P1: structural header
+  membership was incorrectly treated as outer callable visibility. The first
+  VALUE_PARAMETER-only correction was incomplete; ROOT found local generic
+  TYPE_PARAMETER headers still failed in BOTH callable/value candidate scans.
+  Current shared helpers use actual physical direct-body parent plus membership,
+  preserving authentic outer parameters/direct locals and all competition
+  before selected eligibility/arity. The original `unused<U,send,p>()` positive
+  intended original identity/type-rename/edit/reparse assertions; its post-name
+  list later proved outside the admitted lowerer envelope (PR420 failure below).
+  Both reviewers fully reread current2166-line binding and741-line call tests,
+  affected owner/type-root/value/callee callers and exact unchanged source.
+  Earlier incomplete clears are explicitly WITHDRAWN, not current acceptance.
+
+ROOT cherry-picked the reviewed leaves as8793eb9 and5674e21 over root common
+documentationed3ee8b. Expected complete union is16paths; no Cargo/lock/workflow/
+config/vendor/production-lowerer/region/protocol/supervision/capability change.
+Root actual preintegration xd://lsp references proxy attempts failed with
+unexpected rust-analyzer exitcode0/recent initialization failure; xdreport_issue
+acknowledged. Complete grep/read caller fallback is actual evidence. Typed-tool
+omission alone was not proof of unavailability; worker mounts may differ.
+
+Atb63dd2e6/tree949e60ed, BOTH independent ROOT complete16 union reviews cleared
+the full current required source/affected consumers; ROOT fully read both current
+receipts. ROOT then applied its ONE pinned `cargo +1.99.0 fmt --all`,
+completed successfully/1.33s. No second formatter is permitted. Exact all SIX
+postformat ROOT/affected component clears remain required before admitted pinned
+CHECK/strict locked all-target Clippy. No compilation/execution/publication yet.
+Real native418 public consumer and original full hosted Linux/macOS/Windows
+workspace CI remain mandatory. Written outside consumer288lines has two static
+clears and ROOT full read, but has NOT compiled/run; it retains complete actual
+canonical payloads and computed whole-value/pointer occurrence correspondence.
+419 temporary actual writer remains: complete original/actual TYPE-rename-edited
+producers/protocol plus three actual adversarial changes, not fake responses.
+BOTH OWNER+ROOT must FULLread actual payloads and actually apply received edits
+before cleanup; permanent assertions remain. No earlier CI accepts this source.
+
+Independent FormattingContractNext research (426lines, ROOT fully read) finds
+no release-aligned effective settings/range authority or existing compatible
+native layout engine. A ktfmt wrapper would silently substitute another engine;
+T038 remains HOLD, no provider/dependency/oracle probe admitted. Independent
+WorkspaceAuthorityNext research (218lines, ROOT fully read) reused earlier
+WorkspaceSymbolPrerequisites and confirms412 closes only mutation divergence.
+A real JSON-import→physical inventory→Session revision/overlay→unopened-symbol
+consumer is a proposed next prerequisite, not an implemented workspace index.
+Complete trusted-filesystem/read bounds, URI identity, aggregate budgets,
+reload/cancellation/publication transitions and hidden official behavior remain
+separate decisions/evidence. All #96/#417/B3/oracle/native-only/T004/provenance
+and full-parity limits remain unchanged.
+
+#### First418419 strict compilation failure — minimal capture-expression repair
+
+All SIX exact postformat current clears were accepted at
+674d0f9e8b83ce227c4e6394757857f8675fad2f/tree248da5d0, with complete actual
+receipt text retained in
+`/private/tmp/ktlsp-418-419-all-six-formatted-clears-and-compile-admission.json`.
+ROOT admitted pinned format-CHECK plus strict locked workspace/all-target Clippy
+ONLY. Format-CHECK passed; Clippy FAILED101/3.97s compiling
+server tests/document_symbols.rs5012: json! rejects bare array followed by.map.
+This is a real compile failure, not a runtime result or passing source.
+
+ROOT parenthesized the complete array.map JSON-value expression, retaining both
+original annotations, every produced field and all producer/CLI/edit/refusal
+assertions. No fixture/predicate/bound/deadline/corpus/cleanup change, suppression
+or product behavior patch. No second formatter; changed-source exact reviews
+must clear before the next compile. No unchanged retry or local product runtime.
+Original failure `/private/tmp/ktlsp-418-419-first-compile-failure.json` retained.
+Native418 data and original full hosted419/Linux/macOS/Windows evidence remain
+UNOBSERVED; temporary writers remain until BOTH independent full actual gates.
+All #96/native-only/T004/#417UNKNOWN/B3/oracle/provenance/full-parity holds remain.
+
+#### Composed418419 compile acceptance and independent native418 actual proof
+
+The minimal JSON-expression repair at2aef0924f8a426bad821c279583a652df6589645,
+tree89c7302d6106016d20391bcf2d01cfdc990df513, received all FOUR affected exact
+functionality/adversarial clears. The two418 source reviews explicitly apply to
+byte-identical source, not an invented fresh review. Pinned format-CHECK and
+strict locked workspace/all-target Clippy passed; the original failure above is
+retained. No second formatter, suppression or unchanged retry.
+
+Separately admitted unfiltered native binary/import tests passed647 =
+640ordinary+7compile-fail doctests across67rows,0failed0ignored0measured0filtered.
+ROOT fully read all1092stdout/72stderr lines and retained complete case/runner
+associations in `/private/tmp/ktlsp-418-native/ROOT-full-binary-import-data-tests.json`.
+The external actual public-API consumer used the actual Cargo-reported fresh
+binary rlib and pinned Rust1.99, compiled0/0.1641s, ran0/0.5684s with empty PATH
+and no Kotlin/parser/server/JVM runtime. Original stdout299512bytes/7160lines
+SHA2562a9cc7b531b82d3ffdcfca33ae2ae9a1c485de4965df04566c38a2679086d13e;
+compile/run stderr empty.
+
+Independent OWNER+ROOT FULL actual gates accepted every genuine Class model,
+annotation/Outcome/Constructor value and all original pointer/raw-byte pairs.
+ROOT proved whole-value equality to previously fully read genuine Pair bases,
+then fully read all new fields and the complete current occurrence map;
+OWNER independently read all current actual data. All560 records reconcile:
+228actual calls/157 whole-value+pointer successes/71 full errors,18 original
+pointer/byte records and22 explicitly authored inputs with2 complete successes
+and20 complete errors. Actual operation minima: bytes859,records101,nodes22,
+work4996,owned_bytes3200,entries39,range_slots26,queries6,output_units24.
+Joint exact succeeds; all9 joint one-less and flat depth1 refuse. Signed IDs,
+Class NAME refusal, structural-before-semantic failures, atomic late errors
+and third-value cumulative output exhaustion were actually observed.
+
+Only after BOTH full gates was the outside throwaway consumer source removed;
+full executed source, commands, library/fixture hashes and original payloads
+remain retained. Complete dual acceptance:
+`/private/tmp/ktlsp-418-native/ROOT-complete-actual-native-acceptance.json`;
+independent OWNER receipt766lines SHA256
+b2dc607fe66fef229f57cd0f51c177637d13af541d6680c7786ffb2b40718060.
+No #419 runtime/publication or full hosted union/workspace acceptance yet.
+Its temporary writer remains until BOTH full actual producer/protocol/edit gates.
+No capability expansion; compiler provenance UNVERIFIED, #417 UNKNOWN/OPEN,
+B3 INCONCLUSIVE/HOLD, oracle custody HOLD, #96/native-only/T004 and full-parity
+limits remain unchanged.
+
+#### Prepublication419 actual-payload custody correction
+
+ROOT found that both temporary KTLSP419_ACTUAL observations used println!,
+which successful Native libtest capture would hide; the platform workflow's
+existing --nocapture would expose them. Before any push/hosted run, replaced
+ONLY both temporary writers with direct stdout Write/writeln!, preserving all
+JSON fields, fixture/replay/assertions and permanent call frequency.
+No workflow change, new probe, unchanged retry or product semantic patch.
+Earlier exact reviews do not cover this changed capture source; affected
+component and ROOT reviews plus changed-source format-CHECK/strict Clippy are
+required before publication. The ONE formatter is already used; no second.
+No #419 actual execution or custody acceptance is claimed at this stage.
+
+#### Original PR420 CI failure and leading-header fixture correction
+
+After all SIX exact current affected clears and pinned CHECK/strict Clippy0,
+ROOT published draft PR420 at4f124819d73ac77818796bd3b80f0289d1db0b82,
+tree d0db5c679e999fd4a15566ba3629e49755094c54. OWN ORIGINAL Native
+39014856676/1/job117344758697 FAILED101; actual checkout
+4513d2eb04b30b612bd694643a03d75aa28b9281 has the exact tree and ordered parents
+[0d7d21923246f75969e6b8d52da71e1aeec086ce,4f124819d73ac77818796bd3b80f0289d1db0b82].
+857passed1failed2ignored/79rows,0measured0filtered;860 individual case occurrences.
+The sole failed case lexical_argument_label_borrows_the_original_applicable_call_and_formal
+panicked at call_syntax.rs632:58: lower_declarations unwrap Unsupported{element:30}.
+Regions/call_site/binder were not reached in that iteration. No actual failed
+fixture identity/full CST was retained; do not claim the canonical fixture failed.
+Native halted before419 CLI: zero packets, no actual returned TYPE edits.
+
+ROOT independently retained137398bytes/1609lines SHA256
+5b399257b7d88400bcbcc9e342e17996c4816eda256b3c92763f7c3eb4362740;
+independent full Native audit agrees. Original platform39014856641/1 also FAILED:
+Windows117344758643 and macOS117344758813 each failed the same named case.
+Both retained five complete419 CLI packets, pending BOTH full actual data/edit
+gates; those individual transactions do NOT make a failed full union acceptable.
+Original raw logs and packets are in `/private/tmp/ktlsp-420-first-original/`.
+No unchanged retry, cancellation, probe or local Kotlin runtime.
+
+ROOT and two independent component diagnostics found one definite static source
+defect: the new unrelated-header positive spells `fun unused<U,send,p>(){}`.
+The producer accepts this sole post-name type list without diagnostics, but the
+documented finite lowerer deliberately admits only LEADING lists. The function
+name moves plain1 to2 before the list's mandatory plain1 guard; leading-only
+ordered completion/name-emission and existing post-name refusal tests agree.
+This statically broken positive cannot exercise header isolation. Its match to
+actual error/node30 remains INFERENCE without original branch/CST custody.
+
+Corrected ONLY that sibling spelling to `fun <U,send,p> unused(){}`, preserving
+all8 fixtures, U/send/p competitor names and every original identity/type-rename/
+actual edit/version8 reparse assertion. Shared lowerer/vendor/production/budgets/
+BodyCheck/reference/type-root/guards/workflows/deadlines remain unchanged.
+This repairs the authored input to the existing intended envelope, not an
+assertion suppression or grammar expansion. Exact changed-source reviews,
+CHECK/strict Clippy and OWN original full three-host CI are still required.
+Earlier static clears missed the inconsistency; original failures remain
+FAILED/REJECTED, not retroactively passed. Temporary writers remain until BOTH
+full actual gates, and guarded integration/main acceptance remain pending.
+
+#### Corrected PR420 original three-host CI and complete actual gates
+
+Corrected c6c065ba5ff77015fe388bf07ac0ba4c645268cb/tree66d17def924314dfe8540594eeaa9cdc78afe258
+received both exact ROOT and both affected419 reviews;418 unchanged-code/document
+authority explicitly carries. Pinned CHECK0/1.1421s and strict Clippy0/0.2006s.
+OWN original Native39015889975/1/job117347797027 and platform39015890015/1
+(Mac117347796742,Win117347796641) ALL SUCCEEDED. Actual checkout
+de044e4f6d8323e911c2b6ac0687351b126735f0 has exact reviewed tree and ordered
+[0d7d21923246f75969e6b8d52da71e1aeec086ce,c6c065ba5ff77015fe388bf07ac0ba4c645268cb].
+All mandatory steps/source/config/case rows and each platform's18CRC-valid ZIP
+members are authenticated; independent fetches directly equal ROOT originals.
+
+|Original current host|Passes incl39 doctests|Ordinary|Rows|Ignored|Failures|
+|---|---:|---:|---:|---:|---:|
+|Native39015889975|1252|1213|142|3|0|
+|macOS39015890015|1250|1211|142|3|0|
+|Windows39015890015|1199|1160|142|3|0|
+
+Zero measured/filtered; actual case occurrences1255/1253/1202. Each separately
+retains22 worker fault cases and three same-owned-Child code86 confirmations;
+these are not ordinary libtest rows or invented individual CASE dumps.
+ROOT full accepted bases plus every complete new current value and exact
+occurrence correspondence cover all actual output; full independent auditors
+record precise lossless read extents. Native raw404450B/3306L SHA256
+1e50ff6f846ef91729be5165e7be7d15f88b56bad8f5ff5ad022317e47b4a661;
+Mac524586B/4249L SHA2560be8af6b29a68f5aeda55d87980afe34c4e309b16777094d918fb5d4783ea17c;
+Win481292B/4013L SHA256d9640aa1de44958f2bf870e320fdccf405cfbd0eea3e8eb1ba29975f50d2df32.
+Mac artifact12095061405/58542B SHA25610ccabf210537ec74d80e66d036a41034c832f15d92c0abf9f2cdd499ce787fd;
+Win12094643275/53517B SHA256d07a28e9e0d8d300d4b0f2cf949904ff95062dad952e14de2d53a0b83485ab86.
+
+BOTH independent OWNER+ROOT full current actual gates accepted all15 packets,
+21 complete producers/312 messages/240 responses. Current whole serialized bytes
+AND parsed whole values match the previously personally FULL-read original five
+payloads, with every current host/raw/archive occurrence authenticated. Each
+independently applied six genuine current version7 TYPE batches/18 returned edits
+and nine actual adversarial changes to complete actual version8 sources, checking
+original CST/declarations/owners/memberships/regions/all proof roles/both original
+lexical annotation identities and original/replayed UTF16 locations/refusals.
+ROOT actual gate:
+`/private/tmp/ktlsp-420-corrected-original/ROOT-BOTH-current-three-host-actual-gates.json`;
+independent OWNER receipt `OWNER-current-three-host-419-payload-acceptance.json`.
+No selected fields/count-only proof or claim of rereading repeated raw JSON lines.
+
+Only AFTER BOTH full gates ROOT admitted observation-only cleanup. Removed both
+temporary writers/local Write import/obsolete retention comment and sole JSON
+observation fields, keeping only data consumed by permanent assertions. Every
+original producer/binder/query/edit/reparse/refusal assertion and its frequency
+remains; the three adversarial producer calls formerly inside output stay as
+explicit calls after the same protocol assertions. No semantic/fixture/predicate/
+production/budget/workflow/deadline change. The cleaned successor needs renewed
+exact affected reviews/CHECK/strict Clippy and its OWN original full three-host
+CI before fresh guarded integration and independent exact-main acceptance.
+Original4f failures remain FAILED/REJECTED; missing original loop/CST attribution
+is not repaired by a later pass. B3 INCONCLUSIVE/HOLD, #417UNKNOWN, oracle custody
+HOLD, #96/no local Kotlin runtime/native-only/T004/provenance/full-parity limits
+remain. No second formatter, unchanged retry or general platform/parity claim.
+

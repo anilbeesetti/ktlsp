@@ -2471,6 +2471,165 @@ mod tests {
     }
 
     #[test]
+    fn label_applicability_one_budget_covers_projections_root_and_final_identity() {
+        use crate::{
+            call_syntax::{CallArgument, CallableParameter},
+            local_value_binding::{LocalBindingError, argument_label_with_budget},
+            structural_regions::build_regions,
+        };
+        // Synthetic accounting ONLY. Genuine producer and paired CLI acceptance
+        // live in the hosted functional tests; this never supplies their proof.
+        let mut tree = Tree::new();
+        tree.open("FUN");
+        tree.token("FUN_KEYWORD", "fun");
+        tree.token("WHITE_SPACE", " ");
+        tree.open("TYPE_PARAMETER_LIST");
+        tree.token("LT", "<");
+        tree.open("TYPE_PARAMETER");
+        tree.token("IDENTIFIER", "T");
+        tree.close();
+        tree.token("GT", ">");
+        tree.close();
+        tree.token("WHITE_SPACE", " ");
+        tree.token("IDENTIFIER", "outer");
+        for (name, local) in [("p", false), ("to", true)] {
+            if local {
+                tree.header("send");
+            }
+            tree.open("VALUE_PARAMETER_LIST");
+            tree.token("LPAR", "(");
+            tree.open("VALUE_PARAMETER");
+            tree.token("IDENTIFIER", name);
+            tree.token("COLON", ":");
+            tree.open("TYPE_REFERENCE");
+            tree.open("USER_TYPE");
+            tree.open("REFERENCE_EXPRESSION");
+            tree.token("IDENTIFIER", "T");
+            tree.close();
+            tree.close();
+            tree.close();
+            tree.close();
+            tree.token("RPAR", ")");
+            tree.close();
+            tree.open("BLOCK");
+            tree.token("LBRACE", "{");
+            if local {
+                tree.token("RBRACE", "}");
+                tree.close();
+                tree.close();
+                tree.token("SEMICOLON", ";");
+            }
+        }
+        tree.open("CALL_EXPRESSION");
+        tree.open("REFERENCE_EXPRESSION");
+        tree.token("IDENTIFIER", "send");
+        tree.close();
+        tree.open("VALUE_ARGUMENT_LIST");
+        tree.token("LPAR", "(");
+        tree.open("VALUE_ARGUMENT");
+        tree.open("VALUE_ARGUMENT_NAME");
+        let selected = tree.elements.len();
+        tree.open("REFERENCE_EXPRESSION");
+        tree.token("IDENTIFIER", "to");
+        tree.close();
+        tree.close();
+        tree.token("EQ", "=");
+        tree.open("REFERENCE_EXPRESSION");
+        tree.token("IDENTIFIER", "p");
+        tree.close();
+        tree.close();
+        tree.token("RPAR", ")");
+        tree.close();
+        tree.close();
+        let result = finish_body(tree);
+        let lower = lower(&result).unwrap();
+        let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
+        let mut measured = ReferenceBudget::default();
+        let binding = argument_label_with_budget(
+            &directory,
+            &result,
+            selected,
+            result.snapshot(),
+            &mut measured,
+        )
+        .unwrap();
+        assert!(std::ptr::eq(binding.target(), &lower.declarations()[4]));
+        assert!(std::ptr::eq(
+            binding.argument_parameter(),
+            &lower.declarations()[2]
+        ));
+        assert!(std::ptr::eq(
+            binding.type_parameter(),
+            &lower.declarations()[1]
+        ));
+        assert_eq!(
+            measured.requested,
+            size_of::<CallArgument<'_>>() + size_of::<CallableParameter<'_>>()
+        );
+        assert!(measured.retained >= measured.requested);
+        for (work, succeeds) in [
+            (WORK - measured.work, true),
+            (WORK - measured.work + 1, false),
+            (usize::MAX, false),
+        ] {
+            let mut budget = ReferenceBudget {
+                work,
+                ..ReferenceBudget::default()
+            };
+            let found = argument_label_with_budget(
+                &directory,
+                &result,
+                selected,
+                result.snapshot(),
+                &mut budget,
+            );
+            if succeeds {
+                assert!(std::ptr::eq(found.unwrap().target(), binding.target()));
+                assert_eq!(budget.work, WORK);
+            } else {
+                assert_eq!(found.unwrap_err(), LocalBindingError::Resource);
+                if work != usize::MAX {
+                    // This is a late final-emission failure, after BOTH
+                    // projections and the complete original type-root proof.
+                    assert_eq!(budget.requested, measured.requested);
+                    assert_eq!(budget.retained, measured.retained);
+                }
+            }
+        }
+        for (requested, retained, succeeds) in [
+            (
+                REQUESTED - measured.requested,
+                RETAINED - measured.retained,
+                true,
+            ),
+            (REQUESTED - measured.requested + 1, 0, false),
+            (0, RETAINED - measured.retained + 1, false),
+            (usize::MAX, 0, false),
+            (0, usize::MAX, false),
+        ] {
+            let mut budget = ReferenceBudget {
+                requested,
+                retained,
+                ..ReferenceBudget::default()
+            };
+            let found = argument_label_with_budget(
+                &directory,
+                &result,
+                selected,
+                result.snapshot(),
+                &mut budget,
+            );
+            if succeeds {
+                assert!(std::ptr::eq(found.unwrap().target(), binding.target()));
+                assert_eq!(budget.requested, REQUESTED);
+                assert_eq!(budget.retained, RETAINED);
+            } else {
+                assert_eq!(found.unwrap_err(), LocalBindingError::Resource);
+            }
+        }
+    }
+
+    #[test]
     fn call_projection_work_and_storage_are_one_monotonic_budget() {
         use crate::call_syntax::{call_site_with_budget, callable_parameters_with_budget};
         // Synthetic accounting only; actual syntax acceptance uses the original worker.

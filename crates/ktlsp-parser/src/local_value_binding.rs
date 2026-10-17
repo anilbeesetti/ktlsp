@@ -390,8 +390,8 @@ pub(super) fn callable_with_budget<'a>(
     })
 }
 
-// Private lookup is called only by the complete-body walk, never recursively
-// through the public query. No name/candidate allocation or per-call reset.
+// Private lookup is shared by complete-body empty-call checking and the separate
+// label applicability proof. No name/candidate allocation or per-call reset.
 fn callable_target<'a>(
     directory: &'a RegionDirectory<'a>,
     parsed: &'a Parsed,
@@ -418,16 +418,19 @@ fn callable_target<'a>(
                 .owner()
                 .and_then(|owner| directory.lowered().declarations().get(owner))
                 .is_some_and(|owner| std::ptr::eq(owner, function));
+        // Header membership is structural, not visibility. Only physical direct
+        // body declarations compete here; local value/type headers do not.
         let local = directory
             .memberships()
             .get(ordinal)
             .ok_or(LocalBindingError::InvalidOrigin)?
             .region()
-            == body_ordinal;
+            == body_ordinal
+            && declaration.cst_parent_index() == Some(body);
         if !parameter && !local {
             continue;
         }
-        if declaration.incomplete() || local && declaration.cst_parent_index() != Some(body) {
+        if declaration.incomplete() {
             return Err(LocalBindingError::UnsupportedContext);
         }
         // Inspect every relevant spelling before any candidate eligibility.
@@ -450,8 +453,223 @@ fn callable_target<'a>(
     if target.cst_index() >= call || target.range().end > callee.start {
         return Err(LocalBindingError::NoEligibleLocal);
     }
-    // BodyCheck separately proves every local FUN's exact empty-body grammar.
+    // The caller separately proves the selected local FUN's eligible grammar.
     Ok(target)
+}
+
+/// Definition-only applicability proof for one original named label. The two
+/// annotations share an original lexical type declaration, not merely a name.
+/// This does not authorize callee/value navigation or complete value occurrences.
+#[derive(Debug)]
+pub struct LocalArgumentLabelBinding<'a> {
+    call: crate::call_syntax::CallSite<'a>,
+    parameters: crate::call_syntax::CallableParameters<'a>,
+    argument_parameter: &'a Declaration<'a>,
+    formal_annotation: TypeParameterAnnotation<'a>,
+    argument_annotation: TypeParameterAnnotation<'a>,
+    type_parameter: &'a Declaration<'a>,
+}
+impl<'a> LocalArgumentLabelBinding<'a> {
+    pub fn target(&self) -> &'a Declaration<'a> {
+        self.parameters.parameters()[0].declaration()
+    }
+    pub fn call(&self) -> &crate::call_syntax::CallSite<'a> {
+        &self.call
+    }
+    pub fn parameters(&self) -> &crate::call_syntax::CallableParameters<'a> {
+        &self.parameters
+    }
+    pub fn argument_parameter(&self) -> &'a Declaration<'a> {
+        self.argument_parameter
+    }
+    pub fn formal_annotation(&self) -> &TypeParameterAnnotation<'a> {
+        &self.formal_annotation
+    }
+    pub fn argument_annotation(&self) -> &TypeParameterAnnotation<'a> {
+        &self.argument_annotation
+    }
+    pub fn type_parameter(&self) -> &'a Declaration<'a> {
+        self.type_parameter
+    }
+}
+
+/// Authenticate an original VALUE_ARGUMENT_NAME reference and prove the finite
+/// local candidate applicable by reflexive lexical type identity, under ONE
+/// complete type-root proof and budget. Recheck the open snapshot at publication.
+pub fn bind_local_argument_label<'a>(
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    label_reference_cst_index: usize,
+    current: &SourceSnapshot,
+) -> Result<LocalArgumentLabelBinding<'a>> {
+    argument_label_with_budget(
+        directory,
+        result,
+        label_reference_cst_index,
+        current,
+        &mut ReferenceBudget::default(),
+    )
+}
+
+pub(super) fn argument_label_with_budget<'a>(
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    index: usize,
+    current: &SourceSnapshot,
+    b: &mut ReferenceBudget,
+) -> Result<LocalArgumentLabelBinding<'a>> {
+    let parsed = type_tree(directory, result, current, b)?;
+    let reference = b.element(parsed, index)?;
+    if reference.token || !b.equal(&reference.kind, "REFERENCE_EXPRESSION")? {
+        return Err(LocalBindingError::UnsupportedContext);
+    }
+    let mut parent = reference.parent;
+    for kind in [
+        "VALUE_ARGUMENT_NAME",
+        "VALUE_ARGUMENT",
+        "VALUE_ARGUMENT_LIST",
+    ] {
+        let node = b.element(parsed, parent.ok_or(LocalBindingError::UnsupportedContext)?)?;
+        if node.token || !b.equal(&node.kind, kind)? {
+            return Err(LocalBindingError::UnsupportedContext);
+        }
+        parent = node.parent;
+    }
+    let call = crate::call_syntax::call_site_with_budget(
+        directory.lowered(),
+        result,
+        current,
+        parent.ok_or(LocalBindingError::UnsupportedContext)?,
+        b,
+    )?;
+    let body_index = call
+        .call()
+        .parent
+        .ok_or(LocalBindingError::UnsupportedContext)?;
+    // Full candidate competition precedes parameter eligibility and arity:
+    // unsupported/generic/other-arity and future duplicates cannot disappear.
+    let candidate = callable_target(
+        directory,
+        parsed,
+        call.function(),
+        body_index,
+        call.cst_index(),
+        call.callee(),
+        b,
+    )?;
+    let parameters = crate::call_syntax::callable_parameters_with_budget(
+        directory.lowered(),
+        result,
+        current,
+        candidate,
+        b,
+    )?;
+    let [argument] = call.arguments() else {
+        return Err(LocalBindingError::UnsupportedContext);
+    };
+    let [formal] = parameters.parameters() else {
+        return Err(LocalBindingError::UnsupportedContext);
+    };
+    let label = argument
+        .label()
+        .ok_or(LocalBindingError::UnsupportedContext)?;
+    if !std::ptr::eq(label.reference(), reference)
+        || !b.equal(&argument.expression().kind, "REFERENCE_EXPRESSION")?
+    {
+        return Err(LocalBindingError::UnsupportedContext);
+    }
+    let label_name = parsed
+        .source()
+        .get(label.name().start..label.name().end)
+        .ok_or(LocalBindingError::UnsupportedContext)?;
+    let label_name = b
+        .spelling(label_name)?
+        .ok_or(LocalBindingError::UnsupportedSpelling)?;
+    let formal_name = b
+        .spelling(formal.declaration().raw_name())?
+        .ok_or(LocalBindingError::UnsupportedSpelling)?;
+    if !b.equal(label_name, formal_name)? {
+        return Err(LocalBindingError::UnsupportedContext);
+    }
+    let raw = parsed
+        .source()
+        .get(argument.expression().start..argument.expression().end)
+        .ok_or(LocalBindingError::UnsupportedContext)?;
+    let spelling = b
+        .spelling(raw)?
+        .ok_or(LocalBindingError::UnsupportedSpelling)?;
+    let (body_ordinal, _) = find_body(directory, body_index, b)?;
+    let (local, parameter) = value_candidates(
+        directory,
+        body_ordinal,
+        body_index,
+        call.function(),
+        spelling,
+        b,
+    )?;
+    // Unlike initializer value binding, even a future local is competition here.
+    if local.is_some() {
+        return Err(LocalBindingError::AmbiguousLocal);
+    }
+    let argument_parameter = parameter.ok_or(LocalBindingError::NoEligibleLocal)?;
+    let root = type_root(directory, parsed, argument_parameter.owner(), b)?;
+    if !std::ptr::eq(root.function, call.function()) || root.body.cst_index() != body_index {
+        return Err(LocalBindingError::UnsupportedContext);
+    }
+    // Return annotations retain type-only authority, not this first call envelope.
+    for header in root.function.cst_index()..body_index {
+        let node = b.element(parsed, header)?;
+        if node.parent == Some(root.function.cst_index())
+            && b.equal(&node.kind, "TYPE_REFERENCE")?
+        {
+            return Err(LocalBindingError::UnsupportedContext);
+        }
+    }
+    let (argument_annotation, argument_type) =
+        parameter_type_identity(directory, parsed, argument_parameter, b)?;
+    let (formal_annotation, formal_type) =
+        parameter_type_identity(directory, parsed, formal.declaration(), b)?;
+    b.charge(7)?;
+    if !std::ptr::eq(argument_type, formal_type) {
+        return Err(LocalBindingError::NoEligibleTypeParameter);
+    }
+    Ok(LocalArgumentLabelBinding {
+        call,
+        parameters,
+        argument_parameter,
+        formal_annotation,
+        argument_annotation,
+        type_parameter: argument_type,
+    })
+}
+
+// Called only after the one closed-root proof. Authenticate the original
+// parameter's annotation and reuse lexical lookup without a public-query reset.
+fn parameter_type_identity<'a>(
+    directory: &'a RegionDirectory<'a>,
+    parsed: &'a Parsed,
+    parameter: &'a Declaration<'a>,
+    b: &mut ReferenceBudget,
+) -> Result<(TypeParameterAnnotation<'a>, &'a Declaration<'a>)> {
+    let node = b.element(parsed, parameter.cst_index())?;
+    let mut selected = None;
+    for index in parameter.cst_index()..node.subtree_end {
+        let reference = b.element(parsed, index)?;
+        if reference.token || !b.equal(&reference.kind, "REFERENCE_EXPRESSION")? {
+            continue;
+        }
+        let (ordinal, annotation) = type_annotation(directory, parsed, index, b)?;
+        if !std::ptr::eq(annotation.annotated, parameter) || selected.is_some() {
+            return Err(LocalBindingError::UnsupportedContext);
+        }
+        let context = type_function(directory, parsed, parameter.owner(), b)?;
+        check_type_annotation(directory, parsed, ordinal, &annotation, &context, b)?;
+        let spelling = annotation_spelling(parsed, &annotation, b)?;
+        let target = type_target(directory, &context, spelling, None, b)?
+            .ok_or(LocalBindingError::NoEligibleTypeParameter)?;
+        selected = Some((annotation, target));
+    }
+    selected.ok_or(LocalBindingError::UnsupportedContext)
 }
 
 // Only after BodyCheck proves every call is a local FUN may its callee be
@@ -1371,13 +1589,14 @@ fn value_candidates<'a>(
                 return Err(LocalBindingError::UnsupportedContext);
             }
         } else {
-            if membership.region() != body_ordinal {
+            // As in callable lookup, inherited region membership alone does
+            // not make another function's header a direct local declaration.
+            if membership.region() != body_ordinal
+                || declaration.cst_parent_index() != Some(body_index)
+            {
                 continue;
             }
-            if declaration.cst_parent_index() != Some(body_index)
-                || !(b.equal(declaration.kind(), "PROPERTY")?
-                    || b.equal(declaration.kind(), "FUN")?)
-            {
+            if !(b.equal(declaration.kind(), "PROPERTY")? || b.equal(declaration.kind(), "FUN")?) {
                 return Err(LocalBindingError::UnsupportedContext);
             }
         }

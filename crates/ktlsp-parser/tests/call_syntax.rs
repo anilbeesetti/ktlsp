@@ -7,9 +7,9 @@ use ktlsp_parser::{
     call_syntax::{call_site, callable_parameters},
     local_value_binding::{
         LocalBindingError, LocalValueAnchor, TypeParameterAnchor, bind_lexical_type_parameter,
-        bind_local_function_callee, bind_local_value, guarded_local_value_rename,
-        guarded_type_parameter_rename, local_value_occurrences, type_parameter_occurrences,
-        visible_local_values,
+        bind_local_argument_label, bind_local_function_callee, bind_local_value,
+        guarded_local_value_rename, guarded_type_parameter_rename, local_value_occurrences,
+        type_parameter_occurrences, visible_local_values,
     },
     lowering::{ReferenceSiteError, lower_declarations, reference_site},
     structural_regions::build_regions,
@@ -608,6 +608,277 @@ fn nongeneric_returns_do_not_authorize_any_value_body_route_or_callable_return()
                 callable_parameters(&lower, &result, current, target).unwrap_err(),
                 ReferenceSiteError::UnsupportedContext
             );
+        }
+    }
+}
+
+#[test]
+fn lexical_argument_label_borrows_the_original_applicable_call_and_formal() {
+    let _serial = functional::serial();
+    for source in [
+        "fun <T> outer(p:T){ fun send(to:T){}; send(to=p) }",
+        "fun <T> outer(p:T){ fun send(send:T){}; send(send=p) }",
+        "fun <T> outer(p:T){ fun send(p:T){}; send(p=p) }",
+        "fun <T> outer(p:T){ fun <U,send,p> unused(){}; fun send(to:T){}; send(to=p) }",
+        "fun <`T`> outer(`p`:T){ fun `send`(`to`:`T`){}; send(to=p) }",
+        "// 😀\r\nfun /* header */ <`🦀`> outer(`p🦀`: /* type */ `🦀`){\r\n fun `send🦀`(`to🦀`: `🦀`,) /* empty */ {}\r\n `send🦀`(/* label */ `to🦀` /* equals */ = /* value */ `p🦀`, /* tail */)\r\n}\r\n",
+        "fun <Int> outer(p:Int){ fun send(to:`Int`){}; send(to=p) }",
+        "import elsewhere.send\nclass send {}\nfun send(){}\nfun <T> outer(p:T){ fun send(to:T){}; send(to=p) }",
+    ] {
+        let result = parse(source, 7);
+        let current = result.snapshot();
+        let tree = result.tree_for(current).unwrap();
+        assert_tree(tree);
+        let lower = lower_declarations(&result, current).unwrap();
+        let directory = build_regions(&lower, &result, current).unwrap();
+        let syntax = call_site(&lower, &result, current, selected_call(tree)).unwrap();
+        let label = syntax.arguments()[0].label().unwrap();
+        let selected = original(tree, label.reference());
+        let found = bind_local_argument_label(&directory, &result, selected, current).unwrap();
+        let call = found.call();
+        assert!(std::ptr::eq(call.origin(), &lower));
+        assert!(std::ptr::eq(call.call(), syntax.call()));
+        assert!(std::ptr::eq(call.callee(), syntax.callee()));
+        assert!(std::ptr::eq(call.argument_list(), syntax.argument_list()));
+        assert!(std::ptr::eq(call.function(), syntax.function()));
+        assert!(std::ptr::eq(call.body(), syntax.body()));
+        assert_eq!(call.arguments().len(), 1);
+        let argument = &call.arguments()[0];
+        assert_eq!(argument.ordinal(), 0);
+        assert!(std::ptr::eq(argument.node(), syntax.arguments()[0].node()));
+        assert!(std::ptr::eq(
+            argument.expression(),
+            syntax.arguments()[0].expression()
+        ));
+        assert!(std::ptr::eq(
+            argument.value_token(),
+            syntax.arguments()[0].value_token()
+        ));
+        assert!(std::ptr::eq(
+            argument.label().unwrap().reference(),
+            &tree.elements()[selected]
+        ));
+        assert!(std::ptr::eq(argument.label().unwrap().node(), label.node()));
+        assert!(std::ptr::eq(argument.label().unwrap().name(), label.name()));
+        assert!(std::ptr::eq(
+            argument.label().unwrap().equals(),
+            label.equals()
+        ));
+        assert_eq!(label.reference().parent, Some(original(tree, label.node())));
+        assert_eq!(label.node().parent, Some(original(tree, argument.node())));
+        assert_eq!(
+            argument.node().parent,
+            Some(original(tree, call.argument_list()))
+        );
+        assert_eq!(call.argument_list().parent, Some(call.cst_index()));
+        assert_eq!(call.call().parent, Some(original(tree, call.body())));
+
+        let parameters = found.parameters();
+        let function = parameters.function();
+        let function_ordinal = lower
+            .declarations()
+            .iter()
+            .position(|d| std::ptr::eq(d, function))
+            .unwrap();
+        let outer_ordinal = lower
+            .declarations()
+            .iter()
+            .position(|d| std::ptr::eq(d, call.function()))
+            .unwrap();
+        let formal = lower
+            .declarations()
+            .iter()
+            .find(|d| d.kind() == "VALUE_PARAMETER" && d.owner() == Some(function_ordinal))
+            .unwrap();
+        let outer_parameter = lower
+            .declarations()
+            .iter()
+            .find(|d| d.kind() == "VALUE_PARAMETER" && d.owner() == Some(outer_ordinal))
+            .unwrap();
+        let ty = lower
+            .declarations()
+            .iter()
+            .find(|d| d.kind() == "TYPE_PARAMETER" && d.owner() == Some(outer_ordinal))
+            .unwrap();
+        assert!(std::ptr::eq(found.target(), formal));
+        assert!(std::ptr::eq(found.argument_parameter(), outer_parameter));
+        assert!(std::ptr::eq(found.type_parameter(), ty));
+        assert!(std::ptr::eq(parameters.origin(), &lower));
+        assert_eq!(parameters.parameters().len(), 1);
+        assert_eq!(parameters.parameters()[0].ordinal(), 0);
+        assert!(std::ptr::eq(
+            parameters.parameters()[0].declaration(),
+            formal
+        ));
+        assert_eq!(
+            formal.cst_parent_index(),
+            Some(original(tree, parameters.parameter_list()))
+        );
+        assert_eq!(
+            parameters.parameter_list().parent,
+            Some(function.cst_index())
+        );
+        assert_eq!(parameters.open_paren().parent, formal.cst_parent_index());
+        assert_eq!(parameters.close_paren().parent, formal.cst_parent_index());
+        assert_eq!(parameters.body().parent, Some(function.cst_index()));
+        assert_eq!(function.owner(), Some(outer_ordinal));
+        assert_eq!(
+            function.cst_parent_index(),
+            Some(original(tree, call.body()))
+        );
+        assert_eq!(
+            tree.elements()[outer_parameter.cst_parent_index().unwrap()].parent,
+            Some(call.function().cst_index())
+        );
+        assert_eq!(
+            tree.elements()[ty.cst_parent_index().unwrap()].parent,
+            Some(call.function().cst_index())
+        );
+        assert_eq!(ty.cst_parent_kind(), "TYPE_PARAMETER_LIST");
+        let projected = callable_parameters(&lower, &result, current, function).unwrap();
+        assert!(std::ptr::eq(
+            projected.parameter_list(),
+            parameters.parameter_list()
+        ));
+        assert!(std::ptr::eq(
+            projected.parameters()[0].annotation(),
+            parameters.parameters()[0].annotation()
+        ));
+        for (annotation, declaration) in [
+            (found.formal_annotation(), formal),
+            (found.argument_annotation(), outer_parameter),
+        ] {
+            assert!(std::ptr::eq(annotation.annotated(), declaration));
+            assert!(std::ptr::eq(
+                annotation.reference(),
+                &tree.elements()[annotation.reference_index()]
+            ));
+            assert!(std::ptr::eq(
+                annotation.name_token(),
+                &tree.elements()[annotation.reference_index() + 1]
+            ));
+            assert_eq!(
+                annotation.name_token().parent,
+                Some(annotation.reference_index())
+            );
+            assert_eq!(
+                annotation.range(),
+                annotation.reference().start..annotation.reference().end
+            );
+            let bound = bind_lexical_type_parameter(
+                &directory,
+                &result,
+                annotation.reference_index(),
+                current,
+            )
+            .unwrap();
+            assert!(std::ptr::eq(bound.target(), ty));
+            assert!(std::ptr::eq(bound.annotated(), declaration));
+            assert!(std::ptr::eq(bound.reference(), annotation.reference()));
+        }
+        for declaration in [formal, outer_parameter, ty] {
+            assert_eq!(
+                declaration.raw_name().as_ptr(),
+                tree.source()[declaration.name_range()].as_ptr()
+            );
+        }
+        assert_eq!(
+            formal.semantic_spelling(),
+            Some(text(tree, label.name()).trim_matches('`'))
+        );
+        assert_eq!(
+            outer_parameter.semantic_spelling(),
+            Some(text(tree, argument.value_token()).trim_matches('`'))
+        );
+        if source.contains("send🦀") {
+            assert_eq!(
+                ktlsp_text::offset_to_position(source, formal.name_range().start).unwrap(),
+                ktlsp_text::Position {
+                    line: 2,
+                    character: 14
+                }
+            );
+            assert_eq!(
+                ktlsp_text::offset_to_position(source, formal.name_range().end).unwrap(),
+                ktlsp_text::Position {
+                    line: 2,
+                    character: 20
+                }
+            );
+        }
+        assert_eq!(
+            reference_site(&lower, &result, current, selected).unwrap_err(),
+            ReferenceSiteError::UnsupportedContext
+        );
+        assert_eq!(
+            reference_site(
+                &lower,
+                &result,
+                current,
+                original(tree, argument.expression())
+            )
+            .unwrap_err(),
+            ReferenceSiteError::UnsupportedContext
+        );
+
+        // Use the actual existing type-rename proof/ranges, not guessed substitutions.
+        let renamed = guarded_type_parameter_rename(
+            &directory,
+            &result,
+            TypeParameterAnchor::Declaration(ty),
+            current,
+            Some("Fresh"),
+        )
+        .unwrap();
+        assert!(std::ptr::eq(renamed.target(), ty));
+        assert_eq!(
+            renamed
+                .occurrences()
+                .iter()
+                .map(|a| a.reference_index())
+                .collect::<Vec<_>>(),
+            [
+                found.argument_annotation().reference_index(),
+                found.formal_annotation().reference_index(),
+            ]
+        );
+        let mut edited = source.to_owned();
+        for range in std::iter::once(ty.name_range())
+            .chain(renamed.occurrences().iter().map(|a| a.range()))
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+        {
+            edited.replace_range(range, "Fresh");
+        }
+        let updated = parse(&edited, 8);
+        let lower2 = lower_declarations(&updated, updated.snapshot()).unwrap();
+        let directory2 = build_regions(&lower2, &updated, updated.snapshot()).unwrap();
+        let tree2 = updated.tree_for(updated.snapshot()).unwrap();
+        assert_tree(tree2);
+        let call2 = call_site(&lower2, &updated, updated.snapshot(), selected_call(tree2)).unwrap();
+        let label2 = original(tree2, call2.arguments()[0].label().unwrap().reference());
+        let rebound =
+            bind_local_argument_label(&directory2, &updated, label2, updated.snapshot()).unwrap();
+        assert_eq!(rebound.type_parameter().raw_name(), "Fresh");
+        assert_eq!(rebound.target().raw_name(), formal.raw_name());
+        assert_eq!(rebound.target().owner(), formal.owner());
+        assert_eq!(
+            rebound.argument_parameter().raw_name(),
+            outer_parameter.raw_name()
+        );
+        for annotation in [rebound.formal_annotation(), rebound.argument_annotation()] {
+            assert!(std::ptr::eq(
+                bind_lexical_type_parameter(
+                    &directory2,
+                    &updated,
+                    annotation.reference_index(),
+                    updated.snapshot()
+                )
+                .unwrap()
+                .target(),
+                rebound.type_parameter()
+            ));
         }
     }
 }

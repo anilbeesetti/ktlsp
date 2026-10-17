@@ -3373,3 +3373,28 @@ read fallback, including recovered later matches, is not successful LSP refs.
 Changed exact affected reviews must clear before the next CHECK/strict Clippy.
 No unchanged retry, native runtime, current CI or full-parity claim.
 
+
+#### Successor421 strict type-complexity failure and private capture alias
+
+All SIX exact derived-default clears accepted871c82e44564228c304ef7905269c9138e21ded9
+/tree0bbba4ed0f225b784d8f8163c923b1c3c483e78a. ROOT fully read current prefixes/
+trailers and authenticated complete historical appendices by actual whole-byte
+embedding in already FULL-read originals. Pinned format-CHECK exited0/1.145952s.
+Successor strict locked workspace/all-target Clippy exited101/1.144165s, sole
+reported diagnostic type_complexity at workspace.rs343: the existing capture
+return Result of four-element tuple. Complete1203B actual stderr SHA256
+9fcf8848aaf87013d977d9d7447b2fc6da9bdc25bee43d1fdf46722e5cf1bc66 is retained
+separately in root-evidence/corrected-strict-clippy.stderr and FULL ROOT-read.
+Original derivable_impls failure remains preserved. Sequence STOPPED; no
+workspace--no-run/test/native consumer/Kotlin/Session/parser/hosted CI ran.
+
+ROOT adds ONLY private CapturedSource alias for the SAME Arc<Snapshot>, SourceKey,
+Arc<str>, Arc<str> tuple and uses it in capture's return signature, following
+the existing private named-result pattern. Body, all concrete callers, immutable
+model lifetime, key/URI/source order and all counters/freshness/IO are unchanged;
+no extra allocation/copy or wrapper, public export, suppression, changed bound,
+test or runtime behavior. Complete concrete caller fallback included later
+matches251-321 omitted by the search tool's cap; unavailable LSP is not success.
+No second formatter or unchanged retry. Renew exact affected clears before
+changed-source CHECK/strictClippy/compile-only; subsequent native and hosted
+gates remain separate. No full-parity claim or native/#96/B3/oracle boundary change.

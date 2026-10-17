@@ -56,19 +56,24 @@ Borrowed roots are never cleaned; all old/user/delivered/component WTs remain.
 
 Current421 remains runtime-UNVERIFIED. BOTH full20 ROOT reviews cleared3a4cb4f,
 then ONE pinned formatter succeeded1.36s; it is SPENT, NEVER a second formatter.
-All SIX exact formatted ROOT/component clears then accepted6d43de4/tree53500bb;
-ROOT FULL-read/authenticated every complete receipt before compile admission.
-Pinned format-CHECK0/1.22960775s; FIRST strict locked workspace/all-target Clippy
-FAILED101/5.258058s, sole reported diagnostic derivable_impls on manual Budget
-Default at source_inventory.rs207. Full original59line/2612B stderr SHA256
-4841158a5eda3db5d722aeeb7b6f723f1b16fad796b5ff5b09f6cd99ffcfdab9;
-custody `/private/tmp/ktlsp-421-root-evidence/first-compile-failure.json`.
-Sequence STOPPED: workspace--no-run, tests/native import/consumer/server/parser/
-CLI runtime and hosted CI NEVER ran. ROOT replaces ONLY manual Budget Default
-with #[derive(Debug, Default)], preserving custom frozen Limits, zero counters,
-empty owner map/allcallers. No suppression, changed bound/default or retry.
-Native Budget LSP refs again failed serverexit0 (reported); honest complete
-caller/source fallback only. Changed source requires exact affected rechecks.
+All SIX exact formatted ROOT/component clears accepted6d43de4/tree53500bb,
+and all SIX renewed clears accepted derived-default871c82/tree0bbba4ed;
+ROOT FULL-read/authenticated every receipt, including lossless complete prior
+appendices, before each changed-source compile admission. Original format-CHECK0
+then strictClippy101/5.258058s (derivable_impls) remains retained with its complete
+59line2612B stderr4841158a5eda3db5d722aeeb7b6f723f1b16fad796b5ff5b09f6cd99ffcfdab9.
+Derived Budget preserves custom frozen Limits, zero counters and empty owner map.
+Successor format-CHECK0/1.145952s, strictClippy101/1.144165s reports ONLY
+type_complexity at workspace.rs343 (capture's existing four-element tuple).
+Complete1203B stderr9fcf8848aaf87013d977d9d7447b2fc6da9bdc25bee43d1fdf46722e5cf1bc66
+is retained separately as corrected-strict-clippy.stderr; neither failure erased.
+Sequence STOPPED again: workspace--no-run/tests/native consumer/server/parser/
+CLI runtime and hosted CI NEVER ran. ROOT adds ONLY a private CapturedSource
+type alias for that identical tuple and uses it in the return signature.
+No allocation/copy/ownership, bounds, caller behavior, suppression or second
+formatter. Failed Budget LSP refs remain unavailable; complete concrete capture
+caller fallback recovered later capped search matches. Exact affected rechecks
+must renew before another changed-source CHECK/strictClippy/compile-only gate.
 All four ACTUAL421 writers stay through BOTH full actual OWNER+ROOT gates;
 three CLI packets emit BEFORE outer result assertions. Reviewed outside native
 consumer52556b8d includes real same-length source/model byte and identity cases.

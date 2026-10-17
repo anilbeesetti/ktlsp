@@ -68,6 +68,8 @@ pub(super) struct SourceKey {
     entry: usize,
 }
 
+type CapturedSource = (Arc<Snapshot>, SourceKey, Arc<str>, Arc<str>);
+
 #[derive(Debug)]
 pub(super) struct Snapshot {
     pub(super) generation: i64,
@@ -337,10 +339,7 @@ impl Workspace {
         self.overlays.get(&key).map(|overlay| overlay.uri.as_ref())
     }
 
-    pub(super) fn capture(
-        &self,
-        uri: &str,
-    ) -> Result<(Arc<Snapshot>, SourceKey, Arc<str>, Arc<str>), &'static str> {
+    pub(super) fn capture(&self, uri: &str) -> Result<CapturedSource, &'static str> {
         if !self.available || self.exhausted {
             return Err("workspace source inventory unavailable; reload required");
         }

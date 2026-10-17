@@ -4286,3 +4286,269 @@ fn documentation_paired_cli_selects_original_class_property_parameter_and_nested
         );
     }
 }
+
+fn recursive_cli_layout(
+    source: &str,
+    renamed: Option<usize>,
+) -> (Vec<std::ops::Range<usize>>, Vec<(std::ops::Range<usize>, Option<usize>)>) {
+    let targets = [
+        ("outer","T"),("outer","Spare"),("inner","U"),("deep","`🦀`"),
+        ("peer","U"),("shadow","T"),("other","T"),
+    ];
+    let declarations = targets.iter().enumerate().map(|(ordinal,(owner,raw))| {
+        let end = source.find(&format!("> {owner}(")).unwrap();
+        let start = source[..end].rfind('<').unwrap()+1;
+        let raw = if renamed==Some(ordinal) {"Fresh"} else {raw};
+        let offset = source[start..end].find(raw).unwrap()+start;
+        offset..offset+raw.len()
+    }).collect();
+    let annotations = [
+        ("root",Some(0)),("before",Some(0)),("a",Some(0)),("b",Some(2)),
+        ("inherited",Some(0)),("c",Some(0)),("d",Some(3)),("e",Some(2)),
+        ("f",None),("own",Some(3)),("g",Some(0)),("h",Some(4)),
+        ("i",Some(0)),("j",Some(5)),("k",Some(0)),("last",Some(0)),("z",Some(6)),
+    ].iter().map(|(label,target)| {
+        let pattern=format!("{label}:");
+        let offset=source.match_indices(&pattern).find(|(i,_)| {
+            *i==0 || !source.as_bytes()[i-1].is_ascii_alphanumeric()
+                && source.as_bytes()[i-1]!=b'_'
+        }).unwrap().0+pattern.len();
+        let raw=&source[offset..];
+        let length=if let Some(quoted)=raw.strip_prefix('`') {
+            quoted.find('`').unwrap()+2
+        } else {
+            raw.find([',',')','=',';',' ']).unwrap()
+        };
+        (offset..offset+length,*target)
+    }).collect();
+    (declarations,annotations)
+}
+
+// Temporary capture of the actual paired CLI source producer, not expected JSON.
+fn recursive_cli_producer(source: &str, revision: i64) -> Value {
+    use ktlsp_parser::{
+        FileKind, Parser, SourceSnapshot, local_value_binding::bind_lexical_type_parameter,
+        lowering::lower_declarations, structural_regions::build_regions,
+    };
+    let snapshot=SourceSnapshot::new(URI,revision,FileKind::Source,source).unwrap();
+    let result=Parser::new(worker()).unwrap()
+        .parse_snapshot(&snapshot,&std::sync::atomic::AtomicBool::new(false)).unwrap();
+    let tree=result.tree_for(&snapshot).unwrap();
+    assert!(tree.diagnostics().is_empty());
+    let lower=lower_declarations(&result,&snapshot).unwrap();
+    let directory=build_regions(&lower,&result,&snapshot).unwrap();
+    let ordinal=|target: &ktlsp_parser::lowering::Declaration<'_>| {
+        lower.declarations().iter().position(|d|std::ptr::eq(d,target)).unwrap()
+    };
+    json!({
+        "source":source,"revision":revision,
+        "cst":tree.elements().iter().enumerate().map(|(i,e)|json!({
+            "index":i,"kind":e.kind,"parent":e.parent,"token":e.token,
+            "range":[e.start,e.end],"subtree_end":e.subtree_end
+        })).collect::<Vec<_>>(),
+        "declarations":lower.declarations().iter().enumerate().map(|(i,d)|json!({
+            "ordinal":i,"kind":d.kind(),"name":d.raw_name(),"owner":d.owner(),
+            "index":d.cst_index(),"parent":d.cst_parent_index(),"incomplete":d.incomplete(),
+            "range":[d.range().start,d.range().end],"name_range":[d.name_range().start,d.name_range().end]
+        })).collect::<Vec<_>>(),
+        "regions":directory.regions().iter().map(|r|json!({
+            "index":r.cst_index(),"kind":r.kind(),"parent":r.parent(),"introducer":r.introducer(),
+            "subtree_end":r.subtree_end(),"range":[r.range().start,r.range().end]
+        })).collect::<Vec<_>>(),
+        "memberships":directory.memberships().iter().map(|m|m.region()).collect::<Vec<_>>(),
+        "bindings":tree.elements().iter().enumerate().filter(|(_,e)|
+            e.kind=="REFERENCE_EXPRESSION"&&tree.elements()[e.parent.unwrap()].kind=="USER_TYPE"
+        ).map(|(i,e)| match bind_lexical_type_parameter(&directory,&result,i,&snapshot) {
+            Ok(binding)=>json!({
+                "index":i,"annotated":ordinal(binding.annotated()),"target":ordinal(binding.target()),
+                "function":ordinal(binding.function()),"body":binding.body().cst_index(),
+                "original_reference":std::ptr::eq(binding.reference(),e),
+                "original_token":std::ptr::eq(binding.name_token(),&tree.elements()[i+1]),
+                "original_body":directory.regions().iter().any(|r|std::ptr::eq(r,binding.body()))
+            }),
+            Err(error)=>json!({"index":i,"error":format!("{error:?}")})
+        }).collect::<Vec<_>>()
+    })
+}
+
+#[test]
+fn recursive_type_scope_actual_paired_cli_all_anchors_and_full_version8_replay() {
+    let _serial=SERIAL.lock().unwrap_or_else(|p|p.into_inner());
+    let package=Package::new(true);
+    let source="// 😀\r\nfun <T, Spare> outer(root:T){ val before:T=root; fun <U> inner(a:`T`,b:U){ val inherited:T=a; fun middle(c:T){ fun <`🦀`> deep(d:`🦀`,e:U,f:Missing){ val own:`🦀`=d; unknown(noSuch=d); }; fun side(g:T){} }; fun <U> peer(h:U,i:T){} }; fun <T> shadow(j:T){}; fun after(k:T){}; val last:T=root }\r\nfun <T> other(z:T){}\r\n";
+    let init=json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{"capabilities":{
+        "general":{"positionEncodings":["utf-8"]},
+        "workspace":{"workspaceEdit":{"documentChanges":true}},
+        "textDocument":{"rename":{"prepareSupport":true}}
+    }}});
+    let (declarations,annotations)=recursive_cli_layout(source,None);
+    let anchors: Vec<_>=declarations.iter().cloned().enumerate().map(|(t,r)|(r,t,false))
+        .chain(annotations.iter().filter_map(|(r,t)|t.map(|t|(r.clone(),t,true)))).collect();
+    let mut requests=vec![
+        init.clone(),json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":7,"text":source}}}),
+    ];
+    for (i,(anchor,_,_)) in anchors.iter().enumerate() {
+        for (role,method,params) in [
+            ("definition","textDocument/definition",navigation_params(source,anchor.start)),
+            ("refs","textDocument/references",references_params(source,anchor.start,true)),
+            ("uses","textDocument/references",references_params(source,anchor.start,false)),
+            ("highlights","textDocument/documentHighlight",navigation_params(source,anchor.start)),
+            ("prepare","textDocument/prepareRename",navigation_params(source,anchor.start)),
+            ("rename","textDocument/rename",rename_params(source,anchor.start,"Fresh")),
+        ] {
+            requests.push(json!({"jsonrpc":"2.0","id":format!("{role}-{i}"),"method":method,"params":params}));
+        }
+    }
+    for (id,offset,name) in [
+        ("outer-capture",declarations[0].start,"U"),
+        ("unused-capture",declarations[1].start,"Missing"),
+        ("inner-capture",declarations[2].start,"T"),
+        ("unmatched",annotations.iter().find(|(_,t)|t.is_none()).unwrap().0.start,"Fresh"),
+        ("callee",source.find("unknown(").unwrap(),"Fresh"),
+        ("label",source.find("noSuch=").unwrap(),"Fresh"),
+        ("value",source.find("noSuch=d").unwrap()+7,"Fresh"),
+    ] {
+        requests.push(json!({"jsonrpc":"2.0","id":id,"method":"textDocument/rename","params":rename_params(source,offset,name)}));
+    }
+    requests.extend([json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),json!({"jsonrpc":"2.0","method":"exit"})]);
+    let replies=package.exchange(&requests);
+    let reply=|id: &str|replies.iter().find(|r|r["id"]==id).unwrap();
+    let original_producer=recursive_cli_producer(source,7);
+    for (i,(anchor,target,is_use)) in anchors.iter().enumerate() {
+        let partition: Vec<_>=std::iter::once(declarations[*target].clone())
+            .chain(annotations.iter().filter(|(_,t)|*t==Some(*target)).map(|(r,_)|r.clone())).collect();
+        let range=|r: &std::ops::Range<usize>|references_range(source,r.start,r.len());
+        let locations=|skip: usize|json!(partition.iter().skip(skip).map(|r|json!({"uri":URI,"range":range(r)})).collect::<Vec<_>>());
+        assert_eq!(reply(&format!("refs-{i}"))["result"],locations(0));
+        assert_eq!(reply(&format!("uses-{i}"))["result"],locations(1));
+        assert_eq!(reply(&format!("highlights-{i}"))["result"],json!(partition.iter().enumerate().map(|(j,r)|json!({"range":range(r),"kind":if j==0 {3}else{2}})).collect::<Vec<_>>()));
+        assert_eq!(reply(&format!("prepare-{i}"))["result"],json!({
+            "range":range(anchor),"placeholder":source[declarations[*target].clone()].trim_matches('`')
+        }));
+        assert_eq!(reply(&format!("definition-{i}"))["result"],if *is_use {
+            json!({"uri":URI,"range":range(&declarations[*target])})
+        } else {Value::Null});
+        let actual_rename=reply(&format!("rename-{i}"));
+        let edited=apply_original_rename(source,actual_rename,URI,7);
+        let (edited_declarations,edited_annotations)=recursive_cli_layout(&edited,Some(*target));
+        // Preserve the complete source outside actual returned edit coordinates.
+        let mut expected=source.to_owned();
+        for r in partition.iter().rev() {expected.replace_range(r.clone(),"Fresh");}
+        assert_eq!(edited,expected);
+        let mut replay=vec![
+            init.clone(),json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":8,"text":edited}}}),
+        ];
+        for (j,(annotation,_)) in edited_annotations.iter().enumerate() {
+            replay.push(json!({"jsonrpc":"2.0","id":format!("definition-{j}"),"method":"textDocument/definition","params":navigation_params(&edited,annotation.start)}));
+        }
+        for (j,declaration) in edited_declarations.iter().enumerate() {
+            replay.push(json!({"jsonrpc":"2.0","id":format!("refs-{j}"),"method":"textDocument/references","params":references_params(&edited,declaration.start,true)}));
+        }
+        replay.extend([json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),json!({"jsonrpc":"2.0","method":"exit"})]);
+        let rebound=package.exchange(&replay);
+        for (j,(_,binding)) in edited_annotations.iter().enumerate() {
+            if let Some(t)=binding {
+                let actual=&rebound.iter().find(|r|r["id"]==format!("definition-{j}")).unwrap()["result"];
+                assert_eq!(*actual,json!({"uri":URI,"range":references_range(&edited,edited_declarations[*t].start,edited_declarations[*t].len())}));
+            } else {
+                let response=rebound.iter().find(|r|r["id"]==format!("definition-{j}")).unwrap();
+                assert_eq!(response["error"]["code"],-32803);
+                assert!(response.get("result").is_none());
+            }
+        }
+        for (j,declaration) in edited_declarations.iter().enumerate() {
+            let partition: Vec<_>=std::iter::once(declaration.clone())
+                .chain(edited_annotations.iter().filter(|(_,t)|*t==Some(j)).map(|(r,_)|r.clone())).collect();
+            assert_eq!(rebound.iter().find(|r|r["id"]==format!("refs-{j}")).unwrap()["result"],
+                json!(partition.iter().map(|r|json!({"uri":URI,"range":references_range(&edited,r.start,r.len())})).collect::<Vec<_>>()));
+        }
+        println!("RECURSIVE_TYPE_CLI={}",json!({
+            "anchor":i,"target":target,"original_producer":original_producer,
+            "requests":requests,"responses":replies,"actual_rename":actual_rename,
+            "edited_source":edited,"edited_producer":recursive_cli_producer(&edited,8),
+            "replay_requests":replay,"replay_responses":rebound
+        }));
+    }
+    for id in ["outer-capture","unused-capture","inner-capture","unmatched","callee","label","value"] {
+        assert_eq!(reply(id)["error"]["code"],-32803,"{id}");
+    }
+}
+
+#[test]
+fn recursive_type_capture_unused_inner_and_safe_sibling_actual_cli() {
+    let _serial=SERIAL.lock().unwrap_or_else(|p|p.into_inner());
+    let package=Package::new(true);
+    for (source,needle,name,accepted) in [
+        ("fun <T> outer(){ fun <U> inner(a:T){} }","<T","U",false),
+        ("fun <T> outer(){ fun <U> inner(a:T){} }","<U","T",false),
+        ("fun <T> outer(){ fun middle(){ fun unused(a:Captured){} } }","<T","Captured",false),
+        ("fun <T> outer(){ fun <U> inner(){ fun unused(a:Captured){} } }","<U","Captured",false),
+        ("fun <T> outer(){ fun <U> inner(a:U){}; fun sibling(b:T){} }","<T","U",true),
+        ("fun <T> outer(){ fun <U> inner(a:U){}; fun sibling(b:T){} }","<U","T",true),
+        ("fun <T> outer(){ fun middle(){ fun <U,`U`> unused(){} } }","<T","Fresh",false),
+    ] {
+        let offset=source.find(needle).unwrap()+1;
+        let requests=vec![
+            json!({"jsonrpc":"2.0","id":"init","method":"initialize","params":{"capabilities":{
+                "workspace":{"workspaceEdit":{"documentChanges":true}},
+                "textDocument":{"rename":{"prepareSupport":true}}
+            }}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":7,"text":source}}}),
+            json!({"jsonrpc":"2.0","id":"rename","method":"textDocument/rename","params":rename_params(source,offset,name)}),
+            json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ];
+        let replies=package.exchange(&requests);
+        let response=replies.iter().find(|r|r["id"]=="rename").unwrap();
+        if accepted {
+            let edited=apply_original_rename(source,response,URI,7);
+            let mut expected=source.to_owned();
+            let use_needle=if needle=="<T" {"b:T"} else {"a:U"};
+            let use_offset=source.find(use_needle).unwrap()+2;
+            expected.replace_range(use_offset..use_offset+1,name);
+            expected.replace_range(offset..offset+1,name);
+            assert_eq!(edited,expected);
+            let mut replay=vec![
+                requests[0].clone(),requests[1].clone(),
+                json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":URI,"languageId":"kotlin","version":8,"text":edited}}}),
+            ];
+            let expected_partitions: Vec<_>=[("outer","b:"),("inner","a:")].iter().map(|(owner,label)| {
+                let end=edited.find(&format!("> {owner}(")).unwrap();
+                let declaration=edited[..end].rfind('<').unwrap()+1;
+                let annotation=edited.find(label).unwrap()+label.len();
+                (declaration,annotation)
+            }).collect();
+            for (i,(declaration,annotation)) in expected_partitions.iter().enumerate() {
+                replay.push(json!({"jsonrpc":"2.0","id":format!("definition-{i}"),"method":"textDocument/definition","params":navigation_params(&edited,*annotation)}));
+                replay.push(json!({"jsonrpc":"2.0","id":format!("refs-{i}"),"method":"textDocument/references","params":references_params(&edited,*declaration,true)}));
+            }
+            replay.extend([requests[4].clone(),requests[5].clone()]);
+            let rebound=package.exchange(&replay);
+            for (i,(declaration,annotation)) in expected_partitions.iter().enumerate() {
+                assert_eq!(rebound.iter().find(|r|r["id"]==format!("definition-{i}")).unwrap()["result"],
+                    json!({"uri":URI,"range":references_range(&edited,*declaration,1)}));
+                assert_eq!(rebound.iter().find(|r|r["id"]==format!("refs-{i}")).unwrap()["result"],
+                    json!([
+                        {"uri":URI,"range":references_range(&edited,*declaration,1)},
+                        {"uri":URI,"range":references_range(&edited,*annotation,1)}
+                    ]));
+            }
+            println!("RECURSIVE_TYPE_CAPTURE_CLI={}",json!({
+                "source":source,"requests":requests,"responses":replies,
+                "edited_source":edited,"original_producer":recursive_cli_producer(source,7),
+                "edited_producer":recursive_cli_producer(&edited,8),
+                "replay_requests":replay,"replay_responses":rebound
+            }));
+        } else {
+            assert_eq!(response["error"]["code"],-32803);
+            assert!(response.get("result").is_none());
+            println!("RECURSIVE_TYPE_CAPTURE_CLI={}",json!({
+                "source":source,"requests":requests,"responses":replies,
+                "original_producer":recursive_cli_producer(source,7)
+            }));
+        }
+    }
+}

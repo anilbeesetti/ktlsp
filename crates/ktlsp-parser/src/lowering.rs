@@ -1352,19 +1352,19 @@ fn close_frames<'a>(
     Ok(())
 }
 
-// Only ordinary top-level functions and their direct block-local functions.
-// `depth` is the number of frames through the function, excluding its header list.
+// Authenticate the complete alternating ordinary-function/body ancestry.
+// `depth` includes the function but excludes its header list or body.
 fn ordinary_function_path(s: &[Frame<'_>; DEPTH], depth: usize, b: &mut Budget) -> Result<bool> {
-    Ok(match depth {
-        2 => frame(s, 0, b)?.tag == Tag::Root && frame(s, 1, b)?.tag == Tag::Fun,
-        4 => {
-            frame(s, 0, b)?.tag == Tag::Root
-                && frame(s, 1, b)?.tag == Tag::Fun
-                && frame(s, 2, b)?.tag == Tag::Block
-                && frame(s, 3, b)?.tag == Tag::Fun
+    if depth < 2 || !depth.is_multiple_of(2) || frame(s, 0, b)?.tag != Tag::Root {
+        return Ok(false);
+    }
+    for slot in 1..depth {
+        let expected = if slot % 2 == 1 { Tag::Fun } else { Tag::Block };
+        if frame(s, slot, b)?.tag != expected {
+            return Ok(false);
         }
-        _ => false,
-    })
+    }
+    Ok(true)
 }
 
 fn context(t: Tag, parent: Option<Frame<'_>>, i: usize) -> Result<()> {
@@ -1739,10 +1739,8 @@ fn walk<'a>(
         if pass != Pass::Structure {
             context(t, parent, i)?;
             if t == Tag::TypeParameters
-                && (depth != 2
-                    || frame(s, 0, b)?.tag != Tag::Root
-                    || frame(s, 1, b)?.tag != Tag::Fun
-                    || frame(s, 1, b)?.plain != 1)
+                && (!ordinary_function_path(s, depth, b)?
+                    || frame(s, depth - 1, b)?.plain != 1)
             {
                 return Err(unsupported(i));
             }
@@ -1777,7 +1775,6 @@ fn walk<'a>(
                 if !ordinary_function_path(s, function_depth, b)?
                     || frame(s, depth - 2, b)?.tag != container
                     || declaration.plain != 5
-                    || declaration.tag == Tag::Property && depth != 4
                 {
                     return Err(unsupported(i));
                 }
@@ -1819,11 +1816,9 @@ fn walk<'a>(
                     Tag::ArgumentName => depth.checked_sub(3).ok_or(unsupported(i))?,
                     _ => return Err(unsupported(i)),
                 };
-                if call_depth != 4
-                    || frame(s, 0, b)?.tag != Tag::Root
-                    || frame(s, 1, b)?.tag != Tag::Fun
-                    || frame(s, 2, b)?.tag != Tag::Block
-                    || !matches!(frame(s, 3, b)?.tag, Tag::Property | Tag::Call)
+                if !ordinary_function_path(s, call_depth.checked_sub(2).ok_or(unsupported(i))?, b)?
+                    || frame(s, call_depth - 2, b)?.tag != Tag::Block
+                    || !matches!(frame(s, call_depth - 1, b)?.tag, Tag::Property | Tag::Call)
                     || e.subtree_end != i + 2
                 {
                     return Err(unsupported(i));
@@ -2199,9 +2194,29 @@ mod tests {
         tree.close();
         tree.open("BLOCK");
         tree.token("LBRACE", "{");
+        for name in ["middle", "deeper"] {
+            tree.header(name);
+            tree.open("VALUE_PARAMETER_LIST");
+            tree.token("LPAR", "(");
+            tree.token("RPAR", ")");
+            tree.close();
+            tree.open("BLOCK");
+            tree.token("LBRACE", "{");
+        }
         let mut references = Vec::new();
         for (name, annotation) in [("before", "T"), ("unused", "Captured"), ("after", "T")] {
-            tree.header(name);
+            tree.open("FUN");
+            tree.token("FUN_KEYWORD", "fun");
+            tree.token("WHITE_SPACE", " ");
+            tree.open("TYPE_PARAMETER_LIST");
+            tree.token("LT", "<");
+            tree.open("TYPE_PARAMETER");
+            tree.token("IDENTIFIER", "U");
+            tree.close();
+            tree.token("GT", ">");
+            tree.close();
+            tree.token("WHITE_SPACE", " ");
+            tree.token("IDENTIFIER", name);
             tree.open("VALUE_PARAMETER_LIST");
             tree.token("LPAR", "(");
             tree.open("VALUE_PARAMETER");
@@ -2224,6 +2239,11 @@ mod tests {
             tree.close();
             tree.close();
             tree.token("SEMICOLON", ";");
+        }
+        for _ in 0..2 {
+            tree.token("RBRACE", "}");
+            tree.close();
+            tree.close();
         }
         tree.open("CALL_EXPRESSION");
         tree.open("REFERENCE_EXPRESSION");
@@ -2313,6 +2333,23 @@ mod tests {
                         );
                     } else {
                         assert_eq!(outcome.unwrap_err(), LocalBindingError::Resource);
+                    }
+                }
+                assert!(measured.requested > 0 && measured.retained > 0);
+                for extra in [0, 1] {
+                    for (requested, retained) in [
+                        (REQUESTED - measured.requested + extra, 0),
+                        (0, RETAINED - measured.retained + extra),
+                    ] {
+                        let outcome = type_rename_with_budget(
+                            &directory, &result, anchor, result.snapshot(), name,
+                            &mut ReferenceBudget { requested, retained, ..ReferenceBudget::default() },
+                        );
+                        if extra == 0 {
+                            assert!(std::ptr::eq(outcome.unwrap().target(), found.target()));
+                        } else {
+                            assert_eq!(outcome.unwrap_err(), LocalBindingError::Resource);
+                        }
                     }
                 }
             }

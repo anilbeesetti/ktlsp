@@ -873,6 +873,38 @@ fn generic_headers_require_complete_restricted_syntax_even_without_value_reads()
         assert_eq!(lower.declarations()[1].kind(), "TYPE_PARAMETER");
     }
     for source in [
+        "fun outer() { fun <T> f() {} }",
+        "fun outer() { fun <T> f(p:T) {} }",
+    ] {
+        use ktlsp_parser::local_value_binding::{TypeParameterAnchor,type_parameter_occurrences};
+        let result=parse(source);
+        let snapshot=result.snapshot();
+        let tree=result.tree_for(snapshot).unwrap();
+        assert!(tree.diagnostics().is_empty());
+        let lower=lower_declarations(&result,snapshot).unwrap();
+        let directory=build_regions(&lower,&result,snapshot).unwrap();
+        let local=&lower.declarations()[1];
+        let target=&lower.declarations()[2];
+        assert_eq!((local.kind(),local.raw_name(),local.owner()),("FUN","f",Some(0)));
+        assert_eq!((target.kind(),target.raw_name(),target.owner()),("TYPE_PARAMETER","T",Some(1)));
+        assert_eq!(directory.memberships()[2].region(),directory.memberships()[1].region());
+        let enclosing=&directory.regions()[directory.memberships()[1].region()];
+        assert_eq!(enclosing.introducer(),Some(0));
+        assert_eq!(local.cst_parent_index(),Some(enclosing.cst_index()));
+        let found=type_parameter_occurrences(&directory,&result,
+            TypeParameterAnchor::Declaration(target),snapshot).unwrap();
+        assert!(std::ptr::eq(found.target(),target));
+        assert!(std::ptr::eq(found.function(),local));
+        assert_eq!(found.body().introducer(),Some(1));
+        assert_eq!(found.body().parent(),Some(directory.memberships()[1].region()));
+        assert_eq!(found.occurrences().len(),usize::from(source.contains("p:T")));
+        for annotation in found.occurrences() {
+            let by_use=type_parameter_occurrences(&directory,&result,
+                TypeParameterAnchor::AnnotationReference(annotation.reference_index()),snapshot).unwrap();
+            assert!(std::ptr::eq(by_use.target(),target));
+        }
+    }
+    for source in [
         "fun <> f() {}",
         "fun <T",
         "fun <T> () {}",
@@ -898,7 +930,6 @@ fn generic_headers_require_complete_restricted_syntax_even_without_value_reads()
         "fun <T> f() { val x = }",
         "fun <T> f() { var x = 1 }",
         "class C { fun <T> f() {} }",
-        "fun outer() { fun <T> f() {} }",
         "fun <T> f(p: T?) {}",
         "fun <T> f(p: pkg.T) {}",
         "fun <T> f() { val x: List<T> = 1 }",
@@ -2204,9 +2235,13 @@ fn local_type_namespace_refuses_the_entire_unsupported_envelope_and_annotation_c
     for source in [
         "fun <T> outer(){ class Other{}; fun target(p:T){} }",
         "fun <T> outer(){ fun target(p:T){}; class Other{} }",
-        "fun <T> outer(){ fun <U> target(p:T){} }",
-        "fun <T> outer(){ fun target(p:T){ val x=1 } }",
-        "fun <T> outer(){ fun target(){ fun deeper(p:T){} } }",
+        "fun <T> outer(){ fun middle(){ fun <U> unused(){ class Other{} } }; fun target(p:T){} }",
+        "fun <T> outer(){ fun middle(){ fun unused(p:T?){ } }; fun target(p:T){} }",
+        "fun <T> outer(){ fun middle(){ fun unused(){ if(true){} } }; fun target(p:T){} }",
+        "fun <T> outer(){ fun middle(){ fun unused(){ val x={1} } }; fun target(p:T){} }",
+        "fun <T> outer(){ fun middle(){ fun unused(){ var x=1 } }; fun target(p:T){} }",
+        "fun <T> outer(){ fun middle(){ fun <U:Any> unused(){} }; fun target(p:T){} }",
+        "fun <T> outer(){ fun middle(){ fun unused():T{} }; fun target(p:T){} }",
         "fun <T> outer(){ fun target(p:T?){} }",
         "fun <T> outer(){ fun target(p:pkg.T){} }",
         "fun <T> outer(){ fun target(p:List<T>){} }",
@@ -2324,6 +2359,8 @@ fn documentation_operation_cannot_authorize_lexical_type_consumers() {
         ("fun <T> f(){ /** doc */ val x:T=1 }", false),
         ("fun <T> f(){ /** doc */ final val x:T=1 }", false),
         ("fun <T> f(){ val x:T=1 }", true),
+        ("fun <T> f(){ fun middle(){ fun <U> deep(){ val x:T=1 } } }", true),
+        ("fun <T> f(){ fun middle(){ fun <U> deep(){ /** doc */ val x:T=1 } } }", false),
     ] {
         let result = parse(source);
         let snapshot = result.snapshot();
@@ -2401,6 +2438,249 @@ fn documentation_operation_cannot_authorize_lexical_type_consumers() {
             assert!(std::ptr::eq(found.target(), bound.target()));
             assert_eq!(found.occurrences().len(), 1);
             assert_eq!(found.occurrences()[0].reference_index(), reference);
+        }
+    }
+}
+
+// Temporary original-producer readback. Keep until ROOT and the independent
+// owner have fully read hosted payloads and applied the actual CLI edit batches.
+fn recursive_type_observation(result: &SnapshotResult) -> serde_json::Value {
+    use ktlsp_parser::local_value_binding::bind_lexical_type_parameter;
+    use serde_json::json;
+    let snapshot = result.snapshot();
+    let tree = result.tree_for(snapshot).unwrap();
+    let lower = lower_declarations(result, snapshot).unwrap();
+    let directory = build_regions(&lower, result, snapshot).unwrap();
+    let ordinal = |target: &ktlsp_parser::lowering::Declaration<'_>| {
+        lower.declarations().iter().position(|d| std::ptr::eq(d, target)).unwrap()
+    };
+    let bindings: Vec<_> = tree.elements().iter().enumerate().filter(|(_, e)| {
+        e.kind == "REFERENCE_EXPRESSION"
+            && tree.elements()[e.parent.unwrap()].kind == "USER_TYPE"
+    }).map(|(index, e)| {
+        match bind_lexical_type_parameter(&directory, result, index, snapshot) {
+            Ok(binding) => json!({
+                "index":index,"range":[e.start,e.end],"annotated":ordinal(binding.annotated()),
+                "target":ordinal(binding.target()),"function":ordinal(binding.function()),
+                "body":binding.body().cst_index(),
+                "original_reference":std::ptr::eq(binding.reference(), e),
+                "original_token":std::ptr::eq(binding.name_token(), &tree.elements()[index+1]),
+                "original_body":directory.regions().iter().any(|r| std::ptr::eq(r,binding.body()))
+            }),
+            Err(error) => json!({"index":index,"range":[e.start,e.end],"error":format!("{error:?}")}),
+        }
+    }).collect();
+    json!({
+        "source":snapshot.source(),"revision":snapshot.revision(),
+        "cst":tree.elements().iter().enumerate().map(|(i,e)| json!({
+            "index":i,"kind":e.kind,"token":e.token,"parent":e.parent,
+            "subtree_end":e.subtree_end,"range":[e.start,e.end]
+        })).collect::<Vec<_>>(),
+        "declarations":lower.declarations().iter().enumerate().map(|(i,d)| json!({
+            "ordinal":i,"kind":d.kind(),"raw_name":d.raw_name(),"owner":d.owner(),
+            "cst_index":d.cst_index(),"parent":d.cst_parent_index(),
+            "range":[d.range().start,d.range().end],
+            "name_range":[d.name_range().start,d.name_range().end],"incomplete":d.incomplete()
+        })).collect::<Vec<_>>(),
+        "regions":directory.regions().iter().map(|r| json!({
+            "index":r.cst_index(),"kind":r.kind(),"parent":r.parent(),
+            "introducer":r.introducer(),"subtree_end":r.subtree_end(),
+            "range":[r.range().start,r.range().end]
+        })).collect::<Vec<_>>(),
+        "memberships":directory.memberships().iter().map(|m|m.region()).collect::<Vec<_>>(),
+        "bindings":bindings
+    })
+}
+
+#[test]
+fn recursive_type_scopes_preserve_complete_original_identity_partitions_and_replay() {
+    use ktlsp_parser::local_value_binding::{
+        TypeParameterAnchor, bind_lexical_type_parameter, guarded_type_parameter_rename,
+        type_parameter_occurrences,
+    };
+    let _serial = functional::serial();
+    let ordinary = "// 😀\r\nfun <T, Spare> outer(root:T){ val before:T=root; fun <U> inner(a:`T`,b:U){ val inherited:T=a; fun middle(c:T){ fun <`T`> deep(d:T,e:U,f:Missing){ val own:T=d; unknown(noSuch=d); }; fun side(g:T){} }; fun <U> peer(h:U,i:T){} }; fun <T> shadow(j:T){}; fun after(k:T){}; val last:T=root }\r\nfun <T> other(z:T){}\r\n";
+    for original in [
+        ordinary.to_owned(),
+        ordinary.replace("`T`", "`🦀`").replace("<T", "<`🦀`").replace(":T", ":`🦀`"),
+    ] {
+        let result = parse(&original);
+        let snapshot = result.snapshot();
+        let tree = result.tree_for(snapshot).unwrap();
+        assert!(tree.diagnostics().is_empty());
+        let lower = lower_declarations(&result, snapshot).unwrap();
+        let directory = build_regions(&lower, &result, snapshot).unwrap();
+        for (ordinal,declaration) in lower.declarations().iter().enumerate() {
+            let membership=directory.memberships()[ordinal].region();
+            if declaration.kind()=="FUN" {
+                let body=directory.regions().iter().find(|r|r.introducer()==Some(ordinal)).unwrap();
+                assert_eq!(body.parent(),Some(membership));
+                if let Some(owner)=declaration.owner() {
+                    assert_eq!(directory.regions()[membership].introducer(),Some(owner));
+                    assert_eq!(declaration.cst_parent_index(),Some(directory.regions()[membership].cst_index()));
+                }
+            } else if matches!(declaration.kind(),"VALUE_PARAMETER"|"TYPE_PARAMETER") {
+                assert_eq!(membership,directory.memberships()[declaration.owner().unwrap()].region());
+            } else if declaration.kind()=="PROPERTY" {
+                assert_eq!(directory.regions()[membership].introducer(),declaration.owner());
+            }
+        }
+        let expected = [
+            ("root",Some("outer")),("before",Some("outer")),("a",Some("outer")),
+            ("b",Some("inner")),("inherited",Some("outer")),("c",Some("outer")),
+            ("d",Some("deep")),("e",Some("inner")),("f",None),("own",Some("deep")),
+            ("g",Some("outer")),("h",Some("peer")),("i",Some("outer")),
+            ("j",Some("shadow")),("k",Some("outer")),("last",Some("outer")),("z",Some("other")),
+        ];
+        let annotations: Vec<_> = tree.elements().iter().enumerate().filter(|(_,e)| {
+            e.kind == "REFERENCE_EXPRESSION"
+                && tree.elements()[e.parent.unwrap()].kind == "USER_TYPE"
+        }).map(|(i,_)|i).collect();
+        assert_eq!(annotations.len(), expected.len());
+        let mut original_targets = Vec::new();
+        for (&index, &(annotated, owner)) in annotations.iter().zip(&expected) {
+            let binding = bind_lexical_type_parameter(&directory,&result,index,snapshot);
+            let target = if let Some(owner) = owner {
+                let binding = binding.unwrap();
+                assert_eq!(binding.annotated().raw_name(),annotated);
+                assert_eq!(binding.function().raw_name(),owner);
+                assert_eq!(binding.target().owner(),lower.declarations().iter()
+                    .position(|d|std::ptr::eq(d,binding.function())));
+                assert_eq!(binding.body().introducer(),binding.target().owner());
+                assert!(std::ptr::eq(binding.reference(),&tree.elements()[index]));
+                Some(lower.declarations().iter().position(|d|std::ptr::eq(d,binding.target())).unwrap())
+            } else {
+                assert_eq!(binding.unwrap_err(),LocalBindingError::NoEligibleTypeParameter);
+                None
+            };
+            original_targets.push(target);
+        }
+        let foreign = parse(&original);
+        let foreign_lower = lower_declarations(&result,snapshot).unwrap();
+        for (ordinal,target) in lower.declarations().iter().enumerate().filter(|(_,d)|d.kind()=="TYPE_PARAMETER") {
+            let partition: Vec<_> = annotations.iter().zip(&original_targets)
+                .filter(|(_,t)|**t==Some(ordinal)).map(|(i,_)|*i).collect();
+            let anchors: Vec<_> = std::iter::once(TypeParameterAnchor::Declaration(target))
+                .chain(partition.iter().copied().map(TypeParameterAnchor::AnnotationReference)).collect();
+            for anchor in anchors {
+                for found in [
+                    type_parameter_occurrences(&directory,&result,anchor,snapshot).unwrap(),
+                    guarded_type_parameter_rename(&directory,&result,anchor,snapshot,None).unwrap(),
+                    guarded_type_parameter_rename(&directory,&result,anchor,snapshot,Some("Fresh")).unwrap(),
+                ] {
+                    assert!(std::ptr::eq(found.target(),target));
+                    assert_eq!(found.occurrences().iter().map(|a|a.reference_index()).collect::<Vec<_>>(),partition);
+                }
+                assert_eq!(type_parameter_occurrences(&directory,&foreign,anchor,foreign.snapshot()).unwrap_err(),LocalBindingError::InvalidOrigin);
+                let stale = SourceSnapshot::new("local-occurrences",8,FileKind::Source,&original).unwrap();
+                assert_eq!(type_parameter_occurrences(&directory,&result,anchor,&stale).unwrap_err(),LocalBindingError::StaleSnapshot);
+            }
+            assert_eq!(type_parameter_occurrences(&directory,&result,
+                TypeParameterAnchor::Declaration(&foreign_lower.declarations()[ordinal]),snapshot).unwrap_err(),LocalBindingError::InvalidOrigin);
+            let renamed = guarded_type_parameter_rename(&directory,&result,
+                TypeParameterAnchor::Declaration(target),snapshot,Some("Fresh")).unwrap();
+            let mut edited = original.clone();
+            for range in std::iter::once(target.name_range())
+                .chain(renamed.occurrences().iter().map(|a|a.range())).collect::<Vec<_>>().into_iter().rev()
+            {
+                edited.replace_range(range,"Fresh");
+            }
+            let rebound = parse_revision(&edited,8);
+            let rebound_snapshot = rebound.snapshot();
+            let rebound_tree = rebound.tree_for(rebound_snapshot).unwrap();
+            assert!(rebound_tree.diagnostics().is_empty());
+            let rebound_lower = lower_declarations(&rebound,rebound_snapshot).unwrap();
+            let rebound_directory = build_regions(&rebound_lower,&rebound,rebound_snapshot).unwrap();
+            assert_eq!(lower.declarations().len(),rebound_lower.declarations().len());
+            for (i,(old,new)) in lower.declarations().iter().zip(rebound_lower.declarations()).enumerate() {
+                assert_eq!((old.kind(),old.owner()),(new.kind(),new.owner()));
+                assert_eq!(new.raw_name(),if i==ordinal {"Fresh"} else {old.raw_name()});
+            }
+            for (&index,&expected_target) in annotations.iter().zip(&original_targets) {
+                let binding = bind_lexical_type_parameter(&rebound_directory,&rebound,index,rebound_snapshot);
+                if let Some(expected_target)=expected_target {
+                    assert!(std::ptr::eq(binding.unwrap().target(),&rebound_lower.declarations()[expected_target]));
+                } else {
+                    assert_eq!(binding.unwrap_err(),LocalBindingError::NoEligibleTypeParameter);
+                }
+                let old=&tree.elements()[index];
+                let new=&rebound_tree.elements()[index];
+                assert_eq!(&edited[new.start..new.end],if expected_target==Some(ordinal) {"Fresh"} else {&original[old.start..old.end]});
+            }
+            println!("RECURSIVE_TYPE_PRODUCER={}",serde_json::json!({
+                "selected_ordinal":ordinal,"original":recursive_type_observation(&result),
+                "edited":recursive_type_observation(&rebound)
+            }));
+        }
+        // Broader lowering is not authority for existing value/callee semantics.
+        for (i,e) in tree.elements().iter().enumerate().filter(|(_,e)|e.kind=="REFERENCE_EXPRESSION") {
+            if tree.elements()[e.parent.unwrap()].kind=="CALL_EXPRESSION" {
+                assert!(ktlsp_parser::local_value_binding::bind_local_function_callee(&directory,&result,i,snapshot).is_err());
+            }
+        }
+        for function in lower.declarations().iter().filter(|d|d.kind()=="FUN" && matches!(d.raw_name(),"inner"|"deep"|"middle")) {
+            assert!(ktlsp_parser::call_syntax::callable_parameters(&lower,&result,snapshot,function).is_err());
+        }
+    }
+}
+
+#[test]
+fn recursive_type_rename_relooks_up_all_annotations_and_preserves_sibling_shadowing() {
+    use ktlsp_parser::local_value_binding::{TypeParameterAnchor,guarded_type_parameter_rename};
+    let _serial = functional::serial();
+    for (source,function,name,accepted) in [
+        ("fun <T> outer(){ fun <U> inner(a:T){} }","outer","U",false),
+        ("fun <T> outer(){ fun <U> inner(a:T){} }","inner","T",false),
+        ("fun <T> outer(){ fun middle(){ fun unused(a:Captured){} } }","outer","Captured",false),
+        ("fun <T> outer(){ fun <U> inner(){ fun unused(a:Captured){} } }","inner","Captured",false),
+        ("fun <T> outer(){ fun <U> inner(a:U){}; fun sibling(b:T){} }","outer","U",true),
+        ("fun <T> outer(){ fun <U> inner(a:U){}; fun sibling(b:T){} }","inner","T",true),
+        ("fun <T> outer(){ fun middle(){ fun <U,`U`> unused(){} } }","outer","Fresh",false),
+        ("fun <T> outer(){ fun <U,V> inner(){} }","inner","V",false),
+    ] {
+        let result=parse(source);
+        let snapshot=result.snapshot();
+        let lower=lower_declarations(&result,snapshot).unwrap();
+        let directory=build_regions(&lower,&result,snapshot).unwrap();
+        let owner=lower.declarations().iter().position(|d|d.kind()=="FUN"&&d.raw_name()==function).unwrap();
+        let target=lower.declarations().iter().find(|d|d.kind()=="TYPE_PARAMETER"&&d.owner()==Some(owner)).unwrap();
+        let renamed=guarded_type_parameter_rename(&directory,&result,TypeParameterAnchor::Declaration(target),snapshot,Some(name));
+        if accepted { renamed.unwrap(); } else {
+            assert_eq!(renamed.unwrap_err(),LocalBindingError::AmbiguousTypeParameter,"{source}");
+        }
+    }
+}
+
+#[test]
+fn recursive_type_scope_depth_is_structural_not_a_fixed_function_lane() {
+    use ktlsp_parser::local_value_binding::{bind_lexical_type_parameter,TypeParameterAnchor,type_parameter_occurrences};
+    let _serial=functional::serial();
+    for depth in [3usize,7,15,31] {
+        let mut source=String::new();
+        for level in 0..depth {
+            write!(&mut source,"fun {}f{level}(p{level}:T){{ ",if level.is_multiple_of(3) {"<T> "} else {""}).unwrap();
+        }
+        source.push_str("val leaf:T=p0");
+        source.push_str(&"}".repeat(depth));
+        let result=parse(&source);
+        let snapshot=result.snapshot();
+        let tree=result.tree_for(snapshot).unwrap();
+        assert!(tree.diagnostics().is_empty());
+        let lower=lower_declarations(&result,snapshot).unwrap();
+        let directory=build_regions(&lower,&result,snapshot).unwrap();
+        for (index,_) in tree.elements().iter().enumerate().filter(|(_,e)|
+            e.kind=="REFERENCE_EXPRESSION"&&tree.elements()[e.parent.unwrap()].kind=="USER_TYPE"
+        ) {
+            let binding=bind_lexical_type_parameter(&directory,&result,index,snapshot).unwrap();
+            let level=if binding.annotated().raw_name()=="leaf" {depth-1} else {
+                binding.annotated().raw_name()[1..].parse::<usize>().unwrap()
+            };
+            assert_eq!(binding.function().raw_name(),format!("f{}",level-level%3));
+            let by_use=type_parameter_occurrences(&directory,&result,TypeParameterAnchor::AnnotationReference(index),snapshot).unwrap();
+            let by_declaration=type_parameter_occurrences(&directory,&result,TypeParameterAnchor::Declaration(binding.target()),snapshot).unwrap();
+            assert!(std::ptr::eq(by_use.target(),by_declaration.target()));
+            assert_eq!(by_use.occurrences().iter().map(|a|a.reference_index()).collect::<Vec<_>>(),
+                by_declaration.occurrences().iter().map(|a|a.reference_index()).collect::<Vec<_>>());
         }
     }
 }

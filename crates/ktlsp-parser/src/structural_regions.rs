@@ -471,26 +471,28 @@ fn walk<'a>(
                     .filter(|owner| *owner < ordinal)
                     .and_then(|owner| out.lowered.declarations().get(owner))
                     .ok_or(invalid(i))?;
-                let ordinary_owner = if function.parent == Some(0) {
-                    true
-                } else if value_parameter {
-                    b.work(3)?;
-                    let block = function
-                        .parent
-                        .and_then(|index| p.elements().get(index))
-                        .ok_or(invalid(i))?;
-                    let outer = block
-                        .parent
-                        .and_then(|index| p.elements().get(index))
-                        .ok_or(invalid(i))?;
-                    !block.token
-                        && b.equal(&block.kind, "BLOCK")?
-                        && !outer.token
-                        && b.equal(&outer.kind, "FUN")?
-                        && outer.parent == Some(0)
-                } else {
-                    false
-                };
+                let mut ancestor = function;
+                loop {
+                    b.work(1)?;
+                    if ancestor.token || !b.equal(&ancestor.kind, "FUN")? {
+                        return Err(invalid(i));
+                    }
+                    if ancestor.parent == Some(0) {
+                        break;
+                    }
+                    b.work(2)?;
+                    let block_index = ancestor.parent.ok_or(invalid(i))?;
+                    let block = p.elements().get(block_index).ok_or(invalid(i))?;
+                    let outer_index = block.parent.ok_or(invalid(i))?;
+                    if block.token
+                        || !b.equal(&block.kind, "BLOCK")?
+                        || outer_index >= block_index
+                        || block_index >= function_index
+                    {
+                        return Err(invalid(i));
+                    }
+                    ancestor = p.elements().get(outer_index).ok_or(invalid(i))?;
+                }
                 if pe.token
                     || !b.equal(
                         &pe.kind,
@@ -501,7 +503,6 @@ fn walk<'a>(
                         },
                     )?
                     || function.token
-                    || !ordinary_owner
                     || !b.equal(&function.kind, "FUN")?
                     || owner.cst_index() != function_index
                     || !b.equal(owner.kind(), "FUN")?

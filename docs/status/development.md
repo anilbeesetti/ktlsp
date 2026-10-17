@@ -2997,3 +2997,62 @@ same-live-job/exactstep custody HOLD remain. Bare Function-root genuine producer
 emission, exact compiler provenance, general semantics and full parity remain
 unestablished. This delivery adds no capability and no JVM analysis dependency.
 
+#### Composed418419 source — static components, no execution acceptance yet
+
+Both independent owners used SAME verified0d7d and obtained separate full current
+functionality/adversarial component reviews. ROOT read all current receipts and
+independently froze exact head/tree/soleparent/cleanliness/scope/config identities
+before composition; all fact commands exited0.
+
+- 418 **72a8b283022e717d0c85b70de4f6edef8015d6af**,
+  tree38a96cd842c36b628304cc95c77b18fbb6049cb1, five binary paths.
+  ROOT requested immediate dropping of unused opaque Constructor staging before
+  semantic growth; raw-parent validation and monotonic charges stay unchanged.
+  ROOT/reviewers removed permanent raw-helper/forwarding echoes and retained
+  literal genuine owner/Constructor/value/Type/options/pointer assertions.
+  Full current144-line module and437-line/10-test source are static-reviewed,
+  NOT observed test passes or new operation resource minima.
+- 419 **58fd4c42e5cd3959d01165fc4f1a4896d2e8c234**,
+  tree7d99b3a02e4d13fd88b369364d4689262134e199, eight parser/server paths.
+  Independent adversarial review found the canonical P1: structural header
+  membership was incorrectly treated as outer callable visibility. The first
+  VALUE_PARAMETER-only correction was incomplete; ROOT found local generic
+  TYPE_PARAMETER headers still failed in BOTH callable/value candidate scans.
+  Current shared helpers use actual physical direct-body parent plus membership,
+  preserving authentic outer parameters/direct locals and all competition
+  before selected eligibility/arity. New unrelated `unused<U,send,p>()` positive
+  uses original identity/type-rename/actual edit/reparse/rebinding assertions.
+  Both reviewers fully reread current2166-line binding and741-line call tests,
+  affected owner/type-root/value/callee callers and exact unchanged source.
+  Earlier incomplete clears are explicitly WITHDRAWN, not current acceptance.
+
+ROOT cherry-picked the reviewed leaves as8793eb9 and5674e21 over root common
+documentationed3ee8b. Expected complete union is16paths; no Cargo/lock/workflow/
+config/vendor/production-lowerer/region/protocol/supervision/capability change.
+Root actual preintegration xd://lsp references proxy attempts failed with
+unexpected rust-analyzer exitcode0/recent initialization failure; xdreport_issue
+acknowledged. Complete grep/read caller fallback is actual evidence. Typed-tool
+omission alone was not proof of unavailability; worker mounts may differ.
+
+Composed source is NOT formatted/compiled/executed/published. ROOT still needs
+TWO complete union reviews, its ONE formatter, exact all-affected current-source
+rechecks, admitted pinned CHECK/strict locked all-target Clippy, real native418
+public consumer and original full hosted Linux/macOS/Windows workspace CI.
+419 temporary actual writer remains: complete original/actual TYPE-rename-edited
+producers/protocol plus three actual adversarial changes, not fake responses.
+BOTH OWNER+ROOT must FULLread actual payloads and actually apply received edits
+before cleanup; permanent assertions remain. No earlier CI accepts this source.
+
+Independent FormattingContractNext research (426lines, ROOT fully read) finds
+no release-aligned effective settings/range authority or existing compatible
+native layout engine. A ktfmt wrapper would silently substitute another engine;
+T038 remains HOLD, no provider/dependency/oracle probe admitted. Independent
+WorkspaceAuthorityNext research (218lines, ROOT fully read) reused earlier
+WorkspaceSymbolPrerequisites and confirms412 closes only mutation divergence.
+A real JSON-import→physical inventory→Session revision/overlay→unopened-symbol
+consumer is a proposed next prerequisite, not an implemented workspace index.
+Complete trusted-filesystem/read bounds, URI identity, aggregate budgets,
+reload/cancellation/publication transitions and hidden official behavior remain
+separate decisions/evidence. All #96/#417/B3/oracle/native-only/T004/provenance
+and full-parity limits remain unchanged.
+

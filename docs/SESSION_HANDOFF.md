@@ -81,14 +81,45 @@ each GRANTED TWO separate full functionality/adversarial review slots:
 Completed full research is `/private/tmp/ktlsp-next-constructor-values-research.md`
 and `/private/tmp/ktlsp-next-lexical-label-definition-research.md`; shared admitted
 contract `/private/tmp/ktlsp-next-418-419-contract.md`. Reuse, do not restart.
-Implementations are in progress, NOT reviewed/compiled/runtime verified yet.
-ROOT reserves TWO additional complete union reviewers and all final exact-source
-affected rechecks. No mid-flight build/lint/test/formatter/runtime or publication.
+Both components are now implemented with TWO independent current static clears:
+418 leaf72a8b283022e717d0c85b70de4f6edef8015d6af/tree38a96cd8 (five files);
+419 leaf58fd4c42e5cd3959d01165fc4f1a4896d2e8c234/tree7d99b3a0 (eight files).
+ROOT independently froze exact clean identities/scopes/soleparent0d7d/configpins
+before composing them as8793eb9 and5674e21 over root documentationed3ee8b.
+Root review fixed418 unused opaque staging retention without budget refund and
+removed permanent raw-helper forwarding echoes; genuine literals remain.
+419's initial canonical header-membership P1 and incomplete VALUE_PARAMETER-only
+fix are superseded: BOTH callable/value candidate helpers now require physical
+direct-body parent plus region membership; original outer parameters remain
+competitors. Unrelated generic-local U/send/p headers have a permanent positive
+through original identity/type-rename/edit/reparse assertions. ALL4BodyCheck
+routes remain closed. Earlier source/reviews are explicitly withdrawn, not reused.
+Full current component receipts are `/private/tmp/ktlsp-418-{functionality,adversarial}-review.txt`
+and `/private/tmp/ktlsp-419-review-{functionality,adversarial}.txt`, ROOT fully read.
+ROOT actual xd://lsp references attempts failed rust-analyzer initialization with
+unexpected exitcode0; xdreport_issue acknowledged. Complete caller grep/read is
+the fallback, NOT successful LSP refs. Worker proxies may separately be absent.
+Composed source remains UNFORMATTED/UNCOMPILED/UNEXECUTED/UNPUBLISHED.
+ROOT next obtains TWO complete16 union reviews, owns its ONE formatter and all
+exact final-source affected rechecks before compile-only admission. No mid-flight
+build/lint/test/formatter/runtime or publication. #419 actual writer remains.
 Native binary data proof needs separate ROOT admission after all static clears;
 Kotlin/CLI proof only original full hosted CI. Temporary writers stay until BOTH
 OWNER+ROOT FULL-read actual payloads and actually returned edits; permanent
 consumer-visible assertions remain after cleanup. Successor source needs its
 OWN original full CI and guarded exact-main acceptance, never earlier-source CI.
+
+Two further independent READ-ONLY investigations completed and ROOT read fully:
+FormattingContractNext (426lines) rejects a ktfmt wrapper: official IntelliJ
+effective settings/helper, release pin and partial/empty-range expectations are
+missing; no native formatter or settings read authority exists. Preserve T038
+HOLD, no fake/no-op provider or new oracle probe. WorkspaceAuthorityNext
+(218lines) reused WorkspaceSymbolPrerequisites:412 immutability alone is not
+Session import/complete physical inventory/overlay/revision authority. A real
+official-JSON source-authority→unopened document-symbol prerequisite is proposed,
+not admitted; exact filesystem trust/aggregate budgets/publication must be frozen.
+Full workspace symbols/library navigation and hidden official import state/
+reload semantics remain unproved. Continue these results, do not restart.
 
 ### Historical414/415 composition and first-source smoke stages
 

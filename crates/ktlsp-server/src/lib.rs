@@ -78,8 +78,20 @@ impl ParserFailure {
                     PipedTimeoutSite::WriterJoin => "writer_join",
                     PipedTimeoutSite::ReaderJoin => "reader_join",
                 };
+                // Tagged envelope bytes excluding the encoded ID: 131 for
+                // supervisor_poll, 127 for either join. Keep the original
+                // error if optional metadata alone would overflow the frame.
+                let id_limit = ktlsp_protocol::MAX_PAYLOAD_BYTES - 116 - site.len();
+                let fits = id.as_str().is_none_or(|id| {
+                    id.len() <= id_limit - 2
+                        && (id.len() <= (id_limit - 2) / 6
+                            || workspace_symbols::json_string_bytes(id)
+                                .is_some_and(|bytes| bytes <= id_limit))
+                });
                 let mut response = response_error(id, -32803, "parser deadline exceeded");
-                response["error"]["data"] = json!({"parserTimeoutSite":site});
+                if fits {
+                    response["error"]["data"] = json!({"parserTimeoutSite":site});
+                }
                 response
             }
             Self::Source(error) => {

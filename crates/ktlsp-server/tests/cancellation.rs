@@ -590,3 +590,36 @@ fn navigation_uses_shared_wire_ids_cancellation_and_snapshot_guards() {
         }
     }
 }
+
+#[cfg(not(unix))]
+#[test]
+fn piped_timeout_annotation_respects_actual_escaped_frame_boundary() {
+    let _serial = SERIAL.lock().unwrap_or_else(|poison| poison.into_inner());
+    let package = Package::new();
+    let mut client = Client::new(&package);
+    client.send(open("wireboundary"));
+    for (padding, tagged) in [(135, true), (134, false)] {
+        // Encoded ID includes two quotes and a two-byte escaped backslash.
+        // With the 131-byte poll envelope, the first fits exactly; the next
+        // byte must omit only optional data, not break the existing response.
+        let id = format!("{}\\", "a".repeat(ktlsp_protocol::MAX_PAYLOAD_BYTES - padding));
+        client.send(symbols(json!(&id)));
+        let response = client.reply();
+        assert_eq!(response["id"].as_str(), Some(id.as_str()));
+        assert_eq!(response["error"]["code"], -32803, "{response}");
+        assert_eq!(response["error"]["message"], "parser deadline exceeded");
+        assert!(response.get("result").is_none());
+        if tagged {
+            assert_eq!(
+                response["error"]["data"],
+                json!({"parserTimeoutSite":"supervisor_poll"})
+            );
+        } else {
+            assert!(response["error"].get("data").is_none());
+        }
+    }
+    client.send(request(json!("stop"), "shutdown", Value::Null));
+    assert_eq!(client.reply()["id"], "stop");
+    client.send(notify("exit", Value::Null));
+    client.finish(0);
+}

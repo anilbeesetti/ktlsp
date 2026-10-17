@@ -77,6 +77,16 @@ fn charge(used: &mut usize, amount: usize, limit: usize) -> Result<(), &'static 
     *used = next.min(limit);
     if next > limit { Err(LIMIT) } else { Ok(()) }
 }
+pub(super) fn json_string_bytes(value: &str) -> Option<usize> {
+    value.bytes().try_fold(2usize, |bytes, byte| {
+        let width = match byte {
+            b'"' | b'\\' | 8 | 9 | 10 | 12 | 13 => 2,
+            0..=0x1f => 6,
+            _ => 1,
+        };
+        bytes.checked_add(width)
+    })
+}
 impl Budget {
     pub(super) fn new(query: &str, id: &Value) -> Result<Self, AdmissionError> {
         let mut budget = Self::default();
@@ -88,16 +98,7 @@ impl Budget {
             }
             budget.work(id.len(), &AtomicBool::new(false))?;
             budget.storage(id.len())?;
-            id.bytes().try_fold(2usize, |bytes, byte| {
-                let width = match byte {
-                    b'"' | b'\\' | 8 | 9 | 10 | 12 | 13 => 2,
-                    0..=0x1f => 6,
-                    _ => 1,
-                };
-                bytes
-                    .checked_add(width)
-                    .ok_or(AdmissionError::UnreplyableId)
-            })?
+            json_string_bytes(id).ok_or(AdmissionError::UnreplyableId)?
         } else {
             20
         };

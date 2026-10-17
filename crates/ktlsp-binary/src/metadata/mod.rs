@@ -30,6 +30,7 @@ pub mod resolved_class_function_parameters;
 pub mod resolved_class_function_return;
 pub mod resolved_class_function_signature;
 pub mod resolved_class_properties;
+pub mod resolved_class_supertypes;
 pub mod string_table;
 pub mod type_alias;
 pub mod type_alias_types;

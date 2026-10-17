@@ -4400,3 +4400,24 @@ No lint suppression or formatter mutation was added. Fresh exact source
 renewals remain required. Next strict FULL-workspace Clippy should use
 --keep-going to collect remaining diagnostics without reducing scope or
 weakening -D warnings; no unchanged failure is rerun merely to confirm it.
+
+Both COMPLETE30path r4 source renewals cleared3ca122addea3f887377011a7acf701dde5a9a0c9/
+tree08e7758a92fc5e97a6749031d9e5e17278d32368. ROOT personally FULL-read current
+function11032B SHA759df8c7ec5f09baeaf850ee3e11e99b13ec8a0035bc0895c043d8ea013abe72
+and adversary10185B SHAed1b049983175489eee8e98707c97392734f93a8eeff0ef4fd2b2e5c99575cce
+rendered receipts. Fresh exact fmtCHECK0 in1.181275375s; strict locked FULL
+workspace/all-target/all-feature keep-going Clippy101 in0.978137584s retained
+1538B stderr SHA826dc9de218adb7b08cb61767d3d53c9a3495cb068aefc6197067f76d800d44a.
+The only new finding is a392-byte Workspace variant versus16-byte Document in
+SymbolRequest; NoRun was NOT invoked and no native/Kotlin runtime ran.
+
+ROOT uses std Box for ONLY a workspace budget actually waiting on an import,
+so the shared Document variant need not carry that large inline payload.
+The queued payload is charged before allocation to the SAME logical storage
+allowance; its actual consuming match moves out the SAME budget, never a
+fresh/default/refunded allowance. Direct workspace work allocates no box.
+Waiter capacity, IDs, cancellation/supersession/drop and all real consumers/
+assertions stay unchanged. Ordinary Box/JSON/Arc allocation is not a new
+whole-process OOM/allocator guarantee. No lint suppression, extra pool/index,
+compatibility wrapper or formatter mutation is added. Both exact cumulative
+source renewals and fresh full compiler gates remain required.

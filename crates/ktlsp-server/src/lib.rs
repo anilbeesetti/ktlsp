@@ -183,7 +183,7 @@ enum SymbolRequest {
     Document(Arc<str>),
     Workspace {
         query: String,
-        budget: workspace_symbols::Budget,
+        budget: Box<workspace_symbols::Budget>,
     },
 }
 
@@ -1005,6 +1005,9 @@ impl Session {
         if self.pending_import.as_ref().is_some_and(|pending| {
             !pending.cancelled.load(Ordering::Relaxed) && pending.attempt == self.workspace.attempt
         }) {
+            budget
+                .storage(std::mem::size_of::<workspace_symbols::Budget>())
+                .map_err(|e| (-32803, e))?;
             self.waiting_symbols
                 .try_reserve(1)
                 .map_err(|_| (-32803, "workspace waiter allocation failed"))?;
@@ -1012,7 +1015,7 @@ impl Session {
                 id,
                 request: SymbolRequest::Workspace {
                     query: owned_query,
-                    budget,
+                    budget: Box::new(budget),
                 },
                 attempt: self.workspace.attempt,
             });
@@ -1268,7 +1271,7 @@ impl Session {
                                 None,
                             ),
                             SymbolRequest::Workspace { query, budget } => {
-                                self.start_workspace_symbol_query(id.clone(), query, budget)
+                                self.start_workspace_symbol_query(id.clone(), query, *budget)
                             }
                         };
                         if let Err((code, message)) = started {

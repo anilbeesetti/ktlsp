@@ -136,6 +136,14 @@ in native mutation tests (stderr2530B SHA ff5c69475e8c6444b59c3920aa549a0bb1f48e
 Root replaced ONLY those with std::slice::from_ref; no changed assertions or
 production code. NoRun/native runtime not invoked. Preserve failure; renew exact
 source gates and use strict full-scope keep-going compiler diagnostics next.
+Both complete r4 source renewals CLEAR3ca122a/tree08e7758. Fresh fmtCHECK0;
+strict FULL-workspace keep-going Clippy101 found392-byte Workspace waiter
+variant versus16-byte Document. Original1538B stderr SHA826dc9de218adb7b08cb61767d3d53c9a3495cb068aefc6197067f76d800d44a.
+Root boxes ONLY the budget of a genuinely queued workspace request, charges
+that payload to the SAME logical allowance, then moves the SAME budget out
+at its actual import-completion consumer. No allocation for direct requests,
+no new allowance/reset or lint suppression. NoRun/runtime not invoked.
+Exact full source renewals and new compiler gates remain pending.
 No owner formatter/build/check/test/runtime is permitted mid-flight.
 Keep real packaged stdio cancel/ID-reuse observations distinct from complementary
 Session owned-count/retained-until-join proof; no production probe/barrier/delay.

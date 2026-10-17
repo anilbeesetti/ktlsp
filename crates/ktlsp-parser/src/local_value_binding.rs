@@ -1988,6 +1988,8 @@ pub struct OuterValueLookup<'a> {
     directory: &'a RegionDirectory<'a>,
     site: &'a ReferenceSite<'a>,
     body: &'a Region<'a>,
+    import: &'a crate::lowering::ImportDirective<'a>,
+    spelling: &'a str,
     budget: ReferenceBudget,
 }
 
@@ -2041,12 +2043,17 @@ pub(super) fn lookup_value_with_budget<'a>(
     let (body, target) = validated_value_target(directory, site, current, &mut budget)?;
     Ok(match target {
         Some(target) => ValueLookup::Local(LocalValueBinding { site, body, target }),
-        None => ValueLookup::Outer(OuterValueLookup {
-            directory,
-            site,
-            body,
-            budget,
-        }),
+        None => {
+            let (import, spelling) = selected_import(site, &mut budget)?;
+            ValueLookup::Outer(OuterValueLookup {
+                directory,
+                site,
+                body,
+                import,
+                spelling,
+                budget,
+            })
+        }
     })
 }
 
@@ -2067,6 +2074,43 @@ fn charge_import_name(
     Ok(())
 }
 
+// Select the original ordinary import before any target producer is needed.
+// The borrow and SAME budget move into Outer; no second selector or copied name.
+fn selected_import<'a>(
+    site: &'a ReferenceSite<'a>,
+    b: &mut ReferenceBudget,
+) -> Result<(&'a crate::lowering::ImportDirective<'a>, &'a str)> {
+    let parsed = site.origin().parsed();
+    let spelling = b.spelling(site.raw_spelling())?
+        .ok_or(LocalBindingError::UnsupportedSpelling)?;
+    let mut selected = None;
+    for import in site.origin().imports() {
+        b.charge(1)?;
+        charge_import_name(import.name(), parsed, b)?;
+        let mut last = None;
+        for segment in import.name().segments() {
+            last = Some(b.spelling(segment.raw_spelling())?
+                .ok_or(LocalBindingError::UnsupportedSpelling)?);
+        }
+        let visible = if let Some(alias) = import.alias() {
+            b.spelling(alias.raw_spelling())?
+                .ok_or(LocalBindingError::UnsupportedSpelling)?
+        } else {
+            last.ok_or(LocalBindingError::UnsupportedContext)?
+        };
+        if import.on_demand() || !b.equal(visible, spelling)? {
+            continue;
+        }
+        if import.alias().is_some() {
+            return Err(LocalBindingError::UnsupportedContext);
+        }
+        if selected.replace(import).is_some() {
+            return Err(LocalBindingError::AmbiguousLocal);
+        }
+    }
+    Ok((selected.ok_or(LocalBindingError::NoEligibleLocal)?, spelling))
+}
+
 impl<'a> OuterValueLookup<'a> {
     /// Consume one shared allowance over the COMPLETE original closed-module
     /// directory, including the requester exactly once. The caller owns module
@@ -2085,37 +2129,8 @@ impl<'a> OuterValueLookup<'a> {
             return Err(LocalBindingError::Resource);
         }
         let parsed = self.site.origin().parsed();
-        let spelling = b
-            .spelling(self.site.raw_spelling())?
-            .ok_or(LocalBindingError::UnsupportedSpelling)?;
-        let mut selected = None;
-        for import in self.site.origin().imports() {
-            b.charge(1)?;
-            charge_import_name(import.name(), parsed, b)?;
-            let mut last = None;
-            for segment in import.name().segments() {
-                last = Some(
-                    b.spelling(segment.raw_spelling())?
-                        .ok_or(LocalBindingError::UnsupportedSpelling)?,
-                );
-            }
-            let visible = if let Some(alias) = import.alias() {
-                b.spelling(alias.raw_spelling())?
-                    .ok_or(LocalBindingError::UnsupportedSpelling)?
-            } else {
-                last.ok_or(LocalBindingError::UnsupportedContext)?
-            };
-            if import.on_demand() || !b.equal(visible, spelling)? {
-                continue;
-            }
-            if import.alias().is_some() {
-                return Err(LocalBindingError::UnsupportedContext);
-            }
-            if selected.replace(import).is_some() {
-                return Err(LocalBindingError::AmbiguousLocal);
-            }
-        }
-        let import = selected.ok_or(LocalBindingError::NoEligibleLocal)?;
+        let spelling = self.spelling;
+        let import = self.import;
         let mut requester = false;
         let mut found = None;
         // ponytail: per-request borrowed scans share the fixed semantic work

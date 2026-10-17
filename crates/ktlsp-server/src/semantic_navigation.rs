@@ -484,9 +484,6 @@ pub(crate) fn render(
         match lookup_value(&directory, &site, snapshot).map_err(|_| UNSUPPORTED)? {
             ValueLookup::Local(binding) => binding.target(),
             ValueLookup::Outer(outer) => {
-                if lowered.imports().is_empty() {
-                    return Err(UNSUPPORTED.into());
-                }
                 return imported.ok_or(UNSUPPORTED)?
                     .render(outer, &directory, result, snapshot, response_id_bound);
             }

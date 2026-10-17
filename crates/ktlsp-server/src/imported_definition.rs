@@ -148,14 +148,14 @@ impl<'a> Context<'a> {
             {
                 return Err(ParserFailure::Protocol(-32803, "imported definition response limit exceeded"));
             }
-            // Charge escaped URI and the fixed position/envelope fields before
-            // allocating JSON. The caller retains its original ID frame bound.
+            // Reserve escaped URI plus fixed logical JSON-map/key/endpoint
+            // storage separately from the 256-byte encoded frame allowance.
             self.budget.storage(source.document().len().checked_mul(6)
-                .and_then(|bytes| bytes.checked_add(256)).ok_or(LIMIT)?)
+                .and_then(|bytes| bytes.checked_add(4096)).ok_or(LIMIT)?)
                 .map_err(|_| LIMIT)?;
             let positions = structure::positions(source.source(), &[target.start, target.end]);
-            let start = positions[0].ok_or(UNSUPPORTED)?;
-            let end = positions[1].ok_or(UNSUPPORTED)?;
+            let start = positions[0];
+            let end = positions[1];
             Ok(json!({"uri":source.document(),"range":{"start":start,"end":end}}))
         })();
         // Revalidate even a refused/negative directory: a late mutation must not

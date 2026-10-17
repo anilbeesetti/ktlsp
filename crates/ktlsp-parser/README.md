@@ -561,9 +561,11 @@ evidence and integration verification remain ROOT-gated under #96.
   types, stable cross-revision identity or official navigation equivalence.
 - `local_value_binding::lookup_value` preserves the existing successful local and
   parameter binding path, but returns `ValueLookup::Outer` only after the complete
-  original body and namespace search genuinely have no eligible target. In
-  particular, `NoEligibleLocal` from an unresolved unrelated call remains an
-  error; catching the old binder's generic error is not import authority.
+  original body and namespace search genuinely have no eligible target, followed
+  by selection of one original ordinary nonstar/nonalias import. Unmatched,
+  star-only, matching-alias and duplicate choices refuse before target producers.
+  `NoEligibleLocal` from an unresolved unrelated call remains an error; catching
+  the old binder's generic error is not import authority.
   The private-field continuation consumes its SAME monotonic semantic allowance
   in `resolve_import`, over a complete borrowed original source directory with
   the requester included exactly once. It authenticates every result/lowering/

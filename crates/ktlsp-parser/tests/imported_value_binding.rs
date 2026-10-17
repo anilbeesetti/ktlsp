@@ -39,8 +39,14 @@ fn imported(
     let lower = lower_declarations(&request, request.snapshot()).unwrap();
     let regions = build_regions(&lower, &request, request.snapshot()).unwrap();
     let site = reference_site(&lower, &request, request.snapshot(), selected(&request)).unwrap();
-    let ValueLookup::Outer(outer) = lookup_value(&regions, &site, request.snapshot()).unwrap() else {
-        panic!("expected imported continuation");
+    let outer = match lookup_value(&regions, &site, request.snapshot()) {
+        Ok(ValueLookup::Outer(outer)) => outer,
+        Ok(ValueLookup::Local(_)) => panic!("expected imported continuation"),
+        Err(error) => {
+            // Invalid imports refuse BEFORE constructing target producers.
+            assert_eq!(expected, Err(error));
+            return;
+        }
     };
     // The original requesting continuation PRECEDES the actual target producers.
     // This exercises the real worker's delayed-directory borrowing seam.
@@ -137,11 +143,21 @@ fn two_original_sources_late_producer_and_quoted_component_boundaries() {
 fn duplicate_imports_candidates_and_nonproperty_namespace_competition_refuse() {
     let _serial = functional::serial();
     let request = "import values.answer\nfun use() { val result = answer }";
-    imported(
-        "import values.answer\nimport `values`.`answer`\nfun use() { val result = answer }",
-        &["package values\nval answer = 1"],
-        Err(LocalBindingError::AmbiguousLocal),
-    );
+    for (imports, error) in [
+        ("import values.answer\nimport `values`.`answer`", LocalBindingError::AmbiguousLocal),
+        ("import values.answer as answer", LocalBindingError::UnsupportedContext),
+        ("import values.*", LocalBindingError::NoEligibleLocal),
+        ("import values.other", LocalBindingError::NoEligibleLocal),
+    ] {
+        let source = format!("{imports}\nfun use() {{ val result = answer }}");
+        let request = parse("Uses.kt", &source);
+        let lower = lower_declarations(&request, request.snapshot()).unwrap();
+        let regions = build_regions(&lower, &request, request.snapshot()).unwrap();
+        let site = reference_site(&lower, &request, request.snapshot(), selected(&request)).unwrap();
+        // No target producer exists: an invalid import must never authorize
+        // secondary native parsing, even though local absence was proved.
+        assert_eq!(lookup_value(&regions, &site, request.snapshot()).unwrap_err(), error);
+    }
     imported(
         request,
         &["package values\nval answer = 1\nval `answer` = 2"],
@@ -162,16 +178,6 @@ fn duplicate_imports_candidates_and_nonproperty_namespace_competition_refuse() {
             "package values\nclass answer {}",
         ],
         Err(LocalBindingError::UnsupportedContext),
-    );
-    imported(
-        "import values.answer as answer\nfun use() { val result = answer }",
-        &["package values\nval answer = 1"],
-        Err(LocalBindingError::UnsupportedContext),
-    );
-    imported(
-        "import values.*\nfun use() { val result = answer }",
-        &["package values\nval answer = 1"],
-        Err(LocalBindingError::NoEligibleLocal),
     );
     imported(
         request,

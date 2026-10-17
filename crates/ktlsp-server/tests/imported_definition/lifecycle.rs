@@ -395,3 +395,71 @@ fn imported_definition_joins_cancelled_work_before_slot_reuse_and_revalidates_be
     assert!(closed.is_empty(), "{closed:?}");
     assert_eq!(failed_import.pending_requests(), 0);
 }
+
+#[test]
+fn queued_local_type_and_call_definitions_ignore_unrelated_files_but_keep_explicit_cancellation() {
+    let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    let package = Package::source_only();
+    let project = source_project(&package, "queued-definitions", &["src"]);
+    let source = "package app\nfun <T> f(p:T) { val local = 1; val use = local; fun nested() {}; nested() }\n";
+    write_member(&project, "Uses.kt", source);
+    write_member(&project, "Other.kt", "package app\nval other = 1\n");
+    let root = source_directory_uri(&project);
+    let uri = format!("{root}/src/Uses.kt");
+    let other = format!("{root}/src/Other.kt");
+    let options = source_options(&[&root]);
+    let local_use = source.find("= local").unwrap() + 2;
+    let local_target = source.find("local =").unwrap();
+    let mut session = start_source_session(&options, &uri, source);
+    let mut replies = Vec::new();
+    for (id, offset) in [
+        (10, local_use),
+        (11, source.find("p:T").unwrap() + 2),
+        (12, source.rfind("nested()").unwrap()),
+    ] {
+        replies.extend(session.handle(definition(id, &uri, source, offset)));
+    }
+    // pending_import remains owned until FIRST poll, even if its thread has
+    // finished. These three consumers are deterministically initial waiters.
+    assert_eq!(session.pending_requests(), 4);
+    replies.extend(session.handle(json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{
+        "textDocument":{"uri":other,"languageId":"kotlin","version":1,"text":"package app\nval other = 1\n"}}})));
+    replies.extend(session.handle(json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{
+        "textDocument":{"uri":other,"version":2},"contentChanges":[{"text":"package app\nval other = 2\n"}]}})));
+    replies.extend(session.handle(json!({"jsonrpc":"2.0","method":"textDocument/didClose","params":{
+        "textDocument":{"uri":other}}})));
+    replies.extend(collect_owned(&mut session));
+    assert_eq!(replies.len(), 3, "{replies:?}");
+    assert_definition(source_reply(&replies, 10), &uri, source, local_target, 5);
+    assert_definition(source_reply(&replies, 11), &uri, source, source.find("<T>").unwrap() + 1, 1);
+    assert_definition(source_reply(&replies, 12), &uri, source, source.find("nested()").unwrap(), 6);
+    let (closed, clean) = session.close();
+    assert!(clean, "{closed:?}");
+    assert!(closed.is_empty(), "{closed:?}");
+
+    let mut cancelled = start_source_session(&options, &uri, source);
+    let mut replies = cancelled.handle(definition(60, &uri, source, local_use));
+    replies.extend(cancelled.handle(json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":60}})));
+    replies.extend(collect_owned(&mut cancelled));
+    assert_eq!(replies.len(), 1, "{replies:?}");
+    assert_refused(source_reply(&replies, 60), -32800);
+    let mut reused = cancelled.handle(definition(60, &uri, source, local_use));
+    reused.extend(collect_owned(&mut cancelled));
+    assert_eq!(reused.len(), 1, "{reused:?}");
+    assert_definition(source_reply(&reused, 60), &uri, source, local_target, 5);
+    let (closed, clean) = cancelled.close();
+    assert!(clean, "{closed:?}");
+    assert!(closed.is_empty(), "{closed:?}");
+
+    let mut superseded = start_source_session(&options, &uri, source);
+    let mut replies = superseded.handle(definition(70, &uri, source, local_use));
+    replies.extend(superseded.handle(source_reload(71, &options)));
+    replies.extend(collect_owned(&mut superseded));
+    assert_eq!(replies.len(), 2, "{replies:?}");
+    assert_refused(source_reply(&replies, 70), -32801);
+    assert_eq!(source_reply(&replies, 71)["result"], Value::Null);
+    assert!(source_reply(&replies, 71).get("error").is_none(), "{replies:?}");
+    let (closed, clean) = superseded.close();
+    assert!(clean, "{closed:?}");
+    assert!(closed.is_empty(), "{closed:?}");
+}

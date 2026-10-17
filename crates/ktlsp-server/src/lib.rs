@@ -1270,7 +1270,7 @@ impl Session {
             .collect()
     }
 
-    fn cancel_imported(&mut self, code: i32, message: &str) -> Vec<Value> {
+    fn cancel_imported_symbols(&mut self, code: i32, message: &str) -> Vec<Value> {
         let mut responses: Vec<_> = self
             .pending_parser
             .iter_mut()
@@ -1284,9 +1284,19 @@ impl Session {
         );
         responses.extend(
             self.waiting_symbols
-                .drain(..)
+                .extract_if(.., |pending| !matches!(&pending.request, SymbolRequest::Definition { .. }))
                 .map(|pending| response_error(pending.id, code, message)),
         );
+        responses
+    }
+
+    fn cancel_imported(&mut self, code: i32, message: &str) -> Vec<Value> {
+        let mut responses = self.cancel_imported_symbols(code, message);
+        // Explicit cancellation/configuration/reload supersession still revokes
+        // all waiters. File notifications only revoke known imported symbols;
+        // queued definitions recheck their own requester on actual resume.
+        responses.extend(self.waiting_symbols.drain(..)
+            .map(|pending| response_error(pending.id, code, message)));
         responses
     }
 
@@ -1733,7 +1743,7 @@ impl Session {
                 .expect("validated URI");
             let mut responses = self.cancel_parser(Some(uri), -32801, "parser snapshot is stale");
             if workspace::is_file_uri(uri) && (method != "textDocument/didClose" || closing_open) {
-                responses.extend(self.cancel_imported(-32801, "workspace snapshot is stale"));
+                responses.extend(self.cancel_imported_symbols(-32801, "workspace snapshot is stale"));
             }
             responses
         } else {

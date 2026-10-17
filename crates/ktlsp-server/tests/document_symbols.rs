@@ -6978,7 +6978,7 @@ mod workspace_symbols {
                     b,
                     &uris[1],
                     "READY",
-                    "READY",
+                    "READY,",
                     if modern { 22 } else { 10 },
                     Some("Mode")
                 ),

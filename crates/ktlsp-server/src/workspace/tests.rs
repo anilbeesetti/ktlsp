@@ -347,13 +347,14 @@ fn aggregate_capture_authenticates_alias_content_version_and_reopen_incarnation(
         )
         .unwrap();
     assert_eq!(capture.members.len(), 2);
-    assert_eq!(capture.members[0].source.document(), uri);
-    assert_eq!(capture.members[0].source.source(), "fun unsaved() = 9\n");
-    assert_eq!(capture.members[0].source.revision(), 2);
-    assert_eq!(
-        capture.members[0].overlay,
-        Some((Arc::from(alias.as_str()), 61))
-    );
+    let member = capture
+        .members
+        .iter()
+        .find(|member| member.source.document() == uri)
+        .unwrap();
+    assert_eq!(member.source.source(), "fun unsaved() = 9\n");
+    assert_eq!(member.source.revision(), 2);
+    assert_eq!(member.overlay, Some((Arc::from(alias.as_str()), 61)));
     assert_eq!(capture.closed.iter().map(Vec::len).sum::<usize>(), 1);
     assert!(workspace.fresh_all(&capture, &documents, &incarnations));
     documents.insert(

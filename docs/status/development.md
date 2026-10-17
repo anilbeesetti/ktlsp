@@ -4421,3 +4421,74 @@ assertions stay unchanged. Ordinary Box/JSON/Arc allocation is not a new
 whole-process OOM/allocator guarantee. No lint suppression, extra pool/index,
 compatibility wrapper or formatter mutation is added. Both exact cumulative
 source renewals and fresh full compiler gates remain required.
+
+#### PR429 source gates passed; original full3host CI FAILED; basic430 prepared
+
+Complete30pathc03523a268478d07da6c6932dc1d174e1ab031be/
+tree7afee25ab15d4cd0a084ca5fdbd89e2883552d82 received both full ROOT r5 source
+renewals0.96/0.97. ROOT read complete current rendered receipts: function12349B
+SHAcbbca0f48884c7026ba581c7237cf89fee86f2dcd28151d8e0164d9f22f7371e,
+adversary10154B SHAcd6b26b8176712d211e6029d2fea3af683481d96ddbbf932010ee1ac7b63f3cd.
+Fresh separately admitted fmtCHECK0 in1.185487541s; locked keep-going strict
+FULL workspace/all-target/all-feature Clippy0 in1.328394208s; FULL locked
+workspace NoRun0 in14.532226209s (199 JSON records,189 compiler artifacts,
+9 build-script results,1 successful completion; no runtime inferred).
+Unfiltered pure binary/import DATA tests0 in61.739126167s and the separately
+compiled standalone native Class consumer0 in0.474849917s ran ONCE under
+distinct native-data admission, with no Kotlin/Session runtime or Java.
+Both native OWNER data/control receipts are retained; ROOT's full native
+actual-value acceptance remains separate and pending, not inferred from exits.
+
+Draft PR429 published only the ROOT branch. OWN ORIGINAL Native39054129295/1/
+job117458503345 and platform39054129461/1/Mac117458504287/Win117458504140
+ALL FAILED. Both platform original preflights identify actual synthetic checkout
+b630ab5df9cc9aa78c84b7f36de5342b0d1e8f9c, ordered parents
+[7afdc68dd2e283379ebaa99073b068339df84bdd,c03523a268478d07da6c6932dc1d174e1ab031be].
+All format/Clippy steps succeeded; full workspace runtime did not.
+
+All hosts failed the new profile fixture's expected READY location: expected
+line1 characters18..23 is only its name. The original parser's enum-entry path
+consumes COMMA before closing ENUM_ENTRY; the provider projects full node range.
+ROOT preserves the genuine-node assertion and corrects the fixture to READY,.
+Mac's aggregate-capture check selected index0 as A.kt, although native filesystem
+inventory order returned B.kt first. ROOT selects the original URI member,
+without sorting or weakening source/version/alias/incarnation/freshness checks.
+Both platform lifecycle tests also treated workspace/symbol as unimplemented:
+an invalid query now correctly reaches implemented validation (-32602 versus
+obsolete -32601). ROOT removes that obsolete unsupported-method-list entry.
+These are three test-contract repairs, not passing runtime or parser fixes.
+The complete source scope now also includes tests/session.rs; both full
+cumulative source reviews and fresh admitted original checks/CI remain required.
+
+Windows separately failed existing typed_local_navigation_and_references_compose_
+over_paired_stdio at document_symbols.rs:1341 with complete actual response
+{"error":{"code":-32803,"message":"parser deadline exceeded"},"id":"typed-definition","jsonrpc":"2.0"}.
+This original failure is UNKNOWN/OPEN. No phase/root cause is inferred, no
+unchanged retry/probe/barrier/bound relaxation is admitted, and later passes
+cannot diagnose it. The three contract fixes do not claim to repair it.
+
+Full original evidence remains under root-evidence/
+429-original-ALL3-hosted-FAILURE-custody-original-identities-and-controls.json,
+23144B SHA71d84d1bbd44789ecc4052e943519a843255deb7ee104c6af03f0addd7cda80d.
+Native exact API log45562866B SHA00f5d126e046096cffcef8192a4a774886b52a762426211fce9fd7f2d51f0c28;
+Mac exact original transcript24922499B SHAa3f0945444b6564c4237c9da8167b0da1376a8555bd425e5e3c4d8e29be506c1;
+Windows25617645B SHAfc020549441ef3d1b16767ffebed529b3fbdbbf4453b101adba095a9071f1774.
+Original ZIPs/18 exact members/source/toolchain/step metadata are preserved.
+gh-run-view omitted original failure controls and is NOT complete primary
+authority; escape-preserved raw API and original archives are authoritative.
+All native/workspace/TEMP428 captures stay. OWNER and ROOT must finish complete
+actual values and genuinely apply every returned edit before retirement; the
+profile fixture's early failure means426 remains incomplete.
+
+User priority now targets a working BASIC native candidate within ten hours,
+not promised completion or full parity. Issue430 independently prepares a
+minimal extension of the existing extracted-package Rust consumer plus concise
+generic-client/project setup in existing READMEs. Source and documentation use
+isolated branches from reviewed c035 for preparation only. No new packaging
+framework/client/workflow/dependency or local runtime; integrate only after429
+against ONE verified incoming main. Actual current archives require separate
+ROOT admission and an original exact-main manual three-host packaging run with
+full workspace checks, checksums/notices/provenance and REAL extracted-pair
+behavior. Existing PR306 cleanup ownership, experimental/no-first-party-license
+status and all96/B3/oracle/original395377417 holds remain. No current release,
+visual-editor certification, general semantic authority or full parity claimed.

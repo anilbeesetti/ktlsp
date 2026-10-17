@@ -74,7 +74,6 @@ fn lifecycle_states_and_honest_capabilities() {
         "textDocument/completion",
         "textDocument/hover",
         "textDocument/signatureHelp",
-        "workspace/symbol",
         "textDocument/didOpen",
     ] {
         assert_eq!(

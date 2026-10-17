@@ -8,6 +8,76 @@ decisions or phase boundaries. **Full official Kotlin LSP parity is NOT achieved
 Use the actual session capacity; the historical 32-concurrent instruction below
 is not a new limit. Do not manufacture hundreds of overlapping/blocked tasks.
 
+### Latest PR429 original CI failure and basic-candidate priority
+
+This subsection supersedes the earlier source/compiler-stage checkpoint below.
+Verified incoming main remains7afdc68; no new merge lease is active.
+[Draft PR429](https://github.com/anilbeesetti/ktlsp/pull/429) published exact
+headc03523a268478d07da6c6932dc1d174e1ab031be,
+tree7afee25ab15d4cd0a084ca5fdbd89e2883552d82, complete30path union.
+Both renewed independent ROOT full-source reviews cleared0.96/0.97.
+Separately admitted fmtCHECK0, strict locked FULL workspace/all-target/
+all-feature keep-going Clippy0, and FULL locked workspace NoRun0 ran.
+Separately admitted unfiltered pure binary/import DATA tests0 and the compiled
+standalone native Class consumer0 with empty PATH/no Java ran ONCE; complete
+original actual values are retained. Native OWNERS accepted their full retained
+data/control slices; independent ROOT full-value acceptance is still pending.
+These are NOT Kotlin parser/server/Session runtime or full-parity acceptance.
+
+The OWN ORIGINAL full3host CI FAILED: Native39054129295/1/job117458503345,
+platform39054129461/1 Mac117458504287/Win117458504140. Actual platform source
+b630ab5df9cc9aa78c84b7f36de5342b0d1e8f9c has ordered parents[7afdc68,c03523a].
+All format/Clippy steps passed; FULL workspace tests failed. All3 hosts expose
+the same new fixture error: expected READY name-only range is not the original
+ENUM_ENTRY declaration range, whose parser consumes its comma before closing.
+Mac additionally exposed an incidental first-member=A filesystem-order
+assumption. Both platform legs exposed an obsolete workspace/symbol
+method-not-found assertion after that method became implemented.
+ROOT changed ONLY these test contracts: expect full READY, punctuation range;
+select the captured original member by URI without sorting/reordering inventory;
+remove workspace/symbol from the unsupported-method list. Keep all actual
+source/CST/range/overlay/incarnation/freshness/cleanup assertions.
+New complete source reviews/compiler gates/original full3host CI are required.
+
+Windows ALSO returned actual -32803 "parser deadline exceeded" for the existing
+typed-definition paired-stdio request. Cause/phase remain UNKNOWN/OPEN; the
+three test-contract repairs do NOT diagnose or fix this separate failure.
+No unchanged retry, probe, barrier, delay, raised bound or relaxed timeout is
+admitted. A later changed-source pass must not be represented as its diagnosis.
+
+Primary evidence root `/private/tmp/ktlsp-426-427-root-evidence`:
+`429-original-ALL3-hosted-FAILURE-custody-original-identities-and-controls.json`,
+23144B SHA71d84d1bbd44789ecc4052e943519a843255deb7ee104c6af03f0addd7cda80d.
+Native raw API log45562866B
+SHA00f5d126e046096cffcef8192a4a774886b52a762426211fce9fd7f2d51f0c28;
+Mac original workspace transcript24922499B
+SHAa3f0945444b6564c4237c9da8167b0da1376a8555bd425e5e3c4d8e29be506c1;
+Windows25617645B
+SHAfc020549441ef3d1b16767ffebed529b3fbdbbf4453b101adba095a9071f1774.
+Both full original18-member ZIPs and exact member bytes remain retained.
+The derived gh-run-view log omitted actual failure controls: retained, NOT
+complete primary authority. Use `gh api .../actions/jobs/<id>/logs
+--allow-escape-sequences`; that flag belongs to api, not run view.
+All426/428/427 captures stay until complete independent OWNER+ROOT actual-value/
+genuine-edit gates; the failed profile fixture leaves426 incomplete. Three
+original feature OWNERS are independently auditing retained original host values.
+
+The user's newest priority is a WORKING BASIC native candidate within a ten-hour
+target, not a guarantee or a waiver of review/runtime/merge gates. Freeze unrelated
+new semantic expansion while finishing429 and actual installable paired archives.
+[Issue430](https://github.com/anilbeesetti/ktlsp/issues/430) prepares a separately
+reviewed successor: extend the EXISTING extracted Rust smoke with real basic
+editing/diagnostics/folding/outlines/lexical tokens/imported workspace search,
+actual returned completion/rename edit replay and finite signature/lifecycle
+proof; add generic-client/project setup to existing READMEs. Two genuine isolated
+implementation lanes usec035 only as PREPARATION, not verified-main authority.
+Integrate them against ONE verified incoming main only AFTER429 acceptance.
+Existing packaging mechanics/PR306 borrowed-versus-owned cleanup stay unchanged.
+No local Kotlin/Session runtime, packaging dispatch, current archive readiness,
+actual visual-editor compatibility, first-party license grant, general semantics
+or full parity is claimed. #96/B3/oracle/original395377417 holds remain.
+
+
 ### Latest verified425 integration and active426/427/428 source lanes
 
 ONE stable verified incoming main is **7afdc68dd2e283379ebaa99073b068339df84bdd**,

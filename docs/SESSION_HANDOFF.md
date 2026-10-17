@@ -43,6 +43,14 @@ worker/peer/fake runtime from this preparation. No ten-hour guarantee or current
 archive/visual-editor/first-party-license/full-parity claim. Original431 remains
 UNKNOWN/OPEN; failedc035/acbfmt/bddClippy and96/T004/B3/oracle/395377417 holds remain.
 
+Initial430 head91005d4/tree48efe0a4 did NOT clear its source gate: complete
+functionality review found the shared outline expectation trimmed two bound
+leading comments from the original FUN range. This was static source evidence,
+not an observed runtime/CI failure; no430 compiler/runtime/CI ran. ROOT changed
+only that expected extent to the existing full-comment-bound declaration policy,
+keeping selectionRange, fixtures, genuine calls and all assertions. BOTH complete
+current9path authorities must renew before separate compiler-only admission.
+
 ### Historical capture-free composition checkpoint before final verification
 
 All three admitted observation retirements are now complete, independently

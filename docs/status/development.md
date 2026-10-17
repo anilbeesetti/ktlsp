@@ -4751,3 +4751,25 @@ No post-test hosted source cleanliness/main three-host CI/visual editor/license/
 official parity invented. B3INCONCLUSIVE/oracleHOLD/96/T004/native-only and original
 431UNKNOWNOPEN/395377417UNKNOWN remain; old failures are not cured by later passes.
 
+
+#### Basic430 initial pre-runtime source finding and exact-range repair
+
+Initial complete9path head91005d4e47c21c6e5a58017ff16f50eef01b4457/
+tree48efe0a4db9e5e857abe9a105f591796574ba5ff did NOT clear its source gate.
+Full functionality review identified P1: the shared outline expected a function
+range starting at `fun`, trimming two immediately preceding line comments.
+Unchanged top-level `PrecedingComments` binding includes both comments, and the
+existing renderer emits original node endpoints. Existing permanent hierarchy
+coverage already asserts that policy. This is static evidence, NOT an observed
+runtime failure: no compiler/check/CI/product ran at that head.
+
+ROOT fixed ONLY the shared expected extent with `span(text,text.trim_end())`.
+Both initial and post-rename outline checks retain the original name selection,
+leading-comment fixture, complete exact result and every genuine call/assertion.
+No producer change, comment removal, fallback, relaxed assertion or retry.
+Original full functionality receipt18753B
+SHAe8f26d55ca13bbd1761b4e6150feb026a197dcefde5404fa757aef058a24b6f3
+is retained outside repo; the other original review does not override the defect.
+BOTH full CURRENT9path source authorities must renew on the changed exact source
+before separate ROOT compiler-only admission and OWN original hosted gates.
+

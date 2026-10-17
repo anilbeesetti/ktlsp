@@ -1586,7 +1586,7 @@ fn basic_extracted_exchange(directory: &Path) -> Value {
         ]),
     );
     let outline = |text: &str, name: &str| {
-        json!([{"name":"host","kind":12,"range":span(text,text[text.find("fun host").unwrap()..].trim_end()),
+        json!([{"name":"host","kind":12,"range":span(text,text.trim_end()),
             "selectionRange":span(text,"host"),"children":[
                 {"name":name,"kind":7,"range":span(text,&format!("val {name} = 1")),
                     "selectionRange":span(text,name),"children":[]},

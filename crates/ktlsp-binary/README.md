@@ -396,6 +396,63 @@ parameters, library symbol lookup/source attachment, server integration and full
 Kotlin LSP parity remain unsupported. This extension does not broaden the sibling
 property/return operations' narrower scope/NAME refusals.
 
+## Selected values and finite nominal Function return (#411)
+
+`metadata::resolved_class_function_signature::decode(&outcome,
+all_class_field_ordinal, limits)` adds a distinct composition. Its `parameters`
+component is the existing `SelectedParameters`: original owner, ordered Class
+and Function-own declarations, selected Function and every ordered value.
+`return_type` retains original outer/body ranges, borrowed header, an explicitly
+and independently resolved nominal `class_id::ClassId`, and ordered original
+Argument bodies/projection Options/leaf headers and ranges. Argument `classifier`
+uses the existing `resolved_class_function_parameters::Classifier` import and
+checked Function/Class declaration ordinals in this result, never raw IDs or
+global symbols. Every raw body borrows the same retained Outcome.
+
+The return admits a nominal Class with zero or more invariant inline parameter
+leaves. Signed ID searches Function before Class; NAME uses the same actual
+resolver and unique immediate-own UTF-16 comparison as values, without parent
+fallback or normalization. The returned target is not assumed to be the owner;
+argument count is not compared with owning Class declarations because target
+arity is unavailable without loading its metadata. Nullable absent/false/true
+and projection absent/explicit INV remain encoded presence, not inferred meaning.
+
+One original Class context, resolver and monotonic budget cover all declarations,
+values and return, including independent nominal resolution, temporary NAME
+strings, each inspected comparison unit and staged/final capacities. The private
+selected-Function path is shared, not two public child calls or copied declarations.
+All Class framing and all own declarations complete before values. Any selected
+value/return error, late duplicate ID or malformed tail refuses atomically.
+Missing/table-only/duplicate inline roles, wrong significant wires, conflicting
+classifiers, nonzero effective Type flags, unknown/non-invariant projections,
+nominal/bare parameter-root/recursive/richer leaves and varargs refuse.
+
+Permanent source regressions use unchanged genuine licensed Result$Companion
+(success4/failure5) and Pair.copy9 fixtures, with same-Outcome pointers and
+separate sibling-own identities. ROOT's separately admitted real public native
+consumer at reviewed2b739597/treea0c514f9 compiled0/ran0 with empty stderr/PATH.
+It ACTUALLY resolved index5 to kotlin.Result, not ownerkotlin.Result.Companion:
+returns55..63/92..100, NAME6 leaves59..61/96..98 bind their distinct original
+ownT65..69/102..106. Pair.copy retains kotlin.Pair target and original A/B.
+OWNER+ROOT fully read original class bytes/annotations/Header/d1/d2, every actual
+signature/span/pointer/binding/refusal and all9 authored exact/one-below limits.
+Both independently checked all56 printed pointer/raw-original slice pairs;
+full output/source/proof remain `/private/tmp/ktlsp-411-412-native/`.
+Only then was the throwaway source removed. All630 binary/import data tests
+passed, including all11 new signature tests. Previous408 value smoke is NOT
+this return evidence. Fixture custody/notices unchanged; compiler provenance
+and genuine Function-own ID/shadow/ambiguous-NAME/table/richer-return emission
+remain gaps, with authored controls labelled.
+
+The parameter-only API still leaves returns opaque and has unchanged allowances;
+the old self-return API still refuses Function-own declarations and retains its
+self/Class-ID/count guarantees. Property/context/method-link contracts are
+unchanged. Receiver/context/contracts/JVM extensions/bounds/TypeTables remain
+opaque: this is not a complete Kotlin signature, target loading, substitution,
+applicability, JVM linkage, symbols, server capability or full Kotlin LSP parity.
+No local build/tests/format/lint or new native smoke was run by this source owner;
+ROOT separately admits exact reviewed-source verification and data observation.
+
 ## Selected self-applied Class Function return (#390)
 
 `metadata::resolved_class_function_return::decode(&outcome, class_field_ordinal,

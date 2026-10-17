@@ -118,12 +118,20 @@ pub struct Module {
     #[serde(skip)]
     pub declaration: Source,
 }
+/// Immutable declared-source records with their original XML provenance.
+/// ```compile_fail
+/// fn mutate(mut w: ktlsp_import::jps::ImportedSources) { w.modules.clear(); }
+/// ```
 #[derive(Debug)]
 pub struct ImportedSources {
     project: ProjectModel,
-    pub modules: Vec<Module>,
+    modules: Vec<Module>,
 }
 impl ImportedSources {
+    /// Original modules and declared roots in document order.
+    pub fn modules(&self) -> &[Module] {
+        &self.modules
+    }
     /// Declared roots ONLY. Empty dependency collections do not describe a classpath.
     pub fn declared_source_projection(&self) -> &ProjectModel {
         &self.project

@@ -282,17 +282,24 @@ were removed afterward; changed completion/rename rebind assertions remain.
 
 References/highlights and negotiated prepare/versioned rename now positively
 select an original function type-parameter declaration (including unused names)
-or a supported simple parameter/direct-local annotation. Original initializer,
-callee and value-declaration roles remain separate. Type hover/typeDefinition
+or a supported simple parameter/property annotation in a recursive ordinary-function tree.
+Initializer, callee and value-declaration roles remain separate. Type hover/typeDefinition
 and richer types remain unsupported; no new capability is advertised for them.
 
-The kernel authenticates the complete ordinary function once, retaining proved
-empty local calls, and scans the entire type list and all annotations under one
-existing budget. Rename refuses matching semantic duplicates and capture of an
-unedited annotation, even before the body or when the target was unused.
-Value-only names and proved local-function/callee spellings are not type
-collisions. Bare `where`, `dynamic` and `suspend` outputs refuse context changes
-before same-name quote removal; value-rename name admission is unchanged.
+The kernel authenticates the complete top-level ordinary-function root and every
+ordinary nested function, including uncalled descendants, under one existing
+aggregate work/storage budget. Each function may own the restricted leading
+unbounded/unmodified type list. Annotation lookup searches own declarations then
+enclosing functions nearest-first; sibling scopes and other roots are not fallback
+candidates. Partitions retain exact original declaration identity, not spelling.
+Rename hypothetically relooks up every annotation: edited uses keep their original
+target and unedited bound/unmatched annotations keep their identity/status.
+Duplicate own-list names, descendant capture in either direction and capture by
+unused binders refuse; safe sibling shadowing does not falsely conflict.
+Values, functions/callees and labels remain separate namespaces. Existing value
+and callable providers keep their stricter independent body/header contracts.
+Bare `where`, `dynamic` and `suspend` outputs still refuse context changes before
+same-name quote removal; value-rename name admission is unchanged.
 
 Rendering reuses sorted original UTF-16 coordinates, declaration-Write and
 annotation-Read highlights, exact selected-token preparation and a single
@@ -301,26 +308,36 @@ current-URI/integer-version `documentChanges` edit. Existing 64 KiB edited-sourc
 incarnation/version/content publication guards are unchanged. Permanent real
 producer/paired-CLI regressions apply returned edits with native `TextChange`
 helpers, reopen version8, and rebind original type/value/callee partitions,
-including contextual `out`/`reified` outputs. These new tests and temporary
-bounded first-hosted observation writers have not run locally; hosted acceptance
-is ROOT-gated. This is not workspace refactoring, generic inference, official
-equivalence or full parity; #96/#377/#395 remain separate open limits.
+including contextual `out`/`reified` outputs. First original PR413 source694f2f9/
+treee0d3 passed full Native38998942941 and platform38998942890, both attempt1.
+Independent OWNER+ROOT fully read all44 actual producer/CLI packets PER host and
+applied all25 genuine returned version7 batches/135edits per host through
+complete actual version8 source/producer/definition/reference/unmatched/shadow
+replay. Recorded repeated-response applications531/3017 per host are not distinct
+transactions. Only afterward were all four temporary writers/sole JSON captures
+removed. Permanent actual edit/reparse/rebinding assertions and the CLI helper's
+diagnostics/lowering/region checks remain at their original frequency/placement.
+Cleaned-source reviews/OWN full CI/guarded exact-main integration are still
+required. No local Kotlin runtime ran. This is not workspace refactoring,
+generic inference, official equivalence or full parity; #96/#377/#395 stay open.
 
 ## Finite local definition and declaration hover
 
 Over open Kotlin documents, a strict UTF-16 position selects an actual original value `REFERENCE_EXPRESSION` containing that position (end-exclusive). The existing declaration lowerer, structural-region directory, authenticated `ReferenceSite` and `bind_local_value` prove a unique eligible preceding direct immutable local `val` or same-function ordinary parameter. Only ordinary named top-level block functions with complete plain integer/whole-identifier local initializers and simple syntax-only parameter/local annotations are eligible. Definition returns the original target **name** range and same URI. Hover returns the original target **declaration text** (`p: T` for a parameter) and original reference range: no invented types, initializer chasing or inferred global unresolvedness.
 
 Definition additionally accepts an authenticated simple parameter/local annotation
-inside an admitted ordinary top-level block function with one nonempty leading
-unbounded/unmodified type-parameter list. The annotation-only lexical query
-returns the unique original same-function `TYPE_PARAMETER` name range and URI.
-Multiple parameters, supported bare/backtick spellings, trivia and a real trailing
-comma retain original identity; matching duplicate spellings refuse even when
-the duplicate is later in the list. Outer classes, imports/aliases, other functions
+inside the admitted recursive ordinary-function tree. The annotation-only lexical
+query returns the nearest matching original function `TYPE_PARAMETER` name range
+and URI, preserving the actual annotated owner separately from the target owner.
+Multiple parameters, supported bare/backtick/Unicode spellings, trivia and a real
+trailing comma retain original identity; duplicate semantic names in any own list
+refuse even when unused. Outer classes, imports/aliases, siblings, other roots
 and values are not candidates or fallbacks. Bounds/variance/reified/annotations,
 where clauses, malformed/empty/post-name/second lists, receivers/context,
-explicit returns, expression bodies, generic member/local function headers and
-richer annotation syntax remain unsupported. Bare `T` does not imply semantic non-nullability.
+explicit returns, expression bodies, member headers, richer annotation syntax
+and unsupported syntax anywhere in the root remain refused. Bare `T` does not
+imply semantic non-nullability. Recursive depth follows existing structural
+ceilings, not a fixed function-nesting lane.
 All eight existing parser-backed consumers retain their original value/body
 contracts on this generic body. Type parameters stay out of value completion,
 occurrences and rename edits; annotation references stay outside value partitions.

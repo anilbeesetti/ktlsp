@@ -171,7 +171,7 @@ fn charge(total: &mut usize, amount: usize, max: usize, field: &'static str) -> 
 
 /// Select an explicitly named dependency class for an absolute, normalized source
 /// path. Ownership and dependencies use only the private validated projection;
-/// public importer sidecar mutation cannot grant visibility or change bindings.
+/// complete ordered import metadata remains immutable alongside that projection.
 ///
 /// Only production owners and direct COMPILE libraries are admitted. All owner
 /// edges and every binary-root binding/index are checked before class lookup or

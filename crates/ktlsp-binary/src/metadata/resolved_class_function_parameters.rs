@@ -115,7 +115,7 @@ fn wire_error(start: usize, e: wire::Error) -> Error {
     failure(start + e.offset, ErrorKind::Wire(e.kind))
 }
 
-fn classifier(
+pub(super) fn classifier(
     header: &type_header::TypeHeader<'_>,
     start: usize,
     context: &class_context::Context<'_>,
@@ -288,8 +288,32 @@ pub fn decode<'a>(
         &mut resolver,
         &mut budget,
     )?;
+    let function = function_with_budget(
+        bytes,
+        framed.payload_span.start,
+        ordinal,
+        &context,
+        &mut resolver,
+        &mut budget,
+    )?;
+    Ok(SelectedParameters {
+        owner: context.owner,
+        parameters: context.parameters,
+        function,
+    })
+}
+
+/// Shared selected Function path; the caller retains the sole context and allowance.
+pub(super) fn function_with_budget<'a>(
+    bytes: &'a [u8],
+    class_start: usize,
+    ordinal: usize,
+    context: &class_context::Context<'_>,
+    resolver: &mut name_resolver::Resolver<'_, '_>,
+    budget: &mut string_table::Budget,
+) -> Result<Function<'a>, Error> {
     let mut selected = None;
-    let mut pos = framed.payload_span.start;
+    let mut pos = class_start;
     let mut current = 0;
     while pos < bytes.len() {
         let field = wire::field(bytes, &mut pos, bytes.len(), &mut budget.wire)?;
@@ -323,8 +347,8 @@ pub fn decode<'a>(
                     start + field.span.end - raw.len()..start + field.span.end,
                     offset,
                     &mut type_parameters,
-                    &mut resolver,
-                    &mut budget,
+                    resolver,
+                    budget,
                 )?;
             }
             (1 | 2 | 4 | 6 | 9, _) => {
@@ -334,7 +358,7 @@ pub fn decode<'a>(
         }
     }
     let name = resolver
-        .get_string_with_budget(function_header.name, &mut budget)
+        .get_string_with_budget(function_header.name, budget)
         .map_err(|e| failure(start, ErrorKind::Name(e)))?;
     let mut parameters = Vec::new();
     let mut pos = 0;
@@ -348,25 +372,21 @@ pub fn decode<'a>(
                 raw,
                 offset..start + field.span.end,
                 parameters.len(),
-                &context,
+                context,
                 &type_parameters,
-                &mut resolver,
-                &mut budget,
+                resolver,
+                budget,
             )?;
             budget.push(&mut parameters, selected, offset)?;
         }
     }
-    Ok(SelectedParameters {
-        owner: context.owner,
-        parameters: context.parameters,
-        function: Function {
-            ordinal,
-            span,
-            body_span: start..start + body.len(),
-            header: function_header,
-            name,
-            type_parameters,
-            parameters,
-        },
+    Ok(Function {
+        ordinal,
+        span,
+        body_span: start..start + body.len(),
+        header: function_header,
+        name,
+        type_parameters,
+        parameters,
     })
 }

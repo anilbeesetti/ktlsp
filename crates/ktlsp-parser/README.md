@@ -571,23 +571,23 @@ evidence and integration verification remain ROOT-gated under #96.
 - `local_value_binding::bind_lexical_type_parameter(directory, result,
   annotation_reference_index, current)` authenticates original snapshot/tree
   association, exact reference/token/USER_TYPE/TYPE_REFERENCE/parameter-or-local
-  ancestry, type-declaring outer function and complete closed type namespace.
-  Ordinary nongeneric direct-local empty functions may have simple parameter
-  annotations. Their parameter owners remain the original local declarations;
-  returned function/body identify the outer that declares the type parameter.
-  Every annotation and direct-local header/body is authenticated once, including
-  uncalled functions before/after the selected use. Direct calls use the existing
-  identifier/integer/optional-label syntax grammar without resolving callees,
-  names, labels or arity. All local classifiers and unsupported nested/header/
-  type shapes refuse the entire envelope. The complete outer leading type list
-  shares ONE existing 2,097,152-unit reference budget, including spelling/
-  comparison work after the first match. A unique
-  semantic spelling returns original borrowed annotated declaration, function,
-  body, reference/name token and `TYPE_PARAMETER` target. Matching duplicates
-  (including later `T`/backtick-T), no match, foreign/stale snapshots, unsupported
-  context/spelling and exhaustion refuse atomically. No values, other functions,
-  outer classes, package names or imports are fallback candidates. This query
-  allocates nothing; value completion/occurrences/rename remain value-only.
+  ancestry and the complete closed ordinary-function tree. Functions may nest
+  recursively under the existing CST/depth/declaration ceilings; each may have
+  the existing restricted leading type list, simple parameter annotations,
+  immutable locals and syntax-only direct calls. Every descendant is checked,
+  including uncalled functions. Lookup searches the immediate function's own
+  type declarations before enclosing functions, nearest first, and never siblings
+  or other roots. Actual annotation ownership remains distinct from the returned
+  function/body, which identify the exact target-declaring function.
+  Classifiers, richer types, receivers/modifiers/bounds/where, explicit returns,
+  expression bodies, arbitrary blocks and unsupported syntax anywhere refuse
+  the whole root. Original definition targets and all occurrence partitions use
+  borrowed declaration identity, not spelling equality. Duplicate own-list names,
+  including quoted equivalents even when unused, refuse. The whole proof shares
+  ONE existing 2,097,152-unit reference budget; no values, classes, package names
+  or imports are fallback candidates. Foreign/stale snapshots, documentation-only
+  operation origins, unsupported spelling and exhaustion refuse atomically.
+  This query allocates nothing; value completion/occurrences/rename remain value-only.
   Original platform38930044300 at source1f118a4 directly retained four complete
   producer packets per host; ROOT and the owner independently authenticated
   and read original CST/name/owner associations and paired-CLI edit rebinding.
@@ -604,21 +604,22 @@ evidence and integration verification remain ROOT-gated under #96.
   The existing definition query shares private ancestry/function/list helpers.
   Each query authenticates its original tree and completes the independent closed
   type-namespace proof once under one 2,097,152-unit budget, including the complete
-  type list, **all** outer/header/direct-local-function parameter annotations,
-  borrowed-record reservation/capacity and emission.
+  root and descendant lists, **all** header/property annotations, original and
+  hypothetical nearest-scope lookups, borrowed-record reservation and emission.
   Matching semantic duplicates, stale/foreign origins and exhaustion fail atomically.
-  Rename checks both edited and unedited annotation identities: another type
-  parameter or any unrelated simple annotation with the new spelling refuses
-  capture, including annotations only in another uncalled local function and
-  unused targets. Values and nongeneric local function/callee/label names remain
-  separate namespaces, not automatic collisions.
+  Rename relooks up EVERY root annotation with the selected original declaration
+  hypothetically renamed. Edited uses must retain their original target; unedited
+  bound and unmatched annotations must retain their original identities/status.
+  This includes descendant capture in either direction and unused targets,
+  without false conflicts from safe sibling shadowing. Values, functions,
+  callees and labels remain separate namespaces, not automatic collisions.
   Output remains bare ASCII with existing spelling/boundary limits; native
   contextual outputs `where`, `dynamic` and `suspend` refuse before same-name quote
   removal. `out`/`reified` edited-producer/rebinding regressions are included, not
   blanket-classified as invalid modifiers. Storage remains at most 1,024 records
   and 131,072 requested/retained bytes, measured using the actual annotation width.
-  This is finite same-function lexical refactoring, not full type resolution,
-  type hover/typeDefinition, workspace rename or official equivalence. PR409's
+  This is finite recursive ordinary-function lexical refactoring, not full Kotlin
+  type resolution, hover/typeDefinition, workspace rename or official equivalence. PR409's
   OWN ORIGINAL native38994222653 and platform38994222817 at8285763 retained
   all30 original/edited producer packets and57 paired-CLI records PER host.
   OWNER+ROOT FULLY read complete actual CST/source/owner/region/binding and
@@ -633,6 +634,17 @@ evidence and integration verification remain ROOT-gated under #96.
   ALL permanent pointer/namespace/capture/budget assertions and real edit/
   reparse/rebinding paths remain. Final cleaned-source OWN original full CI and
   guarded exact-main integration remain separate; no local Kotlin runtime ran.
+  First original PR413 source694f2f9/treee0d3 generalized the recursive proof above:
+  Native38998942941 and platform38998942890 both attempt1 passed full checks.
+  Actual executed mergec712988 has exact treee0d3/ordered[df6b,694f].
+  Independent OWNER+ROOT fully read all14 producer/23 CLI/7 capture packets PER
+  host and applied all25 genuine returned version7 batches/135edits PER host,
+  preserving complete actual version8 targets, unmatched and shadow partitions.
+  Repeated response records are531applications/3017edits per host, not distinct
+  transactions. Only after both full gates were four observation writers/sole
+  JSON bookkeeping removed; permanent actual edits/reparse/rebinding/pointer
+  assertions remain. Cleaned-source reviews/OWN full CI/guarded exact-main
+  integration are separate pending gates; #96/native-only/full-parity limits stay.
 - `local_value_binding::visible_local_values(directory, result, initializer_index,
   current_snapshot)` authenticates an existing whole-identifier initializer
   reference without requiring its spelling to bind. The owned result retains

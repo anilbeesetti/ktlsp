@@ -69,7 +69,7 @@ fn genuine_original_xml_preserves_original_ranges_and_real_model_roundtrip() {
         ],
     )
     .unwrap();
-    let module = &result.modules[0];
+    let module = &result.modules()[0];
     assert_eq!(module.id, "moduleB");
     assert_eq!(module.source.document, base().join("moduleB.iml"));
     assert_eq!(
@@ -167,23 +167,23 @@ fn nested_generated_default_type_precedence_and_input_order_are_declared_order()
         ],
     )
     .unwrap();
-    assert_eq!(first.modules, second.modules);
+    assert_eq!(first.modules(), second.modules());
     assert_eq!(
         first
-            .modules
+            .modules()
             .iter()
             .map(|m| m.id.as_str())
             .collect::<Vec<_>>(),
         ["z", "a"]
     );
-    let roots = &first.modules[0].source_roots;
+    let roots = &first.modules()[0].source_roots;
     assert_eq!(
         roots.iter().map(|r| r.kind).collect::<Vec<_>>(),
         [Production, Test, Production, Test]
     );
     assert!(roots[2].generated);
     assert_eq!(roots[0].path, base().join("nested/default"));
-    assert!(first.modules[1].source_roots.is_empty());
+    assert!(first.modules()[1].source_roots.is_empty());
     assert_eq!(
         serde_json::to_vec(first.declared_source_projection()).unwrap(),
         serde_json::to_vec(second.declared_source_projection()).unwrap()
@@ -214,7 +214,7 @@ fn bom_unicode_xml_references_and_url_encoding_have_original_byte_provenance() {
         ],
     )
     .unwrap();
-    let module = &result.modules[0];
+    let module = &result.modules()[0];
     assert_eq!(module.id, "a & λ%");
     assert_eq!(module.source.range.start, 3);
     let source_root = &module.source_roots[0];
@@ -526,7 +526,7 @@ fn path_macros_urls_and_filepaths_are_not_interchangeable() {
         ],
     )
     .unwrap();
-    assert_eq!(result.modules[0].id, "a%20");
+    assert_eq!(result.modules()[0].id, "a%20");
     assert!(jps::source_projection("relative", &[]).is_err());
 }
 
@@ -599,7 +599,10 @@ fn exact_snapshot_reference_count_and_next_document_are_bounded() {
         bytes: a.as_bytes(),
     }));
     assert_eq!(
-        jps::source_projection(base(), &docs).unwrap().modules.len(),
+        jps::source_projection(base(), &docs)
+            .unwrap()
+            .modules()
+            .len(),
         jps::MAX_DOCUMENTS - 1
     );
     docs.push(Document {
@@ -640,9 +643,12 @@ fn lexical_parent_macros_absolute_urls_and_same_kind_nested_roots_roundtrip() {
         ],
     )
     .unwrap();
-    assert_eq!(result.modules[0].source_roots[0].path, project.join("src"));
     assert_eq!(
-        result.modules[0].source_roots[1].path,
+        result.modules()[0].source_roots[0].path,
+        project.join("src")
+    );
+    assert_eq!(
+        result.modules()[0].source_roots[1].path,
         project.join("src/nested")
     );
     let bytes = serde_json::to_vec(result.declared_source_projection()).unwrap();
@@ -671,7 +677,7 @@ fn oversized_invalid_snapshot_keys_refuse_before_diagnostic_retention() {
 fn trailing_separator_on_supported_macro_is_the_same_declared_path() {
     let body = r#"<content url="file://$MODULE_DIR$/"><sourceFolder url="file://$MODULE_DIR$/"/></content>"#;
     let result = import(&manifest(&["a.iml"]), &module(body)).unwrap();
-    assert_eq!(result.modules[0].source_roots[0].path, base());
+    assert_eq!(result.modules()[0].source_roots[0].path, base());
     assert_eq!(
         result.declared_source_projection().modules[0].source_roots[0].path,
         base()

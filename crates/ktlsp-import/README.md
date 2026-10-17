@@ -18,6 +18,25 @@ Upstream source notice: Copyright 2000-2025 JetBrains s.r.o. and contributors. U
 
 The complete supported result is `ImportedWorkspace`: ordered modules, content-root boundaries/source membership/exact root type, full dependency order (including moduleSource position), and library-root order/type, together with `project_projection()`. The latter is a validated ProjectModel v1 projection and **alone loses import semantics**. Later consumers must use the whole imported result. This import-local representation does not change ProjectModel v1.
 
+Complete JSON-v1/v2, JPS and Maven import results retain immutable loader-produced
+records. Use borrowed `modules()` and (JSON) `libraries()` slices; the former
+public vectors are intentionally no longer mutable fields. Nested record types
+remain ordinary public data, but shared result views cannot mutate retained
+order, roots or provenance independently of the validated projection. Standalone
+project-model clones remain mutable and must pass the normal loader validation
+before reuse. No replacement API, duplicate catalog or workspace provider is added.
+
+A separately admitted external native public consumer at reviewed2b739597/
+treea0c514f9 compiled0/ran0 with empty stderr/PATH. OWNER+ROOT fully read actual
+JSON-v1/v2 records/projections, invalid detached-clone input and real
+UnknownReference refusal, subsequent genuine Commons Lang class selection with
+original owner/library/artifact pointers, and complete JPS/Maven XML/records/
+provenance/source-only projections. All630 binary/import data tests passed,
+including seven compile-fail import authority checks. Full original consumer
+source/output/commands/executable remain `/private/tmp/ktlsp-411-412-native/`;
+only its throwaway Rust source was removed after both complete readbacks.
+This is neither a prior dependency visibility bypass nor server workspace parity.
+
 Supported fields/defaults follow the source contract:
 
 - Workspace modules/libraries default empty. sdks/kotlinSettings/javaSettings may be absent or empty; externalSystem absent/null.
@@ -136,7 +155,7 @@ export bit, CLASSES-root ordinal/import path, retained artifact (digest and
 provenance), and existing classpath origin/entry/rank/decoded identity.
 
 Ownership and ordering come only from the private validated immutable v2
-projection, not mutable public importer sidecars. Paths must be absolute UTF-8,
+projection; complete ordered importer metadata is retained immutably alongside it. Paths must be absolute UTF-8,
 lexically normalized host paths under declared source roots, not content-root
 boundaries. Native Windows separators are accepted in query/provenance PathBufs;
 foreign backslashes on Unix are refused. Imported JSON still uses the importer's

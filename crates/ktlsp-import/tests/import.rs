@@ -38,25 +38,28 @@ fn preserves_graph_roots_library_sources_and_order() {
         model.libraries[0].binaries,
         [base().join("lib/classes.jar")]
     );
-    assert_eq!(result.modules[0].content_roots[0].path, base().join("app"));
     assert_eq!(
-        result.modules[0].content_roots[0].source_roots[0].root_type,
+        result.modules()[0].content_roots[0].path,
+        base().join("app")
+    );
+    assert_eq!(
+        result.modules()[0].content_roots[0].source_roots[0].root_type,
         "kotlin-source"
     );
     assert!(matches!(
-        result.modules[0].dependencies[0],
+        result.modules()[0].dependencies[0],
         Dependency::Library(_)
     ));
     assert!(matches!(
-        result.modules[0].dependencies[1],
+        result.modules()[0].dependencies[1],
         Dependency::ModuleSource
     ));
     assert!(matches!(
-        result.modules[0].dependencies[2],
+        result.modules()[0].dependencies[2],
         Dependency::Module(_)
     ));
-    assert_eq!(result.libraries[0].roots[0].root_type, "SOURCES");
-    assert_eq!(result.libraries[0].roots[1].root_type, "CLASSES");
+    assert_eq!(result.libraries()[0].roots[0].root_type, "SOURCES");
+    assert_eq!(result.libraries()[0].roots[1].root_type, "CLASSES");
     assert!(model.sdk_archives.is_empty());
 }
 #[test]

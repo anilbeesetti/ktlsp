@@ -112,7 +112,7 @@ impl Limits {
 /// One monotonic budget across all candidate loads, or both request verifications.
 /// Failed operations never refund charges. Logical work is charged for bytes,
 /// path comparisons, validation and filesystem operations, not elapsed time/RSS.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Budget {
     limits: Limits,
     used: [usize; 9],
@@ -202,15 +202,6 @@ impl Budget {
             self.charge(Count::Paths, text.len())?;
         }
         Ok(())
-    }
-}
-impl Default for Budget {
-    fn default() -> Self {
-        Self {
-            limits: Limits::default(),
-            used: [0; 9],
-            physical_owners: HashMap::new(),
-        }
     }
 }
 

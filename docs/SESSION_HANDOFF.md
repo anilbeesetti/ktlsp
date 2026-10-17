@@ -54,22 +54,27 @@ real CLI4fb07cd and real native-model state6b72251. ROOT additionally wires
 owned cancellation/waiters/config invalidation and real behavior checks.
 Borrowed roots are never cleaned; all old/user/delivered/component WTs remain.
 
-Current421 source remains runtime-UNVERIFIED: no source compilation/check/test/
-import/server/parser/CLI runtime or hosted CI has run. Both full20-path ROOT
-reviews CLEAR exact3a4cb4f/treea805884d, including the complete config-aware guard.
-ROOT FULL-read both actual receipts and authenticated their full hashes.
-`/private/tmp/ktlsp-421-root-evidence/preformat-full-union-static-acceptance.json`
-then admitted ONE `cargo +1.99.0 fmt --all`, completed successfully/1.36s.
-ONE421formatter is now SPENT; no second formatter is allowed.
-Formatted successor needs exact affected ROOT/component clears before compile.
-Temporary complete ACTUAL421 CLI packets now emit after the actual exchange
-BEFORE result assertions, preserving unexpected complete replies without changing
-permanent calls/assertions/frequency. Writers stay until BOTH complete actual
-OWNER+ROOT read/apply gates. The outside native consumer now additionally writes/
-refuses/restores a real same-length selected-source change; the unmeasured zero
-invocation output was removed. Its changed source also needs exact rechecks.
-Then compile/native-data smoke, OWN original full3host CI, observation-only cleanup
-and its OWN source acceptance, fresh guarded integration and dual main proof.
+Current421 remains runtime-UNVERIFIED. BOTH full20 ROOT reviews cleared3a4cb4f,
+then ONE pinned formatter succeeded1.36s; it is SPENT, NEVER a second formatter.
+All SIX exact formatted ROOT/component clears then accepted6d43de4/tree53500bb;
+ROOT FULL-read/authenticated every complete receipt before compile admission.
+Pinned format-CHECK0/1.22960775s; FIRST strict locked workspace/all-target Clippy
+FAILED101/5.258058s, sole reported diagnostic derivable_impls on manual Budget
+Default at source_inventory.rs207. Full original59line/2612B stderr SHA256
+4841158a5eda3db5d722aeeb7b6f723f1b16fad796b5ff5b09f6cd99ffcfdab9;
+custody `/private/tmp/ktlsp-421-root-evidence/first-compile-failure.json`.
+Sequence STOPPED: workspace--no-run, tests/native import/consumer/server/parser/
+CLI runtime and hosted CI NEVER ran. ROOT replaces ONLY manual Budget Default
+with #[derive(Debug, Default)], preserving custom frozen Limits, zero counters,
+empty owner map/allcallers. No suppression, changed bound/default or retry.
+Native Budget LSP refs again failed serverexit0 (reported); honest complete
+caller/source fallback only. Changed source requires exact affected rechecks.
+All four ACTUAL421 writers stay through BOTH full actual OWNER+ROOT gates;
+three CLI packets emit BEFORE outer result assertions. Reviewed outside native
+consumer52556b8d includes real same-length source/model byte and identity cases.
+Next: changed-source CHECK/strictClippy/compile-only after renewed exact clears,
+separate native smoke, OWN original full3host CI, capture-only cleanup/OWN source
+acceptance, fresh guarded integration and dual original exact-main proof.
 
 ROOT owns Cargo/workspace/lock/docs/config/CI/publication. Windows-target-only
 file-id0.2.3 and server->import path dependency are resolved; all existing registry

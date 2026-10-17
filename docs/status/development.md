@@ -3349,3 +3349,27 @@ Kotlin/Session runtime, unchanged retry or widened capability. Full parity NOT
 achieved; B3 INCONCLUSIVE/HOLD, original417/395/377 causes UNKNOWN/OPEN, oracle
 HOLD and #96/native-only/provenance limits remain.
 
+
+#### Original421 strict compile failure and minimal derived-default correction
+
+After ROOT fully read/authenticated all SIX exact current formatted clears,
+compile-only admission bound6d43de4ad57cab4411cfec7a5a7f3ed031470f51/tree53500bb.
+Pinned format-CHECK exited0/1.229607750s with empty stdout/stderr. FIRST strict
+locked workspace/all-target Clippy exited101/5.258058s: sole reported diagnostic
+clippy::derivable_impls at import/source_inventory.rs207, the manual Budget
+Default can derive. Full actual stderr59lines/2612B SHA256
+4841158a5eda3db5d722aeeb7b6f723f1b16fad796b5ff5b09f6cd99ffcfdab9 was ROOT-read
+completely and retained in `/private/tmp/ktlsp-421-root-evidence/strict-clippy.stderr`.
+Sequence STOPPED immediately: no workspace--no-run, tests, native consumer,
+server/Session/parser/worker or hosted CI execution. Original failure remains.
+
+ROOT adds Default to Budget's existing derive and removes ONLY its identical
+manual implementation. The existing custom Limits::default remains the source
+of every frozen ceiling; array default is zero, HashMap default empty, no caller/
+API/charge/identity/cancellation/semantic/bound/deadline/assertion changes.
+No suppression or second formatter. Required Budget LSP reference lookup failed
+with unexpected serverexit0 and was reported; exact native caller/source grep/
+read fallback, including recovered later matches, is not successful LSP refs.
+Changed exact affected reviews must clear before the next CHECK/strict Clippy.
+No unchanged retry, native runtime, current CI or full-parity claim.
+

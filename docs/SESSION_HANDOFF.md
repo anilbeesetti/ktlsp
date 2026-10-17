@@ -68,9 +68,35 @@ empty stderr/PATH; OWNER+ROOT fully read actual source/output/original identitie
 and9 exact authored budget boundaries. All630=623ordinary+7authoritydoctests
 passed/66rows/0failed0ignored0filtered. Complete custody
 `/private/tmp/ktlsp-411-412-native/`; ONLY throwaway Rust sources were then removed,
-with full original source/output/exe/commands retained. Temporary410 hosted
-writers remain. First original recursive producer/CLI/full hosted three-host
-CI, final writer-only cleanup/reviews/OWN CI and guarded integration are PENDING.
+with full original source/output/exe/commands retained.
+
+Draft [PR413](https://github.com/anilbeesetti/ktlsp/pull/413) first source
+694f2f91903b5d80259cfed489e28b8a0903ddbe/treee0d3c32dfcc47bca83be348658e5ec536c45333d
+received BOTH CURRENT FULL27 ROOT clears and all affected component clears.
+FIRST ORIGINAL Native38998942941/1/job117297572789 passed1225=1186ordinary+39doc;
+platform38998942890/1 Macjob117297572604 passed1223=1184+39,
+Winjob117297572794 passed1172=1133+39. EACH141rows,0failed3ignored0measured0filtered,
+plus22 SEPARATE fault CASES. Actual checkoutc7129881c4ac768d1d01fb71cfea916a2eac7bff
+has EXACT treee0d3 and ordered[df6b,694f]; original logs/archives/API agree.
+OWNER+ROOT EACH fully read ALL44 actual packets PER host and independently applied
+all25 genuine original version7 UTF16 batches/135edits PER host=75/405,
+matching complete actual version8 sources/producer identities/all target,
+unmatched and sibling-shadow partitions. Repeated recorded responses add
+531applications/3017edits PER host, NOT531 independent transactions.
+Complete custody `/private/tmp/ktlsp-413-first-platform-38998942890/`;
+independent OWNER `/private/tmp/ktlsp-410-owner-three-host-413-first-actual-gate.json`.
+ROOT read all5561 lossless actual-value reader lines, with ALL44 byte-exact original
+JSON reconstructions; platform payloads match complete Native values/bytes.
+Independent original Native and platform/archive auditors cleared source,
+mandatory steps, full streams/censuses and exact artifact custody.
+
+ONLY AFTER BOTH complete three-host gates, ROOT removed all four temporary
+writers/sole JSON bookkeeping. Permanent actual edit/reparse/rebinding and
+pointer/namespace/refusal/budget assertions remain. The CLI source helper retains
+its diagnostics/lowering/region checks at the same call frequency/placement,
+without constructing observation JSON. Cleaned-source exact reviews,
+format-CHECK/strict Clippy, OWN ORIGINAL full CI and guarded integration are
+PENDING; do not merge using first-source CI. No second formatter.
 
 ALL LOCAL Kotlin parser/server/Session/worker/peer/supervision runtime remains
 FORBIDDEN under96, including fake peers and parser-free Session. This overrides

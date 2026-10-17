@@ -634,6 +634,17 @@ evidence and integration verification remain ROOT-gated under #96.
   ALL permanent pointer/namespace/capture/budget assertions and real edit/
   reparse/rebinding paths remain. Final cleaned-source OWN original full CI and
   guarded exact-main integration remain separate; no local Kotlin runtime ran.
+  First original PR413 source694f2f9/treee0d3 generalized the recursive proof above:
+  Native38998942941 and platform38998942890 both attempt1 passed full checks.
+  Actual executed mergec712988 has exact treee0d3/ordered[df6b,694f].
+  Independent OWNER+ROOT fully read all14 producer/23 CLI/7 capture packets PER
+  host and applied all25 genuine returned version7 batches/135edits PER host,
+  preserving complete actual version8 targets, unmatched and shadow partitions.
+  Repeated response records are531applications/3017edits per host, not distinct
+  transactions. Only after both full gates were four observation writers/sole
+  JSON bookkeeping removed; permanent actual edits/reparse/rebinding/pointer
+  assertions remain. Cleaned-source reviews/OWN full CI/guarded exact-main
+  integration are separate pending gates; #96/native-only/full-parity limits stay.
 - `local_value_binding::visible_local_values(directory, result, initializer_index,
   current_snapshot)` authenticates an existing whole-identifier initializer
   reference without requiring its spelling to bind. The owned result retains

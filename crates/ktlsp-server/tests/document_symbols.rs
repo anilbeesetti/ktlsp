@@ -4361,11 +4361,10 @@ fn recursive_cli_layout(source: &str, renamed: Option<usize>) -> RecursiveCliLay
     (declarations, annotations)
 }
 
-// Temporary capture of the actual paired CLI source producer, not expected JSON.
-fn recursive_cli_producer(source: &str, revision: i64) -> Value {
+fn assert_recursive_cli_source(source: &str, revision: i64) {
     use ktlsp_parser::{
-        FileKind, Parser, SourceSnapshot, local_value_binding::bind_lexical_type_parameter,
-        lowering::lower_declarations, structural_regions::build_regions,
+        FileKind, Parser, SourceSnapshot, lowering::lower_declarations,
+        structural_regions::build_regions,
     };
     let snapshot = SourceSnapshot::new(URI, revision, FileKind::Source, source).unwrap();
     let result = Parser::new(worker())
@@ -4375,43 +4374,7 @@ fn recursive_cli_producer(source: &str, revision: i64) -> Value {
     let tree = result.tree_for(&snapshot).unwrap();
     assert!(tree.diagnostics().is_empty());
     let lower = lower_declarations(&result, &snapshot).unwrap();
-    let directory = build_regions(&lower, &result, &snapshot).unwrap();
-    let ordinal = |target: &ktlsp_parser::lowering::Declaration<'_>| {
-        lower
-            .declarations()
-            .iter()
-            .position(|d| std::ptr::eq(d, target))
-            .unwrap()
-    };
-    json!({
-        "source":source,"revision":revision,
-        "cst":tree.elements().iter().enumerate().map(|(i,e)|json!({
-            "index":i,"kind":e.kind,"parent":e.parent,"token":e.token,
-            "range":[e.start,e.end],"subtree_end":e.subtree_end
-        })).collect::<Vec<_>>(),
-        "declarations":lower.declarations().iter().enumerate().map(|(i,d)|json!({
-            "ordinal":i,"kind":d.kind(),"name":d.raw_name(),"owner":d.owner(),
-            "index":d.cst_index(),"parent":d.cst_parent_index(),"incomplete":d.incomplete(),
-            "range":[d.range().start,d.range().end],"name_range":[d.name_range().start,d.name_range().end]
-        })).collect::<Vec<_>>(),
-        "regions":directory.regions().iter().map(|r|json!({
-            "index":r.cst_index(),"kind":r.kind(),"parent":r.parent(),"introducer":r.introducer(),
-            "subtree_end":r.subtree_end(),"range":[r.range().start,r.range().end]
-        })).collect::<Vec<_>>(),
-        "memberships":directory.memberships().iter().map(|m|m.region()).collect::<Vec<_>>(),
-        "bindings":tree.elements().iter().enumerate().filter(|(_,e)|
-            e.kind=="REFERENCE_EXPRESSION"&&tree.elements()[e.parent.unwrap()].kind=="USER_TYPE"
-        ).map(|(i,e)| match bind_lexical_type_parameter(&directory,&result,i,&snapshot) {
-            Ok(binding)=>json!({
-                "index":i,"annotated":ordinal(binding.annotated()),"target":ordinal(binding.target()),
-                "function":ordinal(binding.function()),"body":binding.body().cst_index(),
-                "original_reference":std::ptr::eq(binding.reference(),e),
-                "original_token":std::ptr::eq(binding.name_token(),&tree.elements()[i+1]),
-                "original_body":directory.regions().iter().any(|r|std::ptr::eq(r,binding.body()))
-            }),
-            Err(error)=>json!({"index":i,"error":format!("{error:?}")})
-        }).collect::<Vec<_>>()
-    })
+    build_regions(&lower, &result, &snapshot).unwrap();
 }
 
 #[test]
@@ -4505,7 +4468,7 @@ fn recursive_type_scope_actual_paired_cli_all_anchors_and_full_version8_replay()
     ]);
     let replies = package.exchange(&requests);
     let reply = |id: &str| replies.iter().find(|r| r["id"] == id).unwrap();
-    let original_producer = recursive_cli_producer(source, 7);
+    assert_recursive_cli_source(source, 7);
     for (i, (anchor, target, is_use)) in anchors.iter().enumerate() {
         let partition: Vec<_> = std::iter::once(declarations[*target].clone())
             .chain(
@@ -4620,17 +4583,7 @@ fn recursive_type_scope_actual_paired_cli_all_anchors_and_full_version8_replay()
                 )
             );
         }
-        writeln!(
-            std::io::stdout().lock(),
-            "RECURSIVE_TYPE_CLI={}",
-            json!({
-                "anchor":i,"target":target,"original_producer":original_producer,
-                "requests":requests,"responses":replies,"actual_rename":actual_rename,
-                "edited_source":edited,"edited_producer":recursive_cli_producer(&edited,8),
-                "replay_requests":replay,"replay_responses":rebound
-            })
-        )
-        .unwrap();
+        assert_recursive_cli_source(&edited, 8);
     }
     for id in [
         "outer-capture",
@@ -4744,29 +4697,12 @@ fn recursive_type_capture_unused_inner_and_safe_sibling_actual_cli() {
                     ])
                 );
             }
-            writeln!(
-                std::io::stdout().lock(),
-                "RECURSIVE_TYPE_CAPTURE_CLI={}",
-                json!({
-                    "source":source,"requests":requests,"responses":replies,
-                    "edited_source":edited,"original_producer":recursive_cli_producer(source,7),
-                    "edited_producer":recursive_cli_producer(&edited,8),
-                    "replay_requests":replay,"replay_responses":rebound
-                })
-            )
-            .unwrap();
+            assert_recursive_cli_source(source, 7);
+            assert_recursive_cli_source(&edited, 8);
         } else {
             assert_eq!(response["error"]["code"], -32803);
             assert!(response.get("result").is_none());
-            writeln!(
-                std::io::stdout().lock(),
-                "RECURSIVE_TYPE_CAPTURE_CLI={}",
-                json!({
-                    "source":source,"requests":requests,"responses":replies,
-                    "original_producer":recursive_cli_producer(source,7)
-                })
-            )
-            .unwrap();
+            assert_recursive_cli_source(source, 7);
         }
     }
 }

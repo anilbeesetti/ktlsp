@@ -2473,67 +2473,12 @@ fn documentation_operation_cannot_authorize_lexical_type_consumers() {
     }
 }
 
-// Temporary original-producer readback. Keep until ROOT and the independent
-// owner have fully read hosted payloads and applied the actual CLI edit batches.
-fn recursive_type_observation(result: &SnapshotResult) -> serde_json::Value {
-    use ktlsp_parser::local_value_binding::bind_lexical_type_parameter;
-    use serde_json::json;
-    let snapshot = result.snapshot();
-    let tree = result.tree_for(snapshot).unwrap();
-    let lower = lower_declarations(result, snapshot).unwrap();
-    let directory = build_regions(&lower, result, snapshot).unwrap();
-    let ordinal = |target: &ktlsp_parser::lowering::Declaration<'_>| {
-        lower
-            .declarations()
-            .iter()
-            .position(|d| std::ptr::eq(d, target))
-            .unwrap()
-    };
-    let bindings: Vec<_> = tree.elements().iter().enumerate().filter(|(_, e)| {
-        e.kind == "REFERENCE_EXPRESSION"
-            && tree.elements()[e.parent.unwrap()].kind == "USER_TYPE"
-    }).map(|(index, e)| {
-        match bind_lexical_type_parameter(&directory, result, index, snapshot) {
-            Ok(binding) => json!({
-                "index":index,"range":[e.start,e.end],"annotated":ordinal(binding.annotated()),
-                "target":ordinal(binding.target()),"function":ordinal(binding.function()),
-                "body":binding.body().cst_index(),
-                "original_reference":std::ptr::eq(binding.reference(), e),
-                "original_token":std::ptr::eq(binding.name_token(), &tree.elements()[index+1]),
-                "original_body":directory.regions().iter().any(|r| std::ptr::eq(r,binding.body()))
-            }),
-            Err(error) => json!({"index":index,"range":[e.start,e.end],"error":format!("{error:?}")}),
-        }
-    }).collect();
-    json!({
-        "source":snapshot.source(),"revision":snapshot.revision(),
-        "cst":tree.elements().iter().enumerate().map(|(i,e)| json!({
-            "index":i,"kind":e.kind,"token":e.token,"parent":e.parent,
-            "subtree_end":e.subtree_end,"range":[e.start,e.end]
-        })).collect::<Vec<_>>(),
-        "declarations":lower.declarations().iter().enumerate().map(|(i,d)| json!({
-            "ordinal":i,"kind":d.kind(),"raw_name":d.raw_name(),"owner":d.owner(),
-            "cst_index":d.cst_index(),"parent":d.cst_parent_index(),
-            "range":[d.range().start,d.range().end],
-            "name_range":[d.name_range().start,d.name_range().end],"incomplete":d.incomplete()
-        })).collect::<Vec<_>>(),
-        "regions":directory.regions().iter().map(|r| json!({
-            "index":r.cst_index(),"kind":r.kind(),"parent":r.parent(),
-            "introducer":r.introducer(),"subtree_end":r.subtree_end(),
-            "range":[r.range().start,r.range().end]
-        })).collect::<Vec<_>>(),
-        "memberships":directory.memberships().iter().map(|m|m.region()).collect::<Vec<_>>(),
-        "bindings":bindings
-    })
-}
-
 #[test]
 fn recursive_type_scopes_preserve_complete_original_identity_partitions_and_replay() {
     use ktlsp_parser::local_value_binding::{
         TypeParameterAnchor, bind_lexical_type_parameter, guarded_type_parameter_rename,
         type_parameter_occurrences,
     };
-    use std::io::Write;
     let _serial = functional::serial();
     let ordinary = "// 😀\r\nfun <T, Spare> outer(root:T){ val before:T=root; fun <U> inner(a:`T`,b:U){ val inherited:T=a; fun middle(c:T){ fun <`T`> deep(d:T,e:U,f:Missing){ val own:T=d; unknown(noSuch=d); }; fun side(g:T){} }; fun <U> peer(h:U,i:T){} }; fun <T> shadow(j:T){}; fun after(k:T){}; val last:T=root }\r\nfun <T> other(z:T){}\r\n";
     for original in [
@@ -2785,15 +2730,6 @@ fn recursive_type_scopes_preserve_complete_original_identity_partitions_and_repl
                     }
                 );
             }
-            writeln!(
-                std::io::stdout().lock(),
-                "RECURSIVE_TYPE_PRODUCER={}",
-                serde_json::json!({
-                    "selected_ordinal":ordinal,"original":recursive_type_observation(&result),
-                    "edited":recursive_type_observation(&rebound)
-                })
-            )
-            .unwrap();
         }
         // Broader lowering is not authority for existing value/callee semantics.
         for (i, e) in tree

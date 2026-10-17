@@ -2397,3 +2397,122 @@ four direct-stdout writers stay through complete actual read+edit application.
 Common/evidence-document delta will be independently rechecked before publication.
 All96/B3/unknown-original-causes/oracle/full-parity/native-only limits unchanged.
 
+#### First original413 three-host CI and complete independent actual smoke
+
+Draft [PR413](https://github.com/anilbeesetti/ktlsp/pull/413) first published source
+**694f2f91903b5d80259cfed489e28b8a0903ddbe**, tree
+**e0d3c32dfcc47bca83be348658e5ec536c45333d**, received BOTH current COMPLETE FULL27
+ROOT reviews and all affected component scopes before first publication.
+Its documentation-only successor of strict-passing2b739 retains unchanged
+production/test source. Actual original reviewed-source Native and platform CI
+ran automatically, attempt1, without rerun/dispatch/filters/workflow changes.
+
+| Original job | Passed ordinary | Passed doctests | Failed | Ignored | Measured | Filtered | Result rows |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| [Native38998942941/117297572789](https://github.com/anilbeesetti/ktlsp/actions/runs/38998942941/job/117297572789) |1186|39|0|3|0|0|141|
+| [macOS38998942890/117297572604](https://github.com/anilbeesetti/ktlsp/actions/runs/38998942890/job/117297572604) |1184|39|0|3|0|0|141|
+| [Windows38998942890/117297572794](https://github.com/anilbeesetti/ktlsp/actions/runs/38998942890/job/117297572794) |1133|39|0|3|0|0|141|
+
+All mandatory pinned format/strict locked all-target workspace Clippy/full
+unfiltered workspace checks passed. Platform tests used the unchanged release
+invocation. EACH job also passed the SEPARATE assert-based22-fault-CASE suite,
+exact-depth/cancellation/healthy-followup controls and three same-child allocation
+code86 confirmations; these are not extra libtest rows. Seven import authority
+doctests failed compilation for the intended six private fields and borrowed
+nested mutation, not missing crates. Expected unwind/fault panics are not failures.
+B3 remains original INCONCLUSIVE/B3-HOLD, not a newly established healthy result.
+
+Actual executed checkout **c7129881c4ac768d1d01fb71cfea916a2eac7bff** has EXACT
+reviewed treee0d3 and ordered parents[df6b02953d22e520ef1b0acaae691471a1666287,
+694f2f91903b5d80259cfed489e28b8a0903ddbe]. Checkout logs, original platform
+identity/preflight/parents/tree records and independent GitHub commit API agree.
+The event's observational merge-SHA field is absent; it is not the authority.
+Both original artifacts have exactly18 CRC-valid members and downloaded ZIP
+size/digest matches authenticated original artifact metadata.
+
+| Retained original bytes | Bytes | Lines | SHA256 |
+|---|---:|---:|---|
+| Native raw |5585839|3312|a043149223ef49c2738461805cdc03308f2d5c266c65f704e12d27f84a99b3ce|
+| macOS raw |5706481|4258|f6a85e9a7e03fc47fbcdc3d45be701388aa86f8d959611f1303fe2f6fbcf56ae|
+| Windows raw |5662613|4019|9311a05b648fb6a440304032b262d50f950ca4ba93527f9516d41771d1e9b679|
+| macOS artifact12088252394 |566120|—|02724268a302dc39931788d11009f3947c06d9b3a2f83e89f71cfdf51150934a|
+| Windows artifact12087469567 |561571|—|1ca4aeddd409e119960be276ed642f11bda4f8a63c59b7148e31fedbdeeb04fc|
+
+Original Native executor Ubuntu24.04.5/image20261012.334.1/runner2.337.0;
+macOS26.6.2 ARM64/image20261013.0424.1 and Windows10.0.26100 X64/
+image20261007.264.1 both PowerShell7.6.6. Pinned Rust1.99.0 is unchanged;
+no same-image/timing comparison to earlier409 evidence is inferred.
+
+**Independent OWNER+ROOT actual semantic gates are COMPLETE, not marker counts.**
+Each host emitted14 complete producer pairs,23 CLI and7 capture packets.
+ROOT read ALL5561 lines/334705bytes of a lossless complete actual-value reader:
+every original dictionary field/order,5411 unique composite values, all source/
+CST kind/token/parent/subtree/ranges, declaration names/owners, regions/
+introducers/memberships, annotation targets/functions/bodies/unmatched statuses,
+actual borrow-identity observations, requests/responses/capabilities/positions/
+ranges/kinds/placeholders/errors/versioned edits and replay fields.
+ALL44 packets reconstruct BYTE-EXACT original raw JSON. Exact repeated values
+are references to their fully shown values, not hashes or expected output.
+All31 distinct actual snapshots independently match original source bytes,
+names/CST ancestry, owners/regions/memberships and borrowed-association markings.
+
+ROOT independently applied every actual original-version7 URI/UTF16/CRLF/astral
+batch: **25 genuine successful original requests/135edits PER host=75/405 across
+three hosts**, matching complete actual edited source and version8 producer
+identities, every definition/reference partition, unused declaration, unmatched
+annotation and sibling/root shadow partition. All14 actual producer pairs
+additionally preserve original ordinals/source transformations/full partitions.
+Every emitted protocol result is checked against actual producer identity,
+not fixture-count echoes. Native's605 emitted target-selected rename record
+occurrences satisfy complete original-annotation hypothetical identity checks,
+including74 refused record occurrences; repetition is not more transactions.
+ROOT's data-only reader initially treated a generic capture-rename request as
+necessarily successful. Its actual typed refusal corrected that reader assumption;
+the complete independent original-annotation identity check then verified every
+accepted/refused targeted request. No payload mismatch was tolerated, product
+behavior changed or CI rerun. Raw `gh api` retrieval required
+`--allow-escape-sequences` to retain original ANSI bytes; this was fetch handling,
+not a check retry or output sanitization.
+
+The main all-anchor session's23 successful responses repeat in23 emitted
+packets. ROOT and OWNER also apply ALL531 retained response occurrences/
+3017edits PER host=1593/9051 total, explicitly NOT1593 independent server
+transactions. ROOT additionally applied23 selected duplicate response views/
+131edits in Native. Both platforms' COMPLETE actual44 payload dictionaries AND
+raw JSON text equal the fully read Native values byte-for-byte, with full
+occurrence correspondence and no missing field differences. ROOT then independently
+reapplied each platform's actual batches and checked every actual replay again.
+OWNER used a separate complete-base/all-difference reader and independently
+performed the same original-field/identity/application/replay gates on all hosts.
+
+ROOT read all34 non-workspace archive members through1221 complete reader lines.
+Complete workspace archive streams match original raw logs contiguously:
+macOS3805/3805lines at raw406–4210, Windows3568/3568 at raw404–3971.
+ROOT reused only complete exact line values from already fully read verified409
+and current Native evidence, then fully read ALL106 new Native nonpacket and
+ALL462 remaining platform workspace lines, including actual authority errors/
+fault contexts. This is complete actual-value/source/census reconciliation,
+not a claimed literal manual reread of17MB of raw logs. Independent Native
+auditor read all3268 current nonpacket lines; independent platform auditor
+freshly downloaded both raw logs and both archives, authenticated all18 members,
+full stream/packet correspondence, mandatory source/toolchain/step/census facts.
+
+Full custody `/private/tmp/ktlsp-413-first-platform-38998942890/`:
+`ROOT-first-original-CI-and-smoke-acceptance.json`,
+`ROOT-native-actual-read-application-proof.json`,
+`ROOT-three-host-actual-read-application-proof.json`,
+`ROOT-complete-actual44-lossless-reader.txt`, original raw logs/ZIPs and all
+original metadata/correspondences. Independent OWNER full three-host receipt
+`/private/tmp/ktlsp-410-owner-three-host-413-first-actual-gate.json`.
+
+ONLY AFTER BOTH complete OWNER+ROOT three-host gates, ROOT removed the four
+temporary stdout writers and sole JSON capture helpers/bookkeeping. The CLI
+helper keeps diagnostics/lowering/region checks at the SAME call frequency and
+placement without constructing capture JSON. All permanent actual edit,
+reparse/rebinding, pointer/namespace/capture/refusal/budget assertions remain.
+Cleaned-source exact FULL27/affected reviews, format-CHECK/strict Clippy and OWN
+ORIGINAL full three-host CI are PENDING before a separate fresh readonly complete
+guard/expected-head merge and independent original exact-main acceptance.
+No second formatter, local Kotlin/JVM runtime, relaxed limits, unchanged CI retry,
+new capability promotion or official full-parity claim.
+

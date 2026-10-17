@@ -308,10 +308,18 @@ current-URI/integer-version `documentChanges` edit. Existing 64 KiB edited-sourc
 incarnation/version/content publication guards are unchanged. Permanent real
 producer/paired-CLI regressions apply returned edits with native `TextChange`
 helpers, reopen version8, and rebind original type/value/callee partitions,
-including contextual `out`/`reified` outputs. These new tests and temporary
-bounded first-hosted observation writers have not run locally; hosted acceptance
-is ROOT-gated. This is not workspace refactoring, generic inference, official
-equivalence or full parity; #96/#377/#395 remain separate open limits.
+including contextual `out`/`reified` outputs. First original PR413 source694f2f9/
+treee0d3 passed full Native38998942941 and platform38998942890, both attempt1.
+Independent OWNER+ROOT fully read all44 actual producer/CLI packets PER host and
+applied all25 genuine returned version7 batches/135edits per host through
+complete actual version8 source/producer/definition/reference/unmatched/shadow
+replay. Recorded repeated-response applications531/3017 per host are not distinct
+transactions. Only afterward were all four temporary writers/sole JSON captures
+removed. Permanent actual edit/reparse/rebinding assertions and the CLI helper's
+diagnostics/lowering/region checks remain at their original frequency/placement.
+Cleaned-source reviews/OWN full CI/guarded exact-main integration are still
+required. No local Kotlin runtime ran. This is not workspace refactoring,
+generic inference, official equivalence or full parity; #96/#377/#395 stay open.
 
 ## Finite local definition and declaration hover
 

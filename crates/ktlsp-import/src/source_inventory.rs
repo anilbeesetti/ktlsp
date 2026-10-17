@@ -303,6 +303,43 @@ fn read_file(path: &Path, before: &Metadata, id: Identity, source: bool,
     same(path, before, id, &current)?;
     Ok(bytes)
 }
+
+// Accounting only: reuse the existing bounded JSON decoder, never its schema
+// validation/projection. Reserve the pre-normalization expansion envelope BEFORE
+// unchanged v2 allocates expanded paths. Normalization cannot enlarge this bound.
+fn admit_model_paths(project: &Path, bytes: &[u8], budget: &mut Budget, cancelled: &AtomicBool) -> Result<(), Error> {
+    use serde_json::Value;
+    let value = crate::json::parse(bytes).map_err(|e| Error::Import(v2::Error::Import(e)))?;
+    fn array<'a>(value: &'a Value, key: &str) -> &'a [Value] {
+        value.get(key).and_then(Value::as_array).map_or(&[], Vec::as_slice)
+    }
+    let mut admit = |value: &Value, copies: usize, expand: bool| -> Result<(), Error> {
+        let Some(text) = value.as_str() else { return Ok(()); };
+        budget.work(text.len().saturating_add(1), cancelled)?;
+        let length = if expand {
+            if let Some(rest) = text.strip_prefix("<WORKSPACE>/") {
+                project.as_os_str().as_encoded_bytes().len().checked_add(1)
+                    .and_then(|n| n.checked_add(rest.len())).ok_or(Error::Budget("path bytes"))?
+            } else { text.len() }
+        } else { text.len() };
+        if length > budget.limits.path_file_bytes { return Err(Error::Budget("per-path bytes")); }
+        budget.charge(Count::Paths, length.checked_mul(copies).ok_or(Error::Budget("path bytes"))?)
+    };
+    for module in array(&value, "modules") {
+        for content in array(module, "contentRoots") {
+            admit(&content["path"], 1, true)?;
+            for source in array(content, "sourceRoots") { admit(&source["path"], 2, true)?; }
+        }
+    }
+    for library in array(&value, "libraries") {
+        for root in array(library, "roots") { admit(&root["path"], 2, true)?; }
+    }
+    for sdk in array(&value, "sdks") {
+        admit(&sdk["homePath"], 1, false)?;
+        for root in array(sdk, "roots") { admit(&root["url"], 1, false)?; }
+    }
+    Ok(())
+}
 struct Root { path: PathBuf, membership: Membership, test: bool }
 struct Builder<'a> {
     budget: &'a mut Budget,
@@ -419,36 +456,19 @@ pub fn load(project_directory: impl AsRef<Path>, budget: &mut Budget, cancelled:
     let delegated = bytes.len().checked_add(expansion).and_then(|n| n.checked_mul(32))
         .ok_or(Error::Budget("work"))?;
     builder.budget.work(delegated, cancelled)?;
+    admit_model_paths(&project, &bytes, builder.budget, cancelled)?;
     let imported = v2::from_json(&project, &bytes).map_err(Error::Import)?;
     builder.model = Some((model_id, model_path));
-    // Retain the ENTIRE model, accounting every stored path, including the
-    // separate native projection; SDK URL/home spellings remain data-only.
+    // Preflight reserved all original/projection path storage before import.
+    // Keep physical-path syntax admission separate from data-only SDK URL/home.
     for module in imported.modules() {
         for content in &module.content_roots {
-            builder.budget.path(&content.path, true, cancelled)?;
-            for source in &content.source_roots {
-                builder.budget.path(&source.path, true, cancelled)?;
-            }
+            builder.budget.path(&content.path, false, cancelled)?;
+            for source in &content.source_roots { builder.budget.path(&source.path, false, cancelled)?; }
         }
     }
     for library in imported.libraries() {
-        for root in &library.roots { builder.budget.path(&root.path, true, cancelled)?; }
-    }
-    let projection = imported.project_projection();
-    for module in &projection.modules {
-        for root in &module.source_roots { builder.budget.path(&root.path, true, cancelled)?; }
-    }
-    for library in &projection.libraries {
-        for path in library.binaries.iter().chain(&library.sources) { builder.budget.path(path, true, cancelled)?; }
-    }
-    for path in &projection.sdk_archives { builder.budget.path(path, true, cancelled)?; }
-    for sdk in imported.sdks() {
-        for spelling in sdk.home_path.iter().map(String::as_str)
-            .chain(sdk.roots.iter().flatten().map(|root| root.url.as_str())) {
-            builder.budget.work(spelling.len(), cancelled)?;
-            if spelling.len() > builder.budget.limits.path_file_bytes { return Err(Error::Budget("per-path bytes")); }
-            builder.budget.charge(Count::Paths, spelling.len())?;
-        }
+        for root in &library.roots { builder.budget.path(&root.path, false, cancelled)?; }
     }
     for (module_index, module) in imported.modules().iter().enumerate() {
         for (content_root_index, content) in module.content_roots.iter().enumerate() {

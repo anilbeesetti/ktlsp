@@ -420,3 +420,17 @@ fn ordinary_absolute_drive_roots_match_canonical_verbatim_projects() {
     let original = &inventory.imported().modules()[0].content_roots[0].source_roots[0].path;
     assert!(matches!(original.components().next(), Some(std::path::Component::Prefix(p)) if matches!(p.kind(), std::path::Prefix::Disk(_))));
 }
+
+#[test]
+fn expanded_path_reservation_precedes_allocating_schema_import() {
+    let project = Project::new();
+    let mut value = model(&[]);
+    value["unknownMeaningfulField"] = json!(true);
+    value["modules"][0]["contentRoots"][0]["path"] =
+        json!(format!("<WORKSPACE>/{}", "x".repeat(4097)));
+    project.put("workspace.json", &serde_json::to_vec(&value).unwrap());
+    // Unchanged v2 would refuse this meaningful field, but inventory must first
+    // refuse the known over-ceiling expansion, before handing bytes to v2.
+    assert!(v2::from_json(&project.0, &fs::read(project.0.join("workspace.json")).unwrap()).is_err());
+    assert!(matches!(project.load(), Err(Error::Budget("per-path bytes"))));
+}

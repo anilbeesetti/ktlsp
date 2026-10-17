@@ -7,8 +7,11 @@ static NEXT: AtomicU64 = AtomicU64::new(0);
 struct Project(PathBuf);
 impl Project {
     fn new() -> Self {
-        // Own only a newly created directory. Canonicalize the temp parent before
-        // admission (macOS /var may itself be a symlink); never clean borrowed roots.
+        // Own only a newly created child; never clean borrowed roots. Unix
+        // sockets need a short parent (Darwin sun_path is only 104 bytes).
+        #[cfg(unix)]
+        let parent = fs::canonicalize("/tmp").unwrap();
+        #[cfg(not(unix))]
         let parent = fs::canonicalize(std::env::temp_dir()).unwrap();
         let path = parent.join(format!("ktlsp-421-inventory-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
         fs::create_dir(&path).unwrap();
@@ -433,4 +436,46 @@ fn expanded_path_reservation_precedes_allocating_schema_import() {
     // refuse the known over-ceiling expansion, before handing bytes to v2.
     assert!(v2::from_json(&project.0, &fs::read(project.0.join("workspace.json")).unwrap()).is_err());
     assert!(matches!(project.load(), Err(Error::Budget("per-path bytes"))));
+}
+
+#[test]
+fn original_model_identity_and_exact_bytes_are_verified_without_storage_recharge() {
+    let project = Project::new();
+    let original = project.model(&[("src", "kotlin-source")]);
+    project.put("src/A.kt", b"fun a() = 1");
+    let inventory = project.load().unwrap();
+    let index = source_index(&inventory);
+    let cancelled = AtomicBool::new(false);
+    let mut request = Budget::new(Limits { model_bytes: 0, ..Limits::default() }).unwrap();
+    inventory.verify_source(index, &mut request, &cancelled).unwrap();
+    inventory.verify_source(index, &mut request, &cancelled).unwrap();
+    // A model edit with no client event cannot leave old membership current.
+    let changed = String::from_utf8(original.clone()).unwrap().replace("\"app\"", "\"new\"");
+    assert_eq!(changed.len(), original.len());
+    project.put("workspace.json", changed.as_bytes());
+    assert!(matches!(inventory.verify_source(index, &mut Budget::default(), &cancelled), Err(Error::Changed)));
+    project.put("workspace.json", &original);
+    fs::rename(project.0.join("workspace.json"), project.0.join("original-model")).unwrap();
+    project.put("workspace.json", &original);
+    assert!(matches!(inventory.verify_source(index, &mut Budget::default(), &cancelled), Err(Error::Changed)));
+    fs::remove_file(project.0.join("workspace.json")).unwrap();
+    assert!(matches!(inventory.verify_source(index, &mut Budget::default(), &cancelled), Err(Error::Io(_))));
+}
+
+#[test]
+fn consumer_uri_reservations_share_the_candidate_path_and_work_counters() {
+    let mut budget = Budget::new(Limits { path_bytes: 10, ..Limits::default() }).unwrap();
+    budget.reserve_path_bytes(4).unwrap();
+    budget.reserve_path_bytes(6).unwrap();
+    assert!(matches!(budget.reserve_path_bytes(1), Err(Error::Budget("path bytes"))));
+    let mut budget = Budget::new(Limits { work: 10, ..Limits::default() }).unwrap();
+    budget.reserve_path_bytes(10).unwrap();
+    assert!(matches!(budget.reserve_path_bytes(1), Err(Error::Budget("work"))));
+    let project = Project::new();
+    project.model(&[]);
+    let exact = minimum_path_bytes(&project);
+    let mut budget = Budget::new(Limits { path_bytes: exact+7, ..Limits::default() }).unwrap();
+    source_inventory::load(&project.0, &mut budget, &AtomicBool::new(false)).unwrap();
+    budget.reserve_path_bytes(7).unwrap();
+    assert!(matches!(budget.reserve_path_bytes(1), Err(Error::Budget("path bytes"))));
 }

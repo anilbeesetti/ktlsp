@@ -88,6 +88,13 @@ impl Budget {
         }
         Ok(Self { limits, used: [0; 9], physical_owners: HashMap::new() })
     }
+    /// Reserve retained consumer path/URI bytes before encoding or storing them.
+    /// Uses this same aggregate path/work budget; no per-native-path ceiling is
+    /// applied to encoded URIs. The caller owns cancellation around encoding.
+    pub fn reserve_path_bytes(&mut self, bytes: usize) -> Result<(), Error> {
+        self.charge(Count::Work, bytes)?;
+        self.charge(Count::Paths, bytes)
+    }
     fn charge(&mut self, count: Count, amount: usize) -> Result<(), Error> {
         let index = count as usize;
         let next = self.used[index].checked_add(amount).ok_or(Error::Budget(count.name()))?;
@@ -222,6 +229,8 @@ pub struct Inventory {
     project_directory: PathBuf,
     imported: v2::ImportedWorkspace,
     workspace_json: Vec<u8>,
+    model_path: PathBuf,
+    model_identity: Identity,
     entries: Vec<Entry>,
     ancestors: BTreeMap<PathBuf, Identity>,
 }
@@ -230,27 +239,43 @@ impl Inventory {
     pub fn imported(&self) -> &v2::ImportedWorkspace { &self.imported }
     pub fn workspace_json(&self) -> &[u8] { &self.workspace_json }
     pub fn entries(&self) -> &[Entry] { &self.entries }
-    /// Revalidate only an original Kotlin source, including original ancestor IDs
-    /// and exact bytes. Unknown/non-source indices perform no filesystem I/O.
+    /// Revalidate the original model AND selected Kotlin source: original
+    /// ancestor/native IDs and exact bytes, streaming through one stack buffer.
+    /// Unknown/non-source indices perform no filesystem I/O. Model comparisons
+    /// charge actual work, not retained-model storage a second time.
     pub fn verify_source(&self, entry_index: usize, budget: &mut Budget, cancelled: &AtomicBool) -> Result<(), Error> {
         budget.work(1, cancelled)?;
         let entry = self.entries.get(entry_index).ok_or(Error::InvalidSource("unknown entry"))?;
         let expected = entry.source.as_ref().ok_or(Error::InvalidSource("not an original Kotlin source"))?;
-        let metadata = inspect(&entry.path, budget, cancelled, |path, id, _| {
-            if path != entry.path && self.ancestors.get(path) != Some(&id) { return Err(Error::Changed); }
-            Ok(())
-        })?;
-        if !metadata.is_file() || identity(&entry.path, &metadata)? != entry.identity { return Err(Error::Changed); }
+        if expected.len() > budget.limits.source_file_bytes { return Err(Error::Budget("per-source bytes")); }
         budget.charge(Count::Sources, 1)?;
-        let bytes = read_file(&entry.path, &metadata, entry.identity, true, budget, cancelled)?;
-        budget.work(bytes.len(), cancelled)?;
-        if bytes != expected.as_bytes() { return Err(Error::Changed); }
-        let after = inspect(&entry.path, budget, cancelled, |path, id, _| {
+        self.verify_file(&self.model_path, self.model_identity, &self.workspace_json, budget, cancelled)?;
+        budget.charge(Count::SourceBytes, expected.len())?;
+        self.verify_file(&entry.path, entry.identity, expected.as_bytes(), budget, cancelled)
+    }
+    fn verify_file(&self, path: &Path, id: Identity, expected: &[u8], budget: &mut Budget, cancelled: &AtomicBool) -> Result<(), Error> {
+        let check_ancestor = |path: &Path, id, _: &mut Budget| {
             if self.ancestors.get(path) != Some(&id) { return Err(Error::Changed); }
             Ok(())
-        })?;
-        same(&entry.path, &metadata, entry.identity, &after)?;
-        Ok(())
+        };
+        let metadata = inspect(path, budget, cancelled, check_ancestor)?;
+        if !metadata.is_file() || identity(path, &metadata)? != id || metadata.len() != expected.len() as u64 {
+            return Err(Error::Changed);
+        }
+        budget.work(1, cancelled)?;
+        let mut file = File::open(path)?;
+        same(path, &metadata, id, &file.metadata()?)?;
+        let mut buffer = [0; 8192];
+        for chunk in expected.chunks(buffer.len()) {
+            budget.work(chunk.len().checked_mul(2).and_then(|n| n.checked_add(1)).ok_or(Error::Budget("work"))?, cancelled)?;
+            file.read_exact(&mut buffer[..chunk.len()])?;
+            if &buffer[..chunk.len()] != chunk { return Err(Error::Changed); }
+        }
+        budget.work(1, cancelled)?;
+        if file.read(&mut buffer[..1])? != 0 { return Err(Error::Changed); }
+        same(path, &metadata, id, &file.metadata()?)?;
+        let after = inspect(path, budget, cancelled, check_ancestor)?;
+        same(path, &metadata, id, &after)
     }
 }
 
@@ -509,6 +534,7 @@ pub fn load(project_directory: impl AsRef<Path>, budget: &mut Budget, cancelled:
         }
     }
     builder.budget.work(1, cancelled)?;
-    Ok(Inventory { project_directory: project, imported, workspace_json: bytes,
+    let (model_identity, model_path) = builder.model.ok_or(Error::UnsafePath("missing admitted model"))?;
+    Ok(Inventory { project_directory: project, imported, workspace_json: bytes, model_path, model_identity,
         entries: builder.entries, ancestors: builder.ancestors })
 }

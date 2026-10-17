@@ -457,8 +457,7 @@ fn queued_local_type_and_call_definitions_ignore_unrelated_files_but_keep_explic
     replies.extend(collect_owned(&mut superseded));
     assert_eq!(replies.len(), 2, "{replies:?}");
     assert_refused(source_reply(&replies, 70), -32801);
-    assert_eq!(source_reply(&replies, 71)["result"], Value::Null);
-    assert!(source_reply(&replies, 71).get("error").is_none(), "{replies:?}");
+    assert_refused(source_reply(&replies, 71), -32803);
     let (closed, clean) = superseded.close();
     assert!(clean, "{closed:?}");
     assert!(closed.is_empty(), "{closed:?}");

@@ -16,7 +16,7 @@ use ktlsp_text::Range;
 use serde_json::{Value, json};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-const UNSUPPORTED: &str = "navigation requires a supported unambiguous function parameter or preceding local val binding; general global resolution is unavailable";
+const UNSUPPORTED: &str = "navigation requires a supported unambiguous source binding";
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum HoverFormat {
@@ -1027,4 +1027,21 @@ mod documentation_rendering {
             })
         );
     }
+}
+
+#[cfg(test)]
+#[test]
+fn unsupported_navigation_error_fits_every_admitted_definition_id_envelope() {
+    // The serialized ID contributes identical bytes to request and response.
+    // Use the smallest valid definition envelope and account for an ASCII ID
+    // filling the frame without allocating a sixteen-MiB test string.
+    let request = json!({"jsonrpc":"2.0","id":"","method":"textDocument/definition",
+        "params":{"textDocument":{"uri":"u:"},"position":{"line":0,"character":0}}});
+    let response = crate::ParserFailure::from(UNSUPPORTED).response(json!(""));
+    let request_bytes = serde_json::to_vec(&request).unwrap().len();
+    let response_bytes = serde_json::to_vec(&response).unwrap().len();
+    let id_bytes = ktlsp_protocol::MAX_PAYLOAD_BYTES - request_bytes;
+    assert!(response_bytes + id_bytes <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
+    assert_eq!(response["error"]["code"], -32803);
+    assert!(response.get("result").is_none());
 }

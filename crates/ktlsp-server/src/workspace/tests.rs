@@ -167,6 +167,7 @@ fn close_reopen_invalidates_incarnation_and_requires_original_disk_validation() 
     assert!(!workspace.fresh(&before_close, before_close_epoch));
     assert_eq!(workspace.overlay_uri(&uri), None);
     let (disk, key, canonical, source) = workspace.capture(&alias).unwrap();
+    let disk_epoch = workspace.epoch;
     assert_eq!(canonical.as_ref(), uri);
     assert_eq!(source.as_ref(), "fun diskA() = 1\n");
     disk.verify(key, &mut Budget::default(), &AtomicBool::new(false))
@@ -176,7 +177,7 @@ fn close_reopen_invalidates_incarnation_and_requires_original_disk_validation() 
     workspace.opened(&uri, 22);
     workspace.closed(&alias, 21);
     assert_eq!(workspace.overlay_uri(&alias), Some(uri.as_str()));
-    assert!(!workspace.fresh(&before_close, workspace.epoch));
+    assert!(!workspace.fresh(&disk, disk_epoch));
     fixture.put("src/A.kt", b"fun changedOnDisk() = 3\n");
     workspace.closed(&uri, 22);
     assert_eq!(workspace.overlay_uri(&alias), None);

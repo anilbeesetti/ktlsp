@@ -84,9 +84,23 @@ ONE formatter is SPENT; NEVER another. Failed LSP refs remain failed; honest
 complete concrete source/caller fallback recovered capped later matches.
 All FOUR ACTUAL421 committed writers stay until BOTH full hosted OWNER+ROOT
 actual gates, including applying the genuine client ranged edit. Three CLI
-packets precede outer result assertions. Next: docs-only exact ROOT2 acceptance,
-OWN original full Linux/macOS/Windows CI, observation-only cleanup/OWN source
-review+CI, fresh guarded merge and dual original exact-main proof.
+packets precede outer result assertions. Published DRAFT
+[PR422](https://github.com/anilbeesetti/ktlsp/pull/422) at reviewed
+b90e5bde07cee303dc800df44d8318ef3127da07/treedc670cb88d75d6c999303e8f6d14ad3dffd75041.
+ORIGINAL Native39028446315/attempt1/job117383963569 FAILED Tests101,
+server-lib24pass/1fail: workspace/tests.rs179 mixes old capture with CURRENT
+epoch. Actual checkout946204298781ecc9c75c6d82800b30f5fe14965d has reviewed tree
+and parents[18733,b90e]; full279781B raw log SHA
+d576c524a2306ed58957ea8227cd993dd89d76a052f31c4579704915018d28bb retained
+in `/private/tmp/ktlsp-422-original-b90e-native/`. All FOUR421 markers absent;
+CLI integration did not run. Actual production stores and later consumes the
+SAME captured epoch. ROOT corrects ONLY test: save disk_epoch with disk capture
+after first close, then assert that real captured request stale after reopen/
+old-incarnation close. No production guard or expected boolean is relaxed.
+Original platform39028446301 is separate; preserve complete original outcomes,
+never cancel/retry to hide this failure. Next exact affected ROOT2 reviews and
+changed-source compiler gates, OWN original full3host CI, observation-only cleanup/
+OWN source review+CI, fresh guarded merge and dual original exact-main proof.
 
 ROOT owns Cargo/workspace/lock/docs/config/CI/publication. Windows-target-only
 file-id0.2.3 and server->import path dependency are resolved; all existing registry

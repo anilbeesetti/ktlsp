@@ -3491,3 +3491,47 @@ Session runtime. Next docs-only ROOT2 review/publication/original full3host CI,
 fresh leased read-only guards/ordinary expected-head merge/actual tree+soleparent
 and dual original exact-main proof. Full parity NOT achieved; B3/oracle/native/
 T004/#96 and original417/395/377 UNKNOWN limits unchanged; no active lease.
+
+#### PR422 original hosted failure: state-test mixed captured/current identity
+
+Draft [PR422](https://github.com/anilbeesetti/ktlsp/pull/422) published reviewed
+b90e5bde07cee303dc800df44d8318ef3127da07/treedc670cb88d75d6c999303e8f6d14ad3dffd75041
+against stable18733. Independent full-union publication receipts were FULL
+ROOT-read; corrected external PR body distinguishes cancellation ID release from
+owned work join and waiter capacity. Native original-data gates remain accepted,
+not composed LSP acceptance. No active merge lease.
+
+ORIGINAL Native39028446315/attempt1/job117383963569 completed FAILURE: format and
+strict Clippy success, Tests exit101; server library24passed/1failed at
+workspace::tests::close_reopen_invalidates_incarnation_and_requires_original_disk_validation,
+workspace/tests.rs179: !workspace.fresh(&before_close,workspace.epoch).
+Actual original checkout946204298781ecc9c75c6d82800b30f5fe14965d, Git tree
+dc670cb88d75d6c999303e8f6d14ad3dffd75041, parents exact[18733,b90e].
+Complete279781B raw original log SHA256
+d576c524a2306ed58957ea8227cd993dd89d76a052f31c4579704915018d28bb and full
+job/commit metadata retained under `/private/tmp/ktlsp-422-original-b90e-native/`.
+Initial administrative gh log retrieval refused terminal escapes before emitting
+bytes; explicit raw escape-preserving fetch0 retained the complete log. This is
+NOT CI rerun. Full failing body and actual current state test/source/producer/
+consumer were read. Four ACTUAL421 marker counts are all0; CLI integration was
+not reached, so no actual wire gate or observation-only cleanup is accepted.
+
+Root cause is a test consumer identity error: the SAME immutable model can be
+current for a new request, so pairing its old Arc with the newly CURRENT epoch
+does not represent the earlier request. Real Session stores epoch with Imported
+authority at capture and consumes THAT same epoch at publication. Both sides
+were directly read; all freshness callers including later tests were traced.
+ROOT saves disk_epoch beside the real disk capture AFTER first close and checks
+that captured request stale after reopen/old-incarnation close. The prior
+before-close captured-epoch assertion, reopened-overlay incarnation check and
+all real disk mutation/reload verification remain. This is a distinct meaningful
+transition, not deleting the failure, swapping expected boolean, repinning an
+incidental default or modifying production semantics. Only2 test lines change.
+
+Changed exact reviews/format-CHECK/strictClippy/workspace compile-only remain
+required before changed-head OWN original hosted fullCI. No local Kotlin/
+Session/parser/worker/fake-runtime test admitted; no second formatter or retry
+of failed b90e. Independent platform39028446301 originals must be retained;
+do not cancel or retry them. Native665 package/standalone data source remains
+unchanged and accepted separately. Fourwriters remain. Full parity/B3/oracle/
+native/T004/#96/original417/395/377 UNKNOWN gates remain unchanged.

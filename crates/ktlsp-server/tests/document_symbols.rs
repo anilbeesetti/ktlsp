@@ -5009,11 +5009,11 @@ fn label_producer_packet(source: &str, revision: i64, accepted: bool) -> Value {
             "formalList":element_index(parameters.parameter_list()),
             "formalParens":[element_index(parameters.open_paren()),element_index(parameters.close_paren())],
             "formalBody":element_index(parameters.body()),
-            "annotations":[binding.formal_annotation(),binding.argument_annotation()].map(|a| json!({
+            "annotations":([binding.formal_annotation(),binding.argument_annotation()].map(|a| json!({
                 "annotated":declaration_index(a.annotated()),"reference":a.reference_index(),
                 "nameToken":element_index(a.name_token()),"range":a.range(),
                 "target":declaration_index(binding.type_parameter())
-            }))
+            })))
         })
     } else {
         json!({"refusal":format!("{:?}",binding.unwrap_err())})

@@ -103,9 +103,14 @@ Both independent ROOT complete16 union reviews CLEAR atb63dd2e6/tree949e60ed,
 with full current receipts `/private/tmp/ktlsp-418-419-root-{functionality,adversarial}-review.txt`
 ROOT fully read. ROOT then used its ONE pinned `cargo +1.99.0 fmt --all`,
 completed successfully/1.33s; NO second formatter is permitted.
-Source remains UNCOMPILED/UNEXECUTED/UNPUBLISHED. All SIX exact postformat
-ROOT/affected component rechecks are required before compile-only admission.
-No local Kotlin runtime or publication. #419 actual writer remains.
+All SIX exact postformat clears accepted at674d0f9e/tree248da5d0; full actual
+receipts embedded in `/private/tmp/ktlsp-418-419-all-six-formatted-clears-and-compile-admission.json`.
+Pinned format-CHECK passed; first strict locked workspace/all-target Clippy
+FAILED101/3.97s: unparenthesized array.map inside json! at server test5012.
+ROOT minimally parenthesized that complete JSON expression without changing any
+payload/fixture/assertion, and renewed exact changed-source reviews are required
+before another compile. Original failure retained; no unchanged retry/secondfmt.
+No tests/local Kotlin runtime/publication. #419 actual writer remains.
 Native binary data proof needs separate ROOT admission after all static clears;
 Kotlin/CLI proof only original full hosted CI. Temporary writers stay until BOTH
 OWNER+ROOT FULL-read actual payloads and actually returned edits; permanent

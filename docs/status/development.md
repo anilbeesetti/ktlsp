@@ -3062,3 +3062,24 @@ reload/cancellation/publication transitions and hidden official behavior remain
 separate decisions/evidence. All #96/#417/B3/oracle/native-only/T004/provenance
 and full-parity limits remain unchanged.
 
+#### First418419 strict compilation failure — minimal capture-expression repair
+
+All SIX exact postformat current clears were accepted at
+674d0f9e8b83ce227c4e6394757857f8675fad2f/tree248da5d0, with complete actual
+receipt text retained in
+`/private/tmp/ktlsp-418-419-all-six-formatted-clears-and-compile-admission.json`.
+ROOT admitted pinned format-CHECK plus strict locked workspace/all-target Clippy
+ONLY. Format-CHECK passed; Clippy FAILED101/3.97s compiling
+server tests/document_symbols.rs5012: json! rejects bare array followed by.map.
+This is a real compile failure, not a runtime result or passing source.
+
+ROOT parenthesized the complete array.map JSON-value expression, retaining both
+original annotations, every produced field and all producer/CLI/edit/refusal
+assertions. No fixture/predicate/bound/deadline/corpus/cleanup change, suppression
+or product behavior patch. No second formatter; changed-source exact reviews
+must clear before the next compile. No unchanged retry or local product runtime.
+Original failure `/private/tmp/ktlsp-418-419-first-compile-failure.json` retained.
+Native418 data and original full hosted419/Linux/macOS/Windows evidence remain
+UNOBSERVED; temporary writers remain until BOTH independent full actual gates.
+All #96/native-only/T004/#417UNKNOWN/B3/oracle/provenance/full-parity holds remain.
+

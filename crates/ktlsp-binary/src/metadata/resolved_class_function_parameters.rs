@@ -21,7 +21,7 @@ pub enum Classifier {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ValueParameter<'a> {
-    /// Position in the selected Function's value list, not a Class/JVM ordinal.
+    /// Position in the selected callable's value list, not a Class/JVM ordinal.
     pub ordinal: usize,
     /// Original outer field and body ranges, relative to decoded d1 (not source).
     pub span: Range<usize>,
@@ -201,7 +201,7 @@ pub(super) fn classifier(
     }
 }
 
-fn parameter<'a>(
+pub(super) fn parameter<'a>(
     body: &'a [u8],
     span: Range<usize>,
     ordinal: usize,

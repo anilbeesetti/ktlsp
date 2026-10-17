@@ -330,6 +330,56 @@ d1 declaration54..60/Type238..240) and second→B(id1,ordinal1,62..68/263..265),
 with original borrowed pointers and absent nullable marking. The example source
 was removed. These are native data observations, not official generics or linkage.
 
+## Selected Class Constructor value declarations (#418)
+
+`metadata::resolved_class_constructor_parameters::decode(&outcome,
+all_class_field_ordinal, limits)` selects original Class field8/wire2, counting
+**all** fields, in supported kind1/mv2.3.0 Metadata. It returns the existing
+`class_context` owner and ordered original Class declarations plus the selected
+Constructor's ALL-field ordinal, true outer/body d1 ranges, borrowed complete raw
+body, complete raw flags/version IDs and ordered existing
+`resolved_class_function_parameters::ValueParameter` values. There is no invented
+constructor name, own declaration list, return type, descriptor or JVM index map.
+
+The existing value helper/classifier/finite grammar is shared, not duplicated.
+Exact signed ID lookup binds an original Class declaration ordinal. Constructor
+own declarations are empty: NAME resolves the string but always refuses with
+the existing `UnknownParameterName`, even when it equals a Class name. Pinned
+[`MemberDeserializer.loadConstructor`](https://github.com/JetBrains/kotlin/blob/d57eb4a26ed01ab03cf195da686c8047032ff16f/core/deserialization/src/org/jetbrains/kotlin/serialization/deserialization/MemberDeserializer.kt#L274-L290)
+creates that empty child scope; ID lookup recurses to its parent whereas NAME
+lookup does not. `Classifier::FunctionParameter` is unreachable here.
+
+Admission/framing/Class declarations precede selection; full raw Constructor
+framing and packed version IDs precede ordered value semantics. Errors return
+no partial result, wrap existing context/value failures and rebase relative
+offsets exactly once to d1. A charged original-field scan preserves nonminimal
+outer prefixes. One context, resolver and monotonic allowance cover d1+d2,
+staging, scans/comparisons, queries and temporary/final requested capacity,
+without refunds. All nine existing resource dimensions and flat-leaf depth2
+remain bounded; depth1 refuses. These are logical bounds, not RSS guarantees.
+
+Permanent genuine-data source assertions reuse unchanged licensed Pair:
+Class body47..285; Constructor ALL-field ordinal5, outer76..103/body78..103,
+flagsSome(70), empty version IDs; first outer80..88/body82..88/Type86..88
+binds original A ID0/ordinal0/body54..60, and second88..96/90..96/Type94..96
+binds B ID1/ordinal1/body62..68. Value flags/type IDs/vararg IDs/nullable marking
+are absent; OUT declaration variance is not inferred nullability or projection.
+These are byte-derived test expectations, not an execution receipt. Producing
+compiler provenance stays **UNVERIFIED**, distinct from stdlib distribution2.3.20.
+Existing fixture notices/provenance and binary bytes are unchanged.
+
+Authored controls separately cover structural/semantic error order, original
+nonminimal spans, empty/multiple Constructors, signed/reordered/duplicate IDs,
+duplicate names, NAME refusal, nominal/predefined resolution and aggregate
+exact/one-less boundaries measured by this operation's tests, not copied minima.
+Inline Type beats retained type-ID; missing/table-only/duplicate inline Types,
+all vararg roles, significant wrong wires, classifier conflicts, richer Types
+and nonzero effective Type flags refuse. Raw Options/default bits stay data.
+Annotations/plugin/extensions/version applicability, bounds/substitution,
+source/JVM mapping, overloads, server integration and full parity stay outside
+this operation. Existing Function/signature/raw-constructor/#394 APIs are unchanged.
+No execution or formatter was run by this source owner; ROOT admits those gates.
+
 ## Selected Class Function value declarations (#402)
 
 `metadata::resolved_class_function_parameters::decode(&outcome,

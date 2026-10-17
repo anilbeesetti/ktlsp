@@ -61,11 +61,6 @@ fn borrowed(raw: &[u8], input: &[u8], span: Range<usize>) {
     let retained = &input[span.start..span.end];
     assert_eq!(raw, retained);
     assert_eq!(raw.as_ptr(), retained.as_ptr());
-    println!(
-        "actual borrowed span={span:?} raw={raw:?} ptr={:p} retained={:p}",
-        raw.as_ptr(),
-        retained.as_ptr()
-    );
 }
 fn identity(id: &metadata::class_id::ClassId, package: &str, relative: &str) {
     assert_eq!(id.package_name(), units(package));
@@ -280,26 +275,22 @@ fn assert_limit(error: Error, label: &str) {
 }
 fn resources(input: &metadata::Outcome<'_>, floating: bool) -> Limits {
     let mut exact = Limits::default();
-    for (label, set, get) in DIMENSIONS {
+    for (_, set, get) in DIMENSIONS {
         let n = minimum(input, set, get);
-        println!("actual minimum {label}={n}");
         set(&mut exact, n);
     }
     let actual = decode(input, exact).unwrap();
-    println!("actual joint exact limits={exact:?} output={actual:#?}");
     complete(&actual, input, floating);
     assert_eq!(actual, decode(input, Limits::default()).unwrap());
     for (label, set, get) in DIMENSIONS {
         let mut below = exact;
         set(&mut below, get(exact) - 1);
         let error = decode(input, below).unwrap_err();
-        println!("actual joint one-short {label} limits={below:?} error={error:?}");
         assert_limit(error, label);
     }
     exact
 }
 fn resource_mutations(input: &mut metadata::Outcome<'_>, exact: Limits, floating: bool) {
-    println!("MUTATION CONTROLS: not unchanged-carrier evidence");
     let original = bytes(input).to_vec();
     let start = if floating { 25 } else { 27 };
     let super_end = if floating { 55 } else { 51 };
@@ -314,9 +305,6 @@ fn resource_mutations(input: &mut metadata::Outcome<'_>, exact: Limits, floating
         let bound_only = decode(input, bound_limits).unwrap();
         assert_eq!(bound_only.bounds.len(), 1);
         assert!(bound_only.supertypes.is_empty());
-        println!(
-            "actual mutation bound-only {label} limits={bound_limits:?} output={bound_only:#?}"
-        );
         *bytes_mut(input) = original.clone();
         bytes_mut(input).drain(start + 10..start + 20); // supertype-only mutation
         bytes_mut(input)[start + 5] -= 10; // retain original ID0/name1 declaration
@@ -326,11 +314,9 @@ fn resource_mutations(input: &mut metadata::Outcome<'_>, exact: Limits, floating
         let super_only = decode(input, shared).unwrap();
         assert!(super_only.bounds.is_empty());
         assert_eq!(super_only.supertypes.len(), 1);
-        println!("actual mutation supertype-only {label} limits={shared:?} output={super_only:#?}");
         *bytes_mut(input) = original.clone();
         assert!(get(exact) > get(shared));
         let error = decode(input, shared).unwrap_err();
-        println!("actual combined-vs-isolated {label} limits={shared:?} error={error:?}");
         assert_limit(error, label);
         assert!(
             error.offset >= start + 22,
@@ -341,7 +327,6 @@ fn resource_mutations(input: &mut metadata::Outcome<'_>, exact: Limits, floating
     // resources, even though its classifier and parameter identity are unchanged.
     bytes_mut(input).extend(&super_field);
     let repeated = decode(input, Limits::default()).unwrap();
-    println!("actual mutation appended original supertype output={repeated:#?}");
     assert_eq!(repeated.bounds.len(), 1);
     assert_eq!(repeated.supertypes.len(), 2);
     assert_eq!(
@@ -357,7 +342,6 @@ fn resource_mutations(input: &mut metadata::Outcome<'_>, exact: Limits, floating
         let mut limited = Limits::default();
         set(&mut limited, get(exact));
         let error = decode(input, limited).unwrap_err();
-        println!("actual cumulative later-child {label} limits={limited:?} error={error:?}");
         assert_limit(error, label);
         // Parent rescans can spend record/work first. Selected-node/name failures
         // must reach the appended child, proving earlier selected children fit.
@@ -373,7 +357,6 @@ fn resource_mutations(input: &mut metadata::Outcome<'_>, exact: Limits, floating
     bytes_mut(input).splice(start + 20..start + 20, bound_field);
     bytes_mut(input)[start + 5] += 10;
     let repeated = decode(input, Limits::default()).unwrap();
-    println!("actual mutation repeated inline bound output={repeated:#?}");
     assert_eq!(repeated.parameters.len(), 1);
     assert_eq!(repeated.bounds.len(), 2);
     assert_eq!(repeated.supertypes.len(), 1);
@@ -394,7 +377,6 @@ fn resource_mutations(input: &mut metadata::Outcome<'_>, exact: Limits, floating
         let mut limited = Limits::default();
         set(&mut limited, get(exact));
         let error = decode(input, limited).unwrap_err();
-        println!("actual cumulative repeated-bound {label} limits={limited:?} error={error:?}");
         assert_limit(error, label);
         if matches!(dimension, 8 | 9) {
             assert!(error.offset >= start + 22, "{label}: {error:?}");
@@ -405,7 +387,6 @@ fn resource_mutations(input: &mut metadata::Outcome<'_>, exact: Limits, floating
 }
 
 // Shared ONLY by this integration test and fixtures/metadata_class_bounds/public_consumer.rs.
-// Every printed result below is an actual public API value, not an expected-value echo.
 pub fn run() {
     for (raw, floating) in [(RANGE, false), (FLOATING, true)] {
         let name = if floating {
@@ -413,9 +394,7 @@ pub fn run() {
         } else {
             "ClosedRange"
         };
-        println!("UNCHANGED ORIGINAL {name}");
         let class = ktlsp_binary::parse_class(raw).unwrap();
-        println!("actual class={class:#?}");
         assert_eq!((class.major, class.minor), (52, 0));
         assert_eq!(
             (class.access_flags, class.this_class, class.super_class),
@@ -446,9 +425,7 @@ pub fn run() {
             borrowed(attribute.bytes, raw, start..end);
         }
         let annotations = annotations::decode(&class).unwrap();
-        println!("actual annotations={annotations:#?}");
         let mut input = metadata::decode(&annotations, Default::default()).unwrap();
-        println!("actual metadata={input:#?}");
         let metadata::Outcome::Decoded {
             bytes: data,
             header: h,
@@ -535,10 +512,6 @@ pub fn run() {
             assert_eq!(*actual, cp);
             assert_eq!(actual.as_ptr(), cp.as_ptr());
             assert_eq!(*actual, units(expected));
-            println!(
-                "actual d2 CP{index} units={actual:?} ptr={:p}",
-                actual.as_ptr()
-            );
         }
         assert_eq!(
             h.raw.elements[4].value,
@@ -568,7 +541,6 @@ pub fn run() {
                 )
             })
             .collect();
-        println!("actual independent resolver controls={resolved:?}");
         assert_eq!(resolved[0].1, units(&format!("kotlin/ranges/{name}")));
         assert_eq!(resolved[1].1, [84]);
         assert_eq!(resolved[2].1, units("kotlin/Comparable"));
@@ -582,7 +554,6 @@ pub fn run() {
         );
         assert!(resolved.iter().all(|entry| !entry.2));
         let actual = decode(&input, Limits::default()).unwrap();
-        println!("actual composed class bounds/supertypes={actual:#?}");
         complete(&actual, &input, floating);
         let exact = resources(&input, floating);
         resource_mutations(&mut input, exact, floating);

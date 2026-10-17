@@ -2,9 +2,9 @@
 // Compile with rustc --edition=2024 and the admitted ktlsp_binary --extern/-L paths;
 // no Cargo change, JVM, compiler-generated fixture, private API or product inclusion.
 // The shared integration source calls parse_class -> annotations::decode ->
-// metadata::decode -> existing extended resolved_class_supertypes::decode, prints
-// ACTUAL Debug results and pointers, asserts complete genuine values, dynamically
-// discovers exact operation-specific resource minima, and labels mutations apart.
+// metadata::decode -> existing extended resolved_class_supertypes::decode, asserts
+// complete genuine values and borrowed pointers, and dynamically discovers exact
+// operation-specific resource minima with separate mutation controls.
 //
 // Original data custody, preserved without relying on /tmp at future execution:
 // kotlin-stdlib-2.3.20.jar: 1804720 bytes; SHA256

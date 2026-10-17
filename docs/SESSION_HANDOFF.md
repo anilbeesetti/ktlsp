@@ -48,8 +48,8 @@ GRANTED TWO separate complete functionality/adversarial review slots:
   Optional original simple ordinary-function return annotation, own-function
   immediate scope, unique source-ordered root/nested return occurrences and
   capture-safe actual versioned rename. Reuse410 ancestry/grammar/budgets;
-  value/callee guards stay closed. Prospective return-CST positives remain
-  UNOBSERVED until OWN original authorized hosted producer/CLI evidence.
+  value/callee guards stay closed. First original return-CST/CLI positives are
+  now observed across all three hosts; Windows full CI separately failed under417.
 - [415](https://github.com/anilbeesetti/ktlsp/issues/415):
   `/private/tmp/ktlsp-415-bare-return-signatures`, `omp/415-bare-return-signatures`.
   Replace nominal-only ReturnType.class_id with EXISTING scoped Classifier;
@@ -58,7 +58,8 @@ GRANTED TWO separate complete functionality/adversarial review slots:
   roots to original Class A/B; genuine Function-root producer evidence remains a gap.
 Completed research `agent://ReturnAnnotationNext` and `agent://BareReturnNext`
 was read in full; continue it, do not restart. Implementation/static reviews and
-separately admitted native data verification are complete; hosted414 remains pending.
+separately admitted native data verification are complete; hosted414 actual
+gates are complete, but original Windows full CI failed with unknown cause.
 Root grants TWO further complete composed-union reviews and owns one formatter.
 No first-source/previous-source CI substitutes for a successor's OWN full CI.
 
@@ -89,9 +90,38 @@ Full proof `/private/tmp/ktlsp-415-native/ROOT-complete-actual-native-acceptance
 new minima and limits are in the evidence ledger. Initial ROOT-driver E0463 was
 corrected using BOTH actual Cargo artifact dependency directories, with unchanged
 source and no Cargo rebuild; initial failure remains recorded, not suppressed.
-Current docs must receive renewed exact reviews before publication. Original
-hosted414 return producer/paired-CLI full CI remains PENDING. Keep KTLSP414_ACTUAL
-until BOTH OWNER+ROOT FULLactual payload/edit gates; no earlier CI substitutes.
+Doc-only64de24d31833dcd5b219e51379a23ac10e742833/tree98c67178 received ALL SIX exact
+current full clears and pinned format-CHECK/strict Clippy0/1.34s before DRAFT
+PR416 publication. FIRST ORIGINAL Native39004570583/1/job117314294229 passed1234;
+platform39004570596/1 Mac117314294338 passed1232; Windows117314294583 FAILED:
+1180passed1failed3ignored/141rows, unchanged long-fence docless-hover4012.
+Its indexed value was Null, but complete original response/error/CST was NOT
+retained. Source/transport audits exclude no confirmed-clean parser refusal.
+Cause UNKNOWN; #417 tracks it. No unchanged retry/filter/bound/deadline relaxation.
+
+Actual executed bf62d8797198590b1cb0f1701bb24ba8f98bfaf0 has exacttree98c67178
+and ordered[4bbf,64de24]. ALL21 #414 packets PER host passed independently
+OWNER+ROOT FULLactual read/application gates:37 genuine original version7
+batches/261 edits per host=111/783 total;12duplicate selected fields/41edits
+per host are NOT additional transactions. ROOT read ALL4304 lossless reader
+lines/48schemas/4223complete values and independently reconciled19 distinct
+complete sources/CSTs/declarations/owners/regions/memberships/nearest scopes/
+partitions, every592 protocol result and48 hypothetical rename checks per host.
+Every Mac/Windows complete JSON value ANDserialized payload byte matches the
+fully read Native base with complete occurrence maps. Full source outside edits,
+version8 rebinds, unmatched/unused/unedited/sibling partitions, astral/backticks/
+CRLF/out/reified and refusals remain actual, not count echoes.
+ROOT `/private/tmp/ktlsp-416-first-platform-39004570596/ROOT-complete-three-host-actual-gates.json`;
+OWNER `/private/tmp/ktlsp-414-owner-416-first/OWNER-complete-original-three-host-actual-gate.json`.
+Only AFTER BOTH gates ROOT removed temporary414 writers/sole JSON bookkeeping,
+keeping all permanent assertions/reparses/query frequency/placement. Original
+found.target pointer observation is now an assertion. Existing failing hover
+assertion gains complete-response failure context ONLY; no predicate/input/cap/
+deadline changes or behavioral fix claim. Windows fullCI remains REJECTED.
+Normal cleaned changed-source successor needs exact full14/allaffected reviews,
+CHECK/strict Clippy and its OWN original full CI, then guarded integration and
+independent original main proof. No rerun of the failed source, second formatter,
+local Kotlin runtime or merge lease is admitted by these actual smoke gates.
 
 Delivered413 history below retains the original component/source/smoke gates:
 Both full27 union reviews and all SIX affected reviews cleared the formatted

@@ -625,10 +625,17 @@ evidence and integration verification remain ROOT-gated under #96.
   Direct returns, including the root return, are visited exactly once in original
   CST/source order, never by treating a complete function subtree as an annotation.
   Return-only, inherited, shadowed, unmatched and unused-binder capture regressions
-  and actual version7-edit/version8 producer/paired-CLI assertions are authored for
-  #414. Prospective original return-CST/runtime positives remain **UNOBSERVED**
-  until ROOT admits and reads the original full hosted CI. Temporary full actual
-  observation writers remain until independent OWNER+ROOT read/application gates.
+  and actual version7-edit/version8 producer/paired-CLI assertions are delivered
+  for #414. First original PR416 source64de24/tree98c67178 yielded all21 complete
+  actual producer/CLI packets PER host on Linux/macOS/Windows. Independent
+  OWNER+ROOT FULLread every value and applied all37 genuine batches/261 edits
+  per host through full version8 source/identity replay, including out/reified,
+  CRLF/backtick-astral and unmatched/unused/sibling-shadow controls. Only AFTER
+  both full gates ROOT removed temporary observation writers/JSON bookkeeping;
+  permanent source/edit/reparse/binding assertions retain their placement/frequency.
+  First-source Windows full CI separately failed an unchanged docless-hover
+  assertion; original cause UNKNOWN under #417. Cleanup is NOT its fix.
+  Cleaned-source reviews/OWN full CI/guarded integration remain required.
   This is finite recursive ordinary-function lexical refactoring, not full Kotlin
   type resolution, hover/typeDefinition, workspace rename or official equivalence. PR409's
   OWN ORIGINAL native38994222653 and platform38994222817 at8285763 retained
@@ -654,8 +661,11 @@ evidence and integration verification remain ROOT-gated under #96.
   Repeated response records are531applications/3017edits per host, not distinct
   transactions. Only after both full gates were four observation writers/sole
   JSON bookkeeping removed; permanent actual edits/reparse/rebinding/pointer
-  assertions remain. Cleaned-source reviews/OWN full CI/guarded exact-main
-  integration are separate pending gates; #96/native-only/full-parity limits stay.
+  assertions remain. PR413 cleaned source1369/treea41d received renewed reviews,
+  OWN original full three-host CI and guarded integration as4bbf; independent
+  OWNER+ROOT accepted original exact-main39001476453 before lease clearance.
+  Its earlier evidence does not accept the #414 successor; all96/native-only/
+  full-parity limits stay.
 - `local_value_binding::visible_local_values(directory, result, initializer_index,
   current_snapshot)` authenticates an existing whole-identifier initializer
   reference without requiring its spelling to bind. The owned result retains

@@ -323,17 +323,27 @@ replay. Recorded repeated-response applications531/3017 per host are not distinc
 transactions. Only afterward were all four temporary writers/sole JSON captures
 removed. Permanent actual edit/reparse/rebinding assertions and the CLI helper's
 diagnostics/lowering/region checks remain at their original frequency/placement.
-Cleaned-source reviews/OWN full CI/guarded exact-main integration are still
-required. No local Kotlin runtime ran. This is not workspace refactoring,
-generic inference, official equivalence or full parity; #96/#377/#395 stay open.
+PR413 cleaned1369/treea41d received renewed reviews, OWN original full three-host
+CI and guarded integration as4bbf. Independent OWNER+ROOT accepted original
+exact-main39001476453 before lease clearance. No local Kotlin runtime ran.
+This is not workspace refactoring, generic inference, official equivalence or
+full parity; #96/#377/#395 stay open.
 
-#414's return-specific producer/paired-CLI regressions apply actual version7
-UTF-16 edits, reparse version8 and check every declaration/parameter/property/
-return partition, including unmatched and unedited sites. Original full hosted
-return-CST/runtime positives are **UNOBSERVED** until ROOT's own full CI and
-independent OWNER+ROOT actual read/application gates. Temporary direct-stdout
-writers retain complete actual packets, emitting the original complete session
-once and every distinct edited producer/session in full; only ROOT admits cleanup.
+#414's first original PR416 source64de24/tree98c67178 now has actual complete
+return-CST/paired-CLI evidence across Linux/macOS/Windows. Independent OWNER+ROOT
+FULLread all21 packets PER host and applied all37 genuine original version7
+batches/261 edits per host through complete version8 source/declaration/
+parameter/property/return identity replay, preserving unmatched/unused/unedited/
+sibling partitions, strict CRLF/astral coordinates and contextual out/reified.
+Twelve duplicate selected-response fields/41 edits per host are additional
+custody, NOT new transactions. ONLY AFTER both gates ROOT removed temporary
+writers/sole observation JSON; permanent actual edit/reparse/query/assertion
+flows retain their original frequency/placement, including target-pointer checks.
+First-source Windows full CI separately failed the unchanged long-fence docless
+hover assertion; its complete original response was not retained, so cause is
+UNKNOWN under #417. Added complete-response assertion context changes no input,
+acceptance predicate, cap or deadline and is NOT a behavioral fix or retry.
+Cleaned-source reviews/OWN full CI/guarded exact-main integration remain required.
 
 ## Finite local definition and declaration hover
 

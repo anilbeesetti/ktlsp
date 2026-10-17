@@ -5818,14 +5818,6 @@ fn lexical_label_definition_keeps_selectors_stale_cancel_and_reopen_guards() {
     }
 }
 
-// TEMP424: retain complete actual producer and wire observations through BOTH
-// independent ROOT/OWNER actual-value gates. Direct Write bypasses libtest capture.
-fn signature_observation(kind: &str, packet: &Value) {
-    let mut output = std::io::stdout().lock();
-    writeln!(output, "TEMP424_{kind} {packet}").unwrap();
-    output.flush().unwrap();
-}
-
 fn signature_producer_packet(source: &str, revision: i64, cursor: usize) -> Value {
     use ktlsp_parser::{
         FileKind, Parser, SourceSnapshot, local_value_binding::local_call_signature,
@@ -5835,23 +5827,15 @@ fn signature_producer_packet(source: &str, revision: i64, cursor: usize) -> Valu
     let (parsed, clean) = Parser::new(worker())
         .unwrap()
         .parse_snapshot_with_cleanup(&snapshot, &std::sync::atomic::AtomicBool::new(false));
-    let mut packet = json!({"source":source,"revision":revision,"cursor":cursor,
-        "snapshot":format!("{snapshot:?}"),"parseError":format!("{:?}",parsed.as_ref().err()),"cleanup":clean});
-    if parsed.is_err() {
-        signature_observation("PRODUCER_PARSE_ERROR", &packet);
-    }
+    let mut packet = json!({"source":source,"revision":revision,"cursor":cursor,"cleanup":clean});
     let result = parsed.unwrap();
     let tree = result.tree_for(&snapshot).unwrap();
     packet["elements"] = json!(tree.elements());
     packet["diagnostics"] = json!(tree.diagnostics());
-    signature_observation("PRODUCER_PARSE", &packet);
     let lowered = lower_declarations(&result, &snapshot);
-    packet["loweringError"] = json!(format!("{:?}", lowered.as_ref().err()));
     let Ok(lowered) = lowered else {
-        signature_observation("PRODUCER_LOWER_ERROR", &packet);
         return packet;
     };
-    packet["loweredErrors"] = json!(format!("{:?}", lowered.errors()));
     packet["declarations"] =
         json!(lowered.declarations().iter().map(|d| json!({
         "kind":d.kind(),"name":d.raw_name(),"range":d.range(),"nameRange":d.name_range(),
@@ -5859,9 +5843,7 @@ fn signature_producer_packet(source: &str, revision: i64, cursor: usize) -> Valu
         "incomplete":d.incomplete()
     })).collect::<Vec<_>>());
     let directory = build_regions(&lowered, &result, &snapshot);
-    packet["regionsError"] = json!(format!("{:?}", directory.as_ref().err()));
     let Ok(directory) = directory else {
-        signature_observation("PRODUCER_REGIONS_ERROR", &packet);
         return packet;
     };
     packet["memberships"] = json!(
@@ -5875,12 +5857,6 @@ fn signature_producer_packet(source: &str, revision: i64, cursor: usize) -> Valu
         "cst":r.cst_index(),"kind":r.kind(),"range":r.range(),"parent":r.parent(),"introducer":r.introducer()
     })).collect::<Vec<_>>());
     let proof = local_call_signature(&directory, &result, &snapshot, cursor);
-    packet["signatureError"] = json!(format!("{:?}", proof.as_ref().err()));
-    packet["signatureStatus"] = json!(match &proof {
-        Ok(Some(_)) => "some",
-        Ok(None) => "none",
-        Err(_) => "error",
-    });
     if let Ok(Some(proof)) = proof {
         let binding = proof.binding();
         let call = binding.call();
@@ -5922,13 +5898,11 @@ fn signature_producer_packet(source: &str, revision: i64, cursor: usize) -> Valu
             "cursor":proof.cursor(),"signatureRange":proof.signature_range(),"parameterRange":proof.parameter_range()
         });
         let labels = proof.into_labels(20);
-        packet["labelsResult"] = json!(format!("{labels:?}"));
         if let Ok((signature, parameter)) = labels {
             packet["result"] = json!({"signatures":[{"label":signature,"parameters":[{"label":parameter}]}],
                 "activeSignature":0,"activeParameter":0});
         }
     }
-    signature_observation("PRODUCER_COMPLETE", &packet);
     packet
 }
 
@@ -5938,9 +5912,7 @@ struct SignatureWire {
     child: Option<std::process::Child>,
     input: Option<std::process::ChildStdin>,
     reader: std::io::BufReader<std::process::ChildStdout>,
-    messages: Vec<Value>,
     responses: Vec<Value>,
-    raw: Vec<Vec<u8>>,
 }
 impl SignatureWire {
     fn new(package: &Package) -> Self {
@@ -5965,14 +5937,10 @@ impl SignatureWire {
             child: Some(child),
             input,
             reader,
-            messages: Vec::new(),
             responses: Vec::new(),
-            raw: Vec::new(),
         }
     }
     fn send(&mut self, message: Value) -> Value {
-        self.messages.push(message.clone());
-        signature_observation("CLI_SEND", &message);
         let input = self.input.as_mut().unwrap();
         ktlsp_protocol::write_frame(input, &serde_json::to_vec(&message).unwrap()).unwrap();
         input.flush().unwrap();
@@ -5981,8 +5949,6 @@ impl SignatureWire {
                 let frame = ktlsp_protocol::read_frame(&mut self.reader)
                     .unwrap()
                     .unwrap();
-                signature_observation("CLI_FRAME", &json!({"bytes":frame}));
-                self.raw.push(frame.clone());
                 let response: Value = serde_json::from_slice(&frame).unwrap();
                 let matched = response.get("id") == Some(id);
                 self.responses.push(response.clone());
@@ -5998,17 +5964,9 @@ impl SignatureWire {
         self.send(json!({"jsonrpc":"2.0","method":"exit"}));
         self.input.take();
         while let Some(frame) = ktlsp_protocol::read_frame(&mut self.reader).unwrap() {
-            signature_observation("CLI_FRAME", &json!({"bytes":frame}));
             self.responses.push(serde_json::from_slice(&frame).unwrap());
-            self.raw.push(frame);
         }
         let output = self.child.take().unwrap().wait_with_output().unwrap();
-        signature_observation(
-            "CLI_COMPLETE",
-            &json!({"messages":self.messages,"responses":self.responses,
-            "wirePayloads":self.raw,"exit":format!("{:?}",output.status),"stderr":output.stderr,
-            "filesystemSourceInputs":[]}),
-        );
         assert!(output.status.success(), "{:?}", output.status);
         assert!(
             output.stderr.is_empty(),
@@ -6022,12 +5980,7 @@ impl Drop for SignatureWire {
     fn drop(&mut self) {
         if let Some(child) = self.child.take() {
             self.input.take(); // EOF retains the server's ordinary owned cleanup.
-            let output = child.wait_with_output().unwrap();
-            signature_observation(
-                "CLI_ABORT",
-                &json!({"messages":self.messages,"responses":self.responses,
-                "wirePayloads":self.raw,"exit":format!("{:?}",output.status),"stderr":output.stderr}),
-            );
+            child.wait_with_output().unwrap();
         }
     }
 }
@@ -6533,7 +6486,7 @@ fn manual_signature_help_actual_pending_work_keeps_owned_join_and_incarnation_gu
         let mut session = running_rename();
         let open_message = json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{
             "textDocument":{"uri":URI,"languageId":"kotlin","version":7,"text":source}}});
-        let opened = session.handle(open_message.clone());
+        session.handle(open_message.clone());
         let request_message = json!({"jsonrpc":"2.0","id":"help-owned","method":"textDocument/signatureHelp",
             "params":navigation_params(source,cursor)});
         let initial = session.handle(request_message.clone());
@@ -6561,11 +6514,9 @@ fn manual_signature_help_actual_pending_work_keeps_owned_join_and_incarnation_gu
             session.handle(mutation.clone())
         };
         let retained = session.pending_requests();
-        let reopened = if action == "reopen" {
-            session.handle(open_message.clone())
-        } else {
-            Vec::new()
-        };
+        if action == "reopen" {
+            session.handle(open_message.clone());
+        }
         let fresh_request = json!({"jsonrpc":"2.0","id":"help-reopened","method":"textDocument/signatureHelp",
             "params":navigation_params(source,cursor)});
         let mut fresh = Vec::new();
@@ -6593,15 +6544,7 @@ fn manual_signature_help_actual_pending_work_keeps_owned_join_and_incarnation_gu
         };
         responses.extend(closing);
         let after = session.pending_requests();
-        signature_observation(
-            "SESSION_OWNED",
-            &json!({"source":source,"action":action,
-            "open":open_message,"opened":opened,"request":request_message,"initial":initial,
-            "mutation":mutation,"reopened":reopened,"responses":responses,
-            "freshRequest":if action=="reopen" { fresh_request } else { Value::Null },"freshResponses":fresh,
-            "ownedBefore":before,"ownedAfterMutation":retained,"ownedAfterClose":after,"clean":clean,
-            "errors":session.drain_errors()}),
-        );
+        session.drain_errors();
         assert!(initial.is_empty());
         assert_eq!(before, 1);
         assert_eq!(retained, 1, "work remains owned until actual join");

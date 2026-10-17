@@ -190,14 +190,17 @@ fn genuine_result_companion_return_name_binds_its_original_selected_function() {
         assert_eq!(ret.span, return_span.start - 2..return_span.end);
         borrowed(ret.header.raw, bytes, return_span);
         assert_eq!(ret.header.class_name, Some(5));
-        assert_eq!(ret.class_id.local, target_local);
-        let mut resolved_identity = ret.class_id.package_name().to_vec();
+        let Classifier::Class(target) = &ret.classifier else {
+            panic!("nominal Result target")
+        };
+        assert_eq!(target.local, target_local);
+        let mut resolved_identity = target.package_name().to_vec();
         if !resolved_identity.is_empty() {
             resolved_identity.push(47);
         }
-        resolved_identity.extend(ret.class_id.relative_class_name());
+        resolved_identity.extend(target.relative_class_name());
         assert_eq!(resolved_identity, actual_target);
-        assert_ne!(ret.class_id, selected.parameters.owner.class_id);
+        assert_ne!(*target, selected.parameters.owner.class_id);
         assert_eq!(ret.arguments.len(), 1); // NOT owning Class declaration count (zero).
         let arg = &ret.arguments[0];
         assert_eq!(arg.body_span, argument_span);
@@ -239,15 +242,12 @@ fn genuine_pair_copy_keeps_values_and_explicit_self_class_target() {
         result.parameters,
         parameters::decode(&original, 9, Limits::default()).unwrap()
     );
-    assert_eq!(
-        result.return_type.class_id,
-        result.parameters.owner.class_id
-    );
-    assert_eq!(result.return_type.class_id.package_name(), units("kotlin"));
-    assert_eq!(
-        result.return_type.class_id.relative_class_name(),
-        units("Pair")
-    );
+    let Classifier::Class(target) = &result.return_type.classifier else {
+        panic!("nominal Pair target")
+    };
+    assert_eq!(*target, result.parameters.owner.class_id);
+    assert_eq!(target.package_name(), units("kotlin"));
+    assert_eq!(target.relative_class_name(), units("Pair"));
     assert_eq!(result.return_type.span, 153..169);
     borrowed(result.return_type.header.raw, bytes, 155..169);
     let old = self_return::decode(&original, 9, Limits::default()).unwrap();
@@ -409,18 +409,21 @@ fn authored_target_is_independent_including_local_membership_and_unknown_arity()
         roles.extend(return_role(&arguments));
         let original = input(class(&function(&roles), &table), &names);
         let selected = decode(&original, 1, Limits::default()).unwrap();
+        let Classifier::Class(target) = &selected.return_type.classifier else {
+            panic!("nominal local target")
+        };
         assert_eq!(
-            selected.return_type.class_id.package_name(),
+            target.package_name(),
             selected.parameters.owner.class_id.package_name()
         );
         assert_eq!(
-            selected.return_type.class_id.relative_class_name(),
+            target.relative_class_name(),
             selected.parameters.owner.class_id.relative_class_name()
         );
         assert!(!selected.parameters.owner.class_id.local);
-        assert!(selected.return_type.class_id.local);
+        assert!(target.local);
         assert_ne!(
-            selected.return_type.class_id,
+            *target,
             selected.parameters.owner.class_id
         );
         assert_eq!(selected.return_type.arguments.len(), arguments.len());
@@ -610,9 +613,7 @@ fn authored_all_return_and_argument_role_refusals_preserve_parameter_only_opacit
             ErrorKind::Parameters(parameters::ErrorKind::UnsupportedType)
         );
     }
-    for ty in [leaf(-7), scalar(9, 1), vec![]] {
-        assert_eq!(return_kind(&ty), ErrorKind::UnsupportedType);
-    }
+    assert_eq!(return_kind(&[]), ErrorKind::UnsupportedType);
     let mut flagged = nominal(6, &[]);
     flagged.extend(scalar(1, 1));
     assert_eq!(return_kind(&flagged), ErrorKind::UnsupportedType);
@@ -628,7 +629,7 @@ fn authored_all_return_and_argument_role_refusals_preserve_parameter_only_opacit
         argument_kind(&message(2, &conflicting)),
         ErrorKind::Parameters(parameters::ErrorKind::UnsupportedType)
     );
-    for return_role in [message(3, &[0x80]), scalar(7, 0), message(3, &leaf(-7))] {
+    for return_role in [message(3, &[0x80]), scalar(7, 0)] {
         let mut roles = declaration(4, -7, 1);
         roles.extend(value(&leaf(-7)));
         roles.extend(return_role);
@@ -845,4 +846,300 @@ fn authored_original_container_admission_stays_class_only() {
             ))
         );
     }
+}
+
+#[test]
+fn genuine_pair_components_are_original_bare_class_parameter_roots() {
+    // Prospective retained-wire controls; actual observation awaits ROOT admission.
+    let class = ktlsp_binary::parse_class(include_bytes!(
+        "fixtures/metadata_constructor/Pair.class.bin"
+    ))
+    .unwrap();
+    let annotations = ktlsp_binary::annotations::decode(&class).unwrap();
+    let original = metadata::decode(&annotations, Default::default()).unwrap();
+    let members = metadata::class_member_names::decode(&original, Default::default()).unwrap();
+    let metadata::Outcome::Decoded { bytes, .. } = &original else {
+        unreachable!()
+    };
+    for (name, ordinal, outer, body, declaration, id) in [
+        ("component1", 7, 119..123, 121..123, 54..60, 0),
+        ("component2", 8, 136..140, 138..140, 62..68, 1),
+    ] {
+        let member = members.iter().find(|m| m.name == units(name)).unwrap();
+        assert_eq!(member.kind, metadata::class_member_names::Kind::Function);
+        assert_eq!(member.ordinal, ordinal);
+        let selected = decode(&original, member.ordinal, Limits::default()).unwrap();
+        assert_eq!(selected.parameters.function.name, member.name);
+        assert_eq!(selected.parameters.function.span, member.span);
+        assert_eq!(selected.parameters.function.body_span, member.body_span);
+        assert_eq!(
+            selected.parameters,
+            parameters::decode(&original, member.ordinal, Limits::default()).unwrap()
+        );
+        let ret = &selected.return_type;
+        assert_eq!(ret.span, outer);
+        assert_eq!(ret.body_span, body);
+        borrowed(ret.header.raw, bytes, body);
+        assert_eq!(ret.header.raw, [0x38, id as u8]);
+        assert_eq!(&bytes[outer], [0x1a, 2, 0x38, id as u8]);
+        assert_eq!(ret.header.class_name, None);
+        assert_eq!(ret.header.type_parameter, Some(id));
+        assert_eq!(ret.header.type_parameter_name, None);
+        assert_eq!(ret.header.nullable, None);
+        assert_eq!(ret.classifier, Classifier::ClassParameter(id as usize));
+        assert!(ret.arguments.is_empty());
+        assert!(selected.parameters.function.type_parameters.is_empty());
+        assert!(selected.parameters.function.parameters.is_empty());
+        let p = &selected.parameters.parameters[id as usize];
+        assert_eq!(p.parameter.id, id);
+        assert_eq!(p.body_span, declaration);
+        borrowed(p.parameter.raw, bytes, declaration);
+    }
+}
+
+#[test]
+fn authored_bare_signed_roots_keep_shadow_fallback_and_original_late_declarations() {
+    for (id, expected) in [
+        (-1, Classifier::FunctionParameter(1)),
+        (12345, Classifier::FunctionParameter(0)),
+        (77, Classifier::ClassParameter(1)),
+    ] {
+        let mut roles = value(&leaf(-1));
+        roles.extend(message(3, &scalar(7, u64::from(id as u32))));
+        roles.extend(declaration(4, 12345, 1));
+        roles.extend(declaration(4, -1, 1));
+        let mut fields = function(&roles);
+        fields.extend(declaration(5, -1, 2));
+        fields.extend(declaration(5, 77, 2));
+        let original = input(class(&fields, &[10, 2, 8, 7]), NAMES);
+        let selected = decode(&original, 1, Limits::default()).unwrap();
+        assert_eq!(selected.return_type.classifier, expected);
+        assert!(selected.return_type.arguments.is_empty());
+        assert_eq!(selected.return_type.header.type_parameter, Some(id));
+        assert_eq!(
+            selected.parameters.function.parameters[0].classifier,
+            Classifier::FunctionParameter(1)
+        );
+        let metadata::Outcome::Decoded { bytes, .. } = &original else {
+            unreachable!()
+        };
+        borrowed(selected.return_type.header.raw, bytes, selected.return_type.body_span.clone());
+        for p in selected.parameters.parameters.iter().chain(&selected.parameters.function.type_parameters) {
+            borrowed(p.parameter.raw, bytes, p.body_span.clone());
+        }
+    }
+    assert_eq!(
+        return_kind(&leaf(88)),
+        ErrorKind::Parameters(parameters::ErrorKind::UnknownParameterId)
+    );
+}
+
+#[test]
+fn authored_bare_name_roots_use_unique_immediate_own_lossless_resolver_content() {
+    let mut roles = message(3, &scalar(9, 2));
+    roles.extend(declaration(4, 7, 1));
+    let mut fields = function(&roles);
+    fields.extend(declaration(5, 8, 2));
+    let original = input(class(&fields, &[10, 2, 8, 7]), NAMES);
+    assert_eq!(
+        decode(&original, 1, Limits::default()).unwrap_err().kind,
+        ErrorKind::Parameters(parameters::ErrorKind::UnknownParameterName)
+    );
+    for (record, encoded, resolved) in [
+        (vec![24, 1], units("a/b/T$Inner"), units("a/b/T.Inner")),
+        (vec![24, 2], units("La/b/T$Inner;"), units("a/b/T.Inner")),
+        (vec![16, 0], vec![], units("kotlin/Any")),
+    ] {
+        let mut names = NAMES.to_vec();
+        names[1] = &resolved;
+        names[6] = &encoded;
+        let mut table = message(1, &[8, 6]);
+        table.extend(message(1, &record));
+        let mut roles = message(3, &scalar(9, 6));
+        roles.extend(declaration(4, 7, 1));
+        let original = input(class(&function(&roles), &table), &names);
+        let selected = decode(&original, 1, Limits::default()).unwrap();
+        assert_eq!(selected.return_type.classifier, Classifier::FunctionParameter(0));
+        assert_eq!(selected.return_type.header.type_parameter_name, Some(6));
+        roles.extend(declaration(4, 8, 6));
+        let original = input(class(&function(&roles), &table), &names);
+        assert_eq!(
+            decode(&original, 1, Limits::default()).unwrap_err().kind,
+            ErrorKind::Parameters(parameters::ErrorKind::AmbiguousParameterName)
+        );
+    }
+    for (query, declaration_name, expected) in [
+        (vec![0xd800, 0, 0xdc00], vec![0xd800, 0, 0xdc00], true),
+        (vec![0xfffd, 0, 0xfffd], vec![0xd800, 0, 0xdc00], false),
+        (units("e\u{301}"), units("\u{e9}"), false),
+    ] {
+        let mut names = NAMES.to_vec();
+        names[1] = &declaration_name;
+        names[6] = &query;
+        let mut roles = declaration(4, 7, 1);
+        roles.extend(message(3, &scalar(9, 6)));
+        let original = input(class(&function(&roles), &[10, 2, 8, 7]), &names);
+        assert_eq!(decode(&original, 1, Limits::default()).is_ok(), expected);
+    }
+    assert!(matches!(return_kind(&scalar(9, 99)), ErrorKind::Parameters(parameters::ErrorKind::Name(_))));
+}
+
+#[test]
+fn authored_bare_markings_roles_and_rich_refusal_keep_error_priority() {
+    for nullable in [None, Some(false), Some(true)] {
+        for mut ty in [leaf(-7), scalar(9, 1)] {
+            ty.extend(scalar(1, 1u64 << 32));
+            if let Some(n) = nullable {
+                ty.extend(scalar(3, u64::from(n)));
+            }
+            ty.extend(scalar(15, 99)); // Unknown fields stay opaque.
+            let mut roles = scalar(7, u64::MAX);
+            roles.extend(message(3, &ty));
+            roles.extend(declaration(4, -7, 1));
+            let original = authored(&roles);
+            let selected = decode(&original, 1, Limits::default()).unwrap();
+            assert_eq!(selected.return_type.classifier, Classifier::FunctionParameter(0));
+            assert_eq!(selected.return_type.header.flags, Some(0));
+            assert_eq!(selected.return_type.header.nullable, nullable);
+            assert!(selected.return_type.arguments.is_empty());
+            assert!(parameters::decode(&original, 1, Limits::default()).is_ok());
+            for wrong in [scalar(3, 0), message(7, &[])] {
+                let mut bad = roles.clone();
+                bad.extend(wrong);
+                assert_eq!(kind(&bad), ErrorKind::UnsupportedFunction);
+            }
+            roles.extend(message(3, &ty));
+            assert_eq!(kind(&roles), ErrorKind::DuplicateInlineRole);
+        }
+    }
+    for base in [leaf(-7), scalar(9, 1)] {
+        for extra in [
+            message(2, &[]), scalar(2, 0), message(2, &message(2, &leaf(-7))),
+            scalar(1, 1), scalar(4, 0), message(5, &[]), scalar(8, 0),
+            message(10, &[]), scalar(11, 0), scalar(12, 0), message(13, &[]),
+            scalar(14, 0), message(7, &[]), message(9, &[]),
+        ] {
+            let mut ty = base.clone();
+            ty.extend(extra);
+            assert_eq!(return_kind(&ty), ErrorKind::Parameters(parameters::ErrorKind::UnsupportedType));
+        }
+    }
+    let mut conflicting = leaf(-7);
+    conflicting.extend(scalar(9, 1));
+    assert_eq!(return_kind(&conflicting), ErrorKind::Parameters(parameters::ErrorKind::UnsupportedType));
+    let mut nominal_conflict = nominal(6, &[]);
+    nominal_conflict.extend(leaf(-7));
+    assert_eq!(return_kind(&nominal_conflict), ErrorKind::UnsupportedType);
+    // Staging precedes either classifier's semantic refusal.
+    for mut ty in [leaf(-7), nominal(6, &[])] {
+        ty.extend(message(2, &[0x80]));
+        let mut roles = declaration(4, -7, 1);
+        roles.extend(message(3, &ty));
+        let original = authored(&roles);
+        let selected = parameters::decode(&original, 1, Limits::default()).unwrap();
+        let root_start = selected.function.body_span.start + declaration(4, -7, 1).len() + 4;
+        let error = decode(&original, 1, Limits::default()).unwrap_err();
+        assert_eq!(error.offset, root_start + ty.len());
+        assert!(matches!(error.kind, ErrorKind::Wire(_)));
+        assert!(matches!(
+            decode(&original, 1, Limits { depth: 1, ..Default::default() }).unwrap_err().kind,
+            ErrorKind::Parameters(_) | ErrorKind::Wire(_)
+        ));
+    }
+}
+
+#[test]
+fn authored_bare_atomicity_validates_complete_scopes_values_and_framing() {
+    let mut roles = declaration(4, -7, 1);
+    roles.extend(value(&leaf(-7)));
+    roles.extend(message(3, &scalar(9, 1)));
+    let mut duplicate = roles.clone();
+    duplicate.extend(declaration(4, -7, 2));
+    assert_eq!(kind(&duplicate), ErrorKind::Parameters(parameters::ErrorKind::Context(class_context::ErrorKind::DuplicateParameterId)));
+    let mut invalid = roles.clone();
+    invalid.extend(value(&leaf(999)));
+    assert_eq!(kind(&invalid), ErrorKind::Parameters(parameters::ErrorKind::UnknownParameterId));
+    let mut fields = function(&roles);
+    fields.extend(declaration(5, 9, 1));
+    fields.extend(declaration(5, 9, 2));
+    let original = input(class(&fields, &[10, 2, 8, 7]), NAMES);
+    assert_eq!(decode(&original, 1, Limits::default()).unwrap_err().kind, ErrorKind::Parameters(parameters::ErrorKind::Context(class_context::ErrorKind::DuplicateParameterId)));
+    let mut tail = roles.clone();
+    tail.push(0x80);
+    assert!(decode(&authored(&tail), 1, Limits::default()).is_err());
+    let mut fields = function(&roles);
+    fields.extend(message(9, &[0x80]));
+    fields.extend(message(10, &[0x80]));
+    let original = input(class(&fields, &[10, 2, 8, 7]), NAMES);
+    assert!(decode(&original, 1, Limits::default()).is_ok());
+    fields.push(0x80);
+    let original = input(class(&fields, &[10, 2, 8, 7]), NAMES);
+    assert!(decode(&original, 1, Limits::default()).is_err());
+    let mut siblings = function(&declaration(4, -7, 1));
+    siblings.extend(function(&message(3, &leaf(-7))));
+    let original = input(class(&siblings, &[10, 2, 8, 7]), NAMES);
+    assert_eq!(decode(&original, 2, Limits::default()).unwrap_err().kind, ErrorKind::Parameters(parameters::ErrorKind::UnknownParameterId));
+}
+
+#[test]
+fn authored_bare_name_values_and_return_share_new_nine_exact_allowances() {
+    let mut roles = value(&scalar(9, 1));
+    roles.extend(message(3, &scalar(9, 1)));
+    roles.extend(declaration(4, -7, 1));
+    let original = authored(&roles);
+    let dimensions: [Set; 9] = [
+        |l, n| l.bytes = n, |l, n| l.records = n, |l, n| l.nodes = n,
+        |l, n| l.work = n, |l, n| l.owned_bytes = n, |l, n| l.queries = n,
+        |l, n| l.output_units = n, |l, n| l.entries = n, |l, n| l.range_slots = n,
+    ];
+    let mut exact = Limits { depth: 2, ..Default::default() };
+    for set in dimensions {
+        set(&mut exact, minimum(&original, set, true));
+    }
+    let expected = decode(&original, 1, Limits::default()).unwrap();
+    assert_eq!(decode(&original, 1, exact).unwrap(), expected);
+    for set in dimensions {
+        let mut below = exact;
+        set(&mut below, minimum(&original, set, true) - 1);
+        assert!(decode(&original, 1, below).is_err());
+    }
+    assert!(decode(&original, 1, Limits { depth: 1, ..exact }).is_err());
+    let raised = Limits {
+        bytes: usize::MAX, records: usize::MAX, nodes: usize::MAX, depth: usize::MAX,
+        work: usize::MAX, owned_bytes: usize::MAX, entries: usize::MAX,
+        range_slots: usize::MAX, queries: usize::MAX, output_units: usize::MAX,
+    };
+    assert_eq!(decode(&original, 1, raised).unwrap(), expected);
+    for set in [dimensions[1], dimensions[2], dimensions[3], dimensions[5], dimensions[6]] {
+        let n = minimum(&original, set, false);
+        assert!(minimum(&original, set, true) > n);
+        let mut limits = Limits::default();
+        set(&mut limits, n);
+        assert!(parameters::decode(&original, 1, limits).is_ok());
+        assert!(decode(&original, 1, limits).is_err());
+    }
+}
+
+#[test]
+fn authored_bare_name_charges_late_utf16_mismatch_units() {
+    let target = vec![65u16; 256];
+    let mut early = target.clone();
+    early[0] = 66;
+    let mut late = target.clone();
+    late[255] = 66;
+    let mut roles = declaration(4, 7, 1);
+    roles.extend(declaration(4, 8, 2));
+    roles.extend(message(3, &scalar(9, 6)));
+    let mut names = NAMES.to_vec();
+    names[1] = &early;
+    names[2] = &target;
+    names[6] = &target;
+    let early_input = input(class(&function(&roles), &[10, 2, 8, 7]), &names);
+    let early_work = minimum(&early_input, |l, n| l.work = n, true);
+    names[1] = &late;
+    let late_input = input(class(&function(&roles), &[10, 2, 8, 7]), &names);
+    let late_work = minimum(&late_input, |l, n| l.work = n, true);
+    assert_eq!(late_work - early_work, 255);
+    assert!(decode(&late_input, 1, Limits { work: early_work, ..Default::default() }).is_err());
+    assert_eq!(decode(&late_input, 1, Limits::default()).unwrap().return_type.classifier, Classifier::FunctionParameter(1));
 }

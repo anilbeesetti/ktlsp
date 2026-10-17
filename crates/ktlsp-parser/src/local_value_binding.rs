@@ -855,7 +855,10 @@ fn check_type_annotation(
     let expected_region = if b.equal(annotated.kind(), "FUN")? {
         let user = b.element(
             parsed,
-            annotation.reference.parent.ok_or(LocalBindingError::InvalidOrigin)?,
+            annotation
+                .reference
+                .parent
+                .ok_or(LocalBindingError::InvalidOrigin)?,
         )?;
         let header = b.element(parsed, user.parent.ok_or(LocalBindingError::InvalidOrigin)?)?;
         // Complete-root namespace validation proved the ordered post-parameter
@@ -1212,33 +1215,40 @@ pub(super) fn type_occurrences_with_budget<'a>(
         };
         let owner = annotation_owner(ordinal, &annotation, b)?;
         let annotation_context = type_function(directory, parsed, owner, b)?;
-        check_type_annotation(directory, parsed, ordinal, &annotation, &annotation_context, b)?;
-            let name = if selected {
-                spelling
-            } else {
-                annotation_spelling(parsed, &annotation, b)?
-            };
-            let original = type_target(directory, &annotation_context, name, None, b)?;
-            let matched = original.is_some_and(|original| std::ptr::eq(original, target));
-            if let Some(new_name) = new_name {
-                let hypothetical = type_target(
-                    directory,
-                    &annotation_context,
-                    if matched { new_name } else { name },
-                    Some((target, new_name)),
-                    b,
-                )?;
-                if original.map(|d| d as *const _) != hypothetical.map(|d| d as *const _) {
-                    return Err(LocalBindingError::AmbiguousTypeParameter);
-                }
+        check_type_annotation(
+            directory,
+            parsed,
+            ordinal,
+            &annotation,
+            &annotation_context,
+            b,
+        )?;
+        let name = if selected {
+            spelling
+        } else {
+            annotation_spelling(parsed, &annotation, b)?
+        };
+        let original = type_target(directory, &annotation_context, name, None, b)?;
+        let matched = original.is_some_and(|original| std::ptr::eq(original, target));
+        if let Some(new_name) = new_name {
+            let hypothetical = type_target(
+                directory,
+                &annotation_context,
+                if matched { new_name } else { name },
+                Some((target, new_name)),
+                b,
+            )?;
+            if original.map(|d| d as *const _) != hypothetical.map(|d| d as *const _) {
+                return Err(LocalBindingError::AmbiguousTypeParameter);
             }
-            if matched {
-                b.charge(1)?;
-                if occurrences.len() >= count {
-                    return Err(LocalBindingError::Resource);
-                }
-                occurrences.push(annotation);
+        }
+        if matched {
+            b.charge(1)?;
+            if occurrences.len() >= count {
+                return Err(LocalBindingError::Resource);
             }
+            occurrences.push(annotation);
+        }
     }
     // Final emission also shares the query budget; no successful prefix escapes.
     b.charge(4)?;

@@ -555,9 +555,16 @@ fn parameter_ambiguity_and_unsupported_headers_never_publish_partial_bindings() 
     let current = result.snapshot();
     let lowered = lower_declarations(&result, current).unwrap();
     let directory = build_regions(&lowered, &result, current).unwrap();
-    assert_eq!(local_value_occurrences(&directory, &result,
-        LocalValueAnchor::Declaration(&lowered.declarations()[1]), current).unwrap_err(),
-        LocalBindingError::UnsupportedContext);
+    assert_eq!(
+        local_value_occurrences(
+            &directory,
+            &result,
+            LocalValueAnchor::Declaration(&lowered.declarations()[1]),
+            current
+        )
+        .unwrap_err(),
+        LocalBindingError::UnsupportedContext
+    );
     for source in [
         "fun f(p) { val use = p }",
         "fun f(p: T = 1) { val use = p }",
@@ -2589,13 +2596,21 @@ fn recursive_type_scopes_preserve_complete_original_identity_partitions_and_repl
                 );
                 assert_eq!(binding.body().introducer(), binding.target().owner());
                 if binding.annotated().kind() == "FUN" {
-                    let annotated_ordinal = lower.declarations().iter()
-                        .position(|d| std::ptr::eq(d, binding.annotated())).unwrap();
-                    let own_body = directory.regions().iter()
-                        .find(|r| r.introducer() == Some(annotated_ordinal)).unwrap();
+                    let annotated_ordinal = lower
+                        .declarations()
+                        .iter()
+                        .position(|d| std::ptr::eq(d, binding.annotated()))
+                        .unwrap();
+                    let own_body = directory
+                        .regions()
+                        .iter()
+                        .find(|r| r.introducer() == Some(annotated_ordinal))
+                        .unwrap();
                     assert!(binding.reference().end <= own_body.range().start);
-                    assert_eq!(directory.memberships()[annotated_ordinal].region(),
-                        own_body.parent().unwrap());
+                    assert_eq!(
+                        directory.memberships()[annotated_ordinal].region(),
+                        own_body.parent().unwrap()
+                    );
                 }
                 assert!(std::ptr::eq(binding.reference(), &tree.elements()[index]));
                 Some(
@@ -2795,13 +2810,48 @@ fn recursive_type_rename_relooks_up_all_annotations_and_preserves_sibling_shadow
     use ktlsp_parser::local_value_binding::{TypeParameterAnchor, guarded_type_parameter_rename};
     let _serial = functional::serial();
     for (source, function, name, accepted) in [
-        ("fun <T> outer():T{ fun <U> inner():T{} }", "outer", "U", false),
-        ("fun <T> outer():T{ fun <U> inner():T{} }", "inner", "T", false),
-        ("fun <T> outer(){ fun middle(){ fun unused():Captured{} } }", "outer", "Captured", false),
-        ("fun <T> outer(){ fun <U> inner(){ fun unused():Captured{} } }", "inner", "Captured", false),
-        ("fun <T> outer():T{ fun <U> inner():U{}; fun sibling():T{} }", "outer", "U", true),
-        ("fun <T> outer():T{ fun <U> inner():U{}; fun sibling():T{} }", "inner", "T", true),
-        ("fun <T> outer(){ fun <U,V> inner():U{} }", "inner", "V", false),
+        (
+            "fun <T> outer():T{ fun <U> inner():T{} }",
+            "outer",
+            "U",
+            false,
+        ),
+        (
+            "fun <T> outer():T{ fun <U> inner():T{} }",
+            "inner",
+            "T",
+            false,
+        ),
+        (
+            "fun <T> outer(){ fun middle(){ fun unused():Captured{} } }",
+            "outer",
+            "Captured",
+            false,
+        ),
+        (
+            "fun <T> outer(){ fun <U> inner(){ fun unused():Captured{} } }",
+            "inner",
+            "Captured",
+            false,
+        ),
+        (
+            "fun <T> outer():T{ fun <U> inner():U{}; fun sibling():T{} }",
+            "outer",
+            "U",
+            true,
+        ),
+        (
+            "fun <T> outer():T{ fun <U> inner():U{}; fun sibling():T{} }",
+            "inner",
+            "T",
+            true,
+        ),
+        (
+            "fun <T> outer(){ fun <U,V> inner():U{} }",
+            "inner",
+            "V",
+            false,
+        ),
         (
             "fun <T> outer(){ fun <U> inner(a:T){} }",
             "outer",
@@ -2960,7 +3010,10 @@ fn recursive_type_scope_depth_is_structural_not_a_fixed_function_lane() {
 fn return_only_headers_require_the_complete_original_ordered_finite_shape() {
     use ktlsp_parser::local_value_binding::bind_lexical_type_parameter;
     let _serial = functional::serial();
-    for source in ["fun f():Missing{}", "fun f() /* header */ : `Missing` /* body */ {}"] {
+    for source in [
+        "fun f():Missing{}",
+        "fun f() /* header */ : `Missing` /* body */ {}",
+    ] {
         let result = parse(source);
         let snapshot = result.snapshot();
         let tree = result.tree_for(snapshot).unwrap();
@@ -2968,23 +3021,47 @@ fn return_only_headers_require_the_complete_original_ordered_finite_shape() {
         let lower = lower_declarations(&result, snapshot).unwrap();
         assert_eq!(lower.declarations().len(), 1);
         let directory = build_regions(&lower, &result, snapshot).unwrap();
-        let index = tree.elements().iter().position(|e| e.kind == "REFERENCE_EXPRESSION").unwrap();
+        let index = tree
+            .elements()
+            .iter()
+            .position(|e| e.kind == "REFERENCE_EXPRESSION")
+            .unwrap();
         let annotation = &tree.elements()[tree.elements()[index].parent.unwrap()];
         let header = &tree.elements()[annotation.parent.unwrap()];
         assert_eq!(header.parent, Some(lower.declarations()[0].cst_index()));
-        let body = directory.regions().iter().find(|r| r.introducer() == Some(0)).unwrap();
+        let body = directory
+            .regions()
+            .iter()
+            .find(|r| r.introducer() == Some(0))
+            .unwrap();
         assert!(header.end <= body.range().start);
         assert_eq!(body.parent(), Some(directory.memberships()[0].region()));
-        assert_eq!(bind_lexical_type_parameter(&directory, &result, index, snapshot).unwrap_err(),
-            LocalBindingError::NoEligibleTypeParameter);
+        assert_eq!(
+            bind_lexical_type_parameter(&directory, &result, index, snapshot).unwrap_err(),
+            LocalBindingError::NoEligibleTypeParameter
+        );
     }
     for source in [
-        "fun f():{}", "fun f():T:T{}", "fun f():T?{}", "fun f():pkg.T{}",
-        "fun f():List<T>{}", "fun f():(T){}", "fun f():()->T{}", "fun f():@A T{}",
-        "fun f():T = 1", "fun f():T", "fun f():T where T:Any{}", "fun f():T{ val x= }",
-        "fun f():T;{}", "fun f():T(){}", "fun f():T{ fun broken():List<T>{} }",
+        "fun f():{}",
+        "fun f():T:T{}",
+        "fun f():T?{}",
+        "fun f():pkg.T{}",
+        "fun f():List<T>{}",
+        "fun f():(T){}",
+        "fun f():()->T{}",
+        "fun f():@A T{}",
+        "fun f():T = 1",
+        "fun f():T",
+        "fun f():T where T:Any{}",
+        "fun f():T{ val x= }",
+        "fun f():T;{}",
+        "fun f():T(){}",
+        "fun f():T{ fun broken():List<T>{} }",
     ] {
         let result = parse(source);
-        assert!(lower_declarations(&result, result.snapshot()).is_err(), "{source}");
+        assert!(
+            lower_declarations(&result, result.snapshot()).is_err(),
+            "{source}"
+        );
     }
 }

@@ -4309,7 +4309,9 @@ fn recursive_cli_layout(source: &str, renamed: Option<(usize, &str)>) -> Recursi
         .map(|(ordinal, (owner, raw))| {
             let end = source.find(&format!("> {owner}(")).unwrap();
             let start = source[..end].rfind('<').unwrap() + 1;
-            let raw = if let Some((selected, name)) = renamed && selected == ordinal {
+            let raw = if let Some((selected, name)) = renamed
+                && selected == ordinal
+            {
                 name
             } else {
                 raw
@@ -4394,9 +4396,12 @@ fn return_scope_observation(packet: Value) {
 
 fn assert_recursive_cli_source(source: &str, revision: i64) -> RecursiveProducer {
     use ktlsp_parser::{
-        FileKind, Parser, SourceSnapshot, lowering::lower_declarations,
-        local_value_binding::{LocalBindingError, TypeParameterAnchor,
-            bind_lexical_type_parameter, type_parameter_occurrences},
+        FileKind, Parser, SourceSnapshot,
+        local_value_binding::{
+            LocalBindingError, TypeParameterAnchor, bind_lexical_type_parameter,
+            type_parameter_occurrences,
+        },
+        lowering::lower_declarations,
         structural_regions::build_regions,
     };
     let snapshot = SourceSnapshot::new(URI, revision, FileKind::Source, source).unwrap();
@@ -4408,30 +4413,62 @@ fn assert_recursive_cli_source(source: &str, revision: i64) -> RecursiveProducer
     assert!(tree.diagnostics().is_empty());
     let lower = lower_declarations(&result, &snapshot).unwrap();
     let directory = build_regions(&lower, &result, &snapshot).unwrap();
-    let declarations: Vec<_> = lower.declarations().iter()
-        .map(|d| (d.kind().to_owned(), d.owner())).collect();
+    let declarations: Vec<_> = lower
+        .declarations()
+        .iter()
+        .map(|d| (d.kind().to_owned(), d.owner()))
+        .collect();
     let mut annotations = Vec::new();
     let mut annotation_packets = Vec::new();
     for (index, element) in tree.elements().iter().enumerate().filter(|(_, e)| {
-        e.kind == "REFERENCE_EXPRESSION"
-            && tree.elements()[e.parent.unwrap()].kind == "USER_TYPE"
+        e.kind == "REFERENCE_EXPRESSION" && tree.elements()[e.parent.unwrap()].kind == "USER_TYPE"
     }) {
-        let annotated_index = tree.elements()[tree.elements()[element.parent.unwrap()].parent.unwrap()].parent.unwrap();
-        let annotated = lower.declarations().iter().position(|d| d.cst_index() == annotated_index).unwrap();
+        let annotated_index = tree.elements()
+            [tree.elements()[element.parent.unwrap()].parent.unwrap()]
+        .parent
+        .unwrap();
+        let annotated = lower
+            .declarations()
+            .iter()
+            .position(|d| d.cst_index() == annotated_index)
+            .unwrap();
         let bound = bind_lexical_type_parameter(&directory, &result, index, &snapshot);
         let (target, function, body, error) = match bound {
             Ok(binding) => {
                 assert!(std::ptr::eq(binding.reference(), element));
-                assert!(std::ptr::eq(binding.annotated(), &lower.declarations()[annotated]));
-                assert!(std::ptr::eq(binding.name_token(), &tree.elements()[index + 1]));
-                let target = lower.declarations().iter().position(|d| std::ptr::eq(d, binding.target())).unwrap();
-                let function = lower.declarations().iter().position(|d| std::ptr::eq(d, binding.function())).unwrap();
+                assert!(std::ptr::eq(
+                    binding.annotated(),
+                    &lower.declarations()[annotated]
+                ));
+                assert!(std::ptr::eq(
+                    binding.name_token(),
+                    &tree.elements()[index + 1]
+                ));
+                let target = lower
+                    .declarations()
+                    .iter()
+                    .position(|d| std::ptr::eq(d, binding.target()))
+                    .unwrap();
+                let function = lower
+                    .declarations()
+                    .iter()
+                    .position(|d| std::ptr::eq(d, binding.function()))
+                    .unwrap();
                 assert_eq!(lower.declarations()[target].owner(), Some(function));
                 assert_eq!(binding.body().introducer(), Some(function));
-                (Some(target), Some(function), Some(binding.body().cst_index()), None)
+                (
+                    Some(target),
+                    Some(function),
+                    Some(binding.body().cst_index()),
+                    None,
+                )
             }
             Err(error) => {
-                assert!(matches!(error, LocalBindingError::NoEligibleTypeParameter | LocalBindingError::AmbiguousTypeParameter));
+                assert!(matches!(
+                    error,
+                    LocalBindingError::NoEligibleTypeParameter
+                        | LocalBindingError::AmbiguousTypeParameter
+                ));
                 (None, None, None, Some(format!("{error:?}")))
             }
         };
@@ -4440,9 +4477,18 @@ fn assert_recursive_cli_source(source: &str, revision: i64) -> RecursiveProducer
             "function":function,"body":body,"error":error,"reference_is_original":true}));
     }
     let mut partitions = Vec::new();
-    for (ordinal, target) in lower.declarations().iter().enumerate().filter(|(_, d)| d.kind() == "TYPE_PARAMETER") {
-        let found = match type_parameter_occurrences(&directory, &result,
-            TypeParameterAnchor::Declaration(target), &snapshot) {
+    for (ordinal, target) in lower
+        .declarations()
+        .iter()
+        .enumerate()
+        .filter(|(_, d)| d.kind() == "TYPE_PARAMETER")
+    {
+        let found = match type_parameter_occurrences(
+            &directory,
+            &result,
+            TypeParameterAnchor::Declaration(target),
+            &snapshot,
+        ) {
             Ok(found) => found,
             Err(error) => {
                 assert_eq!(error, LocalBindingError::AmbiguousTypeParameter);
@@ -4450,9 +4496,19 @@ fn assert_recursive_cli_source(source: &str, revision: i64) -> RecursiveProducer
                 continue;
             }
         };
-        let expected: Vec<_> = annotation_packets.iter().filter(|a| a["target"] == json!(ordinal))
-            .map(|a| a["index"].as_u64().unwrap() as usize).collect();
-        assert_eq!(found.occurrences().iter().map(|a| a.reference_index()).collect::<Vec<_>>(), expected);
+        let expected: Vec<_> = annotation_packets
+            .iter()
+            .filter(|a| a["target"] == json!(ordinal))
+            .map(|a| a["index"].as_u64().unwrap() as usize)
+            .collect();
+        assert_eq!(
+            found
+                .occurrences()
+                .iter()
+                .map(|a| a.reference_index())
+                .collect::<Vec<_>>(),
+            expected
+        );
         partitions.push(json!({"target":ordinal,"annotations":expected,
             "target_is_original":std::ptr::eq(found.target(), target)}));
     }
@@ -4471,7 +4527,11 @@ fn assert_recursive_cli_source(source: &str, revision: i64) -> RecursiveProducer
         "memberships":directory.memberships().iter().map(|m|m.region()).collect::<Vec<_>>(),
         "annotations":annotation_packets,"partitions":partitions
     });
-    RecursiveProducer { declarations, annotations, observation }
+    RecursiveProducer {
+        declarations,
+        annotations,
+        observation,
+    }
 }
 
 #[test]
@@ -4496,7 +4556,12 @@ fn recursive_type_scope_actual_paired_cli_all_anchors_and_full_version8_replay()
                 .filter_map(|(r, t)| t.map(|t| (r.clone(), t, true, "Fresh"))),
         )
         .collect();
-    let return_only = annotations.iter().find(|(_, t)| *t == Some(7)).unwrap().0.clone();
+    let return_only = annotations
+        .iter()
+        .find(|(_, t)| *t == Some(7))
+        .unwrap()
+        .0
+        .clone();
     for name in ["out", "reified"] {
         anchors.push((return_only.clone(), 7, true, name));
     }
@@ -4564,22 +4629,34 @@ fn recursive_type_scope_actual_paired_cli_all_anchors_and_full_version8_replay()
         requests.push(json!({"jsonrpc":"2.0","id":id,"method":"textDocument/rename","params":rename_params(source,offset,name)}));
     }
     for name in ["where", "dynamic", "suspend"] {
-        requests.push(json!({"jsonrpc":"2.0","id":name,"method":"textDocument/rename",
-            "params":rename_params(source,return_only.start,name)}));
+        requests.push(
+            json!({"jsonrpc":"2.0","id":name,"method":"textDocument/rename",
+            "params":rename_params(source,return_only.start,name)}),
+        );
     }
     for (id, character) in [("split-surrogate", 4), ("interior-crlf", 6)] {
-        requests.push(json!({"jsonrpc":"2.0","id":id,"method":"textDocument/prepareRename",
-            "params":{"textDocument":{"uri":URI},"position":{"line":0,"character":character}}}));
+        requests.push(
+            json!({"jsonrpc":"2.0","id":id,"method":"textDocument/prepareRename",
+            "params":{"textDocument":{"uri":URI},"position":{"line":0,"character":character}}}),
+        );
     }
     let unmatched_return = annotations.last().unwrap().0.start;
-    for method in ["definition", "references", "documentHighlight", "prepareRename", "rename"] {
+    for method in [
+        "definition",
+        "references",
+        "documentHighlight",
+        "prepareRename",
+        "rename",
+    ] {
         let params = match method {
             "references" => references_params(source, unmatched_return, true),
             "rename" => rename_params(source, unmatched_return, "Fresh"),
             _ => navigation_params(source, unmatched_return),
         };
-        requests.push(json!({"jsonrpc":"2.0","id":format!("unmatched-return-{method}"),
-            "method":format!("textDocument/{method}"),"params":params}));
+        requests.push(
+            json!({"jsonrpc":"2.0","id":format!("unmatched-return-{method}"),
+            "method":format!("textDocument/{method}"),"params":params}),
+        );
     }
     requests.extend([
         json!({"jsonrpc":"2.0","id":"stop","method":"shutdown"}),
@@ -4588,8 +4665,10 @@ fn recursive_type_scope_actual_paired_cli_all_anchors_and_full_version8_replay()
     let replies = package.exchange(&requests);
     let reply = |id: &str| replies.iter().find(|r| r["id"] == id).unwrap();
     let original_producer = assert_recursive_cli_source(source, 7);
-    return_scope_observation(json!({"phase":"original","producer":original_producer.observation,
-        "requests":requests,"responses":replies}));
+    return_scope_observation(
+        json!({"phase":"original","producer":original_producer.observation,
+        "requests":requests,"responses":replies}),
+    );
     let mut emitted = Vec::new();
     for (i, (anchor, target, is_use, name)) in anchors.iter().enumerate() {
         let partition: Vec<_> = std::iter::once(declarations[*target].clone())
@@ -4732,8 +4811,17 @@ fn recursive_type_scope_actual_paired_cli_all_anchors_and_full_version8_replay()
     for id in ["split-surrogate", "interior-crlf"] {
         assert_eq!(reply(id)["error"]["code"], -32602);
     }
-    for method in ["definition", "references", "documentHighlight", "prepareRename", "rename"] {
-        assert_eq!(reply(&format!("unmatched-return-{method}"))["error"]["code"], -32803);
+    for method in [
+        "definition",
+        "references",
+        "documentHighlight",
+        "prepareRename",
+        "rename",
+    ] {
+        assert_eq!(
+            reply(&format!("unmatched-return-{method}"))["error"]["code"],
+            -32803
+        );
     }
 }
 
@@ -4791,12 +4879,18 @@ fn recursive_type_capture_unused_inner_and_safe_sibling_actual_cli() {
         let replies = package.exchange(&requests);
         let response = replies.iter().find(|r| r["id"] == "rename").unwrap();
         let original_producer = assert_recursive_cli_source(source, 7);
-        return_scope_observation(json!({"phase":"capture-original","producer":original_producer.observation,
-            "requests":requests,"responses":replies}));
+        return_scope_observation(
+            json!({"phase":"capture-original","producer":original_producer.observation,
+            "requests":requests,"responses":replies}),
+        );
         if accepted {
             let edited = apply_original_rename(source, response, URI, 7);
             let mut expected = source.to_owned();
-            let use_needle = if needle == "<T" { "sibling():T" } else { "inner():U" };
+            let use_needle = if needle == "<T" {
+                "sibling():T"
+            } else {
+                "inner():U"
+            };
             let use_offset = source.find(use_needle).unwrap() + use_needle.len() - 1;
             expected.replace_range(use_offset..use_offset + 1, name);
             expected.replace_range(offset..offset + 1, name);
@@ -4843,8 +4937,10 @@ fn recursive_type_capture_unused_inner_and_safe_sibling_actual_cli() {
             let edited_producer = assert_recursive_cli_source(&edited, 8);
             assert_eq!(edited_producer.declarations, original_producer.declarations);
             assert_eq!(edited_producer.annotations, original_producer.annotations);
-            return_scope_observation(json!({"phase":"capture-edited","producer":edited_producer.observation,
-                "original_rename_response":response,"requests":replay,"responses":rebound}));
+            return_scope_observation(
+                json!({"phase":"capture-edited","producer":edited_producer.observation,
+                "original_rename_response":response,"requests":replay,"responses":rebound}),
+            );
         } else {
             assert_eq!(response["error"]["code"], -32803);
             assert!(response.get("result").is_none());

@@ -646,8 +646,12 @@ pub(crate) fn validate_type_namespace<'a>(
     cursor.at = list.subtree_end;
     if cursor.is(function.cst_index(), node.subtree_end, "COLON")? {
         cursor.expect(function.cst_index(), node.subtree_end, "COLON", true)?;
-        let (index, annotation) =
-            cursor.expect(function.cst_index(), node.subtree_end, "TYPE_REFERENCE", false)?;
+        let (index, annotation) = cursor.expect(
+            function.cst_index(),
+            node.subtree_end,
+            "TYPE_REFERENCE",
+            false,
+        )?;
         // The shared lowerer proved the same finite simple_annotation grammar.
         cursor.b.charge(annotation.subtree_end - index)?;
         cursor.at = annotation.subtree_end;

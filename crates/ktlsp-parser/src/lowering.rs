@@ -1783,8 +1783,7 @@ fn walk<'a>(
                     ordinary_function_path(s, function_depth, b)?
                         && frame(s, depth - 2, b)?.tag == container
                 };
-                if !ordinary || declaration.plain != 5
-                {
+                if !ordinary || declaration.plain != 5 {
                     return Err(unsupported(i));
                 }
                 simple_annotation(p, i, b)?;

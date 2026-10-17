@@ -422,10 +422,7 @@ fn authored_target_is_independent_including_local_membership_and_unknown_arity()
         );
         assert!(!selected.parameters.owner.class_id.local);
         assert!(target.local);
-        assert_ne!(
-            *target,
-            selected.parameters.owner.class_id
-        );
+        assert_ne!(*target, selected.parameters.owner.class_id);
         assert_eq!(selected.return_type.arguments.len(), arguments.len());
     }
     assert!(matches!(return_kind(&nominal(99, &[])), ErrorKind::Name(_)));
@@ -923,8 +920,17 @@ fn authored_bare_signed_roots_keep_shadow_fallback_and_original_late_declaration
         let metadata::Outcome::Decoded { bytes, .. } = &original else {
             unreachable!()
         };
-        borrowed(selected.return_type.header.raw, bytes, selected.return_type.body_span.clone());
-        for p in selected.parameters.parameters.iter().chain(&selected.parameters.function.type_parameters) {
+        borrowed(
+            selected.return_type.header.raw,
+            bytes,
+            selected.return_type.body_span.clone(),
+        );
+        for p in selected
+            .parameters
+            .parameters
+            .iter()
+            .chain(&selected.parameters.function.type_parameters)
+        {
             borrowed(p.parameter.raw, bytes, p.body_span.clone());
         }
     }
@@ -959,7 +965,10 @@ fn authored_bare_name_roots_use_unique_immediate_own_lossless_resolver_content()
         roles.extend(declaration(4, 7, 1));
         let original = input(class(&function(&roles), &table), &names);
         let selected = decode(&original, 1, Limits::default()).unwrap();
-        assert_eq!(selected.return_type.classifier, Classifier::FunctionParameter(0));
+        assert_eq!(
+            selected.return_type.classifier,
+            Classifier::FunctionParameter(0)
+        );
         assert_eq!(selected.return_type.header.type_parameter_name, Some(6));
         roles.extend(declaration(4, 8, 6));
         let original = input(class(&function(&roles), &table), &names);
@@ -981,7 +990,10 @@ fn authored_bare_name_roots_use_unique_immediate_own_lossless_resolver_content()
         let original = input(class(&function(&roles), &[10, 2, 8, 7]), &names);
         assert_eq!(decode(&original, 1, Limits::default()).is_ok(), expected);
     }
-    assert!(matches!(return_kind(&scalar(9, 99)), ErrorKind::Parameters(parameters::ErrorKind::Name(_))));
+    assert!(matches!(
+        return_kind(&scalar(9, 99)),
+        ErrorKind::Parameters(parameters::ErrorKind::Name(_))
+    ));
 }
 
 #[test]
@@ -998,7 +1010,10 @@ fn authored_bare_markings_roles_and_rich_refusal_keep_error_priority() {
             roles.extend(declaration(4, -7, 1));
             let original = authored(&roles);
             let selected = decode(&original, 1, Limits::default()).unwrap();
-            assert_eq!(selected.return_type.classifier, Classifier::FunctionParameter(0));
+            assert_eq!(
+                selected.return_type.classifier,
+                Classifier::FunctionParameter(0)
+            );
             assert_eq!(selected.return_type.header.flags, Some(0));
             assert_eq!(selected.return_type.header.nullable, nullable);
             assert!(selected.return_type.arguments.is_empty());
@@ -1014,19 +1029,35 @@ fn authored_bare_markings_roles_and_rich_refusal_keep_error_priority() {
     }
     for base in [leaf(-7), scalar(9, 1)] {
         for extra in [
-            message(2, &[]), scalar(2, 0), message(2, &message(2, &leaf(-7))),
-            scalar(1, 1), scalar(4, 0), message(5, &[]), scalar(8, 0),
-            message(10, &[]), scalar(11, 0), scalar(12, 0), message(13, &[]),
-            scalar(14, 0), message(7, &[]), message(9, &[]),
+            message(2, &[]),
+            scalar(2, 0),
+            message(2, &message(2, &leaf(-7))),
+            scalar(1, 1),
+            scalar(4, 0),
+            message(5, &[]),
+            scalar(8, 0),
+            message(10, &[]),
+            scalar(11, 0),
+            scalar(12, 0),
+            message(13, &[]),
+            scalar(14, 0),
+            message(7, &[]),
+            message(9, &[]),
         ] {
             let mut ty = base.clone();
             ty.extend(extra);
-            assert_eq!(return_kind(&ty), ErrorKind::Parameters(parameters::ErrorKind::UnsupportedType));
+            assert_eq!(
+                return_kind(&ty),
+                ErrorKind::Parameters(parameters::ErrorKind::UnsupportedType)
+            );
         }
     }
     let mut conflicting = leaf(-7);
     conflicting.extend(scalar(9, 1));
-    assert_eq!(return_kind(&conflicting), ErrorKind::Parameters(parameters::ErrorKind::UnsupportedType));
+    assert_eq!(
+        return_kind(&conflicting),
+        ErrorKind::Parameters(parameters::ErrorKind::UnsupportedType)
+    );
     let mut nominal_conflict = nominal(6, &[]);
     nominal_conflict.extend(leaf(-7));
     assert_eq!(return_kind(&nominal_conflict), ErrorKind::UnsupportedType);
@@ -1042,7 +1073,16 @@ fn authored_bare_markings_roles_and_rich_refusal_keep_error_priority() {
         assert_eq!(error.offset, root_start + ty.len());
         assert!(matches!(error.kind, ErrorKind::Wire(_)));
         assert!(matches!(
-            decode(&original, 1, Limits { depth: 1, ..Default::default() }).unwrap_err().kind,
+            decode(
+                &original,
+                1,
+                Limits {
+                    depth: 1,
+                    ..Default::default()
+                }
+            )
+            .unwrap_err()
+            .kind,
             ErrorKind::Parameters(_) | ErrorKind::Wire(_)
         ));
     }
@@ -1055,15 +1095,28 @@ fn authored_bare_atomicity_validates_complete_scopes_values_and_framing() {
     roles.extend(message(3, &scalar(9, 1)));
     let mut duplicate = roles.clone();
     duplicate.extend(declaration(4, -7, 2));
-    assert_eq!(kind(&duplicate), ErrorKind::Parameters(parameters::ErrorKind::Context(class_context::ErrorKind::DuplicateParameterId)));
+    assert_eq!(
+        kind(&duplicate),
+        ErrorKind::Parameters(parameters::ErrorKind::Context(
+            class_context::ErrorKind::DuplicateParameterId
+        ))
+    );
     let mut invalid = roles.clone();
     invalid.extend(value(&leaf(999)));
-    assert_eq!(kind(&invalid), ErrorKind::Parameters(parameters::ErrorKind::UnknownParameterId));
+    assert_eq!(
+        kind(&invalid),
+        ErrorKind::Parameters(parameters::ErrorKind::UnknownParameterId)
+    );
     let mut fields = function(&roles);
     fields.extend(declaration(5, 9, 1));
     fields.extend(declaration(5, 9, 2));
     let original = input(class(&fields, &[10, 2, 8, 7]), NAMES);
-    assert_eq!(decode(&original, 1, Limits::default()).unwrap_err().kind, ErrorKind::Parameters(parameters::ErrorKind::Context(class_context::ErrorKind::DuplicateParameterId)));
+    assert_eq!(
+        decode(&original, 1, Limits::default()).unwrap_err().kind,
+        ErrorKind::Parameters(parameters::ErrorKind::Context(
+            class_context::ErrorKind::DuplicateParameterId
+        ))
+    );
     let mut tail = roles.clone();
     tail.push(0x80);
     assert!(decode(&authored(&tail), 1, Limits::default()).is_err());
@@ -1078,7 +1131,10 @@ fn authored_bare_atomicity_validates_complete_scopes_values_and_framing() {
     let mut siblings = function(&declaration(4, -7, 1));
     siblings.extend(function(&message(3, &leaf(-7))));
     let original = input(class(&siblings, &[10, 2, 8, 7]), NAMES);
-    assert_eq!(decode(&original, 2, Limits::default()).unwrap_err().kind, ErrorKind::Parameters(parameters::ErrorKind::UnknownParameterId));
+    assert_eq!(
+        decode(&original, 2, Limits::default()).unwrap_err().kind,
+        ErrorKind::Parameters(parameters::ErrorKind::UnknownParameterId)
+    );
 }
 
 #[test]
@@ -1088,11 +1144,20 @@ fn authored_bare_name_values_and_return_share_new_nine_exact_allowances() {
     roles.extend(declaration(4, -7, 1));
     let original = authored(&roles);
     let dimensions: [Set; 9] = [
-        |l, n| l.bytes = n, |l, n| l.records = n, |l, n| l.nodes = n,
-        |l, n| l.work = n, |l, n| l.owned_bytes = n, |l, n| l.queries = n,
-        |l, n| l.output_units = n, |l, n| l.entries = n, |l, n| l.range_slots = n,
+        |l, n| l.bytes = n,
+        |l, n| l.records = n,
+        |l, n| l.nodes = n,
+        |l, n| l.work = n,
+        |l, n| l.owned_bytes = n,
+        |l, n| l.queries = n,
+        |l, n| l.output_units = n,
+        |l, n| l.entries = n,
+        |l, n| l.range_slots = n,
     ];
-    let mut exact = Limits { depth: 2, ..Default::default() };
+    let mut exact = Limits {
+        depth: 2,
+        ..Default::default()
+    };
     for set in dimensions {
         set(&mut exact, minimum(&original, set, true));
     }
@@ -1105,12 +1170,25 @@ fn authored_bare_name_values_and_return_share_new_nine_exact_allowances() {
     }
     assert!(decode(&original, 1, Limits { depth: 1, ..exact }).is_err());
     let raised = Limits {
-        bytes: usize::MAX, records: usize::MAX, nodes: usize::MAX, depth: usize::MAX,
-        work: usize::MAX, owned_bytes: usize::MAX, entries: usize::MAX,
-        range_slots: usize::MAX, queries: usize::MAX, output_units: usize::MAX,
+        bytes: usize::MAX,
+        records: usize::MAX,
+        nodes: usize::MAX,
+        depth: usize::MAX,
+        work: usize::MAX,
+        owned_bytes: usize::MAX,
+        entries: usize::MAX,
+        range_slots: usize::MAX,
+        queries: usize::MAX,
+        output_units: usize::MAX,
     };
     assert_eq!(decode(&original, 1, raised).unwrap(), expected);
-    for set in [dimensions[1], dimensions[2], dimensions[3], dimensions[5], dimensions[6]] {
+    for set in [
+        dimensions[1],
+        dimensions[2],
+        dimensions[3],
+        dimensions[5],
+        dimensions[6],
+    ] {
         let n = minimum(&original, set, false);
         assert!(minimum(&original, set, true) > n);
         let mut limits = Limits::default();
@@ -1140,6 +1218,22 @@ fn authored_bare_name_charges_late_utf16_mismatch_units() {
     let late_input = input(class(&function(&roles), &[10, 2, 8, 7]), &names);
     let late_work = minimum(&late_input, |l, n| l.work = n, true);
     assert_eq!(late_work - early_work, 255);
-    assert!(decode(&late_input, 1, Limits { work: early_work, ..Default::default() }).is_err());
-    assert_eq!(decode(&late_input, 1, Limits::default()).unwrap().return_type.classifier, Classifier::FunctionParameter(1));
+    assert!(
+        decode(
+            &late_input,
+            1,
+            Limits {
+                work: early_work,
+                ..Default::default()
+            }
+        )
+        .is_err()
+    );
+    assert_eq!(
+        decode(&late_input, 1, Limits::default())
+            .unwrap()
+            .return_type
+            .classifier,
+        Classifier::FunctionParameter(1)
+    );
 }

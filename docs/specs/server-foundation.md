@@ -158,6 +158,9 @@ the finite contract: actual Windows `supervisor_poll`, untagged Mac Unix timeout
 and following reused-ID cancellations without stale data. The actual escaped
 frame-boundary regression passed; join-site wire values and large raw frames
 remain unprinted. [Exact source and limits](../status/development.md#basic430-and-bounded433-original2627-smoke-and-ci-accepted)
-do not diagnose the earlier PR432 Windows failure or clear #96. Final reviewed
-documentation-source integration/exact-main and separate archive gates remain.
+do not diagnose the earlier PR432 Windows failure or clear #96.
+[Final reviewed PR432 integration/exact-main and separate three-host archive
+gates](../status/development.md#verified432-integration-and430-actual-extracted-basic-candidate)
+are accepted at exact5926; this finite proof does not promote historical causes,
+uncaptured join-site wire values, broader reliability or full parity.
 

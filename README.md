@@ -15,16 +15,19 @@ Install `ktlsp` and `ktlsp-parser-worker` from the same build together in one tr
 
 For an explicit tiny source project and generic LSP client configuration, see
 [basic native candidate setup (#430)](crates/ktlsp-server/README.md#basic-native-candidate-setup-430).
-This is source/setup guidance, not visual-editor verification or a ready release.
-PR429 is verified on main `21aab03`; its first failed runs remain historical
-failures. Use only separately accepted exact-source archives and extracted proof
-from [#430](https://github.com/anilbeesetti/ktlsp/issues/430), not old package receipts.
-PR432's changed `2627f9e` source passed its own original Linux/macOS/Windows CI
-and complete independent basic-editing/timeout-provenance gates.
-[Exact source, actual replies and limits](docs/status/development.md#basic430-and-bounded433-original2627-smoke-and-ci-accepted)
-remain separate from guarded integration, extracted archives and release claims.
-The earlier `acf06cd` Windows deadline failure remains FAILED/cause UNKNOWN;
-no current candidate archive is accepted and full parity is not achieved.
+**Experimental basic archives are verified at exact main `5926de3`.**
+[Downloads, checksums and actual extracted proof](https://github.com/anilbeesetti/ktlsp/issues/430#issuecomment-6242490468)
+cover Linux X64, macOS ARM64 and Windows X64 from original package run39074621949/1.
+Keep the matching server/worker together; verify the outer checksum, inner
+`SHA256SUMS` and provenance before execution. GitHub artifacts have fourteen-day
+retention, not permanent release hosting. These archives remain pinned5926,
+not any later documentation head.
+
+[PR432's guarded integration and original exact-main proof](docs/status/development.md#verified432-integration-and430-actual-extracted-basic-candidate)
+and independent whole-package/actual-edit gates are accepted. This is finite
+native CLI/protocol/editing proof, not IDE/UI, signing/notarization, installer,
+general-platform/reliability or full-parity certification. No first-party
+license grant is present. Earlier failed deadlines remain cause UNKNOWN.
 
 ## Current behavior
 

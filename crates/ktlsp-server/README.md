@@ -27,11 +27,19 @@ the complete captured Mac/Windows values and applied every returned edit.
 However, that source's original Windows full CI FAILED an older navigation
 request with `parser deadline exceeded`; cause remains UNKNOWN. The copied-pair
 pass is not extracted-archive or release acceptance. [Exact outcome and holds](https://github.com/anilbeesetti/ktlsp/pull/432#issuecomment-6240834265).
-The #433 selected-site prerequisite is source-only until its own gates pass.
+At that earlier checkpoint, the #433 selected-site prerequisite was source-only.
 Use only current-source archives and extracted proof separately accepted in
 [#430](https://github.com/anilbeesetti/ktlsp/issues/430); the historical
 [#373 receipts below](#optional-extracted-archive-smoke-373) certify only their
 exact sources. The ten-hour goal is not a guarantee.
+
+The changed `2627f9e` composition subsequently passed its OWN original full
+Linux/macOS/Windows CI. Independent controls, both #433 OWNERS and the basic
+consumer OWNER+ROOT accepted the complete current actual replies and genuine
+edits. [Exact original source and evidence](../../docs/status/development.md#basic430-and-bounded433-original2627-smoke-and-ci-accepted)
+remain distinct from the documentation-completion head and its still-required
+guarded integration/exact-main/packaging gates. This is copied-pair proof,
+not an accepted extracted archive, editor certification or historical diagnosis.
 
 For #433's non-Unix piped deadline errors, the existing `-32803` and
 `parser deadline exceeded` message remain unchanged. Optional

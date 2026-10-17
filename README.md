@@ -19,10 +19,12 @@ This is source/setup guidance, not visual-editor verification or a ready release
 PR429 is verified on main `21aab03`; its first failed runs remain historical
 failures. Use only separately accepted exact-source archives and extracted proof
 from [#430](https://github.com/anilbeesetti/ktlsp/issues/430), not old package receipts.
-The expanded copied-pair basic consumer passed on all three original PR432 hosts,
-but Windows full CI failed an older parser deadline request; no candidate archive
-is accepted. [Original result and bounded #433 prerequisite](https://github.com/anilbeesetti/ktlsp/pull/432#issuecomment-6240834265)
-remain separate from release/full-parity claims.
+PR432's changed `2627f9e` source passed its own original Linux/macOS/Windows CI
+and complete independent basic-editing/timeout-provenance gates.
+[Exact source, actual replies and limits](docs/status/development.md#basic430-and-bounded433-original2627-smoke-and-ci-accepted)
+remain separate from guarded integration, extracted archives and release claims.
+The earlier `acf06cd` Windows deadline failure remains FAILED/cause UNKNOWN;
+no current candidate archive is accepted and full parity is not achieved.
 
 ## Current behavior
 

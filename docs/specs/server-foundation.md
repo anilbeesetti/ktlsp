@@ -153,6 +153,11 @@ No extra clock/I/O/status/readiness check, observer channel, retry or raised bou
 If annotation alone would overflow the existing frame ceiling, retain the
 original unannotated timeout response; no new ID admission policy or larger frame.
 Workspace aggregate failure reserve and other error data remain unchanged.
-This changed source needs its own reviews/verification. Original PR432 Windows
-failure remains UNKNOWN/blocking, despite the different basic consumer's pass.
+Original `2627f9e` full three-host CI and independent OWNER+ROOT gates exercised
+the finite contract: actual Windows `supervisor_poll`, untagged Mac Unix timeout
+and following reused-ID cancellations without stale data. The actual escaped
+frame-boundary regression passed; join-site wire values and large raw frames
+remain unprinted. [Exact source and limits](../status/development.md#basic430-and-bounded433-original2627-smoke-and-ci-accepted)
+do not diagnose the earlier PR432 Windows failure or clear #96. Final reviewed
+documentation-source integration/exact-main and separate archive gates remain.
 

@@ -38,9 +38,13 @@ locations, not evidence that a thread was blocked, a worker phase or a runtime
 cause. Tagging adds no clock/I/O/status/readiness query and changes no deadline,
 priority or cleanup. The server may carry the finite site in an existing failure
 response; if that annotation cannot fit the existing frame limit, it preserves
-the original unannotated error instead. This changed source still requires its
-own reviews and separately admitted verification. Original PR432 Windows failure
-remains UNKNOWN; a later pass cannot diagnose it.
+the original unannotated error instead. Original `2627f9e` three-host CI and
+independent OWNER+ROOT gates exercised this finite contract: Windows actually
+returned `supervisor_poll`, while the Unix timeout remained untagged. Join-site
+regressions passed, but their production wire values were not captured.
+[Exact evidence and limits](../../docs/status/development.md#basic430-and-bounded433-original2627-smoke-and-ci-accepted)
+do not diagnose the earlier Windows failure or clear #96; final integration and
+separate exact-source packaging gates remain.
 
 On Unix, all Parser instances share eight reservations covering active children,
 pending cleanup and permanent failure pins. Admission happens before normalization,

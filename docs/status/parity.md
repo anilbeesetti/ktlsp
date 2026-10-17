@@ -265,9 +265,12 @@ Its original acf copied-pair case passed on Linux/macOS/Windows; OWNER+ROOT
 accepted all captured Mac/Windows values and genuine edit applications. However,
 original Windows full CI FAILED an older navigation deadline request, whose
 selected timeout site/cause remains UNKNOWN after two complete original audits.
-The #433 finite selected-site source prerequisite changes no deadline/priority/
-cleanup/healthy assertion and is NOT a cause repair; its own composed-source and
-separately admitted verification gates remain pending. [Exact result and holds](development.md#basic430-original-acf-three-host-result-and-bounded433-prerequisite).
+The #433 finite selected-site prerequisite changes no deadline/priority/cleanup/
+healthy assertion and is NOT a cause repair. Changed2627f9e subsequently passed
+its OWN original full Linux/macOS/Windows CI, both independent controls and
+parser/server/basic OWNERS+ROOT actual finite behavior/edit gates.
+[Exact current source, actual values and limits](development.md#basic430-and-bounded433-original2627-smoke-and-ci-accepted)
+are not final documentation-source guarded integration/exact-main clearance.
 Separate exact-source manual packaging/real extracted proof is still required:
 copied-pair CI is not archive acceptance or visual-editor certification. No
 general inference/index/hierarchy/compiler/oracle/parity, first-party license or

@@ -32,7 +32,7 @@ ROOT preserved WT/private/tmp/ktlsp-430-basic-candidate-integration,
 branchomp/430-basic-candidate-integration and draft [PR432](https://github.com/anilbeesetti/ktlsp/pull/432).
 Both prepared smoke commits7b4d60b→7899fbc and docsf0d9290 were composed on that
 SAME verified main; every original owner/user worktree and branch remains.
-Current preserved headacf06cda8ecf6ea15749c0e9232438f3fa5e3d7a/
+Prior preserved headacf06cda8ecf6ea15749c0e9232438f3fa5e3d7a/
 tree10c079733cfdccfc09da789a9f15e2adb0f4dcf2 received BOTH full current9path
 source renewals0.97/0.97, then separately admitted fmtCHECK0, FULL strict locked
 all-target/all-feature Clippy0 and FULL workspace NoRun0. No local product ran.
@@ -85,6 +85,42 @@ its two already-received small Timeout/reused-ID-cancel responses on test stdout
 No new request, engine observer, timing sample or production log is added; large
 boundary IDs are NOT printed. These are source-only receipt statements until
 their OWN original hosted execution. Include them in the complete source renewal.
+
+#### Current433 actual smoke and original CI accepted; final documentation next
+
+This supersedes the pending433 source/compiler stages above, not their failures.
+ROOT published reviewed2627f9e5800ab28f6b35b56e592738873130d7dd/
+tree42bd70914573e094fbad21120bd78e250f715590, SOLE immediate parent9fb312b,
+to the preserved430 branch/draft PR432, retaining SAME verified incoming21a.
+ALL FOUR full15path source renewals0.96 preceded separate fmtCHECK0,
+FULL strict locked all-target/all-feature Clippy0 and FULL workspace NoRun0;
+all199 Cargo records parsed,142 declared executables NOT run locally.
+Separate publication/OWN original hosted admission then produced ALL3 PASS:
+Native39070764100/1/job117507705425 and platform39070764057/1/
+Mac117507705560/Win117507705352. Actual checkout235a25d63bcee51491c77adae7541d4db5f7537e
+has tree42bd and ordered parents[21a,2627]; both retained stale event
+`pr_merge_sha=b853cd81` fields are observational, NOT actual checkout authority.
+
+Two independent complete CI controls0.97/0.97, parser/server OWNERS and ROOT
+accepted all original gates/147rows per host. Basic OWNER+ROOT independently
+read both complete current641typedscalar payloads and genuinely applied every
+UTF16/CRLF/astral change and returned completion/versioned rename edit.
+Actual Windows timeout has `supervisor_poll`; Mac Unix timeout has no data.
+Both following reused `active` IDs return cancellation without stale site data.
+Only poll is observed on the wire; join sites have source/regression evidence.
+Windows escaped-frame exact-fit/one-byte-over omission regression passed;
+large raw IDs and Linux successful-test raw values remain unprinted.
+[Complete original values, counts, hashes and limits](status/development.md#basic430-and-bounded433-original2627-smoke-and-ci-accepted).
+
+After this observed smoke, ROOT updates ONLY these seven existing docs; all
+product/test/config bytes stay exact2627. The documentation-completion head
+still needs independent complete15path source renewals and its OWN original CI
+before separate fresh read-only guard/ordinary expected-head squash, actual
+tree/SOLE21a proof and independent OWNER+ROOT original exact-main clearance.
+No active merge/packaging lease or local runtime grant. Only then separately
+admit exact-source three-host packaging and genuine extracted acceptance.
+Old acf Windows cause UNKNOWN,70ba format FAILED,96/431/417 and all broader
+native-only/T004/B3/oracle/license/parity holds remain.
 
 Initial430 head91005d4/tree48efe0a4 did NOT clear its source gate: complete
 functionality review found the shared outline expectation trimmed two bound

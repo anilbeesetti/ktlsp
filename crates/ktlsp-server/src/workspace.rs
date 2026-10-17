@@ -77,6 +77,53 @@ pub(super) struct Snapshot {
     files: HashMap<Arc<str>, SourceKey>,
 }
 
+/// Closed production ownership over the original coherent capture, not a
+/// projected classpath. Construction proves complete candidate coverage.
+#[derive(Debug)]
+pub(super) struct SourceModule<'a> {
+    snapshot: &'a Snapshot,
+    capture: &'a crate::workspace_symbols::Capture,
+    owner: &'a SourceKey,
+    module: &'a ktlsp_import::v2::ImportedModule,
+}
+
+impl SourceModule<'_> {
+    /// Only actual members of this same capture can participate. Canonical
+    /// member URIs are resolved through the original map, never path prefixes.
+    pub(super) fn contains(
+        &self,
+        member: &crate::workspace_symbols::Member,
+        budget: &mut crate::workspace_symbols::Budget,
+        cancelled: &AtomicBool,
+    ) -> Result<bool, &'static str> {
+        budget.work(self.capture.members.len(), cancelled)?;
+        if !self
+            .capture
+            .members
+            .iter()
+            .any(|original| std::ptr::eq(original, member))
+        {
+            return Err("foreign captured source member");
+        }
+        let key = self.snapshot.member_key(member, budget, cancelled)?;
+        if key.project != self.owner.project {
+            return Ok(false);
+        }
+        let entry = &self.snapshot.projects[key.project].entries()[key.entry];
+        budget.work(entry.memberships().len(), cancelled)?;
+        Ok(entry
+            .memberships()
+            .iter()
+            .any(|membership| {
+                std::ptr::eq(
+                    &self.snapshot.projects[key.project].imported().modules()
+                        [membership.module_index()],
+                    self.module,
+                )
+            }))
+    }
+}
+
 impl Snapshot {
     pub(super) fn load(
         projects: Vec<Project>,
@@ -166,6 +213,125 @@ impl Snapshot {
             .get(key.entry)?
             .source()?;
         Some((key, Arc::clone(canonical), Arc::clone(source)))
+    }
+
+    fn member_key(
+        &self,
+        member: &crate::workspace_symbols::Member,
+        budget: &mut crate::workspace_symbols::Budget,
+        cancelled: &AtomicBool,
+    ) -> Result<&SourceKey, &'static str> {
+        budget.work(member.source.document().len(), cancelled)?;
+        self.files
+            .get(member.source.document())
+            .ok_or("captured source is not an original canonical member")
+    }
+
+    /// Allocation-free original-model bridge for the finite imported-value
+    /// consumer. Existing verify_all/fresh_all still gate execution/publication.
+    pub(super) fn source_module<'a>(
+        &'a self,
+        capture: &'a crate::workspace_symbols::Capture,
+        requester: &'a crate::workspace_symbols::Member,
+        budget: &mut crate::workspace_symbols::Budget,
+        cancelled: &AtomicBool,
+    ) -> Result<SourceModule<'a>, &'static str> {
+        budget.work(1, cancelled)?;
+        if !capture
+            .snapshot
+            .as_ref()
+            .is_some_and(|snapshot| std::ptr::eq(self, snapshot.as_ref()))
+            || capture.members.len() != self.files.len()
+            || capture.closed.len() != self.projects.len()
+        {
+            return Err("foreign or incomplete workspace source capture");
+        }
+        // Strict original key order proves every canonical member exactly once,
+        // including negative/nonmatching files; aliases cannot replace members.
+        let mut previous = None;
+        let mut found = false;
+        for member in &capture.members {
+            budget.work(1, cancelled)?;
+            let key = self.member_key(member, budget, cancelled)?;
+            if previous.is_some_and(|old: &SourceKey| {
+                (old.project, old.entry) >= (key.project, key.entry)
+            }) {
+                return Err("competing or unordered captured source members");
+            }
+            previous = Some(key);
+            found |= std::ptr::eq(member, requester);
+        }
+        if !found {
+            return Err("foreign requesting source member");
+        }
+        let owner = self.member_key(requester, budget, cancelled)?;
+        let inventory = &self.projects[owner.project];
+        let entry = &inventory.entries()[owner.entry];
+        let membership = entry
+            .memberships()
+            .first()
+            .ok_or("requesting source has no original module")?;
+        let module_index = membership.module_index();
+        let module = inventory
+            .imported()
+            .modules()
+            .get(module_index)
+            .ok_or("original source module unavailable")?;
+        budget.work(module.dependencies.len(), cancelled)?;
+        if module.dependencies.is_empty()
+            || module
+                .dependencies
+                .iter()
+                .any(|dependency| !matches!(dependency, ktlsp_import::v2::Dependency::ModuleSource))
+        {
+            return Err("source module has unsupported dependency competition");
+        }
+        for content in &module.content_roots {
+            budget.work(1, cancelled)?;
+            for root in &content.source_roots {
+                budget.work(1, cancelled)?;
+                if !matches!(root.root_type.as_str(), "kotlin-source" | "java-source") {
+                    return Err("source module is not closed production source");
+                }
+            }
+        }
+        // ponytail: O(n) original inventory/capture scans per request; contains
+        // additionally authenticates its borrowed member in O(n). Cache only
+        // original producer authority if this bounded query cost matters.
+        for candidate in inventory.entries() {
+            budget.work(1, cancelled)?;
+            let mut relevant = false;
+            for membership in candidate.memberships() {
+                budget.work(1, cancelled)?;
+                relevant |= membership.module_index() == module_index;
+            }
+            if !relevant {
+                continue;
+            }
+            for membership in candidate.memberships() {
+                budget.work(1, cancelled)?;
+                if membership.module_index() != module_index {
+                    return Err("competing original source module ownership");
+                }
+                let root = module
+                    .content_roots
+                    .get(membership.content_root_index())
+                    .and_then(|content| content.source_roots.get(membership.source_root_index()))
+                    .ok_or("original source membership unavailable")?;
+                if !matches!(root.root_type.as_str(), "kotlin-source" | "java-source") {
+                    return Err("mixed production and test source ownership");
+                }
+            }
+            if matches!(candidate.kind(), EntryKind::Java | EntryKind::KotlinScript) {
+                return Err("unsupported source module semantic contributor");
+            }
+        }
+        Ok(SourceModule {
+            snapshot: self,
+            capture,
+            owner,
+            module,
+        })
     }
 
     pub(super) fn verify(

@@ -15,6 +15,161 @@ Install **both** `ktlsp` and `ktlsp-parser-worker` from that same build into the
 
 Without that sibling, synchronization/folding/lexical diagnostics, compatible lexical semantic tokens and the negotiated structural quickfix remain available, `documentSymbolProvider`/`workspaceSymbolProvider`/`definitionProvider`/`hoverProvider`/`referencesProvider`/`documentHighlightProvider`/`completionProvider`/`signatureHelpProvider`/`renameProvider` are omitted and their requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. A configured worker that subsequently fails is a request failure, not a fabricated outline or binding. No JVM/JDK, Kotlin compiler or C parser is required.
 
+## Basic native candidate setup (#430)
+
+**Source/setup contract, not a ready release or editor verification.** PR429's
+original Native39054129295/attempt1 and Platform39054129461/attempt1 failed
+across all three hosts; reviewed `c03523a` is not verified main. #430's expanded
+extracted-pair proof is pending ROOT's original hosted execution. Current-source
+basic-candidate archives are **not available** until guarded verified-main
+acceptance and a separately admitted original packaging run. The historical
+[#373 receipts below](#optional-extracted-archive-smoke-373) remain evidence only
+for their exact sources, not this candidate. The ten-hour goal is not a guarantee.
+
+1. Once that exact-source package is accepted, obtain the package and its separate
+   evidence from the admitted run for your host/architecture. Verify its outer
+   SHA-256 before extraction and its inner inventory/checksums/provenance against
+   the trusted run; checksums alone do not authenticate a distributor. Keep the
+   matching `ktlsp` and `ktlsp-parser-worker` together in one trusted directory.
+   Do not mix builds. See [installation trust](#build-and-distribute-both-executables).
+2. Create a small local project, for example `/absolute/demo`, containing
+   `workspace.json` and a `src` directory. Save this **unversioned importer model**
+   as `workspace.json` (not the separate versioned T004 manifest):
+
+   ```json
+   {
+     "modules": [{
+       "name": "app",
+       "dependencies": [{"type": "moduleSource"}],
+       "contentRoots": [{
+         "path": "<WORKSPACE>/",
+         "sourceRoots": [{
+           "path": "<WORKSPACE>/src",
+           "type": "kotlin-source"
+         }]
+       }]
+     }],
+     "libraries": []
+   }
+   ```
+
+   Keep `<WORKSPACE>` literal; the importer resolves it to the project directory.
+   For a finite value-editing example, save `src/Basic.kt`:
+
+   ```kotlin
+   // Basic editing 😀
+   // Native lexical providers
+   fun host() {
+       val `old😀` = 1
+       val use = `old😀`
+   }
+   ```
+
+   Keep the separate signature-help envelope in `src/Signature.kt`:
+
+   ```kotlin
+   fun <T> outer(p: T) {
+       fun send(to: T) {}
+       send(to = p)
+   }
+   ```
+
+3. Map these settings into an existing generic LSP client's normal launcher:
+
+   ```text
+   command:          /absolute/trusted-install/ktlsp
+   arguments:        ["--stdio"]
+   transport:        Content-Length-framed stdio
+   language/filetype: kotlin
+   root directory:   /absolute/demo
+   initialization options:
+     projects:
+       - type: json
+         path: file:///absolute/demo
+   ```
+
+   Use `.exe` on Windows and a native absolute command path; a Windows project
+   URI looks like `file:///C:/absolute/demo`. Percent-encode spaces/non-ASCII
+   characters in file URIs. `projects[].path` is the **directory URI**, not
+   `file:///absolute/demo/workspace.json`. `initializationOptions.projects` is
+   mandatory for this workspace authority: `rootUri`/`workspaceFolders` alone
+   do not import sources, and there is no implicit Gradle/Maven/compiler import.
+   In Neovim-style configuration these map to `cmd`, Kotlin buffer attachment,
+   `root_dir` and `init_options`; this is a **configuration suggestion, not
+   observed Neovim/VS Code compatibility or visual-editor proof**. No first-party
+   editor client/plugin/configuration generator is supplied.
+4. Let the client perform `initialize` → `initialized` and `didOpen` with
+   `languageId:"kotlin"`. Use its real supported capabilities, inspect the returned
+   providers, and enable only features it can consume. A compatible **pull-mode
+   capability fragment** is:
+
+   ```json
+   {
+     "general": {"positionEncodings": ["utf-16"]},
+     "workspace": {
+       "workspaceEdit": {"documentChanges": true},
+       "symbol": {}
+     },
+     "textDocument": {
+       "diagnostic": {},
+       "documentSymbol": {"hierarchicalDocumentSymbolSupport": true},
+       "hover": {"contentFormat": ["plaintext"]},
+       "rename": {"prepareSupport": true},
+       "semanticTokens": {
+         "requests": {"full": true, "range": true},
+         "tokenTypes": ["keyword", "comment", "string", "number", "operator"],
+         "tokenModifiers": [],
+         "formats": ["relative"]
+       }
+     }
+   }
+   ```
+
+   This is `initialize.params.capabilities`, not initialization options and not
+   a promise that an arbitrary client implements every field. Advertising
+   `textDocument.diagnostic:{}` selects always-full pull reports and suppresses
+   push: the client must request `textDocument/diagnostic` after changes. For a
+   push-only client **omit that field entirely**. Hierarchical outlines require
+   the shown document-symbol flag; workspace-symbol kind negotiation is separate.
+   Tokens use the returned lexical legend, full/range only (no delta/modifiers).
+   Rename requires versioned `documentChanges`; advertise preparation only if
+   supported. Completion and signature help have no automatic trigger characters.
+5. Synchronize edits with increasing document versions and **UTF-16 ranged**
+   `didChange` positions, including CRLF/non-BMP text; saving is not sync authority.
+   In `Basic.kt`, definition/hover/references/highlights on the final initializer
+   stay within the same-function parameter/preceding immutable-local envelope.
+   For manual completion, replace that initializer with the complete identifier
+   `olSuffix`, place the caret after `ol`, then apply the returned whole-token
+   `textEdit` and synchronize it. A hole or unfinished quote is unsupported.
+   Prepare/rename the original local to bare ASCII `Fresh`, apply the actual
+   returned current-version `documentChanges`, and synchronize before requesting
+   fresh results. This is not parameter/member/function/workspace rename.
+   In `Signature.kt`, manually invoke signature help inside the **completed**
+   `send(to = p)` argument list: one preceding empty local, one required named
+   argument, formal and outer parameter sharing the same lexical `T`. Incomplete
+   calls, overloads, constructors and general Kotlin signature help are unsupported.
+
+Diagnostics/folding and token categories are lexical/structural, not compiler
+errors or semantic type coloring. Workspace search requires the explicit project;
+matching is literal case-sensitive substring, not fuzzy/normalized matching or
+cross-file semantic resolution. Only captured admitted `.kt` members participate;
+closing an unsaved buffer restores disk authority. New files/model changes need
+explicit `intellij/reloadWorkspace` with `{"initializationOptions":{"projects":[...]}}`;
+folder changes alone do not discover sources. Keep unrelated file overlays out of
+this tiny project. Parser-backed providers have a **64 KiB source / 500 ms exchange**
+ceiling, independent of the larger sync limit; aggregate workspace search allows
+**at most 42 tiny parser delegations before other work**, not guaranteed 42 and
+never a 1,024-file success promise. Whole-answer exhaustion refuses, not truncates.
+See [workspace limits](#coherent-eager-native-workspace-symbols-426),
+[provider limits](#independent-limits) and the finite provider sections below.
+
+This remains experimental: unresolved [#96](https://github.com/anilbeesetti/ktlsp/issues/96)
+and [#377](https://github.com/anilbeesetti/ktlsp/issues/377) platform reliability
+limits remain; a later pass does not explain or repair an earlier parser deadline.
+No first-party license grant (including commercial-use permission), signatures,
+notarization, installer, general-platform/editor certification or full official
+Rust/Kotlin parity is established.
+
 ## Optional extracted-archive smoke (#373)
 
 The existing manual experimental packaging workflow keeps the full unfiltered
@@ -800,9 +955,10 @@ eight global owned handles, with at most one retained import per Session.
 Cancellation releases IDs/responds once, including dependent waiting symbols,
 but never releases owned work before join. EOF/shutdown/broken output use the
 existing cleanup proof and unchanged one-second grace, excluding OS calls.
-No watcher, progress/FINISHED status, workspace symbols, cross-file semantic
-binding, effective SDK/classpath, build-tool import or official equivalence is
-advertised. Existing provider capabilities are unchanged.
+The #421 operation did not itself advertise workspace symbols; the separate
+[#426 source contract](#coherent-eager-native-workspace-symbols-426) now adds them.
+No watcher, progress/FINISHED status, cross-file semantic binding, effective
+SDK/classpath, build-tool import or official equivalence follows from #421.
 
 ## Bounded syntactic document symbols
 

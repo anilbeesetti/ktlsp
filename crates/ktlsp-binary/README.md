@@ -708,7 +708,7 @@ CI, then PR425's separate guarded integration7afdc68/tree93eee/SOLE1ddf parent.
 Both feature OWNERS and ROOT independently accepted OWN original exact-main
 39045022100 before lease clearance; this data scope is delivered.
 
-### #427 accepted native/hosted actual values; clean integration pending
+### #427 accepted original values and verified main delivery
 
 ROOT composed the complete nine-path binary-only leaf
 `1a88ccc483773c148113a832f76af1e1d8f6661a`, tree
@@ -744,9 +744,12 @@ OWNER+ROOT actual-value gates. All genuine producer/consumer calls, measured
 minimum probes, mutations/restoration, borrowing and substantive assertions
 remain in the shared proof and separate13-test mutation target. Standalone
 executes the shared genuine/resource proof, not that separate registered target.
-The cleaned union's OWN full source reviews/original three-host CI and guarded
-integration remain pending. Earlier #423 values above remain historical scope
-evidence, not substitute #427 acceptance.
-No local parser/server/Session runtime is authorized. [Exact current evidence
-and limits](../../docs/status/development.md#pr429-r6-original-full-three-host-and-all-feature-actual-gates-accepted).
+The cleaned union passed its OWN complete independent source reviews, compiler
+gates and original full Linux/macOS/Windows CI, then guarded PR429 integration at
+main `21aab03`. All THREE feature OWNERS+ROOT independently accepted the original
+exact-main full CI before the exclusive original-base lease cleared. Current
+unprinted Class values are carried from the accepted original complete native/
+hosted gate through unchanged production and preserved real calls/assertions;
+they are not fabricated new main output. Earlier #423 values stay historical.
+No local parser/server/Session runtime is authorized. [Exact delivery and limits](../../docs/status/development.md#verified429-cleaned-source-integration-and-original-exact-main-acceptance).
 

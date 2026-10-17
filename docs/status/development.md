@@ -4695,3 +4695,59 @@ The prior failed check remains failed. BOTH full source authorities must renew
 on this changed source before a new separate compiler-only admission; OWN
 original clean-source full three-host CI/integration/exact-main gates remain.
 
+
+#### Verified429 cleaned-source integration and original exact-main acceptance
+
+This supersedes only the preceding pending429 stages, not their original failed
+evidence or any historical assessment cutoff. Reviewed capture-free head
+14e836db75fb262e765f31e05a10839508471318/
+tree732b9636d8c58ace9f910ad6e6c1e575e812dfcc received BOTH complete ROOT source
+reviews0.96/0.97. Its separately admitted fmtCHECK0/1.1915825s, strict locked
+keep-going FULL workspace/all-target/all-feature Clippy0/0.471191667s and FULL
+locked workspace NoRun0/1.598110375s completed. All199 Cargo JSON records were
+parsed:189 artifacts,9 build scripts,1 success,0 diagnostics; no product ran.
+
+OWN ORIGINAL Native39061069094/attempt1/job117478970085 and
+platform39061069071/attempt1/Mac117478970120/Win117478969874 passed all32 steps.
+BOTH independent control reviewers and ROOT accepted full original custody/
+checkout/parents/tree/config/commands, all441 numeric rows,4013 full named cases
+and complete actual printed controls. Per-host passes1353/1351/1300, each0failed/
+3ignored/0measured/0filtered;147 rows each. This is new clean-source CI, not
+capture-bearing4b3429c CI reused. All feature OWNER+ROOT full actual/genuine-edit
+gates preceded separate retirement; six component and both full ROOT source
+authorities preserved every real producer/consumer/assertion/edit/frequency/
+bound/cleanup. Current private feature payloads remain unprinted, not replayed.
+
+Separate fresh strictly READONLY actualouter0/parsed0/allcompletevalidmatching
+lease facts were inspected before separate ordinary expected-head squash.
+Actual PR429 main21aab03e4e232be128cf9ff1414ac17041bf78e0 has reviewed tree732b963
+and SOLE original exclusive base7afdc68dd2e283379ebaa99073b068339df84bdd.
+ALL THREE feature OWNERS426427428 and ROOT independently accepted OWN ORIGINAL
+[exact-main39063111523/1/job117485003868](https://github.com/anilbeesetti/ktlsp/actions/runs/39063111523/job/117485003868):
+all8 steps,147 complete numeric rows,1356 full named outcomes,1353pass/0fail/
+3ignored/0measured/0filtered. Root independently matched every complete numeric/
+case/status/group/position and actual printed control to the independent records.
+Primary API log316836B SHA3723fbd3c34abec36a7872f777b499131b0432d15ec71fb0b35557bcf10b761b.
+Initial CLI escape-byte refusal was preserved; only that failed retrieval used
+the documented literal-escape option, not a CI retry/rerun.
+
+The exclusive original-base lease remained through actual tree/sole-parent and
+ALL four exact-main acceptances, then cleared after separate read-only current
+main/source/local-clean matching proof. Joint receipt4897B
+SHA662e4b04132c44bcbc0e7a8d052ad520677369d206f1fdbe9ca7d1baf37c3f1b.
+Immutable original active lease and complete receipts remain outside repo at
+/private/tmp/ktlsp-426-427-root-evidence.
+[Public exact delivery](https://github.com/anilbeesetti/ktlsp/pull/429#issuecomment-6240002934).
+Children426427428 are delivered/closed; broader parents remain open.
+
+Basic430 now composes BOTH reviewed smoke commits and consumer docs on this ONE
+verified incoming main in omp/430-basic-candidate-integration. Same real basic
+helper runs in nonignored copied-pair coverage and separate borrowed-extracted
+coverage; complete actual request/response/returned-edit text receipts retain
+the64KiB ceiling. OWN full-union/compiler/original hosted/integration/exact-main
+gates and separate original exact-source three-host packaging/extracted acceptance
+remain required at this source checkpoint. No ready archive/ten-hour guarantee.
+No post-test hosted source cleanliness/main three-host CI/visual editor/license/
+official parity invented. B3INCONCLUSIVE/oracleHOLD/96/T004/native-only and original
+431UNKNOWNOPEN/395377417UNKNOWN remain; old failures are not cured by later passes.
+

@@ -897,10 +897,12 @@ evidence must be recorded separately from source.
 
 ### Snapshot-owned immutable-local value types (#428)
 
-**Capture-bearing `4b3429c` passed its full source/compiler/original three-host
-and BOTH OWNER+ROOT complete actual-value gates. Temporary observations are now
-retired; the cleaned union's OWN new reviews/CI and guarded integration remain
-pending.**
+**Delivered in PR429 at verified main `21aab03`.** Complete original values were
+accepted before observation retirement. Unchanged production and preserved real
+consumers/assertions passed the cleaned union's OWN source/compiler/original
+three-host CI and guarded integration, then independent ALL THREE feature
+OWNERS+ROOT original exact-main acceptance before lease clearance. Unprinted
+private proof values are not invented new main output. [Delivery evidence](../../docs/status/development.md#verified429-cleaned-source-integration-and-original-exact-main-acceptance).
 `local_value_binding::infer_local_value_type` selects an ORIGINAL direct
 immutable-local `Declaration` with the original `RegionDirectory`,
 `SnapshotResult` and current `SourceSnapshot`. Unused/direct locals need no

@@ -18,13 +18,15 @@ Without that sibling, synchronization/folding/lexical diagnostics, compatible le
 ## Basic native candidate setup (#430)
 
 **Source/setup contract, not a ready release or editor verification.** PR429's
-original Native39054129295/attempt1 and Platform39054129461/attempt1 failed
-across all three hosts; reviewed `c03523a` is not verified main. #430's expanded
-extracted-pair proof is pending ROOT's original hosted execution. Current-source
-basic-candidate archives are **not available** until guarded verified-main
-acceptance and a separately admitted original packaging run. The historical
-[#373 receipts below](#optional-extracted-archive-smoke-373) remain evidence only
-for their exact sources, not this candidate. The ten-hour goal is not a guarantee.
+capture-free source is verified on main `21aab03`, after its OWN original full
+three-host CI, guarded integration and independent feature OWNERS+ROOT original
+exact-main acceptance. Its first c035 runs remain FAILED; later passes do not
+diagnose historical deadlines. #430's expanded basic consumer is composed on
+that ONE verified incoming main, with execution/publication gates separate.
+Use only current-source archives and extracted proof separately accepted in
+[#430](https://github.com/anilbeesetti/ktlsp/issues/430); the historical
+[#373 receipts below](#optional-extracted-archive-smoke-373) certify only their
+exact sources. The ten-hour goal is not a guarantee.
 
 1. Once that exact-source package is accepted, obtain the package and its separate
    evidence from the admitted run for your host/architecture. Verify its outer
@@ -189,12 +191,18 @@ An absent/invalid directory fails this explicit invocation; it is never a
 success-shaped skip. Default native tests do not require an archive or JDK and
 do **not** exercise this ignored test. The smoke runs the actual extracted server
 `--help`, `--version` and matching sibling-worker stdio with empty PATH and
-JAVA_HOME/JDK_HOME removed. It reuses the ordinary-parameter/local-shadow fixture,
-original string/u64 request IDs, CRLF/non-BMP UTF-16 ranges, definition/hover,
-references/highlights and full empty pull diagnostics without duplicate pushes.
-All processes must exit successfully with empty stderr. The borrowing exchange
-helper never deletes the extraction directory; only exclusively created `Package`
-test directories have deletion ownership, and retained extraction is asserted.
+JAVA_HOME/JDK_HOME removed. It preserves the ordinary-parameter/local-shadow
+fixture and original string/u64 IDs, then exercises the SAME basic-editing helper
+as the nonignored copied-pair consumer: CRLF/non-BMP incremental edits, nonempty
+then cleared diagnostics, outlines/folds/full and range lexical tokens, explicit
+project workspace search, actual returned completion/rename edits applied to the
+same live overlay with fresh navigation/search, close restoring disk authority,
+finite completed-call signature help, invalid-surrogate refusal/recovery, and
+shutdown/exit plus separate shutdown/EOF. Complete requests/responses/edited
+texts remain within the existing64KiB receipt. The copied-pair test is not archive
+provenance or extracted execution. All processes require exit0 and empty stderr.
+Borrowing helpers never delete the extraction; only exclusively created
+`Package` scratch directories have deletion ownership. Retention is asserted.
 
 The permanent bounded decoded wire/CLI/provenance receipt is
 `extracted-smoke.json` in the **separate evidence ZIP**, alongside verification
@@ -209,10 +217,11 @@ At later independently verified main `040dbba580d908c649c7256405687e2044e4cec2`,
 
 ## Coherent eager native workspace symbols (#426)
 
-**Capture-bearing `4b3429c` passed its full source/compiler/original three-host
-and BOTH OWNER+ROOT complete actual-value/genuine-edit gates. Temporary
-observations were retired only afterward; the cleaned union's OWN new reviews/CI,
-guarded integration and original exact-main acceptance remain separate.**
+**Delivered in PR429 at verified main `21aab03`.** Complete original actual-value/
+genuine-edit gates preceded observation retirement. The cleaned union passed
+its OWN full source/compiler/original three-host CI and guarded integration;
+all THREE feature OWNERS+ROOT independently accepted its original exact-main
+CI before the base lease cleared. [Exact evidence and limits](../../docs/status/development.md#verified429-cleaned-source-integration-and-original-exact-main-acceptance).
 With the trusted sibling provider,
 initialization advertises `workspaceSymbolProvider: true`. Symbol-kind negotiation
 uses `capabilities.workspace.symbol` independently of document-symbol profiles.

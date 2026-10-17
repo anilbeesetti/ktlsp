@@ -98,8 +98,10 @@ substitute for exact ROOT union/compiler/original hosted actual-value/edit gates
 The complete composed source now adds an independent `workspace/symbol` path;
 the narrower421 operation above did not itself grant this capability.
 Capture-bearing4b3429c passed full original three-host CI and independent
-BOTH owner/ROOT complete actual-value/genuine-edit acceptance. Observation-only
-retirement's OWN source/CI gates and guarded integration remain separate.
+BOTH owner/ROOT complete actual-value/genuine-edit acceptance before retirement.
+The cleaned union passed its OWN source/compiler/original three-host CI, guarded
+PR429 integration at main21aab03 and ALL THREE feature OWNERS+ROOT original
+exact-main acceptance before the exclusive original-base lease cleared.
 Only the trusted sibling-parser provider advertises `workspaceSymbolProvider:true`;
 the client's `workspace.symbol` kind profile is independent of document symbols.
 Results are eager full declaration locations, without resolve/data/pagination/
@@ -134,7 +136,7 @@ BOTH owner/ROOT complete original hosted readbacks BEFORE separate observation
 retirement admission. Complete old captures remain outside the repository;
 source-only aggregate/hidden internal states have no invented producer telemetry.
 The permanent real requests, producer calls, applied edits, assertions and owned
-cleanup must survive retirement and pass the cleaned union's OWN new gates.
+cleanup survived retirement and passed the cleaned union's OWN new gates.
 No local Kotlin/parser/server/Session/worker runtime is admitted under96.
 No semantic index, effective library/classpath, official matcher or full-parity
 claim is added.

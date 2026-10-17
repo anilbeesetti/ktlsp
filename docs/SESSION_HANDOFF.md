@@ -8,7 +8,42 @@ decisions or phase boundaries. **Full official Kotlin LSP parity is NOT achieved
 Use the actual session capacity; the historical 32-concurrent instruction below
 is not a new limit. Do not manufacture hundreds of overlapping/blocked tasks.
 
-### Latest capture-free source composition; OWN new gates required
+### Latest verified delivery and basic-candidate continuation
+
+[PR429](https://github.com/anilbeesetti/ktlsp/pull/429) is delivered on ONE verified
+incoming main **21aab03e4e232be128cf9ff1414ac17041bf78e0**,
+tree732b9636d8c58ace9f910ad6e6c1e575e812dfcc, SOLE original base
+7afdc68dd2e283379ebaa99073b068339df84bdd. Full current31path source reviews,
+compiler gates and OWN original cleaned-source Linux/macOS/Windows CI passed.
+The separate fresh read-only actualouter0/parsed0/fullmatching lease guard
+preceded an ordinary expected-head squash; actual tree/sole-parent were proved.
+ALL THREE feature OWNERS426427428 and ROOT independently accepted OWN ORIGINAL
+exact-main39063111523/attempt1/job117485003868: all8 steps,147 complete rows,
+1356 full named outcomes,1353pass/0fail/3ignored and every printed control.
+The exclusive original-base lease cleared only afterward. Children426427428
+are closed; broader parents and full parity remain open.
+[Complete public delivery evidence](https://github.com/anilbeesetti/ktlsp/pull/429#issuecomment-6240002934)
+and [ledger](status/development.md#verified429-cleaned-source-integration-and-original-exact-main-acceptance).
+Main's automatic workflow is Native push only, not a new three-host main run.
+Post-test hosted source cleanliness is unobserved. Properly retired private
+feature values carry their full original gates, not fabricated new main output.
+
+ROOT's successor WT/private/tmp/ktlsp-430-basic-candidate-integration,
+branchomp/430-basic-candidate-integration, starts from that SAME verified main.
+Both prepared smoke commits7b4d60b→7899fbc and docsf0d9290 were composed, not
+only the smoke leaf; all original owner/user worktrees and branches remain.
+The nonignored real copied-pair consumer executes the SAME basic/edit/lifecycle
+helpers as the separately invoked borrowed extracted consumer. Genuine original
+completion/rename edits are applied in one live overlay; receipt stays64KiB.
+At this source checkpoint the successor's OWN full-union reviews, compiler,
+original full hosted CI, guarded integration/exact-main and separately admitted
+manual three-host packaging/actual extracted gates are still required.
+Do not dispatch packaging or invoke ANY local Kotlin/parser/server/Session/
+worker/peer/fake runtime from this preparation. No ten-hour guarantee or current
+archive/visual-editor/first-party-license/full-parity claim. Original431 remains
+UNKNOWN/OPEN; failedc035/acbfmt/bddClippy and96/T004/B3/oracle/395377417 holds remain.
+
+### Historical capture-free composition checkpoint before final verification
 
 All three admitted observation retirements are now complete, independently
 double-reviewed and composed in ROOT's integration branch. Complete exact

@@ -99,10 +99,13 @@ and `/private/tmp/ktlsp-419-review-{functionality,adversarial}.txt`, ROOT fully 
 ROOT actual xd://lsp references attempts failed rust-analyzer initialization with
 unexpected exitcode0; xdreport_issue acknowledged. Complete caller grep/read is
 the fallback, NOT successful LSP refs. Worker proxies may separately be absent.
-Composed source remains UNFORMATTED/UNCOMPILED/UNEXECUTED/UNPUBLISHED.
-ROOT next obtains TWO complete16 union reviews, owns its ONE formatter and all
-exact final-source affected rechecks before compile-only admission. No mid-flight
-build/lint/test/formatter/runtime or publication. #419 actual writer remains.
+Both independent ROOT complete16 union reviews CLEAR atb63dd2e6/tree949e60ed,
+with full current receipts `/private/tmp/ktlsp-418-419-root-{functionality,adversarial}-review.txt`
+ROOT fully read. ROOT then used its ONE pinned `cargo +1.99.0 fmt --all`,
+completed successfully/1.33s; NO second formatter is permitted.
+Source remains UNCOMPILED/UNEXECUTED/UNPUBLISHED. All SIX exact postformat
+ROOT/affected component rechecks are required before compile-only admission.
+No local Kotlin runtime or publication. #419 actual writer remains.
 Native binary data proof needs separate ROOT admission after all static clears;
 Kotlin/CLI proof only original full hosted CI. Temporary writers stay until BOTH
 OWNER+ROOT FULL-read actual payloads and actually returned edits; permanent

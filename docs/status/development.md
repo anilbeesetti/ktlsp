@@ -3034,10 +3034,16 @@ unexpected rust-analyzer exitcode0/recent initialization failure; xdreport_issue
 acknowledged. Complete grep/read caller fallback is actual evidence. Typed-tool
 omission alone was not proof of unavailability; worker mounts may differ.
 
-Composed source is NOT formatted/compiled/executed/published. ROOT still needs
-TWO complete union reviews, its ONE formatter, exact all-affected current-source
-rechecks, admitted pinned CHECK/strict locked all-target Clippy, real native418
-public consumer and original full hosted Linux/macOS/Windows workspace CI.
+Atb63dd2e6/tree949e60ed, BOTH independent ROOT complete16 union reviews cleared
+the full current required source/affected consumers; ROOT fully read both current
+receipts. ROOT then applied its ONE pinned `cargo +1.99.0 fmt --all`,
+completed successfully/1.33s. No second formatter is permitted. Exact all SIX
+postformat ROOT/affected component clears remain required before admitted pinned
+CHECK/strict locked all-target Clippy. No compilation/execution/publication yet.
+Real native418 public consumer and original full hosted Linux/macOS/Windows
+workspace CI remain mandatory. Written outside consumer288lines has two static
+clears and ROOT full read, but has NOT compiled/run; it retains complete actual
+canonical payloads and computed whole-value/pointer occurrence correspondence.
 419 temporary actual writer remains: complete original/actual TYPE-rename-edited
 producers/protocol plus three actual adversarial changes, not fake responses.
 BOTH OWNER+ROOT must FULLread actual payloads and actually apply received edits

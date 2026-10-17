@@ -524,7 +524,11 @@ pub(super) fn argument_label_with_budget<'a>(
         return Err(LocalBindingError::UnsupportedContext);
     }
     let mut parent = reference.parent;
-    for kind in ["VALUE_ARGUMENT_NAME", "VALUE_ARGUMENT", "VALUE_ARGUMENT_LIST"] {
+    for kind in [
+        "VALUE_ARGUMENT_NAME",
+        "VALUE_ARGUMENT",
+        "VALUE_ARGUMENT_LIST",
+    ] {
         let node = b.element(parsed, parent.ok_or(LocalBindingError::UnsupportedContext)?)?;
         if node.token || !b.equal(&node.kind, kind)? {
             return Err(LocalBindingError::UnsupportedContext);
@@ -538,14 +542,27 @@ pub(super) fn argument_label_with_budget<'a>(
         parent.ok_or(LocalBindingError::UnsupportedContext)?,
         b,
     )?;
-    let body_index = call.call().parent.ok_or(LocalBindingError::UnsupportedContext)?;
+    let body_index = call
+        .call()
+        .parent
+        .ok_or(LocalBindingError::UnsupportedContext)?;
     // Full candidate competition precedes parameter eligibility and arity:
     // unsupported/generic/other-arity and future duplicates cannot disappear.
     let candidate = callable_target(
-        directory, parsed, call.function(), body_index, call.cst_index(), call.callee(), b,
+        directory,
+        parsed,
+        call.function(),
+        body_index,
+        call.cst_index(),
+        call.callee(),
+        b,
     )?;
     let parameters = crate::call_syntax::callable_parameters_with_budget(
-        directory.lowered(), result, current, candidate, b,
+        directory.lowered(),
+        result,
+        current,
+        candidate,
+        b,
     )?;
     let [argument] = call.arguments() else {
         return Err(LocalBindingError::UnsupportedContext);
@@ -553,26 +570,42 @@ pub(super) fn argument_label_with_budget<'a>(
     let [formal] = parameters.parameters() else {
         return Err(LocalBindingError::UnsupportedContext);
     };
-    let label = argument.label().ok_or(LocalBindingError::UnsupportedContext)?;
+    let label = argument
+        .label()
+        .ok_or(LocalBindingError::UnsupportedContext)?;
     if !std::ptr::eq(label.reference(), reference)
         || !b.equal(&argument.expression().kind, "REFERENCE_EXPRESSION")?
     {
         return Err(LocalBindingError::UnsupportedContext);
     }
-    let label_name = parsed.source().get(label.name().start..label.name().end)
+    let label_name = parsed
+        .source()
+        .get(label.name().start..label.name().end)
         .ok_or(LocalBindingError::UnsupportedContext)?;
-    let label_name = b.spelling(label_name)?.ok_or(LocalBindingError::UnsupportedSpelling)?;
-    let formal_name = b.spelling(formal.declaration().raw_name())?
+    let label_name = b
+        .spelling(label_name)?
+        .ok_or(LocalBindingError::UnsupportedSpelling)?;
+    let formal_name = b
+        .spelling(formal.declaration().raw_name())?
         .ok_or(LocalBindingError::UnsupportedSpelling)?;
     if !b.equal(label_name, formal_name)? {
         return Err(LocalBindingError::UnsupportedContext);
     }
-    let raw = parsed.source().get(argument.expression().start..argument.expression().end)
+    let raw = parsed
+        .source()
+        .get(argument.expression().start..argument.expression().end)
         .ok_or(LocalBindingError::UnsupportedContext)?;
-    let spelling = b.spelling(raw)?.ok_or(LocalBindingError::UnsupportedSpelling)?;
+    let spelling = b
+        .spelling(raw)?
+        .ok_or(LocalBindingError::UnsupportedSpelling)?;
     let (body_ordinal, _) = find_body(directory, body_index, b)?;
     let (local, parameter) = value_candidates(
-        directory, body_ordinal, body_index, call.function(), spelling, b,
+        directory,
+        body_ordinal,
+        body_index,
+        call.function(),
+        spelling,
+        b,
     )?;
     // Unlike initializer value binding, even a future local is competition here.
     if local.is_some() {
@@ -1563,9 +1596,7 @@ fn value_candidates<'a>(
             {
                 continue;
             }
-            if !(b.equal(declaration.kind(), "PROPERTY")?
-                || b.equal(declaration.kind(), "FUN")?)
-            {
+            if !(b.equal(declaration.kind(), "PROPERTY")? || b.equal(declaration.kind(), "FUN")?) {
                 return Err(LocalBindingError::UnsupportedContext);
             }
         }

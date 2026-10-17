@@ -2546,21 +2546,42 @@ mod tests {
         let directory = build_regions(&lower, &result, result.snapshot()).unwrap();
         let mut measured = ReferenceBudget::default();
         let binding = argument_label_with_budget(
-            &directory, &result, selected, result.snapshot(), &mut measured,
-        ).unwrap();
+            &directory,
+            &result,
+            selected,
+            result.snapshot(),
+            &mut measured,
+        )
+        .unwrap();
         assert!(std::ptr::eq(binding.target(), &lower.declarations()[4]));
-        assert!(std::ptr::eq(binding.argument_parameter(), &lower.declarations()[2]));
-        assert!(std::ptr::eq(binding.type_parameter(), &lower.declarations()[1]));
-        assert_eq!(measured.requested, size_of::<CallArgument<'_>>() + size_of::<CallableParameter<'_>>());
+        assert!(std::ptr::eq(
+            binding.argument_parameter(),
+            &lower.declarations()[2]
+        ));
+        assert!(std::ptr::eq(
+            binding.type_parameter(),
+            &lower.declarations()[1]
+        ));
+        assert_eq!(
+            measured.requested,
+            size_of::<CallArgument<'_>>() + size_of::<CallableParameter<'_>>()
+        );
         assert!(measured.retained >= measured.requested);
         for (work, succeeds) in [
             (WORK - measured.work, true),
             (WORK - measured.work + 1, false),
             (usize::MAX, false),
         ] {
-            let mut budget = ReferenceBudget { work, ..ReferenceBudget::default() };
+            let mut budget = ReferenceBudget {
+                work,
+                ..ReferenceBudget::default()
+            };
             let found = argument_label_with_budget(
-                &directory, &result, selected, result.snapshot(), &mut budget,
+                &directory,
+                &result,
+                selected,
+                result.snapshot(),
+                &mut budget,
             );
             if succeeds {
                 assert!(std::ptr::eq(found.unwrap().target(), binding.target()));
@@ -2576,15 +2597,27 @@ mod tests {
             }
         }
         for (requested, retained, succeeds) in [
-            (REQUESTED - measured.requested, RETAINED - measured.retained, true),
+            (
+                REQUESTED - measured.requested,
+                RETAINED - measured.retained,
+                true,
+            ),
             (REQUESTED - measured.requested + 1, 0, false),
             (0, RETAINED - measured.retained + 1, false),
             (usize::MAX, 0, false),
             (0, usize::MAX, false),
         ] {
-            let mut budget = ReferenceBudget { requested, retained, ..ReferenceBudget::default() };
+            let mut budget = ReferenceBudget {
+                requested,
+                retained,
+                ..ReferenceBudget::default()
+            };
             let found = argument_label_with_budget(
-                &directory, &result, selected, result.snapshot(), &mut budget,
+                &directory,
+                &result,
+                selected,
+                result.snapshot(),
+                &mut budget,
             );
             if succeeds {
                 assert!(std::ptr::eq(found.unwrap().target(), binding.target()));

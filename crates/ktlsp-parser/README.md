@@ -43,8 +43,11 @@ independent OWNER+ROOT gates exercised this finite contract: Windows actually
 returned `supervisor_poll`, while the Unix timeout remained untagged. Join-site
 regressions passed, but their production wire values were not captured.
 [Exact evidence and limits](../../docs/status/development.md#basic430-and-bounded433-original2627-smoke-and-ci-accepted)
-do not diagnose the earlier Windows failure or clear #96; final integration and
-separate exact-source packaging gates remain.
+do not diagnose the earlier Windows failure or clear #96.
+[Guarded PR432 integration/exact-main and separately admitted three-host extracted
+basic candidate proof](../../docs/status/development.md#verified432-integration-and430-actual-extracted-basic-candidate)
+are now accepted at exact main5926. That finite delivery does not capture every
+join-site wire value or grant broader runtime, reliability or parity claims.
 
 On Unix, all Parser instances share eight reservations covering active children,
 pending cleanup and permanent failure pins. Admission happens before normalization,

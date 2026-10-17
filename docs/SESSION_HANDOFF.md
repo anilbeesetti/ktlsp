@@ -41,7 +41,7 @@ platform/reliability/full-parity certification. Old FAILED/UNKNOWN,
 
 ROOT owns the documentation-only434 worktree
 `/private/tmp/ktlsp-434-verified-basic-docs`, branch
-`omp/434-verified-basic-docs`, from verified5926. Its five existing docs require
+`omp/434-verified-basic-docs`, from verified5926. Its seven existing docs require
 their OWN complete source reviews/original CI/guarded integration/exact-main
 gates; the verified5926 product and package evidence is not relabeled as434.
 Preserve every older user/owner worktree. Continue source-resolution/library

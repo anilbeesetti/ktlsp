@@ -8,8 +8,8 @@ use ktlsp_parser::{
     local_value_binding::{
         LocalBindingError, LocalValueAnchor, TypeParameterAnchor, bind_lexical_type_parameter,
         bind_local_argument_label, bind_local_function_callee, bind_local_value,
-        guarded_local_value_rename, guarded_type_parameter_rename, local_value_occurrences,
-        type_parameter_occurrences, visible_local_values,
+        guarded_local_value_rename, guarded_type_parameter_rename, local_call_signature,
+        local_value_occurrences, type_parameter_occurrences, visible_local_values,
     },
     lowering::{ReferenceSiteError, lower_declarations, reference_site},
     structural_regions::build_regions,
@@ -821,6 +821,73 @@ fn lexical_argument_label_borrows_the_original_applicable_call_and_formal() {
             ReferenceSiteError::UnsupportedContext
         );
 
+        // Every original byte-boundary caret, including comment/comma endpoints.
+        for cursor in 0..=source.len() {
+            if !source.is_char_boundary(cursor) {
+                continue;
+            }
+            let comment = tree.elements().iter().any(|e| {
+                e.token
+                    && matches!(e.kind.as_str(), "EOL_COMMENT" | "BLOCK_COMMENT")
+                    && e.start <= cursor
+                    && cursor < e.end
+            });
+            let admitted = call.open_paren().end <= cursor
+                && cursor <= call.close_paren().start
+                && !comment
+                && argument.comma().is_none_or(|comma| cursor < comma.end);
+            let proof = local_call_signature(&directory, &result, current, cursor).unwrap();
+            assert_eq!(
+                proof.is_some(),
+                admitted,
+                "cursor={cursor}, source={source:?}"
+            );
+            if let Some(proof) = proof {
+                assert_eq!(proof.cursor(), cursor);
+                assert!(std::ptr::eq(proof.binding().call().call(), call.call()));
+                assert!(std::ptr::eq(proof.binding().target(), formal));
+                assert!(std::ptr::eq(proof.binding().type_parameter(), ty));
+                let signature = function.name_range().start..parameters.close_paren().end;
+                assert_eq!(proof.signature_range(), signature);
+                assert_eq!(proof.parameter_range(), formal.range());
+                assert_eq!(
+                    proof.into_labels(20).unwrap(),
+                    (
+                        source[signature].to_owned(),
+                        source[formal.range()].to_owned()
+                    )
+                );
+            }
+        }
+        for stale in [
+            SourceSnapshot::new(current.document(), 8, FileKind::Source, source).unwrap(),
+            SourceSnapshot::new("foreign", 7, FileKind::Source, source).unwrap(),
+            SourceSnapshot::new(current.document(), 7, FileKind::Script, source).unwrap(),
+            SourceSnapshot::new(
+                current.document(),
+                7,
+                FileKind::Source,
+                format!("{source} "),
+            )
+            .unwrap(),
+        ] {
+            assert_eq!(
+                local_call_signature(&directory, &result, &stale, call.open_paren().end)
+                    .unwrap_err(),
+                LocalBindingError::StaleSnapshot
+            );
+        }
+        let foreign = parse(source, 7);
+        assert_eq!(
+            local_call_signature(
+                &directory,
+                &foreign,
+                foreign.snapshot(),
+                call.open_paren().end
+            )
+            .unwrap_err(),
+            LocalBindingError::InvalidOrigin
+        );
         // Use the actual existing type-rename proof/ranges, not guessed substitutions.
         let renamed = guarded_type_parameter_rename(
             &directory,
@@ -880,5 +947,23 @@ fn lexical_argument_label_borrows_the_original_applicable_call_and_formal() {
                 rebound.type_parameter()
             ));
         }
+        let signature = local_call_signature(
+            &directory2,
+            &updated,
+            updated.snapshot(),
+            call2.arguments()[0].value_token().start,
+        )
+        .unwrap()
+        .unwrap();
+        assert!(std::ptr::eq(
+            signature.binding().type_parameter(),
+            rebound.type_parameter()
+        ));
+        let range = signature.signature_range();
+        let parameter_range = signature.parameter_range();
+        assert_eq!(
+            signature.into_labels(20).unwrap(),
+            (edited[range].to_owned(), edited[parameter_range].to_owned())
+        );
     }
 }

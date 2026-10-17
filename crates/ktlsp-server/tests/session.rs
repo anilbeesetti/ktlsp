@@ -55,6 +55,7 @@ fn lifecycle_states_and_honest_capabilities() {
     assert_eq!(capabilities["textDocumentSync"]["openClose"], true);
     assert_eq!(capabilities["textDocumentSync"]["change"], 2);
     assert_eq!(capabilities["textDocumentSync"]["save"], false);
+    assert!(capabilities.get("signatureHelpProvider").is_none());
     assert_eq!(
         result["result"]["serverInfo"],
         json!({"name":"ktlsp","version":"0.1.0"})
@@ -72,6 +73,7 @@ fn lifecycle_states_and_honest_capabilities() {
     for method in [
         "textDocument/completion",
         "textDocument/hover",
+        "textDocument/signatureHelp",
         "workspace/symbol",
         "textDocument/didOpen",
     ] {

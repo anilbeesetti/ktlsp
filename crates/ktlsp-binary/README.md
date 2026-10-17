@@ -632,3 +632,59 @@ constructor ordinal5→method0/CP8,9 and copy ordinal9→method6/CP50,51; these 
 are source coverage, not an execution receipt. ROOT's separate public-API smoke
 and native-data admission remain required. No JVM/compiler, parser/server runtime,
 general Kotlin linkage/overload engine or official Kotlin LSP parity is claimed.
+
+## Original bare nominal Class supertypes (#423)
+
+`metadata::resolved_class_supertypes::decode(&outcome, limits)` internally selects
+ALL original Class field6/wire2 occurrences from the SAME supported kind1/mv2.3.0
+Outcome. `ClassSupertypes` retains the original `Owner`, complete ordered original
+Class parameter declarations/opaque bounds and ordered `Supertype` occurrences.
+Each occurrence carries its ordinal among ALL Class fields, decoded-d1 outer/body
+spans, borrowed Type header/raw scalar Options and resolver-derived nominal
+ClassId/local membership. Repetitions remain separate; nothing is sorted/deduped.
+
+Only bare nominal Types are interpreted. Any Class supertype-ID field2,
+including empty/malformed packed interiors or mixed inline/ID lists, refuses the
+WHOLE operation. Parameter ID/NAME classifiers, significant wrong wires, nonzero
+flags, arguments, flexible/outer/alias/abbreviated Types and malformed late
+parent/selected children refuse without a partial result. Class declarations are
+never passed as Function-own NAME scope. Unknown extensions and unused tables
+stay bounded opaque data, not semantically validated overlays.
+
+One monotonic existing allowance covers combined decoded d1+d2, framing/schema,
+one resolver, complete owner/declarations/selection scans, Type/classifier/name
+work and output reservations, including repeated occurrences. Earlier classfile/
+annotation/Metadata decoding has separate budgets. No child reset/refund, second
+resolver, copied raw metadata, target loading or general type graph is added.
+Bounds stay original opaque bodies/IDs; absence is not an interpreted implicit
+Any? bound or effective nullability. Same-Outcome custody is NOT authentication
+of caller-constructible models, retained archive bytes or classfile `this_class`.
+No legal inheritance, subtype/hierarchy/classpath/server or full-parity claim.
+
+All six independent component/union static reviews and pinned compiler-only
+gates passed at9cc1823. Separately admitted unfiltered binary/import execution
+passed674 checks (666 ordinary and8 privacy compile-fail), all69 complete result
+rows, with zero failed/ignored/measured/filtered. All nine new checks ran.
+The frozen public-API consumer executed once with empty PATH and six Java
+environment variables removed: exit0, empty stderr, complete190502-byte stdout
+SHA09dc0e1ed5e84cd71d2fccb13a1813191c4bbc0d7424d64540d7654fda17408e.
+ROOT personally read every complete actual value and independently matched all
+three original class carriers to the existing2.3.20 archive. Genuine Unit and
+Result.Companion each resolve their original bare supertype to kotlin.Any;
+genuine Pair refuses its abbreviation atomically at72. Its separate original
+A/B declaration control and explicitly labelled abbreviation-strip mutation
+preserve original declarations, not an invented genuine positive.
+
+Actual joint exact allowance: bytes106, records30, nodes8, depth2, work1710,
+owned_bytes1378, entries11, range_slots6, queries4, output_units21. Every
+one-short dimension refuses; repeated children cannot reset the shared budget.
+Full original spans/options/UTF16/local/raw/pointer equality and typed refusal
+records remain retained. This proves this finite data operation, not target
+authentication or semantic inheritance. Genuine nonempty-bound interpretation
+in this public consumer remains unobserved; its positive coverage is labelled
+mutated data. BOTH independent OWNER+ROOT full actual-value gates accepted
+these original values. Full consumer source/executable/rlib/fixtures/outputs
+and both receipts remain preserved. PR425's original full three-host composition
+also passed; cleaned-source own reviews/CI and guarded integration are separate.
+No local parser/server/Session runtime is authorized.
+

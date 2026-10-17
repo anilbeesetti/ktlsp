@@ -155,3 +155,28 @@ This source is awaiting root integration gates; it is not full scopes/imports,
 types, cross-file resolution, official navigation evidence or an advertised
 semantic server capability. The historical matrix and cutoffs above are unchanged.
 
+
+## Verified source-authority continuation through1ddf69a
+
+The whole historical matrix/cutoffs above remain unchanged; their pending
+statements are not a fresh assessment of current main. [PR422](https://github.com/anilbeesetti/ktlsp/pull/422)
+delivered bounded explicit JSON inventory, Session overlay/revision authority
+and admitted unopened-file symbols/manual reload at
+`1ddf69acb4158a8927a8b5a87e679c0599d96a54`. BOTH complete actual-value/edit gates
+preceded observation-only retirement; cleaned source passed its OWN reviews and
+original full three-host CI, separate guarded integration and both independent
+original exact-main gates. [Exact reviewed tree/sole parent, execution evidence
+and residual limits](development.md#verified422-capture-free-integration-and-original-exact-main-acceptance)
+remain distinct from official project or semantic equivalence.
+
+Other finite delivered editor/data subsets are documented in the current
+[README](../../README.md) and linked delivery ledger, not retroactively promoted
+into this matrix. Signature help remains unsupported on that verified main;
+423 original nominal Class supertypes and424 manual source-owned signature help
+are separate active implementations from this ONE verified incoming main.
+Their own reviews/runtime/CI/integration remain pending. No full parity,
+effective classpath, workspace symbols, watchers, build-tool orchestration,
+fresh official oracle or general platform/latency/RSS proof is claimed.
+Native-only/T004/96, B3 INCONCLUSIVE/HOLD, oracle HOLD and original417/395/377
+causes UNKNOWN/OPEN remain unchanged.
+

@@ -16,8 +16,9 @@ Only configured local projects are discovered; unknown URI queries do not probe
 outside membership. Windows-only `file-id = 0.2.3` supplies native OS identity,
 not C/C++ analysis or Java. No JDK/compiler/build tool is invoked for this path.
 Capture-bearing composition passed original full three-host runtime and independent
-actual-value/edit gates; capture-free source still requires its own reviewed CI.
-[Exact evidence and limits](../status/development.md#pr422-original-hosted-actual-gates-and-capture-only-retirement)
+actual-value/edit gates. Capture-free source then passed its OWN reviews/full
+three-host CI, guarded PR422 integration and both original exact-main gates.
+[Exact evidence and limits](../status/development.md#verified422-capture-free-integration-and-original-exact-main-acceptance)
 do not establish full official import, effective classpaths or external-tool
 orchestration. #96 local server/parser/Session/worker restrictions still apply.
 

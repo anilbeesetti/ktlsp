@@ -492,12 +492,13 @@ fn navigation_uses_shared_wire_ids_cancellation_and_snapshot_guards() {
         ("textDocument/prepareRename", "preparerename"),
         ("textDocument/rename", "rename"),
         ("textDocument/completion", "completion"),
+        ("textDocument/signatureHelp", "signaturehelp"),
     ] {
         let navigation = |id: Value| {
             request(
                 id,
                 method,
-                json!({"textDocument":{"uri":URI},"position":{"line":1,"character":0},"context":{"includeDeclaration":true,"triggerKind":1},"newName":"fresh"}),
+                json!({"textDocument":{"uri":URI},"position":{"line":1,"character":0},"context":{"includeDeclaration":true,"triggerKind":1,"isRetrigger":false},"newName":"fresh"}),
             )
         };
         let mut client = Client::new(&package);
@@ -546,6 +547,7 @@ fn navigation_uses_shared_wire_ids_cancellation_and_snapshot_guards() {
                 assert!(session.handle(open(&token)).is_empty()); // Identical bytes/version, new incarnation.
             }
             assert!(collect(&mut session).is_empty());
+            assert_eq!(session.pending_requests(), 0);
             assert!(session.close().1);
         }
 

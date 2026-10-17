@@ -542,6 +542,27 @@ pub(super) fn argument_label_with_budget<'a>(
         parent.ok_or(LocalBindingError::UnsupportedContext)?,
         b,
     )?;
+    b.charge(call.arguments().len())?;
+    if !call.arguments().iter().any(|argument| {
+        argument
+            .label()
+            .is_some_and(|label| std::ptr::eq(label.reference(), reference))
+    }) {
+        return Err(LocalBindingError::UnsupportedContext);
+    }
+    applicable_named_call(directory, result, current, parsed, call, b)
+}
+
+// Consumes the already authenticated original call. Both selectors share every
+// competitor, complete-root and lexical-identity obligation without a reset.
+fn applicable_named_call<'a>(
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    current: &SourceSnapshot,
+    parsed: &'a Parsed,
+    call: crate::call_syntax::CallSite<'a>,
+    b: &mut ReferenceBudget,
+) -> Result<LocalArgumentLabelBinding<'a>> {
     let body_index = call
         .call()
         .parent
@@ -573,9 +594,7 @@ pub(super) fn argument_label_with_budget<'a>(
     let label = argument
         .label()
         .ok_or(LocalBindingError::UnsupportedContext)?;
-    if !std::ptr::eq(label.reference(), reference)
-        || !b.equal(&argument.expression().kind, "REFERENCE_EXPRESSION")?
-    {
+    if !b.equal(&argument.expression().kind, "REFERENCE_EXPRESSION")? {
         return Err(LocalBindingError::UnsupportedContext);
     }
     let label_name = parsed
@@ -641,6 +660,170 @@ pub(super) fn argument_label_with_budget<'a>(
         argument_annotation,
         type_parameter: argument_type,
     })
+}
+
+/// Source-owned manual help for the single authenticated completed named call.
+/// The private allowance moves with the proof through output preparation.
+#[derive(Debug)]
+pub struct LocalCallSignature<'a> {
+    binding: LocalArgumentLabelBinding<'a>,
+    cursor: usize,
+    signature_range: std::ops::Range<usize>,
+    parameter_range: std::ops::Range<usize>,
+    pub(super) budget: ReferenceBudget,
+}
+impl<'a> LocalCallSignature<'a> {
+    pub fn binding(&self) -> &LocalArgumentLabelBinding<'a> {
+        &self.binding
+    }
+    pub fn cursor(&self) -> usize {
+        self.cursor
+    }
+    pub fn signature_range(&self) -> std::ops::Range<usize> {
+        self.signature_range.clone()
+    }
+    pub fn parameter_range(&self) -> std::ops::Range<usize> {
+        self.parameter_range.clone()
+    }
+    /// Preflight both source copies and escaped wire/envelope bytes, then move
+    /// these strings into the renderer. No caller-supplied source or new budget.
+    pub fn into_labels(mut self, response_id_bound: usize) -> Result<(String, String)> {
+        self.labels_with_budget(response_id_bound)
+    }
+    pub(super) fn labels_with_budget(
+        &mut self,
+        response_id_bound: usize,
+    ) -> Result<(String, String)> {
+        let source = self.binding.call.origin().parsed().source();
+        let signature = source
+            .get(self.signature_range.clone())
+            .ok_or(LocalBindingError::InvalidOrigin)?;
+        let parameter = source
+            .get(self.parameter_range.clone())
+            .ok_or(LocalBindingError::InvalidOrigin)?;
+        // Fixed result keys, arrays, zero indices, JSON-RPC and framing fit 256.
+        let mut escaped = response_id_bound
+            .checked_add(256)
+            .ok_or(LocalBindingError::Resource)?;
+        for text in [signature, parameter] {
+            for byte in text.bytes() {
+                self.budget.charge(1)?;
+                escaped = escaped
+                    .checked_add(match byte {
+                        b'"' | b'\\' | b'\x08' | b'\x0c' | b'\n' | b'\r' | b'\t' => 2,
+                        0..=0x1f => 6,
+                        _ => 1,
+                    })
+                    .ok_or(LocalBindingError::Resource)?;
+            }
+        }
+        self.budget.charge(escaped)?;
+        if escaped > 1_048_576 {
+            return Err(LocalBindingError::Resource);
+        }
+        let mut label = String::new();
+        self.budget.reserve_string(&mut label, signature.len())?;
+        let mut formal = String::new();
+        self.budget.reserve_string(&mut formal, parameter.len())?;
+        self.budget.charge(signature.len())?;
+        label.push_str(signature);
+        self.budget.charge(parameter.len())?;
+        formal.push_str(parameter);
+        self.budget.charge(1)?;
+        Ok((label, formal))
+    }
+}
+
+/// Select only original completed argument lists; no argument counting or
+/// inferred overload. Outside the list, comment interiors and a nonexistent
+/// post-trailing-comma slot return None. Unsupported containing calls refuse.
+pub fn local_call_signature<'a>(
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    current: &SourceSnapshot,
+    cursor: usize,
+) -> Result<Option<LocalCallSignature<'a>>> {
+    signature_with_budget(
+        directory,
+        result,
+        current,
+        cursor,
+        ReferenceBudget::default(),
+    )
+}
+
+pub(super) fn signature_with_budget<'a>(
+    directory: &'a RegionDirectory<'a>,
+    result: &'a SnapshotResult,
+    current: &SourceSnapshot,
+    cursor: usize,
+    mut b: ReferenceBudget,
+) -> Result<Option<LocalCallSignature<'a>>> {
+    let parsed = type_tree(directory, result, current, &mut b)?;
+    b.charge(1)?;
+    if !parsed.source().is_char_boundary(cursor) {
+        return Err(LocalBindingError::UnsupportedContext);
+    }
+    let mut selected = None;
+    let mut comment = false;
+    for index in 0..parsed.elements().len() {
+        let node = b.element(parsed, index)?;
+        if node.start <= cursor && cursor < node.end {
+            if node.token {
+                comment |=
+                    b.equal(&node.kind, "EOL_COMMENT")? || b.equal(&node.kind, "BLOCK_COMMENT")?;
+            } else if b.equal(&node.kind, "VALUE_ARGUMENT_LIST")? {
+                let parent = node.parent.ok_or(LocalBindingError::UnsupportedContext)?;
+                let call = b.element(parsed, parent)?;
+                if b.equal(&call.kind, "CALL_EXPRESSION")? && selected.replace(parent).is_some() {
+                    return Err(LocalBindingError::UnsupportedContext);
+                }
+            }
+        }
+    }
+    if comment {
+        return Ok(None);
+    }
+    let Some(index) = selected else {
+        return Ok(None);
+    };
+    let call = crate::call_syntax::call_site_with_budget(
+        directory.lowered(),
+        result,
+        current,
+        index,
+        &mut b,
+    )?;
+    b.charge(3)?;
+    if cursor < call.open_paren().end || cursor > call.close_paren().start {
+        return Ok(None);
+    }
+    let binding = applicable_named_call(directory, result, current, parsed, call, &mut b)?;
+    b.charge(4)?;
+    if binding.call.arguments()[0]
+        .comma()
+        .is_some_and(|comma| cursor >= comma.end)
+    {
+        return Ok(None);
+    }
+    let signature_range =
+        binding.parameters.function().name_range().start..binding.parameters.close_paren().end;
+    let parameter_range = binding.target().range();
+    b.charge(5)?;
+    if signature_range.start > parameter_range.start
+        || parameter_range.end > signature_range.end
+        || parsed.source().get(signature_range.clone()).is_none()
+        || parsed.source().get(parameter_range.clone()).is_none()
+    {
+        return Err(LocalBindingError::InvalidOrigin);
+    }
+    Ok(Some(LocalCallSignature {
+        binding,
+        cursor,
+        signature_range,
+        parameter_range,
+        budget: b,
+    }))
 }
 
 // Called only after the one closed-root proof. Authenticate the original

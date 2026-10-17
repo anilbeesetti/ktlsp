@@ -77,9 +77,22 @@ must renew before another changed-source CHECK/strictClippy/compile-only gate.
 All four ACTUAL421 writers stay through BOTH full actual OWNER+ROOT gates;
 three CLI packets emit BEFORE outer result assertions. Reviewed outside native
 consumer52556b8d includes real same-length source/model byte and identity cases.
-Next: changed-source CHECK/strictClippy/compile-only after renewed exact clears,
-separate native smoke, OWN original full3host CI, capture-only cleanup/OWN source
-acceptance, fresh guarded integration and dual original exact-main proof.
+After renewed SIX exact clears3464d6f/treee9f3ff5a, pinned CHECK0/1.146082s,
+strict locked workspace/all-target Clippy0/1.091233s and full workspace
+test--no-run0/13.945685s passed (NO parser/Session runtime). Separate native-only
+admission ran unfiltered binary/import tests:101/59.323599s; source_inventory
+16passed/1FAILED because fs::write at487 rejects authored0xff filename with
+Darwin code92 Illegal byte sequence BEFORE importer inspection. All original
+streams retained; doctests and native consumer runtime NOT reached. Outside
+consumer compiled0/0.217723s, source52556b8d unchanged, fixtures not created.
+ROOT corrects ONLY fixture portability: every Unix target now actually exercises
+public non-UTF8 input refusal; non-macOS additionally retains original invalid
+filename/discovery assertions. All symlink/socket/ancestor assertions still run
+on macOS. Production validation/bounds unchanged, no caught error or weak pass.
+Next: exact affected reviews for test+docs correction, changed-source CHECK/
+Clippy/compile-only, full unfiltered native packages and real native consumer,
+OWN original full3host CI, observation-only cleanup/OWN source acceptance,
+fresh guarded integration and dual original exact-main proof. No second formatter.
 
 ROOT owns Cargo/workspace/lock/docs/config/CI/publication. Windows-target-only
 file-id0.2.3 and server->import path dependency are resolved; all existing registry

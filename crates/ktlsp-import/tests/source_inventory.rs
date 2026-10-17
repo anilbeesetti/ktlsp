@@ -484,9 +484,17 @@ fn symlink_ancestor_leaf_cycle_special_and_nonunicode_paths_refuse() {
         .0
         .join("src")
         .join(std::ffi::OsString::from_vec(vec![0xff]));
-    fs::write(&bad, b"other").unwrap();
-    assert!(matches!(project.load(), Err(Error::UnsafePath(_))));
-    fs::remove_file(bad).unwrap();
+    assert!(matches!(
+        source_inventory::load(&bad, &mut Budget::default(), &AtomicBool::new(false)),
+        Err(Error::UnsafePath(_))
+    ));
+    // APFS refuses invalid UTF-8 filenames before an entry exists.
+    #[cfg(not(target_os = "macos"))]
+    {
+        fs::write(&bad, b"other").unwrap();
+        assert!(matches!(project.load(), Err(Error::UnsafePath(_))));
+        fs::remove_file(bad).unwrap();
+    }
     fs::rename(project.0.join("src"), project.0.join("actual")).unwrap();
     symlink(project.0.join("actual"), project.0.join("src")).unwrap();
     assert!(matches!(project.load(), Err(Error::UnsafePath(_))));

@@ -3398,3 +3398,37 @@ matches251-321 omitted by the search tool's cap; unavailable LSP is not success.
 No second formatter or unchanged retry. Renew exact affected clears before
 changed-source CHECK/strictClippy/compile-only; subsequent native and hosted
 gates remain separate. No full-parity claim or native/#96/B3/oracle boundary change.
+
+#### Native421 fixture failure after successful strict compile-only gates
+
+After all SIX exact current clears at3464d6fc1dce31e05b39a6a60d57b33523e1af5d
+/treee9f3ff5a4210bd7686dea2291f4c848e076cf99c were FULL ROOT-read/authenticated,
+pinned format-CHECK0/1.146082s, strict locked workspace/all-target Clippy0/1.091233s
+and workspace test--no-run0/13.945685s passed. All195 compiler JSON records were
+parsed: no compiler-message record; terminal build-finished success true.
+This compiles but NEVER executes Kotlin/parser/server/Session/worker code.
+Both distinct earlier Clippy failures remain preserved with original source IDs.
+
+ROOT separately admitted ONLY unfiltered binary/import data packages and the
+exact already-reviewed public native consumer52556b8d. Actual package command
+exited101/59.323599s, stdout52635B SHA33c1c271920581abafe1a1e7a32fb91a58b9f47ad9b64caea2919d821f3d7046
+and stderr8870B SHA887f48e1cc59efc1340515a03be837ba4d278505d8dd5753b1c0ba683620893f.
+Final source_inventory row16passed/1failed: composite Unix unsafe-path fixture
+panicked at source_inventory.rs487 because fs::write invalid0xff filename itself
+returns Darwin92 Illegal byte sequence, before any loader discovery. Full
+actual failing body/diagnostic and complete stderr were ROOT-read; no rerun.
+Doctests were NOT reached. Native consumer compiled0/0.217723s with empty streams
+but runtime was deliberately NOT run after the failed package prerequisite;
+its executable/source/provenance retained and exclusive fixture root not created.
+
+ROOT changes ONLY the offending fixture: public load(non-UTF8 Path) must refuse
+UnsafePath on EVERY Unix target, without constructing an impossible APFS entry.
+Original invalid-name creation/discovery/refusal/removal remains under non-macOS
+cfg; all symlink, cycle, socket and ancestor assertions stay unconditional Unix.
+No exception catch, blanket skip, source whitelist, production/bound/default/
+deadline/cleanup/assertion relaxation or second formatter. This is an observed
+fixture-platform correction, NOT a production security fix or completed smoke.
+Affected exact source reviews/checks and full native packages must pass before
+actual consumer runtime; original full hosted3host CI remains required for the
+composed LSP surface. #96/native-only/B3/oracle/unknown-original-failure/full-parity
+limits remain unchanged; no push/PR/lease/merge acceptance exists.

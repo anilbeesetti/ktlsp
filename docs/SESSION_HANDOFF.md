@@ -47,8 +47,21 @@ with TWO separate functionality/adversarial review slots:
   original own/Class argument identities; existing opaque-return/self-return
   consumers retain their separate contracts. Genuine return target/bindings
   are future observations, NOT inferred from earlier408 parameter smoke.
-No new410/411 source, nested producer outcome, composed return observation,
-compile/runtime/hosted acceptance or integration is claimed by this admission.
+Both410 and411 source components are implemented and independently statically
+reviewed:410 head865396234376c82d36a1a31695a1520cd410879e/treec8845584;
+411 head4a1566db040fa928ac748fc2cdb11d140efa1d74/tree700ba507.
+ROOT also implemented [412](https://github.com/anilbeesetti/ktlsp/issues/412)
+immutable complete JSONv1/v2/JPS/Maven import results at
+`/private/tmp/ktlsp-412-immutable-imports`, `omp/412-immutable-imports`;
+head89d8708fd794e3d274b2a53f7bab3c7ef342aef0/tree1e8ee6a4 has TWO current FULL11
+static clears after fixing the one reported unmigrated chained library read.
+No existing dependency visibility bypass is claimed: its query already trusted
+the private projection; this closes mutable sidecar/projection divergence.
+All THREE reviewed components are composed into ROOT's successor WT.
+Full union reviews, compile/format/lint, new original nested producer outcomes,
+composed-return/import data smoke, hosted CI and guarded integration remain
+UNVERIFIED. Temporary410 writers are retained; external411/412 public native
+consumer sources await ROOT admission and complete independent actual readback.
 
 ALL LOCAL Kotlin parser/server/Session/worker/peer/supervision runtime remains
 FORBIDDEN under96, including fake peers and parser-free Session. This overrides

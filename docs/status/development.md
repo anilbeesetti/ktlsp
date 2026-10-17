@@ -2233,3 +2233,76 @@ Saved read-only research `agent://NestedTypeScopeNext` and
 Existing direct-local/public parameter-only/self-return boundaries stay honest
 until new complete original consumer evidence and independent acceptance.
 
+#### Recursive scopes410, composed signatures411 and immutable imports412: reviewed source only
+
+All three components start from SAME independently verifieddf6b/treeF66/sole608,
+after409 lease clearance. ROOT successor integration preserves every old/user/
+delivered/component WT and composes their original commits; common docs only
+were first committeda706514. No new runtime or full-parity claim follows.
+
+410 reviewed865396234376c82d36a1a31695a1520cd410879e/tree
+c8845584feb62f2a9a3d83698c00fd50f9cbcf4b: TWO independent full8 static clears,
+including renewed review after both independently found a stale unconditional
+nested-generic refusal test. It became positive original owner/region/identity
+and unused-partition assertions; unsupported member-generic refusal retained.
+Recursive ordinary-function lowering/region ancestry, nearest-own/ancestor
+type lookup, original identity partitions and hypothetical ALL-annotation rename
+relookup use existing bounded iterative structures/aggregate allowance; strict
+value/callee/callable and operation-origin contracts remain separate.
+Full producer/paired-CLI markers RECURSIVE_TYPE_PRODUCER=,
+RECURSIVE_TYPE_CLI= and RECURSIVE_TYPE_CAPTURE_CLI= remain until BOTH OWNER+ROOT
+complete actual full-payload reads and independent returned-edit applications.
+Original nested producer outcomes remain UNOBSERVED before hosted admission.
+
+411 reviewed4a1566db040fa928ac748fc2cdb11d140efa1d74/tree
+700ba5073f202294cfc05a8b75ca7c8c75b62dfb: TWO independent full5+affected
+consumer/private-context/classifier reviews, no findings. New distinct finite
+signature projection contains existing ordered value/declaration result plus
+explicit nominal return ClassId/original raw arguments/Function-or-Class leaf
+identities. Private selected-Function/classifier factoring retains ONE original
+context/resolver/monotonic budget. Opaque-return parameter-only and self/Class-ID
+return/property/context/method-link contracts unchanged. No target arity guess.
+External public consumer `/private/tmp/ktlsp-411-signature-public-consumer.rs`
+awaits compile/actual data execution. Genuine Result return target/NAME binding
+is still prospective; previous408 value proof is NOT new return evidence.
+Genuine own-ID/shadow/ambiguous-NAME/table/richer-return/compiler-provenance gaps
+remain. Exact source/caller/independent receipts `/private/tmp/ktlsp-411-delivery.json`.
+
+412 ROOT implementation reviewed89d8708fd794e3d274b2a53f7bab3c7ef342aef0/tree
+1e8ee6a4bacf9390e31cc09328cad8345b3b4c4d: TWO independent FULL11+external
+consumer current clears after both found the SAME missed chained library-field
+reader at import_v2.rs755; fixed to libraries() before any compilation.
+Exactly six top-level JSONv1/v2/JPS/Maven sidecar vectors become private with
+borrowed slice accessors; existing records/allocations/ordering/provenance,
+canonical SDK catalog and projections/loaders/query signatures stay unchanged.
+Nested detached records/public project models remain ordinary data; no wrapper,
+cache, mutable replacement API, duplicate catalog or server provider.
+Existing dependency-class query ALREADY used only the private validated
+projection: this is mutable-sidecar/projection consistency repair, NOT evidence
+of a visibility bypass. Permanent six-field/shared-nested compile-fail checks
+protect authority; genuine dependency/source assertions remain, augmented by
+detached-invalid-clone reload refusal and exact original owner/library pointers.
+External `/private/tmp/ktlsp-412-import-public-consumer.rs` awaits actual native
+data proof for JSON views, real invalid-clone reload, genuine class identity/
+provenance and original JPS/Maven source records. No original input bytes are
+newly attached or claimed retained by results. Source API break is intentional.
+
+Actual root LSP references for ImportedWorkspace.modules failed unexpectedcode0
+and were reported;410 had no exposed LSP tool,411 actual analyzer initialization
+ended fallback recursion/exit1. No successful code-intelligence claim. Complete
+fallback caller maps are retained, not guessed references.
+
+Full composed union reviews, pinned format/strict compile-lint, admitted native
+411/412 data smoke and full binary/import tests, original hosted recursive
+producer/CLI smoke and unfiltered whole-workspace three-host CI remain PENDING.
+No local Kotlin parser/server/Session/worker/peer/runtime, JVM/compiler/oracle,
+CI dispatch/retry or changed dependency/config/limits/corpus/cleanup.
+
+Separate read-only SDK research `agent://CompactCpPrerequisite` recovered pinned
+OpenJDK compact-cp codec contract, but retained genuine images contain only
+stored/zip payloads. No genuine compact-cp acceptance is supplied. The existing
+host Temurin21 lib/modules carrier is140714013bytes (metadata stat only), beyond
+unchanged64MiB carrier admission. No JDK program/probe/recapture or limit increase
+was performed. Genuine compact payload/independent expected bytes/provenance
+remain the precise prerequisite, not another speculative codec-only ticket.
+

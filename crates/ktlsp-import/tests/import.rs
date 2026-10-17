@@ -38,7 +38,10 @@ fn preserves_graph_roots_library_sources_and_order() {
         model.libraries[0].binaries,
         [base().join("lib/classes.jar")]
     );
-    assert_eq!(result.modules()[0].content_roots[0].path, base().join("app"));
+    assert_eq!(
+        result.modules()[0].content_roots[0].path,
+        base().join("app")
+    );
     assert_eq!(
         result.modules()[0].content_roots[0].source_roots[0].root_type,
         "kotlin-source"

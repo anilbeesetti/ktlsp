@@ -599,7 +599,10 @@ fn exact_snapshot_reference_count_and_next_document_are_bounded() {
         bytes: a.as_bytes(),
     }));
     assert_eq!(
-        jps::source_projection(base(), &docs).unwrap().modules().len(),
+        jps::source_projection(base(), &docs)
+            .unwrap()
+            .modules()
+            .len(),
         jps::MAX_DOCUMENTS - 1
     );
     docs.push(Document {
@@ -640,7 +643,10 @@ fn lexical_parent_macros_absolute_urls_and_same_kind_nested_roots_roundtrip() {
         ],
     )
     .unwrap();
-    assert_eq!(result.modules()[0].source_roots[0].path, project.join("src"));
+    assert_eq!(
+        result.modules()[0].source_roots[0].path,
+        project.join("src")
+    );
     assert_eq!(
         result.modules()[0].source_roots[1].path,
         project.join("src/nested")

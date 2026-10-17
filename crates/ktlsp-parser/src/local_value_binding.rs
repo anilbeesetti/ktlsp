@@ -688,13 +688,21 @@ fn type_function<'a>(
     }
     let (body_ordinal, body) = body.ok_or(LocalBindingError::UnsupportedContext)?;
     let node = b.element(parsed, function.cst_index())?;
-    let membership = directory.memberships().get(function_ordinal)
-        .ok_or(LocalBindingError::InvalidOrigin)?.region();
+    let membership = directory
+        .memberships()
+        .get(function_ordinal)
+        .ok_or(LocalBindingError::InvalidOrigin)?
+        .region();
     if let Some(owner) = function.owner() {
         b.charge(2)?;
-        let outer = directory.lowered().declarations().get(owner)
+        let outer = directory
+            .lowered()
+            .declarations()
+            .get(owner)
             .ok_or(LocalBindingError::InvalidOrigin)?;
-        let enclosing = directory.regions().get(membership)
+        let enclosing = directory
+            .regions()
+            .get(membership)
             .ok_or(LocalBindingError::InvalidOrigin)?;
         if owner >= function_ordinal
             || !b.equal(outer.kind(), "FUN")?
@@ -739,31 +747,48 @@ fn type_root<'a>(
         if b.equal(declaration.kind(), "FUN")? {
             let scope = type_function(directory, parsed, Some(ordinal), b)?;
             crate::call_syntax::validate_type_namespace(
-                directory.lowered(), parsed, declaration, scope.body.cst_index(), b,
+                directory.lowered(),
+                parsed,
+                declaration,
+                scope.body.cst_index(),
+                b,
             )?;
         } else if b.equal(declaration.kind(), "TYPE_PARAMETER")? {
             let scope = type_function(directory, parsed, declaration.owner(), b)?;
-            let list = b.element(parsed, declaration.cst_parent_index()
-                .ok_or(LocalBindingError::InvalidOrigin)?)?;
+            let list = b.element(
+                parsed,
+                declaration
+                    .cst_parent_index()
+                    .ok_or(LocalBindingError::InvalidOrigin)?,
+            )?;
             b.charge(1)?;
-            if declaration.incomplete() || list.token
+            if declaration.incomplete()
+                || list.token
                 || !b.equal(&list.kind, "TYPE_PARAMETER_LIST")?
                 || list.parent != Some(scope.function.cst_index())
-                || directory.memberships().get(ordinal)
-                    .ok_or(LocalBindingError::InvalidOrigin)?.region()
-                    != directory.memberships().get(scope.ordinal)
-                        .ok_or(LocalBindingError::InvalidOrigin)?.region()
+                || directory
+                    .memberships()
+                    .get(ordinal)
+                    .ok_or(LocalBindingError::InvalidOrigin)?
+                    .region()
+                    != directory
+                        .memberships()
+                        .get(scope.ordinal)
+                        .ok_or(LocalBindingError::InvalidOrigin)?
+                        .region()
             {
                 return Err(LocalBindingError::UnsupportedContext);
             }
-            let name = b.spelling(declaration.raw_name())?
+            let name = b
+                .spelling(declaration.raw_name())?
                 .ok_or(LocalBindingError::UnsupportedSpelling)?;
             for previous in &directory.lowered().declarations()[..ordinal] {
                 b.charge(1)?;
                 if previous.owner() == declaration.owner()
                     && b.equal(previous.kind(), "TYPE_PARAMETER")?
                 {
-                    let previous_name = b.spelling(previous.raw_name())?
+                    let previous_name = b
+                        .spelling(previous.raw_name())?
                         .ok_or(LocalBindingError::UnsupportedSpelling)?;
                     if b.equal(name, previous_name)? {
                         return Err(LocalBindingError::AmbiguousTypeParameter);
@@ -778,15 +803,21 @@ fn type_root<'a>(
             for index in declaration.cst_index()..node.subtree_end {
                 let element = b.element(parsed, index)?;
                 if !element.token && b.equal(&element.kind, "REFERENCE_EXPRESSION")? {
-                    let parent = b.element(parsed, element.parent
-                        .ok_or(LocalBindingError::InvalidOrigin)?)?;
+                    let parent = b.element(
+                        parsed,
+                        element.parent.ok_or(LocalBindingError::InvalidOrigin)?,
+                    )?;
                     if b.equal(&parent.kind, "USER_TYPE")? {
-                        let (annotated, reference, name_token) = annotation_parts(parsed, index, b)?;
+                        let (annotated, reference, name_token) =
+                            annotation_parts(parsed, index, b)?;
                         if annotated != declaration.cst_index() {
                             return Err(LocalBindingError::InvalidOrigin);
                         }
                         let annotation = TypeParameterAnnotation {
-                            annotated: declaration, reference, name_token, reference_index: index,
+                            annotated: declaration,
+                            reference,
+                            name_token,
+                            reference_index: index,
                         };
                         check_type_annotation(directory, parsed, ordinal, &annotation, &scope, b)?;
                         let name = annotation_spelling(parsed, &annotation, b)?;
@@ -886,7 +917,10 @@ fn type_target<'a>(
     let mut owner = Some(context.ordinal);
     while let Some(ordinal) = owner {
         b.charge(1)?;
-        let function = directory.lowered().declarations().get(ordinal)
+        let function = directory
+            .lowered()
+            .declarations()
+            .get(ordinal)
             .ok_or(LocalBindingError::InvalidOrigin)?;
         let mut target = None;
         for declaration in directory.lowered().declarations() {
@@ -1005,8 +1039,10 @@ pub(super) fn type_rename_with_budget<'a>(
 
 fn type_annotation_storage(count: usize) -> Result<()> {
     if count > MAX_OCCURRENCES
-        || count.checked_mul(std::mem::size_of::<TypeParameterAnnotation<'_>>())
-            .ok_or(LocalBindingError::Resource)? > OCCURRENCE_BYTES
+        || count
+            .checked_mul(std::mem::size_of::<TypeParameterAnnotation<'_>>())
+            .ok_or(LocalBindingError::Resource)?
+            > OCCURRENCE_BYTES
     {
         return Err(LocalBindingError::Resource);
     }
@@ -1093,7 +1129,8 @@ pub(super) fn type_occurrences_with_budget<'a>(
                 && b.equal(declaration.kind(), "TYPE_PARAMETER")?
                 && !std::ptr::eq(declaration, target)
             {
-                let other = b.spelling(declaration.raw_name())?
+                let other = b
+                    .spelling(declaration.raw_name())?
                     .ok_or(LocalBindingError::UnsupportedSpelling)?;
                 if b.equal(other, name)? {
                     return Err(LocalBindingError::AmbiguousTypeParameter);
@@ -1163,7 +1200,14 @@ pub(super) fn type_occurrences_with_budget<'a>(
                     name_token,
                     reference_index: index,
                 };
-                check_type_annotation(directory, parsed, ordinal, &annotation, &annotation_context, b)?;
+                check_type_annotation(
+                    directory,
+                    parsed,
+                    ordinal,
+                    &annotation,
+                    &annotation_context,
+                    b,
+                )?;
                 annotation
             };
             let name = if selected {
@@ -1175,8 +1219,11 @@ pub(super) fn type_occurrences_with_budget<'a>(
             let matched = original.is_some_and(|original| std::ptr::eq(original, target));
             if let Some(new_name) = new_name {
                 let hypothetical = type_target(
-                    directory, &annotation_context, if matched { new_name } else { name },
-                    Some((target, new_name)), b,
+                    directory,
+                    &annotation_context,
+                    if matched { new_name } else { name },
+                    Some((target, new_name)),
+                    b,
                 )?;
                 if original.map(|d| d as *const _) != hypothetical.map(|d| d as *const _) {
                     return Err(LocalBindingError::AmbiguousTypeParameter);

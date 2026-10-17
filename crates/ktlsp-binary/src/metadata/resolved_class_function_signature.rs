@@ -163,7 +163,8 @@ fn nominal_return<'a>(
         if header.class_name.is_some() {
             return Err(failure(leaf_start, ErrorKind::UnsupportedType));
         }
-        let classifier = parameters::classifier(&header, leaf_start, context, own, resolver, budget)?;
+        let classifier =
+            parameters::classifier(&header, leaf_start, context, own, resolver, budget)?;
         let type_span = leaf_start..leaf_start + inline.raw.len();
         budget.push(
             &mut arguments,

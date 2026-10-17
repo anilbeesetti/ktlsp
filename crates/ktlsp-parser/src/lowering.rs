@@ -1739,8 +1739,7 @@ fn walk<'a>(
         if pass != Pass::Structure {
             context(t, parent, i)?;
             if t == Tag::TypeParameters
-                && (!ordinary_function_path(s, depth, b)?
-                    || frame(s, depth - 1, b)?.plain != 1)
+                && (!ordinary_function_path(s, depth, b)? || frame(s, depth - 1, b)?.plain != 1)
             {
                 return Err(unsupported(i));
             }
@@ -2342,8 +2341,16 @@ mod tests {
                         (0, RETAINED - measured.retained + extra),
                     ] {
                         let outcome = type_rename_with_budget(
-                            &directory, &result, anchor, result.snapshot(), name,
-                            &mut ReferenceBudget { requested, retained, ..ReferenceBudget::default() },
+                            &directory,
+                            &result,
+                            anchor,
+                            result.snapshot(),
+                            name,
+                            &mut ReferenceBudget {
+                                requested,
+                                retained,
+                                ..ReferenceBudget::default()
+                            },
                         );
                         if extra == 0 {
                             assert!(std::ptr::eq(outcome.unwrap().target(), found.target()));

@@ -521,37 +521,6 @@ fn assert_source_refused(replies: &[Value], id: i32, code: i32) {
     assert!(reply.get("result").is_none(), "{reply}");
 }
 
-// Temporary actual-value observation; retain until OWNER and ROOT have read
-// complete hosted packets and applied the genuine ranged overlay changes.
-fn source_checkpoint(paths: &[PathBuf]) -> Value {
-    Value::Array(
-        paths
-            .iter()
-            .map(|path| {
-                let bytes = std::fs::read(path)
-                    .map(|bytes| String::from_utf8(bytes).unwrap())
-                    .map_err(|error| error.to_string());
-                let metadata = std::fs::metadata(path)
-                    .map(|metadata| format!("{metadata:?}"))
-                    .map_err(|error| error.to_string());
-                json!({"path":path,"read":bytes,"metadata":metadata})
-            })
-            .collect(),
-    )
-}
-
-fn source_capture(marker: &str, messages: &[Value], replies: &[Value], checkpoints: &[Value]) {
-    let mut output = std::io::stdout().lock();
-    writeln!(
-        output,
-        "{marker}={}",
-        json!({
-            "requests":messages,"responses":replies,"filesystemCheckpoints":checkpoints
-        })
-    )
-    .unwrap();
-}
-
 #[test]
 fn json_import_cancel_replies_once_reuses_ids_and_retains_owned_work() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
@@ -576,10 +545,10 @@ fn json_import_cancel_replies_once_reuses_ids_and_retains_owned_work() {
         source_symbols(3, &uri),
     ];
     let mut session = Session::with_parser(worker()).unwrap();
-    let mut replies = session.handle(messages[0].clone());
+    let replies = session.handle(messages[0].clone());
     assert!(replies[0].get("error").is_none(), "{replies:?}");
-    replies.extend(session.handle(messages[1].clone()));
-    replies.extend(session.handle(messages[2].clone()));
+    session.handle(messages[1].clone());
+    session.handle(messages[2].clone());
     // The invalid final addition must not remove the old folder or retain a prefix.
     assert_eq!(
         session.configuration().workspace_folders,
@@ -588,25 +557,22 @@ fn json_import_cancel_replies_once_reuses_ids_and_retains_owned_work() {
             name: "owned".into(),
         }]
     );
-    let errors = session.drain_errors();
+    session.drain_errors();
     assert!(session.handle(messages[3].clone()).is_empty());
     assert!(session.handle(messages[4].clone()).is_empty());
     let duplicate = session.handle(messages[5].clone());
     assert_eq!(duplicate.len(), 1, "{duplicate:?}");
     assert_eq!(duplicate[0]["id"], Value::Null);
     assert_eq!(duplicate[0]["error"]["code"], -32600);
-    replies.extend(duplicate);
     let cancelled = session.handle(messages[6].clone());
     assert_eq!(cancelled.len(), 2, "{cancelled:?}");
     assert_source_refused(&cancelled, 2, -32800);
     assert_source_refused(&cancelled, 3, -32800);
-    replies.extend(cancelled);
     // Completion may be ready, but the import remains owned until collected/joined.
     assert_eq!(session.pending_requests(), 1);
     let reused = session.handle(messages[7].clone());
     assert_eq!(reused.len(), 1, "{reused:?}");
     assert_source_refused(&reused, 3, -32803);
-    replies.extend(reused);
     let (late, clean) = session.close();
     assert!(clean, "cancelled native import did not prove owned closure");
     assert!(
@@ -614,15 +580,6 @@ fn json_import_cancel_replies_once_reuses_ids_and_retains_owned_work() {
         "cancelled requests published twice: {late:?}"
     );
     assert_eq!(session.pending_requests(), 0);
-    source_capture(
-        "ACTUAL421_JSON_CANCELLED_IMPORT",
-        &messages,
-        &replies,
-        &[json!({
-            "files":source_checkpoint(&[project.join("workspace.json"),project.join("src/A.kt")]),
-            "notificationErrors":errors,"closeResponses":late,"cleanupConfirmed":clean,
-        })],
-    );
 }
 
 #[test]
@@ -643,12 +600,6 @@ fn packaged_json_initial_unopened_symbols_alias_overlay_edits_close_and_outside_
         source_directory_uri(&std::fs::canonicalize(&package.0).unwrap())
     );
     let options = source_options(&[&project_uri]);
-    let files = [
-        project.join("workspace.json"),
-        project.join("src/空 😀.kt"),
-        package.0.join("Outside.kt"),
-    ];
-    let initial = source_checkpoint(&files);
     let messages = [
         source_initialize(&options),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
@@ -673,15 +624,6 @@ fn packaged_json_initial_unopened_symbols_alias_overlay_edits_close_and_outside_
         json!({"jsonrpc":"2.0","method":"exit"}),
     ];
     let replies = package.exchange(&messages);
-    source_capture(
-        "ACTUAL421_JSON_ALIAS_OVERLAY",
-        &messages,
-        &replies,
-        &[
-            json!({"beforeRequest":1,"files":initial}),
-            json!({"afterResponse":13,"files":source_checkpoint(&files)}),
-        ],
-    );
     assert_eq!(replies.len(), 13, "{replies:?}");
     assert_eq!(
         source_reply(&replies, 1)["result"]["capabilities"]["documentSymbolProvider"],
@@ -722,13 +664,6 @@ fn packaged_json_disk_and_model_mutation_require_reload_to_successor_authority()
     let next_uri = format!("{project_uri}/next/B.kt");
     let added_uri = format!("{project_uri}/next/Added.kt");
     let options = source_options(&[&project_uri]);
-    let files = [
-        project.join("workspace.json"),
-        project.join("src/A.kt"),
-        project.join("next/B.kt"),
-        project.join("next/Added.kt"),
-    ];
-    let mut checkpoints = vec![json!({"beforeRequest":1,"files":source_checkpoint(&files)})];
     let mut init = source_initialize(&options);
     init["params"]["workspaceFolders"] = json!([{"uri":project_uri,"name":"owned"}]);
     let messages = [
@@ -771,9 +706,6 @@ fn packaged_json_disk_and_model_mutation_require_reload_to_successor_authority()
                 // matching actual response; no sleeps, polling or fake acknowledgments.
                 Some(3) => {
                     std::fs::write(project.join("src/A.kt"), changed).unwrap();
-                    checkpoints.push(json!({
-                        "afterResponse":2,"beforeRequest":3,"files":source_checkpoint(&files)
-                    }));
                 }
                 Some(8) => {
                     std::fs::write(
@@ -781,31 +713,15 @@ fn packaged_json_disk_and_model_mutation_require_reload_to_successor_authority()
                         serde_json::to_vec(&source_model(&["next"])).unwrap(),
                     )
                     .unwrap();
-                    checkpoints.push(json!({
-                        "afterResponse":7,"beforeRequest":8,"files":source_checkpoint(&files)
-                    }));
                 }
                 Some(16) => {
                     std::fs::write(project.join("next/Added.kt"), added).unwrap();
-                    checkpoints.push(json!({
-                        "afterResponse":15,"beforeRequest":16,"files":source_checkpoint(&files)
-                    }));
                 }
                 Some(19) => {
                     std::fs::remove_file(project.join("next/Added.kt")).unwrap();
-                    checkpoints.push(json!({
-                        "afterResponse":18,"beforeRequest":19,"files":source_checkpoint(&files)
-                    }));
                 }
                 _ => {}
             }),
-    );
-    checkpoints.push(json!({"afterResponse":23,"files":source_checkpoint(&files)}));
-    source_capture(
-        "ACTUAL421_JSON_DISK_MODEL_RELOAD",
-        &messages,
-        &replies,
-        &checkpoints,
     );
     assert_eq!(replies.len(), 23, "{replies:?}");
     assert_source_class(&replies, 2, before, "Before");
@@ -858,16 +774,6 @@ fn packaged_json_late_root_and_meaningful_unsupported_import_never_publish_prefi
     let new = format!("{candidate_uri}/src/New.kt");
     let late_options = source_options(&[&late_uri]);
     let historical_options = source_options(&[&historical_uri]);
-    let files = [
-        late.join("workspace.json"),
-        late.join("first/Prefix.kt"),
-        historical.join("workspace.json"),
-        historical.join("src/Old.kt"),
-        candidate.join("workspace.json"),
-        candidate.join("src/New.kt"),
-        unsupported.join("workspace.json"),
-    ];
-    let initial = source_checkpoint(&files);
     let messages = [
         source_initialize(&historical_options),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
@@ -886,15 +792,6 @@ fn packaged_json_late_root_and_meaningful_unsupported_import_never_publish_prefi
         json!({"jsonrpc":"2.0","method":"exit"}),
     ];
     let replies = package.exchange(&messages);
-    source_capture(
-        "ACTUAL421_JSON_ATOMIC_FAILURE",
-        &messages,
-        &replies,
-        &[
-            json!({"beforeRequest":1,"files":initial}),
-            json!({"afterResponse":13,"files":source_checkpoint(&files)}),
-        ],
-    );
     assert_eq!(replies.len(), 13, "{replies:?}");
     for id in [3, 4, 5, 8, 9, 10] {
         assert_source_refused(&replies, id, -32803);

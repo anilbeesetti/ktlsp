@@ -45,7 +45,10 @@ Shutdown/exit/EOF/fatal input/output errors cancel owned work. Clean shutdown/ex
 
 ## Explicit JSON source authority (#421)
 
-Current composition is implemented but not yet runtime-verified. Explicit
+Capture-bearing composition passed original full Linux/macOS/Windows CI and
+independent actual-value/edit gates; capture-free integration still needs its own
+reviewed CI. [Exact evidence and limits](../status/development.md#pr422-original-hosted-actual-gates-and-capture-only-retirement)
+remain narrower than official project equivalence. Explicit
 `initialize.initializationOptions.projects` entries `{type:"json",path:fileURI}`
 load actual `workspace.json` through unchanged immutable v2 import and a separate
 native source-inventory layer. An immediate unopened `documentSymbol` can await

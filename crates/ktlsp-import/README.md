@@ -277,7 +277,9 @@ official runtime parity remain required work.
 
 ## Bounded read-only source inventory (#421)
 
-**Current source composition is not yet runtime-verified.** This separate API
+**Native data runtime and the capture-bearing composed consumer are verified within
+the [recorded scope](../../docs/status/development.md#pr422-original-hosted-actual-gates-and-capture-only-retirement);
+capture-free integration still requires its own reviewed full CI.** This separate API
 performs explicit native I/O; JSON-v1/v2, JPS, Maven and T004 producers keep their
 existing data-only contracts. No Java, build tool, compiler or C/C++ analyzer is
 required. Windows uses target-only pinned `file-id = 0.2.3` Rust OS bindings for

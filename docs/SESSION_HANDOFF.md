@@ -54,7 +54,8 @@ real CLI4fb07cd and real native-model state6b72251. ROOT additionally wires
 owned cancellation/waiters/config invalidation and real behavior checks.
 Borrowed roots are never cleaned; all old/user/delivered/component WTs remain.
 
-Composed421 Session/CLI remains hosted-runtime-UNVERIFIED; native data is accepted.
+Native data and capture-bearing421 hosted consumer gates are accepted below;
+the observation-only capture-free candidate still requires its OWN reviewed CI.
 Reviewed71040c8435e6835895ee06aa56cf86362f378782/treef9ac3eaf7d17f0ef963551977bed89c6236053b2
 has BOTH complete20path ROOT clears, BOTH affected inventory clears and exact
 unchanged URI2 component authority. ROOT FULL-read/authenticated all receipts.
@@ -82,10 +83,9 @@ derive/private tuple alias/portable real invalid-input fixture fixes only;
 no production guard/bound/default/assertion/cleanup relaxation or unchanged retry.
 ONE formatter is SPENT; NEVER another. Failed LSP refs remain failed; honest
 complete concrete source/caller fallback recovered capped later matches.
-All FOUR ACTUAL421 committed writers stay until BOTH full hosted OWNER+ROOT
-actual gates, including applying the genuine client ranged edit. Three CLI
-packets precede outer result assertions. Published DRAFT
-[PR422](https://github.com/anilbeesetti/ktlsp/pull/422) at reviewed
+Four ACTUAL421 writers were retained through BOTH complete current hosted gates.
+Three CLI packets preceded outer result assertions. DRAFT
+[PR422](https://github.com/anilbeesetti/ktlsp/pull/422) first published reviewed
 b90e5bde07cee303dc800df44d8318ef3127da07/treedc670cb88d75d6c999303e8f6d14ad3dffd75041.
 ORIGINAL Native39028446315/attempt1/job117383963569 FAILED Tests101,
 server-lib24pass/1fail: workspace/tests.rs179 mixes old capture with CURRENT
@@ -97,10 +97,33 @@ CLI integration did not run. Actual production stores and later consumes the
 SAME captured epoch. ROOT corrects ONLY test: save disk_epoch with disk capture
 after first close, then assert that real captured request stale after reopen/
 old-incarnation close. No production guard or expected boolean is relaxed.
-Original platform39028446301 is separate; preserve complete original outcomes,
-never cancel/retry to hide this failure. Next exact affected ROOT2 reviews and
-changed-source compiler gates, OWN original full3host CI, observation-only cleanup/
-OWN source review+CI, fresh guarded merge and dual original exact-main proof.
+Original platform39028446301 Mac117383963655/Win117383963413 ALSO FAILED that
+same state assertion. no-fail-fast let all four CLI cases pass there, but those
+packets remain diagnostic ONLY; all first-source originals stay REJECTED.
+Root corrected ONLY the two captured-epoch test lines, obtained BOTH exact full
+ROOT clears with unchanged component authority, then pinned CHECK/strictClippy/
+workspace--no-run all0 atcffc4b6a04c2c2f96633a93e43eb95deb5227780/tree24390aa793df4c0a1667f5f6e760e57a5a1da00d.
+OWN ORIGINAL Native39029144408/1/job117385919987 and platform39029144406/1
+(Mac117385919954/Win117385920112) ALL SUCCESS, every required step succeeds.
+Actual checkout7dbb104d4f59496c0f27d8bf6c9f1eaf92b66306 has exacttree24390 and
+orderedparents[18733,cffc]. Stale observational event946204 is NOT source authority.
+Raw/archive complete packets match; exact original artifact digests/source
+preflights/zero exits/clean identities verified. OWNER and ROOT independently
+FULL-read ALL12 actual packets; ROOT6720lossless lines, not counts or summaries.
+Each genuinely applied the actual UTF16 client didChange v1->v2 and matched full
+OverlayEdited source and canonical/alias symbols/ranges, plus all disk/model/
+membership/reload/atomic/cancellation transitions and platform-specific read errors.
+BOTH gates: `/private/tmp/ktlsp-422-original-cffc-platform/ROOT-all-current-hosted-actual-gates.json`
+SHA78aed8e5c473c13ca0a8dd6d7c153a160d4e321c235caf388dc3b3168cab7063;
+OWNER JSONa2c75cfeb10ee631209b0e3164f6fbb5d1934d14f9bdf876306082d4b834683b,
+TXT155164316f1254b8f709c778a0ce9509470749e58b523637ddb0041c131649aa.
+ONLY AFTER BOTH complete gates Root removed the four writers and solely
+observation-owned scaffolds, preserving all real consumer calls/assertions,
+frequency, owned closure and exact iterator FS-mutation placement. All original
+captures/source/fixtures/proofs remain. Capture-free source now requires OWN
+exact full2ROOT reviews/compiler-only gates/original full3hostCI, fresh exclusive
+guarded merge and dual original exact-main proof. NO local Kotlin runtime,
+second formatter, retry/probe, lease or merge authority. Full parity NOT achieved.
 
 ROOT owns Cargo/workspace/lock/docs/config/CI/publication. Windows-target-only
 file-id0.2.3 and server->import path dependency are resolved; all existing registry

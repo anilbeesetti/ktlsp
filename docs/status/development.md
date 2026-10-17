@@ -3535,3 +3535,70 @@ of failed b90e. Independent platform39028446301 originals must be retained;
 do not cancel or retry them. Native665 package/standalone data source remains
 unchanged and accepted separately. Fourwriters remain. Full parity/B3/oracle/
 native/T004/#96/original417/395/377 UNKNOWN gates remain unchanged.
+
+#### PR422 original hosted actual gates and capture-only retirement
+
+Changed reviewed source `cffc4b6a04c2c2f96633a93e43eb95deb5227780`,
+tree `24390aa793df4c0a1667f5f6e760e57a5a1da00d`, received BOTH exact full20path
+ROOT clears with unchanged native/URI component authority. Pinned format-CHECK,
+strict locked workspace/all-target Clippy and workspace test--no-run all passed;
+NO local Kotlin/parser/server/Session/worker runtime. The separate native665/
+standalone complete-data gates above remain accepted, not inferred from CLI.
+
+Its OWN original [Native39029144408/1/job117385919987](https://github.com/anilbeesetti/ktlsp/actions/runs/39029144408/job/117385919987)
+and [platform39029144406/1](https://github.com/anilbeesetti/ktlsp/actions/runs/39029144406)
+(macOS117385919954, Windows117385920112) ALL SUCCEEDED, every required step.
+Actual executed checkout `7dbb104d4f59496c0f27d8bf6c9f1eaf92b66306` has exact
+reviewed tree and ordered parents `[18733fe9f1233e0671ef765b1c2295d3f7fbb39e,cffc4b6a04c2c2f96633a93e43eb95deb5227780]`.
+Stale observational event946204 is NOT checkout authority. Full original source
+preflights, clean identities, zero format/Clippy/full-test exits and manifest-bound
+artifact digests verified; all18 members retained per archive, complete raw/ZIP
+packet values equal. Original b90e platform Mac117383963655/Win117383963413 also
+FAILED the same captured/current-epoch test. Its no-fail-fast CLI passes remain
+diagnostic only; no unchanged original was retried or failure hidden.
+
+| Original evidence | Bytes | SHA256 |
+|---|---:|---|
+| Native raw |357110|dfb0368c380c664240421bb7873cc3c6cff58ce16d780800a4c6371e0a81bde9|
+| macOS raw |485233|66f6f7d084338fc9da37b21c6cd6e8b32e6c80bde54a214417727a0bf9b6ea41|
+| Windows raw |438786|933cd5295e26487919b5137f89dca7b8a4cd25ae822c161d3c87002d7cfa06f3|
+| macOS artifact12099686872 |54455|e17eb7068c6a4e3c336df4a5b95767afb52de0c08f210c9e19a90d684d91e775|
+| Windows artifact12099279486 |49253|14e08e7bb61251de1f2956a848d5b67c0e29f7d2729102add4da5266484e2bb1|
+
+OWNER and ROOT independently FULL-read ALL12 complete CURRENT actual packets:
+original models/source bytes/debug metadata/read errors, all requests/replies,
+filesystem checkpoints and stale/refusal/reload/atomic/cancellation transitions.
+ROOT read6720lossless packet lines and reconstructed original raw payloads exactly.
+Both independently genuinely applied each actual UTF16 didChange v1->v2,
+range0:6..0:13/rangeLength7, to `class Overlay\r\n`, producing the entire actual
+`class OverlayEdited\r\n`; actual canonical/alias ids5/6 match name/kind/full
+range0:0..0:19/selection0:6..0:19. Original Ω disk is unchanged. No returned
+WorkspaceEdit exists. Mutation iterator still waits for each preceding actual
+response; disk/model/add/delete/failed-last-root/unsupported-project refusal and
+recovery outcomes are genuine consumer evidence, not invented parser echoes.
+Cancellation packet is hosted real Session integration, not packaged stdio;
+owned-before-collection/zero-after-close are passing source assertions, not
+explicit packet counters or measured eight-slot saturation.
+
+ROOT combined gate `/private/tmp/ktlsp-422-original-cffc-platform/ROOT-all-current-hosted-actual-gates.json`
+SHA78aed8e5c473c13ca0a8dd6d7c153a160d4e321c235caf388dc3b3168cab7063;
+independent OWNER JSONa2c75cfeb10ee631209b0e3164f6fbb5d1934d14f9bdf876306082d4b834683b
+and TXT155164316f1254b8f709c778a0ce9509470749e58b523637ddb0041c131649aa.
+Root fully read both complete Owner texts and all gate/custody/transition/limit
+metadata; all12 embedded packet values equal already independently FULL Root-read
+values. ONLY AFTER BOTH complete gates Root removed four temporary ACTUAL421
+writers and solely observation-owned helpers/data. EVERY real consumer call,
+assertion, frequency, owned closure and iterator FS-mutation placement remains.
+Original source/captures/archives/readers/fixtures/full proofs stay retained.
+
+Capture-free source still needs its OWN exact full2ROOT source review, pinned
+compiler-only checks and OWN original unfiltered full Linux/macOS/Windows CI,
+then fresh separate strictly-readonly complete guards, ordinary expected-head
+squash, actual tree/sole-parent verification and dual original exact-main proof.
+No lease/merge acceptance, local Kotlin runtime, second formatter or retry/probe.
+No private native-ID graph dump, syscall/no-outside-IO trace, hostileFS/latency/
+arbitrary stale-schedule/full-eight-slot/nonBMP-edit/official-equivalence proof.
+Full parity NOT achieved; native-only/T004/#96/B3/oracle and original417/395/377
+UNKNOWN/OPEN limits stay unchanged. Legitimate Cargo.lock change still requires
+separate exact BASE and HEAD config dictionaries in the future exclusive lease.
+

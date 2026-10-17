@@ -4370,3 +4370,16 @@ recorder returns actual null-ID rejection responses rather than waiting forever
 for an impossible echoed ID; each case independently asserts its allowed ID/code.
 This is source repair, not passing runtime proof. BOTH r1 source reviews remain
 rejected until independent exact cumulative whole30path renewals.
+
+Both COMPLETE30path r2 renewals accepted493aa9773e427ca2f70a31bf9f08579a34065608/
+tree198e213fd5c72ed8dae0e31667cb50d25de773d2, source-only0.96/0.97. ROOT
+personally read both complete current bodies; rendered-current receipts
+function13323B SHA0dd37485e08aa1c5213a4a1cd8979742645a0b2fc327a2f5fcbda0b06739e414,
+adversary12550B SHAc65ae60879928e7de811099eb966ad7fe0380f2bd16a697a4869a31a80aee419.
+Separate exact compiler-only admission began with fmtCHECK: actual1 in1.289427584s,
+empty stderr and3344B stdout SHAf420e46b7a7fe389e4ae61d623e03f650d0cbddbb4a5e140217eadbfd678ac30.
+Strict full-workspace Clippy and NoRun were NOT invoked, nor any runtime.
+ROOT read that complete original formatting diff and manually applied ONLY
+checked-chain wrapping plus7 observation-call trailing commas in2files. No
+formatter mutator reran; no behavior/assertion/capture/cleanup change. Both
+exact cumulative source renewals and NEW compiler admission remain mandatory.

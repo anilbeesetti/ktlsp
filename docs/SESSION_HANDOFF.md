@@ -124,6 +124,12 @@ never a fatal oversized output. Framed exact-fit/one-over/max-input and actual
 same-session recovery source added; all new raw frames remain lossless.
 Both r1 receipts/source stay rejected; exact cumulative whole-union renewals
 required. No check/runtime or formatter rerun occurred.
+Both COMPLETE30path r2 source renewals CLEAR493aa977/tree198e213 (0.96/0.97).
+First newly admitted full-composition fmtCHECK returned1: checked-chain wrapping
+and7 observation-call trailing commas only; Clippy/NoRun were NOT invoked.
+Root manually applied exactly that read diff, no formatter mutation. Preserve
+r2 fmt3344B stdout SHAf420e46b7a7fe389e4ae61d623e03f650d0cbddbb4a5e140217eadbfd678ac30.
+Exact renewed source/compiler gates remain required; no runtime is admitted.
 No owner formatter/build/check/test/runtime is permitted mid-flight.
 Keep real packaged stdio cancel/ID-reuse observations distinct from complementary
 Session owned-count/retained-until-join proof; no production probe/barrier/delay.

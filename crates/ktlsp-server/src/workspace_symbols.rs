@@ -94,7 +94,9 @@ impl Budget {
                     0..=0x1f => 6,
                     _ => 1,
                 };
-                bytes.checked_add(width).ok_or(AdmissionError::UnreplyableId)
+                bytes
+                    .checked_add(width)
+                    .ok_or(AdmissionError::UnreplyableId)
             })?
         } else {
             20

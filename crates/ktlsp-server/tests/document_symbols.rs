@@ -6662,7 +6662,7 @@ mod workspace_symbols {
                 json!({
                     "terminal":action,"requests":self.requests,"responses":self.inner.responses,
                     "status":output.status.code(),"stderr":output.stderr
-                })
+                }),
             );
             std::mem::take(&mut self.inner.responses)
         }
@@ -6696,7 +6696,7 @@ mod workspace_symbols {
                 json!({
                     "terminal":"broken-output","requests":self.requests,"responsesBeforeOutputClosed":responses,
                     "status":output.status.code(),"stderr":output.stderr
-                })
+                }),
             );
             drop(input); // stdin stayed open through actual child termination.
         }
@@ -6709,7 +6709,7 @@ mod workspace_symbols {
                 "WORKSPACE_SYMBOL_WIRE_ACTUAL_RECEIPT",
                 json!({
                     "requests":self.requests,"responses":responses
-                })
+                }),
             );
             responses
         }
@@ -6731,7 +6731,7 @@ mod workspace_symbols {
                 json!({
                     "requests":self.requests,"responses":self.inner.responses,
                     "status":output.status.code(),"stderr":output.stderr
-                })
+                }),
             );
             std::mem::take(&mut self.inner.responses)
         }
@@ -6754,7 +6754,7 @@ mod workspace_symbols {
             "WORKSPACE_SYMBOL_SESSION_EXCHANGE_ACTUAL_RECEIPT",
             json!({
                 "request":{"jsonrpc":"2.0","id":1,"method":method,"params":params},"response":response
-            })
+            }),
         );
         response
     }
@@ -6763,7 +6763,7 @@ mod workspace_symbols {
             "WORKSPACE_SYMBOL_SESSION_NOTIFICATION_ACTUAL_RECEIPT",
             json!({
                 "jsonrpc":"2.0","method":method,"params":params
-            })
+            }),
         );
         super::notify(session, method, params);
     }
@@ -6850,7 +6850,7 @@ mod workspace_symbols {
             json!({
                 "fixture":label,"original":original,"requests":requests,
                 "responses":responses,"owned":owned
-            })
+            }),
         );
     }
 

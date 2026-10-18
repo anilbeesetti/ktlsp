@@ -5,9 +5,9 @@ use ktlsp_parser::{
     documentation::{self, Budget as DocumentationBudget},
     local_value_binding::{
         LocalValueAnchor, TypeParameterAnchor, ValueLookup, bind_lexical_type_parameter,
-        bind_local_argument_label, bind_local_function_callee,
-        guarded_local_value_rename, guarded_type_parameter_rename, local_call_signature,
-        local_value_occurrences, lookup_value, type_parameter_occurrences, visible_local_values,
+        bind_local_argument_label, bind_local_function_callee, guarded_local_value_rename,
+        guarded_type_parameter_rename, local_call_signature, local_value_occurrences, lookup_value,
+        type_parameter_occurrences, visible_local_values,
     },
     lowering::{Declaration, lower_declarations, reference_site},
     structural_regions::build_regions,

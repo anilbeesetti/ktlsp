@@ -897,10 +897,8 @@ impl Session {
                     | semantic_navigation::Query::Hover { .. }
             )
         ) && self.pending_import.as_ref().is_some_and(|pending| {
-            !pending.cancelled.load(Ordering::Relaxed)
-                && pending.attempt == self.workspace.attempt
-        })
-        {
+            !pending.cancelled.load(Ordering::Relaxed) && pending.attempt == self.workspace.attempt
+        }) {
             if self.pending_requests() >= MAX_PENDING_PARSER_REQUESTS {
                 return Err((-32803, "native analysis capacity exhausted"));
             }
@@ -971,7 +969,8 @@ impl Session {
         let client = self.symbol_client.clone();
         // Hover counts actual escaped ID bytes without a serialization copy.
         // Definition retains its existing conservative error-envelope contract.
-        let response_id_bound = if matches!(&query, Some(semantic_navigation::Query::Hover { .. })) {
+        let response_id_bound = if matches!(&query, Some(semantic_navigation::Query::Hover { .. }))
+        {
             if let Some(id) = id.as_str() {
                 workspace_symbols::json_string_bytes(id)
             } else if let Some(id) = id.as_u64() {

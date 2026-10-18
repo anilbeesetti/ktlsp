@@ -132,6 +132,38 @@ fn refused_definition(wire: &mut SignatureWire, id: &str, uri: &str, source: &st
     assert!(reply.get("result").is_none(), "{reply}");
 }
 
+fn hover_contents(profile: &str, declaration: &str, fence: &str) -> Value {
+    json!({"kind":profile,"value":if profile == "markdown" {
+        format!("{fence}kotlin\n{declaration}\n{fence}")
+    } else {
+        declaration.to_owned()
+    }})
+}
+
+fn hover(
+    wire: &mut SignatureWire,
+    id: &str,
+    profile: &str,
+    declaration: &str,
+    fence: &str,
+    position: Value,
+    range: Value,
+) {
+    let reply = query(wire, id, "textDocument/hover", position);
+    assert!(reply.get("error").is_none(), "{reply}");
+    assert_eq!(
+        reply["result"],
+        json!({"contents":hover_contents(profile,declaration,fence),"range":range}),
+        "{reply}"
+    );
+}
+
+fn refused_hover(wire: &mut SignatureWire, id: &str, uri: &str, source: &str, offset: usize) {
+    let reply = query(wire, id, "textDocument/hover", params(uri, source, offset));
+    assert_eq!(reply["error"]["code"], -32803, "{reply}");
+    assert!(reply.get("result").is_none(), "{reply}");
+}
+
 // Reuse the parent's child, framing and cleanup owner. Log the genuine exit and
 // stderr BEFORE asserting them, including on a failed hosted acceptance run.
 fn finish(mut wire: ExitReceipt) {
@@ -159,11 +191,20 @@ fn finish(mut wire: ExitReceipt) {
 }
 
 #[test]
-fn imported_property_definition_initial_waiter_ranged_edits_reopen_reload_and_local_paths() {
+fn imported_property_hover_profiles_initial_waiter_edits_reload_and_preserved_paths() {
     let _serial = SERIAL.lock().unwrap_or_else(|p| p.into_inner());
+    for profile in ["plaintext", "markdown"] {
+        imported_property_hover_profile(profile);
+    }
+}
+
+fn imported_property_hover_profile(profile: &str) {
     let package = Package::new(true);
-    let project = source_project(&package, "imported-definition", &["src"]);
-    let original_target = "// 😀\r\npackage values\r\nval `answer😀` = 1\r\n";
+    let project = source_project(&package, "imported-hover", &["src"]);
+    // A legal ordinary property: block-comment trivia retains a long backtick
+    // run INSIDE its original declaration, without widening the initializer.
+    let declaration = "val /* `````` */ `answer😀` = 1";
+    let original_target = "// 😀\r\npackage values\r\nval /* `````` */ `answer😀` = 1\r\n";
     let original_requester = "// 🦀\r\npackage app\r\nimport values.`answer😀`\r\nfun use() {\r\n val result = `answer😀`\r\n}\r\nfun local() {\r\n val `answer😀` = 2\r\n val chosen = `answer😀`\r\n}\r\nfun parameter(`answer😀`: Long) {\r\n val chosen = `answer😀`\r\n}\r\nfun <T> legacy(p: T) { fun nested() {}; nested(); val preserved = p }\r\n";
     std::fs::write(project.join("src/Definitions.kt"), original_target).unwrap();
     std::fs::write(project.join("src/Uses.kt"), original_requester).unwrap();
@@ -173,7 +214,7 @@ fn imported_property_definition_initial_waiter_ranged_edits_reopen_reload_and_lo
     let requester_uri = format!("{root}/src/Uses.kt");
     let requester_alias = format!("{root}/src/%55ses.kt");
     let options = source_options(&[&root]);
-    observe(json!({"initialSources":{
+    observe(json!({"profile":profile,"initialSources":{
         target_uri.clone():std::fs::read_to_string(project.join("src/Definitions.kt")).unwrap(),
         requester_uri.clone():std::fs::read_to_string(project.join("src/Uses.kt")).unwrap()},
         "model":std::fs::read_to_string(project.join("workspace.json")).unwrap()}));
@@ -187,7 +228,7 @@ fn imported_property_definition_initial_waiter_ranged_edits_reopen_reload_and_lo
         "capabilities":{"general":{"positionEncodings":["utf-8"]},
             "workspace":{"workspaceEdit":{"documentChanges":true}},
             "textDocument":{"documentSymbol":{"hierarchicalDocumentSymbolSupport":true},
-                "hover":{"contentFormat":["plaintext"]},"rename":{"prepareSupport":true},"diagnostic":{}}}}),
+                "hover":{"contentFormat":[profile]},"rename":{"prepareSupport":true},"diagnostic":{}}}}),
     );
     send(
         &mut wire,
@@ -196,9 +237,26 @@ fn imported_property_definition_initial_waiter_ranged_edits_reopen_reload_and_lo
     opened(&mut wire, &requester_alias, 1, original_requester);
     // This is the FIRST post-initialize request: no workspaceSymbol, readiness
     // query, sleep, retry or warmup can hide the initial-import waiter path.
+    hover(
+        &mut wire,
+        "initial-import-hover",
+        profile,
+        declaration,
+        "```````",
+        params(
+            &requester_alias,
+            original_requester,
+            original_requester.find("= `answer😀`").unwrap() + 2,
+        ),
+        references_range(
+            original_requester,
+            original_requester.find("= `answer😀`").unwrap() + 2,
+            "`answer😀`".len(),
+        ),
+    );
     definition(
         &mut wire,
-        "initial-import",
+        "initial-import-definition",
         &requester_alias,
         original_requester,
         original_requester.find("= `answer😀`").unwrap() + 2,
@@ -213,6 +271,7 @@ fn imported_property_definition_initial_waiter_ranged_edits_reopen_reload_and_lo
         initialized["result"]["capabilities"]["positionEncoding"],
         "utf-16"
     );
+    assert_eq!(initialized["result"]["capabilities"]["hoverProvider"], true);
 
     opened(&mut wire, &target_alias, 1, original_target);
     let mut target = original_target.to_owned();
@@ -227,6 +286,23 @@ fn imported_property_definition_initial_waiter_ranged_edits_reopen_reload_and_lo
         original_requester.find("= `answer😀`").unwrap() + 2,
         &target_uri,
         span(&target, "`answer😀`"),
+    );
+    hover(
+        &mut wire,
+        "moved-target-hover",
+        profile,
+        declaration,
+        "```````",
+        params(
+            &requester_alias,
+            original_requester,
+            original_requester.find("= `answer😀`").unwrap() + 2,
+        ),
+        references_range(
+            original_requester,
+            original_requester.find("= `answer😀`").unwrap() + 2,
+            "`answer😀`".len(),
+        ),
     );
     assert_ne!(
         span(&target, "`answer😀`"),
@@ -249,6 +325,8 @@ fn imported_property_definition_initial_waiter_ranged_edits_reopen_reload_and_lo
         )
     );
     let mut requester = original_requester.to_owned();
+    let requester_prefix = "// shifted 😀\r\n";
+    let shifted_requester = format!("{requester_prefix}{original_requester}");
     let imported = requester.find("`answer😀`").unwrap();
     let used = requester.find("= `answer😀`").unwrap() + 2;
     changed(
@@ -259,11 +337,12 @@ fn imported_property_definition_initial_waiter_ranged_edits_reopen_reload_and_lo
         &[
             (used..used + "`answer😀`".len(), "`moved🦀`"),
             (imported..imported + "`answer😀`".len(), "`moved🦀`"),
+            (0..0, requester_prefix),
         ],
     );
     assert_eq!(
         requester,
-        original_requester.replacen("`answer😀`", "`moved🦀`", 2)
+        shifted_requester.replacen("`answer😀`", "`moved🦀`", 2)
     );
     definition(
         &mut wire,
@@ -274,11 +353,35 @@ fn imported_property_definition_initial_waiter_ranged_edits_reopen_reload_and_lo
         &target_uri,
         span(&target, "`moved🦀`"),
     );
+    hover(
+        &mut wire,
+        "renamed-target-import-use-hover",
+        profile,
+        &declaration.replace("`answer😀`", "`moved🦀`"),
+        "```````",
+        params(
+            &requester_alias,
+            &requester,
+            requester.find("= `moved🦀`").unwrap() + 2,
+        ),
+        references_range(
+            &requester,
+            requester.find("= `moved🦀`").unwrap() + 2,
+            "`moved🦀`".len(),
+        ),
+    );
 
     closed(&mut wire, &target_alias);
     refused_definition(
         &mut wire,
         "closed-discards-renamed-overlay",
+        &requester_alias,
+        &requester,
+        requester.find("= `moved🦀`").unwrap() + 2,
+    );
+    refused_hover(
+        &mut wire,
+        "closed-discards-renamed-hover",
         &requester_alias,
         &requester,
         requester.find("= `moved🦀`").unwrap() + 2,
@@ -295,7 +398,7 @@ fn imported_property_definition_initial_waiter_ranged_edits_reopen_reload_and_lo
             (imported..imported + "`moved🦀`".len(), "`answer😀`"),
         ],
     );
-    assert_eq!(requester, original_requester);
+    assert_eq!(requester, shifted_requester);
     definition(
         &mut wire,
         "closed-original-source",
@@ -316,6 +419,23 @@ fn imported_property_definition_initial_waiter_ranged_edits_reopen_reload_and_lo
         &target_uri,
         span(&reopened, "`answer😀`"),
     );
+    hover(
+        &mut wire,
+        "reopened-new-incarnation-hover",
+        profile,
+        declaration,
+        "```````",
+        params(
+            &requester_alias,
+            &requester,
+            requester.find("= `answer😀`").unwrap() + 2,
+        ),
+        references_range(
+            &requester,
+            requester.find("= `answer😀`").unwrap() + 2,
+            "`answer😀`".len(),
+        ),
+    );
     closed(&mut wire, &target_alias);
     definition(
         &mut wire,
@@ -325,6 +445,23 @@ fn imported_property_definition_initial_waiter_ranged_edits_reopen_reload_and_lo
         requester.find("= `answer😀`").unwrap() + 2,
         &target_uri,
         span(original_target, "`answer😀`"),
+    );
+    hover(
+        &mut wire,
+        "closed-original-hover",
+        profile,
+        declaration,
+        "```````",
+        params(
+            &requester_alias,
+            &requester,
+            requester.find("= `answer😀`").unwrap() + 2,
+        ),
+        references_range(
+            &requester,
+            requester.find("= `answer😀`").unwrap() + 2,
+            "`answer😀`".len(),
+        ),
     );
     assert_eq!(
         std::fs::read_to_string(project.join("src/Definitions.kt")).unwrap(),
@@ -369,17 +506,17 @@ fn imported_property_definition_initial_waiter_ranged_edits_reopen_reload_and_lo
         &requester_alias,
         span(&requester, "nested"),
     );
-    let hover = query(
+    let local_hover = query(
         &mut wire,
         "local-hover",
         "textDocument/hover",
         params(&requester_alias, &requester, local_use),
     );
     assert_eq!(
-        hover["result"],
-        json!({"contents":{"kind":"plaintext","value":"val `answer😀` = 2"},
+        local_hover["result"],
+        json!({"contents":hover_contents(profile,"val `answer😀` = 2","```"),
         "range":references_range(&requester,local_use,"`answer😀`".len())}),
-        "{hover}"
+        "{local_hover}"
     );
     let mut references = params(&requester_alias, &requester, local_use);
     references["context"] = json!({"includeDeclaration":true});
@@ -438,13 +575,20 @@ fn imported_property_definition_initial_waiter_ranged_edits_reopen_reload_and_lo
     );
     assert_eq!(
         requester,
-        original_requester
+        shifted_requester
             .replacen("values.`answer😀`", "extras.arrived", 1)
             .replacen("= `answer😀`", "= arrived", 1)
     );
     refused_definition(
         &mut wire,
         "addition-not-yet-captured",
+        &requester_alias,
+        &requester,
+        requester.find("= arrived").unwrap() + 2,
+    );
+    refused_hover(
+        &mut wire,
+        "addition-not-yet-captured-hover",
         &requester_alias,
         &requester,
         requester.find("= arrived").unwrap() + 2,
@@ -461,6 +605,23 @@ fn imported_property_definition_initial_waiter_ranged_edits_reopen_reload_and_lo
         &late_uri,
         span(late, "arrived"),
     );
+    hover(
+        &mut wire,
+        "manual-reload-admits-hover",
+        profile,
+        "val arrived = 3",
+        "```",
+        params(
+            &requester_alias,
+            &requester,
+            requester.find("= arrived").unwrap() + 2,
+        ),
+        references_range(
+            &requester,
+            requester.find("= arrived").unwrap() + 2,
+            "arrived".len(),
+        ),
+    );
     definition(
         &mut wire,
         "reload-preserves-local-shadow",
@@ -474,5 +635,79 @@ fn imported_property_definition_initial_waiter_ranged_edits_reopen_reload_and_lo
             "`answer😀`".len(),
         ),
     );
+
+    // Both sources are admitted after reload. A same-name overlay in another
+    // file must refuse rather than expose either candidate or cached contents.
+    let duplicate = "// duplicate 🦀\r\npackage extras\r\nval arrived = 9\r\n";
+    opened(&mut wire, &target_alias, 1, duplicate);
+    refused_hover(
+        &mut wire,
+        "ambiguous-target-hover",
+        &requester_alias,
+        &requester,
+        requester.find("= arrived").unwrap() + 2,
+    );
+    let mut unsupported = duplicate.to_owned();
+    let immutable = unsupported.find("val arrived").unwrap();
+    let name = unsupported.find("arrived").unwrap();
+    changed(
+        &mut wire,
+        &target_alias,
+        2,
+        &mut unsupported,
+        &[
+            (name..name + "arrived".len(), "unrelated"),
+            (immutable..immutable + 3, "var"),
+        ],
+    );
+    // No competing name remains: accepting this mutable negative member would
+    // now incorrectly expose the sole valid Late.kt target instead of refusing.
+    refused_hover(
+        &mut wire,
+        "unsupported-module-source-hover",
+        &requester_alias,
+        &requester,
+        requester.find("= arrived").unwrap() + 2,
+    );
+    closed(&mut wire, &target_alias);
+    hover(
+        &mut wire,
+        "refusal-does-not-poison-hover",
+        profile,
+        "val arrived = 3",
+        "```",
+        params(
+            &requester_alias,
+            &requester,
+            requester.find("= arrived").unwrap() + 2,
+        ),
+        references_range(
+            &requester,
+            requester.find("= arrived").unwrap() + 2,
+            "arrived".len(),
+        ),
+    );
+
+    // Mutate an unopened NONmatching member, not the selected Late.kt target.
+    // Its original negative-source authority must still be checked per request.
+    std::fs::write(
+        project.join("src/Definitions.kt"),
+        original_target.replace("= 1", "= 7"),
+    )
+    .unwrap();
+    observe(json!({"replacedSource":{"uri":target_uri,
+        "text":std::fs::read_to_string(project.join("src/Definitions.kt")).unwrap()}}));
+    let stale = query(
+        &mut wire,
+        "stale-negative-source-hover",
+        "textDocument/hover",
+        params(
+            &requester_alias,
+            &requester,
+            requester.find("= arrived").unwrap() + 2,
+        ),
+    );
+    assert_eq!(stale["error"]["code"], -32801, "{stale}");
+    assert!(stale.get("result").is_none(), "{stale}");
     finish(wire);
 }

@@ -212,11 +212,11 @@ impl PendingWorkspaceSymbol {
 #[derive(Debug)]
 enum SymbolRequest {
     Document(Arc<str>),
-    Definition {
+    Navigation {
         uri: Arc<str>,
         incarnation: u64,
         version: i32,
-        offset: usize,
+        query: semantic_navigation::Query,
     },
     Workspace {
         query: String,
@@ -796,7 +796,7 @@ impl Session {
         method: &str,
         uri: &str,
         map: Option<&Map<String, Value>>,
-        definition_offset: Option<usize>,
+        supplied_query: Option<semantic_navigation::Query>,
     ) -> Result<(), (i32, &'static str)> {
         let document_uri = if method == "textDocument/documentSymbol" {
             self.workspace.overlay_uri(uri).unwrap_or(uri)
@@ -827,8 +827,8 @@ impl Session {
         }
         let query = if method == "textDocument/documentSymbol" {
             None
-        } else if let Some(offset) = definition_offset {
-            Some(semantic_navigation::Query::Definition { offset })
+        } else if let Some(query) = supplied_query {
+            Some(query)
         } else {
             let map = map.ok_or((-32602, "parser request params missing"))?;
             let document =
@@ -890,11 +890,16 @@ impl Session {
                 _ => return Err((-32601, "Method not found")),
             })
         };
-        if let Some(semantic_navigation::Query::Definition { offset }) = &query
-            && self.pending_import.as_ref().is_some_and(|pending| {
-                !pending.cancelled.load(Ordering::Relaxed)
-                    && pending.attempt == self.workspace.attempt
-            })
+        if matches!(
+            &query,
+            Some(
+                semantic_navigation::Query::Definition { .. }
+                    | semantic_navigation::Query::Hover { .. }
+            )
+        ) && self.pending_import.as_ref().is_some_and(|pending| {
+            !pending.cancelled.load(Ordering::Relaxed)
+                && pending.attempt == self.workspace.attempt
+        })
         {
             if self.pending_requests() >= MAX_PENDING_PARSER_REQUESTS {
                 return Err((-32803, "native analysis capacity exhausted"));
@@ -904,11 +909,11 @@ impl Session {
                 .map_err(|_| (-32803, "definition waiter allocation failed"))?;
             self.waiting_symbols.push(WaitingSymbol {
                 id,
-                request: SymbolRequest::Definition {
+                request: SymbolRequest::Navigation {
                     uri: document_uri.into(),
                     incarnation: self.incarnations[document_uri],
-                    version: document.expect("definition requires open source").version(),
-                    offset: *offset,
+                    version: document.expect("navigation requires open source").version(),
+                    query: query.expect("navigation query checked"),
                 },
                 attempt: self.workspace.attempt,
             });
@@ -964,30 +969,55 @@ impl Session {
                 .ok_or((-32601, "Method not found"))?,
         );
         let client = self.symbol_client.clone();
-        // Bound the complete response envelope without copying or serializing
-        // the arbitrary client id. A JSON string byte needs at most six bytes.
-        let response_id_bound = id
-            .as_str()
-            .map_or(Some(20), |id| {
+        // Hover counts actual escaped ID bytes without a serialization copy.
+        // Definition retains its existing conservative error-envelope contract.
+        let response_id_bound = if matches!(&query, Some(semantic_navigation::Query::Hover { .. })) {
+            if let Some(id) = id.as_str() {
+                workspace_symbols::json_string_bytes(id)
+            } else if let Some(id) = id.as_u64() {
+                Some(id.checked_ilog10().unwrap_or(0) as usize + 1)
+            } else {
+                let id = id.as_i64().expect("validated integer request id");
+                Some(
+                    id.unsigned_abs().checked_ilog10().unwrap_or(0) as usize
+                        + 1
+                        + usize::from(id < 0),
+                )
+            }
+        } else {
+            id.as_str().map_or(Some(20), |id| {
                 id.len()
                     .checked_mul(6)
                     .and_then(|bytes| bytes.checked_add(2))
             })
-            .ok_or((-32803, "hover response id limit exceeded"))?;
+        }
+        .ok_or((-32803, "hover response id limit exceeded"))?;
         let cancelled = Arc::new(AtomicBool::new(false));
         let worker_cancelled = Arc::clone(&cancelled);
         // Capture coherently on the Session owner before the thread starts.
-        // Admission failure is deferred: successful local definitions do not
-        // depend on unrelated workspace availability, contents or resource use.
-        let mut imported_capture =
-            matches!(&query, Some(semantic_navigation::Query::Definition { .. })).then(|| {
-                let mut budget = workspace_symbols::Budget::default();
-                let capture = self
-                    .workspace
+        // Admission failure is deferred: successful local/declaration answers
+        // do not depend on unrelated workspace availability or resource use.
+        let mut imported_capture = matches!(
+            &query,
+            Some(
+                semantic_navigation::Query::Definition { .. }
+                    | semantic_navigation::Query::Hover { .. }
+            )
+        )
+        .then(|| {
+            let mut budget = workspace_symbols::Budget::default();
+            let capture = (|| {
+                if matches!(&query, Some(semantic_navigation::Query::Hover { .. })) {
+                    let bytes = id.as_str().map_or(0, str::len);
+                    budget.work(bytes, &cancelled)?;
+                    budget.storage(bytes)?;
+                }
+                self.workspace
                     .capture_all(&self.documents, &self.incarnations, &mut budget, &cancelled)
-                    .map(Arc::new);
-                (capture, budget)
-            });
+                    .map(Arc::new)
+            })();
+            (capture, budget)
+        });
         let (sender, result) = mpsc::sync_channel(1);
         let thread = thread::Builder::new()
             .name("ktlsp-parser".into())
@@ -1300,7 +1330,7 @@ impl Session {
         responses.extend(
             self.waiting_symbols
                 .extract_if(.., |pending| {
-                    !matches!(&pending.request, SymbolRequest::Definition { .. })
+                    !matches!(&pending.request, SymbolRequest::Navigation { .. })
                 })
                 .map(|pending| response_error(pending.id, code, message)),
         );
@@ -1311,7 +1341,7 @@ impl Session {
         let mut responses = self.cancel_imported_symbols(code, message);
         // Explicit cancellation/configuration/reload supersession still revokes
         // all waiters. File notifications only revoke known imported symbols;
-        // queued definitions recheck their own requester on actual resume.
+        // queued navigation rechecks its own requester on actual resume.
         responses.extend(
             self.waiting_symbols
                 .drain(..)
@@ -1384,7 +1414,7 @@ impl Session {
                 responses.extend(self.import_response(pending.id.take(), result));
                 let waiting = std::mem::take(&mut self.waiting_symbols);
                 for request in waiting {
-                    if (committed || matches!(&request.request, SymbolRequest::Definition { .. }))
+                    if (committed || matches!(&request.request, SymbolRequest::Navigation { .. }))
                         && request.attempt == pending.attempt
                     {
                         let id = request.id;
@@ -1396,11 +1426,11 @@ impl Session {
                                 None,
                                 None,
                             ),
-                            SymbolRequest::Definition {
+                            SymbolRequest::Navigation {
                                 uri,
                                 incarnation,
                                 version,
-                                offset,
+                                query,
                             } => {
                                 if self.incarnations.get(uri.as_ref()) != Some(&incarnation)
                                     || !self
@@ -1410,12 +1440,21 @@ impl Session {
                                 {
                                     Err((-32801, "parser snapshot is stale"))
                                 } else {
+                                    let method = match &query {
+                                        semantic_navigation::Query::Definition { .. } => {
+                                            "textDocument/definition"
+                                        }
+                                        semantic_navigation::Query::Hover { .. } => {
+                                            "textDocument/hover"
+                                        }
+                                        _ => unreachable!("only imported navigation waits"),
+                                    };
                                     self.start_parser_uri(
                                         id.clone(),
-                                        "textDocument/definition",
+                                        method,
                                         &uri,
                                         None,
-                                        Some(offset),
+                                        Some(query),
                                     )
                                 }
                             }

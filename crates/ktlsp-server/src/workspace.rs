@@ -111,16 +111,13 @@ impl SourceModule<'_> {
         }
         let entry = &self.snapshot.projects[key.project].entries()[key.entry];
         budget.work(entry.memberships().len(), cancelled)?;
-        Ok(entry
-            .memberships()
-            .iter()
-            .any(|membership| {
-                std::ptr::eq(
-                    &self.snapshot.projects[key.project].imported().modules()
-                        [membership.module_index()],
-                    self.module,
-                )
-            }))
+        Ok(entry.memberships().iter().any(|membership| {
+            std::ptr::eq(
+                &self.snapshot.projects[key.project].imported().modules()
+                    [membership.module_index()],
+                self.module,
+            )
+        }))
     }
 }
 
@@ -253,9 +250,9 @@ impl Snapshot {
         for member in &capture.members {
             budget.work(1, cancelled)?;
             let key = self.member_key(member, budget, cancelled)?;
-            if previous.is_some_and(|old: &SourceKey| {
-                (old.project, old.entry) >= (key.project, key.entry)
-            }) {
+            if previous
+                .is_some_and(|old: &SourceKey| (old.project, old.entry) >= (key.project, key.entry))
+            {
                 return Err("competing or unordered captured source members");
             }
             previous = Some(key);

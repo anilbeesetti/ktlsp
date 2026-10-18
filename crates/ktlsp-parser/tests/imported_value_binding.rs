@@ -144,8 +144,14 @@ fn duplicate_imports_candidates_and_nonproperty_namespace_competition_refuse() {
     let _serial = functional::serial();
     let request = "import values.answer\nfun use() { val result = answer }";
     for (imports, error) in [
-        ("import values.answer\nimport `values`.`answer`", LocalBindingError::AmbiguousLocal),
-        ("import values.answer as answer", LocalBindingError::UnsupportedContext),
+        (
+            "import values.answer\nimport `values`.`answer`",
+            LocalBindingError::AmbiguousLocal,
+        ),
+        (
+            "import values.answer as answer",
+            LocalBindingError::UnsupportedContext,
+        ),
         ("import values.*", LocalBindingError::NoEligibleLocal),
         ("import values.other", LocalBindingError::NoEligibleLocal),
     ] {
@@ -153,10 +159,14 @@ fn duplicate_imports_candidates_and_nonproperty_namespace_competition_refuse() {
         let request = parse("Uses.kt", &source);
         let lower = lower_declarations(&request, request.snapshot()).unwrap();
         let regions = build_regions(&lower, &request, request.snapshot()).unwrap();
-        let site = reference_site(&lower, &request, request.snapshot(), selected(&request)).unwrap();
+        let site =
+            reference_site(&lower, &request, request.snapshot(), selected(&request)).unwrap();
         // No target producer exists: an invalid import must never authorize
         // secondary native parsing, even though local absence was proved.
-        assert_eq!(lookup_value(&regions, &site, request.snapshot()).unwrap_err(), error);
+        assert_eq!(
+            lookup_value(&regions, &site, request.snapshot()).unwrap_err(),
+            error
+        );
     }
     imported(
         request,
@@ -181,7 +191,10 @@ fn duplicate_imports_candidates_and_nonproperty_namespace_competition_refuse() {
     );
     imported(
         request,
-        &["package values\nval answer = 1", "package unrelated\nval ignored"],
+        &[
+            "package values\nval answer = 1",
+            "package unrelated\nval ignored",
+        ],
         Err(LocalBindingError::UnsupportedContext),
     );
 }
@@ -208,7 +221,8 @@ fn existing_local_precedence_self_future_parameters_and_unrelated_calls() {
         let request = parse("Uses.kt", &format!("import values.answer\n{body}"));
         let lower = lower_declarations(&request, request.snapshot()).unwrap();
         let regions = build_regions(&lower, &request, request.snapshot()).unwrap();
-        let site = reference_site(&lower, &request, request.snapshot(), selected(&request)).unwrap();
+        let site =
+            reference_site(&lower, &request, request.snapshot(), selected(&request)).unwrap();
         match (
             lookup_value(&regions, &site, request.snapshot()).unwrap(),
             expected,
@@ -233,7 +247,8 @@ fn existing_local_precedence_self_future_parameters_and_unrelated_calls() {
         let request = parse("Uses.kt", &format!("import values.answer\n{body}"));
         let lower = lower_declarations(&request, request.snapshot()).unwrap();
         let regions = build_regions(&lower, &request, request.snapshot()).unwrap();
-        let site = reference_site(&lower, &request, request.snapshot(), selected(&request)).unwrap();
+        let site =
+            reference_site(&lower, &request, request.snapshot(), selected(&request)).unwrap();
         assert_eq!(
             lookup_value(&regions, &site, request.snapshot()).unwrap_err(),
             LocalBindingError::NoEligibleLocal
@@ -258,7 +273,8 @@ fn foreign_equal_byte_and_late_stale_producers_never_publish_prefix() {
     let late = parse("Other.kt", "package unrelated\nval ignored = 1");
     let late_lower = lower_declarations(&late, late.snapshot()).unwrap();
     let late_regions = build_regions(&late_lower, &late, late.snapshot()).unwrap();
-    let stale = SourceSnapshot::new("Other.kt", 8, FileKind::Source, late.snapshot().source()).unwrap();
+    let stale =
+        SourceSnapshot::new("Other.kt", 8, FileKind::Source, late.snapshot().source()).unwrap();
     for (files, expected) in [
         (
             vec![

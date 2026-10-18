@@ -184,11 +184,17 @@ impl Budget {
     ) -> Result<(), &'static str> {
         self.parse(bytes, cancelled)?;
         let retained = ktlsp_parser::MAX_OUTPUT_BYTES
-            .checked_add(ktlsp_parser::MAX_ELEMENTS
-                .checked_mul(std::mem::size_of::<ktlsp_parser::Element>()).ok_or(LIMIT)?)
-            .and_then(|n| bytes.checked_add(1)
-                .and_then(|bytes| bytes.checked_mul(4 * std::mem::size_of::<usize>()))
-                .and_then(|bytes| n.checked_add(bytes)))
+            .checked_add(
+                ktlsp_parser::MAX_ELEMENTS
+                    .checked_mul(std::mem::size_of::<ktlsp_parser::Element>())
+                    .ok_or(LIMIT)?,
+            )
+            .and_then(|n| {
+                bytes
+                    .checked_add(1)
+                    .and_then(|bytes| bytes.checked_mul(4 * std::mem::size_of::<usize>()))
+                    .and_then(|bytes| n.checked_add(bytes))
+            })
             .ok_or(LIMIT)?;
         self.storage(retained)
     }
@@ -201,13 +207,20 @@ impl Budget {
         // Reserve the lowerer, region builder and semantic scan allowances
         // before allocating records; the imported binder also keeps its SAME
         // independent monotonic reference allowance across the whole directory.
-        self.work(ktlsp_parser::MAX_ELEMENTS
-            .checked_mul(ktlsp_parser::MAX_NESTING)
-            .and_then(|n| n.checked_mul(3)).ok_or(LIMIT)?, cancelled)?;
+        self.work(
+            ktlsp_parser::MAX_ELEMENTS
+                .checked_mul(ktlsp_parser::MAX_NESTING)
+                .and_then(|n| n.checked_mul(3))
+                .ok_or(LIMIT)?,
+            cancelled,
+        )?;
         let record = std::mem::size_of::<ktlsp_parser::lowering::Declaration<'_>>()
-            .checked_add(std::mem::size_of::<ktlsp_parser::structural_regions::Region<'_>>())
+            .checked_add(std::mem::size_of::<
+                ktlsp_parser::structural_regions::Region<'_>,
+            >())
             .and_then(|n| n.checked_add(16 * std::mem::size_of::<usize>()))
-            .and_then(|n| n.checked_mul(2)).ok_or(LIMIT)?;
+            .and_then(|n| n.checked_mul(2))
+            .ok_or(LIMIT)?;
         self.storage(tree.elements().len().checked_mul(record).ok_or(LIMIT)?)
     }
 
@@ -217,7 +230,8 @@ impl Budget {
         cancelled: &AtomicBool,
     ) -> Result<(), ParserFailure> {
         if let Some(snapshot) = &capture.snapshot {
-            snapshot.verify_all(&capture.closed, &mut self.verification, cancelled)
+            snapshot
+                .verify_all(&capture.closed, &mut self.verification, cancelled)
                 .map_err(source_failure)?;
         }
         Ok(())
@@ -500,9 +514,12 @@ mod tests {
         measured.retained_parse(17, &cancelled).unwrap();
         // Delegation work alone is insufficient: even an empty-source reply
         // needs its full CST/element and original-position storage allowance.
-        assert!(measured.storage >= ktlsp_parser::MAX_OUTPUT_BYTES
-            + ktlsp_parser::MAX_ELEMENTS * std::mem::size_of::<ktlsp_parser::Element>()
-            + 18 * 4 * std::mem::size_of::<usize>());
+        assert!(
+            measured.storage
+                >= ktlsp_parser::MAX_OUTPUT_BYTES
+                    + ktlsp_parser::MAX_ELEMENTS * std::mem::size_of::<ktlsp_parser::Element>()
+                    + 18 * 4 * std::mem::size_of::<usize>()
+        );
         let mut exact = Budget {
             storage: MAX_STORAGE - measured.storage,
             ..Budget::default()
@@ -514,8 +531,16 @@ mod tests {
             ..Budget::default()
         };
         assert!(short.retained_parse(17, &cancelled).is_err());
-        assert!(Budget::default().retained_parse(17, &AtomicBool::new(true)).is_err());
-        assert!(Budget::default().retained_parse(usize::MAX, &cancelled).is_err());
+        assert!(
+            Budget::default()
+                .retained_parse(17, &AtomicBool::new(true))
+                .is_err()
+        );
+        assert!(
+            Budget::default()
+                .retained_parse(usize::MAX, &cancelled)
+                .is_err()
+        );
     }
     #[test]
     fn actual_escaped_id_and_query_bounds_are_admitted_before_source_work() {

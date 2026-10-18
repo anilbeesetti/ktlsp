@@ -29,7 +29,14 @@ impl<'a> Context<'a> {
         cancelled: &'a AtomicBool,
         clean: &'a mut bool,
     ) -> Self {
-        Self { capture, budget, provider, cancelled, clean, used: false }
+        Self {
+            capture,
+            budget,
+            provider,
+            cancelled,
+            clean,
+            used: false,
+        }
     }
 
     // A failed global admission MUST NOT change an otherwise valid local answer.
@@ -55,12 +62,16 @@ impl<'a> Context<'a> {
     ) -> ParserResult {
         // Every error on this finite path also fits this fixed envelope bound.
         // Keep the existing caller's conservative escaped-ID accounting.
-        if response_id_bound.checked_add(256)
+        if response_id_bound
+            .checked_add(256)
             .is_none_or(|bytes| bytes > ktlsp_protocol::MAX_PAYLOAD_BYTES)
         {
             return Err(ParserFailure::Protocol(-32803, "limit"));
         }
-        let capture = self.capture.as_ref().map_err(|error| ParserFailure::from(*error))?;
+        let capture = self
+            .capture
+            .as_ref()
+            .map_err(|error| ParserFailure::from(*error))?;
         let snapshot = capture.snapshot.as_ref().ok_or(UNSUPPORTED)?;
         self.used = true;
         self.budget.verify_capture(capture, self.cancelled)?;
@@ -68,32 +79,44 @@ impl<'a> Context<'a> {
             let mut requester = None;
             for member in &capture.members {
                 if let Some((uri, _)) = &member.overlay {
-                    self.budget.work(uri.len() + current.document().len(), self.cancelled)
+                    self.budget
+                        .work(uri.len() + current.document().len(), self.cancelled)
                         .map_err(|_| LIMIT)?;
-                    if uri.as_ref() == current.document() {
-                        if requester.replace(member).is_some() {
-                            return Err(UNSUPPORTED.into());
-                        }
+                    if uri.as_ref() == current.document() && requester.replace(member).is_some() {
+                        return Err(UNSUPPORTED.into());
                     }
                 }
             }
             let requester = requester.ok_or(UNSUPPORTED)?;
-            self.budget.work(requester.source.source().len() + current.source().len(), self.cancelled)
+            self.budget
+                .work(
+                    requester.source.source().len() + current.source().len(),
+                    self.cancelled,
+                )
                 .map_err(|_| LIMIT)?;
             if requester.source.revision() != current.revision()
                 || requester.source.source() != current.source()
             {
-                return Err(ParserFailure::Protocol(-32801, "requesting source snapshot is stale"));
+                return Err(ParserFailure::Protocol(
+                    -32801,
+                    "requesting source snapshot is stale",
+                ));
             }
-            let module = snapshot.source_module(capture, requester, &mut self.budget, self.cancelled)?;
+            let module =
+                snapshot.source_module(capture, requester, &mut self.budget, self.cancelled)?;
             // ponytail: eagerly retain complete original module facts per request.
             // Worst-case CST/position reservations can refuse far below1024 files;
             // use a producer-owned cache only if measured workloads justify it.
             // Reserve all vector wrappers/entry metadata before allocation; CST
             // and lowered-record capacities have separate monotonic reservations.
             let count = capture.members.len();
-            self.budget.storage(count.checked_mul(std::mem::size_of::<SnapshotResult>() + 1024)
-                .ok_or(LIMIT)?).map_err(|_| LIMIT)?;
+            self.budget
+                .storage(
+                    count
+                        .checked_mul(std::mem::size_of::<SnapshotResult>() + 1024)
+                        .ok_or(LIMIT)?,
+                )
+                .map_err(|_| LIMIT)?;
             let mut results = Vec::new();
             results.try_reserve_exact(count).map_err(|_| LIMIT)?;
             for (index, member) in capture.members.iter().enumerate() {
@@ -102,34 +125,49 @@ impl<'a> Context<'a> {
                 {
                     continue;
                 }
-                self.budget.retained_parse(member.source.source().len(), self.cancelled)
+                self.budget
+                    .retained_parse(member.source.source().len(), self.cancelled)
                     .map_err(|_| LIMIT)?;
                 let (parsed, clean) = self.provider.parse(&member.source, self.cancelled);
                 *self.clean &= clean;
                 // A value alongside unproved child closure is NOT permission to
                 // launch the next child, build a directory or publish a target.
                 if !clean {
-                    return Err(ParserFailure::Protocol(-32803, "parser I/O or cleanup failed"));
+                    return Err(ParserFailure::Protocol(
+                        -32803,
+                        "parser I/O or cleanup failed",
+                    ));
                 }
                 let parsed = parsed.map_err(crate::parser_failure)?;
                 let tree = parsed.tree_for(&member.source).map_err(|_| UNSUPPORTED)?;
-                self.budget.retained_facts(tree, self.cancelled).map_err(|_| LIMIT)?;
+                self.budget
+                    .retained_facts(tree, self.cancelled)
+                    .map_err(|_| LIMIT)?;
                 results.push((index, parsed));
             }
             let mut lowered = Vec::new();
-            lowered.try_reserve_exact(results.len()).map_err(|_| LIMIT)?;
+            lowered
+                .try_reserve_exact(results.len())
+                .map_err(|_| LIMIT)?;
             for (index, parsed) in &results {
-                lowered.push(lower_declarations(parsed, &capture.members[*index].source)
-                    .map_err(|_| UNSUPPORTED)?);
+                lowered.push(
+                    lower_declarations(parsed, &capture.members[*index].source)
+                        .map_err(|_| UNSUPPORTED)?,
+                );
             }
             let mut directories = Vec::new();
-            directories.try_reserve_exact(results.len()).map_err(|_| LIMIT)?;
+            directories
+                .try_reserve_exact(results.len())
+                .map_err(|_| LIMIT)?;
             for (lowered, (index, parsed)) in lowered.iter().zip(&results) {
-                directories.push(build_regions(lowered, parsed, &capture.members[*index].source)
-                    .map_err(|_| UNSUPPORTED)?);
+                directories.push(
+                    build_regions(lowered, parsed, &capture.members[*index].source)
+                        .map_err(|_| UNSUPPORTED)?,
+                );
             }
             let mut files = Vec::new();
-            files.try_reserve_exact(results.len().checked_add(1).ok_or(LIMIT)?)
+            files
+                .try_reserve_exact(results.len().checked_add(1).ok_or(LIMIT)?)
                 .map_err(|_| LIMIT)?;
             // Keep the request's ORIGINAL raw-URI producer exactly once. The
             // canonical duplicate from Capture is NOT reparsed or substituted.
@@ -140,18 +178,30 @@ impl<'a> Context<'a> {
             let binding = outer.resolve_import(&files).map_err(|_| UNSUPPORTED)?;
             let target = binding.target().name_range();
             let source = binding.result().snapshot();
-            self.budget.work(source.source().len(), self.cancelled).map_err(|_| LIMIT)?;
+            self.budget
+                .work(source.source().len(), self.cancelled)
+                .map_err(|_| LIMIT)?;
             if workspace_symbols::json_string_bytes(source.document())
                 .and_then(|bytes| bytes.checked_add(response_id_bound))
                 .and_then(|bytes| bytes.checked_add(256))
                 .is_none_or(|bytes| bytes > ktlsp_protocol::MAX_PAYLOAD_BYTES)
             {
-                return Err(ParserFailure::Protocol(-32803, "imported definition response limit exceeded"));
+                return Err(ParserFailure::Protocol(
+                    -32803,
+                    "imported definition response limit exceeded",
+                ));
             }
             // Reserve escaped URI plus fixed logical JSON-map/key/endpoint
             // storage separately from the 256-byte encoded frame allowance.
-            self.budget.storage(source.document().len().checked_mul(6)
-                .and_then(|bytes| bytes.checked_add(4096)).ok_or(LIMIT)?)
+            self.budget
+                .storage(
+                    source
+                        .document()
+                        .len()
+                        .checked_mul(6)
+                        .and_then(|bytes| bytes.checked_add(4096))
+                        .ok_or(LIMIT)?,
+                )
                 .map_err(|_| LIMIT)?;
             let positions = structure::positions(source.source(), &[target.start, target.end]);
             let start = positions[0];

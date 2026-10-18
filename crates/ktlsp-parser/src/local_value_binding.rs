@@ -2081,7 +2081,8 @@ fn selected_import<'a>(
     b: &mut ReferenceBudget,
 ) -> Result<(&'a crate::lowering::ImportDirective<'a>, &'a str)> {
     let parsed = site.origin().parsed();
-    let spelling = b.spelling(site.raw_spelling())?
+    let spelling = b
+        .spelling(site.raw_spelling())?
         .ok_or(LocalBindingError::UnsupportedSpelling)?;
     let mut selected = None;
     for import in site.origin().imports() {
@@ -2089,8 +2090,10 @@ fn selected_import<'a>(
         charge_import_name(import.name(), parsed, b)?;
         let mut last = None;
         for segment in import.name().segments() {
-            last = Some(b.spelling(segment.raw_spelling())?
-                .ok_or(LocalBindingError::UnsupportedSpelling)?);
+            last = Some(
+                b.spelling(segment.raw_spelling())?
+                    .ok_or(LocalBindingError::UnsupportedSpelling)?,
+            );
         }
         let visible = if let Some(alias) = import.alias() {
             b.spelling(alias.raw_spelling())?
@@ -2108,7 +2111,10 @@ fn selected_import<'a>(
             return Err(LocalBindingError::AmbiguousLocal);
         }
     }
-    Ok((selected.ok_or(LocalBindingError::NoEligibleLocal)?, spelling))
+    Ok((
+        selected.ok_or(LocalBindingError::NoEligibleLocal)?,
+        spelling,
+    ))
 }
 
 impl<'a> OuterValueLookup<'a> {
@@ -2152,7 +2158,10 @@ impl<'a> OuterValueLookup<'a> {
                     return Err(LocalBindingError::InvalidOrigin);
                 }
                 requester = true;
-            } else if b.equal(result.snapshot().document(), self.directory.snapshot().document())? {
+            } else if b.equal(
+                result.snapshot().document(),
+                self.directory.snapshot().document(),
+            )? {
                 return Err(LocalBindingError::InvalidOrigin);
             }
             charge_import_name(import.name(), parsed, b)?;

@@ -4952,7 +4952,10 @@ mod tests {
         assert!(std::ptr::eq(binding.site(), &site));
         assert!(std::ptr::eq(binding.result(), &target));
         assert!(std::ptr::eq(binding.directory(), &target_regions));
-        assert!(std::ptr::eq(binding.target(), &target_lower.declarations()[0]));
+        assert!(std::ptr::eq(
+            binding.target(),
+            &target_lower.declarations()[0]
+        ));
         assert!(std::ptr::eq(binding.import(), &request_lower.imports()[0]));
         assert!(low > 0);
         assert_eq!(resolve(low - 1).unwrap_err(), LocalBindingError::Resource);
@@ -4997,11 +5000,7 @@ mod tests {
         };
         assert_eq!(
             outer
-                .resolve_import(&[
-                    files[0],
-                    files[1],
-                    (&late_regions, &late, late.snapshot()),
-                ])
+                .resolve_import(&[files[0], files[1], (&late_regions, &late, late.snapshot()),])
                 .unwrap_err(),
             LocalBindingError::UnsupportedContext
         );

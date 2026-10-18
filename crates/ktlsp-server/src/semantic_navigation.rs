@@ -329,7 +329,8 @@ pub(crate) fn render(
             format,
             response_id_bound,
             &mut budget,
-        ).map_err(Into::into);
+        )
+        .map_err(Into::into);
     }
     let lowered = lower_declarations(result, snapshot).map_err(|_| UNSUPPORTED)?;
     if declaration_hover {
@@ -429,7 +430,8 @@ pub(crate) fn render(
                 render_rename(found.target(), ranges, snapshot, &query, offset)
             } else {
                 render_occurrences(found.target(), ranges, snapshot, &query)
-            }).map_err(Into::into);
+            })
+            .map_err(Into::into);
         }
     }
     if occurrence_query {
@@ -462,7 +464,8 @@ pub(crate) fn render(
                 snapshot,
                 &query,
                 offset,
-            ).map_err(Into::into);
+            )
+            .map_err(Into::into);
         }
         let occurrences = local_value_occurrences(&directory, result, anchor, snapshot)
             .map_err(|_| UNSUPPORTED)?;
@@ -471,7 +474,8 @@ pub(crate) fn render(
             occurrences.occurrences().iter().map(|site| site.range()),
             snapshot,
             &query,
-        ).map_err(Into::into);
+        )
+        .map_err(Into::into);
     }
     let site = reference_site(
         &lowered,
@@ -484,13 +488,19 @@ pub(crate) fn render(
         match lookup_value(&directory, &site, snapshot).map_err(|_| UNSUPPORTED)? {
             ValueLookup::Local(binding) => binding.target(),
             ValueLookup::Outer(outer) => {
-                return imported.ok_or(UNSUPPORTED)?
-                    .render(outer, &directory, result, snapshot, response_id_bound);
+                return imported.ok_or(UNSUPPORTED)?.render(
+                    outer,
+                    &directory,
+                    result,
+                    snapshot,
+                    response_id_bound,
+                );
             }
         }
     } else {
         bind_local_value(&directory, &site, snapshot)
-            .map_err(|_| UNSUPPORTED)?.target()
+            .map_err(|_| UNSUPPORTED)?
+            .target()
     };
     let bytes = match query {
         Query::Definition { .. } => target.name_range(),

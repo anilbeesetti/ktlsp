@@ -1,9 +1,9 @@
 //! Real trusted-worker CST consumers. Build BOTH binaries before running this test.
 //! No synthetic worker replies, parser bypass, or local #96 reliability claim.
-#[path = "imported_definition/protocol.rs"]
-mod imported_definition_protocol;
 #[path = "imported_definition/lifecycle.rs"]
 mod imported_definition_lifecycle;
+#[path = "imported_definition/protocol.rs"]
+mod imported_definition_protocol;
 use ktlsp_server::Session;
 use ktlsp_text::{Range, offset_to_position, position_to_offset};
 use serde_json::{Value, json};

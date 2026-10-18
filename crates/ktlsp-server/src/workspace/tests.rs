@@ -506,9 +506,21 @@ fn source_module_borrows_original_owner_and_rejects_foreign_capture_members() {
     let module = snapshot
         .source_module(&capture, &capture.members[0], &mut budget, &cancelled)
         .unwrap();
-    assert!(module.contains(&capture.members[0], &mut budget, &cancelled).unwrap());
-    assert!(module.contains(&capture.members[1], &mut budget, &cancelled).unwrap());
-    assert!(!module.contains(&capture.members[2], &mut budget, &cancelled).unwrap());
+    assert!(
+        module
+            .contains(&capture.members[0], &mut budget, &cancelled)
+            .unwrap()
+    );
+    assert!(
+        module
+            .contains(&capture.members[1], &mut budget, &cancelled)
+            .unwrap()
+    );
+    assert!(
+        !module
+            .contains(&capture.members[2], &mut budget, &cancelled)
+            .unwrap()
+    );
 
     let second_capture = source_capture(&workspace);
     assert!(
@@ -518,17 +530,28 @@ fn source_module_borrows_original_owner_and_rejects_foreign_capture_members() {
     );
     assert!(
         snapshot
-            .source_module(&capture, &second_capture.members[0], &mut budget, &cancelled)
+            .source_module(
+                &capture,
+                &second_capture.members[0],
+                &mut budget,
+                &cancelled
+            )
             .is_err()
     );
     fixture.reload(&mut workspace, &[]).unwrap();
     let current = source_capture(&workspace);
     assert!(
-        current.snapshot.as_ref().unwrap()
+        current
+            .snapshot
+            .as_ref()
+            .unwrap()
             .source_module(&capture, &capture.members[0], &mut budget, &cancelled)
             .is_err()
     );
-    let current_module = current.snapshot.as_ref().unwrap()
+    let current_module = current
+        .snapshot
+        .as_ref()
+        .unwrap()
         .source_module(&current, &current.members[0], &mut budget, &cancelled)
         .unwrap();
     assert!(
@@ -549,7 +572,8 @@ fn source_module_reconciles_original_nested_roots_without_duplicate_members() {
     fixture.put("src/nested/C.kt", b"package values\nval answer = 3\n");
     let mut module = production_module("app", "<WORKSPACE>/src");
     module["contentRoots"][0]["sourceRoots"]
-        .as_array_mut().unwrap()
+        .as_array_mut()
+        .unwrap()
         .push(json!({"path": "<WORKSPACE>/src/nested", "type": "kotlin-source"}));
     write_modules(&fixture, json!([module]));
     let mut workspace = Workspace::default();
@@ -557,13 +581,26 @@ fn source_module_reconciles_original_nested_roots_without_duplicate_members() {
     let capture = source_capture(&workspace);
     let snapshot = capture.snapshot.as_ref().unwrap();
     assert_eq!(capture.members.len(), 3);
-    let key = snapshot.files.get(fixture.uri("src/nested/C.kt").as_str()).unwrap();
-    assert_eq!(snapshot.projects[key.project].entries()[key.entry].memberships().len(), 2);
+    let key = snapshot
+        .files
+        .get(fixture.uri("src/nested/C.kt").as_str())
+        .unwrap();
+    assert_eq!(
+        snapshot.projects[key.project].entries()[key.entry]
+            .memberships()
+            .len(),
+        2
+    );
     let mut budget = crate::workspace_symbols::Budget::default();
     let cancelled = AtomicBool::new(false);
-    let module = snapshot.source_module(&capture, &capture.members[0], &mut budget, &cancelled)
+    let module = snapshot
+        .source_module(&capture, &capture.members[0], &mut budget, &cancelled)
         .unwrap();
-    assert!(module.contains(&capture.members[2], &mut budget, &cancelled).unwrap());
+    assert!(
+        module
+            .contains(&capture.members[2], &mut budget, &cancelled)
+            .unwrap()
+    );
 }
 
 #[test]
@@ -578,24 +615,44 @@ fn source_module_refuses_original_test_java_script_and_dependency_competition() 
         let mut workspace = Workspace::default();
         fixture.reload(&mut workspace, &[]).unwrap();
         let capture = source_capture(&workspace);
-        assert!(capture.snapshot.as_ref().unwrap().source_module(
-            &capture, &capture.members[0],
-            &mut crate::workspace_symbols::Budget::default(), &cancelled,
-        ).is_err());
+        assert!(
+            capture
+                .snapshot
+                .as_ref()
+                .unwrap()
+                .source_module(
+                    &capture,
+                    &capture.members[0],
+                    &mut crate::workspace_symbols::Budget::default(),
+                    &cancelled,
+                )
+                .is_err()
+        );
         fs::remove_file(fixture.0.join(file)).unwrap();
     }
     fs::create_dir(fixture.0.join("tests")).unwrap();
     let mut module = production_module("app", "<WORKSPACE>/src");
-    module["contentRoots"][0]["sourceRoots"].as_array_mut().unwrap()
+    module["contentRoots"][0]["sourceRoots"]
+        .as_array_mut()
+        .unwrap()
         .push(json!({"path": "<WORKSPACE>/tests", "type": "kotlin-test"}));
     write_modules(&fixture, json!([module]));
     let mut workspace = Workspace::default();
     fixture.reload(&mut workspace, &[]).unwrap();
     let capture = source_capture(&workspace);
-    assert!(capture.snapshot.as_ref().unwrap().source_module(
-        &capture, &capture.members[0],
-        &mut crate::workspace_symbols::Budget::default(), &cancelled,
-    ).is_err());
+    assert!(
+        capture
+            .snapshot
+            .as_ref()
+            .unwrap()
+            .source_module(
+                &capture,
+                &capture.members[0],
+                &mut crate::workspace_symbols::Budget::default(),
+                &cancelled,
+            )
+            .is_err()
+    );
 
     for dependency in [
         json!([]),
@@ -622,10 +679,19 @@ fn source_module_refuses_original_test_java_script_and_dependency_competition() 
         let mut workspace = Workspace::default();
         fixture.reload(&mut workspace, &[]).unwrap();
         let capture = source_capture(&workspace);
-        assert!(capture.snapshot.as_ref().unwrap().source_module(
-            &capture, &capture.members[0],
-            &mut crate::workspace_symbols::Budget::default(), &cancelled,
-        ).is_err());
+        assert!(
+            capture
+                .snapshot
+                .as_ref()
+                .unwrap()
+                .source_module(
+                    &capture,
+                    &capture.members[0],
+                    &mut crate::workspace_symbols::Budget::default(),
+                    &cancelled,
+                )
+                .is_err()
+        );
     }
 }
 
@@ -638,7 +704,9 @@ fn source_module_refuses_mixed_roots_at_original_inventory_admission() {
         other["contentRoots"][0]["sourceRoots"][0]["type"] = json!(other_kind);
         let modules = if other_name == "app" {
             let mut app = app;
-            app["contentRoots"][0]["sourceRoots"].as_array_mut().unwrap()
+            app["contentRoots"][0]["sourceRoots"]
+                .as_array_mut()
+                .unwrap()
                 .push(other["contentRoots"][0]["sourceRoots"][0].clone());
             json!([app])
         } else {
@@ -659,24 +727,46 @@ fn source_module_requires_complete_canonical_capture_not_alias_or_duplicate() {
     let mut capture = source_capture(&workspace);
     let snapshot = capture.snapshot.as_ref().unwrap().clone();
     capture.members.swap(0, 1);
-    assert!(snapshot.source_module(&capture, &capture.members[0], &mut budget, &cancelled).is_err());
+    assert!(
+        snapshot
+            .source_module(&capture, &capture.members[0], &mut budget, &cancelled)
+            .is_err()
+    );
     capture.members.swap(0, 1);
     let original = capture.members.pop().unwrap();
-    assert!(snapshot.source_module(&capture, &capture.members[0], &mut budget, &cancelled).is_err());
+    assert!(
+        snapshot
+            .source_module(&capture, &capture.members[0], &mut budget, &cancelled)
+            .is_err()
+    );
     capture.members.push(original);
     let source = &capture.members[0].source;
     capture.members[1].source = ktlsp_parser::SourceSnapshot::new(
-        source.document(), source.revision(), ktlsp_parser::FileKind::Source,
+        source.document(),
+        source.revision(),
+        ktlsp_parser::FileKind::Source,
         std::sync::Arc::<str>::from(source.source()),
-    ).unwrap();
-    assert!(snapshot.source_module(&capture, &capture.members[0], &mut budget, &cancelled).is_err());
+    )
+    .unwrap();
+    assert!(
+        snapshot
+            .source_module(&capture, &capture.members[0], &mut budget, &cancelled)
+            .is_err()
+    );
     let mut capture = source_capture(&workspace);
     let source = &capture.members[0].source;
     capture.members[0].source = ktlsp_parser::SourceSnapshot::new(
-        alias(source.document()), source.revision(), ktlsp_parser::FileKind::Source,
+        alias(source.document()),
+        source.revision(),
+        ktlsp_parser::FileKind::Source,
         std::sync::Arc::<str>::from(source.source()),
-    ).unwrap();
-    assert!(snapshot.source_module(&capture, &capture.members[0], &mut budget, &cancelled).is_err());
+    )
+    .unwrap();
+    assert!(
+        snapshot
+            .source_module(&capture, &capture.members[0], &mut budget, &cancelled)
+            .is_err()
+    );
 }
 
 #[test]
@@ -690,36 +780,82 @@ fn source_module_uses_same_monotonic_work_allowance_and_honors_cancellation() {
     let limit = ktlsp_import::source_inventory::SnapshotLimits::default().work;
     let inventory = &snapshot.projects[0];
     let original = &inventory.imported().modules()[0];
-    let work = 1 + capture.members.len()
-        + capture.members.iter().map(|m| m.source.document().len()).sum::<usize>()
+    let work = 1
+        + capture.members.len()
+        + capture
+            .members
+            .iter()
+            .map(|m| m.source.document().len())
+            .sum::<usize>()
         + capture.members[0].source.document().len()
-        + original.dependencies.len() + original.content_roots.len()
-        + original.content_roots.iter().map(|c| c.source_roots.len()).sum::<usize>()
+        + original.dependencies.len()
+        + original.content_roots.len()
+        + original
+            .content_roots
+            .iter()
+            .map(|c| c.source_roots.len())
+            .sum::<usize>()
         + inventory.entries().len()
-        + 2 * inventory.entries().iter().map(|e| e.memberships().len()).sum::<usize>();
+        + 2 * inventory
+            .entries()
+            .iter()
+            .map(|e| e.memberships().len())
+            .sum::<usize>();
     let mut exact = crate::workspace_symbols::Budget::default();
     exact.work(limit - work, &cancelled).unwrap();
-    let module = snapshot.source_module(&capture, &capture.members[0], &mut exact, &cancelled)
+    let module = snapshot
+        .source_module(&capture, &capture.members[0], &mut exact, &cancelled)
         .unwrap();
-    assert!(module.contains(&capture.members[1], &mut exact, &cancelled).is_err());
+    assert!(
+        module
+            .contains(&capture.members[1], &mut exact, &cancelled)
+            .is_err()
+    );
     let mut short = crate::workspace_symbols::Budget::default();
     short.work(limit - work + 1, &cancelled).unwrap();
-    assert!(snapshot.source_module(&capture, &capture.members[0], &mut short, &cancelled).is_err());
+    assert!(
+        snapshot
+            .source_module(&capture, &capture.members[0], &mut short, &cancelled)
+            .is_err()
+    );
     let mut budget = crate::workspace_symbols::Budget::default();
-    let module = snapshot.source_module(&capture, &capture.members[0], &mut budget, &cancelled)
+    let module = snapshot
+        .source_module(&capture, &capture.members[0], &mut budget, &cancelled)
         .unwrap();
-    let key = snapshot.files.get(capture.members[1].source.document()).unwrap();
-    let member_work = capture.members.len() + capture.members[1].source.document().len()
-        + snapshot.projects[key.project].entries()[key.entry].memberships().len();
+    let key = snapshot
+        .files
+        .get(capture.members[1].source.document())
+        .unwrap();
+    let member_work = capture.members.len()
+        + capture.members[1].source.document().len()
+        + snapshot.projects[key.project].entries()[key.entry]
+            .memberships()
+            .len();
     let mut exact = crate::workspace_symbols::Budget::default();
     exact.work(limit - member_work, &cancelled).unwrap();
-    assert!(module.contains(&capture.members[1], &mut exact, &cancelled).unwrap());
+    assert!(
+        module
+            .contains(&capture.members[1], &mut exact, &cancelled)
+            .unwrap()
+    );
     let mut short = crate::workspace_symbols::Budget::default();
     short.work(limit - member_work + 1, &cancelled).unwrap();
-    assert!(module.contains(&capture.members[1], &mut short, &cancelled).is_err());
+    assert!(
+        module
+            .contains(&capture.members[1], &mut short, &cancelled)
+            .is_err()
+    );
     cancelled.store(true, Ordering::Relaxed);
-    assert!(snapshot.source_module(&capture, &capture.members[0], &mut budget, &cancelled).is_err());
-    assert!(module.contains(&capture.members[1], &mut budget, &cancelled).is_err());
+    assert!(
+        snapshot
+            .source_module(&capture, &capture.members[0], &mut budget, &cancelled)
+            .is_err()
+    );
+    assert!(
+        module
+            .contains(&capture.members[1], &mut budget, &cancelled)
+            .is_err()
+    );
 }
 
 #[test]
@@ -743,10 +879,17 @@ fn source_module_ignores_unused_catalogs_and_unrelated_semantic_contributors() {
     let capture = source_capture(&workspace);
     let cancelled = AtomicBool::new(false);
     let mut budget = crate::workspace_symbols::Budget::default();
-    let module = capture.snapshot.as_ref().unwrap()
+    let module = capture
+        .snapshot
+        .as_ref()
+        .unwrap()
         .source_module(&capture, &capture.members[0], &mut budget, &cancelled)
         .unwrap();
-    assert!(module.contains(&capture.members[1], &mut budget, &cancelled).unwrap());
+    assert!(
+        module
+            .contains(&capture.members[1], &mut budget, &cancelled)
+            .unwrap()
+    );
 }
 
 #[test]
@@ -765,23 +908,37 @@ fn source_module_keeps_known_alias_overlay_and_negative_source_verification() {
     let incarnations = HashMap::from([(alias.clone(), 81)]);
     let cancelled = AtomicBool::new(false);
     let mut budget = crate::workspace_symbols::Budget::default();
-    let capture = workspace.capture_all(&documents, &incarnations, &mut budget, &cancelled)
+    let capture = workspace
+        .capture_all(&documents, &incarnations, &mut budget, &cancelled)
         .unwrap();
     let snapshot = capture.snapshot.as_ref().unwrap();
-    let member = capture.members.iter()
+    let member = capture
+        .members
+        .iter()
         .find(|member| member.source.document() == uri)
         .unwrap();
-    let module = snapshot.source_module(&capture, member, &mut budget, &cancelled)
+    let module = snapshot
+        .source_module(&capture, member, &mut budget, &cancelled)
         .unwrap();
     assert!(module.contains(member, &mut budget, &cancelled).unwrap());
     assert_eq!(member.source.document(), uri);
     assert_eq!(member.source.source(), documents[&alias].text());
     assert!(workspace.fresh_all(&capture, &documents, &incarnations));
     let mut verification = ktlsp_import::source_inventory::SnapshotBudget::default();
-    snapshot.verify_all(&capture.closed, &mut verification, &cancelled).unwrap();
+    snapshot
+        .verify_all(&capture.closed, &mut verification, &cancelled)
+        .unwrap();
     fixture.put("src/B.kt", b"package negative\nval unrelated = 99\n");
-    assert!(snapshot.verify_all(&capture.closed, &mut verification, &cancelled).is_err());
+    assert!(
+        snapshot
+            .verify_all(&capture.closed, &mut verification, &cancelled)
+            .is_err()
+    );
     workspace.opened(&fixture.uri("outside.kt"), 82);
     assert!(!workspace.fresh_all(&capture, &documents, &incarnations));
-    assert!(workspace.capture_all(&documents, &incarnations, &mut budget, &cancelled).is_err());
+    assert!(
+        workspace
+            .capture_all(&documents, &incarnations, &mut budget, &cancelled)
+            .is_err()
+    );
 }

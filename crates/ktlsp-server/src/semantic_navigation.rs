@@ -5,7 +5,7 @@ use ktlsp_parser::{
     documentation::{self, Budget as DocumentationBudget},
     local_value_binding::{
         LocalValueAnchor, TypeParameterAnchor, ValueLookup, bind_lexical_type_parameter,
-        bind_local_argument_label, bind_local_function_callee, bind_local_value,
+        bind_local_argument_label, bind_local_function_callee,
         guarded_local_value_rename, guarded_type_parameter_rename, local_call_signature,
         local_value_occurrences, lookup_value, type_parameter_occurrences, visible_local_values,
     },
@@ -484,23 +484,18 @@ pub(crate) fn render(
         reference.expect("reference-only query checked").0,
     )
     .map_err(|_| UNSUPPORTED)?;
-    let target = if matches!(query, Query::Definition { .. }) {
-        match lookup_value(&directory, &site, snapshot).map_err(|_| UNSUPPORTED)? {
-            ValueLookup::Local(binding) => binding.target(),
-            ValueLookup::Outer(outer) => {
-                return imported.ok_or(UNSUPPORTED)?.render(
-                    outer,
-                    &directory,
-                    result,
-                    snapshot,
-                    response_id_bound,
-                );
-            }
+    let target = match lookup_value(&directory, &site, snapshot).map_err(|_| UNSUPPORTED)? {
+        ValueLookup::Local(binding) => binding.target(),
+        ValueLookup::Outer(outer) => {
+            return imported.ok_or(UNSUPPORTED)?.render(
+                outer,
+                &directory,
+                result,
+                snapshot,
+                &query,
+                response_id_bound,
+            );
         }
-    } else {
-        bind_local_value(&directory, &site, snapshot)
-            .map_err(|_| UNSUPPORTED)?
-            .target()
     };
     let bytes = match query {
         Query::Definition { .. } => target.name_range(),

@@ -318,3 +318,36 @@ head's own reviews/CI, guarded squash or independent original exact-main receipt
 use PR437 for that separate evidence. Archives remain exact5926, all historical
 FAILED/UNKNOWN and native-only/#96/T004/B3/oracle limits remain, full parity is NOT achieved.
 
+## Verified66676 basic packages and finite imported hover (#438/#439)
+
+This supersedes pending437 integration/package stages above, not the fixed
+assessment matrix or any historical FAILED/UNKNOWN evidence.
+[PR437](https://github.com/anilbeesetti/ktlsp/pull/437#issuecomment-6244112864)
+is guardedly delivered at66676daafeca94211ce6070d25f020e51767cd10,
+reviewed tree3ea654731f011989d0296c5342441fd2c2c36116, SOLE original parenta2f97.
+ALL FOUR independent feature OWNERS+ROOT accepted its OWN original exact-main CI
+before explicit base-lease clearance. Separately admitted original package
+39086038637/1 passed all42steps, full release workspaces and actual extracted
+smoke on Linux X64/macOS ARM64/Windows X64. Both complete independent controls,
+consumer OWNER+ROOT accepted all archive/provenance/reply/real-edit evidence.
+[#438 downloads and exact limits](https://github.com/anilbeesetti/ktlsp/issues/438#issuecomment-6244424563)
+are fixed66676, not #439 hover binaries or permanent/signed/IDE-certified releases.
+Their extracted basic fixture does not exercise imported definition.
+
+#439 adds source-owned hover through the SAME finite explicit imported-property
+lookup, not general imports/library types/inference/documentation/reference/
+refactoring parity. Original TARGET declaration contents and REQUESTER UTF16 range
+remain distinct under the same negotiated renderer, owned job and whole-capture
+authority. Original corrected7155 passed all six current cases and complete
+three-host CI; actual both-profile wire values include genuine two-file changes,
+renaming, close/reopen/reload, refusals and preserved providers.
+[Exact original-source checkpoint](development.md#original439-corrected7155-source-and-complete-edited-hover-proof)
+is separate from [PR440 final-source/CI/guarded-integration/exact-main gates](https://github.com/anilbeesetti/ktlsp/pull/440).
+
+Original08df failed CI remains failed; restoring the unchanged ID policy and
+correcting new assertions is not a diagnosis of its additional Windows deadline.
+[#441 complete original audits](https://github.com/anilbeesetti/ktlsp/issues/441#issuecomment-6244536593)
+establish selected SupervisorPoll, not incident cause; original missing private
+facts are unreachable, UNKNOWN/OPEN. Full parity is NOT achieved. All historical
+native-only/T004/#96/B3/oracle/publication/reliability limits remain unchanged.
+

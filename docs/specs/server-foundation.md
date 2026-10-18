@@ -167,22 +167,37 @@ uncaptured join-site wire values, broader reliability or full parity.
 
 ## Explicit imported-property definition (#436)
 
-Only definition extends the authenticated whole-immutable-initializer reference
-lane through one ordinary explicit nonstar/nonalias import. It selects a unique
-supported unmodified/default-public top-level immutable property in another
-canonical file of the SAME original closed production module. Original lowered
-components and module/source membership authorize the answer, never package/path
-guesses. Local/parameter/type/call paths keep their existing precedence/contracts.
+Definition (#436) and negotiated source-owned hover (#439) extend the authenticated
+whole-immutable-initializer reference lane through one ordinary explicit
+nonstar/nonalias import. They select a unique supported unmodified/default-public
+top-level immutable property in another canonical file of the SAME original
+closed production module. Original lowered components and module/source membership
+authorize the answer, never package/path guesses. Existing local/parameter/type/
+call paths keep their own precedence/contracts.
 
-The same global eight-slot owned job, sequential children, aggregate reservations,
+The same global eight-slot owned job, sequential children, one aggregate allowance,
 strict cleanup/join, selected requester freshness and used whole-capture freshness
-guard the original target URI/UTF-16 name range. Initial-import definition waiters
-resume by their own requester incarnation/version even after import failure;
-unrelated file notifications do not cancel them, explicit cancellation/reload does.
-Unsupported or ambiguous facts and relevant mixed/module/library/SDK competition
+guard publication. Definition returns the original TARGET URI/UTF-16 name range;
+hover returns the exact TARGET declaration source, including producer-owned trivia,
+but its range belongs to the original REQUESTER reference. Literal plaintext and
+source-safe dynamically fenced Markdown use the negotiated format; no inferred
+type, synthesized signature or imported KDoc interpretation is supplied.
+
+Initial-import navigation waiters retain their full original query/format/position
+and requester incarnation/version/attempt, including valid local/declaration
+navigation after global import failure. Unrelated file notifications preserve them;
+explicit cancellation/supersession/reload revoke them. First-post-initialize wire
+ordering is not proof of a pending import; real pre-first-poll Session cases are
+separate. The shared conservative escaped-ID resource policy is unchanged.
+
+Unsupported/ambiguous facts and relevant mixed/module/library/SDK competition
 refuse without prefix results; unused catalogs do not become invented competitors.
-There is no new capability, persistent semantic index, general imported-value
-consumer or parity claim. [Provider bounds](../../crates/ktlsp-server/README.md#same-module-explicit-imported-property-definition-436)
-and [original/final integration evidence](https://github.com/anilbeesetti/ktlsp/pull/437)
-remain distinct from the older exact5926 downloadable candidate.
+Complete negative/nonmatching source facts are revalidated too. There is no new
+capability, persistent index, imported-reference/refactoring consumer or parity.
+[Definition and hover bounds](../../crates/ktlsp-server/README.md#same-module-explicit-imported-property-definition-436),
+[verified #436 integration](https://github.com/anilbeesetti/ktlsp/pull/437#issuecomment-6244112864)
+and [#439 original/final gates](https://github.com/anilbeesetti/ktlsp/pull/440)
+are separate evidence. [Exact66676 basic archives](https://github.com/anilbeesetti/ktlsp/issues/438#issuecomment-6244424563)
+contain #436 source, not #439; extracted basic smoke does not exercise imported
+definition. Old FAILED/UNKNOWN deadlines, native-only/T004/#96/B3/oracle holds remain.
 

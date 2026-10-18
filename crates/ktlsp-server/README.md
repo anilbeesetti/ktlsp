@@ -1,6 +1,6 @@
 # Native server providers
 
-`ktlsp` supports bounded stdio lifecycle, document synchronization, folding, one negotiated authoritative structural quickfix, negotiated lexical semantic-token full/range transport, parser-backed syntactic symbols, finite local definition/hover/references/highlights, eager local-value completion, and guarded local-val prepare/rename. Initialization advertises only the implemented negotiated providers.
+`ktlsp` supports bounded stdio lifecycle, document synchronization, folding, one negotiated authoritative structural quickfix, negotiated lexical semantic-token full/range transport, parser-backed syntactic symbols, finite local and explicitly imported definition/hover, local references/highlights, eager local-value completion, and guarded local-val prepare/rename. Initialization advertises only the implemented negotiated providers.
 
 Parser-backed capabilities require the trusted matching worker. Hover also requires a compatible content format; rename requires versioned `documentChanges`, with preparation advertised only when supported by the client. Lexical tokens need compatible token capabilities but no worker. The structural quickfix also needs no worker, but requires code-action literal support and versioned `documentChanges`. Clients advertising `textDocument.diagnostic` negotiate lexical/structural pull reports instead of legacy push diagnostics. Neither diagnostics, structural quickfix nor lexical token categories provide Kotlin compiler analysis or full semantic coloring.
 
@@ -17,26 +17,27 @@ Without that sibling, synchronization/folding/lexical diagnostics, compatible le
 
 ## Basic native candidate setup (#430)
 
-**Verified experimental basic candidate at exact main `5926de3`, not a general
-release or editor certification.** [Exact downloads, checksums and proof](https://github.com/anilbeesetti/ktlsp/issues/430#issuecomment-6242490468)
+**Verified experimental basic candidate at exact main `66676da`, not a general
+release or editor certification.** [Exact downloads, checksums and proof](https://github.com/anilbeesetti/ktlsp/issues/438#issuecomment-6244424563)
 cover actual extracted Linux X64, macOS ARM64 and Windows X64 pairs in original
-package39074621949/1. Verify the outer TAR checksum before extraction, then
+package39086038637/1. Verify the outer TAR checksum before extraction, then
 `SHA256SUMS` and `provenance.json` before trusting/executing the pair. Keep both
-binaries together. Artifacts have fourteen-day retention; these exact5926
-archives are not binaries for a later documentation head.
+binaries together. Artifacts have fourteen-day retention; these exact66676
+archives are not binaries for the later #439 hover or documentation source.
 
-PR432 passed complete final-source reviews, its OWN original three-host CI,
-guarded integration and all three feature OWNERS+ROOT original exact-main gates.
-The separately admitted package passed all42 steps; two independent complete
-controls plus basic OWNER+ROOT accepted every current extracted reply and genuine
+PR437 passed complete final-source reviews, its OWN original three-host CI,
+guarded integration and all four feature OWNERS+ROOT original exact-main gates.
+The separately admitted #438 package passed all42 steps; two independent complete
+controls plus consumer OWNER+ROOT accepted every current extracted reply and genuine
 completion/rename edit. CLI help/version, the older parameter-shadow fixture,
 basic editing, invalid-coordinate recovery and shutdown/EOF actually ran.
-[Full source identities and finite limits](../../docs/status/development.md#verified432-integration-and430-actual-extracted-basic-candidate)
-do not establish IDE compatibility, signing, first-party licensing, general
-reliability or full Kotlin parity. Earlier acf/c035 deadline failures remain
-FAILED/cause UNKNOWN; later success is not diagnosis. Historical
-[#373 receipts below](#optional-extracted-archive-smoke-373) retain their own
-source scope. The ten-hour goal was not a safety waiver or guarantee.
+These archives contain #436 source, but the extracted basic fixture does not
+exercise imported definition; its separate feature execution is not archive smoke.
+[Complete exact-source evidence](../../docs/status/development.md#verified437-integration-and438-exact66676-basic-packages)
+does not establish IDE compatibility, signing, first-party licensing, general
+reliability or full Kotlin parity. [Older exact5926 receipts](../../docs/status/development.md#verified432-integration-and430-actual-extracted-basic-candidate)
+retain their own bytes. Earlier deadline failures remain FAILED/cause UNKNOWN;
+later success is not diagnosis. The ten-hour goal was not a safety waiver.
 
 For #433's non-Unix piped deadline errors, the existing `-32803` and
 `parser deadline exceeded` message remain unchanged. Optional
@@ -49,8 +50,8 @@ large escaped ID, the original echoed-ID timeout error is retained without the
 annotation; request admission and frame limits are not enlarged. Unix ordinary
 Timeout has no piped-site annotation. No new observer stream, retry or timer.
 
-1. Once that exact-source package is accepted, obtain the package and its separate
-   evidence from the admitted run for your host/architecture. Verify its outer
+1. Obtain the exact-source package and its separate evidence from the accepted run
+   for your host/architecture. Verify its outer
    SHA-256 before extraction and its inner inventory/checksums/provenance against
    the trusted run; checksums alone do not authenticate a distributor. Keep the
    matching `ktlsp` and `ktlsp-parser-worker` together in one trusted directory.
@@ -737,8 +738,9 @@ Alias/star selection, competing declarations/imports, mutable/richer declaration
 test/mixed ownership and relevant Java/script/module/library/SDK competition
 refuse. Duplicate own-module source edges are allowed; unrelated catalogs are not
 invented competitors. Every candidate's original facts must be complete. There
-is no package-wide fallback, general overload/type resolution or extension of
-imported-value hover, references, rename, completion or signature help.
+is no package-wide fallback or general overload/type resolution. The separately
+bounded #439 hover below reuses this lookup; imported references, rename,
+completion and signature help remain unsupported.
 
 The existing globally owned eight-slot job parses selected and secondary sources
 sequentially; failed/unproved cleanup stops delegation, and join precedes publication.
@@ -748,16 +750,54 @@ and per-parse 64 KiB/500 ms/16K-element/depth128 limits. Conservative reservatio
 permit far fewer than 1,024 successful parses; no RSS or aggregate latency promise.
 Original model/closed-source checks surround global work, including negative
 sources; all used overlay incarnations/versions/bytes are revalidated at publication.
-Initial-import definition waiters retain their own requester version/incarnation
-through unrelated file notifications; explicit cancellation/reload still revokes them.
+Initial-import navigation waiters retain their full original query, format and own
+requester version/incarnation through unrelated file notifications; explicit
+cancellation/reload still revokes them.
 
-Returned URI/name UTF-16 range belongs to the original target source, including
-canonical aliases and current target overlays. Close restores disk authority;
-new source additions require manual reload. [PR437](https://github.com/anilbeesetti/ktlsp/pull/437)
-links the original actual stdio two-file edit/reopen/reload proof and the
-separate final-head review/CI/guarded-integration receipts; neither gate can
-substitute for the other. Basic downloadable archives remain exact `5926de3`;
-no IDE/full-parity or historical-cause repair follows.
+Returned definition URI/name UTF-16 range belongs to the original target source,
+including canonical aliases and current target overlays. Close restores disk
+authority; new source additions require manual reload.
+[PR437](https://github.com/anilbeesetti/ktlsp/pull/437) records original actual
+two-file edits/reopen/reload, separate final-head gates, guarded integration and
+all four independent feature OWNERS+ROOT original exact-main acceptance.
+Exact66676 basic archives contain this source, not #439; their extracted fixture
+does not exercise imported definition. No IDE/full-parity or historical-cause repair.
+
+## Same-module explicit imported property hover (#439)
+
+Hover on the SAME authenticated whole-local-immutable-initializer reference can
+follow that bounded ordinary explicit import to the supported original target.
+`contents` is the original TARGET producer-owned declaration source, including
+owned trivia; `range` is the original current REQUESTER reference-token range.
+It is not an inferred type, synthesized signature or imported KDoc interpretation.
+Plaintext is literal; Markdown's Kotlin fence is longer than every source backtick
+run, with a minimum of three. No source text is trimmed to imitate a prettier
+declaration or a test's mistaken expectation.
+
+The same global eight-slot owner, one aggregate allowance, sequential secondary
+children and clean join-before-publication path apply. Complete original source
+and model facts, including negative/nonmatching sources, are verified around work
+and all used overlay incarnations/versions/bytes are checked before publication.
+The original shared conservative escaped-ID allowance remains unchanged for
+existing local/declaration/KDoc and imported navigation consumers.
+
+Pending initial import retains the original Hover query/format/position and
+requester incarnation/version/attempt; failed global import can still resume
+valid local/declaration hover. Unrelated notifications preserve these waiters,
+while explicit cancellation, supersession and reload revoke them. A first wire
+hover after `initialized` does not prove import was pending; dedicated real
+Session tests exercise pre-first-poll ordering separately.
+
+[Original7155 three-host source/runtime evidence](../../docs/status/development.md#original439-corrected7155-source-and-complete-edited-hover-proof)
+includes both negotiated profiles, real two-file ranged edits, target/import/use
+renaming, canonical aliases, close/reopen, manual reload, negative-source refusal
+and preserved local/type/call/reference/symbol behavior. Real Session lifecycle
+and old large-ID policy outcomes are assertion-backed, not invented raw packets.
+[PR440](https://github.com/anilbeesetti/ktlsp/pull/440) retains the separate final-head
+reviews/CI/integration gates. No new capability, general imports, inferred types,
+imported references/rename/completion/signatures, library resolution or parity.
+Exact66676 downloadable archives contain no #439 source.
+
 
 ## Finite local definition and declaration hover
 
@@ -816,7 +856,7 @@ At first changed-diagnostic union source `2c940228bb4af10f76020503ce007dbd1cfa8b
 
 Only the observed temporary capture writer was removed afterward; all behavioral assertions and production logic remain. This receipt describes that first union source, not execution of the cleanup head or main, an extracted release archive, official parity or a fix for #377. The earlier #377 failures were not reproduced or explained by the changed diagnostic. No local parser/server runtime was run under #96; final cleanup/integration reviews and CI remain separate.
 
-Non-reference positions can return null. Unsupported contexts/names, queried-name duplicates, self/forward references without an eligible parameter fallback, and no eligible target return RequestFailed (`-32803`), not a claim that a symbol is globally unresolved. Malformed/out-of-range/surrogate-interior positions or unopened documents return InvalidParams (`-32602`). Apart from the separately bounded #436 imported-property definition above, no general imports, cross-project/member/full Kotlin resolution, type inference, full navigation or official parity is claimed.
+Non-reference positions can return null. Unsupported contexts/names, queried-name duplicates, self/forward references without an eligible parameter fallback, and no eligible target return RequestFailed (`-32803`), not a claim that a symbol is globally unresolved. Malformed/out-of-range/surrogate-interior positions or unopened documents return InvalidParams (`-32602`). Apart from the separately bounded #436/#439 imported-property definition/hover above, no general imports, cross-project/member/full Kotlin resolution, type inference, full navigation or official parity is claimed.
 
 `textDocument.hover.contentFormat` selects the first recognized client preference (`plaintext` or `markdown`); absent lists default to plaintext. Empty, malformed or wholly incompatible lists disable hover without breaking initialize or other providers. Markdown uses a Kotlin code fence longer than every backtick run in the source declaration, so untrusted source cannot close it; plaintext is emitted only when negotiated/defaulted. Source and response remain bounded by the existing parser input ceiling.
 

@@ -15,16 +15,16 @@ Install `ktlsp` and `ktlsp-parser-worker` from the same build together in one tr
 
 For an explicit tiny source project and generic LSP client configuration, see
 [basic native candidate setup (#430)](crates/ktlsp-server/README.md#basic-native-candidate-setup-430).
-**Experimental basic archives are verified at exact main `5926de3`.**
-[Downloads, checksums and actual extracted proof](https://github.com/anilbeesetti/ktlsp/issues/430#issuecomment-6242490468)
-cover Linux X64, macOS ARM64 and Windows X64 from original package run39074621949/1.
+**Experimental basic archives are verified at exact main `66676da`.**
+[Downloads, checksums and actual extracted proof](https://github.com/anilbeesetti/ktlsp/issues/438#issuecomment-6244424563)
+cover Linux X64, macOS ARM64 and Windows X64 from original package run39086038637/1.
 Keep the matching server/worker together; verify the outer checksum, inner
 `SHA256SUMS` and provenance before execution. GitHub artifacts have fourteen-day
-retention, not permanent release hosting. These archives remain pinned5926,
-not any later documentation head.
+retention, not permanent release hosting. These archives remain pinned66676,
+not the later #439 hover source or a documentation head.
 
-[PR432's guarded integration and original exact-main proof](docs/status/development.md#verified432-integration-and430-actual-extracted-basic-candidate)
-and independent whole-package/actual-edit gates are accepted. This is finite
+[PR437's guarded integration and original exact-main proof](https://github.com/anilbeesetti/ktlsp/pull/437#issuecomment-6244112864)
+and #438's independent whole-package/actual-edit gates are accepted. This is finite
 native CLI/protocol/editing proof, not IDE/UI, signing/notarization, installer,
 general-platform/reliability or full-parity certification. No first-party
 license grant is present. Earlier failed deadlines remain cause UNKNOWN.
@@ -74,9 +74,21 @@ to a unique supported default-public top-level `val` in another admitted file of
 the same closed production module. Original source/model authority and target
 UTF-16 coordinates survive actual two-file edits, close/reopen and manual reload;
 locals retain precedence. This is not general imports, library resolution or
-imported hover/references/rename/completion. [Contract and limits](crates/ktlsp-server/README.md#same-module-explicit-imported-property-definition-436);
+imported references/rename/completion. [Definition contract and limits](crates/ktlsp-server/README.md#same-module-explicit-imported-property-definition-436);
 [original runtime evidence and final integration receipt](https://github.com/anilbeesetti/ktlsp/pull/437).
-The verified basic download archives remain pinned to `5926de3`, not this feature.
+Exact66676 archives contain this source, but their extracted basic fixture does
+not exercise imported definition; the separate feature execution remains its proof.
+
+[#439](https://github.com/anilbeesetti/ktlsp/issues/439) extends that SAME bounded
+lookup to negotiated source-owned hover. Contents are the original TARGET
+declaration, including producer-owned trivia; `Hover.range` is the current
+REQUESTER reference range. Plaintext stays literal and Markdown uses a source-safe
+dynamic fence. The existing owned jobs, aggregate allowance, complete source/model
+authority, freshness and cancellation rules remain. This is not inferred types,
+imported documentation/reference/refactoring parity or a new capability.
+[Hover contract](crates/ktlsp-server/README.md#same-module-explicit-imported-property-hover-439)
+and [PR440's original-source and separate final-integration gates](https://github.com/anilbeesetti/ktlsp/pull/440)
+remain distinct from the exact66676 downloadable archives, which contain no #439 source.
 
 
 Negotiated semantic-token full/range transport uses only positively known native lexer keyword/comment/string/number/operator categories. It handles strict UTF-16 clipping and multiline fragments without a worker; identifiers/template interiors have no guessed semantic identity. No delta, modifiers, semantic type coloring or official-token parity is claimed.

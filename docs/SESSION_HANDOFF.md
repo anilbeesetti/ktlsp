@@ -8,7 +8,62 @@ decisions or phase boundaries. **Full official Kotlin LSP parity is NOT achieved
 Use the actual session capacity; the historical 32-concurrent instruction below
 is not a new limit. Do not manufacture hundreds of overlapping/blocked tasks.
 
-### Verified basic candidate5926 — supersedes pending stages below
+### Verified66676 incoming source and fresh basic packages (#436/#438)
+
+[PR437 is delivered](https://github.com/anilbeesetti/ktlsp/pull/437#issuecomment-6244112864):
+main66676daafeca94211ce6070d25f020e51767cd10, reviewed tree
+3ea654731f011989d0296c5342441fd2c2c36116, SOLE original parent
+a2f97e5acabc9fb8eec6dca2fb13a656f0ec78a9. BOTH final19path SOURCE gates,
+OWN original three-host CI/complete controls/actual edits, separate pure fresh
+original-base guard and ordinary expected-head squash completed. ALL FOUR feature
+OWNERS+ROOT accepted OWN original exact-main39085065878/1/job117549778385
+(148groups,1377pass0fail3ignored,all8steps) before explicit original-a2 lease clear.
+No active integration lease follows from an old receipt.
+
+Only then separately admitted original package39086038637/1 ran on that SAME66676.
+All42steps/three hosts/full release workspaces and actual extracted smoke passed.
+Both independent complete controls plus consumer OWNER+ROOT accepted all archives,
+original values and genuine UTF16 completion/both rename edits.
+[#438 closes with current exact downloads/checksums/limits](https://github.com/anilbeesetti/ktlsp/issues/438#issuecomment-6244424563).
+Archives remain exactly66676 and fourteen-day artifacts, not #439 binaries or a
+signed/general IDE release. They contain #436 source, but extracted basic smoke
+does not exercise imported definition. Older5926 archives keep their own receipts.
+
+### #439 corrected7155 original feature-source checkpoint; final gates separate
+
+ROOT owns `/private/tmp/ktlsp-439-imported-hover-integration`,
+branch `omp/439-imported-hover-integration`, draft [PR440](https://github.com/anilbeesetti/ktlsp/pull/440),
+from ONE verified incoming66676. Preserve every component/user worktree.
+Original7155068590d784f20b0497adc64cd79919c6d7cc/tree
+6bb87e63e37a87e6ed9fa26d723e0101906e8e3a has both fresh complete-five-file source
+gates0.88/0.88, separate compiler-only passes and OWN original Native39088438007/1
+plus platform39088438046/1. All32steps/148groups per host passed:
+1382Linux/1380Mac/1330Windows,0failed/filtered,3ignored.
+ROOT fully consumed both profiles' actual128 replies/356 records and independently
+replayed all24 genuine two-file batches/44 ranged UTF16 edits across both hosts.
+[Original checkpoint and observation limits](status/development.md#original439-corrected7155-source-and-complete-edited-hover-proof)
+do not substitute for final documentation-head SOURCE gates/OWN original CI,
+fresh strictly read-only original-base lease guard, ordinary expected-head merge,
+actual reviewed tree/SOLE original base and independent feature OWNERS+ROOT
+OWN original exact-main acceptance before explicit lease clear.
+
+Original08df all-three-host CI remains FAILED: ROOT restored the OLD shared
+conservative ID policy and corrected NEW lifecycle expectations to include
+producer-owned leading comments; production declaration text was not trimmed.
+Earlier static reviews missed both issues. Separate original Windows `disk`
+SupervisorPoll incident [#441](https://github.com/anilbeesetti/ktlsp/issues/441#issuecomment-6244536593)
+has TWO completed independent full original source/custody audits plus ROOT:
+35pins/13wrappers/all74ZIPmembers authenticated, cause still UNKNOWN/OPEN.
+Missing original request/source/CST/private-PID/IO/clock/cleanup facts are
+unreachable; selected deadline site is not a cause. Do NOT restart those audits,
+retry unchanged code, add probes, raise500ms or weaken healthy assertions.
+Changed7155 passes do not diagnose it. Native-only/T004/#96/B3/oracle and all
+historical FAILED/UNKNOWN holds remain; no local product/test runtime is admitted.
+Older319/320/PR306 cleanup and original packaging work were already delivered;
+continue dependency-ready saved work, not completed investigations.
+
+
+### Historical verified basic candidate5926 — supersedes its pending stages below
 
 [PR432](https://github.com/anilbeesetti/ktlsp/pull/432) is merged at
 **5926de3cbfc91ffcb102a17986d53d80751992df**, tree

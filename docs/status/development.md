@@ -5081,3 +5081,144 @@ tree/SOLE original base and independent OWNER+ROOT original exact-main acceptanc
 none follows from this earlier-source checkpoint alone.
 No archive relabeling, historical-cause repair, general imports or parity promotion.
 
+## Verified437 integration and438 exact66676 basic packages
+
+This supersedes pending final437 integration/package stages above, not its
+original-source checkpoint or historical failures. Final reviewed
+7c9d881a96e229c4c15088b483778dcb54d7f563/tree
+3ea654731f011989d0296c5342441fd2c2c36116 received BOTH complete19path SOURCE
+gates and OWN original Native39083599981/1/job117545455996 plus
+platform39083599987/1/Mac117545455970/Win117545456044. All32steps/148groups
+per host and complete independent controls/ALL FOUR feature OWNERS+ROOT actual
+two-file edit gates passed. The separate strictly read-only fresh original-a2
+lease guard returned actualouter0/parsed0/fullmatching facts before ordinary
+expected-head squash. Actual main66676daafeca94211ce6070d25f020e51767cd10
+has that exact reviewed tree and SOLE original parent
+a2f97e5acabc9fb8eec6dca2fb13a656f0ec78a9.
+
+ALL FOUR independent feature OWNERS+ROOT then accepted NEW OWN original
+exact-main39085065878/1/job117549778385: all8steps/148groups/1380outcomes,
+1377pass0fail3ignored0filtered/measured. Main's default-captured successful Values
+are unprinted; earlier actual final-PR Mac/Windows values are not relabeled.
+The original-a2 lease was explicitly cleared only afterward.
+[Complete public guarded delivery](https://github.com/anilbeesetti/ktlsp/pull/437#issuecomment-6244112864).
+
+ROOT then separately admitted original manual package39086038637/1 at the SAME
+verified66676/tree3ea6547 and matching workflow source. All42steps passed pinned
+formatCHECK, strict locked Clippy, both release binaries, FULL unfiltered release
+workspace, archive/provenance verification and actual borrowed extracted smoke.
+
+|Original package host/job|Full workspace groups|Pass|Fail|Ignored|SEPARATE exact extracted test|
+|---|---:|---:|---:|---:|---|
+|Linux X64/117552704038|148|1377|0|3|1pass/84filtered|
+|macOS ARM64/117552704011|148|1375|0|3|1pass/84filtered|
+|Windows X64/117552703871|148|1325|0|3|1pass/84filtered|
+
+Full workspace filtered/measured are0; the separate ignored extracted case is
+actually executed exactly afterward, not added to an invented filtered0 total.
+Both complete independent controls0.98/0.98, consumer OWNER+ROOT authenticated
+all6ZIPs/69members,48runlog members, three TARs/143headers/102files/101inner hashes
+each, both native binary headers, notices/lock/source/workflow/provenance and every
+actual extracted reply. All147 decoded replies and genuine UTF16 changes,
+completion and BOTH version5 rename edits were independently consumed/applied.
+Older shadow/CLI empty-stderr literals are assertion-backed after real helper
+checks, not direct captured wait values; basic/invalid/EOF parent exits and empty
+SERVERstderr are actual returned data. No private worker/PID/clock/latency or
+post-extraction source-cleanliness receipt is invented.
+
+[#438 exact downloads/checksums/proof](https://github.com/anilbeesetti/ktlsp/issues/438#issuecomment-6244424563)
+close that concrete candidate, not full release46/parity. Archives are fixed66676,
+not #439 or later documentation binaries. They contain #436 source, but extracted
+basic smoke does not exercise imported definition; separate feature CI remains
+its proof. Fourteen-day artifacts are not permanent signed releases, checksums
+not signatures and notices not a first-party license. Older5926 bytes remain
+separate; historical FAILED/UNKNOWN, native-only/T004/#96/B3/oracle holds remain.
+
+## Original439 corrected7155 source and complete edited hover proof
+
+Draft [PR440](https://github.com/anilbeesetti/ktlsp/pull/440) starts from ONE verified
+incoming66676. Initial08df source passed static gates but OWN original
+Native39087287402/1 and platform39087287599/1 FAILED all three hosts: a changed
+shared escaped-ID policy broke the OLD documented KDoc resource refusal, and NEW
+lifecycle expectations omitted actual producer-owned leading-comment text.
+Earlier source reviews missed both defects. ROOT restored the original SHARED
+conservative allowance for every consumer and corrected only the NEW assertions
+to preserve exact original declaration contents. No old healthy assertion, limit,
+deadline or production declaration text was weakened/trimmed.
+
+Corrected7155068590d784f20b0497adc64cd79919c6d7cc/tree
+6bb87e63e37a87e6ed9fa26d723e0101906e8e3a received BOTH fresh complete-current-five-
+file SOURCE renewals0.88/0.88 with explicit changed-behavior rechecks, ROOT
+acceptance and separate exact formatCHECK/strict locked all-target Clippy/full
+workspace `--no-run` passes. No local product/tests ran. Separate publication
+admitted this changed source's OWN original hosted execution, not an unchanged retry.
+Actual checkout6e9ce15254b0124729c4d26b3bb78b133d19c354 has that reviewed tree
+and ordered parents[66676,7155]; both original artifacts retain the identity.
+
+|Own original attempt1 workflow/job|Groups|Pass|Fail|Ignored|Filtered|
+|---|---:|---:|---:|---:|---:|
+|Native39088438007 / Linux117559824146|148|1382|0|3|0|
+|Platform39088438046 / macOS117559824340|148|1380|0|3|0|
+|Platform39088438046 / Windows117559824484|148|1330|0|3|0|
+
+All32steps and all six current cases pass on every host: five real Session
+lifecycle regressions plus the renamed both-profile real paired-stdio consumer.
+The unchanged documented large-ID policy regression passes once on each host.
+Session pending-import/eight-slot/cancellation and leading-comment correctness
+are executed assertion-backed evidence, not raw successful Session packets.
+First hover after wire `initialized` alone does not prove pending import.
+
+ROOT independently consumed all356 actual records/128 replies across BOTH
+profiles on BOTH platform hosts. Each profile has89records/47outgoing/32replies,
+six genuine two-file batches/11 ranged UTF16 edits,12 positive definitions
+(7 imported),8 positive hovers (7 imported) and7 explicit refusals (5 hover).
+Target/import/use renaming is client-authored ranged editing, not a new imported
+rename provider. Each host retains12 overlay records plus2 added-source and2
+replaced-source records. Original target contents, requester reference ranges,
+canonical aliases, astral/CRLF coordinates, literal plaintext and seven-backtick
+Markdown fences over six source backticks were independently source-derived.
+All preserved local/parameter/type/empty-call targets, local references and all10
+original source-ordered symbol nodes match. All four parent exits are actual
+code0/success/empty SERVERstderr; no private worker cleanup/PID/timing inferred.
+
+Both independent COMPLETE original CI/functionality/adversarial controls0.93/0.92,
+ALL THREE independent production/lifecycle/protocol OWNERS and ROOT accepted this
+CURRENT7155 source/execution gate. Every original result-group/case membership and
+all356 actual event objects reconcile with ROOT's independent originals. This does
+not accept the later documentation source, final-head CI, merge or exact-main gates.
+
+Complete ROOT original proof3425645B SHA256
+9234a8f608ade21ef4adf688d203988318d107f39fa4a8ed99b7d97c230de732
+remains outside the repository with all raw originals/reviews. Original08df CI
+and prior7d26 format failure remain rejected. New-hover hostile-ID/near-frame
+boundaries are static-only; default-captured Linux success values are unprinted.
+No post-test cleanliness, private phase/latency, hard OS return bound, IDE,
+reliability or parity claim. This immutable7155 checkpoint is NOT final
+documentation-head reviews/OWN original CI, guarded integration or independent
+OWNERS+ROOT original exact-main acceptance; PR440 retains those separate gates.
+Exact66676 #438 downloads contain no #439 source.
+
+## Original441 Windows SupervisorPoll investigation remains UNKNOWN
+
+The same rejected08df Windows run additionally returned actual `disk`/`-32803`/
+`parserTimeoutSite:"supervisor_poll"` for the initial closed-disk workspace-symbol
+query before `didOpen`. TWO independent complete original source/control-flow and
+custody audits plus ROOT authenticated35pins/13download wrappers/all74ZIPmembers
+and all7 immutable original source blobs. The site proves selection of the
+supervisor-loop deadline before that iteration's channel/status probes, not child
+phase/readiness/scheduling or the operation consuming the500ms allowance.
+Source requires successful child wait/scoped-I/O completion before that typed
+timeout escapes; it is not an independent timed/PID cleanup receipt.
+
+Original failed request/session/project/source/parser-input/CST, private worker
+PID/phase/stderr, monotonic deadline/I/O/readiness state and independent cleanup
+facts were not retained and are unreachable from every original collector.
+Basic receipt is success-only, in-memory wire history is lost on this panic, and
+worker stderr is discarded. Other fixtures' CST/controlled timeouts/imported
+streams or successful Mac/current7155/438 executions cannot supply those facts.
+[#441 remains OPEN/cause UNKNOWN](https://github.com/anilbeesetti/ktlsp/issues/441#issuecomment-6244536593);
+no incident-specific defect or legal minimal fix was established. Original audits
+are complete: do not restart, retry unchanged code, add probes, raise limits,
+reorder readiness before deadline or weaken healthy assertions. All historical
+FAILED/UNKNOWN and native-only/T004/#96/B3/oracle holds remain unchanged.
+

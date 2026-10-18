@@ -39,14 +39,41 @@ or permanent signed release. No first-party license grant or IDE/general
 platform/reliability/full-parity certification. Old FAILED/UNKNOWN,
 96/431/417/T004/native-only/B3/oracle remain unchanged.
 
-ROOT owns the documentation-only434 worktree
-`/private/tmp/ktlsp-434-verified-basic-docs`, branch
-`omp/434-verified-basic-docs`, from verified5926. Its seven existing docs require
-their OWN complete source reviews/original CI/guarded integration/exact-main
-gates; the verified5926 product and package evidence is not relabeled as434.
-Preserve every older user/owner worktree. Continue source-resolution/library
-linkage prerequisites after this checkpoint; completed metadata witness
-research must not restart. No local runtime or new package dispatch is granted.
+Documentation-only [PR435](https://github.com/anilbeesetti/ktlsp/pull/435) is also
+merged: verified incoming main `a2f97e5acabc9fb8eec6dca2fb13a656f0ec78a9`,
+tree `b3b687e800ce96c447abc40d54ace548463942d3`, SOLE original parent5926.
+Both independent complete seven-doc source/OWN original three-host gates passed;
+strict separate read-only guard preceded ordinary expected-head squash.
+Both independent OWNERS+ROOT accepted original exact-main39077795667/1/
+job117528457337 (147rows,1354pass0fail3ignored) before original-base lease clear.
+[Exact guarded delivery receipt](https://github.com/anilbeesetti/ktlsp/pull/435#issuecomment-6242992317).
+Its worktree `/private/tmp/ktlsp-434-verified-basic-docs` and every older user/owner
+worktree remain preserved. Neither docs nor new features relabel exact5926 archives.
+
+### Imported436 original feature-source checkpoint; final receipt is separate
+
+ROOT owns `/private/tmp/ktlsp-436-source-definition-integration`,
+branch `omp/436-source-definition-integration`, [PR437](https://github.com/anilbeesetti/ktlsp/pull/437).
+Independent parser/module/protocol/lifecycle work is composed with the real server
+consumer from verified incoming a2f97. Reviewed original union7fe8bd8/treee5fb0e2
+received BOTH full13-path SOURCE gates and separate current compiler-only passes,
+then OWN original Native39081720231/1 and platform39081720279/1 all32steps passed.
+All23 new cases pass across Linux1377/macOS1375/Windows1325 totals,148rows each,
+0failed/filtered,3ignored. Original Mac/Windows60-event/20-reply stdio captures
+include all5 actual batches/8 ranged edits,12 positive definitions (7 cross-file),
+two refusals, close/reopen/reload/local paths and exit0/empty SERVERstderr.
+Complete original source and all ZIP/raw controls remain outside repository under
+`/private/tmp/ktlsp-430-root-evidence`; independent actual-value acceptance is separate.
+
+Do not infer final integration from that earlier source pass. Read PR437's
+separate final-head reviews/OWN original CI, fresh strictly read-only lease guard,
+ordinary expected-head squash, actual tree/SOLE original a2f97 base and independent
+OWNER+ROOT OWN original exact-main receipt before treating integration as cleared.
+Preserve original component/user worktrees and failures:4bbbb format1/Clippy101
+are not passing gates. No local parser/server/Session/worker/CLI runtime, new
+dispatch/retry, raised limits or historical UNKNOWN repair follows. Continue
+dependency-ready full-parity work from one verified incoming main; do not restart
+completed metadata/source-resolution research or manufacture hundreds of tasks.
 
 ### Latest verified delivery and basic-candidate continuation
 

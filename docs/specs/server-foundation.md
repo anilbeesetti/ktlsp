@@ -164,3 +164,25 @@ gates](../status/development.md#verified432-integration-and430-actual-extracted-
 are accepted at exact5926; this finite proof does not promote historical causes,
 uncaptured join-site wire values, broader reliability or full parity.
 
+
+## Explicit imported-property definition (#436)
+
+Only definition extends the authenticated whole-immutable-initializer reference
+lane through one ordinary explicit nonstar/nonalias import. It selects a unique
+supported unmodified/default-public top-level immutable property in another
+canonical file of the SAME original closed production module. Original lowered
+components and module/source membership authorize the answer, never package/path
+guesses. Local/parameter/type/call paths keep their existing precedence/contracts.
+
+The same global eight-slot owned job, sequential children, aggregate reservations,
+strict cleanup/join, selected requester freshness and used whole-capture freshness
+guard the original target URI/UTF-16 name range. Initial-import definition waiters
+resume by their own requester incarnation/version even after import failure;
+unrelated file notifications do not cancel them, explicit cancellation/reload does.
+Unsupported or ambiguous facts and relevant mixed/module/library/SDK competition
+refuse without prefix results; unused catalogs do not become invented competitors.
+There is no new capability, persistent semantic index, general imported-value
+consumer or parity claim. [Provider bounds](../../crates/ktlsp-server/README.md#same-module-explicit-imported-property-definition-436)
+and [original/final integration evidence](https://github.com/anilbeesetti/ktlsp/pull/437)
+remain distinct from the older exact5926 downloadable candidate.
+

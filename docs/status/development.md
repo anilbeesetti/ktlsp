@@ -5043,3 +5043,41 @@ No IDE/UI/signing/installer/general-platform/performance/reliability/full-parity
 certification. Originalacf Windows FAILED/causeUNKNOWN and70ba formatterFAILED
 remain; 96/431/417/T004/native-only/B3/oracle and other holds remain.
 
+
+## Original436 composed-source execution checkpoint
+
+[PR437](https://github.com/anilbeesetti/ktlsp/pull/437), reviewed union
+`7fe8bd8a645a8960a38db9edc6370315b6a43d6e`, tree
+`e5fb0e2665233242bc33f12efeb91eaa1c481b6c`, derives from verified main
+`a2f97e5acabc9fb8eec6dca2fb13a656f0ec78a9` (PR435). Both independent complete
+13-path SOURCE reviews accepted it; separately admitted current format CHECK,
+strict locked all-target workspace Clippy and full workspace test `--no-run` exited0.
+Prior `4bbbb` format1/Clippy101 remain failed original evidence, not waived.
+
+|Own original attempt1 workflow/job|Rows|Pass|Fail|Ignored|Filtered|
+|---|---:|---:|---:|---:|---:|
+|Native39081720231 / Linux117539861880|148|1377|0|3|0|
+|Platform39081720279 / macOS117539862214|148|1375|0|3|0|
+|Platform39081720279 / Windows117539861975|148|1325|0|3|0|
+
+All32steps and all23 new cases passed on each host. Actual checkout
+`48c88e32041cc0b5ff03d9baff1d84a64e65bf40` has that reviewed tree and ordered
+parents `[a2f97e5,7fe8bd8]`; both event `pr_merge_sha` fields were empty/presentfalse
+observations, not substitutes for checkout identity. Both original ZIPs/36members
+and complete runlog ZIP/28members authenticate; two primary logs byte-match API.
+
+ROOT read both actual60-event/20-request-reply sequences and independently
+replayed all5 genuine batches/8 UTF-16 ranged edits per host, including both
+requester and target. All12 positive definition target spans (7 cross-file),
+two refusals, original local/type/call/hover/references/symbols, manual reload and
+actual parent exit0/empty SERVERstderr are retained. Linux's successful Values
+were captured/unprinted; no invented raw Linux values, private worker stderr,
+PID/phase/latency, JDK-host absence or post-test source-cleanliness claim.
+
+This is the immutable original feature-source execution checkpoint, not a
+stand-in for final documentation-head reviews/OWN original CI or guarded main
+integration. Use PR437 for those separate receipts, including actual squash
+tree/SOLE original base and independent OWNER+ROOT original exact-main acceptance;
+none follows from this earlier-source checkpoint alone.
+No archive relabeling, historical-cause repair, general imports or parity promotion.
+

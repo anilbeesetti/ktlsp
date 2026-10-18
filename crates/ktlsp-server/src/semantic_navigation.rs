@@ -1,12 +1,13 @@
 //! Deliberately finite local binding, never a global unresolved-name answer.
+use crate::{ParserResult, imported_definition};
 use ktlsp_parser::{
     SnapshotResult, SourceSnapshot,
     documentation::{self, Budget as DocumentationBudget},
     local_value_binding::{
-        LocalValueAnchor, TypeParameterAnchor, bind_lexical_type_parameter,
+        LocalValueAnchor, TypeParameterAnchor, ValueLookup, bind_lexical_type_parameter,
         bind_local_argument_label, bind_local_function_callee, bind_local_value,
         guarded_local_value_rename, guarded_type_parameter_rename, local_call_signature,
-        local_value_occurrences, type_parameter_occurrences, visible_local_values,
+        local_value_occurrences, lookup_value, type_parameter_occurrences, visible_local_values,
     },
     lowering::{Declaration, lower_declarations, reference_site},
     structural_regions::build_regions,
@@ -15,7 +16,7 @@ use ktlsp_text::Range;
 use serde_json::{Value, json};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-const UNSUPPORTED: &str = "navigation requires a supported unambiguous function parameter or preceding local val binding; global resolution is unavailable";
+const UNSUPPORTED: &str = "navigation requires a supported unambiguous source binding";
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum HoverFormat {
@@ -197,13 +198,14 @@ pub(crate) fn render(
     query: Query,
     cancelled: &AtomicBool,
     response_id_bound: usize,
-) -> Result<Value, &'static str> {
+    mut imported: Option<&mut imported_definition::Context<'_>>,
+) -> ParserResult {
     if let Query::SignatureHelp { offset } = query {
         if response_id_bound
             .checked_add(256)
             .is_none_or(|bytes| bytes > 1_048_576)
         {
-            return Err("signature help response limit exceeded");
+            return Err("signature help response limit exceeded".into());
         }
         let lowered = lower_declarations(result, snapshot).map_err(|_| UNSUPPORTED)?;
         let directory = build_regions(&lowered, result, snapshot).map_err(|_| UNSUPPORTED)?;
@@ -236,6 +238,9 @@ pub(crate) fn render(
         }
     }
     let tree = result.tree_for(snapshot).map_err(|_| UNSUPPORTED)?;
+    if let Some(context) = imported.as_deref_mut() {
+        context.prepare_selected(tree);
+    }
     let offset = match &query {
         Query::SignatureHelp { offset }
         | Query::Definition { offset }
@@ -263,7 +268,7 @@ pub(crate) fn render(
                 || matches!(query, Query::Completion { .. }) && offset == element.end)
             && reference.replace((index, element)).is_some()
         {
-            return Err(UNSUPPORTED);
+            return Err(UNSUPPORTED.into());
         }
         if element.token
             && element.kind == "IDENTIFIER"
@@ -293,14 +298,14 @@ pub(crate) fn render(
         // without binding the unresolved prefix or resetting a per-item budget.
         let visible = visible_local_values(&directory, result, index, snapshot)
             .map_err(|_| "completion requires supported unambiguous finite local visibility")?;
-        return render_completion(&visible, snapshot.source(), offset);
+        return render_completion(&visible, snapshot.source(), offset).map_err(Into::into);
     }
     let rename_query = matches!(query, Query::PrepareRename { .. } | Query::Rename { .. });
     let occurrence_query =
         rename_query || matches!(query, Query::References { .. } | Query::Highlights { .. });
     if reference.is_none() && !declaration_hover && (!occurrence_query || !identifier) {
         if rename_query {
-            return Err(UNSUPPORTED);
+            return Err(UNSUPPORTED.into());
         }
         return Ok(Value::Null);
     }
@@ -324,7 +329,8 @@ pub(crate) fn render(
             format,
             response_id_bound,
             &mut budget,
-        );
+        )
+        .map_err(Into::into);
     }
     let lowered = lower_declarations(result, snapshot).map_err(|_| UNSUPPORTED)?;
     if declaration_hover {
@@ -336,9 +342,10 @@ pub(crate) fn render(
         });
         let target = declarations.next().ok_or(UNSUPPORTED)?;
         if declarations.next().is_some() || target.incomplete() {
-            return Err(UNSUPPORTED);
+            return Err(UNSUPPORTED.into());
         }
-        return render_target(tree.source(), snapshot, query, target, target.name_range());
+        return render_target(tree.source(), snapshot, query, target, target.name_range())
+            .map_err(Into::into);
     }
     let directory = build_regions(&lowered, result, snapshot).map_err(|_| UNSUPPORTED)?;
     if matches!(query, Query::Definition { .. })
@@ -351,7 +358,8 @@ pub(crate) fn render(
         let binding = bind_lexical_type_parameter(&directory, result, index, snapshot)
             .map_err(|_| UNSUPPORTED)?;
         let target = binding.target();
-        return render_target(tree.source(), snapshot, query, target, target.name_range());
+        return render_target(tree.source(), snapshot, query, target, target.name_range())
+            .map_err(Into::into);
     }
     if matches!(query, Query::Definition { .. })
         && let Some((index, expression)) = reference
@@ -363,7 +371,8 @@ pub(crate) fn render(
         let binding = bind_local_argument_label(&directory, result, index, snapshot)
             .map_err(|_| UNSUPPORTED)?;
         let target = binding.target();
-        return render_target(tree.source(), snapshot, query, target, target.name_range());
+        return render_target(tree.source(), snapshot, query, target, target.name_range())
+            .map_err(Into::into);
     }
     if matches!(query, Query::Definition { .. })
         && let Some((index, expression)) = reference
@@ -375,7 +384,8 @@ pub(crate) fn render(
         let binding = bind_local_function_callee(&directory, result, index, snapshot)
             .map_err(|_| UNSUPPORTED)?;
         let target = binding.target();
-        return render_target(tree.source(), snapshot, query, target, target.name_range());
+        return render_target(tree.source(), snapshot, query, target, target.name_range())
+            .map_err(Into::into);
     }
     if occurrence_query {
         let annotation_anchor = reference.filter(|(_, expression)| {
@@ -390,7 +400,7 @@ pub(crate) fn render(
             });
             let first = selected.next();
             if selected.next().is_some() {
-                return Err(UNSUPPORTED);
+                return Err(UNSUPPORTED.into());
             }
             first.filter(|declaration| declaration.kind() == "TYPE_PARAMETER")
         } else {
@@ -416,11 +426,12 @@ pub(crate) fn render(
                 .occurrences()
                 .iter()
                 .map(|annotation| annotation.range());
-            return if rename_query {
+            return (if rename_query {
                 render_rename(found.target(), ranges, snapshot, &query, offset)
             } else {
                 render_occurrences(found.target(), ranges, snapshot, &query)
-            };
+            })
+            .map_err(Into::into);
         }
     }
     if occurrence_query {
@@ -433,7 +444,7 @@ pub(crate) fn render(
             });
             let target = declarations.next().ok_or(UNSUPPORTED)?;
             if declarations.next().is_some() {
-                return Err(UNSUPPORTED);
+                return Err(UNSUPPORTED.into());
             }
             LocalValueAnchor::Declaration(target)
         };
@@ -453,7 +464,8 @@ pub(crate) fn render(
                 snapshot,
                 &query,
                 offset,
-            );
+            )
+            .map_err(Into::into);
         }
         let occurrences = local_value_occurrences(&directory, result, anchor, snapshot)
             .map_err(|_| UNSUPPORTED)?;
@@ -462,7 +474,8 @@ pub(crate) fn render(
             occurrences.occurrences().iter().map(|site| site.range()),
             snapshot,
             &query,
-        );
+        )
+        .map_err(Into::into);
     }
     let site = reference_site(
         &lowered,
@@ -471,8 +484,24 @@ pub(crate) fn render(
         reference.expect("reference-only query checked").0,
     )
     .map_err(|_| UNSUPPORTED)?;
-    let binding = bind_local_value(&directory, &site, snapshot).map_err(|_| UNSUPPORTED)?;
-    let target = binding.target();
+    let target = if matches!(query, Query::Definition { .. }) {
+        match lookup_value(&directory, &site, snapshot).map_err(|_| UNSUPPORTED)? {
+            ValueLookup::Local(binding) => binding.target(),
+            ValueLookup::Outer(outer) => {
+                return imported.ok_or(UNSUPPORTED)?.render(
+                    outer,
+                    &directory,
+                    result,
+                    snapshot,
+                    response_id_bound,
+                );
+            }
+        }
+    } else {
+        bind_local_value(&directory, &site, snapshot)
+            .map_err(|_| UNSUPPORTED)?
+            .target()
+    };
     let bytes = match query {
         Query::Definition { .. } => target.name_range(),
         Query::Hover { .. } => site.range(),
@@ -483,7 +512,7 @@ pub(crate) fn render(
         | Query::Rename { .. }
         | Query::Completion { .. } => unreachable!("rendered above"),
     };
-    render_target(tree.source(), snapshot, query, target, bytes)
+    render_target(tree.source(), snapshot, query, target, bytes).map_err(Into::into)
 }
 
 // This is literal source prose, not a Markdown renderer. Escaping every ASCII
@@ -1008,4 +1037,21 @@ mod documentation_rendering {
             })
         );
     }
+}
+
+#[cfg(test)]
+#[test]
+fn unsupported_navigation_error_fits_every_admitted_definition_id_envelope() {
+    // The serialized ID contributes identical bytes to request and response.
+    // Use the smallest valid definition envelope and account for an ASCII ID
+    // filling the frame without allocating a sixteen-MiB test string.
+    let request = json!({"jsonrpc":"2.0","id":"","method":"textDocument/definition",
+        "params":{"textDocument":{"uri":"u:"},"position":{"line":0,"character":0}}});
+    let response = crate::ParserFailure::from(UNSUPPORTED).response(json!(""));
+    let request_bytes = serde_json::to_vec(&request).unwrap().len();
+    let response_bytes = serde_json::to_vec(&response).unwrap().len();
+    let id_bytes = ktlsp_protocol::MAX_PAYLOAD_BYTES - request_bytes;
+    assert!(response_bytes + id_bytes <= ktlsp_protocol::MAX_PAYLOAD_BYTES);
+    assert_eq!(response["error"]["code"], -32803);
+    assert!(response.get("result").is_none());
 }

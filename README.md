@@ -68,6 +68,16 @@ The [#421 source-authority composition](https://github.com/anilbeesetti/ktlsp/is
 
 [#428](https://github.com/anilbeesetti/ktlsp/issues/428) delivers a native immutable-local type proof at the SAME verified main `21aab03`: original initializer-reference chains to existing integer defaults or original lexical type-parameter identity, with local annotation compatibility only by that SAME declaration identity. Complete original values were accepted before observation retirement; unchanged production and preserved real consumers received the cleaned union's OWN reviews/CI and independent feature OWNERS+ROOT original exact-main acceptance. Existing direct-integer/server envelopes remain strict. No nominal/builtin authority, general inference or new capability is claimed. [Native contract](crates/ktlsp-parser/README.md#snapshot-owned-immutable-local-value-types-428).
 
+[#436](https://github.com/anilbeesetti/ktlsp/issues/436) extends definition of a
+whole local immutable initializer reference through one ordinary explicit import
+to a unique supported default-public top-level `val` in another admitted file of
+the same closed production module. Original source/model authority and target
+UTF-16 coordinates survive actual two-file edits, close/reopen and manual reload;
+locals retain precedence. This is not general imports, library resolution or
+imported hover/references/rename/completion. [Contract and limits](crates/ktlsp-server/README.md#same-module-explicit-imported-property-definition-436);
+[original runtime evidence and final integration receipt](https://github.com/anilbeesetti/ktlsp/pull/437).
+The verified basic download archives remain pinned to `5926de3`, not this feature.
+
 
 Negotiated semantic-token full/range transport uses only positively known native lexer keyword/comment/string/number/operator categories. It handles strict UTF-16 clipping and multiline fragments without a worker; identifiers/template interiors have no guessed semantic identity. No delta, modifiers, semantic type coloring or official-token parity is claimed.
 

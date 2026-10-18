@@ -4,6 +4,7 @@
 mod cache;
 mod document_symbols;
 mod file_uri;
+mod imported_definition;
 mod input;
 mod semantic_navigation;
 mod semantic_tokens;
@@ -113,6 +114,12 @@ impl ParserFailure {
     }
 }
 
+impl From<&'static str> for ParserFailure {
+    fn from(message: &'static str) -> Self {
+        Self::Protocol(-32803, message)
+    }
+}
+
 fn parser_failure(error: ParserError) -> ParserFailure {
     let (code, message) = match error {
         ParserError::Cancelled => (-32800, "Request cancelled"),
@@ -162,7 +169,7 @@ struct PendingParser {
     snapshot: SourceSnapshot,
     authority: ParserAuthority,
     cancelled: Arc<AtomicBool>,
-    result: Receiver<(ParserResult, bool)>,
+    result: Receiver<(ParserResult, bool, Option<Arc<workspace_symbols::Capture>>)>,
     outcome: Arc<AtomicU8>,
 }
 impl PendingParser {
@@ -205,6 +212,12 @@ impl PendingWorkspaceSymbol {
 #[derive(Debug)]
 enum SymbolRequest {
     Document(Arc<str>),
+    Definition {
+        uri: Arc<str>,
+        incarnation: u64,
+        version: i32,
+        offset: usize,
+    },
     Workspace {
         query: String,
         budget: Box<workspace_symbols::Budget>,
@@ -774,7 +787,7 @@ impl Session {
             .and_then(|d| required(d, "uri"))
             .and_then(uri_value)
             .map_err(|e| (-32602, e))?;
-        self.start_parser_uri(id, method, uri, Some(map))
+        self.start_parser_uri(id, method, uri, Some(map), None)
     }
 
     fn start_parser_uri(
@@ -783,6 +796,7 @@ impl Session {
         method: &str,
         uri: &str,
         map: Option<&Map<String, Value>>,
+        definition_offset: Option<usize>,
     ) -> Result<(), (i32, &'static str)> {
         let document_uri = if method == "textDocument/documentSymbol" {
             self.workspace.overlay_uri(uri).unwrap_or(uri)
@@ -813,6 +827,8 @@ impl Session {
         }
         let query = if method == "textDocument/documentSymbol" {
             None
+        } else if let Some(offset) = definition_offset {
+            Some(semantic_navigation::Query::Definition { offset })
         } else {
             let map = map.ok_or((-32602, "parser request params missing"))?;
             let document =
@@ -874,6 +890,30 @@ impl Session {
                 _ => return Err((-32601, "Method not found")),
             })
         };
+        if let Some(semantic_navigation::Query::Definition { offset }) = &query
+            && self.pending_import.as_ref().is_some_and(|pending| {
+                !pending.cancelled.load(Ordering::Relaxed)
+                    && pending.attempt == self.workspace.attempt
+            })
+        {
+            if self.pending_requests() >= MAX_PENDING_PARSER_REQUESTS {
+                return Err((-32803, "native analysis capacity exhausted"));
+            }
+            self.waiting_symbols
+                .try_reserve(1)
+                .map_err(|_| (-32803, "definition waiter allocation failed"))?;
+            self.waiting_symbols.push(WaitingSymbol {
+                id,
+                request: SymbolRequest::Definition {
+                    uri: document_uri.into(),
+                    incarnation: self.incarnations[document_uri],
+                    version: document.expect("definition requires open source").version(),
+                    offset: *offset,
+                },
+                attempt: self.workspace.attempt,
+            });
+            return Ok(());
+        }
         if self.pending_requests() >= MAX_PENDING_PARSER_REQUESTS {
             return Err((-32803, "parser worker capacity exhausted"));
         }
@@ -936,11 +976,24 @@ impl Session {
             .ok_or((-32803, "hover response id limit exceeded"))?;
         let cancelled = Arc::new(AtomicBool::new(false));
         let worker_cancelled = Arc::clone(&cancelled);
+        // Capture coherently on the Session owner before the thread starts.
+        // Admission failure is deferred: successful local definitions do not
+        // depend on unrelated workspace availability, contents or resource use.
+        let mut imported_capture =
+            matches!(&query, Some(semantic_navigation::Query::Definition { .. })).then(|| {
+                let mut budget = workspace_symbols::Budget::default();
+                let capture = self
+                    .workspace
+                    .capture_all(&self.documents, &self.incarnations, &mut budget, &cancelled)
+                    .map(Arc::new);
+                (capture, budget)
+            });
         let (sender, result) = mpsc::sync_channel(1);
         let thread = thread::Builder::new()
             .name("ktlsp-parser".into())
             .spawn(move || {
                 let mut cleanup_confirmed = true;
+                let mut publication = None;
                 let mut import_budget =
                     matches!(&worker_authority, ParserAuthority::Imported { .. })
                         .then(ktlsp_import::source_inventory::Budget::default);
@@ -948,21 +1001,52 @@ impl Session {
                     if let Some(budget) = import_budget.as_mut() {
                         worker_authority.verify(budget, &worker_cancelled)?;
                     }
+                    if let Some((capture, budget)) = imported_capture.as_mut()
+                        && capture.is_ok()
+                        && budget
+                            .storage(worker_snapshot.source().len())
+                            .and_then(|_| {
+                                budget.retained_parse(
+                                    worker_snapshot.source().len(),
+                                    &worker_cancelled,
+                                )
+                            })
+                            .is_err()
+                    {
+                        *capture = Err("imported definition aggregate limit exceeded");
+                    }
                     let (parsed, clean) = provider.parse(&worker_snapshot, &worker_cancelled);
                     cleanup_confirmed &= clean;
                     let parsed = parsed.map_err(parser_failure)?;
+                    if !clean {
+                        return Err(ParserFailure::Protocol(
+                            -32803,
+                            "parser I/O or cleanup failed",
+                        ));
+                    }
                     if worker_cancelled.load(Ordering::Relaxed) {
                         return Err(ParserFailure::Protocol(-32800, "Request cancelled"));
                     }
                     let rendered = if let Some(query) = query {
-                        semantic_navigation::render(
+                        let mut context = imported_capture.take().map(|(capture, budget)| {
+                            imported_definition::Context::new(
+                                capture,
+                                budget,
+                                &provider,
+                                &worker_cancelled,
+                                &mut cleanup_confirmed,
+                            )
+                        });
+                        let rendered = semantic_navigation::render(
                             &parsed,
                             &worker_snapshot,
                             query,
                             &worker_cancelled,
                             response_id_bound,
-                        )
-                        .map_err(|error| ParserFailure::Protocol(-32803, error))
+                            context.as_mut(),
+                        );
+                        publication = context.and_then(imported_definition::Context::publication);
+                        rendered
                     } else {
                         let tree = parsed.tree_for(&worker_snapshot).map_err(|_| {
                             ParserFailure::Protocol(-32801, "parser snapshot is stale")
@@ -975,7 +1059,7 @@ impl Session {
                     }
                     Ok(rendered)
                 })();
-                let _ = sender.send((result, cleanup_confirmed));
+                let _ = sender.send((result, cleanup_confirmed, publication));
             })
             .map_err(|_| (-32803, "parser worker could not start"))?;
         let outcome = Arc::new(AtomicU8::new(0));
@@ -1201,7 +1285,7 @@ impl Session {
             .collect()
     }
 
-    fn cancel_imported(&mut self, code: i32, message: &str) -> Vec<Value> {
+    fn cancel_imported_symbols(&mut self, code: i32, message: &str) -> Vec<Value> {
         let mut responses: Vec<_> = self
             .pending_parser
             .iter_mut()
@@ -1213,6 +1297,21 @@ impl Session {
                 .iter_mut()
                 .filter_map(|pending| pending.cancel(code, message)),
         );
+        responses.extend(
+            self.waiting_symbols
+                .extract_if(.., |pending| {
+                    !matches!(&pending.request, SymbolRequest::Definition { .. })
+                })
+                .map(|pending| response_error(pending.id, code, message)),
+        );
+        responses
+    }
+
+    fn cancel_imported(&mut self, code: i32, message: &str) -> Vec<Value> {
+        let mut responses = self.cancel_imported_symbols(code, message);
+        // Explicit cancellation/configuration/reload supersession still revokes
+        // all waiters. File notifications only revoke known imported symbols;
+        // queued definitions recheck their own requester on actual resume.
         responses.extend(
             self.waiting_symbols
                 .drain(..)
@@ -1285,7 +1384,9 @@ impl Session {
                 responses.extend(self.import_response(pending.id.take(), result));
                 let waiting = std::mem::take(&mut self.waiting_symbols);
                 for request in waiting {
-                    if committed && request.attempt == pending.attempt {
+                    if (committed || matches!(&request.request, SymbolRequest::Definition { .. }))
+                        && request.attempt == pending.attempt
+                    {
                         let id = request.id;
                         let started = match request.request {
                             SymbolRequest::Document(uri) => self.start_parser_uri(
@@ -1293,7 +1394,31 @@ impl Session {
                                 "textDocument/documentSymbol",
                                 &uri,
                                 None,
+                                None,
                             ),
+                            SymbolRequest::Definition {
+                                uri,
+                                incarnation,
+                                version,
+                                offset,
+                            } => {
+                                if self.incarnations.get(uri.as_ref()) != Some(&incarnation)
+                                    || !self
+                                        .documents
+                                        .get(uri.as_ref())
+                                        .is_some_and(|document| document.version() == version)
+                                {
+                                    Err((-32801, "parser snapshot is stale"))
+                                } else {
+                                    self.start_parser_uri(
+                                        id.clone(),
+                                        "textDocument/definition",
+                                        &uri,
+                                        None,
+                                        Some(offset),
+                                    )
+                                }
+                            }
                             SymbolRequest::Workspace { query, budget } => {
                                 self.start_workspace_symbol_query(id.clone(), query, *budget)
                             }
@@ -1341,12 +1466,14 @@ impl Session {
                 continue;
             }
             let mut pending = self.pending_parser.swap_remove(index);
+            let mut imported_capture = None;
             let result = if outcome != 1 {
                 self.cleanup_confirmed = false;
                 Err(ParserFailure::Protocol(-32803, "parser worker failed"))
             } else {
                 match pending.result.try_recv() {
-                    Ok((result, cleanup_confirmed)) => {
+                    Ok((result, cleanup_confirmed, capture)) => {
+                        imported_capture = capture;
                         self.cleanup_confirmed &= cleanup_confirmed;
                         result
                     }
@@ -1374,6 +1501,11 @@ impl Session {
                     snapshot, epoch, ..
                 } => self.workspace.fresh(snapshot, *epoch),
             };
+            let fresh = fresh
+                && imported_capture.as_ref().is_none_or(|capture| {
+                    self.workspace
+                        .fresh_all(capture, &self.documents, &self.incarnations)
+                });
             let result = if !fresh {
                 Err(ParserFailure::Protocol(-32801, "parser snapshot is stale"))
             } else if pending.cancelled.load(Ordering::Relaxed) {
@@ -1644,7 +1776,8 @@ impl Session {
                 .expect("validated URI");
             let mut responses = self.cancel_parser(Some(uri), -32801, "parser snapshot is stale");
             if workspace::is_file_uri(uri) && (method != "textDocument/didClose" || closing_open) {
-                responses.extend(self.cancel_imported(-32801, "workspace snapshot is stale"));
+                responses
+                    .extend(self.cancel_imported_symbols(-32801, "workspace snapshot is stale"));
             }
             responses
         } else {

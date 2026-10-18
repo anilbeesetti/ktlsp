@@ -4824,4 +4824,215 @@ mod tests {
         assert_eq!(over.emitted, 2);
         assert_eq!(over.reservations, 2);
     }
+    fn imported_name(tree: &mut Tree, segments: &[&str]) {
+        if segments.len() > 1 {
+            tree.open("DOT_QUALIFIED_EXPRESSION");
+            imported_name(tree, &segments[..segments.len() - 1]);
+            tree.token("DOT", ".");
+            imported_name(tree, &segments[segments.len() - 1..]);
+            tree.close();
+        } else {
+            tree.open("REFERENCE_EXPRESSION");
+            tree.token("IDENTIFIER", segments[0]);
+            tree.close();
+        }
+    }
+
+    fn imported_fixture(requester: bool, unknown_call: bool) -> SnapshotResult {
+        let mut tree = Tree::new();
+        tree.open("PACKAGE_DIRECTIVE");
+        tree.token("PACKAGE_KEYWORD", "package");
+        tree.token("WHITE_SPACE", " ");
+        imported_name(&mut tree, &[if requester { "app" } else { "values" }]);
+        tree.close();
+        tree.token("WHITE_SPACE", "\n");
+        if requester {
+            tree.open("IMPORT_LIST");
+            tree.open("IMPORT_DIRECTIVE");
+            tree.token("IMPORT_KEYWORD", "import");
+            tree.token("WHITE_SPACE", " ");
+            imported_name(&mut tree, &["values", "x"]);
+            tree.close();
+            tree.close();
+            tree.token("WHITE_SPACE", "\n");
+            tree.header("f");
+            tree.open("VALUE_PARAMETER_LIST");
+            tree.token("LPAR", "(");
+            tree.token("RPAR", ")");
+            tree.close();
+            tree.open("BLOCK");
+            tree.token("LBRACE", "{");
+            local_val(&mut tree, "REFERENCE_EXPRESSION");
+            if unknown_call {
+                tree.token("SEMICOLON", ";");
+                tree.open("CALL_EXPRESSION");
+                imported_name(&mut tree, &["unknown"]);
+                tree.open("VALUE_ARGUMENT_LIST");
+                tree.token("LPAR", "(");
+                tree.token("RPAR", ")");
+                tree.close();
+                tree.close();
+            }
+            tree.token("RBRACE", "}");
+            tree.close();
+            tree.close();
+        } else {
+            tree.open("PROPERTY");
+            tree.token("VAL_KEYWORD", "val");
+            tree.token("WHITE_SPACE", " ");
+            tree.token("IDENTIFIER", "x");
+            tree.token("EQ", "=");
+            tree.open("INTEGER_CONSTANT");
+            tree.token("INTEGER_LITERAL", "1");
+            tree.close();
+            tree.token("SEMICOLON", ";");
+            tree.close();
+        }
+        let mut result = tree.finish();
+        result.snapshot.document = Arc::from(if requester { "requester" } else { "target" });
+        result
+    }
+
+    #[test]
+    fn imported_lookup_has_one_cumulative_exact_work_boundary_and_no_storage() {
+        use crate::{
+            local_value_binding::{LocalBindingError, ValueLookup, lookup_value_with_budget},
+            structural_regions::build_regions,
+        };
+        let request = imported_fixture(true, false);
+        let target = imported_fixture(false, false);
+        let request_lower = lower(&request).unwrap();
+        let target_lower = lower(&target).unwrap();
+        let request_regions = build_regions(&request_lower, &request, request.snapshot()).unwrap();
+        let target_regions = build_regions(&target_lower, &target, target.snapshot()).unwrap();
+        let selected = request
+            .parsed
+            .elements
+            .iter()
+            .position(|e| {
+                e.kind == "REFERENCE_EXPRESSION"
+                    && e.parent
+                        .is_some_and(|p| request.parsed.elements[p].kind == "PROPERTY")
+            })
+            .unwrap();
+        let site = reference_site(&request_lower, &request, request.snapshot(), selected).unwrap();
+        let files = [
+            (&request_regions, &request, request.snapshot()),
+            (&target_regions, &target, target.snapshot()),
+        ];
+        let resolve = |allowance| {
+            let lookup = lookup_value_with_budget(
+                &request_regions,
+                &site,
+                request.snapshot(),
+                ReferenceBudget {
+                    work: WORK - allowance,
+                    // No query allocation: exact zero remaining storage is valid.
+                    requested: REQUESTED,
+                    retained: RETAINED,
+                },
+            )?;
+            match lookup {
+                ValueLookup::Outer(outer) => outer.resolve_import(&files),
+                ValueLookup::Local(_) => panic!("foreign source is not a local"),
+            }
+        };
+        // Determine the exact allowance from the real composed operation, not
+        // an independently maintained guessed charge sum.
+        let (mut low, mut high) = (0, WORK);
+        while low < high {
+            let middle = low + (high - low) / 2;
+            match resolve(middle) {
+                Ok(_) => high = middle,
+                Err(LocalBindingError::Resource) => low = middle + 1,
+                Err(error) => panic!("unexpected boundary refusal: {error:?}"),
+            }
+        }
+        let binding = resolve(low).unwrap();
+        assert!(std::ptr::eq(binding.site(), &site));
+        assert!(std::ptr::eq(binding.result(), &target));
+        assert!(std::ptr::eq(binding.directory(), &target_regions));
+        assert!(std::ptr::eq(
+            binding.target(),
+            &target_lower.declarations()[0]
+        ));
+        assert!(std::ptr::eq(binding.import(), &request_lower.imports()[0]));
+        assert!(low > 0);
+        assert_eq!(resolve(low - 1).unwrap_err(), LocalBindingError::Resource);
+        let lookup = lookup_value_with_budget(
+            &request_regions,
+            &site,
+            request.snapshot(),
+            ReferenceBudget {
+                work: WORK - low + 1,
+                ..ReferenceBudget::default()
+            },
+        )
+        .unwrap();
+        let ValueLookup::Outer(outer) = lookup else {
+            panic!("expected continuation")
+        };
+        assert_eq!(
+            outer.resolve_import(&files).unwrap_err(),
+            LocalBindingError::Resource
+        );
+        // A later nonmatching producer can be structurally lowered as an outline
+        // yet fail the complete immutable-property grammar. Never publish prefix.
+        let mut late_tree = Tree::new();
+        late_tree.open("PROPERTY");
+        late_tree.token("VAL_KEYWORD", "val");
+        late_tree.token("WHITE_SPACE", " ");
+        late_tree.token("IDENTIFIER", "ignored");
+        late_tree.close();
+        let mut late = late_tree.finish();
+        late.snapshot.document = Arc::from("late");
+        let late_lower = lower(&late).unwrap();
+        let late_regions = build_regions(&late_lower, &late, late.snapshot()).unwrap();
+        let lookup = lookup_value_with_budget(
+            &request_regions,
+            &site,
+            request.snapshot(),
+            ReferenceBudget::default(),
+        )
+        .unwrap();
+        let ValueLookup::Outer(outer) = lookup else {
+            panic!("expected continuation")
+        };
+        assert_eq!(
+            outer
+                .resolve_import(&[files[0], files[1], (&late_regions, &late, late.snapshot()),])
+                .unwrap_err(),
+            LocalBindingError::UnsupportedContext
+        );
+    }
+
+    #[test]
+    fn unrelated_unresolved_call_never_constructs_outer_certificate() {
+        use crate::{
+            local_value_binding::{LocalBindingError, bind_local_value, lookup_value},
+            structural_regions::build_regions,
+        };
+        let request = imported_fixture(true, true);
+        let lower = lower(&request).unwrap();
+        let regions = build_regions(&lower, &request, request.snapshot()).unwrap();
+        let selected = request
+            .parsed
+            .elements
+            .iter()
+            .position(|e| {
+                e.kind == "REFERENCE_EXPRESSION"
+                    && e.parent
+                        .is_some_and(|p| request.parsed.elements[p].kind == "PROPERTY")
+            })
+            .unwrap();
+        let site = reference_site(&lower, &request, request.snapshot(), selected).unwrap();
+        assert_eq!(
+            bind_local_value(&regions, &site, request.snapshot()).unwrap_err(),
+            LocalBindingError::NoEligibleLocal
+        );
+        assert_eq!(
+            lookup_value(&regions, &site, request.snapshot()).unwrap_err(),
+            LocalBindingError::NoEligibleLocal
+        );
+    }
 }

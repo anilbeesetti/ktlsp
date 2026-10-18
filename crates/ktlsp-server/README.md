@@ -723,6 +723,42 @@ job `117322423948`, and cleared the lease. See the
 and [verified integration ledger](../../docs/status/development.md#verified416-integration-and-next418419-prerequisite-wave).
 This does not diagnose or close the first Windows #417 failure.
 
+## Same-module explicit imported property definition (#436)
+
+Definition on the whole reference in `val result = answer` can follow an ordinary
+explicit `import values.answer` to a unique supported, unmodified/default-public
+top-level immutable property in another admitted source file. The
+[explicit JSON source authority](#explicit-json-source-authority-421) must prove
+the SAME original closed production module;
+package names or paths never establish module ownership. Local/parameter targets
+win before import selection; existing type, label and call definitions stay intact.
+
+Alias/star selection, competing declarations/imports, mutable/richer declarations,
+test/mixed ownership and relevant Java/script/module/library/SDK competition
+refuse. Duplicate own-module source edges are allowed; unrelated catalogs are not
+invented competitors. Every candidate's original facts must be complete. There
+is no package-wide fallback, general overload/type resolution or extension of
+imported-value hover, references, rename, completion or signature help.
+
+The existing globally owned eight-slot job parses selected and secondary sources
+sequentially; failed/unproved cleanup stops delegation, and join precedes publication.
+One aggregate allowance precharges retained CST/positions/facts/output, keeping
+the existing 1,024-source/16 MiB-source/32 MiB-logical-storage/256 MiB-work ceilings
+and per-parse 64 KiB/500 ms/16K-element/depth128 limits. Conservative reservations
+permit far fewer than 1,024 successful parses; no RSS or aggregate latency promise.
+Original model/closed-source checks surround global work, including negative
+sources; all used overlay incarnations/versions/bytes are revalidated at publication.
+Initial-import definition waiters retain their own requester version/incarnation
+through unrelated file notifications; explicit cancellation/reload still revokes them.
+
+Returned URI/name UTF-16 range belongs to the original target source, including
+canonical aliases and current target overlays. Close restores disk authority;
+new source additions require manual reload. [PR437](https://github.com/anilbeesetti/ktlsp/pull/437)
+links the original actual stdio two-file edit/reopen/reload proof and the
+separate final-head review/CI/guarded-integration receipts; neither gate can
+substitute for the other. Basic downloadable archives remain exact `5926de3`;
+no IDE/full-parity or historical-cause repair follows.
+
 ## Finite local definition and declaration hover
 
 Over open Kotlin documents, a strict UTF-16 position selects an actual original value `REFERENCE_EXPRESSION` containing that position (end-exclusive). The existing declaration lowerer, structural-region directory, authenticated `ReferenceSite` and `bind_local_value` prove a unique eligible preceding direct immutable local `val` or same-function ordinary parameter. Only ordinary named top-level block functions with complete plain integer/whole-identifier local initializers and simple syntax-only parameter/local annotations are eligible. Definition returns the original target **name** range and same URI. Hover returns the original target **declaration text** (`p: T` for a parameter) and original reference range: no invented types, initializer chasing or inferred global unresolvedness.
@@ -780,7 +816,7 @@ At first changed-diagnostic union source `2c940228bb4af10f76020503ce007dbd1cfa8b
 
 Only the observed temporary capture writer was removed afterward; all behavioral assertions and production logic remain. This receipt describes that first union source, not execution of the cleanup head or main, an extracted release archive, official parity or a fix for #377. The earlier #377 failures were not reproduced or explained by the changed diagnostic. No local parser/server runtime was run under #96; final cleanup/integration reviews and CI remain separate.
 
-Non-reference positions can return null. Unsupported contexts/names, queried-name duplicates, self/forward references without an eligible parameter fallback, and no eligible target return RequestFailed (`-32803`), not a claim that a symbol is globally unresolved. Malformed/out-of-range/surrogate-interior positions or unopened documents return InvalidParams (`-32602`). No imports, cross-file/project/member/full Kotlin resolution, type inference, full navigation or official parity is claimed.
+Non-reference positions can return null. Unsupported contexts/names, queried-name duplicates, self/forward references without an eligible parameter fallback, and no eligible target return RequestFailed (`-32803`), not a claim that a symbol is globally unresolved. Malformed/out-of-range/surrogate-interior positions or unopened documents return InvalidParams (`-32602`). Apart from the separately bounded #436 imported-property definition above, no general imports, cross-project/member/full Kotlin resolution, type inference, full navigation or official parity is claimed.
 
 `textDocument.hover.contentFormat` selects the first recognized client preference (`plaintext` or `markdown`); absent lists default to plaintext. Empty, malformed or wholly incompatible lists disable hover without breaking initialize or other providers. Markdown uses a Kotlin code fence longer than every backtick run in the source declaration, so untrusted source cannot close it; plaintext is emitted only when negotiated/defaulted. Source and response remain bounded by the existing parser input ceiling.
 

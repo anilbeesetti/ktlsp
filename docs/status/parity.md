@@ -303,3 +303,18 @@ diagnostics/refactorings or official Kotlin LSP equivalence. Full parity is NOT
 achieved. Old FAILED/causeUNKNOWN and96/431/417/T004/native-only/B3/oracle holds
 remain unchanged; current success is not diagnosis of historical deadlines.
 
+
+## Finite explicit imported-property definition (#436)
+
+[PR437](https://github.com/anilbeesetti/ktlsp/pull/437) adds same-original-closed-
+production-module definition through one ordinary explicit source import, not
+general project imports, library types, imported hover/references/refactoring or
+full Kotlin LSP parity. Original union `7fe8bd8` passed all 23 new behavioral cases
+and original full Linux/macOS/Windows suites. Actual Mac/Windows stdio values
+include genuine edits to both sources, target UTF-16 movement, rename/import/use,
+canonical aliases, close/reopen/manual reload and preserved local/type/call paths.
+Those original-source observations do not substitute for the final documentation
+head's own reviews/CI, guarded squash or independent original exact-main receipt;
+use PR437 for that separate evidence. Archives remain exact5926, all historical
+FAILED/UNKNOWN and native-only/#96/T004/B3/oracle limits remain, full parity is NOT achieved.
+

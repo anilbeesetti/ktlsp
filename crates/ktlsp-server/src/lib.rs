@@ -967,30 +967,16 @@ impl Session {
                 .ok_or((-32601, "Method not found"))?,
         );
         let client = self.symbol_client.clone();
-        // Hover counts actual escaped ID bytes without a serialization copy.
-        // Definition retains its existing conservative error-envelope contract.
-        let response_id_bound = if matches!(&query, Some(semantic_navigation::Query::Hover { .. }))
-        {
-            if let Some(id) = id.as_str() {
-                workspace_symbols::json_string_bytes(id)
-            } else if let Some(id) = id.as_u64() {
-                Some(id.checked_ilog10().unwrap_or(0) as usize + 1)
-            } else {
-                let id = id.as_i64().expect("validated integer request id");
-                Some(
-                    id.unsigned_abs().checked_ilog10().unwrap_or(0) as usize
-                        + 1
-                        + usize::from(id < 0),
-                )
-            }
-        } else {
-            id.as_str().map_or(Some(20), |id| {
+        // Keep the shared conservative escaped-ID allowance for every consumer.
+        // Imported hover must not change existing documentation resource policy.
+        let response_id_bound = id
+            .as_str()
+            .map_or(Some(20), |id| {
                 id.len()
                     .checked_mul(6)
                     .and_then(|bytes| bytes.checked_add(2))
             })
-        }
-        .ok_or((-32803, "hover response id limit exceeded"))?;
+            .ok_or((-32803, "hover response id limit exceeded"))?;
         let cancelled = Arc::new(AtomicBool::new(false));
         let worker_cancelled = Arc::clone(&cancelled);
         // Capture coherently on the Session owner before the thread starts.

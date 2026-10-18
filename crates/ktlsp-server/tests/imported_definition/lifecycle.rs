@@ -792,7 +792,7 @@ fn imported_hover_reads_target_overlay_but_keeps_requester_utf16_range_through_e
     );
     assert_hover(
         source_reply(&replies, 3),
-        "val /* 🦀 */ `answer😀` = 29",
+        replacement,
         source,
         source.rfind(name).unwrap(),
         name.len(),
@@ -814,7 +814,7 @@ fn imported_hover_reads_target_overlay_but_keeps_requester_utf16_range_through_e
     );
     assert_hover(
         source_reply(&replies, 4),
-        "val /* 🦀 */ `answer😀` = 29",
+        replacement,
         &requester,
         requester.rfind(name).unwrap(),
         name.len(),
@@ -822,6 +822,11 @@ fn imported_hover_reads_target_overlay_but_keeps_requester_utf16_range_through_e
 
     let renamed = "`renamed🦀`";
     let renamed_target = target.replace(name, renamed);
+    let renamed_declaration = renamed_target
+        .strip_prefix("package values\r\n")
+        .unwrap()
+        .strip_suffix("\r\n")
+        .unwrap();
     assert!(
         session
             .handle(
@@ -856,7 +861,7 @@ fn imported_hover_reads_target_overlay_but_keeps_requester_utf16_range_through_e
     );
     assert_hover(
         source_reply(&replies, 6),
-        "val /* 🦀 */ `renamed🦀` = 29",
+        renamed_declaration,
         &renamed_requester,
         renamed_requester.rfind(renamed).unwrap(),
         renamed.len(),
@@ -891,7 +896,7 @@ fn imported_hover_reads_target_overlay_but_keeps_requester_utf16_range_through_e
     );
     assert_hover(
         source_reply(&replies, 8),
-        "val /* 🦀 */ `renamed🦀` = 29",
+        renamed_declaration,
         &renamed_requester,
         renamed_requester.rfind(renamed).unwrap(),
         renamed.len(),
@@ -916,7 +921,7 @@ fn imported_hover_reads_target_overlay_but_keeps_requester_utf16_range_through_e
     );
     assert_hover(
         source_reply(&replies, 9),
-        "val /* 🦀 */ `renamed🦀` = 29",
+        renamed_declaration,
         &renamed_requester,
         renamed_requester.rfind(renamed).unwrap(),
         renamed.len(),

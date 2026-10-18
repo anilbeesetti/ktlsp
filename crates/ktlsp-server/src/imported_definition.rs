@@ -1,9 +1,13 @@
-//! Finite explicit-import value definition over original captured module facts.
+//! Finite explicit-import value navigation over original captured module facts.
 //! No persistent index, guessed source ownership or successful partial directory.
-use crate::{ParserFailure, ParserResult, document_symbols, structure, workspace_symbols};
+use crate::{
+    ParserFailure, ParserResult, document_symbols,
+    semantic_navigation::{HoverFormat, Query},
+    structure, workspace_symbols,
+};
 use ktlsp_parser::{
     Parsed, SnapshotResult, SourceSnapshot,
-    local_value_binding::OuterValueLookup,
+    local_value_binding::{ImportedValueBinding, OuterValueLookup},
     lowering::lower_declarations,
     structural_regions::{RegionDirectory, build_regions},
 };
@@ -58,6 +62,7 @@ impl<'a> Context<'a> {
         directory: &'b RegionDirectory<'b>,
         result: &'b SnapshotResult,
         current: &SourceSnapshot,
+        query: &Query,
         response_id_bound: usize,
     ) -> ParserResult {
         // Every error on this finite path also fits this fixed envelope bound.
@@ -176,6 +181,16 @@ impl<'a> Context<'a> {
                 files.push((directory, parsed, &capture.members[*index].source));
             }
             let binding = outer.resolve_import(&files).map_err(|_| UNSUPPORTED)?;
+            if let Query::Hover { format, .. } = query {
+                return render_hover(
+                    &binding,
+                    current,
+                    *format,
+                    response_id_bound,
+                    &mut self.budget,
+                    self.cancelled,
+                );
+            }
             let target = binding.target().name_range();
             let source = binding.result().snapshot();
             self.budget
@@ -213,4 +228,102 @@ impl<'a> Context<'a> {
         self.budget.verify_capture(capture, self.cancelled)?;
         answer
     }
+}
+
+fn render_hover(
+    binding: &ImportedValueBinding<'_>,
+    requester: &SourceSnapshot,
+    format: HoverFormat,
+    response_id_bound: usize,
+    budget: &mut workspace_symbols::Budget,
+    cancelled: &AtomicBool,
+) -> ParserResult {
+    let declaration = binding
+        .result()
+        .snapshot()
+        .source()
+        .get(binding.target().range())
+        .ok_or(UNSUPPORTED)?;
+    // The original binding authenticates BOTH producers: contents belong to the
+    // target, but positions must sweep the requester's original reference site.
+    let reference = binding.site().range();
+    let markdown = matches!(format, HoverFormat::Markdown);
+    budget
+        .work(declaration.len(), cancelled)
+        .map_err(|_| LIMIT)?;
+    let escaped = workspace_symbols::json_string_bytes(declaration).ok_or(LIMIT)?;
+    let fence = if markdown {
+        budget
+            .work(declaration.len(), cancelled)
+            .map_err(|_| LIMIT)?;
+        3.max(
+            declaration
+                .split(|character| character != '`')
+                .map(str::len)
+                .max()
+                .unwrap_or(0)
+                .checked_add(1)
+                .ok_or(LIMIT)?,
+        )
+    } else {
+        0
+    };
+    let extra = if markdown {
+        fence
+            .checked_mul(2)
+            .and_then(|bytes| bytes.checked_add(8))
+            .ok_or(LIMIT)?
+    } else {
+        0
+    };
+    let size = declaration.len().checked_add(extra).ok_or(LIMIT)?;
+    // Two fence newlines each cost one extra escaped byte. The counted source
+    // string includes its quotes; 256 covers keys/kind, range digits and frame.
+    let frame = escaped
+        .checked_add(extra)
+        .and_then(|bytes| bytes.checked_add(if markdown { 2 } else { 0 }))
+        .and_then(|bytes| bytes.checked_add(response_id_bound))
+        .and_then(|bytes| bytes.checked_add(256))
+        .ok_or(LIMIT)?;
+    if frame > ktlsp_protocol::MAX_PAYLOAD_BYTES {
+        return Err(ParserFailure::Protocol(
+            -32803,
+            "imported hover response limit exceeded",
+        ));
+    }
+    // Reserve the single owned source value, eventual escaped frame and fixed
+    // JSON-map/key storage before allocating either source content or JSON.
+    budget
+        .storage(
+            size.checked_add(frame)
+                .and_then(|bytes| bytes.checked_add(4096))
+                .ok_or(LIMIT)?,
+        )
+        .map_err(|_| LIMIT)?;
+    budget
+        .work(
+            size.checked_add(frame)
+                .and_then(|bytes| bytes.checked_add(requester.source().len()))
+                .ok_or(LIMIT)?,
+            cancelled,
+        )
+        .map_err(|_| LIMIT)?;
+    let mut value = String::new();
+    value.try_reserve_exact(size).map_err(|_| LIMIT)?;
+    if markdown {
+        value.extend(std::iter::repeat_n('`', fence));
+        value.push_str("kotlin\n");
+    }
+    value.push_str(declaration);
+    if markdown {
+        value.push('\n');
+        value.extend(std::iter::repeat_n('`', fence));
+    }
+    let positions = structure::positions(requester.source(), &[reference.start, reference.end]);
+    let mut answer = json!({
+        "contents":{"kind":if markdown { "markdown" } else { "plaintext" },"value":null},
+        "range":{"start":positions[0],"end":positions[1]}
+    });
+    answer["contents"]["value"] = serde_json::Value::String(value);
+    Ok(answer)
 }

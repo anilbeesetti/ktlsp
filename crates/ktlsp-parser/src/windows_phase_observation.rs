@@ -5,7 +5,6 @@ use std::{
     collections::hash_map::RandomState,
     hash::BuildHasher,
     io::{self, Read, Write},
-    net::{Ipv4Addr, SocketAddr, UdpSocket},
     path::{Path, PathBuf},
     process::{Command, ExitStatus},
     sync::atomic::{AtomicBool, AtomicI32, AtomicU8, AtomicU64, Ordering},
@@ -14,8 +13,9 @@ use std::{
 
 const SOURCE: &str = "class Box {}\nfun f(p: Long) { val x = 1; val y = x }\n";
 const REQUEST_CAP: u64 = 16;
-const PACKET_CAP: usize = 32;
-const RECEIVE_CAP: usize = 64;
+const RECORD_CAP: usize = 32;
+const LINE_CAP: usize = 256;
+const WORKER_FILE_CAP: usize = RECORD_CAP * LINE_CAP;
 const FILE_CAP: usize = 32 * 1024;
 static REQUESTS: AtomicU64 = AtomicU64::new(0);
 
@@ -221,11 +221,13 @@ struct CleanupAttempt {
     wait: Option<IoResult>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct Packet {
+struct WorkerLine {
     v: u8,
-    token: u64,
+    capture_id: u64,
+    server_pid: u32,
+    request_seq: u64,
     pid: u32,
     seq: u8,
     stage: u8,
@@ -240,33 +242,43 @@ fn required_wall<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<u128>,
 }
 #[derive(Serialize)]
 struct Event {
-    v: u8,
-    token_redacted: bool,
-    token_and_spawned_pid_match: bool,
-    pid: u32,
-    seq: u8,
-    stage: u8,
-    elapsed_ns: u64,
-    unix_ns: Option<u128>,
-    detail: u64,
-    failed_before: u8,
+    #[serde(flatten)]
+    record: WorkerLine,
+    correlation_and_spawned_pid_match: bool,
     receipt_after_cleanup_ns: u64,
 }
 #[derive(Default, Serialize)]
 struct WorkerRecords {
-    records: [Option<Event>; PACKET_CAP],
-    received: u32,
+    records: [Option<Event>; RECORD_CAP],
+    read_start_ns: Option<u64>,
+    read_end_ns: Option<u64>,
+    read_not_attempted: bool,
+    missing_file: Option<bool>,
+    open_error: Option<IoResult>,
+    read_error: Option<IoResult>,
+    read_bytes: usize,
+    eof_observed: bool,
+    over_limit: bool,
+    complete_lines_observed: usize,
+    lines_examined: usize,
+    line_limit_exceeded: bool,
+    partial_tail: bool,
+    partial_tail_bytes: usize,
+    oversize_lines: u32,
     retained: u32,
-    invalid: u32,
+    invalid_lines: u32,
     duplicate_sequence: u32,
     duplicate_stage: u32,
-    overflow: u32,
-    receive_error: Option<IoResult>,
-    receive_budget_exhausted: bool,
-    queue_observed_empty: bool,
     sequence_gap_mask: u32,
+    sequence_out_of_order: u32,
     absent_stage_mask: u32,
+    prior_write_failures_reported: Option<u8>,
     before_exit_observed: bool,
+    before_exit_is_ok: Option<bool>,
+    unix_clock_missing: u32,
+    elapsed_clock_regressions: u32,
+    elapsed_clock_saturation_observed: bool,
+    complete_successful_stream: bool,
     tail_unknown: bool,
 }
 
@@ -275,6 +287,9 @@ pub(super) struct Observation {
     format_version: u8,
     server_pid: u32,
     request_seq: u64,
+    capture_id: u64,
+    worker_file_relative: String,
+    worker_file_configured: bool,
     request_cap: u64,
     request_cap_reached: bool,
     worker_pid: Option<u32>,
@@ -283,7 +298,6 @@ pub(super) struct Observation {
     parent_return_unix_ns: Option<u128>,
     times: Times,
     setup_error: Option<&'static str>,
-    setup_io_error: Option<IoResult>,
     spawn: Option<IoResult>,
     deadline_check_count: u64,
     first_deadline_check_ns: Option<u64>,
@@ -310,16 +324,14 @@ pub(super) struct Observation {
     finish_attempt: CleanupAttempt,
     drop_attempt: CleanupAttempt,
     worker: WorkerRecords,
-    limits: [(&'static str, usize); 4],
-    limitations: [&'static str; 11],
+    limits: [(&'static str, usize); 5],
+    limitations: [&'static str; 13],
     #[serde(skip)]
     origin: Instant,
     #[serde(skip)]
     dir: PathBuf,
     #[serde(skip)]
-    socket: Option<UdpSocket>,
-    #[serde(skip)]
-    token: u64,
+    worker_path: PathBuf,
     #[serde(skip)]
     site: &'static str,
     #[serde(rename = "cleanup_error_selection")]
@@ -361,11 +373,18 @@ impl Observation {
             }
         };
         let server_pid = std::process::id();
-        let token = RandomState::new().hash_one((server_pid, request_seq));
+        let capture_id = RandomState::new().hash_one((server_pid, request_seq));
+        let worker_file_relative =
+            format!("worker-{server_pid}-{request_seq}-{capture_id:016x}.jsonl");
+        let worker_path = dir.join(&worker_file_relative);
+        let worker_file_configured = worker_path.as_os_str().len() <= 4096;
         let mut observation = Self {
-            format_version: 1,
+            format_version: 2,
             server_pid,
             request_seq,
+            capture_id,
+            worker_file_relative,
+            worker_file_configured,
             request_cap: REQUEST_CAP,
             request_cap_reached: request_seq == REQUEST_CAP,
             worker_pid: None,
@@ -376,8 +395,7 @@ impl Observation {
                 setup_begin_ns,
                 ..Times::default()
             },
-            setup_error: None,
-            setup_io_error: None,
+            setup_error: (!worker_file_configured).then_some("worker_file_path_limit"),
             spawn: None,
             deadline_check_count: 0,
             first_deadline_check_ns: None,
@@ -405,44 +423,35 @@ impl Observation {
             drop_attempt: CleanupAttempt::default(),
             worker: WorkerRecords::default(),
             limits: [
-                ("worker_datagram_bytes", 256),
-                ("retained_worker_records", PACKET_CAP),
-                ("receive_attempts", RECEIVE_CAP),
+                ("worker_line_bytes_including_newline", LINE_CAP),
+                ("worker_file_bytes", WORKER_FILE_CAP),
+                ("worker_file_read_bytes", WORKER_FILE_CAP + 1),
+                ("retained_worker_records", RECORD_CAP),
                 ("parent_file_bytes", FILE_CAP),
             ],
             limitations: [
                 "Opt-in synthetic request only; at most 16 attempts per server process; later attempts have no record.",
-                "Observation perturbs timing, scheduling, allocation and socket/pipe behavior; overhead is not subtracted.",
+                "Observation perturbs timing, scheduling, allocation and pipe behavior. Synchronous worker file writes can block inside the unchanged deadline; overhead is not subtracted and there is no realtime/non-interference guarantee.",
                 "Parent ns uses the original deadline minus TIMEOUT; u64 nanoseconds saturate at u64::MAX.",
                 "Worker elapsed_ns is worker-local, not the parent clock; wall-clock ordering requires stable synchronized clocks.",
-                "UDP is lossy; absent phases/final packet do not prove a phase was not reached or a kill cause.",
+                "Missing files/phases, partial lines and absent final markers do not prove a phase was not reached, a write failed, or any OS/kill cause.",
                 "Worker receipts are after scoped cleanup/joins, not emit times; no predeadline readiness query is added.",
                 "I/O fields are sampled loads, not one atomic state; operation_return marks read/write completion, return is closure work (reader after channel-send attempt), not thread exit/input-close timing; read_zero marks a nonempty read returning zero.",
                 "Statuses come only from original try_wait/wait calls; no OS-cause attribution or postselection readiness probe.",
                 "Outcome covers piped supervision only; later parser decoding/validation/cancellation is not observed.",
-                "Nonce is redacted; not a raw datagram archive. Missing/partial files can reflect persistence failure or hanging cleanup.",
+                "Public capture_id, server/request IDs and actual childPID are correlation, not authentication against a same-user host. Raw worker JSONL is retained separately in the CI artifact; absent/partial files may reflect setup/write/persistence failure or hanging cleanup.",
                 "return_boundary_ns is before bounded serialization/persistence, not the instant the caller resumes; scope_return_ns is absent if spawn failed.",
+                "Only a bounded file prefix is read after cleanup. A partial tail with over-limit/read-error may be truncation of the observed prefix, not the actual file end. Prior write failures are a reported lower bound; no later marker can report a failed final write.",
+                "complete_successful_stream concerns only the observed 18-stage phase stream, not the allocator-aware exit code, parent outcome or later semantic result; those facts must be read separately.",
             ],
             origin,
             dir,
-            socket: None,
-            token,
+            worker_path,
             site: "capture_setup",
             cleanup_override: None,
         };
-        let setup = (|| {
-            let socket = UdpSocket::bind((Ipv4Addr::LOCALHOST, 0))?;
-            socket.set_nonblocking(true)?;
-            let address = socket.local_addr()?;
-            command
-                .env("KTLSP_WINDOWS_PHASE_ADDR", address.to_string())
-                .env("KTLSP_WINDOWS_PHASE_TOKEN", token.to_string());
-            observation.socket = Some(socket);
-            Ok::<_, io::Error>(())
-        })();
-        if let Err(error) = setup {
-            observation.setup_error = Some("loopback_channel_setup");
-            observation.setup_io_error = Some(IoResult::from::<()>(&Err(error)));
+        if observation.worker_file_configured {
+            command.env("KTLSP_WINDOWS_PHASE_FILE", &observation.worker_path);
         }
         observation.times.setup_end_ns = ns(origin, Instant::now());
         Some(observation)
@@ -606,97 +615,156 @@ impl Observation {
             error: result.as_ref().err().copied().map(error_name),
         });
     }
-    fn drain(&mut self) {
-        let Some(socket) = self.socket.as_ref() else {
-            self.worker.absent_stage_mask = (1 << 18) - 1;
-            self.worker.tail_unknown = true;
+    fn read_worker_file(&mut self) {
+        self.worker.absent_stage_mask = (1 << 18) - 1;
+        self.worker.tail_unknown = true;
+        if !self.worker_file_configured || self.worker_pid.is_none() {
+            self.worker.read_not_attempted = true;
             return;
-        };
-        let mut bytes = [0u8; 257];
-        let mut sequences = 0u32;
-        let mut stages = 0u32;
-        let mut max_seq = None::<u8>;
-        for attempt in 0..RECEIVE_CAP {
-            if attempt + 1 == RECEIVE_CAP {
-                self.worker.receive_budget_exhausted = true;
+        }
+        self.worker.read_start_ns = Some(ns(self.origin, Instant::now()));
+        let mut file = match std::fs::File::open(&self.worker_path) {
+            Ok(file) => {
+                self.worker.missing_file = Some(false);
+                file
             }
-            match socket.recv_from(&mut bytes) {
-                Ok((count, peer)) => {
-                    self.worker.received += 1;
-                    let packet = (count <= 256
-                        && matches!(peer, SocketAddr::V4(p) if p.ip().is_loopback()))
-                    .then(|| serde_json::from_slice::<Packet>(&bytes[..count]).ok())
-                    .flatten();
-                    let Some(packet) = packet else {
-                        self.worker.invalid += 1;
-                        continue;
-                    };
-                    if packet.v != 1
-                        || packet.token != self.token
-                        || Some(packet.pid) != self.worker_pid
-                        || packet.seq >= 32
-                        || packet.stage > 17
-                        || packet.failed_before > packet.seq
-                    {
-                        self.worker.invalid += 1;
-                        continue;
-                    }
-                    let seq_bit = 1u32 << packet.seq;
-                    let stage_bit = 1u32 << packet.stage;
-                    if sequences & seq_bit != 0 {
-                        self.worker.duplicate_sequence += 1;
-                        continue;
-                    }
-                    if stages & stage_bit != 0 {
-                        self.worker.duplicate_stage += 1;
-                    }
-                    sequences |= seq_bit;
-                    stages |= stage_bit;
-                    max_seq = Some(max_seq.map_or(packet.seq, |seq| seq.max(packet.seq)));
-                    self.worker.before_exit_observed |= packet.stage == 17;
-                    if let Some(slot) = self.worker.records.iter_mut().find(|event| event.is_none())
-                    {
-                        *slot = Some(Event {
-                            v: packet.v,
-                            token_redacted: true,
-                            token_and_spawned_pid_match: true,
-                            pid: packet.pid,
-                            seq: packet.seq,
-                            stage: packet.stage,
-                            elapsed_ns: packet.elapsed_ns,
-                            unix_ns: packet.unix_ns,
-                            detail: packet.detail,
-                            failed_before: packet.failed_before,
-                            receipt_after_cleanup_ns: ns(self.origin, Instant::now()),
-                        });
-                        self.worker.retained += 1;
-                    } else {
-                        self.worker.overflow += 1;
-                    }
-                }
-                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
-                    self.worker.queue_observed_empty = true;
+            Err(error) => {
+                self.worker.missing_file =
+                    (error.kind() == io::ErrorKind::NotFound).then_some(true);
+                self.worker.open_error = Some(IoResult::from::<()>(&Err(error)));
+                self.worker.read_end_ns = Some(ns(self.origin, Instant::now()));
+                return;
+            }
+        };
+        let mut bytes = [0u8; WORKER_FILE_CAP + 1];
+        let mut count = 0;
+        while count < bytes.len() {
+            match file.read(&mut bytes[count..]) {
+                Ok(0) => {
+                    self.worker.eof_observed = true;
                     break;
                 }
+                Ok(read) => count += read,
                 Err(error) => {
-                    // On Windows an oversized UDP datagram can report WSAEMSGSIZE.
-                    self.worker.receive_error = Some(IoResult::from::<()>(&Err(error)));
+                    self.worker.read_error = Some(IoResult::from::<()>(&Err(error)));
                     break;
                 }
             }
         }
+        self.worker.read_end_ns = Some(ns(self.origin, Instant::now()));
+        self.worker.read_bytes = count;
+        self.worker.over_limit = count > WORKER_FILE_CAP;
+        let bytes = &bytes[..count];
+        self.worker.complete_lines_observed = bytes.iter().filter(|&&b| b == b'\n').count();
+        self.worker.line_limit_exceeded = self.worker.complete_lines_observed > RECORD_CAP;
+        self.worker.partial_tail_bytes = bytes
+            .iter()
+            .rposition(|&b| b == b'\n')
+            .map_or(count, |at| count - at - 1);
+        self.worker.partial_tail = self.worker.partial_tail_bytes != 0;
+        let mut sequences = 0u32;
+        let mut stages = 0u32;
+        let mut max_seq = None::<u8>;
+        let mut previous_seq = None::<u8>;
+        let mut previous_elapsed = None::<u64>;
+        let mut all_success_stages_in_order = true;
+        let mut last_stage = None;
+        for line in bytes.split_inclusive(|&b| b == b'\n').take(RECORD_CAP) {
+            if !line.ends_with(b"\n") {
+                break;
+            }
+            self.worker.lines_examined += 1;
+            if line.len() > LINE_CAP {
+                self.worker.oversize_lines += 1;
+                self.worker.invalid_lines += 1;
+                continue;
+            }
+            let Ok(record) = serde_json::from_slice::<WorkerLine>(line) else {
+                self.worker.invalid_lines += 1;
+                continue;
+            };
+            if record.v != 2
+                || record.capture_id != self.capture_id
+                || record.server_pid != self.server_pid
+                || record.request_seq != self.request_seq
+                || Some(record.pid) != self.worker_pid
+                || record.seq >= RECORD_CAP as u8
+                || record.stage > 17
+                || record.failed_before > record.seq
+                || (matches!(record.stage, 14 | 16 | 17) && record.detail > 1)
+            {
+                self.worker.invalid_lines += 1;
+                continue;
+            }
+            let seq_bit = 1u32 << record.seq;
+            let stage_bit = 1u32 << record.stage;
+            if sequences & seq_bit != 0 {
+                self.worker.duplicate_sequence += 1;
+                continue;
+            }
+            if stages & stage_bit != 0 {
+                self.worker.duplicate_stage += 1;
+            }
+            if previous_seq.is_some_and(|seq| record.seq < seq) {
+                self.worker.sequence_out_of_order += 1;
+            }
+            if previous_elapsed.is_some_and(|elapsed| record.elapsed_ns < elapsed) {
+                self.worker.elapsed_clock_regressions += 1;
+            }
+            previous_seq = Some(record.seq);
+            previous_elapsed = Some(record.elapsed_ns);
+            self.worker.elapsed_clock_saturation_observed |= record.elapsed_ns == u64::MAX;
+            self.worker.unix_clock_missing += u32::from(record.unix_ns.is_none());
+            self.worker.prior_write_failures_reported = Some(
+                self.worker
+                    .prior_write_failures_reported
+                    .unwrap_or(0)
+                    .max(record.failed_before),
+            );
+            all_success_stages_in_order &= record.seq == record.stage
+                && record.seq as u32 == self.worker.retained
+                && (!matches!(record.stage, 14 | 16 | 17) || record.detail == 1);
+            sequences |= seq_bit;
+            stages |= stage_bit;
+            max_seq = Some(max_seq.map_or(record.seq, |seq| seq.max(record.seq)));
+            last_stage = Some(record.stage);
+            if record.stage == 17 {
+                self.worker.before_exit_observed = true;
+                self.worker.before_exit_is_ok = Some(record.detail == 1);
+            }
+            let slot = self.worker.retained as usize;
+            self.worker.records[slot] = Some(Event {
+                record,
+                correlation_and_spawned_pid_match: true,
+                receipt_after_cleanup_ns: ns(self.origin, Instant::now()),
+            });
+            self.worker.retained += 1;
+        }
         self.worker.sequence_gap_mask =
             max_seq.map_or(0, |seq| (u32::MAX >> (31 - seq)) & !sequences);
         self.worker.absent_stage_mask = ((1 << 18) - 1) & !stages;
-        self.worker.tail_unknown = !self.worker.before_exit_observed
-            || !self.worker.queue_observed_empty
-            || self.worker.invalid != 0
-            || self.worker.duplicate_sequence != 0
-            || self.worker.duplicate_stage != 0
-            || self.worker.sequence_gap_mask != 0;
+        self.worker.complete_successful_stream = self.worker.eof_observed
+            && !self.worker.over_limit
+            && self.worker.read_error.is_none()
+            && !self.worker.line_limit_exceeded
+            && !self.worker.partial_tail
+            && self.worker.invalid_lines == 0
+            && self.worker.duplicate_sequence == 0
+            && self.worker.duplicate_stage == 0
+            && self.worker.sequence_gap_mask == 0
+            && self.worker.sequence_out_of_order == 0
+            && self.worker.absent_stage_mask == 0
+            && self.worker.retained == 18
+            && self.worker.prior_write_failures_reported == Some(0)
+            && self.worker.before_exit_is_ok == Some(true)
+            && self.worker.elapsed_clock_regressions == 0
+            && !self.worker.elapsed_clock_saturation_observed
+            && all_success_stages_in_order
+            && last_stage == Some(17);
+        self.worker.tail_unknown = !self.worker.complete_successful_stream;
     }
     pub(super) fn persist(mut self) {
-        self.drain();
+        self.read_worker_file();
         self.parent_return_unix_ns = wall();
         self.times.return_boundary_ns = Some(ns(self.origin, Instant::now()));
         let mut bytes = [0u8; FILE_CAP];

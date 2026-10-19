@@ -1,13 +1,17 @@
 use serde::Serialize;
 use std::{
-    net::{Ipv4Addr, SocketAddrV4, UdpSocket},
+    fs::{File, OpenOptions},
+    io::Write,
+    path::PathBuf,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
 #[derive(Serialize)]
-struct Packet {
+struct Record {
     v: u8,
-    token: u64,
+    capture_id: u64,
+    server_pid: u32,
+    request_seq: u64,
     pid: u32,
     seq: u8,
     stage: u8,
@@ -18,8 +22,10 @@ struct Packet {
 }
 
 pub(super) struct Observer {
-    socket: UdpSocket,
-    token: u64,
+    file: File,
+    capture_id: u64,
+    server_pid: u32,
+    request_seq: u64,
     pid: u32,
     start: Instant,
     seq: u8,
@@ -39,50 +45,73 @@ fn elapsed_ns(start: Instant, now: Instant) -> u64 {
 
 impl Observer {
     pub(super) fn start() -> Option<Self> {
-        // The main-entry clocks precede config parsing and all socket setup.
+        // The main-entry clocks precede config parsing and all file setup.
         let start = Instant::now();
         let main_wall = wall_ns();
-        let address = std::env::var("KTLSP_WINDOWS_PHASE_ADDR").ok()?;
-        let token = std::env::var("KTLSP_WINDOWS_PHASE_TOKEN").ok()?;
-        if address.is_empty()
-            || address.len() > 21
-            || token.is_empty()
-            || token.len() > 20
-            || !token.bytes().all(|byte| byte.is_ascii_digit())
+        let path = PathBuf::from(std::env::var_os("KTLSP_WINDOWS_PHASE_FILE")?);
+        if !path.is_absolute() || path.as_os_str().as_encoded_bytes().len() > 4096 {
+            return None;
+        }
+        let filename = path.file_name()?.to_str()?;
+        let mut fields = filename
+            .strip_prefix("worker-")?
+            .strip_suffix(".jsonl")?
+            .split('-');
+        let server = fields.next()?;
+        let request = fields.next()?;
+        let capture = fields.next()?;
+        if fields.next().is_some()
+            || server.is_empty()
+            || server.len() > 10
+            || server.starts_with('0')
+            || !server.bytes().all(|byte| byte.is_ascii_digit())
+            || request.is_empty()
+            || request.len() > 2
+            || request.starts_with('0')
+            || !request.bytes().all(|byte| byte.is_ascii_digit())
+            || capture.len() != 16
+            || !capture.bytes().all(|byte| byte.is_ascii_hexdigit())
         {
             return None;
         }
-        let address: SocketAddrV4 = address.parse().ok()?;
-        if !address.ip().is_loopback() || address.port() == 0 {
+        let server_pid: u32 = server.parse().ok()?;
+        let request_seq: u64 = request.parse().ok()?;
+        if !(1..=16).contains(&request_seq) {
             return None;
         }
-        let token = token.parse().ok()?;
-        let socket = UdpSocket::bind((Ipv4Addr::LOCALHOST, 0)).ok()?;
-        socket.set_nonblocking(true).ok()?;
-        socket.connect(address).ok()?;
-        let ready = Instant::now();
-        let ready_wall = wall_ns();
+        let capture_id = u64::from_str_radix(capture, 16).ok()?;
+        let file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .ok()?;
         let mut observer = Self {
-            socket,
-            token,
+            file,
+            capture_id,
+            server_pid,
+            request_seq,
             pid: std::process::id(),
             start,
             seq: 0,
             failed: 0,
         };
-        observer.send(0, 0, 0, main_wall);
+        let ready = Instant::now();
+        let ready_wall = wall_ns();
+        observer.record(0, 0, 0, main_wall);
         let setup_ns = elapsed_ns(start, ready);
-        observer.send(1, setup_ns, setup_ns, ready_wall);
+        observer.record(1, setup_ns, setup_ns, ready_wall);
         Some(observer)
     }
 
-    fn send(&mut self, stage: u8, detail: u64, elapsed_ns: u64, unix_ns: Option<u128>) {
+    fn record(&mut self, stage: u8, detail: u64, elapsed_ns: u64, unix_ns: Option<u128>) {
         if self.seq >= 32 {
             return;
         }
-        let packet = Packet {
-            v: 1,
-            token: self.token,
+        let record = Record {
+            v: 2,
+            capture_id: self.capture_id,
+            server_pid: self.server_pid,
+            request_seq: self.request_seq,
             pid: self.pid,
             seq: self.seq,
             stage,
@@ -93,10 +122,13 @@ impl Observer {
         };
         self.seq += 1;
         let mut bytes = [0_u8; 256];
-        let mut remaining = &mut bytes[..];
-        let serialized = serde_json::to_writer(&mut remaining, &packet).is_ok();
-        let len = 256 - remaining.len();
-        if !serialized || !matches!(self.socket.send(&bytes[..len]), Ok(sent) if sent == len) {
+        let mut remaining = &mut bytes[..255];
+        let serialized = serde_json::to_writer(&mut remaining, &record).is_ok();
+        let len = 255 - remaining.len();
+        bytes[len] = b'\n';
+        // Synchronous trace I/O can block inside the unchanged supervisor allowance.
+        // At most 32 attempts of <=256 bytes bound this file to 8192 bytes.
+        if !serialized || self.file.write_all(&bytes[..=len]).is_err() {
             self.failed = self.failed.saturating_add(1);
         }
     }
@@ -105,6 +137,6 @@ impl Observer {
 pub(super) fn emit(observer: &mut Option<Observer>, stage: u8, detail: u64) {
     if let Some(observer) = observer {
         let elapsed = elapsed_ns(observer.start, Instant::now());
-        observer.send(stage, detail, elapsed, wall_ns());
+        observer.record(stage, detail, elapsed, wall_ns());
     }
 }

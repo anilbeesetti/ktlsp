@@ -1,4 +1,4 @@
-use ktlsp_analysis::{Analyzer, Error, Severity};
+use ktlsp_analysis::{Analyzer, Error, FileAnalysis, Severity};
 use ktlsp_parser::{FileKind, ParserError, SourceSnapshot};
 use std::{path::Path, sync::atomic::AtomicBool};
 
@@ -7,6 +7,14 @@ fn snapshot(name: &str, version: i64, source: &str) -> SourceSnapshot {
 }
 fn analyzer() -> Analyzer {
     Analyzer::new(Path::new(env!("CARGO_BIN_EXE_ktlsp-analysis-worker"))).unwrap()
+}
+fn expression_type<'a>(file: &'a FileAnalysis, source: &SourceSnapshot, spelling: &str) -> &'a str {
+    &file
+        .expressions
+        .iter()
+        .find(|expression| &source.source()[expression.start..expression.end] == spelling)
+        .unwrap_or_else(|| panic!("missing inferred type for {spelling:?}: {file:?}"))
+        .ty
 }
 
 #[test]
@@ -36,14 +44,10 @@ fn cross_file_generic_inference_and_real_diagnostics_follow_edits() {
             .all(|d| d.severity != Severity::Error)),
         "{files:?}"
     );
-    assert!(
-        files[1].expressions.iter().any(|expression| {
-            &sources[1].source()[expression.start..expression.end] == "make().value"
-                && expression.ty == "Int"
-        }),
-        "{:?}",
-        files[1].expressions
-    );
+    let integer = expression_type(&files[0], &sources[0], "42");
+    let member = expression_type(&files[1], &sources[1], "make().value");
+    assert_eq!(member, integer);
+    assert_ne!(member, expression_type(&files[1], &sources[1], "total > 1"));
 
     let mut changed = sources.clone();
     changed[1] = snapshot(
@@ -89,10 +93,10 @@ fn cross_file_generic_inference_and_real_diagnostics_follow_edits() {
             .all(|d| d.severity != Severity::Error)),
         "{files:?}"
     );
-    assert!(files[1].expressions.iter().any(|expression| {
-        &changed[1].source()[expression.start..expression.end] == "make().value"
-            && expression.ty == "Int"
-    }));
+    assert_eq!(
+        expression_type(&files[1], &changed[1], "make().value"),
+        integer
+    );
 }
 
 #[test]
@@ -106,19 +110,19 @@ fn excessive_template_recursion_refuses_whole_request_then_healthy_analysis_work
     let (result, closed) = analyzer.analyze_snapshot_with_cleanup(&source, &AtomicBool::new(false));
     assert!(closed);
     assert!(matches!(result, Err(Error::Resource)), "{result:?}");
-    let healthy = snapshot("file:///healthy.kt", 1, "fun value(): Int = 42");
+    let healthy = snapshot(
+        "file:///healthy.kt",
+        1,
+        "fun value(): Int = 42\nfun flag(): Boolean = true",
+    );
     let (result, closed) =
         analyzer.analyze_snapshot_with_cleanup(&healthy, &AtomicBool::new(false));
     assert!(closed);
     let result = result.unwrap();
-    assert!(
-        result.files_for(std::slice::from_ref(&healthy)).unwrap()[0]
-            .expressions
-            .iter()
-            .any(|expression| {
-                &healthy.source()[expression.start..expression.end] == "42"
-                    && expression.ty == "Int"
-            })
+    let file = &result.files_for(std::slice::from_ref(&healthy)).unwrap()[0];
+    assert_ne!(
+        expression_type(file, &healthy, "42"),
+        expression_type(file, &healthy, "true")
     );
 }
 

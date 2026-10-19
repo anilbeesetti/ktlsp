@@ -136,6 +136,18 @@ pub(super) fn render(
         return Err(LIMIT.into());
     }
     let source = snapshot.source();
+    // LSP cannot address the LF inside CRLF. Preserve raw compiler spans in
+    // Analysis; project either endpoint there onto the preceding line end.
+    let addressable = |offset: usize| {
+        if offset != 0
+            && source.as_bytes().get(offset) == Some(&b'\n')
+            && source.as_bytes()[offset - 1] == b'\r'
+        {
+            offset - 1
+        } else {
+            offset
+        }
+    };
     let mut offsets = Vec::new();
     offsets
         .try_reserve_exact(diagnostics.len() * 2)
@@ -145,16 +157,11 @@ pub(super) fn render(
             return Err(failure(Error::InvalidResponse));
         }
         for offset in [diagnostic.start, diagnostic.end] {
-            // visit_positions expects strict boundaries; authenticate UTF-8 and
-            // reject the unaddressable interior of an original CRLF first.
-            if !source.is_char_boundary(offset)
-                || (source.as_bytes().get(offset) == Some(&b'\n')
-                    && offset != 0
-                    && source.as_bytes()[offset - 1] == b'\r')
-            {
+            // Authenticate the original UTF-8 endpoint before projection.
+            if !source.is_char_boundary(offset) {
                 return Err(failure(Error::InvalidResponse));
             }
-            offsets.push(offset);
+            offsets.push(addressable(offset));
         }
     }
     offsets.sort_unstable();
@@ -176,7 +183,7 @@ pub(super) fn render(
         check_cancelled()?;
         let at = |offset| {
             positions[offsets
-                .binary_search(&offset)
+                .binary_search(&addressable(offset))
                 .expect("retained compiler endpoint")]
         };
         items.push(json!({

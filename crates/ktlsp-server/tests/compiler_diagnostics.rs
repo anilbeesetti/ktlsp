@@ -72,15 +72,15 @@ fn start(executable: impl AsRef<Path>) -> Client {
     client.send(notification("initialized", json!({})));
     client
 }
-fn finish(mut client: Client) {
+fn shutdown(client: &mut Client) {
     assert_eq!(
-        exchange(
-            &mut client,
-            request(json!("shutdown"), "shutdown", Value::Null)
-        )["result"],
+        exchange(client, request(json!("shutdown"), "shutdown", Value::Null))["result"],
         Value::Null
     );
     client.send(notification("exit", Value::Null));
+}
+fn finish(mut client: Client) {
+    shutdown(&mut client);
     client.finish();
 }
 fn items(response: &Value) -> &[Value] {
@@ -226,6 +226,30 @@ fn actual_cli_original_unicode_crlf_ranges_merge_structural_diagnostics_and_refu
     finish(client);
 }
 
+#[test]
+fn actual_cli_incomplete_declaration_crlf_diagnostic_is_addressable_and_recovers() {
+    let _serial = SERIAL.lock().unwrap_or_else(|error| error.into_inner());
+    let mut client = start(env!("CARGO_BIN_EXE_ktlsp"));
+    client.send(open(URI, "fun\r\n"));
+    let malformed = exchange(&mut client, diagnostic(json!("newline")));
+    assert!(
+        items(&malformed).iter().any(|diagnostic| {
+            diagnostic["source"] == "krusty"
+                && diagnostic["severity"] == 1
+                && diagnostic["range"]
+                    == json!({
+                        "start":{"line":0,"character":3},
+                        "end":{"line":1,"character":0}
+                    })
+        }),
+        "{malformed}"
+    );
+    client.send(change(2, json!([{"text":"fun valid() = 42\r\n"}])));
+    let fixed = exchange(&mut client, diagnostic(json!("fixed-newline")));
+    assert!(items(&fixed).is_empty(), "{fixed}");
+    finish(client);
+}
+
 struct Package(PathBuf);
 impl Package {
     fn new() -> Self {
@@ -264,7 +288,9 @@ fn actual_cli_worker_disappearance_is_failure_not_empty_success() {
     let failed = exchange(&mut client, diagnostic(json!("failed")));
     assert_eq!(failed["error"]["code"], -32803, "{failed}");
     assert!(failed.get("result").is_none());
-    finish(client);
+    shutdown(&mut client);
+    let errors = client.finish_status(1);
+    assert!(errors.contains("cleanup incomplete"), "{errors}");
 }
 
 fn collect(session: &mut Session) -> Vec<Value> {

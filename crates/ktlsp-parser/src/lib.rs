@@ -9,6 +9,9 @@ pub mod lowering;
 pub mod position_regions;
 pub mod structural_regions;
 
+#[cfg(target_os = "macos")]
+mod macos_phase_observation;
+
 use serde::{Deserialize, Serialize};
 use std::{
     io::{Read, Write},
@@ -1018,6 +1021,12 @@ mod admission {
             }
         }
 
+        // Cached handle metadata only: no readiness, status or reap query.
+        #[cfg(target_os = "macos")]
+        pub(super) fn phase_child_id(&self) -> Option<u32> {
+            self.guard.as_ref()?.child.as_ref().map(Child::id)
+        }
+
         pub(super) fn status(&mut self) -> std::io::Result<Option<std::process::ExitStatus>> {
             let data = self
                 .guard
@@ -1760,6 +1769,8 @@ mod unix_io {
         writer: Option<Result<(), ParserError>>,
         input_close: Option<Result<(), ParserError>>,
         exited: bool,
+        #[cfg(target_os = "macos")]
+        phase: Option<macos_phase_observation::Progress>,
     }
     enum Step {
         Pending(bool),
@@ -1836,12 +1847,19 @@ mod unix_io {
         }
 
         fn check_control(
-            &self,
+            &mut self,
             deadline: Instant,
             cancelled: &AtomicBool,
             observer: Option<&mut DeadlineObserver>,
         ) -> Result<(), ParserError> {
-            if let Err(error) = control(deadline, cancelled) {
+            #[cfg(target_os = "macos")]
+            let begin = self.phase.as_ref().map(|_| Instant::now());
+            let result = control(deadline, cancelled);
+            #[cfg(target_os = "macos")]
+            if let (Some(phase), Some(begin)) = (&mut self.phase, begin) {
+                phase.control(phase.selection_site, begin, &result);
+            }
+            if let Err(error) = result {
                 if error == ParserError::Timeout
                     && !self.exited
                     && let Some(observer) = observer
@@ -1897,7 +1915,14 @@ mod unix_io {
             }
             let mut buffer = [0; CHUNK];
             let len = CHUNK.min(MAX_OUTPUT_BYTES + 1 - self.output.len());
-            match stream.read(&mut buffer[..len]) {
+            #[cfg(target_os = "macos")]
+            let begin = self.phase.as_ref().map(|_| Instant::now());
+            let result = stream.read(&mut buffer[..len]);
+            #[cfg(target_os = "macos")]
+            if let (Some(phase), Some(begin)) = (&mut self.phase, begin) {
+                phase.io(0, begin, &result);
+            }
+            match result {
                 Ok(0) => self.reader = Some(Ok(())),
                 Ok(count) => {
                     self.append(&buffer[..count]);
@@ -1912,7 +1937,14 @@ mod unix_io {
                 return false;
             }
             let end = input.len().min(self.offset + CHUNK);
-            match stream.write(&input[self.offset..end]) {
+            #[cfg(target_os = "macos")]
+            let begin = self.phase.as_ref().map(|_| Instant::now());
+            let result = stream.write(&input[self.offset..end]);
+            #[cfg(target_os = "macos")]
+            if let (Some(phase), Some(begin)) = (&mut self.phase, begin) {
+                phase.io(1, begin, &result);
+            }
+            match result {
                 Ok(0) => self.writer = Some(Err(ParserError::Io)),
                 Ok(count) => self.offset += count,
                 Err(error) if pending(&error) => return false,
@@ -1926,7 +1958,14 @@ mod unix_io {
             {
                 return false;
             }
-            match stream.close_write() {
+            #[cfg(target_os = "macos")]
+            let begin = self.phase.as_ref().map(|_| Instant::now());
+            let result = stream.close_write();
+            #[cfg(target_os = "macos")]
+            if let (Some(phase), Some(begin)) = (&mut self.phase, begin) {
+                phase.io(2, begin, &result);
+            }
+            match result {
                 Ok(()) => {
                     self.input_close = Some(Ok(()));
                     if self.writer.is_none() {
@@ -1950,13 +1989,31 @@ mod unix_io {
             observer: Option<&mut DeadlineObserver>,
             status: impl FnOnce() -> io::Result<Option<std::process::ExitStatus>>,
         ) -> Result<Step, ParserError> {
+            #[cfg(target_os = "macos")]
+            if let Some(phase) = &mut self.phase {
+                phase.site("step.entry");
+            }
             self.check_control(deadline, cancelled, observer)?;
             let mut progress = self.read(stream);
             if !self.exited {
                 if let Some(result) = self.reader {
+                    #[cfg(target_os = "macos")]
+                    if result.is_err()
+                        && let Some(phase) = &mut self.phase
+                    {
+                        phase.site("step.reader");
+                    }
                     result?;
                 }
-                if let Some(status) = status().map_err(|_| ParserError::Io)? {
+                #[cfg(target_os = "macos")]
+                let begin = self.phase.as_ref().map(|_| Instant::now());
+                let observed = status();
+                #[cfg(target_os = "macos")]
+                if let (Some(phase), Some(begin)) = (&mut self.phase, begin) {
+                    phase.site("step.status");
+                    phase.status(begin, &observed);
+                }
+                if let Some(status) = observed.map_err(|_| ParserError::Io)? {
                     if status.code() == Some(WORKER_ALLOCATION_LIMIT_EXIT_CODE) {
                         return Err(ParserError::AllocationLimit);
                     }
@@ -1972,14 +2029,38 @@ mod unix_io {
             // Writer failure still closes input, without turning the error into success.
             progress |= self.close_input(stream, input.len());
             if self.exited {
-                control(deadline, cancelled)?;
+                #[cfg(target_os = "macos")]
+                let begin = self.phase.as_ref().map(|_| Instant::now());
+                let checked = control(deadline, cancelled);
+                #[cfg(target_os = "macos")]
+                if let (Some(phase), Some(begin)) = (&mut self.phase, begin) {
+                    phase.control("postexit.writer", begin, &checked);
+                    if checked.is_ok() {
+                        phase.site("postexit.writer");
+                    }
+                }
+                checked?;
                 let Some(writer) = self.writer else {
                     return Ok(Step::Pending(progress));
                 };
                 writer?;
-                control(deadline, cancelled)?;
+                #[cfg(target_os = "macos")]
+                let begin = self.phase.as_ref().map(|_| Instant::now());
+                let checked = control(deadline, cancelled);
+                #[cfg(target_os = "macos")]
+                if let (Some(phase), Some(begin)) = (&mut self.phase, begin) {
+                    phase.control("postexit.reader", begin, &checked);
+                    if checked.is_ok() {
+                        phase.site("postexit.reader");
+                    }
+                }
+                checked?;
                 if let Some(reader) = self.reader {
                     reader?;
+                    #[cfg(target_os = "macos")]
+                    if let Some(phase) = &mut self.phase {
+                        phase.site("postexit.complete");
+                    }
                     return Ok(Step::Complete(std::mem::take(&mut self.output)));
                 }
             }
@@ -1996,13 +2077,50 @@ mod unix_io {
         lease: &mut admission::Lease<'_>,
         cleanup: &mut (admission::Cleanup, bool),
     ) -> Result<Vec<u8>, ParserError> {
-        let (parent, child_stream) = UnixStream::pair().map_err(|_| ParserError::Io)?;
-        parent.set_nonblocking(true).map_err(|_| ParserError::Io)?;
-        let child_output = child_stream.try_clone().map_err(|_| ParserError::Io)?;
+        #[cfg(target_os = "macos")]
+        let mut phase =
+            macos_phase_observation::Observation::requested(&command, normalized, deadline);
+        let (parent, child_stream) = UnixStream::pair().map_err(|_| {
+            #[cfg(target_os = "macos")]
+            if let Some(phase) = phase.take() {
+                phase.setup_failed("socket.pair", ParserError::Io);
+            }
+            ParserError::Io
+        })?;
+        #[cfg(target_os = "macos")]
+        if let Some(phase) = &mut phase {
+            phase.mark("socket");
+        }
+        parent.set_nonblocking(true).map_err(|_| {
+            #[cfg(target_os = "macos")]
+            if let Some(phase) = phase.take() {
+                phase.setup_failed("socket.nonblocking", ParserError::Io);
+            }
+            ParserError::Io
+        })?;
+        #[cfg(target_os = "macos")]
+        if let Some(phase) = &mut phase {
+            phase.mark("nonblocking");
+        }
+        let child_output = child_stream.try_clone().map_err(|_| {
+            #[cfg(target_os = "macos")]
+            if let Some(phase) = phase.take() {
+                phase.setup_failed("socket.clone", ParserError::Io);
+            }
+            ParserError::Io
+        })?;
+        #[cfg(target_os = "macos")]
+        if let Some(phase) = &mut phase {
+            phase.mark("clone");
+        }
         command
             .stdin(Stdio::from(OwnedFd::from(child_stream)))
             .stdout(Stdio::from(OwnedFd::from(child_output)))
             .env_clear();
+        #[cfg(target_os = "macos")]
+        if let Some(phase) = &mut phase {
+            phase.configure(&mut command);
+        }
         #[cfg(test)]
         let mut observation = if observer.is_none() {
             native_io_observation::Observation::requested(&mut command, deadline)
@@ -2010,7 +2128,29 @@ mod unix_io {
             None
         };
         cleanup.1 = false;
+        #[cfg(target_os = "macos")]
+        if let Some(phase) = &mut phase {
+            phase.mark("spawn.begin");
+        }
         let spawned = lease.spawn(&mut command);
+        #[cfg(target_os = "macos")]
+        if let Some(phase) = &mut phase {
+            phase.spawned(
+                spawned,
+                if spawned.is_ok() {
+                    lease.phase_child_id()
+                } else {
+                    None
+                },
+            );
+        }
+        #[cfg(target_os = "macos")]
+        if spawned.is_err()
+            && let Some(phase) = phase.take()
+        {
+            // Original spawn-error path has no explicit cleanup call; do not invent one.
+            phase.finish(&spawned, None);
+        }
         #[cfg(not(test))]
         spawned?;
         #[cfg(test)]
@@ -2025,11 +2165,21 @@ mod unix_io {
             return Err(error);
         }
         drop(command);
+        #[cfg(target_os = "macos")]
+        if let Some(phase) = &mut phase {
+            phase.mark("command.drop");
+        }
         let result = {
             // Close the parent endpoint before cleanup on both return and unwind.
             let mut stream = parent;
             let mut pump = Pump::default();
-            (|| loop {
+            #[cfg(target_os = "macos")]
+            {
+                pump.phase = phase.as_ref().map(|phase| phase.progress());
+            }
+            let selected = (|| loop {
+                #[cfg(target_os = "macos")]
+                let begin = pump.phase.as_ref().map(|_| Instant::now());
                 let step = pump.step(
                     &mut stream,
                     normalized.as_bytes(),
@@ -2038,6 +2188,29 @@ mod unix_io {
                     observer.as_deref_mut(),
                     || lease.status(),
                 );
+                #[cfg(target_os = "macos")]
+                if let (Some(phase), Some(begin)) = (&mut pump.phase, begin) {
+                    phase.tick(
+                        begin,
+                        macos_phase_observation::TickState {
+                            offset: pump.offset,
+                            bytes: match &step {
+                                Ok(Step::Complete(bytes)) => bytes.len(),
+                                _ => pump.output.len(),
+                            },
+                            reader: pump.reader,
+                            writer: pump.writer,
+                            halfclose: pump.input_close,
+                            exited: pump.exited,
+                        },
+                        match &step {
+                            Ok(Step::Pending(true)) => "pending_progress",
+                            Ok(Step::Pending(false)) => "pending_idle",
+                            Ok(Step::Complete(_)) => "complete",
+                            Err(_) => "error",
+                        },
+                    );
+                }
                 #[cfg(test)]
                 if let Some(observation) = &mut observation {
                     use native_io_observation::{Decision, Sample};
@@ -2061,27 +2234,64 @@ mod unix_io {
                 match step? {
                     Step::Complete(bytes) => return Ok(bytes),
                     Step::Pending(false) => {
-                        if wait_ready(&stream, pump.wait_events(), deadline).is_err() {
+                        #[cfg(target_os = "macos")]
+                        let begin = pump.phase.as_ref().map(|_| Instant::now());
+                        let ready = wait_ready(&stream, pump.wait_events(), deadline);
+                        #[cfg(target_os = "macos")]
+                        if let (Some(phase), Some(begin)) = (&mut pump.phase, begin) {
+                            phase.io(3, begin, &ready);
+                        }
+                        if ready.is_err() {
+                            #[cfg(target_os = "macos")]
+                            if let Some(phase) = &mut pump.phase {
+                                phase.site("poll.error");
+                            }
                             pump.check_control(deadline, cancelled, observer.as_deref_mut())?;
                             return Err(ParserError::Io);
                         }
                     }
                     Step::Pending(true) => {}
                 }
-            })()
+            })();
+            #[cfg(target_os = "macos")]
+            if let Some(phase) = &mut phase {
+                phase.selected(&selected, pump.phase.take());
+                phase.mark("stream.drop.begin");
+            }
+            selected
         };
+        #[cfg(target_os = "macos")]
+        if let Some(phase) = &mut phase {
+            phase.mark("stream.drop.end");
+            phase.mark("cleanup.begin");
+        }
         cleanup.0 = lease.cleanup();
+        #[cfg(target_os = "macos")]
+        if let Some(phase) = &mut phase {
+            phase.mark("cleanup.end");
+        }
         cleanup.1 = cleanup.0 == admission::Cleanup::Confirmed;
         #[cfg(test)]
         {
             let result = admission::select_result(result, cleanup.0);
+            #[cfg(target_os = "macos")]
+            if let Some(phase) = phase {
+                phase.finish(&result, Some(cleanup.0));
+            }
             if let Some(observation) = observation {
                 observation.finish(&result, cleanup.0, std::io::stderr().lock());
             }
             result
         }
         #[cfg(not(test))]
-        admission::select_result(result, cleanup.0)
+        {
+            let result = admission::select_result(result, cleanup.0);
+            #[cfg(target_os = "macos")]
+            if let Some(phase) = phase {
+                phase.finish(&result, Some(cleanup.0));
+            }
+            result
+        }
     }
 
     #[cfg(test)]

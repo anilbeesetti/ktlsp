@@ -143,6 +143,12 @@ jobs:
           $code = $LASTEXITCODE
           "exit_code=$code" | Set-Content "$env:RUNNER_TEMP/native-platform-evidence/clippy-exit.txt"
           exit $code
+      - name: Configure bounded synthetic macOS phase capture
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          $capture = Join-Path $env:RUNNER_TEMP 'native-platform-evidence/macos-phase'
+          New-Item -ItemType Directory -Path $capture -Force | Out-Null
+          "KTLSP_MACOS_PHASE_CAPTURE_DIR=$capture" | Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8
       - name: Full locked release workspace tests
         env:
           KTLSP_NATIVE_IO_OBSERVE: '1'
@@ -155,6 +161,24 @@ jobs:
           if (Select-String -Path "$env:RUNNER_TEMP/native-platform-evidence/clippy.txt", "$env:RUNNER_TEMP/native-platform-evidence/workspace-tests.txt" -Pattern 'rust-objcopy|libLLVM|SIGABRT|signal: 6|failed to strip|stripping.*failed' -Quiet) {
             throw 'Native build/test child failure requires investigation'
           }
+      - name: Record post-test native binary identities
+        if: ${{ always() && runner.os == 'macOS' }}
+        run: |
+          $records = foreach ($name in @('ktlsp', 'ktlsp-parser-worker', 'ktlsp-analysis-worker')) {
+            $binary = Join-Path $env:CARGO_TARGET_DIR "release/$name"
+            if (Test-Path -LiteralPath $binary -PathType Leaf) {
+              @{ name = $name; present = $true; bytes = (Get-Item -LiteralPath $binary).Length; sha256 = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant() }
+            } else {
+              @{ name = $name; present = $false }
+            }
+          }
+          @{
+            source_sha = '${{ github.sha }}'
+            run_id = '${{ github.run_id }}'
+            run_attempt = '${{ github.run_attempt }}'
+            stage = 'after the original full workspace test command; not a worker timing receipt'
+            binaries = @($records)
+          } | ConvertTo-Json -Depth 4 | Set-Content "$env:RUNNER_TEMP/native-platform-evidence/macos-phase-binaries.json" -Encoding utf8NoBOM
       - name: Preserve native platform evidence, including early failures
         if: ${{ always() }}
         uses: actions/upload-artifact@v4

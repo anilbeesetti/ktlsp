@@ -1,0 +1,2937 @@
+//! Type model: Kotlin scalar, object, array, function, nullable, platform-flexible, and type-parameter
+//! shapes. Backend-specific names and descriptors are kept out of this module.
+
+mod classifier_declarations;
+mod deprecation;
+mod diagnostic_rendering;
+mod intersection;
+pub(crate) use intersection::declaration_approximation;
+mod overridden_declaration;
+mod semantic_call_role;
+mod semantic_callable_owner;
+pub use classifier_declarations::{
+    ClassifierDeclarationFacts, ClassifierDeclarationKind, DeclaredValueClass,
+    GeneratedClassifierFact, GeneratedClassifierKind, GeneratedClassifierPurpose,
+    SerializationGeneratedMemberStatuses,
+};
+pub use deprecation::{
+    DeclaredDeprecation, DeprecatedDeclaration, DeprecatedSinceKotlin, Deprecation,
+    DeprecationLevel,
+};
+pub use overridden_declaration::OverriddenDeclaration;
+pub use semantic_call_role::SemanticCallRole;
+pub use semantic_callable_owner::SemanticCallableOwner;
+mod annotation_targets;
+mod interning;
+mod spelling;
+pub use annotation_targets::{
+    AnnotationTargets, DeclaredTargetPolicies, KotlinTarget, PropertyAnnotationSite,
+};
+mod equality_mode;
+mod substitute;
+mod type_parameter_identity;
+pub use equality_mode::EqualityMode;
+
+pub(crate) use substitute::{
+    ty_canonicalize_params, ty_rename_params, ty_subst, ty_subst_alias_expansion, ty_subst_all,
+    ty_subst_applied_arguments, ty_subst_applied_lookup, ty_subst_formals, ty_subst_keep_unbound,
+    ty_with_param_bounds, ty_with_transitive_param_bounds,
+};
+
+pub use crate::context_parameters::{CapturedContextKind, ContextParameterKind};
+pub use crate::inline_parameter_modifier::{InlineExpansionMode, InlineParameterModifier};
+use crate::name_tree::{NameId, NameTree};
+use interning::ShardedInterner;
+pub(crate) use spelling::type_name_from_multifile_facade;
+pub use spelling::{existing_type_name, existing_type_name_child, type_name, type_name_from};
+use std::fmt;
+use std::sync::OnceLock;
+pub(crate) use type_parameter_identity::{
+    call_site_type_variable, constructor_type_parameter, declaration_type_parameter,
+    generated_function_type_parameter, metadata_type_parameter, postponed_call_type_variable,
+    type_parameter_source_name,
+};
+
+/// Compile-time policy for Kotlin's `assert` operation. Every backend must guard, retain, or elide
+/// the checked operation while preserving lazy condition/message evaluation.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum AssertionMode {
+    #[default]
+    Runtime,
+    AlwaysEnabled,
+    AlwaysDisabled,
+}
+
+/// Semantic shape of one compiler-provided Kotlin array factory.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ArrayFactoryKind {
+    PrimitiveVararg(Ty),
+    PrimitiveSize(Ty),
+    ReferenceVararg,
+    ReferenceSize,
+    EmptyReference,
+    NullableReference,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TypeName(NameId);
+
+#[derive(Clone, Default)]
+pub struct TypeNameList {
+    names: Vec<TypeName>,
+}
+
+// The tree is concurrent (lock-free reads, internally-locked inserts), so the global interner is a
+// bare shared instance.
+static TYPE_NAMES: OnceLock<NameTree> = OnceLock::new();
+
+#[inline]
+fn type_names() -> &'static NameTree {
+    TYPE_NAMES.get_or_init(|| {
+        let names = NameTree::default();
+        for (path, expected) in BUILTIN_TYPE_NAMES {
+            let actual = names.insert(path);
+            assert_eq!(actual, expected.0, "built-in TypeName id for {path}");
+        }
+        names
+    })
+}
+
+/// Find a global type-name identity in another name tree without mutating either tree.
+pub(crate) fn existing_type_name_in(names: &NameTree, internal: TypeName) -> Option<NameId> {
+    names.existing_from(type_names(), internal.name_id())
+}
+
+/// Copy a global type-name identity into another name tree without rendering it to text.
+pub(crate) fn insert_type_name_in(names: &NameTree, internal: TypeName) -> NameId {
+    names.insert_from(type_names(), internal.name_id())
+}
+
+const KOTLIN_BOOLEAN: TypeName = TypeName(NameId(2));
+const KOTLIN_BYTE: TypeName = TypeName(NameId(3));
+const KOTLIN_SHORT: TypeName = TypeName(NameId(4));
+const KOTLIN_INT: TypeName = TypeName(NameId(5));
+const KOTLIN_LONG: TypeName = TypeName(NameId(6));
+const KOTLIN_CHAR: TypeName = TypeName(NameId(7));
+const KOTLIN_FLOAT: TypeName = TypeName(NameId(8));
+const KOTLIN_DOUBLE: TypeName = TypeName(NameId(9));
+const KOTLIN_UBYTE: TypeName = TypeName(NameId(10));
+const KOTLIN_USHORT: TypeName = TypeName(NameId(11));
+const KOTLIN_UINT: TypeName = TypeName(NameId(12));
+const KOTLIN_ULONG: TypeName = TypeName(NameId(13));
+const KOTLIN_STRING: TypeName = TypeName(NameId(14));
+const KOTLIN_UNIT: TypeName = TypeName(NameId(15));
+const KOTLIN_NOTHING: TypeName = TypeName(NameId(16));
+const KOTLIN_ARRAY: TypeName = TypeName(NameId(17));
+
+const BUILTIN_TYPE_NAMES: [(&str, TypeName); 16] = [
+    ("kotlin/Boolean", KOTLIN_BOOLEAN),
+    ("kotlin/Byte", KOTLIN_BYTE),
+    ("kotlin/Short", KOTLIN_SHORT),
+    ("kotlin/Int", KOTLIN_INT),
+    ("kotlin/Long", KOTLIN_LONG),
+    ("kotlin/Char", KOTLIN_CHAR),
+    ("kotlin/Float", KOTLIN_FLOAT),
+    ("kotlin/Double", KOTLIN_DOUBLE),
+    ("kotlin/UByte", KOTLIN_UBYTE),
+    ("kotlin/UShort", KOTLIN_USHORT),
+    ("kotlin/UInt", KOTLIN_UINT),
+    ("kotlin/ULong", KOTLIN_ULONG),
+    ("kotlin/String", KOTLIN_STRING),
+    ("kotlin/Unit", KOTLIN_UNIT),
+    ("kotlin/Nothing", KOTLIN_NOTHING),
+    ("kotlin/Array", KOTLIN_ARRAY),
+];
+
+/// Semantic type of a pre-interned builtin classifier, compared by identity.
+///
+/// `Unit` and `Nothing` are the enum variants. The scalar and `String` classifiers are the
+/// `Ty::Obj` constants. Every other name, including `kotlin/Array`, is `None`.
+pub(crate) fn builtin_semantic(name: TypeName) -> Option<Ty> {
+    Some(match name {
+        KOTLIN_BOOLEAN => Ty::Boolean,
+        KOTLIN_BYTE => Ty::Byte,
+        KOTLIN_SHORT => Ty::Short,
+        KOTLIN_INT => Ty::Int,
+        KOTLIN_LONG => Ty::Long,
+        KOTLIN_CHAR => Ty::Char,
+        KOTLIN_FLOAT => Ty::Float,
+        KOTLIN_DOUBLE => Ty::Double,
+        KOTLIN_UBYTE => Ty::UByte,
+        KOTLIN_USHORT => Ty::UShort,
+        KOTLIN_UINT => Ty::UInt,
+        KOTLIN_ULONG => Ty::ULong,
+        KOTLIN_STRING => Ty::String,
+        KOTLIN_UNIT => Ty::Unit,
+        KOTLIN_NOTHING => Ty::Nothing,
+        _ => return None,
+    })
+}
+
+/// `parent/segment` as a `TypeName` without rendering `parent` — one child step in the name tree.
+/// `segment` must be a single path segment; a multi-segment suffix falls back to the full insert.
+pub fn type_name_child(parent: TypeName, segment: &str) -> TypeName {
+    if segment.contains('/') {
+        return segment
+            .split('/')
+            .filter(|segment| !segment.is_empty())
+            .fold(parent, type_name_child);
+    }
+    TypeName(type_names().child_of(parent.name_id(), segment))
+}
+
+pub fn type_name_nested_child(owner: TypeName, nested: &str) -> TypeName {
+    TypeName(type_names().nested_child_of(owner.name_id(), nested))
+}
+
+pub fn existing_type_name_nested_child(owner: TypeName, segment: &str) -> Option<TypeName> {
+    type_names()
+        .existing_nested_child_of(owner.name_id(), segment)
+        .map(TypeName)
+}
+
+impl From<&String> for TypeName {
+    fn from(internal: &String) -> Self {
+        type_name(internal)
+    }
+}
+
+/// Intern a generic type-parameter name. This must not be used for class/FQN storage; class names live
+/// in the type name tree as [`TypeName`].
+pub fn intern(name: &str) -> &'static str {
+    static I: OnceLock<ShardedInterner<str>> = OnceLock::new();
+    I.get_or_init(ShardedInterner::default)
+        .intern_ref_with(name, |value| Box::leak(value.to_owned().into_boxed_str()))
+}
+
+impl TypeName {
+    pub const ROOT: TypeName = TypeName(NameId(0));
+
+    #[inline]
+    fn name_id(self) -> NameId {
+        self.0
+    }
+
+    pub fn matches(self, internal: &str) -> bool {
+        type_names().matches_path(self.name_id(), internal)
+    }
+
+    pub fn starts_with(self, prefix: &str) -> bool {
+        type_names().starts_with(self.name_id(), prefix)
+    }
+
+    pub fn contains(self, needle: &str) -> bool {
+        type_names().contains(self.name_id(), needle)
+    }
+
+    pub fn qualifier_matches(self, qualifier: &str) -> bool {
+        type_names().qualifier_matches(self.name_id(), qualifier)
+    }
+
+    pub fn package_matches(self, package: &str) -> bool {
+        type_names().package_matches(self.name_id(), package)
+    }
+
+    pub fn package(self) -> String {
+        type_names().package(self.name_id())
+    }
+
+    pub fn parent(self) -> Option<TypeName> {
+        type_names().parent(self.name_id()).map(TypeName)
+    }
+
+    pub fn namespace(self) -> TypeName {
+        self.parent().unwrap_or(Self::ROOT)
+    }
+
+    pub fn segment(self) -> String {
+        type_names().segment(self.0).to_string()
+    }
+
+    pub fn segment_ref(self) -> &'static str {
+        type_names().segment(self.0)
+    }
+
+    pub fn nested_segment_ref(self) -> &'static str {
+        self.segment_ref()
+            .rsplit_once(['$', '.'])
+            .map_or(self.segment_ref(), |(_, nested)| nested)
+    }
+
+    /// Whether this classifier identity is `owner` or is nested in it. Callers must use this
+    /// identity-tree relation instead of rendering names and interpreting string prefixes.
+    pub fn same_or_nested_within(self, owner: TypeName) -> bool {
+        type_names().same_or_nested_within(self.name_id(), owner.name_id())
+    }
+
+    /// Immediate lexical classifier owner, retained by nested-child construction or decoded from an
+    /// already-interned nested-class segment.
+    #[inline]
+    pub fn nested_owner(self) -> Option<TypeName> {
+        type_names().nested_owner(self.name_id()).map(TypeName)
+    }
+
+    /// Backend-oriented candidates for textual JVM nesting, deepest first. Semantic resolution
+    /// continues to use the single exact [`Self::nested_owner`] relation.
+    pub(crate) fn existing_nested_owners(self) -> Vec<TypeName> {
+        type_names()
+            .existing_nested_owners(self.name_id())
+            .into_iter()
+            .map(TypeName)
+            .collect()
+    }
+
+    /// The flattened JVM nested segment relative to an already-resolved enclosing classifier.
+    pub(crate) fn nested_segment_within(self, owner: TypeName) -> Option<&'static str> {
+        type_names().nested_segment_within(self.name_id(), owner.name_id())
+    }
+
+    /// Backend boundary split for a nested classifier whose enclosing declaration is external to
+    /// the current file. Semantic callers should keep using [`Self::nested_owner`].
+    pub(crate) fn jvm_nested_parts(self) -> Option<(String, String)> {
+        type_names().jvm_nested_parts(self.name_id())
+    }
+
+    /// JVM classfile spelling of this classifier identity. Source/metadata nesting separators are
+    /// converted by the name tree; semantic callers should retain the identity instead.
+    pub(crate) fn jvm_binary_name(self) -> String {
+        type_names().jvm_binary_name(self.name_id())
+    }
+
+    /// JVM classfile spelling for a nested classifier below this identity, without interning it.
+    pub(crate) fn jvm_nested_binary_name(self, nested: &str) -> String {
+        type_names().jvm_nested_binary_name(self.name_id(), nested)
+    }
+
+    /// Compare a boundary spelling with a direct JVM nested child of this classifier identity.
+    pub(crate) fn nested_child_matches_path(self, nested: &str, path: &str) -> bool {
+        type_names().nested_child_matches_path(self.name_id(), nested, path)
+    }
+
+    /// Lexicographic path ordering for deterministic internal traversal without boundary rendering.
+    pub(crate) fn path_cmp(self, other: TypeName) -> std::cmp::Ordering {
+        type_names().path_cmp(self.name_id(), other.name_id())
+    }
+
+    /// Existing classifier nested directly in `self`, without rendering or interning a probe.
+    pub fn existing_nested_child(self, nested: &str) -> Option<TypeName> {
+        type_names()
+            .existing_nested_child_of(self.name_id(), nested)
+            .map(TypeName)
+    }
+
+    /// Intern a classifier nested directly in this classifier. This is the identity-preserving
+    /// construction used for compiler-generated nested classes; callers must not render, append a
+    /// `$` spelling, and intern the result again.
+    pub fn nested_child(self, nested: &str) -> TypeName {
+        TypeName(type_names().nested_child_of(self.name_id(), nested))
+    }
+
+    pub fn strip_prefix(self, prefix: &str) -> Option<String> {
+        type_names().strip_prefix(self.name_id(), prefix)
+    }
+
+    pub fn unsigned_suffix_after_prefix(self, prefix: &str) -> Option<usize> {
+        type_names().unsigned_suffix_after_prefix(self.name_id(), prefix)
+    }
+
+    pub fn render(self) -> String {
+        type_names().render(self.0)
+    }
+}
+
+impl TypeNameList {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn push(&mut self, internal: &str) {
+        self.names.push(type_name(internal));
+    }
+
+    pub fn push_name(&mut self, internal: TypeName) {
+        self.names.push(internal);
+    }
+
+    pub fn iter_ids(&self) -> impl Iterator<Item = TypeName> + '_ {
+        self.names.iter().copied()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = TypeName> + '_ {
+        self.iter_ids()
+    }
+
+    pub fn iter_rendered(&self) -> impl Iterator<Item = String> + '_ {
+        self.iter_ids().map(TypeName::render)
+    }
+
+    pub(crate) fn remap(&mut self, mut map: impl FnMut(TypeName) -> TypeName) {
+        for name in &mut self.names {
+            *name = map(*name);
+        }
+    }
+
+    pub fn contains(&self, internal: &str) -> bool {
+        self.names.iter().any(|name| name.matches(internal))
+    }
+
+    pub fn contains_name(&self, internal: TypeName) -> bool {
+        self.names.contains(&internal)
+    }
+
+    pub fn to_vec(&self) -> Vec<String> {
+        self.iter_rendered().collect()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.names.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.names.len()
+    }
+}
+
+impl fmt::Debug for TypeNameList {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.iter_rendered()).finish()
+    }
+}
+
+impl From<Vec<String>> for TypeNameList {
+    fn from(names: Vec<String>) -> Self {
+        TypeNameList {
+            names: names.into_iter().map(|name| type_name(&name)).collect(),
+        }
+    }
+}
+
+impl From<Vec<&str>> for TypeNameList {
+    fn from(names: Vec<&str>) -> Self {
+        TypeNameList {
+            names: names.into_iter().map(type_name).collect(),
+        }
+    }
+}
+
+impl From<Vec<TypeName>> for TypeNameList {
+    fn from(names: Vec<TypeName>) -> Self {
+        TypeNameList { names }
+    }
+}
+
+impl IntoIterator for TypeNameList {
+    type Item = String;
+    type IntoIter = std::vec::IntoIter<String>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.to_vec().into_iter()
+    }
+}
+
+impl fmt::Debug for TypeName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("TypeName").field(&self.render()).finish()
+    }
+}
+
+impl fmt::Display for TypeName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.render())
+    }
+}
+
+impl From<&str> for TypeName {
+    fn from(name: &str) -> Self {
+        type_name(name)
+    }
+}
+
+impl From<String> for TypeName {
+    fn from(name: String) -> Self {
+        type_name(&name)
+    }
+}
+
+impl PartialEq<&str> for TypeName {
+    fn eq(&self, other: &&str) -> bool {
+        self.matches(other)
+    }
+}
+
+impl PartialEq<TypeName> for &str {
+    fn eq(&self, other: &TypeName) -> bool {
+        other.matches(self)
+    }
+}
+
+impl PartialEq<String> for TypeName {
+    fn eq(&self, other: &String) -> bool {
+        self.matches(other)
+    }
+}
+
+impl PartialEq<TypeName> for String {
+    fn eq(&self, other: &TypeName) -> bool {
+        other.matches(self)
+    }
+}
+
+impl PartialEq<&str> for &TypeName {
+    fn eq(&self, other: &&str) -> bool {
+        self.matches(other)
+    }
+}
+
+impl PartialEq<&TypeName> for &str {
+    fn eq(&self, other: &&TypeName) -> bool {
+        other.matches(self)
+    }
+}
+
+pub trait InternalName {
+    fn internal_matches(&self, internal: &str) -> bool;
+
+    /// The name's final path segment (`IntArray` for `kotlin/IntArray`).
+    fn final_segment(&self) -> &str;
+}
+
+impl InternalName for TypeName {
+    fn internal_matches(&self, internal: &str) -> bool {
+        self.matches(internal)
+    }
+
+    fn final_segment(&self) -> &str {
+        self.segment_ref()
+    }
+}
+
+impl InternalName for &TypeName {
+    fn internal_matches(&self, internal: &str) -> bool {
+        self.matches(internal)
+    }
+
+    fn final_segment(&self) -> &str {
+        self.segment_ref()
+    }
+}
+
+impl InternalName for &str {
+    fn internal_matches(&self, internal: &str) -> bool {
+        *self == internal
+    }
+
+    fn final_segment(&self) -> &str {
+        self.rsplit('/').next().unwrap_or(self)
+    }
+}
+
+impl InternalName for &String {
+    fn internal_matches(&self, internal: &str) -> bool {
+        self.as_str() == internal
+    }
+
+    fn final_segment(&self) -> &str {
+        self.rsplit('/').next().unwrap_or(self)
+    }
+}
+
+#[inline]
+pub fn same(a: TypeName, b: TypeName) -> bool {
+    a == b
+}
+
+pub mod wk;
+
+mod classifier_roles;
+pub use classifier_roles::{ClassifierRole, CollectionKind, MappedCollection};
+
+/// Intern a `Ty` to a canonical `&'static Ty` so a wrapped inner type (a `Nullable`/`TyParam` bound)
+/// compares by value — the derived `Eq`/`Hash` follow the reference, so equal inner types must share
+/// one pointer.
+pub fn intern_ty(t: Ty) -> &'static Ty {
+    static I: OnceLock<ShardedInterner<Ty>> = OnceLock::new();
+    I.get_or_init(ShardedInterner::default).intern_owned(t)
+}
+
+/// Intern a generic type-argument list to a canonical `&'static [Ty]` so equal instantiations share a
+/// pointer (the derived `Eq`/`Hash` on `Ty::Obj` compares the slice by reference). Empty → `&[]`.
+pub fn intern_tys(ts: &[Ty]) -> &'static [Ty] {
+    if ts.is_empty() {
+        return &[];
+    }
+    static I: OnceLock<ShardedInterner<[Ty]>> = OnceLock::new();
+    I.get_or_init(ShardedInterner::default)
+        .intern_ref_with(ts, |value| Box::leak(value.to_vec().into_boxed_slice()))
+}
+
+/// A function type's signature: parameter types and return type. Interned (`intern_fnsig`) so
+/// `Ty::Fun` stays `Copy`. Lets a `Fun`-typed call recover its real return type (not erased `Object`).
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
+pub struct FnSig {
+    pub params: Vec<Ty>,
+    pub ret: Ty,
+    /// Leading parameters that bind as context receivers.
+    pub context_count: usize,
+    /// Whether the parameter after the context receivers binds as `this`.
+    pub has_receiver: bool,
+    /// A `suspend` function type (`suspend (A) -> R`).
+    pub suspend: bool,
+}
+
+/// Intern a `FnSig` to a canonical `&'static FnSig` (leaked; the compiler is short-lived).
+pub fn intern_fnsig(s: FnSig) -> &'static FnSig {
+    static I: OnceLock<ShardedInterner<FnSig>> = OnceLock::new();
+    I.get_or_init(ShardedInterner::default).intern_owned(s)
+}
+
+/// Every primitive specialized array class and the element it holds — THE inventory, in one place.
+///
+/// An unsigned array keeps its unsigned element so its value-class identity survives; it still
+/// erases to the signed primitive array descriptor (`[I`), which is [`crate::jvm::names`]'s job and
+/// not this table's. Anything needing the set of these classes iterates here rather than writing the
+/// names out again: every copy that has existed eventually disagreed with this one, and the ones
+/// that omitted `UByteArray` and `UShortArray` emitted `int[]` for a `byte[]`.
+const PRIM_ARRAY_CLASSES: [(&str, Ty); 12] = [
+    ("kotlin/IntArray", Ty::Int),
+    ("kotlin/LongArray", Ty::Long),
+    ("kotlin/ShortArray", Ty::Short),
+    ("kotlin/ByteArray", Ty::Byte),
+    ("kotlin/BooleanArray", Ty::Boolean),
+    ("kotlin/CharArray", Ty::Char),
+    ("kotlin/FloatArray", Ty::Float),
+    ("kotlin/DoubleArray", Ty::Double),
+    ("kotlin/UByteArray", Ty::UByte),
+    ("kotlin/UShortArray", Ty::UShort),
+    ("kotlin/UIntArray", Ty::UInt),
+    ("kotlin/ULongArray", Ty::ULong),
+];
+
+/// The element type of a primitive specialized array class (`kotlin/IntArray` → `Int`), or `None`
+/// for a non-primitive-array name. A lookup in [`PRIM_ARRAY_CLASSES`], which is the canonical table
+/// — [`Ty::array_elem`], the constructor, and the backend descriptor logic all route through this
+/// rather than each carrying their own copy.
+pub fn prim_array_element(internal: impl InternalName) -> Option<Ty> {
+    // Every name in the table ends in `Array`; most names asked about are not arrays at all.
+    if !internal.final_segment().ends_with("Array") {
+        return None;
+    }
+    PRIM_ARRAY_CLASSES
+        .iter()
+        .find(|(name, _)| internal.internal_matches(name))
+        .map(|(_, element)| *element)
+}
+
+/// Element type fixed by a specialized primitive-array creator. Both the class-shaped size
+/// constructor (`IntArray`) and its vararg factory (`intArrayOf`) name the same semantic element.
+/// Resolution, signature inference, and intrinsic emission share this table.
+pub fn primitive_array_creator_element(name: &str) -> Option<Ty> {
+    Some(match name {
+        "IntArray" | "intArrayOf" => Ty::Int,
+        "LongArray" | "longArrayOf" => Ty::Long,
+        "ShortArray" | "shortArrayOf" => Ty::Short,
+        "ByteArray" | "byteArrayOf" => Ty::Byte,
+        "BooleanArray" | "booleanArrayOf" => Ty::Boolean,
+        "CharArray" | "charArrayOf" => Ty::Char,
+        "FloatArray" | "floatArrayOf" => Ty::Float,
+        "DoubleArray" | "doubleArrayOf" => Ty::Double,
+        "UByteArray" | "ubyteArrayOf" => Ty::UByte,
+        "UShortArray" | "ushortArrayOf" => Ty::UShort,
+        "UIntArray" | "uintArrayOf" => Ty::UInt,
+        "ULongArray" | "ulongArrayOf" => Ty::ULong,
+        _ => return None,
+    })
+}
+
+/// The primitive specialized array class name for a primitive element (`Int` → `kotlin/IntArray`), or
+/// `None` for a reference element (which lives in a boxed `Array<T>`). Inverse of [`prim_array_element`].
+pub fn prim_array_name(elem: Ty) -> Option<&'static str> {
+    PRIM_ARRAY_CLASSES
+        .iter()
+        .find(|(_, element)| *element == elem)
+        .map(|(name, _)| *name)
+}
+
+/// `java.lang.annotation.ElementType` constants in DECLARATION order. kotlinc projects a Kotlin
+/// `@Target` onto an `EnumSet<ElementType>`, so the `@java.lang.annotation.Target` mirror it writes is
+/// always in this order — never the order the Kotlin targets were written in.
+pub const JAVA_ELEMENT_TYPES: [&str; 10] = [
+    "TYPE",
+    "FIELD",
+    "METHOD",
+    "PARAMETER",
+    "CONSTRUCTOR",
+    "LOCAL_VARIABLE",
+    "ANNOTATION_TYPE",
+    "PACKAGE",
+    "TYPE_PARAMETER",
+    "TYPE_USE",
+];
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+pub enum Ty {
+    Unit,
+    /// A reference type by internal name (e.g. `demo/Point`), with its generic type arguments
+    /// (`List<Int>` → `Obj("kotlin/collections/List", [Int])`). Arguments are interned (`intern_tys`)
+    /// so equal instantiations share a pointer and the front end can recover element/member types.
+    /// Empty for a non-generic class.
+    Obj(TypeName, &'static [Ty]),
+    /// The type of the `null` literal — assignable only to nullable types.
+    Null,
+    /// The bottom type (`Nothing`): the type of `throw`/`return` expressions. Assignable to every
+    /// type; an expression of this type never yields a value (it always diverges).
+    Nothing,
+    /// Placeholder after a type error, suppresses cascading diagnostics.
+    Error,
+    /// A declaration whose type is NOT DETERMINED YET — recorded by signature collection for an
+    /// implicitly-typed declaration the resolution engine has not resolved.
+    ///
+    /// Distinct from [`Ty::Error`] on purpose. Spelling "not yet" and "gave up" the same way is what
+    /// forces every read site to be taught the difference by hand: a reader that finds `Error`
+    /// cannot know whether asking the engine would help, so each place has to be patched
+    /// individually and any place that is missed silently publishes a wrong type. `Pending` is
+    /// answerable — a read of it demands the declaration, and it must never reach emission or
+    /// `@Metadata`, which is an invariant that can be asserted rather than hoped for.
+    Pending,
+    /// A Kotlin function type `(A, B) -> R`. The front end keeps the real parameter/return types
+    /// (interned `FnSig`) so a call through a `Fun` value recovers its return type.
+    Fun(&'static FnSig),
+    /// A nullable type `T?`. Wraps the interned non-null type. Kotlin has no `T??`, so the inner type
+    /// is never itself `Nullable` (the [`Ty::nullable`] constructor enforces this).
+    Nullable(&'static Ty),
+    /// A Java platform type `T!`: flexible between `T` and `T?`. Unlike [`Nullable`](Ty::Nullable),
+    /// direct member access is permitted; assignability accepts it at either nullability bound.
+    PlatformNullable(&'static Ty),
+    /// Use-site type projections. These occur only as generic arguments (`Box<in T>`, `Box<out T>`,
+    /// and `Box<*>`) and remain semantic until assignability/inference consumes their variance. A
+    /// star retains its readable upper bound, but stays distinct from an explicitly written `out`
+    /// projection because Kotlin metadata and JVM generic signatures encode those forms differently.
+    InProjection(&'static Ty),
+    OutProjection(&'static Ty),
+    StarProjection(&'static Ty),
+    /// A generic type-parameter reference (`T`), carrying its name and declared upper bound
+    /// (`<T : CharSequence>` → bound `CharSequence`; unbounded `<T>` → bound `kotlin/Any`). The checker
+    /// reasons about `T` as `T` (subtyping against the bound, substitution at instantiation); runtime
+    /// erasure is a backend concern.
+    TyParam(&'static str, &'static Ty),
+    /// Kotlin's definitely-non-null type `T & Any`.
+    ///
+    /// The wrapped type is the original type parameter, including a bound that still admits null.
+    /// This is distinct from a parameter declared `T : Any`: `(T & Any)?` reopens to that original
+    /// `T?`, while `T : Any` keeps its recorded bound when used as `T?`.
+    DefinitelyNotNull(&'static Ty),
+    /// A denotable intersection `A & B & …` produced when a type variable's only constraints are
+    /// incompatible upper bounds (`Int & String`). It is a subtype of each component and is not
+    /// [`Ty::Nothing`]: the value still exists at run time.
+    Intersection(&'static [Ty]),
+}
+
+pub(crate) fn stored_value_ty(ty: Ty) -> Ty {
+    if ty == Ty::Unit {
+        Ty::obj("kotlin/Unit")
+    } else {
+        ty
+    }
+}
+
+/// Replace every NOT-DETERMINED marker inside `ty` with `replacement`.
+pub fn ty_replace_pending(ty: Ty, replacement: Ty) -> Ty {
+    match ty {
+        Ty::Pending => replacement,
+        Ty::Nullable(inner) => Ty::nullable(ty_replace_pending(*inner, replacement)),
+        Ty::Obj(name, args) if args.iter().any(|argument| argument.mentions_pending()) => {
+            Ty::obj_args_name(
+                name,
+                &args
+                    .iter()
+                    .map(|argument| ty_replace_pending(*argument, replacement))
+                    .collect::<Vec<_>>(),
+            )
+        }
+        // A FUNCTION type carries the marker in its return or its parameters, not in type arguments:
+        // `C::foo` is `(C) -> <not determined>` while `foo`'s own return is being determined. Without
+        // this arm such a type passed through untouched and the declaration declined even though the
+        // answer had already been obtained.
+        Ty::Fun(signature) if signature.mentions_pending() => Ty::fun_with_shape(
+            signature
+                .params
+                .iter()
+                .map(|parameter| ty_replace_pending(*parameter, replacement))
+                .collect::<Vec<_>>(),
+            ty_replace_pending(signature.ret, replacement),
+            signature.context_count,
+            signature.has_receiver,
+            signature.suspend,
+        ),
+        other => other,
+    }
+}
+
+impl FnSig {
+    /// Whether this signature carries the NOT-DETERMINED marker in its return or parameters.
+    pub fn mentions_pending(&self) -> bool {
+        self.ret.mentions_pending()
+            || self
+                .params
+                .iter()
+                .any(|parameter| parameter.mentions_pending())
+    }
+}
+
+impl Ty {
+    // Kotlin built-ins are ordinary classifiers. These associated constants preserve concise call
+    // sites and const-pattern matching without creating scalar/string enum variants alongside `Obj`.
+    #[allow(non_upper_case_globals)]
+    pub const Boolean: Ty = Ty::Obj(KOTLIN_BOOLEAN, &[]);
+    #[allow(non_upper_case_globals)]
+    pub const Byte: Ty = Ty::Obj(KOTLIN_BYTE, &[]);
+    #[allow(non_upper_case_globals)]
+    pub const Short: Ty = Ty::Obj(KOTLIN_SHORT, &[]);
+    #[allow(non_upper_case_globals)]
+    pub const Int: Ty = Ty::Obj(KOTLIN_INT, &[]);
+    #[allow(non_upper_case_globals)]
+    pub const Long: Ty = Ty::Obj(KOTLIN_LONG, &[]);
+    #[allow(non_upper_case_globals)]
+    pub const Char: Ty = Ty::Obj(KOTLIN_CHAR, &[]);
+    #[allow(non_upper_case_globals)]
+    pub const Float: Ty = Ty::Obj(KOTLIN_FLOAT, &[]);
+    #[allow(non_upper_case_globals)]
+    pub const Double: Ty = Ty::Obj(KOTLIN_DOUBLE, &[]);
+    #[allow(non_upper_case_globals)]
+    pub const UByte: Ty = Ty::Obj(KOTLIN_UBYTE, &[]);
+    #[allow(non_upper_case_globals)]
+    pub const UShort: Ty = Ty::Obj(KOTLIN_USHORT, &[]);
+    #[allow(non_upper_case_globals)]
+    pub const UInt: Ty = Ty::Obj(KOTLIN_UINT, &[]);
+    #[allow(non_upper_case_globals)]
+    pub const ULong: Ty = Ty::Obj(KOTLIN_ULONG, &[]);
+    #[allow(non_upper_case_globals)]
+    pub const String: Ty = Ty::Obj(KOTLIN_STRING, &[]);
+
+    /// A class reference type from an internal name (no generic arguments).
+    pub fn obj(internal: &str) -> Ty {
+        Ty::Obj(type_name(internal), &[])
+    }
+
+    /// A class reference type from an existing tree-backed internal name.
+    pub fn obj_name(internal: TypeName) -> Ty {
+        Ty::Obj(internal, &[])
+    }
+
+    /// A generic class reference type — `internal<args…>`.
+    pub fn obj_args(internal: &str, args: &[Ty]) -> Ty {
+        Ty::Obj(type_name(internal), intern_tys(args))
+    }
+
+    pub fn obj_args_name(internal: TypeName, args: &[Ty]) -> Ty {
+        Ty::Obj(internal, intern_tys(args))
+    }
+
+    /// The generic type arguments of a reference type (empty for non-generic / non-`Obj`).
+    pub fn type_args(self) -> &'static [Ty] {
+        match self {
+            Ty::Obj(_, args) => args,
+            Ty::TyParam(_, b) | Ty::PlatformNullable(b) => b.type_args(),
+            _ => &[],
+        }
+    }
+
+    /// Substitute known type parameters and erase an unbound parameter to its non-null upper bound.
+    /// This is a type-shape operation used while publishing and specializing metadata; it is not an
+    /// overload-selection decision.
+    pub fn substitute_erased(self, bindings: &crate::fx_hash::HashMap<String, Ty>) -> Ty {
+        match self {
+            Ty::TyParam(name, bound) => bindings
+                .get(name)
+                .copied()
+                .map(|binding| {
+                    if bound.upper_bound_admits_null() {
+                        binding
+                    } else {
+                        binding.non_null()
+                    }
+                })
+                .unwrap_or_else(|| bound.non_null()),
+            Ty::Fun(signature) => Ty::fun_with_shape(
+                signature
+                    .params
+                    .iter()
+                    .map(|parameter| parameter.substitute_erased(bindings))
+                    .collect(),
+                signature.ret.substitute_erased(bindings),
+                signature.context_count,
+                signature.has_receiver,
+                signature.suspend,
+            ),
+            Ty::Nullable(inner) => Ty::nullable(inner.substitute_erased(bindings)),
+            Ty::PlatformNullable(inner) => Ty::platform_nullable(inner.substitute_erased(bindings)),
+            Ty::InProjection(inner) => Ty::in_projection(inner.substitute_erased(bindings)),
+            Ty::OutProjection(inner) => Ty::out_projection(inner.substitute_erased(bindings)),
+            Ty::StarProjection(inner) => Ty::star_projection(inner.substitute_erased(bindings)),
+            Ty::Obj(internal, arguments) if !arguments.is_empty() => {
+                let arguments = arguments
+                    .iter()
+                    .map(|argument| argument.substitute_erased(bindings))
+                    .collect::<Vec<_>>();
+                Ty::obj_args_name(internal, &arguments)
+            }
+            Ty::Intersection(parts) => Ty::intersection(
+                &parts
+                    .iter()
+                    .map(|part| part.substitute_erased(bindings))
+                    .collect::<Vec<_>>(),
+            ),
+            _ => self,
+        }
+    }
+
+    /// An array whose element is `elem`, choosing the array *kind* the way Kotlin does: a primitive
+    /// element yields the specialized primitive array (`Int` → `IntArray` = `Obj("kotlin/IntArray")`,
+    /// `[I`), any reference element yields the boxed `Array<T>` (`String` → `Obj("kotlin/Array", [String])`,
+    /// `[Ljava/lang/String;`). To force a boxed `Array<Int>` (`[Ljava/lang/Integer;`) construct it
+    /// directly as `Ty::obj_args_name(wk::array(), &[Ty::Int])`.
+    pub fn array(elem: Ty) -> Ty {
+        match prim_array_name(elem) {
+            Some(n) => Ty::obj(n),
+            None => Ty::obj_args_name(wk::array(), &[elem]),
+        }
+    }
+
+    /// The element type if this is an array — a primitive specialized array (`IntArray` → `Int`) or a
+    /// Kotlin `Array<T>` carried as `Obj("kotlin/Array", [T])` (its *logical* element, e.g. `Int` for
+    /// `Array<Int>`; the wrapper boxing is the backend's concern, not the type's).
+    pub fn array_elem(self) -> Option<Ty> {
+        match self {
+            Ty::Obj(n, args) if n == wk::array() => args.first().copied(),
+            Ty::Obj(n, _) => prim_array_element(n),
+            Ty::TyParam(_, b) | Ty::PlatformNullable(b) => b.array_elem(),
+            _ => None,
+        }
+    }
+
+    /// The type produced by READING one element from this array. [`Ty::array_elem`] preserves the
+    /// classifier argument exactly, including a use-site projection; an expression cannot itself
+    /// have that projection wrapper. Reading `Array<out T>` yields `T`, while an `in`-projected
+    /// array exposes only nullable `Any`. Primitive and invariant arrays keep their declared element.
+    pub fn array_read_elem(self) -> Option<Ty> {
+        Some(match self.array_elem()? {
+            Ty::OutProjection(inner) | Ty::StarProjection(inner) => *inner,
+            Ty::InProjection(_) => Ty::nullable(Ty::obj("kotlin/Any")),
+            element => element,
+        })
+    }
+
+    /// Whether this type is any array — a primitive specialized array (`kotlin/IntArray`, …) or a boxed
+    /// `Array<T>` (`Obj("kotlin/Array", [T])`). The single array-ness predicate; consumers must use this
+    /// instead of pattern-matching a specific spelling so the representation can migrate under them.
+    pub fn is_array(self) -> bool {
+        matches!(self, Ty::Obj(n, _) if n == wk::array() || prim_array_element(n).is_some())
+    }
+
+    /// Whether this is a boxed `Array<T>` (`aaload`/`aastore`, elements stored as objects) as opposed to
+    /// a primitive specialized array (`IntArray` → `iaload`/`iastore`). The only bit the backend needs to
+    /// pick array opcodes; a reference array boxes primitive [`array_elem`]s at the store boundary.
+    pub fn is_reference_array(self) -> bool {
+        matches!(self, Ty::Obj(n, _) if n == wk::array())
+    }
+
+    /// The nullable form `T?` of a type. Idempotent (Kotlin has no `T??`), and degenerate inputs
+    /// collapse: `Null?` = `Null`, `Error?` = `Error`. `Nothing?` is kept — it's the real type of the
+    /// `null` literal.
+    pub fn nullable(inner: Ty) -> Ty {
+        match inner {
+            // `(T & Any)?` is the original parameter's `T?`. The intersection exists only to satisfy
+            // a non-null bound; nullability restores the caller parameter and its recorded bound.
+            Ty::DefinitelyNotNull(original) => Ty::nullable(*original),
+            Ty::Nullable(_) | Ty::Null | Ty::Error => inner,
+            Ty::PlatformNullable(inner) => Ty::Nullable(inner),
+            _ => Ty::Nullable(intern_ty(inner)),
+        }
+    }
+
+    /// Java's flexible platform-nullability form `T!`.
+    pub fn platform_nullable(inner: Ty) -> Ty {
+        match inner {
+            Ty::Nullable(inner) | Ty::PlatformNullable(inner) => Ty::PlatformNullable(inner),
+            Ty::Null | Ty::Error => inner,
+            _ => Ty::PlatformNullable(intern_ty(inner)),
+        }
+    }
+
+    /// Re-apply this type's nullability wrapper to `inner`, which must be this type's non-null
+    /// semantic content. `T?` yields `inner?` and Java's `T!` yields `inner!`; any other shape
+    /// yields `inner` unchanged. Normalization that replaces the nominal classifier (for example a
+    /// `FunctionN` projection onto its callable shape) must go through here so a platform wrapper
+    /// is not silently collapsed to non-null.
+    pub fn rewrap_nullability(self, inner: Ty) -> Ty {
+        match self {
+            Ty::Nullable(_) => Ty::nullable(inner),
+            Ty::PlatformNullable(_) => Ty::platform_nullable(inner),
+            _ => inner,
+        }
+    }
+
+    pub fn in_projection(inner: Ty) -> Ty {
+        Ty::InProjection(intern_ty(inner))
+    }
+
+    pub fn out_projection(inner: Ty) -> Ty {
+        Ty::OutProjection(intern_ty(inner))
+    }
+
+    pub fn star_projection(upper_bound: Ty) -> Ty {
+        Ty::StarProjection(intern_ty(upper_bound))
+    }
+
+    /// `A & B & …`. See [`intersection::canonical`].
+    pub fn intersection(parts: &[Ty]) -> Ty {
+        intersection::canonical(parts)
+    }
+
+    pub fn projection_inner(self) -> Option<Ty> {
+        match self {
+            Ty::InProjection(inner) | Ty::OutProjection(inner) | Ty::StarProjection(inner) => {
+                Some(*inner)
+            }
+            _ => None,
+        }
+    }
+
+    /// The expression type obtained by reading a value through a use-site projection. Projection
+    /// wrappers describe a classifier argument/capture, not a type an expression can retain:
+    /// covariant reads expose their upper bound, while a contravariant capture can only be read as
+    /// nullable `Any`. Non-projected types are already valid read types.
+    pub fn projection_read_ty(self) -> Ty {
+        match self {
+            Ty::OutProjection(inner) | Ty::StarProjection(inner) => *inner,
+            Ty::InProjection(_) => Ty::nullable(Ty::obj("kotlin/Any")),
+            ty => ty,
+        }
+    }
+
+    /// Whether this type is nullable (`T?`).
+    pub fn is_nullable(self) -> bool {
+        matches!(self, Ty::Nullable(_))
+    }
+
+    /// Whether this type occurrence admits `null`: an explicit nullable type or a flexible platform
+    /// type. A bare type parameter does not admit `null`, even when its upper bound is `Any?`: the
+    /// parameter may still be instantiated with a non-null type, and only `T?` accepts the literal.
+    /// This is distinct from [`Self::is_nullable`], which identifies source `T?` syntax and must not
+    /// collapse `T!` to that single bound.
+    pub fn admits_null(self) -> bool {
+        matches!(self, Ty::Nullable(_) | Ty::PlatformNullable(_) | Ty::Null)
+    }
+
+    /// Whether this type's upper-bound chain admits `null`. This is for substitution and generic
+    /// constraint reasoning only; it deliberately does not make a bare [`Ty::TyParam`] nullable as
+    /// a source type occurrence (see [`Self::admits_null`]).
+    pub fn upper_bound_admits_null(self) -> bool {
+        let mut current = self;
+        let mut seen = crate::fx_hash::HashSet::default();
+        loop {
+            match current {
+                Ty::Nullable(_) | Ty::PlatformNullable(_) | Ty::Null => return true,
+                Ty::TyParam(name, bound) if seen.insert(name) => current = *bound,
+                _ => return false,
+            }
+        }
+    }
+
+    /// The non-null form: strips a `?` if present, else returns `self`.
+    pub fn non_null(self) -> Ty {
+        match self {
+            Ty::Nullable(inner) => *inner,
+            Ty::PlatformNullable(inner) => *inner,
+            _ => self,
+        }
+    }
+
+    /// Kotlin's definitely-non-null form (`T & Any`). Unlike [`Self::non_null`], this retains a
+    /// type parameter's identity while making its occurrence bound non-null, so substituting a
+    /// nullable type argument through a metadata or source signature cannot erase the intersection.
+    ///
+    /// A parameter whose bound already excludes null stays that parameter. Source `T & Any` tightens
+    /// the occurrence bound and keeps the parameter identity. Inference of a nullable use records
+    /// [`Ty::DefinitelyNotNull`] instead, so the original bound can be reopened by [`Self::nullable`].
+    pub fn definitely_non_null(self) -> Ty {
+        match self {
+            Ty::Null => Ty::Nothing,
+            Ty::DefinitelyNotNull(_) => self,
+            Ty::TyParam(name, bound) => Ty::ty_param(name, bound.definitely_non_null()),
+            _ => self.non_null(),
+        }
+    }
+
+    /// The constraint a nullable formal position contributes.
+    ///
+    /// Concrete types contribute their non-null form. A type parameter whose bound admits null
+    /// contributes `T & Any` ([`Ty::DefinitelyNotNull`]) rather than a copy whose bound was rewritten
+    /// to `Any`: that copy is indistinguishable from a parameter declared `T : Any`. A parameter
+    /// already bounded by non-null `Any` is contributed unchanged.
+    pub(crate) fn contributed_through_nullable_formal(self) -> Ty {
+        let actual = self.non_null();
+        match actual {
+            Ty::TyParam(_, bound) if bound.upper_bound_admits_null() => {
+                Ty::DefinitelyNotNull(intern_ty(actual))
+            }
+            other => other,
+        }
+    }
+
+    /// Lower bound of a flexible Java platform type; fixed Kotlin types are unchanged.
+    pub fn platform_lower_bound(self) -> Ty {
+        match self {
+            Ty::PlatformNullable(inner) => *inner,
+            _ => self,
+        }
+    }
+
+    /// Kotlin class identity for types that have one in source-level member/subtype lookup.
+    ///
+    /// This is not a JVM descriptor mapping: it returns Kotlin internal names (`kotlin/Int`,
+    /// `kotlin/String`, user class names), and deliberately ignores backend wrapper/internal names.
+    /// Nullable and type-parameter forms delegate to their non-null/bound class identity.
+    pub fn kotlin_class_internal(self) -> Option<TypeName> {
+        match self {
+            Ty::Obj(i, _) => Some(i),
+            Ty::DefinitelyNotNull(inner) | Ty::Nullable(inner) | Ty::PlatformNullable(inner) => {
+                inner.kotlin_class_internal()
+            }
+            Ty::TyParam(_, bound) => bound.kotlin_class_internal(),
+            _ => None,
+        }
+    }
+
+    /// Whether this is Kotlin's semantic top reference type, including a physical JVM spelling that may
+    /// arrive from classpath metadata.
+    pub fn is_erased_top(self) -> bool {
+        self.non_null()
+            .kotlin_class_internal()
+            .is_some_and(|n| same(n, wk::any()) || same(n, wk::java_object()))
+    }
+
+    /// The canonical **extension-receiver key**: the `Ty` two receivers must share for an extension
+    /// declared on one to resolve on the other. A Kotlin-level erasure that reproduces the equivalence
+    /// the old JVM descriptor key gave for *reference* receivers, without referencing the backend — it
+    /// drops a nullable reference's `?` (`String?` and `String` take the same extensions), generic
+    /// arguments (`List<Int>` and `List<String>` share `List`'s extensions, recursively through
+    /// arrays), and a type parameter to its (also-erased) bound (`fun T.f()` keys under the bound).
+    /// `null`/`Nothing`/error key under `Any` (a `null` receiver reaches an `Any?` extension). Replaces
+    /// a computed JVM descriptor string, which leaked the backend representation and allocated on every
+    /// insert and lookup.
+    ///
+    /// It is deliberately NOT a faithful descriptor clone in two corners the descriptor folded only by
+    /// accident of JVM erasure: signed vs unsigned primitives stay distinct (the descriptor merged
+    /// `Int`/`UInt` because both erase to `I`), and function-type receivers stay distinct by full
+    /// signature (the descriptor merged every arity-N `Fun` to `FunctionN`; that merge let an
+    /// `((Int)->Int).f()` extension resolve on an `((String)->String)` receiver, which kotlinc rejects).
+    /// A nullable *primitive* IS kept distinct from the unboxed primitive (`Int?` boxes — same key as an
+    /// already-boxed `Array<Int>` element — while `Int` does not), matching the descriptor.
+    pub fn erased_recv(self) -> Ty {
+        match self {
+            // Nullability is semantic and remains in the receiver key. No JVM wrapper classifier is
+            // manufactured in core merely because this receiver may use one on a JVM boundary.
+            Ty::Nullable(inner) if inner.scalar_value_repr().is_some() => {
+                Ty::nullable(inner.erased_recv())
+            }
+            Ty::Nullable(inner) => inner.erased_recv(),
+            Ty::PlatformNullable(inner) => inner.erased_recv(),
+            Ty::DefinitelyNotNull(inner) | Ty::TyParam(_, inner) => inner.erased_recv(),
+            // `Array<T>` keeps its array-ness but erases the ELEMENT's own generics (`Array<List<Int>>` →
+            // `Array<List>`) — an array receiver keys per element class. Use the identity-form
+            // object constructor (NOT `Ty::array`, which collapses a bare-primitive element to an
+            // `IntArray` = `[I`, breaking the boxed `Array<Int>` = `[Integer;` receiver) so the
+            // boxed array form is preserved.
+            Ty::Obj(n, args) if n == wk::array() => {
+                let e = args
+                    .first()
+                    .copied()
+                    .unwrap_or_else(|| Ty::obj("kotlin/Any"));
+                Ty::obj_args_name(wk::array(), &[e.erased_recv()])
+            }
+            Ty::Obj(n, _) => Ty::Obj(n, &[]),
+            // `null`/`Nothing` (and the error placeholder) are subtypes of every reference type, so a
+            // receiver of one of these can invoke an `Any`/`Any?`-receiver extension — key them under
+            // `Any` (`null.unsafeCast()` reaches `fun <T> Any?.unsafeCast()`).
+            Ty::Null | Ty::Nothing | Ty::Error => Ty::obj("kotlin/Any"),
+            _ => self,
+        }
+    }
+
+    /// Semantic extension receiver key preserving nullability and generic receiver shape.
+    pub fn extension_recv_key(self) -> Ty {
+        match self {
+            Ty::Nullable(inner) => Ty::nullable(inner.extension_recv_key()),
+            Ty::PlatformNullable(inner) => Ty::platform_nullable(inner.extension_recv_key()),
+            Ty::DefinitelyNotNull(inner) => inner.extension_recv_key(),
+            Ty::TyParam(_, bound) => Ty::ty_param("\u{0}", bound.extension_recv_key()),
+            Ty::Obj(n, args) if n == wk::array() => {
+                let element = args
+                    .first()
+                    .copied()
+                    .unwrap_or_else(|| Ty::obj("kotlin/Any"));
+                Ty::obj_args_name(wk::array(), &[element.extension_recv_key()])
+            }
+            Ty::Obj(n, _) => Ty::Obj(n, &[]),
+            _ => self,
+        }
+    }
+
+    /// Candidate extension-receiver lookup keys, most-specific first. Generic receivers such as
+    /// `val <T> T.p` or `val <T> Array<T>.p` register under `Any`/`Array<Any>`, while concrete receivers
+    /// keep their precise erased key first so concrete overloads still win.
+    pub fn erased_recv_candidates(self) -> Vec<Ty> {
+        let mut keys = vec![self.erased_recv()];
+        if matches!(keys[0], Ty::Obj(n, _) if n == wk::array()) {
+            keys.push(Ty::obj_args_name(wk::array(), &[Ty::obj("kotlin/Any")]));
+        }
+        keys.push(Ty::obj("kotlin/Any"));
+        keys.dedup();
+        keys
+    }
+
+    /// A generic type-parameter type `T` with the given declared upper bound (`kotlin/Any` if unbounded).
+    pub fn ty_param(name: &str, bound: Ty) -> Ty {
+        Ty::TyParam(intern(name), intern_ty(bound))
+    }
+
+    /// Whether this is a generic type-parameter reference (`T`).
+    pub fn is_ty_param(self) -> bool {
+        matches!(self, Ty::TyParam(..))
+    }
+
+    /// Whether a type parameter appears ANYWHERE in this type — as the type itself, a type argument,
+    /// an array element, a function parameter/return, or under a `?`. A type that mentions one is not
+    /// yet a concrete answer: it still needs the use site's substitution, so asserting it (as a
+    /// reference type's argument, say) records `T.() -> String` where `Int.() -> String` is meant.
+    /// Whether this type carries the NOT-DETERMINED marker anywhere inside it.
+    ///
+    /// `Ty::Pending` is not only a whole answer: a declaration can be typed `KProperty1<C, Pending>`
+    /// by referencing a member whose own type is still being determined. Publishing that is exactly
+    /// what publishing the bare marker would be, and the emission boundary rejects it the same way,
+    /// so "is this determined" has to ask about the whole type rather than its outermost layer.
+    pub fn mentions_pending(self) -> bool {
+        self.mentions_marker(&|ty| ty == Ty::Pending)
+    }
+
+    /// Whether this type carries the ERROR placeholder anywhere inside it.
+    ///
+    /// The same containment question as [`mentions_pending`](Ty::mentions_pending), asked about
+    /// "gave up" rather than "not yet". A publish boundary needs both: an answer of `Error` is not a
+    /// type either, and it erases to `java/lang/Object` in a descriptor and to `<error>` in
+    /// `@Metadata`, so publishing one is how a resolution failure turns into a wrong program rather
+    /// than a diagnostic.
+    pub fn mentions_error(self) -> bool {
+        self.mentions_marker(&|ty| ty == Ty::Error)
+    }
+
+    /// The containment walk both markers share: the type itself, a nullability/projection wrapper's
+    /// inner type, a reference type's arguments, and a function type's parameters and return.
+    fn mentions_marker(self, marker: &dyn Fn(Ty) -> bool) -> bool {
+        if marker(self) {
+            return true;
+        }
+        match self {
+            Ty::Nullable(inner) | Ty::PlatformNullable(inner) | Ty::DefinitelyNotNull(inner) => {
+                inner.mentions_marker(marker)
+            }
+            Ty::Intersection(parts) => parts.iter().any(|part| part.mentions_marker(marker)),
+            Ty::InProjection(inner) | Ty::OutProjection(inner) | Ty::StarProjection(inner) => {
+                inner.mentions_marker(marker)
+            }
+            Ty::Obj(_, args) => args.iter().any(|a| a.mentions_marker(marker)),
+            Ty::Fun(signature) => {
+                signature.ret.mentions_marker(marker)
+                    || signature.params.iter().any(|p| p.mentions_marker(marker))
+            }
+            _ => false,
+        }
+    }
+
+    pub fn mentions_ty_param(self) -> bool {
+        match self {
+            Ty::TyParam(..) => true,
+            Ty::DefinitelyNotNull(inner) => inner.mentions_ty_param(),
+            Ty::Intersection(parts) => parts.iter().any(|part| part.mentions_ty_param()),
+            Ty::Nullable(inner)
+            | Ty::PlatformNullable(inner)
+            | Ty::InProjection(inner)
+            | Ty::OutProjection(inner)
+            | Ty::StarProjection(inner) => inner.mentions_ty_param(),
+            Ty::Obj(_, args) => args.iter().any(|a| a.mentions_ty_param()),
+            Ty::Fun(signature) => {
+                signature.ret.mentions_ty_param()
+                    || signature.params.iter().any(|p| p.mentions_ty_param())
+            }
+            _ => false,
+        }
+    }
+
+    /// The name of a type-parameter type (`T`), else `None`.
+    pub fn ty_param_name(self) -> Option<&'static str> {
+        match self {
+            Ty::TyParam(n, _) => Some(n),
+            _ => None,
+        }
+    }
+
+    /// The declared upper bound of a type-parameter type, else `None`.
+    pub fn ty_param_bound(self) -> Option<Ty> {
+        match self {
+            Ty::TyParam(_, b) => Some(*b),
+            _ => None,
+        }
+    }
+
+    /// The upper bound carried by an occurrence of the type parameter identified by `name`.
+    pub(crate) fn type_parameter_occurrence_bound(self, name: &str) -> Option<Ty> {
+        match self {
+            Ty::TyParam(candidate, bound) => (candidate == name).then_some(*bound),
+            Ty::DefinitelyNotNull(inner) => inner.type_parameter_occurrence_bound(name),
+            Ty::Intersection(parts) => parts
+                .iter()
+                .find_map(|part| part.type_parameter_occurrence_bound(name)),
+            Ty::Nullable(inner)
+            | Ty::PlatformNullable(inner)
+            | Ty::InProjection(inner)
+            | Ty::OutProjection(inner)
+            | Ty::StarProjection(inner) => inner.type_parameter_occurrence_bound(name),
+            Ty::Obj(_, arguments) => arguments
+                .iter()
+                .find_map(|argument| argument.type_parameter_occurrence_bound(name)),
+            Ty::Fun(signature) => signature
+                .params
+                .iter()
+                .chain(std::iter::once(&signature.ret))
+                .find_map(|component| component.type_parameter_occurrence_bound(name)),
+            _ => None,
+        }
+    }
+
+    /// The unboxed primitive of a nullable primitive (`Int?` → `Int`), else `None`. Replaces the old
+    /// "is this a boxed-wrapper `Obj`?" probe (`t.obj_internal().and_then(prim_of_wrapper)`).
+    pub fn nullable_primitive(self) -> Option<Ty> {
+        match self {
+            Ty::Nullable(inner) | Ty::PlatformNullable(inner) if inner.boxed_ref().is_some() => {
+                Some(*inner)
+            }
+            _ => None,
+        }
+    }
+
+    /// The nullable form `T?` of a primitive that krusty can box (`Int` → `Int?`, `UInt` → `UInt?` boxed
+    /// as `kotlin/UInt`). `None` for a non-primitive (already a reference). Unsigned boxes via its wrapper,
+    /// so it is supported (parallel to [`Ty::nullable_primitive`], which already admits unsigned).
+    pub fn nullable_boxed(self) -> Option<Ty> {
+        self.boxed_ref().is_some().then(|| Ty::nullable(self))
+    }
+
+    /// Source-level nullable form for non-reference values that still have a valid reference
+    /// representation. `Unit?` and `Nothing?` are real source types; primitive `T?` is represented as
+    /// `Nullable(T)` until the backend picks its boxed carrier.
+    pub fn nullable_non_ref(self) -> Option<Ty> {
+        match self {
+            Ty::Nothing | Ty::Unit => Some(Ty::nullable(self)),
+            _ => self.nullable_boxed(),
+        }
+    }
+
+    /// A function type `(params) -> ret`.
+    pub fn fun(params: Vec<Ty>, ret: Ty) -> Ty {
+        Self::fun_with_shape(params, ret, 0, false, false)
+    }
+
+    pub fn fun_with_shape(
+        params: Vec<Ty>,
+        ret: Ty,
+        context_count: usize,
+        has_receiver: bool,
+        suspend: bool,
+    ) -> Ty {
+        Ty::Fun(intern_fnsig(FnSig {
+            context_count: context_count.min(params.len()),
+            params,
+            ret,
+            has_receiver,
+            suspend,
+        }))
+    }
+
+    /// A context function type.
+    pub fn fun_context(params: Vec<Ty>, ret: Ty, context_count: usize) -> Ty {
+        Self::fun_with_shape(params, ret, context_count, false, false)
+    }
+
+    /// A `suspend` function type `suspend (params) -> ret`.
+    pub fn fun_suspend(params: Vec<Ty>, ret: Ty) -> Ty {
+        Self::fun_with_shape(params, ret, 0, false, true)
+    }
+
+    /// A suspend context function type.
+    pub fn fun_suspend_context(params: Vec<Ty>, ret: Ty, context_count: usize) -> Ty {
+        Self::fun_with_shape(params, ret, context_count, false, true)
+    }
+
+    /// Arity of a function type.
+    pub fn fun_arity(self) -> Option<u8> {
+        match self {
+            Ty::Fun(s) => Some(s.params.len() as u8),
+            _ => None,
+        }
+    }
+
+    /// Return type of a function type.
+    pub fn fun_ret(self) -> Option<Ty> {
+        match self {
+            Ty::Fun(s) => Some(s.ret),
+            _ => None,
+        }
+    }
+
+    /// Parameter types of a function type.
+    pub fn fun_params(self) -> Option<&'static [Ty]> {
+        match self {
+            Ty::Fun(s) => Some(&s.params),
+            _ => None,
+        }
+    }
+
+    /// Normalize Kotlin builtin classifier objects to their dedicated semantic variants, including
+    /// occurrences nested under generic, nullable, projected, function, and type-parameter shapes.
+    /// Type substitution can reconstruct `Obj(kotlin/Int)` even though source `Int` is `Ty::Int`;
+    /// leaving both representations alive makes representation-sensitive semantic operations disagree.
+    pub fn canonical_semantic(self) -> Ty {
+        match self {
+            Ty::Obj(name, arguments) if arguments.is_empty() => {
+                builtin_semantic(name).unwrap_or_else(|| Ty::obj_name(name))
+            }
+            Ty::Obj(name, arguments) => Ty::obj_args_name(
+                name,
+                &arguments
+                    .iter()
+                    .copied()
+                    .map(Ty::canonical_semantic)
+                    .collect::<Vec<_>>(),
+            ),
+            // Canonicalization changes classifier representation, not occurrence identity. Keep
+            // the intersection wrapper and its original nullable-bound provenance so a later `?`
+            // can still reopen the caller's type parameter.
+            Ty::DefinitelyNotNull(inner) => {
+                Ty::DefinitelyNotNull(intern_ty(inner.canonical_semantic()))
+            }
+            Ty::Nullable(inner) => Ty::nullable(inner.canonical_semantic()),
+            Ty::PlatformNullable(inner) => Ty::platform_nullable(inner.canonical_semantic()),
+            Ty::InProjection(inner) => Ty::in_projection(inner.canonical_semantic()),
+            Ty::OutProjection(inner) => Ty::out_projection(inner.canonical_semantic()),
+            Ty::StarProjection(inner) => Ty::star_projection(inner.canonical_semantic()),
+            Ty::Intersection(parts) => Ty::intersection(
+                &parts
+                    .iter()
+                    .copied()
+                    .map(Ty::canonical_semantic)
+                    .collect::<Vec<_>>(),
+            ),
+            Ty::TyParam(name, bound) => Ty::ty_param(name, bound.canonical_semantic()),
+            Ty::Fun(signature) => Ty::fun_with_shape(
+                signature
+                    .params
+                    .iter()
+                    .copied()
+                    .map(Ty::canonical_semantic)
+                    .collect(),
+                signature.ret.canonical_semantic(),
+                signature.context_count,
+                signature.has_receiver,
+                signature.suspend,
+            ),
+            _ => self,
+        }
+    }
+
+    pub fn from_name(name: &str) -> Option<Ty> {
+        // Qualified source spellings denote the same builtin classifier as their default-import
+        // spelling. Canonicalize them here so `kotlin.Unit` cannot leak into semantic checking as
+        // `Obj("kotlin/Unit")` while `Unit` is `Ty::Unit` (and likewise for scalar classifiers).
+        let name = name.strip_prefix("kotlin.").unwrap_or(name);
+        Some(match name {
+            "Int" => Ty::Int,
+            "Byte" => Ty::Byte,
+            "Short" => Ty::Short,
+            "Long" => Ty::Long,
+            "Float" => Ty::Float,
+            "Double" => Ty::Double,
+            "Boolean" => Ty::Boolean,
+            "Char" => Ty::Char,
+            "UByte" => Ty::UByte,
+            "UShort" => Ty::UShort,
+            "UInt" => Ty::UInt,
+            "ULong" => Ty::ULong,
+            "String" => Ty::String,
+            "Unit" => Ty::Unit,
+            "Nothing" => Ty::Nothing,
+            "Any" => Ty::obj("kotlin/Any"),
+            _ => return None,
+        })
+    }
+
+    /// The element type of a specialized primitive array type name (`IntArray` → `Int`, …).
+    /// `Array<T>` is handled separately (it carries its element as a type argument).
+    pub fn primitive_array_element(name: &str) -> Option<Ty> {
+        primitive_array_creator_element(name).filter(|_| name.ends_with("Array"))
+    }
+
+    /// JVM wrapper classifier for a Kotlin scalar. This is a temporary compatibility seam used by the
+    /// JVM pipeline; semantic types remain the Kotlin classifiers above.
+    pub fn boxed_ref(self) -> Option<Ty> {
+        Some(Ty::obj(match self {
+            Ty::Int => "java/lang/Integer",
+            Ty::Byte => "java/lang/Byte",
+            Ty::Short => "java/lang/Short",
+            Ty::Long => "java/lang/Long",
+            Ty::Float => "java/lang/Float",
+            Ty::Double => "java/lang/Double",
+            Ty::Boolean => "java/lang/Boolean",
+            Ty::Char => "java/lang/Character",
+            // Unsigned types box to their OWN inline-class wrapper (`UInt` → `kotlin/UInt`), not a
+            // `java/lang/*`; `kotlin_prim_to_wrapper` maps the wrapper to itself.
+            Ty::UByte => "kotlin/UByte",
+            Ty::UShort => "kotlin/UShort",
+            Ty::UInt => "kotlin/UInt",
+            Ty::ULong => "kotlin/ULong",
+            _ => return None,
+        }))
+    }
+
+    /// Boxed JVM wrapper for a primitive, excluding unsigned inline classes.
+    pub fn jvm_boxed_ref(self) -> Option<Ty> {
+        self.boxed_ref().filter(|_| !self.is_unsigned())
+    }
+
+    /// Inverse JVM-wrapper mapping. Semantic `kotlin/Int` is already the classifier and does not match.
+    pub fn unboxed_primitive(self) -> Option<Ty> {
+        Some(match self {
+            Ty::Obj(n, _) if n.matches("java/lang/Integer") => Ty::Int,
+            Ty::Obj(n, _) if n.matches("java/lang/Byte") => Ty::Byte,
+            Ty::Obj(n, _) if n.matches("java/lang/Short") => Ty::Short,
+            Ty::Obj(n, _) if n.matches("java/lang/Long") => Ty::Long,
+            Ty::Obj(n, _) if n.matches("java/lang/Float") => Ty::Float,
+            Ty::Obj(n, _) if n.matches("java/lang/Double") => Ty::Double,
+            Ty::Obj(n, _) if n.matches("java/lang/Boolean") => Ty::Boolean,
+            Ty::Obj(n, _) if n.matches("java/lang/Character") => Ty::Char,
+            _ => return None,
+        })
+    }
+
+    /// Render a Kotlin source type.
+    pub fn source_name(self) -> String {
+        self.source_name_with_type_parameter(&|name| type_parameter_source_name(name).to_string())
+    }
+
+    /// Render a Kotlin source type while letting a diagnostic qualify type-parameter names with
+    /// their declaration owner. Semantic type identities remain unchanged.
+    pub(crate) fn source_name_with_type_parameter(
+        self,
+        type_parameter: &dyn Fn(&str) -> String,
+    ) -> String {
+        self.source_name_with_type_parameter_in(std::slice::from_ref(&self), type_parameter)
+    }
+
+    /// Render one type among the types named by the same diagnostic. Classifiers normally use their
+    /// simple source name; colliding classifiers retain their package so the message distinguishes
+    /// them.
+    pub(crate) fn source_name_with_type_parameter_in(
+        self,
+        context: &[Ty],
+        type_parameter: &dyn Fn(&str) -> String,
+    ) -> String {
+        self.source_name_with_classifier_in(context, type_parameter, &|_| None, &|lower| lower)
+    }
+
+    /// Render one type for a diagnostic while allowing the frontend to replace an opaque semantic
+    /// classifier identity with its recorded source declaration name. The callback is consulted
+    /// only while rendering; lookup and equality continue to use the interned identity.
+    pub(crate) fn source_name_with_classifier_in(
+        self,
+        context: &[Ty],
+        type_parameter: &dyn Fn(&str) -> String,
+        classifier: &dyn Fn(TypeName) -> Option<String>,
+        platform_upper_bound: &dyn Fn(Ty) -> Ty,
+    ) -> String {
+        let render = |ty: Ty| {
+            ty.source_name_with_classifier_in(
+                context,
+                type_parameter,
+                classifier,
+                platform_upper_bound,
+            )
+        };
+        match self {
+            Ty::Int => "Int".to_string(),
+            Ty::Byte => "Byte".to_string(),
+            Ty::Short => "Short".to_string(),
+            Ty::Long => "Long".to_string(),
+            Ty::Float => "Float".to_string(),
+            Ty::Double => "Double".to_string(),
+            Ty::Boolean => "Boolean".to_string(),
+            Ty::Char => "Char".to_string(),
+            Ty::UByte => "UByte".to_string(),
+            Ty::UShort => "UShort".to_string(),
+            Ty::UInt => "UInt".to_string(),
+            Ty::ULong => "ULong".to_string(),
+            Ty::String => "String".to_string(),
+            Ty::Unit => "Unit".to_string(),
+            Ty::Obj(n, args) => {
+                let base = classifier(n).unwrap_or_else(|| {
+                    if context
+                        .iter()
+                        .copied()
+                        .any(|ty| ty.contains_distinct_classifier_with_segment(n))
+                    {
+                        n.render().replace(['/', '$'], ".")
+                    } else {
+                        n.segment_ref().replace('$', ".")
+                    }
+                });
+                if args.is_empty() {
+                    base
+                } else {
+                    let arguments = args
+                        .iter()
+                        .map(|argument| render(*argument))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    format!("{base}<{arguments}>")
+                }
+            }
+            Ty::Null => "Null".to_string(),
+            Ty::Nothing => "Nothing".to_string(),
+            Ty::Error => "<error>".to_string(),
+            Ty::Fun(signature) => diagnostic_rendering::function_type(
+                signature,
+                context,
+                type_parameter,
+                classifier,
+                platform_upper_bound,
+            ),
+            // A type parameter's nullability marker belongs to its name, ahead of any owner text a
+            // diagnostic appends: `T? (of class Box<T>)`, `T! (of class Box<T>)`.
+            Ty::Nullable(inner) | Ty::PlatformNullable(inner)
+                if matches!(*inner, Ty::TyParam(..)) =>
+            {
+                diagnostic_rendering::qualified_type_parameter(
+                    *inner,
+                    matches!(self, Ty::Nullable(_)),
+                    type_parameter,
+                )
+            }
+            Ty::Nullable(inner) => intersection::spell_nullable(*inner, render, true),
+            Ty::PlatformNullable(inner) => diagnostic_rendering::platform_type(
+                *inner,
+                context,
+                type_parameter,
+                classifier,
+                platform_upper_bound,
+            ),
+            Ty::InProjection(inner) => match *inner {
+                Ty::OutProjection(conflicting) => {
+                    format!("CONFLICTING-PROJECTION {}", render(*conflicting))
+                }
+                _ => format!("in {}", render(*inner)),
+            },
+            Ty::OutProjection(inner) => match *inner {
+                Ty::InProjection(conflicting) => {
+                    format!("CONFLICTING-PROJECTION {}", render(*conflicting))
+                }
+                _ => format!("out {}", render(*inner)),
+            },
+            Ty::StarProjection(_) => "*".to_string(),
+            Ty::DefinitelyNotNull(inner) => format!("{} & Any", render(*inner)),
+            Ty::Intersection(parts) => parts
+                .iter()
+                .map(|part| render(*part))
+                .collect::<Vec<_>>()
+                .join(" & "),
+            Ty::TyParam(n, _) => type_parameter(n),
+            // Only reachable from a diagnostic rendered while the declaration is still being
+            // resolved; it never names a real type.
+            Ty::Pending => "<not determined>".to_string(),
+        }
+    }
+
+    fn contains_distinct_classifier_with_segment(self, classifier: TypeName) -> bool {
+        match self {
+            Ty::Obj(name, arguments) => {
+                (name != classifier && name.segment_ref() == classifier.segment_ref())
+                    || arguments.iter().copied().any(|argument| {
+                        argument.contains_distinct_classifier_with_segment(classifier)
+                    })
+            }
+            Ty::Fun(signature) => {
+                signature.params.iter().copied().any(|parameter| {
+                    parameter.contains_distinct_classifier_with_segment(classifier)
+                }) || signature
+                    .ret
+                    .contains_distinct_classifier_with_segment(classifier)
+            }
+            Ty::Nullable(inner)
+            | Ty::PlatformNullable(inner)
+            | Ty::InProjection(inner)
+            | Ty::OutProjection(inner)
+            | Ty::StarProjection(inner) => {
+                inner.contains_distinct_classifier_with_segment(classifier)
+            }
+            _ => false,
+        }
+    }
+
+    pub fn name(self) -> String {
+        match self {
+            Ty::Int => "Int".to_string(),
+            Ty::Byte => "Byte".to_string(),
+            Ty::Short => "Short".to_string(),
+            Ty::Long => "Long".to_string(),
+            Ty::Float => "Float".to_string(),
+            Ty::Double => "Double".to_string(),
+            Ty::Boolean => "Boolean".to_string(),
+            Ty::Char => "Char".to_string(),
+            Ty::UByte => "UByte".to_string(),
+            Ty::UShort => "UShort".to_string(),
+            Ty::UInt => "UInt".to_string(),
+            Ty::ULong => "ULong".to_string(),
+            Ty::String => "String".to_string(),
+            Ty::Unit => "Unit".to_string(),
+            Ty::Obj(name, _) => name.render(),
+            Ty::Null => "Null".to_string(),
+            Ty::Nothing => "Nothing".to_string(),
+            Ty::Error => "<error>".to_string(),
+            Ty::Pending => "<not determined>".to_string(),
+            Ty::Fun(_) => "Function".to_string(),
+            Ty::Nullable(inner) => intersection::spell_nullable(*inner, Ty::name, false),
+            Ty::PlatformNullable(inner) => format!("{}!", inner.name()),
+            Ty::InProjection(inner) => format!("in {}", inner.name()),
+            Ty::OutProjection(inner) => format!("out {}", inner.name()),
+            Ty::StarProjection(_) => "*".to_string(),
+            Ty::TyParam(name, _) => name.to_string(),
+            Ty::DefinitelyNotNull(inner) => format!("{} & Any", inner.name()),
+            Ty::Intersection(parts) => parts
+                .iter()
+                .map(|part| part.name())
+                .collect::<Vec<_>>()
+                .join(" & "),
+        }
+    }
+
+    /// Internal class name if this is an object type.
+    pub fn obj_internal(self) -> Option<TypeName> {
+        match self {
+            Ty::Obj(n, _) => Some(n),
+            // A type parameter follows its bound for object identity queries.
+            Ty::DefinitelyNotNull(inner) => inner.obj_internal(),
+            Ty::TyParam(_, b) | Ty::PlatformNullable(b) => b.obj_internal(),
+            _ => None,
+        }
+    }
+
+    /// True for values that can carry `null` in the language model. Any nullable type is reference-like;
+    /// a type parameter follows its bound.
+    pub fn is_reference(self) -> bool {
+        match self {
+            scalar if scalar.scalar_value_repr().is_some() => false,
+            Ty::DefinitelyNotNull(_) | Ty::Intersection(_) => true,
+            Ty::TyParam(_, b) => b.is_reference(),
+            // A flexible Java `T!` can be consumed as its non-null lower bound, but until that
+            // commitment it also admits null and is represented by a reference — including a method
+            // type variable specialized to a source primitive (`Boolean!`).
+            Ty::PlatformNullable(_) => true,
+            _ => matches!(self, Ty::Obj(..) | Ty::Null | Ty::Fun(_) | Ty::Nullable(_)),
+        }
+    }
+
+    pub fn is_numeric(self) -> bool {
+        matches!(
+            self,
+            Ty::Int | Ty::Byte | Ty::Short | Ty::Long | Ty::Float | Ty::Double
+        )
+    }
+
+    pub fn is_numeric_or_char(self) -> bool {
+        self.is_numeric() || self == Ty::Char
+    }
+
+    /// True when a zero-argument callable may supply an inferred property-like read facet. Real
+    /// [`PropertyInfo`](crate::libraries::PropertyInfo) declarations do not use this predicate:
+    /// `Unit` is a valid property value and `Error` still reserves the declared name.
+    pub fn is_read_value_result(self) -> bool {
+        !matches!(self, Ty::Unit | Ty::Error)
+    }
+
+    /// Whether an otherwise-structured type contains an unresolved component.
+    ///
+    /// Resolution deliberately preserves generic/function structure around [`Ty::Error`] so later
+    /// diagnostics can name the failing nested `TypeRef`: `List<Missing>` is an `Obj` whose argument
+    /// is `Error`, and `(Missing) -> String` is a `Fun` whose parameter is `Error`. Consumers that
+    /// check only `ty == Ty::Error` silently miss both shapes. Keep the recursion here as the single
+    /// semantic predicate instead of teaching individual expression forms about every `Ty` variant.
+    pub fn contains_error(self) -> bool {
+        match self {
+            Ty::Error => true,
+            Ty::Obj(_, arguments) => arguments.iter().copied().any(Ty::contains_error),
+            Ty::Fun(signature) => {
+                signature.params.iter().copied().any(Ty::contains_error)
+                    || signature.ret.contains_error()
+            }
+            Ty::Nullable(inner) | Ty::DefinitelyNotNull(inner) => inner.contains_error(),
+            Ty::Intersection(parts) => parts.iter().copied().any(Ty::contains_error),
+            _ => false,
+        }
+    }
+
+    /// True for the signed integral types whose Kotlin range overload yields `IntRange`.
+    pub fn is_int_range_operand(self) -> bool {
+        matches!(self.range_operand_bound(), Ty::Byte | Ty::Short | Ty::Int)
+    }
+
+    /// Classifier that participates in built-in range overload selection. A type parameter uses its
+    /// declared upper bound: `<T : Char>` has the same `rangeTo`/`contains` surface as `Char`, while
+    /// the expression itself remains `T` everywhere else in the type system.
+    pub fn range_operand_bound(self) -> Ty {
+        match self {
+            Ty::TyParam(_, bound) => bound.range_operand_bound(),
+            Ty::PlatformNullable(inner) => inner.range_operand_bound(),
+            other => other,
+        }
+    }
+
+    /// Loop counter type for a same-typed Kotlin range bound, if krusty can lower it as counted.
+    pub fn range_counter_type(self) -> Option<Ty> {
+        let operand = self.range_operand_bound();
+        Some(match operand {
+            Ty::Byte | Ty::Short => Ty::Int,
+            Ty::UByte | Ty::UShort => Ty::UInt,
+            Ty::Int | Ty::Long | Ty::UInt | Ty::ULong | Ty::Char => operand,
+            _ => return None,
+        })
+    }
+
+    /// Counted-loop element selected by the built-in range overload for a pair of bounds.
+    /// Mixed signed integral bounds widen exactly as the corresponding range value does
+    /// (`Int until Long` produces a `LongRange`); unsigned and character ranges remain uniform.
+    pub fn range_counter_type_for(lo: Ty, hi: Ty) -> Option<Ty> {
+        let lo = lo.range_operand_bound();
+        let hi = hi.range_operand_bound();
+        Some(match (lo, hi) {
+            (Ty::Char, Ty::Char) => Ty::Char,
+            (Ty::UInt, Ty::UInt) => Ty::UInt,
+            (Ty::ULong, Ty::ULong) => Ty::ULong,
+            (left, right) if left.is_int_range_operand() && right.is_int_range_operand() => Ty::Int,
+            (left, right)
+                if (left.is_int_range_operand() || left == Ty::Long)
+                    && (right.is_int_range_operand() || right == Ty::Long) =>
+            {
+                Ty::Long
+            }
+            _ => return None,
+        })
+    }
+
+    /// Kotlin range value type for `lo..hi`/`lo..<hi`, if the operand pair is supported.
+    pub fn range_value_type(lo: Ty, hi: Ty) -> Option<Ty> {
+        let lo = lo.range_operand_bound();
+        let hi = hi.range_operand_bound();
+        Some(match (lo, hi) {
+            (Ty::Char, Ty::Char) => Ty::obj("kotlin/ranges/CharRange"),
+            (Ty::UInt, Ty::UInt) => Ty::obj("kotlin/ranges/UIntRange"),
+            (Ty::ULong, Ty::ULong) => Ty::obj("kotlin/ranges/ULongRange"),
+            (Ty::Double, Ty::Double) | (Ty::Float, Ty::Float) => {
+                Ty::obj("kotlin/ranges/ClosedFloatingPointRange")
+            }
+            (l, r) if l.is_int_range_operand() && r.is_int_range_operand() => {
+                Ty::obj("kotlin/ranges/IntRange")
+            }
+            (l, r)
+                if (l.is_int_range_operand() || l == Ty::Long)
+                    && (r.is_int_range_operand() || r == Ty::Long) =>
+            {
+                Ty::obj("kotlin/ranges/LongRange")
+            }
+            _ => return None,
+        })
+    }
+
+    /// Scalar type used while evaluating Kotlin operations that widen small integral values to `Int`.
+    pub fn int_arithmetic_repr(self) -> Ty {
+        match self {
+            Ty::Byte | Ty::Short | Ty::Char => Ty::Int,
+            t => t,
+        }
+    }
+
+    /// Whether a numeric `actual` can be assigned to this numeric target in source checking.
+    pub fn accepts_numeric(self, actual: Ty) -> bool {
+        match self {
+            Ty::Byte | Ty::Short => matches!(actual, Ty::Int | Ty::Byte | Ty::Short),
+            Ty::Long => matches!(actual, Ty::Int | Ty::Byte | Ty::Short | Ty::Char),
+            Ty::Float | Ty::Double => matches!(
+                actual,
+                Ty::Int | Ty::Long | Ty::Byte | Ty::Short | Ty::Char | Ty::Float
+            ),
+            _ => false,
+        }
+    }
+
+    /// True for the unsigned integer types (inline classes over a signed primitive).
+    pub fn is_unsigned(self) -> bool {
+        matches!(self, Ty::UByte | Ty::UShort | Ty::UInt | Ty::ULong)
+    }
+
+    /// Whether a property of this type may carry metadata `HAS_CONSTANT`.
+    ///
+    /// kotlinc's `canBeUsedForConstVal`: the platform lower bound is a primitive, `String`, or an
+    /// unsigned type. A nullable `String?` does not qualify; a platform `String!` does.
+    pub fn can_be_used_for_const_val(self) -> bool {
+        let ty = self.platform_lower_bound().canonical_semantic();
+        matches!(
+            ty,
+            Ty::Boolean
+                | Ty::Byte
+                | Ty::Short
+                | Ty::Int
+                | Ty::Long
+                | Ty::Char
+                | Ty::Float
+                | Ty::Double
+                | Ty::String
+        ) || ty.is_unsigned()
+    }
+
+    /// The zero-extension mask an unsigned value needs when it leaves its own representation, or
+    /// `None` when the representation already spans the whole operation width (`UInt` = `int`,
+    /// `ULong` = `long`). `UByte`/`UShort` live in a `byte`/`short`, which the JVM SIGN-extends on
+    /// every load, so `UByte.toInt()` is `iload; sipush 255; iand` — exactly what kotlinc emits.
+    pub fn unsigned_widen_mask(self) -> Option<i32> {
+        match self {
+            Ty::UByte => Some(0xFF),
+            Ty::UShort => Some(0xFFFF),
+            _ => None,
+        }
+    }
+
+    /// The unsigned type an operator on `self` actually computes in. Kotlin gives `UByte`/`UShort` no
+    /// arithmetic of their own: each operator is defined as `toInt()` (zero-extend) followed by the
+    /// `UInt` operator, so both promote to `UInt` and an operation on them yields `UInt`. `UInt`/`ULong`
+    /// operate in themselves. `None` for a signed type.
+    pub fn unsigned_op_type(self) -> Option<Ty> {
+        match self {
+            Ty::UByte | Ty::UShort | Ty::UInt => Some(Ty::UInt),
+            Ty::ULong => Some(Ty::ULong),
+            _ => None,
+        }
+    }
+
+    /// True for Kotlin scalar values that the JVM backend carries in primitive slots.
+    pub fn is_jvm_scalar(self) -> bool {
+        self.scalar_value_repr().is_some()
+    }
+
+    /// The primitive representation used for built-in scalar values.
+    pub fn scalar_value_repr(self) -> Option<Ty> {
+        Some(match self {
+            Ty::Int
+            | Ty::Byte
+            | Ty::Short
+            | Ty::Long
+            | Ty::Float
+            | Ty::Double
+            | Ty::Boolean
+            | Ty::Char => self,
+            Ty::UByte => Ty::Byte,
+            Ty::UShort => Ty::Short,
+            Ty::UInt => Ty::Int,
+            Ty::ULong => Ty::Long,
+            Ty::TyParam(_, bound) => return bound.scalar_value_repr(),
+            _ => return None,
+        })
+    }
+
+    /// A primitive whose generic upper bound (`fun <T: Int>`) specializes a function type parameter
+    /// to its scalar representation, matching kotlinc's callable descriptor.
+    pub fn is_specializable_bound(self) -> bool {
+        matches!(
+            self,
+            Ty::Int
+                | Ty::Byte
+                | Ty::Short
+                | Ty::Long
+                | Ty::Float
+                | Ty::Double
+                | Ty::Boolean
+                | Ty::Char
+        )
+    }
+
+    /// Numeric promotion rank for binary arithmetic (Int < Long < Double).
+    fn rank(self) -> u8 {
+        match self {
+            // Byte/Short share Int's rank: Kotlin arithmetic on them produces `Int`.
+            Ty::Byte | Ty::Short | Ty::Int => 1,
+            Ty::Long => 2,
+            Ty::Float => 3,
+            Ty::Double => 4,
+            _ => 0,
+        }
+    }
+
+    /// Result type of numeric promotion, or `None` if either side isn't numeric. `Byte`/`Short`
+    /// promote to `Int` (Kotlin has no byte/short arithmetic — operands widen to `Int`).
+    pub fn promote(a: Ty, b: Ty) -> Option<Ty> {
+        if a.is_numeric() && b.is_numeric() {
+            let r = if a.rank() >= b.rank() { a } else { b };
+            Some(r.int_arithmetic_repr())
+        } else {
+            None
+        }
+    }
+}
+
+/// Semantic type of one declared value-parameter slot. A `vararg element: T` is callable as an
+/// `Array<T>` slot even though the source annotation itself denotes the element type.
+pub(crate) fn semantic_value_parameter_ty(declared: Ty, is_vararg: bool) -> Ty {
+    if is_vararg {
+        Ty::array(declared)
+    } else {
+        declared
+    }
+}
+
+/// Whether `ty` mentions any of the named type parameters (`T` itself, `List<T>`, `(T) -> T`,
+/// `T?`). A pure `Ty` predicate shared by the checker (generic-shape classification) and lowering
+/// (generic-shape gates).
+pub(crate) fn ty_mentions_param(ty: Ty, names: &[String]) -> bool {
+    match ty {
+        Ty::TyParam(name, _) => names.iter().any(|parameter| parameter == name),
+        Ty::DefinitelyNotNull(inner) => ty_mentions_param(*inner, names),
+        Ty::Intersection(parts) => parts.iter().any(|part| ty_mentions_param(*part, names)),
+        Ty::Obj(_, arguments) => arguments
+            .iter()
+            .any(|argument| ty_mentions_param(*argument, names)),
+        Ty::Fun(signature) => {
+            signature
+                .params
+                .iter()
+                .any(|parameter| ty_mentions_param(*parameter, names))
+                || ty_mentions_param(signature.ret, names)
+        }
+        Ty::Nullable(inner)
+        | Ty::PlatformNullable(inner)
+        | Ty::InProjection(inner)
+        | Ty::OutProjection(inner)
+        | Ty::StarProjection(inner) => ty_mentions_param(*inner, names),
+        _ => false,
+    }
+}
+
+/// Whether `ty` mentions ANY type parameter, whatever its identity. Semantic type-parameter names
+/// are checker-generated (`\0tp:…`), so a source-name list cannot match them — use this where the
+/// only question is "does a type variable appear at all".
+pub(crate) fn ty_mentions_any_param(ty: Ty) -> bool {
+    match ty {
+        Ty::TyParam(..) => true,
+        Ty::Intersection(parts) => parts.iter().any(|part| ty_mentions_any_param(*part)),
+        Ty::Obj(_, arguments) => arguments
+            .iter()
+            .any(|argument| ty_mentions_any_param(*argument)),
+        Ty::Fun(signature) => {
+            signature
+                .params
+                .iter()
+                .any(|parameter| ty_mentions_any_param(*parameter))
+                || ty_mentions_any_param(signature.ret)
+        }
+        Ty::Nullable(inner)
+        | Ty::PlatformNullable(inner)
+        | Ty::InProjection(inner)
+        | Ty::OutProjection(inner)
+        | Ty::StarProjection(inner) => ty_mentions_any_param(*inner),
+        _ => false,
+    }
+}
+
+/// Kotlin's `ReturnValueStatus` of a callable: whether a caller must use its result. It is a
+/// declaration fact that Kotlin metadata records (`Function.flags` bits 16-17, `Property.flags` bits
+/// 17-18) and that an override inherits from the first declaration it overrides; with the return
+/// value checker disabled (every supported kotlinc's default) inheritance is its only source.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Hash)]
+pub enum ReturnValueStatus {
+    #[default]
+    Unspecified,
+    MustUse,
+    ExplicitlyIgnorable,
+}
+
+impl ReturnValueStatus {
+    /// The `ProtoBuf.ReturnValueStatus` ordinal a metadata flag word stores.
+    pub fn from_metadata(value: u64) -> ReturnValueStatus {
+        match value {
+            1 => ReturnValueStatus::MustUse,
+            2 => ReturnValueStatus::ExplicitlyIgnorable,
+            _ => ReturnValueStatus::Unspecified,
+        }
+    }
+
+    pub fn metadata_value(self) -> u64 {
+        match self {
+            ReturnValueStatus::Unspecified => 0,
+            ReturnValueStatus::MustUse => 1,
+            ReturnValueStatus::ExplicitlyIgnorable => 2,
+        }
+    }
+}
+
+/// Kotlin declaration visibility — the modifier on a `fun`/`val`/`class` (from source) or the
+/// `@Metadata`/bytecode flags of a library declaration. `PRIVATE_TO_THIS` folds into `Private`;
+/// `LOCAL` is not represented (locals are never surfaced as declarations). This records what a
+/// declaration IS; whether a given call site may access it (`protected`/`internal`/`private`) is a
+/// separate context-dependent decision made during resolution.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum Visibility {
+    #[default]
+    Public,
+    Internal,
+    Protected,
+    Private,
+    /// A Java class-file declaration with no access modifier.
+    PackagePrivate,
+}
+
+/// Kotlin annotation retention after frontend resolution. `Default` is runtime retention without
+/// an explicit `@Retention` declaration; keeping it distinct lets metadata emission omit the Kotlin
+/// meta-annotation while still stamping the JVM runtime policy.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AnnotationRetention {
+    Default,
+    Runtime,
+    Binary,
+    Source,
+}
+
+impl AnnotationRetention {
+    /// The retention an enum entry denotes when its declaring enum is exactly
+    /// `kotlin.annotation.AnnotationRetention`. An entry of any other enum, whatever its name, is no
+    /// retention. `owner` is the resolved or provider-normalized declaring classifier; `entry` is the
+    /// entry's declared name.
+    pub fn of_entry(owner: TypeName, entry: &str) -> Option<Self> {
+        if owner != type_name("kotlin/annotation/AnnotationRetention") {
+            return None;
+        }
+        Some(match entry {
+            "RUNTIME" => Self::Runtime,
+            "BINARY" => Self::Binary,
+            "SOURCE" => Self::Source,
+            _ => return None,
+        })
+    }
+}
+
+/// One frontend-checked annotation argument. Every classifier identity is resolved before this
+/// crosses into common lowering; backends only choose the physical encoding of the recorded value.
+#[derive(Clone, Debug, PartialEq)]
+pub enum AnnotationValue {
+    Int(i32),
+    /// A `byte`/`short` element. The JVM writes these with their own element tags (`B`, `S`), so a
+    /// narrower element cannot borrow `Int`: reading such an annotation back throws
+    /// `AnnotationTypeMismatchException`.
+    Byte(i8),
+    Short(i16),
+    Long(i64),
+    Float(f32),
+    Double(f64),
+    Boolean(bool),
+    Char(u16),
+    String(crate::kt_string::KtString),
+    Enum(TypeName, String),
+    /// The exact semantic type represented by a class literal. Arrays retain every dimension and
+    /// their component type; collapsing `Array<String>::class` to the `kotlin/Array` classifier
+    /// loses the class-file descriptor before lowering can encode it.
+    Class(Ty),
+    Annotation {
+        internal: TypeName,
+        values: Vec<(String, AnnotationValue)>,
+    },
+    Array(Vec<AnnotationValue>),
+}
+
+impl AnnotationValue {
+    /// A `String` element holding `value`.
+    pub fn string(value: &str) -> Self {
+        Self::String(crate::kt_string::KtString::from(value))
+    }
+}
+
+/// One resolved annotation application published as part of a classifier record. This is the
+/// provider-neutral semantic payload consumers may inspect: the annotation and every class-valued
+/// argument are stable semantic types, never descriptors or source spellings.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ResolvedAnnotation {
+    pub annotation: TypeName,
+    pub arguments: Vec<(String, AnnotationValue)>,
+    pub facts: AnnotationSemanticFacts,
+}
+
+impl ResolvedAnnotation {
+    pub fn is_deprecated_hidden(&self) -> bool {
+        self.facts.deprecated_hidden
+    }
+}
+
+/// Provider-normalized meaning of an annotation application. Consumers inspect these facts instead
+/// of recovering semantics from an enum constant's source spelling or physical encoding.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct AnnotationSemanticFacts {
+    /// `@kotlin.Deprecated(level = DeprecationLevel.HIDDEN)`.
+    pub deprecated_hidden: bool,
+    /// `@kotlin.Deprecated(level = DeprecationLevel.ERROR)`.
+    pub deprecated_error: bool,
+    /// An `@OptionalExpectation` without an actual here (see `ir::DeclarationAnnotations`).
+    pub optional_expectation: bool,
+}
+
+/// Provider-neutral checked facts for a classifier. Consumers receive stable identities and typed
+/// declaration facts without gaining name lookup, callable selection, or backend access.
+pub trait ClassifierFactSource {
+    fn classifier_annotations(&self, classifier: TypeName) -> Option<Vec<ResolvedAnnotation>>;
+
+    /// Whether this classifier's single instance is reachable as an object value. A plugin that
+    /// names a classifier it does not declare must not infer this from its name or type arity:
+    /// reading `INSTANCE` off an ordinary class is a link-time failure.
+    fn classifier_is_object(&self, _classifier: TypeName) -> Option<bool> {
+        None
+    }
+
+    /// The declaration shape of a classifier this compilation unit does not declare: what a plugin
+    /// needs to name the members the classifier's own compilation generated for it. `None` when the
+    /// provider does not know the classifier.
+    fn classifier_declaration(&self, _classifier: TypeName) -> Option<ClassifierDeclarationFacts> {
+        None
+    }
+
+    /// Exact singleton generated by the serialization plugin for `classifier`. Providers publish
+    /// this only from a declaration/classifier record; consumers must not manufacture the plugin's
+    /// nested-class spelling and probe it.
+    fn generated_serializer_singleton(&self, _classifier: TypeName) -> Option<TypeName> {
+        None
+    }
+
+    /// The provider-confirmed `serializer(KSerializer<...>...)` accessor on an exact companion.
+    fn has_serialization_serializer_accessor(
+        &self,
+        _companion: TypeName,
+        _type_parameters: usize,
+    ) -> bool {
+        false
+    }
+
+    /// Exact companion singleton that owns a generated serializer accessor, including a companion
+    /// contributed by the classifier's frontend plugin rather than written in source.
+    fn serialization_companion(&self, _classifier: TypeName) -> Option<(Box<str>, TypeName)> {
+        None
+    }
+
+    /// The underlying type of this classifier when it is a `value class`, as declared — its sole
+    /// property's type, carrying its own nullability. `None` for any other classifier, and for one
+    /// the provider does not know.
+    ///
+    /// A plugin sees only the file it runs on, so a value class declared in a SIBLING file of the
+    /// module, or on the classpath, is visible to it only through this answer.
+    fn classifier_value_underlying(&self, _classifier: TypeName) -> Option<Ty> {
+        None
+    }
+
+    /// The value class's declared underlying type over its own type parameters. A provider that
+    /// answers [`Self::classifier_value_underlying`] for a declaration answers this for it too.
+    fn classifier_value_declaration(&self, _classifier: TypeName) -> Option<DeclaredValueClass> {
+        None
+    }
+
+    /// Source identity of the sole underlying property for a value class. This travels beside the
+    /// underlying type so a representation backend never has to reopen metadata or inspect a
+    /// classfile to recover it.
+    fn classifier_value_property(&self, _classifier: TypeName) -> Option<String> {
+        None
+    }
+
+    /// The role the classifier's declaration plays in type checks and casts, as its provider
+    /// published it. `None` for an ordinary classifier and for one the provider does not know.
+    fn classifier_role(&self, _classifier: TypeName) -> Option<ClassifierRole> {
+        None
+    }
+}
+
+/// A resolved annotation application, including its declaration-ordered element values and
+/// semantic retention. This is a frontend decision; common lowering must not reopen source or a
+/// symbol provider to reconstruct it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct AppliedAnnotation {
+    pub internal: TypeName,
+    pub values: Vec<(String, AnnotationValue)>,
+    pub facts: AnnotationSemanticFacts,
+    pub retention: AnnotationRetention,
+    /// The annotation's DECLARED `@Target` set (see [`AnnotationTargets`]).
+    pub targets: AnnotationTargets,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TypeVariance {
+    #[default]
+    Invariant,
+    In,
+    Out,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct TypeParameterView<B> {
+    pub(crate) type_params: Vec<String>,
+    pub(crate) type_param_bounds: B,
+    pub(crate) type_param_variances: Vec<TypeVariance>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct TypeParameters<B>(TypeParameterView<B>);
+
+impl<B> std::ops::Deref for TypeParameters<B> {
+    type Target = TypeParameterView<B>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+pub trait TypeParameterBounds {
+    fn valid_for(&self, names: &[String]) -> bool;
+}
+
+impl<T> TypeParameterBounds for Vec<Vec<T>> {
+    fn valid_for(&self, names: &[String]) -> bool {
+        self.len() == names.len()
+    }
+}
+
+impl TypeParameterBounds for Vec<Ty> {
+    fn valid_for(&self, names: &[String]) -> bool {
+        self.len() == names.len()
+    }
+}
+
+impl<T> TypeParameterBounds for Vec<(String, T)> {
+    fn valid_for(&self, _names: &[String]) -> bool {
+        true
+    }
+}
+
+impl<B: TypeParameterBounds> TypeParameters<B> {
+    pub fn new(
+        type_params: Vec<String>,
+        type_param_bounds: B,
+        type_param_variances: Vec<TypeVariance>,
+    ) -> Self {
+        assert_eq!(type_params.len(), type_param_variances.len());
+        assert!(type_param_bounds.valid_for(&type_params));
+        Self(TypeParameterView {
+            type_params,
+            type_param_bounds,
+            type_param_variances,
+        })
+    }
+
+    pub fn type_params(&self) -> &Vec<String> {
+        &self.0.type_params
+    }
+
+    pub fn type_param_bounds(&self) -> &B {
+        &self.0.type_param_bounds
+    }
+
+    pub fn type_param_variances(&self) -> &Vec<TypeVariance> {
+        &self.0.type_param_variances
+    }
+
+    pub fn replace(&mut self, names: Vec<String>, bounds: B, variances: Vec<TypeVariance>) {
+        *self = Self::new(names, bounds, variances);
+    }
+
+    pub fn map_bounds(&mut self, map: impl FnOnce(&mut B))
+    where
+        B: Clone,
+    {
+        let mut bounds = self.0.type_param_bounds.clone();
+        map(&mut bounds);
+        self.replace(
+            self.0.type_params.clone(),
+            bounds,
+            self.0.type_param_variances.clone(),
+        );
+    }
+}
+
+impl<B> TypeParameters<B>
+where
+    B: Default + TypeParameterBounds,
+{
+    pub fn invariant(type_params: Vec<String>, type_param_bounds: B) -> Self {
+        let type_param_variances = vec![TypeVariance::Invariant; type_params.len()];
+        Self::new(type_params, type_param_bounds, type_param_variances)
+    }
+}
+
+impl Visibility {
+    /// The kotlin-metadata `Flags.VISIBILITY` enum value → `Visibility`. Order:
+    /// INTERNAL=0, PRIVATE=1, PROTECTED=2, PUBLIC=3, PRIVATE_TO_THIS=4, LOCAL=5. Unknown/`LOCAL`
+    /// conservatively map to `Private` (never wrongly widens access).
+    pub fn from_metadata(v: u64) -> Visibility {
+        match v {
+            0 => Visibility::Internal,
+            2 => Visibility::Protected,
+            3 => Visibility::Public,
+            _ => Visibility::Private,
+        }
+    }
+
+    /// The source visibility modifier keyword → `Visibility`; no/unknown modifier is `public`
+    /// (Kotlin's default). `PRIVATE_TO_THIS` is not a source keyword.
+    pub fn from_modifier(m: &str) -> Visibility {
+        match m {
+            "private" => Visibility::Private,
+            "protected" => Visibility::Protected,
+            "internal" => Visibility::Internal,
+            _ => Visibility::Public,
+        }
+    }
+
+    /// Coarse map from a legacy `is_public` bool, for synthetic/top-level callables that never carry a
+    /// finer visibility (a top-level or extension can be `public`/`internal`/`private` but NEVER
+    /// `protected`, so no protected information is lost here). `internal` top-levels still read back as
+    /// `Private` until the finer decode reaches those arms — a deliberate interim under-approximation.
+    pub fn from_public(is_public: bool) -> Visibility {
+        if is_public {
+            Visibility::Public
+        } else {
+            Visibility::Private
+        }
+    }
+
+    /// Whether this is the `public` visibility — the exact predicate the pre-context resolver used
+    /// (`is_public`). Kept so the current public-only filter is expressible verbatim while the
+    /// context-aware `accessible(...)` gate is introduced separately.
+    pub fn is_public(self) -> bool {
+        self == Visibility::Public
+    }
+
+    /// Whether this is `private` — the source `is_private` bool the parser/AST previously carried.
+    pub fn is_private(self) -> bool {
+        self == Visibility::Private
+    }
+
+    /// Kotlin's `Visibility.isPublicAPI`: visible outside the module through inheritance or
+    /// directly (`public`, `protected`).
+    pub fn is_public_api(self) -> bool {
+        matches!(self, Visibility::Public | Visibility::Protected)
+    }
+}
+
+/// The metadata-declared reflection function interface. Callable-reference parameter/return shape is
+/// retained independently as `Ty::Fun`; it is never reconstructed from a classifier spelling.
+pub const KFUNCTION_INTERNAL: &str = "kotlin/reflect/KFunction";
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn primitive_array_elements_are_found_by_every_name_spelling() {
+        for (name, element) in PRIM_ARRAY_CLASSES {
+            assert_eq!(prim_array_element(name), Some(element), "{name}");
+            assert_eq!(prim_array_element(&name.to_string()), Some(element));
+            assert_eq!(prim_array_element(type_name(name)), Some(element));
+        }
+        for name in [
+            "kotlin/Array",
+            "kotlin/Int",
+            "sample/IntArray",
+            "IntArray",
+            "kotlin/String",
+        ] {
+            assert_eq!(prim_array_element(name), None, "{name}");
+            assert_eq!(prim_array_element(type_name(name)), None, "{name}");
+        }
+    }
+
+    #[test]
+    fn array_read_element_approximates_use_site_projections() {
+        let platform_string = Ty::platform_nullable(Ty::String);
+        assert_eq!(
+            Ty::obj_args("kotlin/Array", &[Ty::out_projection(platform_string)]).array_read_elem(),
+            Some(platform_string)
+        );
+        assert_eq!(
+            Ty::obj_args("kotlin/Array", &[Ty::in_projection(Ty::String)]).array_read_elem(),
+            Some(Ty::nullable(Ty::obj("kotlin/Any")))
+        );
+        assert_eq!(Ty::array(Ty::Int).array_read_elem(), Some(Ty::Int));
+        assert_eq!(Ty::array(Ty::String).array_read_elem(), Some(Ty::String));
+    }
+
+    #[test]
+    fn boxed_array_operations_preserve_the_well_known_identity() {
+        let list = Ty::obj_args("kotlin/collections/List", &[Ty::String]);
+        let array = Ty::obj_args_name(wk::array(), &[list]);
+
+        assert_eq!(array.array_elem(), Some(list));
+        assert!(array.is_array());
+        assert!(array.is_reference_array());
+        assert_eq!(Ty::array(Ty::String).obj_internal(), Some(wk::array()));
+
+        let erased = array.erased_recv();
+        assert_eq!(erased.obj_internal(), Some(wk::array()));
+        assert_eq!(
+            erased.array_elem(),
+            Some(Ty::obj("kotlin/collections/List"))
+        );
+
+        let generic = Ty::obj_args_name(wk::array(), &[Ty::ty_param("T", Ty::obj("kotlin/Any"))]);
+        assert_eq!(
+            generic.extension_recv_key().obj_internal(),
+            Some(wk::array())
+        );
+        assert_eq!(
+            array.erased_recv_candidates()[1],
+            Ty::obj_args_name(wk::array(), &[Ty::obj("kotlin/Any")])
+        );
+    }
+
+    #[test]
+    fn type_name_tree_operations_preserve_identity_without_text_round_trip() {
+        let names = NameTree::default();
+        let int = type_name_from(&names, names.insert("kotlin/Int"));
+        assert_eq!(int, Ty::Int.kotlin_class_internal().unwrap());
+
+        let dotted = type_name("kotlin/collections/Map.Entry");
+        let dollar = type_name("kotlin/collections/Map$Entry");
+        assert_eq!(dotted, dollar);
+        assert_eq!(
+            existing_type_name("kotlin/collections/Map.Entry"),
+            Some(dollar)
+        );
+        assert_eq!(
+            type_name_from(&names, names.insert("kotlin/collections/Map.Entry")),
+            dollar
+        );
+        let copied = insert_type_name_in(&names, dollar);
+        assert_eq!(type_name_from(&names, copied), dollar);
+
+        let nested = type_name_child(type_name("demo"), "Outer/Inner");
+        assert!(nested.matches("demo/Outer/Inner"));
+        assert!(nested
+            .parent()
+            .is_some_and(|parent| parent.matches("demo/Outer")));
+    }
+
+    #[test]
+    fn exact_generated_package_child_wins_before_nested_spelling_decomposition() {
+        let generated = type_name("GeneratedKt$box$1");
+        assert_eq!(
+            existing_type_name_child(TypeName::ROOT, "GeneratedKt$box$1"),
+            Some(generated)
+        );
+    }
+
+    #[test]
+    fn builtin_aliases_are_the_ordinary_classifier_types() {
+        assert_eq!(Ty::Int, Ty::obj("kotlin/Int"));
+        assert_eq!(Ty::String, Ty::obj("kotlin/String"));
+        assert_eq!(Ty::obj("kotlin/Int").canonical_semantic(), Ty::Int);
+        assert_eq!(Ty::obj("kotlin/String").canonical_semantic(), Ty::String);
+        assert_eq!(Ty::obj("kotlin/Unit").canonical_semantic(), Ty::Unit);
+        assert_eq!(Ty::obj("kotlin/Nothing").canonical_semantic(), Ty::Nothing);
+        assert_eq!(builtin_semantic(type_name("kotlin/UInt")), Some(Ty::UInt));
+        assert_eq!(builtin_semantic(type_name("kotlin/Unit")), Some(Ty::Unit));
+        assert_eq!(
+            builtin_semantic(type_name("kotlin/Nothing")),
+            Some(Ty::Nothing)
+        );
+        assert_eq!(builtin_semantic(type_name("sample/NotABuiltin")), None);
+        assert_eq!(type_name("kotlin/Array"), wk::array());
+        assert_eq!(builtin_semantic(wk::array()), None);
+        let user = Ty::obj("sample/NotABuiltin");
+        assert_eq!(user.canonical_semantic(), user);
+    }
+
+    #[test]
+    fn nullable_any_upper_bound_is_still_the_erased_top_domain() {
+        assert!(Ty::ty_param("T", Ty::nullable(Ty::obj("kotlin/Any"))).is_erased_top());
+    }
+
+    #[test]
+    fn mixed_signed_integral_range_uses_long_counter() {
+        assert_eq!(
+            Ty::range_counter_type_for(Ty::Int, Ty::Long),
+            Some(Ty::Long)
+        );
+        assert_eq!(
+            Ty::range_counter_type_for(Ty::Short, Ty::Byte),
+            Some(Ty::Int)
+        );
+        assert_eq!(Ty::range_counter_type_for(Ty::Int, Ty::UInt), None);
+    }
+
+    #[test]
+    fn declaring_package_is_the_namespace_identity() {
+        let nested = type_name("kotlin/collections/Map$Entry");
+        let sibling = type_name("kotlin/collections/List");
+        let other = type_name("java/util/Map$Entry");
+        let root = type_name("RootClass");
+        assert_eq!(nested.namespace(), sibling.namespace());
+        assert_eq!(nested.namespace().render(), nested.package());
+        assert!(sibling.package_matches(&nested.package()));
+        assert_ne!(nested.namespace(), other.namespace());
+        assert!(!other.package_matches(&nested.package()));
+        assert_eq!(root.namespace(), TypeName::ROOT);
+        assert_eq!(root.package(), "");
+        assert!(TypeName::ROOT.matches(&root.package()));
+    }
+
+    #[test]
+    fn textual_name_comparison_does_not_intern_a_miss() {
+        let missing = "__type_name_comparison_must_not_intern__/Missing";
+        assert_eq!(existing_type_name(missing), None);
+        assert!(!type_name("kotlin/String").matches(missing));
+        assert_eq!(existing_type_name(missing), None);
+    }
+
+    #[test]
+    fn ty_param_carries_name_and_bound() {
+        let t = Ty::ty_param("T", Ty::obj("kotlin/CharSequence"));
+        assert!(t.is_ty_param());
+        assert_eq!(t.ty_param_name(), Some("T"));
+        assert_eq!(t.ty_param_bound(), Some(Ty::obj("kotlin/CharSequence")));
+    }
+
+    #[test]
+    fn nested_type_parameter_occurrence_retains_its_semantic_bound() {
+        let bound = Ty::ty_param("Outer", Ty::obj("example/Recursive"));
+        let nested = Ty::obj_args("kotlin/collections/List", &[Ty::ty_param("T", bound)]);
+
+        assert_eq!(nested.type_parameter_occurrence_bound("T"), Some(bound));
+        assert_eq!(nested.type_parameter_occurrence_bound("Outer"), None);
+    }
+
+    #[test]
+    fn ty_param_is_reference_follows_its_bound() {
+        assert!(Ty::ty_param("T", Ty::obj("kotlin/Any")).is_reference());
+        // A primitive-bounded `<T : Int>` is not a reference (it specializes to the primitive).
+        assert!(!Ty::ty_param("T", Ty::Int).is_reference());
+    }
+
+    #[test]
+    fn non_ty_param_reports_none() {
+        assert!(!Ty::Int.is_ty_param());
+        assert_eq!(Ty::Int.ty_param_name(), None);
+        assert_eq!(Ty::Int.ty_param_bound(), None);
+    }
+
+    #[test]
+    fn kotlin_class_internal_is_source_class_identity() {
+        assert!(Ty::Int
+            .kotlin_class_internal()
+            .is_some_and(|n| n.matches("kotlin/Int")));
+        assert!(Ty::String
+            .kotlin_class_internal()
+            .is_some_and(|n| n.matches("kotlin/String")));
+        assert!(Ty::obj_args("demo/Box", &[Ty::Int])
+            .kotlin_class_internal()
+            .is_some_and(|n| n.matches("demo/Box")));
+        assert!(Ty::nullable(Ty::UInt)
+            .kotlin_class_internal()
+            .is_some_and(|n| n.matches("kotlin/UInt")));
+        assert_eq!(
+            Ty::ty_param("T", Ty::obj("kotlin/CharSequence")).kotlin_class_internal(),
+            Some(type_name("kotlin/CharSequence"))
+        );
+        assert_eq!(Ty::Null.kotlin_class_internal(), None);
+    }
+
+    #[test]
+    fn erased_recv_folds_nullability_generics_and_type_params() {
+        // Nullability: `String?` and `String` resolve the same extensions.
+        assert_eq!(Ty::nullable(Ty::String).erased_recv(), Ty::String);
+        // Generic arguments are dropped (instantiation-independent).
+        assert_eq!(
+            Ty::obj_args("kotlin/collections/List", &[Ty::Int]).erased_recv(),
+            Ty::obj_args("kotlin/collections/List", &[Ty::String]).erased_recv()
+        );
+        assert_eq!(
+            Ty::obj_args("kotlin/collections/List", &[Ty::Int]).erased_recv(),
+            Ty::obj("kotlin/collections/List")
+        );
+        // A type parameter keys under its (also-erased) bound.
+        assert_eq!(
+            Ty::ty_param("T", Ty::obj_args("kotlin/collections/List", &[Ty::Int])).erased_recv(),
+            Ty::obj("kotlin/collections/List")
+        );
+        // Array element generics erase too, but the array-ness is kept.
+        assert_eq!(
+            Ty::array(Ty::obj_args("kotlin/collections/List", &[Ty::Int])).erased_recv(),
+            Ty::array(Ty::obj("kotlin/collections/List"))
+        );
+        // Reference vs primitive and signed vs unsigned stay distinct.
+        assert_ne!(Ty::Int.erased_recv(), Ty::UInt.erased_recv());
+        assert_eq!(Ty::Int.erased_recv(), Ty::Int);
+        // A nullable scalar stays distinct without inventing a wrapper classifier in core.
+        assert_ne!(Ty::nullable(Ty::Int).erased_recv(), Ty::Int.erased_recv());
+        assert_eq!(Ty::nullable(Ty::Int).erased_recv(), Ty::nullable(Ty::Int));
+        assert_eq!(Ty::nullable(Ty::UInt).erased_recv(), Ty::nullable(Ty::UInt));
+        // A nullable reference shares the non-null key.
+        assert_eq!(Ty::nullable(Ty::String).erased_recv(), Ty::String);
+        // `null`/`Nothing`/error all key under `Any` (a `null` receiver reaches an `Any?` extension).
+        assert_eq!(Ty::Null.erased_recv(), Ty::obj("kotlin/Any"));
+        assert_eq!(Ty::Nothing.erased_recv(), Ty::obj("kotlin/Any"));
+        assert_eq!(
+            Ty::nullable(Ty::obj("kotlin/Any")).erased_recv(),
+            Ty::obj("kotlin/Any")
+        );
+    }
+
+    #[test]
+    fn extension_receiver_key_retains_nullability_and_generic_identity() {
+        assert_ne!(
+            Ty::nullable(Ty::String).extension_recv_key(),
+            Ty::String.extension_recv_key()
+        );
+        assert_eq!(
+            Ty::obj_args("kotlin/collections/List", &[Ty::Int]).extension_recv_key(),
+            Ty::obj_args("kotlin/collections/List", &[Ty::String]).extension_recv_key()
+        );
+        assert!(Ty::ty_param("T", Ty::obj("kotlin/Any"))
+            .extension_recv_key()
+            .is_ty_param());
+        assert_eq!(
+            Ty::ty_param("T", Ty::obj("kotlin/Any")).extension_recv_key(),
+            Ty::ty_param("R", Ty::obj("kotlin/Any")).extension_recv_key()
+        );
+        let array_key = Ty::obj_args(
+            "kotlin/Array",
+            &[Ty::ty_param("T", Ty::nullable(Ty::obj("kotlin/Any")))],
+        )
+        .extension_recv_key();
+        assert!(array_key
+            .type_args()
+            .first()
+            .is_some_and(|element| element.is_ty_param()));
+    }
+
+    #[test]
+    fn nullable_wraps_inner_and_reports_nullable() {
+        let t = Ty::nullable(Ty::Int);
+        assert!(t.is_nullable());
+        assert_eq!(t.non_null(), Ty::Int);
+    }
+
+    #[test]
+    fn platform_nullability_has_flexible_source_shape_and_erased_identity() {
+        let platform = Ty::platform_nullable(Ty::String);
+        assert_eq!(platform.source_name(), "String!");
+        assert!(!platform.is_nullable());
+        assert_eq!(platform.platform_lower_bound(), Ty::String);
+        assert_eq!(
+            platform.kotlin_class_internal(),
+            Ty::String.kotlin_class_internal()
+        );
+        assert_eq!(Ty::nullable(platform), Ty::nullable(Ty::String));
+    }
+
+    #[test]
+    fn contains_error_descends_through_semantic_type_shapes() {
+        // Generic and function resolvers intentionally retain their outer type around an erroneous
+        // nested reference. The shared predicate must see both without declaring resolved bottom or
+        // scalar types erroneous.
+        assert!(Ty::obj_args("demo/Box", &[Ty::Error]).contains_error());
+        assert!(Ty::fun(vec![Ty::Error], Ty::String).contains_error());
+        assert!(Ty::fun(vec![Ty::String], Ty::Error).contains_error());
+        assert!(!Ty::obj_args("demo/Box", &[Ty::Nothing]).contains_error());
+        assert!(!Ty::String.contains_error());
+    }
+
+    #[test]
+    fn non_null_type_is_not_nullable() {
+        assert!(!Ty::Int.is_nullable());
+        assert_eq!(Ty::Int.non_null(), Ty::Int);
+    }
+
+    #[test]
+    fn ordinary_dnn_compacts_the_bound_while_nullable_formal_inference_keeps_provenance() {
+        let nullable_any = Ty::nullable(Ty::obj("kotlin/Any"));
+        let caller = Ty::ty_param("T", nullable_any);
+        let compact = Ty::ty_param("T", Ty::obj("kotlin/Any"));
+        let provenance = Ty::DefinitelyNotNull(intern_ty(caller));
+
+        assert_eq!(
+            caller.definitely_non_null(),
+            compact,
+            "ordinary source and expression DNN paths retain the established compact identity"
+        );
+        assert_eq!(
+            caller.contributed_through_nullable_formal(),
+            provenance,
+            "nullable-formal inference alone records the bound needed to reopen T?"
+        );
+        assert_eq!(Ty::nullable(provenance), Ty::nullable(caller));
+
+        let non_null_caller = Ty::ty_param("U", Ty::obj("kotlin/Any"));
+        assert_eq!(non_null_caller.definitely_non_null(), non_null_caller);
+    }
+
+    #[test]
+    fn nullable_formal_contribution_keeps_a_non_null_bound_and_reopens_an_intersection() {
+        let any = Ty::obj("kotlin/Any");
+        let nullable_caller = Ty::ty_param("T", Ty::nullable(any));
+        let non_null_caller = Ty::ty_param("T", any);
+        let intersection = nullable_caller.contributed_through_nullable_formal();
+
+        assert_eq!(
+            intersection,
+            Ty::DefinitelyNotNull(intern_ty(nullable_caller))
+        );
+        assert_eq!(Ty::nullable(intersection), Ty::nullable(nullable_caller));
+        assert_eq!(
+            non_null_caller.contributed_through_nullable_formal(),
+            non_null_caller
+        );
+        assert_eq!(
+            Ty::nullable(non_null_caller).non_null().ty_param_bound(),
+            Some(any)
+        );
+    }
+
+    #[test]
+    fn semantic_canonicalization_preserves_definitely_non_null_provenance() {
+        let caller = Ty::ty_param("caller:T", Ty::nullable(Ty::obj("kotlin/Any")));
+        let intersection = Ty::DefinitelyNotNull(intern_ty(caller));
+
+        let canonical = intersection.canonical_semantic();
+
+        assert_eq!(canonical, intersection);
+        assert_eq!(Ty::nullable(canonical), Ty::nullable(caller));
+        assert_eq!(
+            Ty::nullable(canonical).non_null().ty_param_bound(),
+            Some(Ty::nullable(Ty::obj("kotlin/Any")))
+        );
+    }
+
+    #[test]
+    fn substitution_preserves_definitely_non_null_type_parameter_occurrence() {
+        let declared = Ty::ty_param("T", Ty::obj("kotlin/Any"));
+        let argument = Ty::nullable(Ty::ty_param("F", Ty::obj("kotlin/Any")));
+        let bindings = crate::fx_hash::HashMap::from_iter([("T".to_string(), argument)]);
+
+        assert_eq!(
+            ty_subst(declared, &bindings),
+            Ty::ty_param("F", Ty::obj("kotlin/Any"))
+        );
+    }
+
+    #[test]
+    fn nullable_is_idempotent_no_double_wrap() {
+        // Kotlin has no `T??`: wrapping an already-nullable type is a no-op.
+        let once = Ty::nullable(Ty::obj("demo/Point"));
+        assert_eq!(Ty::nullable(once), once);
+    }
+
+    #[test]
+    fn nullable_primitive_is_a_reference_so_null_is_valid() {
+        // `Int?` boxes — it accepts `null`, unlike the unboxed `Int`.
+        assert!(!Ty::Int.is_reference());
+        assert!(Ty::nullable(Ty::Int).is_reference());
+    }
+
+    #[test]
+    fn nullable_idempotent_over_a_primitive() {
+        let once = Ty::nullable(Ty::Int);
+        assert_eq!(Ty::nullable(once), once);
+    }
+
+    #[test]
+    fn nullable_of_null_or_error_collapses() {
+        // `Null?`/`Error?` are degenerate — wrapping them is meaningless.
+        assert_eq!(Ty::nullable(Ty::Null), Ty::Null);
+        assert_eq!(Ty::nullable(Ty::Error), Ty::Error);
+    }
+
+    #[test]
+    fn nullable_of_nothing_is_a_real_distinct_type() {
+        // Kotlin's `Nothing?` is the type of the `null` literal — a real nullable type, kept.
+        assert!(Ty::nullable(Ty::Nothing).is_nullable());
+        assert_eq!(Ty::nullable(Ty::Nothing).non_null(), Ty::Nothing);
+    }
+
+    #[test]
+    fn nullable_primitive_recovers_the_unboxed_primitive() {
+        assert_eq!(Ty::nullable(Ty::Int).nullable_primitive(), Some(Ty::Int));
+        // Not a nullable primitive → None.
+        assert_eq!(Ty::Int.nullable_primitive(), None);
+        assert_eq!(Ty::nullable(Ty::String).nullable_primitive(), None);
+        assert_eq!(Ty::obj("demo/Point").nullable_primitive(), None);
+    }
+
+    #[test]
+    fn nullable_boxed_is_the_supported_nullable_form_of_a_primitive() {
+        assert_eq!(Ty::Int.nullable_boxed(), Some(Ty::nullable(Ty::Int)));
+        assert_eq!(Ty::Char.nullable_boxed(), Some(Ty::nullable(Ty::Char)));
+        // Unsigned boxes to its inline-class wrapper (`UInt?` → boxed `kotlin/UInt`).
+        assert_eq!(Ty::UInt.nullable_boxed(), Some(Ty::nullable(Ty::UInt)));
+        assert_eq!(Ty::ULong.nullable_boxed(), Some(Ty::nullable(Ty::ULong)));
+        // Already a reference → not a primitive to box.
+        assert_eq!(Ty::String.nullable_boxed(), None);
+    }
+
+    #[test]
+    fn nullable_non_ref_keeps_source_forms() {
+        assert_eq!(Ty::Unit.nullable_non_ref(), Some(Ty::nullable(Ty::Unit)));
+        assert_eq!(
+            Ty::Nothing.nullable_non_ref(),
+            Some(Ty::nullable(Ty::Nothing))
+        );
+        assert_eq!(Ty::Int.nullable_non_ref(), Some(Ty::nullable(Ty::Int)));
+        assert_eq!(Ty::String.nullable_non_ref(), None);
+    }
+
+    #[test]
+    fn source_name_renders_simple_generic_nullable_types() {
+        let ty = Ty::nullable(Ty::obj_args(
+            "demo/Outer$Holder",
+            &[
+                Ty::String,
+                Ty::obj_args("kotlin/collections/List", &[Ty::Int]),
+            ],
+        ));
+        assert_eq!(ty.source_name(), "Outer.Holder<String, List<Int>>?");
+    }
+
+    #[test]
+    fn diagnostic_source_names_qualify_colliding_classifiers() {
+        let actual = Ty::nullable(Ty::obj("right/Box"));
+        let expected = Ty::obj("left/Box");
+        let context = [actual, expected];
+
+        assert_eq!(
+            actual.source_name_with_type_parameter_in(&context, &|name: &str| {
+                type_parameter_source_name(name).to_string()
+            }),
+            "right.Box?"
+        );
+        assert_eq!(
+            expected.source_name_with_type_parameter_in(&context, &|name: &str| {
+                type_parameter_source_name(name).to_string()
+            }),
+            "left.Box"
+        );
+    }
+}

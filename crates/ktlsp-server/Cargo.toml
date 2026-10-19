@@ -13,6 +13,7 @@ ktlsp-text = { path = "../ktlsp-text" }
 ktlsp-protocol = { path = "../ktlsp-protocol" }
 ktlsp-syntax = { path = "../ktlsp-syntax" }
 ktlsp-parser = { path = "../ktlsp-parser" }
+ktlsp-analysis = { path = "../ktlsp-analysis" }
 ktlsp-import = { path = "../ktlsp-import" }
 serde.workspace = true
 serde_json.workspace = true

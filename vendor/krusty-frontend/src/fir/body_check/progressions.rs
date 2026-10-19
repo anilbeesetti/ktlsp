@@ -1,0 +1,533 @@
+use super::*;
+use crate::fir::{
+    FirCallArgument, FirConversionKind, FirExprKind, FirProgressionClass, FirProgressionSource,
+    FirRangeCounterKind, FirRuntimeFunction, FirStatementKind,
+};
+use crate::libraries::CompilerIntrinsic;
+use crate::resolve::ResolvedCall;
+
+impl BodyFirChecker<'_> {
+    /// Materialize a direct range-comparison operand at the non-null boundary selected by the
+    /// frontend. The range and contains calls are bypassed only after resolution records their
+    /// argument/receiver decisions; checked FIR must preserve those decisions for every operand.
+    pub(super) fn direct_range_operand(
+        &mut self,
+        expression: ExprId,
+        comparison: ResolvedTy,
+    ) -> Result<crate::fir::FirExprId, BodyCheckFailure> {
+        if self.info.platform_narrowings.contains_key(&expression) {
+            self.value_at_selected_boundary(expression, comparison)
+        } else {
+            self.expression(expression)
+        }
+    }
+
+    /// The fully checked comparison selected for direct range membership. Keep the conversion of
+    /// the provider-selected unsigned comparator beside the other checked progression contracts.
+    pub(super) fn in_range_comparison(
+        &self,
+        expression: ExprId,
+    ) -> Result<
+        (
+            crate::fir::FirRangeComparisonProvenance,
+            ResolvedTy,
+            Option<FirRuntimeFunction>,
+        ),
+        BodyCheckFailure,
+    > {
+        let comparison = self
+            .info
+            .resolved_in_range_comparisons
+            .get(&expression)
+            .ok_or_else(|| {
+                self.failure(
+                    self.file.expr_span(expression),
+                    BodyCheckFailureKind::UnsupportedExpression(ExpressionForm::InRange),
+                )
+            })?;
+        let span = self
+            .file
+            .expr_span(expression)
+            .ok_or_else(|| self.failure(None, BodyCheckFailureKind::MissingSourceSpan))?;
+        Ok((
+            comparison.provenance,
+            self.resolved_type(span, comparison.comparison)?,
+            comparison
+                .unsigned_compare
+                .as_ref()
+                .map(|function| FirRuntimeFunction {
+                    function: function.function,
+                    parameters: function.parameters.clone(),
+                    result: function.result,
+                }),
+        ))
+    }
+
+    /// kotlinc's `HeaderInfoBuilder`: a loop whose iterable is a progression is counted. The
+    /// iterable is matched as a `kotlin.ranges` builder (`downTo`, `until`, `step`, `reversed`), a
+    /// range literal, or a progression value, in that order; `step` and `reversed` apply to the
+    /// progression their receiver builds, when that one has an inclusive last bound.
+    pub(super) fn progression_loop_header(
+        &self,
+        variable: LocalValueId,
+        variable_ty: ResolvedTy,
+        iterable_source: ExprId,
+        iterable: FirExprId,
+    ) -> Result<Option<FirLoopHeader>, BodyCheckFailure> {
+        let Some(counter) = FirRangeCounterKind::of(variable_ty.get()) else {
+            return Ok(None);
+        };
+        let Some(source) = self.progression_source(iterable_source, iterable)? else {
+            return Ok(None);
+        };
+        let class = match &source {
+            FirProgressionSource::Value { progression, .. } => Some(progression.ty),
+            _ => self
+                .body
+                .expr(iterable)
+                .map(|expression| expression.ty.get().non_null()),
+        };
+        let Some(class) = class else {
+            return Ok(None);
+        };
+        let progression = match &source {
+            FirProgressionSource::Value { progression, .. } => Some(progression.counter),
+            _ => self
+                .progression_class(class, iterable_source)?
+                .map(|progression| progression.counter),
+        };
+        if progression != Some(counter) {
+            return Ok(None);
+        }
+        Ok(Some(FirLoopHeader::Progression {
+            variable,
+            counter,
+            source,
+            unsigned_compare: self.unsigned_loop_compare(class, counter, iterable_source)?,
+        }))
+    }
+
+    /// The bounds of a counted loop over a range literal. kotlinc's `HeaderInfoBuilder` keeps a
+    /// bound of the progression's own element type as it is and commits it to that non-null type,
+    /// so a Java value there is checked where the loop reads it — the receiver of `..` included. A
+    /// bound it must first widen (`0L..javaInt`) is converted through a call and stays unchecked.
+    pub(super) fn counted_range_bounds(
+        &mut self,
+        start: ExprId,
+        end: ExprId,
+        counter: ResolvedTy,
+    ) -> Result<(FirExprId, FirExprId), BodyCheckFailure> {
+        Ok((
+            self.counted_range_bound(start, counter)?,
+            self.counted_range_bound(end, counter)?,
+        ))
+    }
+
+    fn counted_range_bound(
+        &mut self,
+        bound: ExprId,
+        counter: ResolvedTy,
+    ) -> Result<FirExprId, BodyCheckFailure> {
+        let value = self.expression(bound)?;
+        if !self.info.produces_unchecked_java_value(bound)
+            || self.info.ty(bound).range_operand_bound() != counter.get()
+        {
+            return Ok(value);
+        }
+        let cause = self.expression_origin(bound)?;
+        let conversion = self.platform_producer_conversion(bound, value, cause, counter);
+        Ok(self.body.add_expr(FirExpr {
+            origin: cause,
+            ty: counter,
+            kind: FirExprKind::ImplicitConversion { value, conversion },
+        }))
+    }
+
+    /// A range literal used as a value, built by the compiler-supplied range construction. Its
+    /// end is the argument of `rangeTo`/`rangeUntil` and is committed like one; its start is the
+    /// dispatch receiver and is not.
+    pub(super) fn range_literal(
+        &mut self,
+        kind: RangeKind,
+        start: ExprId,
+        end: ExprId,
+    ) -> Result<FirExprKind, BodyCheckFailure> {
+        let start_value = self.expression(start)?;
+        let start_type = self.expression_type(start)?;
+        let (end_value, end_type) = if self.info.platform_narrowings.contains_key(&end) {
+            let span = self
+                .file
+                .expr_span(end)
+                .ok_or_else(|| self.failure(None, BodyCheckFailureKind::MissingSourceSpan))?;
+            let target =
+                self.resolved_type(span, self.info.semantic_ty(end).platform_lower_bound())?;
+            (self.value_at_selected_boundary(end, target)?, target)
+        } else {
+            (self.expression(end)?, self.expression_type(end)?)
+        };
+        Ok(FirExprKind::Range {
+            operation: Self::range_operation(kind),
+            start: start_value,
+            start_type,
+            end: end_value,
+            end_type,
+        })
+    }
+
+    /// The comparison resolution selected for a counted loop over `class` when its counter is
+    /// unsigned. An unsigned loop without one is a missing stable target.
+    pub(super) fn unsigned_loop_compare(
+        &self,
+        class: Ty,
+        counter: FirRangeCounterKind,
+        source: ExprId,
+    ) -> Result<Option<FirRuntimeFunction>, BodyCheckFailure> {
+        if !matches!(
+            counter,
+            FirRangeCounterKind::UInt | FirRangeCounterKind::ULong
+        ) {
+            return Ok(None);
+        }
+        let function = self
+            .info
+            .progression_plan(class)
+            .and_then(|plan| plan.compare.as_ref())
+            .ok_or_else(|| {
+                self.failure(
+                    self.file.expr_span(source),
+                    BodyCheckFailureKind::MissingStableCallTarget,
+                )
+            })?;
+        Ok(Some(FirRuntimeFunction {
+            function: function.function,
+            parameters: function.parameters.clone(),
+            result: function.result,
+        }))
+    }
+
+    fn progression_source(
+        &self,
+        source: ExprId,
+        checked: FirExprId,
+    ) -> Result<Option<FirProgressionSource>, BodyCheckFailure> {
+        if let Some(built) = self.progression_builder(source, checked)? {
+            return Ok(Some(built));
+        }
+        let Some(expression) = self.body.expr(checked) else {
+            return Ok(None);
+        };
+        match &expression.kind {
+            FirExprKind::Range {
+                operation,
+                start,
+                end,
+                start_type,
+                end_type,
+            } if Ty::range_counter_type_for(start_type.get(), end_type.get())
+                .and_then(FirRangeCounterKind::of)
+                .is_some() =>
+            {
+                Ok(Some(FirProgressionSource::Literal {
+                    operation: *operation,
+                    start: *start,
+                    end: *end,
+                }))
+            }
+            _ => {
+                let stepped = self.stepped_until(source, checked)?;
+                self.progression_value(checked, source, stepped)
+            }
+        }
+    }
+
+    /// `start until end step step` with a constant `end` and `step` and a constant or local
+    /// `start`, as a `Step` over its `until`: the form a target may count instead of building the
+    /// progression kotlinc builds (see [`FirProgressionSource::Value`]). Those operands are read
+    /// again rather than evaluated again, which only a constant or a local read allows.
+    fn stepped_until(
+        &self,
+        source: ExprId,
+        checked: FirExprId,
+    ) -> Result<Option<Box<FirProgressionSource>>, BodyCheckFailure> {
+        let Some((CompilerIntrinsic::ProgressionStep, receiver_source, receiver, Some(step))) =
+            self.progression_builder_call(source, checked)
+        else {
+            return Ok(None);
+        };
+        let Some(
+            nested @ FirProgressionSource::Literal {
+                operation: FirRangeOperation::Until | FirRangeOperation::OpenEnd,
+                start,
+                end,
+            },
+        ) = self.progression_source(receiver_source, receiver)?
+        else {
+            return Ok(None);
+        };
+        let kind = |value: FirExprId| self.body.expr(value).map(|expression| &expression.kind);
+        let constant = |value| matches!(kind(value), Some(FirExprKind::Constant(_)));
+        let read = |value| matches!(kind(value), Some(FirExprKind::ValueRead(_)));
+        if !constant(end) || !constant(step) || !(constant(start) || read(start)) {
+            return Ok(None);
+        }
+        Ok(Some(Box::new(FirProgressionSource::Step {
+            nested: Box::new(nested),
+            step,
+            last_element: self.progression_last_element(checked, source)?,
+        })))
+    }
+
+    /// A call to one of the `kotlin.ranges` builders, matched on the selected declaration.
+    fn progression_builder(
+        &self,
+        source: ExprId,
+        checked: FirExprId,
+    ) -> Result<Option<FirProgressionSource>, BodyCheckFailure> {
+        let Some((intrinsic, receiver_source, receiver, argument)) =
+            self.progression_builder_call(source, checked)
+        else {
+            return Ok(None);
+        };
+        let nested = || -> Result<Option<FirProgressionSource>, BodyCheckFailure> {
+            Ok(self
+                .progression_source(receiver_source, receiver)?
+                .filter(FirProgressionSource::has_inclusive_last))
+        };
+        Ok(match (intrinsic, argument) {
+            // A `UByte`/`UShort` bound widens to its unsigned counter by zero extension, which a
+            // bound coercion does not express; such a builder is iterated instead.
+            (CompilerIntrinsic::RangeDownTo | CompilerIntrinsic::RangeUntil, Some(end))
+                if self
+                    .body
+                    .expr(receiver)
+                    .zip(self.body.expr(end))
+                    .is_some_and(|(start, end)| {
+                        Ty::range_counter_type_for(start.ty.get(), end.ty.get()).is_some()
+                    }) =>
+            {
+                Some(FirProgressionSource::Literal {
+                    operation: if intrinsic == CompilerIntrinsic::RangeDownTo {
+                        FirRangeOperation::DownTo
+                    } else {
+                        FirRangeOperation::Until
+                    },
+                    start: receiver,
+                    end,
+                })
+            }
+            (CompilerIntrinsic::ProgressionStep, Some(step)) => match nested()? {
+                Some(nested) => Some(FirProgressionSource::Step {
+                    nested: Box::new(nested),
+                    step,
+                    last_element: self.progression_last_element(checked, source)?,
+                }),
+                None => None,
+            },
+            (CompilerIntrinsic::ProgressionReversed, None) => {
+                nested()?.map(|nested| FirProgressionSource::Reversed(Box::new(nested)))
+            }
+            _ => None,
+        })
+    }
+
+    /// The selected builder intrinsic, its receiver (source and checked) and its one argument.
+    fn progression_builder_call(
+        &self,
+        source: ExprId,
+        checked: FirExprId,
+    ) -> Option<(CompilerIntrinsic, ExprId, FirExprId, Option<FirExprId>)> {
+        let Some(ResolvedCall::Extension(extension)) = self.info.resolved_calls.get(&source) else {
+            return None;
+        };
+        let intrinsic = super::calls::selected_extension_intrinsic(extension)?;
+        let Expr::Call { callee, args } = self.file.expr(source) else {
+            return None;
+        };
+        let Expr::Member {
+            receiver: receiver_source,
+            ..
+        } = self.file.expr(*callee)
+        else {
+            return None;
+        };
+        let FirExprKind::Call(call) = &self.body.expr(checked)?.kind else {
+            return None;
+        };
+        let receiver = call.extension_receiver.filter(|receiver| {
+            receiver.conversion.is_none_or(|conversion| {
+                matches!(
+                    conversion.kind,
+                    FirConversionKind::SmartCast { .. }
+                        | FirConversionKind::NullabilityWidening { .. }
+                )
+            })
+        })?;
+        let argument = match (&call.arguments[..], &args[..]) {
+            ([], []) => None,
+            (
+                [FirCallArgument::Expression {
+                    value,
+                    conversion: None,
+                    ..
+                }],
+                [_],
+            ) => Some(*value),
+            _ => return None,
+        };
+        Some((intrinsic, *receiver_source, receiver.value, argument))
+    }
+
+    /// `DefaultProgressionHandler`: a value of a progression class is read through its `first`,
+    /// `last` and `step`. The class comes from the value's most precise type
+    /// (`getMostPreciseTypeFromValInitializer`), which sees through implicit conversions and from a
+    /// `val` read to its initializer. A smart cast the loop does not need is not applied: every
+    /// progression class declares the members the loop reads.
+    fn progression_value(
+        &self,
+        iterable: FirExprId,
+        source: ExprId,
+        stepped: Option<Box<FirProgressionSource>>,
+    ) -> Result<Option<FirProgressionSource>, BodyCheckFailure> {
+        let Some(class) = self.most_precise_type(iterable) else {
+            return Ok(None);
+        };
+        let Some(progression) = self.progression_class(class, source)? else {
+            return Ok(None);
+        };
+        let mut value = iterable;
+        while let Some(FirExprKind::ImplicitConversion {
+            value: inner,
+            conversion,
+        }) = self.body.expr(value).map(|expression| &expression.kind)
+        {
+            let progression_before = self.body.expr(*inner).is_some_and(|inner| {
+                inner
+                    .ty
+                    .get()
+                    .non_null()
+                    .obj_internal()
+                    .and_then(crate::types::wk::progression_class)
+                    .is_some()
+            });
+            if !matches!(
+                conversion.kind,
+                FirConversionKind::SmartCast { .. } | FirConversionKind::NullabilityWidening { .. }
+            ) || !progression_before
+            {
+                break;
+            }
+            value = *inner;
+        }
+        Ok(Some(FirProgressionSource::Value {
+            progression: Box::new(progression),
+            iterable: value,
+            stepped,
+        }))
+    }
+
+    /// The progression class `class` is, with the `first`, `last` and `step` members resolution
+    /// selected from its declarations. A `kotlin.ranges` progression class whose declarations do
+    /// not publish them is a missing stable target, never an iterator loop.
+    fn progression_class(
+        &self,
+        class: Ty,
+        source: ExprId,
+    ) -> Result<Option<FirProgressionClass>, BodyCheckFailure> {
+        let Some(kind) = class
+            .obj_internal()
+            .filter(|_| class.type_args().is_empty())
+            .and_then(crate::types::wk::progression_class)
+        else {
+            return Ok(None);
+        };
+        let span = self.file.expr_span(source);
+        let missing = || self.failure(span, BodyCheckFailureKind::MissingStablePropertyTarget);
+        let plan = self.info.progression_plan(class).ok_or_else(missing)?;
+        let counter = FirRangeCounterKind::of(plan.first.ty)
+            .filter(|_| plan.last.ty == plan.first.ty)
+            .ok_or_else(missing)?;
+        let member = |member: crate::resolve::LoopMemberProperty| {
+            self.property_target_at(
+                span,
+                None,
+                Some(super::properties::ExternalPropertyTarget {
+                    property: member.property,
+                    receiver: Some(class),
+                    parameters: Vec::new(),
+                    result: member.ty,
+                    extension_receiver_parameter: None,
+
+                    metadata_constant_read: false,
+                }),
+                false,
+                &[],
+            )
+        };
+        Ok(Some(FirProgressionClass {
+            ty: class,
+            counter,
+            first: member(plan.first)?,
+            last: member(plan.last)?,
+            step: match kind {
+                crate::types::wk::ProgressionClass::Range => None,
+                crate::types::wk::ProgressionClass::Progression => Some(member(plan.step)?),
+            },
+        }))
+    }
+
+    /// The `getProgressionLastElement` overload resolution selected for the stepped progression's
+    /// class. Only a `step` needs it: a stepped progression without one is a missing stable
+    /// target.
+    fn progression_last_element(
+        &self,
+        stepped: FirExprId,
+        source: ExprId,
+    ) -> Result<FirRuntimeFunction, BodyCheckFailure> {
+        let span = self.file.expr_span(source);
+        let function = self
+            .body
+            .expr(stepped)
+            .and_then(|stepped| {
+                self.info
+                    .progression_last_element(stepped.ty.get().non_null())
+            })
+            .ok_or_else(|| self.failure(span, BodyCheckFailureKind::MissingStableCallTarget))?;
+        Ok(FirRuntimeFunction {
+            function: function.function,
+            parameters: function.parameters.clone(),
+            result: function.result,
+        })
+    }
+
+    fn most_precise_type(&self, expression: FirExprId) -> Option<Ty> {
+        let checked = self.body.expr(expression)?;
+        match &checked.kind {
+            FirExprKind::ImplicitConversion { value, .. } => self.most_precise_type(*value),
+            FirExprKind::ValueRead(value) => match self.immutable_local_initializer(*value) {
+                Some(initializer) => self.most_precise_type(initializer),
+                None => Some(checked.ty.get().non_null()),
+            },
+            _ => Some(checked.ty.get().non_null()),
+        }
+    }
+
+    /// The initializer of a `val` declared earlier in this body.
+    fn immutable_local_initializer(&self, value: LocalValueId) -> Option<FirExprId> {
+        (0..self.body.statement_count()).find_map(|raw| {
+            match &self
+                .body
+                .statement(crate::fir::FirStatementId::from_raw(raw as u32))?
+                .kind
+            {
+                FirStatementKind::Local {
+                    target,
+                    mutable: false,
+                    lateinit: false,
+                    initializer,
+                    ..
+                } if *target == value => *initializer,
+                _ => None,
+            }
+        })
+    }
+}

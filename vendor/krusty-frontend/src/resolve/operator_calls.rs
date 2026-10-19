@@ -1,0 +1,885 @@
+//! Selection and checking of Kotlin's operator conventions.
+//!
+//! An operator call is an ordinary callable selection wearing source syntax: `a + b` picks `plus`,
+//! `a[i] = v` picks `set`, `a in b` picks `contains`. This module owns that translation and the
+//! argument checking that follows it, including the one input the syntax hides — the call's EXPECTED
+//! RESULT, which a formal shared between an operator's result and its operands can only be settled
+//! by (`Iterable<T>.plus(Iterable<T>): List<T>` against a declared `List<P>`).
+//!
+//! Extracted from the resolver root: the root is migration debt that may not grow, and this is a
+//! cohesive responsibility with a narrow boundary — it consumes a receiver, a convention name and
+//! the argument expressions, and returns the selected call's result type plus its resolved target.
+
+use super::*;
+
+/// Exact classifier roles selected for a builtin operator that has no retained [`ResolvedCall`].
+/// Builtin scalar arithmetic and increment/decrement lower directly, but their semantic access still
+/// belongs to checking; diagnostic consumers must not reconstruct it from syntax or result types.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct SelectedBuiltinOperatorAccess {
+    pub(super) dispatch_receiver: Option<TypeName>,
+    pub(super) owner: Option<TypeName>,
+    pub(super) extension_receiver: Option<TypeName>,
+}
+
+impl SelectedBuiltinOperatorAccess {
+    pub(super) fn member(receiver: Ty) -> Option<Self> {
+        let receiver = receiver.non_null().kotlin_class_internal();
+        Some(Self {
+            dispatch_receiver: receiver,
+            owner: receiver,
+            extension_receiver: None,
+        })
+        .filter(|access| access.dispatch_receiver.is_some())
+    }
+
+    pub(super) fn selected(call: &ResolvedCall) -> Option<Self> {
+        let class_of = |ty: Ty| ty.non_null().kotlin_class_internal();
+        Some(match call {
+            ResolvedCall::Member(selected) => Self {
+                dispatch_receiver: class_of(selected.receiver),
+                owner: selected.member.owner,
+                extension_receiver: None,
+            },
+            ResolvedCall::Companion(member) => Self {
+                dispatch_receiver: None,
+                owner: member.owner,
+                extension_receiver: None,
+            },
+            ResolvedCall::Extension(call) => Self {
+                dispatch_receiver: None,
+                owner: None,
+                extension_receiver: call.callable.source_receiver.and_then(class_of),
+            },
+            ResolvedCall::MemberExtension {
+                owner,
+                extension_receiver,
+                ..
+            } => Self {
+                dispatch_receiver: None,
+                owner: Some(*owner),
+                extension_receiver: class_of(*extension_receiver),
+            },
+            ResolvedCall::TopLevel(_) | ResolvedCall::LocalFunction(_) => return None,
+        })
+    }
+}
+
+/// The synthetic-call key for a range syntax, paired with the declaration name `RangeKind` owns.
+/// Membership, range expressions, and loops share the key so a mixed operand such as
+/// `3f in 1.0..<3.0` is not rewritten through the wrong operator. Membership always selects this
+/// declaration before its exact provider realization may authorize a direct comparison.
+#[derive(Clone, Copy)]
+pub(super) struct RangeConvention {
+    pub(super) key: SyntheticOperatorCall,
+    pub(super) name: &'static str,
+}
+
+pub(super) fn range_operator(kind: crate::ast::RangeKind) -> RangeConvention {
+    let name = kind.operator_name();
+    let key =
+        SyntheticOperatorCall::from_name(name).expect("range syntax names a synthetic operator");
+    RangeConvention { key, name }
+}
+
+impl<'a> Checker<'a> {
+    pub(super) fn operator_call_ret(
+        &mut self,
+        scope: &CheckerScope<'_>,
+        site: ExprId,
+        receiver: Ty,
+        name: &str,
+        arg_tys: &[Ty],
+        arg_exprs: &[ExprId],
+        span: Span,
+        expected_result: Option<Ty>,
+    ) -> Option<(Ty, ResolvedCall)> {
+        self.operator_call_ret_with_argument_kinds(
+            scope,
+            site,
+            receiver,
+            name,
+            arg_tys,
+            arg_exprs,
+            span,
+            expected_result,
+            None,
+        )
+    }
+
+    /// Shared operator selection with an optional checked semantic view of the arguments. Range
+    /// membership uses this only to authorize a direct comparison through a type parameter's
+    /// declared primitive bound; the ordinary call path always derives kinds from source values.
+    fn operator_call_ret_with_argument_kinds(
+        &mut self,
+        scope: &CheckerScope<'_>,
+        site: ExprId,
+        receiver: Ty,
+        name: &str,
+        arg_tys: &[Ty],
+        arg_exprs: &[ExprId],
+        span: Span,
+        expected_result: Option<Ty>,
+        checked_argument_kinds: Option<Vec<crate::symbol_resolver::CallArgKind>>,
+    ) -> Option<(Ty, ResolvedCall)> {
+        // `downTo` and the legacy `until` range spellings are represented by RangeKind in the AST,
+        // but their Kotlin declarations are `infix`, not `operator`. They still go through the same
+        // semantic callable selection and checked-FIR handoff as the operator range conventions.
+        let accepts_range_infix = matches!(name, "downTo" | "until");
+        let has_convention_modifier =
+            |operator: bool, infix: bool| operator || (accepts_range_infix && infix);
+        if name == "set" {
+            self.indexed_operator_ambiguous = false;
+            let arg_kinds = checked_argument_kinds
+                .clone()
+                .unwrap_or_else(|| self.call_arg_kinds(scope, arg_exprs));
+            let (mut functions, properties) =
+                self.stable_receiver_callables(receiver, name).into_parts();
+            let resolver = self.resolver();
+            functions.overloads.retain(|candidate| {
+                candidate.flags.operator
+                    && (candidate.kind == crate::libraries::FnKind::Member
+                        || self.source_callable_visible(candidate))
+                    && (candidate.kind != crate::libraries::FnKind::Member
+                        || candidate.context_count == 0)
+            });
+            let callables = crate::libraries::Callables::from_parts(functions, properties);
+            let indexed = resolver.select_receiver_indexed_set_function_with_params(
+                receiver,
+                name,
+                &arg_kinds,
+                &[],
+                &callables,
+            );
+            drop(resolver);
+            let (selected, params, ret) = match indexed {
+                crate::symbol_resolver::CandidateSelection::Selected(selected) => selected,
+                crate::symbol_resolver::CandidateSelection::Ambiguous => {
+                    self.indexed_operator_ambiguous = true;
+                    self.diags.error(
+                        span,
+                        "overload resolution ambiguity for operator 'set'".to_string(),
+                    );
+                    return None;
+                }
+                crate::symbol_resolver::CandidateSelection::None => {
+                    return match self.member_extension_operator_call(
+                        scope,
+                        CallArgs {
+                            call: site,
+                            args: arg_exprs,
+                            arg_tys,
+                        },
+                        receiver,
+                        name,
+                        span,
+                    ) {
+                        Ok(selected) => selected,
+                        Err(()) => {
+                            self.indexed_operator_ambiguous = true;
+                            self.diags.error(
+                                span,
+                                "overload resolution ambiguity for operator 'set'".to_string(),
+                            );
+                            None
+                        }
+                    };
+                }
+            };
+            let vararg = selected
+                .call_sig
+                .vararg_index
+                .and_then(|index| index.checked_sub(selected.context_count));
+            if !self
+                .expect_indexed_operator_params(scope, &params, vararg, true, arg_exprs, arg_tys)
+            {
+                return None;
+            }
+            let semantic = selected.semantic_signature();
+            let context_count = selected.context_count.min(semantic.params.len());
+            let context_args = if context_count == 0 {
+                Vec::new()
+            } else if let Some(context) =
+                self.select_context_arguments(scope, &semantic.params[..context_count])
+            {
+                context
+            } else {
+                self.diags.error(
+                    span,
+                    "no implicit value is available for the context parameters".to_string(),
+                );
+                return None;
+            };
+            if selected.kind == crate::libraries::FnKind::Member
+                && !self.callable_accessible(
+                    selected.visibility,
+                    selected.callable.owner,
+                    selected.callable.external_identity,
+                )
+            {
+                self.reject_callable_if_inaccessible(
+                    selected.visibility,
+                    name,
+                    selected.callable.owner,
+                    selected.callable.external_identity,
+                    span,
+                );
+                return None;
+            }
+            let target = if selected.kind == crate::libraries::FnKind::Member {
+                let mut member = selected.member_with_return(ret);
+                member.params = params;
+                ResolvedCall::Member(crate::symbol_resolver::ResolvedMember {
+                    receiver,
+                    physical_params: selected.callable.physical_params.clone(),
+                    context_args: context_args.into_iter().map(Some).collect(),
+                    ret,
+                    member,
+                    projected_return_hazard: selected.projected_return_hazard,
+                    suspend: selected.flags.suspend,
+                    origin: selected.callable.origin.clone(),
+                })
+            } else {
+                let mut callable = selected.callable.clone();
+                callable.ret = ret;
+                ResolvedCall::source_extension(ResolvedSourceExtensionCall {
+                    callable,
+                    receiver,
+                    params,
+                    context_args: context_args.into_iter().map(Some).collect(),
+                    ret,
+                    source: selected.source_key,
+                    stable_declaration: selected.stable_declaration,
+                    vararg: vararg.is_some(),
+                    vararg_index: vararg,
+                    param_default_values: selected
+                        .default_values
+                        .get(selected.context_count..)
+                        .unwrap_or_default()
+                        .to_vec(),
+                })
+            };
+            return Some((ret, target));
+        }
+        let arg_kinds =
+            checked_argument_kinds.unwrap_or_else(|| self.call_arg_kinds(scope, arg_exprs));
+        crate::trace_compiler!(
+            "resolve",
+            "operator extension inventory name={name} receiver={receiver:?} candidates={:?}",
+            self.stable_receiver_callables(receiver, name)
+                .functions()
+                .iter()
+                .map(|candidate| (
+                    candidate.flags.operator,
+                    candidate.semantic_receiver(),
+                    candidate.semantic_params().to_vec(),
+                    candidate.applied_params().to_vec(),
+                ))
+                .collect::<Vec<_>>()
+        );
+        let (mut functions, properties) =
+            self.stable_receiver_callables(receiver, name).into_parts();
+        functions.overloads.retain(|candidate| {
+            has_convention_modifier(candidate.flags.operator, candidate.flags.infix)
+                && (candidate.kind == crate::libraries::FnKind::Member
+                    || self.source_callable_visible(candidate))
+                && (candidate.kind != crate::libraries::FnKind::Member
+                    || candidate.context_count == 0)
+        });
+        let mut members = functions.clone();
+        members
+            .overloads
+            .retain(|candidate| candidate.kind == crate::libraries::FnKind::Member);
+        let members = crate::libraries::Callables::Functions(members);
+        let callables = crate::libraries::Callables::from_parts(functions, properties);
+        let member_applicable = {
+            !matches!(
+                self.resolver()
+                    .select_receiver_function_with_params_tracking(
+                        receiver,
+                        name,
+                        &arg_kinds,
+                        &[],
+                        &members,
+                        None,
+                    ),
+                crate::symbol_resolver::CandidateSelection::None
+            )
+        };
+        if !member_applicable {
+            match self.select_local_extension_candidate(
+                scope,
+                name,
+                LocalExtensionSelectionRequest {
+                    receiver,
+                    args: arg_exprs,
+                    arg_tys,
+                    argument_names: None,
+                    trailing_lambda: false,
+                    supplied_type_arguments: None,
+                },
+            ) {
+                LocalExtensionSelection::Selected(selected)
+                    if has_convention_modifier(
+                        selected.signature.is_operator(),
+                        selected.signature.is_infix(),
+                    ) =>
+                {
+                    let context_count = selected
+                        .signature
+                        .context_count
+                        .min(selected.signature.params.len());
+                    self.expect_call_args(
+                        scope,
+                        &selected.signature.params[context_count..],
+                        selected.signature.vararg(),
+                        arg_exprs,
+                        arg_tys,
+                    );
+                    let ret = selected.signature.ret;
+                    return Some((
+                        ret,
+                        ResolvedCall::LocalFunction(Box::new(ResolvedLocalFunctionCall {
+                            stmt_id: selected.statement,
+                            sig: selected.signature,
+                            provided_arg_count: arg_exprs.len(),
+                            context_args: selected.context_args,
+                            receiver: None,
+                        })),
+                    ));
+                }
+                LocalExtensionSelection::Selected(_)
+                | LocalExtensionSelection::Ambiguous
+                | LocalExtensionSelection::None => {}
+            }
+            match self.member_extension_operator_call(
+                scope,
+                CallArgs {
+                    call: site,
+                    args: arg_exprs,
+                    arg_tys,
+                },
+                receiver,
+                name,
+                span,
+            ) {
+                Ok(Some(selected)) => return Some(selected),
+                Ok(None) => {}
+                Err(()) => {
+                    self.diags.error(
+                        span,
+                        format!("overload resolution ambiguity for member '{name}'"),
+                    );
+                    return None;
+                }
+            }
+        }
+        let resolver = self.resolver();
+        // The expected result joins the receiver and the arguments as an input to the ONE
+        // instantiation that yields the parameter vector, the result type and the recorded target,
+        // so they cannot disagree about a formal the result and the operands share.
+        let (selected, params, ret) = match resolver.select_receiver_function_with_params_tracking(
+            receiver,
+            name,
+            &arg_kinds,
+            &[],
+            &callables,
+            expected_result,
+        ) {
+            crate::symbol_resolver::CandidateSelection::Selected(selected) => selected,
+            crate::symbol_resolver::CandidateSelection::None
+            | crate::symbol_resolver::CandidateSelection::Ambiguous => return None,
+        };
+        let semantic = selected.semantic_signature();
+        let context_count = selected.context_count.min(semantic.params.len());
+        let context_args = if context_count == 0 {
+            Vec::new()
+        } else if let Some(context) =
+            self.select_context_arguments(scope, &semantic.params[..context_count])
+        {
+            context
+        } else {
+            self.diags.error(
+                span,
+                "no implicit value is available for the context parameters".to_string(),
+            );
+            return None;
+        };
+        if selected.kind == crate::libraries::FnKind::Member
+            && !self.callable_accessible(
+                selected.visibility,
+                selected.callable.owner,
+                selected.callable.external_identity,
+            )
+        {
+            self.reject_callable_if_inaccessible(
+                selected.visibility,
+                name,
+                selected.callable.owner,
+                selected.callable.external_identity,
+                span,
+            );
+            return None;
+        }
+        self.expect_call_args(scope, &params, false, arg_exprs, arg_tys);
+        let target = if selected.kind == crate::libraries::FnKind::Member {
+            let mut member = selected.member_with_return(ret);
+            member.params = params;
+            ResolvedCall::Member(crate::symbol_resolver::ResolvedMember {
+                receiver,
+                physical_params: selected.callable.physical_params.clone(),
+                context_args: Vec::new(),
+                ret,
+                member,
+                projected_return_hazard: selected.projected_return_hazard,
+                suspend: selected.flags.suspend,
+                origin: selected.callable.origin.clone(),
+            })
+        } else {
+            let vararg = selected
+                .call_sig
+                .vararg_index
+                .and_then(|index| index.checked_sub(selected.context_count));
+            let mut callable = selected.callable.clone();
+            callable.ret = ret;
+            ResolvedCall::source_extension(ResolvedSourceExtensionCall {
+                callable,
+                receiver,
+                params,
+                context_args: context_args.into_iter().map(Some).collect(),
+                ret,
+                source: selected.source_key,
+                stable_declaration: selected.stable_declaration,
+                vararg: vararg.is_some(),
+                vararg_index: vararg,
+                param_default_values: selected
+                    .default_values
+                    .get(selected.context_count..)
+                    .unwrap_or_default()
+                    .to_vec(),
+            })
+        };
+        Some((ret, target))
+    }
+
+    /// Parameter types of the one applicable operator overload, before any postponed argument body is
+    /// checked. Members and in-scope extensions are selected from the same federated callable set.
+    pub(super) fn selected_operator_params(
+        &mut self,
+        scope: &CheckerScope<'_>,
+        receiver: Ty,
+        name: &str,
+        args: &[ExprId],
+    ) -> Option<Vec<Ty>> {
+        let argument_kinds = self.call_arg_kinds(scope, args);
+        let (mut functions, _) = self.stable_receiver_callables(receiver, name).into_parts();
+        let resolver = self.resolver();
+        functions.overloads.retain(|candidate| {
+            candidate.flags.operator
+                && self.source_callable_visible(candidate)
+                && (candidate.kind != crate::libraries::FnKind::Member
+                    || candidate.context_count == 0)
+        });
+        let callables = crate::libraries::Callables::Functions(functions);
+        if name == "set" {
+            match resolver.select_receiver_indexed_set_function_with_params(
+                receiver,
+                name,
+                &argument_kinds,
+                &[],
+                &callables,
+            ) {
+                crate::symbol_resolver::CandidateSelection::Selected((_, params, _)) => {
+                    Some(params)
+                }
+                crate::symbol_resolver::CandidateSelection::None
+                | crate::symbol_resolver::CandidateSelection::Ambiguous => None,
+            }
+        } else {
+            resolver
+                .select_receiver_function_with_params(
+                    receiver,
+                    name,
+                    &argument_kinds,
+                    &[],
+                    &callables,
+                )
+                .map(|(_, params)| params)
+        }
+    }
+
+    /// Whether `x in a..b` has a REFERENCE value over a primitive range whose elements can actually
+    /// inhabit it (`x: Any` over `4..10`). The membership test then reduces to "is `x` a boxed element
+    /// of the range", so a value type unrelated to the boxed element (`x: String` over `4..10`) is
+    /// excluded — that comparison is never non-trivially true and kotlinc rejects it.
+    ///
+    /// Only `Int`/`Long`/`Char` elements qualify, because the widened form is `Iterable<T>.contains`:
+    /// a FLOATING-POINT range is a `ClosedFloatingPointRange`, not an `Iterable`, so kotlinc rejects
+    /// `x: Any in 1.0..2.0` outright; a `Byte`/`Short` range is really an `IntRange` (its elements box
+    /// to `Integer`, not to the bound's own wrapper); and an unsigned range's elements box to their
+    /// inline class, which krusty erases to the signed primitive.
+    fn in_range_widened_value(&self, value: Ty, element: Ty) -> bool {
+        if !matches!(element, Ty::Int | Ty::Long | Ty::Char) {
+            return false;
+        }
+        let Some(boxed) = element.boxed_ref() else {
+            return false;
+        };
+        value.is_reference() && self.when_objs_comparable(value.non_null(), boxed)
+    }
+
+    pub(super) fn resolve_in_range_expression(
+        &mut self,
+        scope: &CheckerScope<'_>,
+        e: ExprId,
+        value: ExprId,
+        start: ExprId,
+        end: ExprId,
+        kind: crate::ast::RangeKind,
+    ) -> Ty {
+        self.resolved_in_range_comparisons.remove(&e);
+        let convention = range_operator(kind);
+        for operator in [convention.key, SyntheticOperatorCall::Contains] {
+            self.resolved_operator_calls.remove(&(e, operator));
+            self.resolved_builtin_operator_accesses
+                .remove(&(e, operator));
+        }
+        let t = {
+            let vt = self.expr(scope, value);
+            let st = self.expr(scope, start);
+            let et = self.expr(scope, end);
+            let operands = InRangeOperands {
+                expression: e,
+                kind,
+                value_ty: vt,
+            };
+            let Some((range_ty, range_call)) = self.operator_call_ret(
+                scope,
+                e,
+                st,
+                convention.name,
+                &[et],
+                &[end],
+                self.span(e),
+                None,
+            ) else {
+                self.diags.error(
+                    self.span(e),
+                    format!(
+                        "operator '{}' cannot be applied to '{}' and '{}'",
+                        convention.name,
+                        st.source_name(),
+                        et.source_name()
+                    ),
+                );
+                return self.set(e, Ty::Error);
+            };
+            // Built-in range overload selection uses a type parameter's declared upper bound. The
+            // original symbolic type remains attached to each expression; these three values are
+            // only the classifiers participating in `rangeTo`/`contains` selection.
+            let prim = |t: &Ty| {
+                matches!(
+                    *t,
+                    Ty::Int
+                        | Ty::Long
+                        | Ty::Char
+                        | Ty::Short
+                        | Ty::Byte
+                        | Ty::Double
+                        | Ty::Float
+                        | Ty::UInt
+                        | Ty::ULong
+                )
+            };
+            let range_operand = |ty: Ty| {
+                let primary = ty.range_operand_bound();
+                if prim(&primary) {
+                    primary
+                } else {
+                    self.semantic_tparam_extra_bounds(scope, ty)
+                        .into_iter()
+                        .map(Ty::range_operand_bound)
+                        .find(prim)
+                        .unwrap_or(primary)
+                }
+            };
+            let range_vt = range_operand(vt);
+            let range_st = range_operand(st);
+            let range_et = range_operand(et);
+            let comparison_provenance = selected_range_comparison_provenance(kind, &range_call);
+            let operands_are_numeric = [range_vt, range_st, range_et].iter().all(prim);
+            let uniform = range_vt == range_st && range_st == range_et;
+            let mut ordinary_contains = None;
+            // kotlinc's `RangeContainsLowering` compares in the widest numeric type of the bounds
+            // and the value (`computeComparisonClass`) when the call is the range's own `contains`
+            // or a stdlib closed-range extension. Every primitive range declares the member
+            // `contains` of its own element type, and a member wins over any extension, so operands
+            // of one type always select it; mixed operands select through ordinary resolution.
+            // Unsigned membership is compared only between operands of one type. A range kotlinc
+            // does not compare (`downTo`, a floating `..<`) calls its `contains`.
+            let mut unsigned_compare = None;
+            let comparison =
+                if operands_are_numeric {
+                    // Resolve `contains` before bypassing it even when the source operand types are
+                    // uniform. `Byte..Byte` and `Short..Short` build an `IntRange`, whose applicable
+                    // narrow overload is an extension and may be shadowed by a local declaration.
+                    // A type parameter participates through its declared primitive bound here,
+                    // just as it does in `rangeTo` selection above. Keep the source type for the
+                    // ordinary-call fallback below: only the selected builtin role authorizes
+                    // bypassing that call.
+                    let selected = if range_vt == vt {
+                        self.range_contains_call(scope, e, range_ty, vt, value)
+                    } else {
+                        self.range_contains_call_for_bound(scope, e, range_ty, range_vt, value)
+                    };
+                    let selects_range_contains = match &selected {
+                        Some((Ty::Boolean, ResolvedCall::Member(_))) => true,
+                        Some((Ty::Boolean, ResolvedCall::Extension(extension))) => {
+                            extension.callable.compiler_intrinsic
+                                == Some(crate::libraries::CompilerIntrinsic::ClosedRangeContains)
+                        }
+                        _ => false,
+                    };
+                    if range_vt == vt {
+                        ordinary_contains = Some(selected);
+                    }
+                    let unsigned = [range_vt, range_st, range_et]
+                        .iter()
+                        .any(|ty| ty.is_unsigned());
+                    let comparison = (selects_range_contains
+                        && comparison_provenance.is_some()
+                        && (uniform || !unsigned))
+                        .then(|| range_comparison_type(range_st, range_et, range_vt))
+                        .flatten();
+                    if let Some(counter @ (Ty::UInt | Ty::ULong)) = comparison {
+                        unsigned_compare = self.unsigned_loop_compare(counter);
+                        unsigned_compare.as_ref().map(|_| counter)
+                    } else {
+                        comparison
+                    }
+                } else if prim(&range_st)
+                    && range_st == range_et
+                    && self.in_range_widened_value(vt, range_st)
+                {
+                    // A WIDENED value over a primitive range: `when (x: Any) { in 4..10 -> … }`. kotlinc
+                    // lowers it to `CollectionsKt.contains(4..10, x)`, which is true exactly when `x` is a
+                    // BOXED element of the range — so it stays a comparison chain, guarded by the
+                    // `instanceof` the boxed element type implies.
+                    Some(range_st.range_counter_type().expect(
+                        "widened direct membership is restricted to counted primitive ranges",
+                    ))
+                } else {
+                    None
+                };
+            if let (Some(comparison), Some(provenance)) = (comparison, comparison_provenance) {
+                if let Some(access) = SelectedBuiltinOperatorAccess::selected(&range_call) {
+                    self.resolved_builtin_operator_accesses
+                        .insert((e, convention.key), access);
+                }
+                // Direct comparison bypasses the selected range call, so publish the non-null
+                // boundaries it would impose on both bounds. Use the already selected comparison
+                // type: for a mixed floating range this preserves the platform check before the
+                // same Float-to-Double widening the comparison requires.
+                for operand in [start, end] {
+                    self.narrow_platform_value(comparison, operand, PlatformNarrowing::Argument);
+                }
+                // Numeric membership similarly bypasses the selected contains call. The alternate
+                // direct arm is a widened reference (`Any! in 1..2`): it must stay boxed for the
+                // checked `instanceof Int` path and therefore has no scalar value boundary.
+                if operands_are_numeric {
+                    self.narrow_platform_value(comparison, value, PlatformNarrowing::Argument);
+                }
+                self.resolved_in_range_comparisons.insert(
+                    e,
+                    ResolvedInRangeComparison {
+                        comparison,
+                        provenance,
+                        unsigned_compare,
+                    },
+                );
+                Ty::Boolean
+            } else {
+                // Every non-direct-comparison range desugars through the ordinary declarations
+                // `a.rangeTo(b).contains(x)`. This includes reference operators AND mixed unsigned
+                // membership (`UByte in UIntRange`, `UInt in ULongRange`), whose `contains` overloads
+                // live in stdlib metadata. Scalar storage is irrelevant to source applicability.
+                let contains = ordinary_contains
+                    .unwrap_or_else(|| self.range_contains_call(scope, e, range_ty, vt, value));
+                self.finish_range_contains(&operands, range_ty, range_call, contains)
+            }
+        };
+        self.set(e, t)
+    }
+
+    /// The `contains` operator call testing membership of `value` in a range of `range_ty`.
+    fn range_contains_call(
+        &mut self,
+        scope: &CheckerScope<'_>,
+        expression: ExprId,
+        range_ty: Ty,
+        value_ty: Ty,
+        value: ExprId,
+    ) -> Option<(Ty, ResolvedCall)> {
+        self.operator_call_ret(
+            scope,
+            expression,
+            range_ty,
+            "contains",
+            &[value_ty],
+            &[value],
+            self.span(expression),
+            None,
+        )
+    }
+
+    /// Select `contains` through a type parameter's checked primitive bound solely to authorize
+    /// direct comparison. This still runs the ordinary shared operator selector; it changes only
+    /// the semantic argument view. A non-direct fallback calls [`Self::range_contains_call`] with
+    /// the original symbolic source type instead.
+    fn range_contains_call_for_bound(
+        &mut self,
+        scope: &CheckerScope<'_>,
+        expression: ExprId,
+        range_ty: Ty,
+        bound: Ty,
+        value: ExprId,
+    ) -> Option<(Ty, ResolvedCall)> {
+        self.operator_call_ret_with_argument_kinds(
+            scope,
+            expression,
+            range_ty,
+            "contains",
+            &[bound],
+            &[value],
+            self.span(expression),
+            None,
+            Some(vec![crate::symbol_resolver::CallArgKind::Typed(bound)]),
+        )
+    }
+
+    fn finish_range_contains(
+        &mut self,
+        operands: &InRangeOperands,
+        range_ty: Ty,
+        range_call: ResolvedCall,
+        contains: Option<(Ty, ResolvedCall)>,
+    ) -> Ty {
+        let Some((Ty::Boolean, contains_call)) = contains else {
+            self.diags.error(
+                self.span(operands.expression),
+                format!(
+                    "operator 'contains' cannot be applied to range '{}' and '{}'",
+                    range_ty.source_name(),
+                    operands.value_ty.source_name()
+                ),
+            );
+            return Ty::Error;
+        };
+        self.resolved_operator_calls.insert(
+            (operands.expression, range_operator(operands.kind).key),
+            range_call,
+        );
+        self.resolved_operator_calls.insert(
+            (operands.expression, SyntheticOperatorCall::Contains),
+            contains_call,
+        );
+        Ty::Boolean
+    }
+}
+
+/// `computeComparisonClass`: the widest numeric type of a range literal's bounds and the value.
+fn range_comparison_type(start: Ty, end: Ty, value: Ty) -> Option<Ty> {
+    widest_numeric_type(widest_numeric_type(start, end)?, value)
+}
+
+/// `leastCommonPrimitiveNumericType`.
+fn widest_numeric_type(left: Ty, right: Ty) -> Option<Ty> {
+    let either = |types: &[Ty]| types.contains(&left) || types.contains(&right);
+    Some(if either(&[Ty::Double]) {
+        Ty::Double
+    } else if either(&[Ty::Float]) {
+        Ty::Float
+    } else if either(&[Ty::ULong]) {
+        Ty::ULong
+    } else if either(&[Ty::UInt, Ty::UShort, Ty::UByte]) {
+        Ty::UInt
+    } else if either(&[Ty::Long]) {
+        Ty::Long
+    } else if either(&[Ty::Int, Ty::Short, Ty::Byte]) {
+        Ty::Int
+    } else if either(&[Ty::Char]) {
+        Ty::Char
+    } else {
+        return None;
+    })
+}
+
+/// Whether the selected range declaration is one kotlinc's `RangeContainsLowering` turns into
+/// comparisons: a closed range built by `rangeTo`, `rangeUntil` or `until` over progression
+/// elements, or a floating-point `rangeTo`. `downTo` builds a progression, which is not a
+/// `ClosedRange`, and a floating-point `rangeUntil` an `OpenEndRange`: membership in either calls
+/// its `contains`.
+fn selected_range_comparison_provenance(
+    kind: crate::ast::RangeKind,
+    range_call: &ResolvedCall,
+) -> Option<crate::fir::FirRangeComparisonProvenance> {
+    use crate::ast::RangeKind;
+    use crate::fir::FirRangeComparisonProvenance as Provenance;
+    use crate::libraries::{CompilerIntrinsic, MemberRealization};
+
+    match (kind, range_call.range_provider_realization()?) {
+        (RangeKind::Through, MemberRealization::RangeConstruction { open_end: false }) => {
+            Some(Provenance::RangeConstruction { open_end: false })
+        }
+        (RangeKind::OpenEnd, MemberRealization::RangeConstruction { open_end: true }) => {
+            Some(Provenance::RangeConstruction { open_end: true })
+        }
+        (RangeKind::Until, MemberRealization::Intrinsic(CompilerIntrinsic::RangeUntil)) => {
+            Some(Provenance::RangeUntil)
+        }
+        (
+            RangeKind::Through,
+            MemberRealization::Intrinsic(CompilerIntrinsic::FloatingRangeMembership),
+        ) => Some(Provenance::FloatingRangeMembership),
+        _ => None,
+    }
+}
+
+impl ResolvedCall {
+    /// Provider realization attached to this exact selected range declaration. Normalized library
+    /// extensions carry compiler intrinsics beside their ordinary dispatch realization, so fold
+    /// those provider fields before deciding whether membership may bypass `contains`.
+    fn range_provider_realization(&self) -> Option<crate::libraries::MemberRealization> {
+        let realization = match self {
+            Self::Member(resolved) => resolved.member.realization,
+            Self::TopLevel(call) => call
+                .callable
+                .compiler_intrinsic
+                .map(crate::libraries::MemberRealization::Intrinsic)
+                .unwrap_or(call.callable.member_realization),
+            Self::Companion(member) => member.realization,
+            Self::Extension(extension) => extension
+                .callable
+                .compiler_intrinsic
+                .map(crate::libraries::MemberRealization::Intrinsic)
+                .unwrap_or(extension.callable.member_realization),
+            Self::MemberExtension { .. } | Self::LocalFunction(_) => return None,
+        };
+        Some(realization)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ResolvedInRangeComparison {
+    pub(crate) comparison: Ty,
+    pub(crate) provenance: crate::fir::FirRangeComparisonProvenance,
+    /// Exact provider-selected comparison for an unsigned counter. Common lowering consumes this
+    /// identity before publishing the normalized unsigned-ordering operation to backends.
+    pub(crate) unsigned_compare: Option<super::for_loop_iteration::RuntimeFunction>,
+}
+
+struct InRangeOperands {
+    expression: ExprId,
+    kind: crate::ast::RangeKind,
+    value_ty: Ty,
+}

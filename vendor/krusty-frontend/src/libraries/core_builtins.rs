@@ -1,0 +1,713 @@
+//! The declarations a target still has when no stdlib artifact is on its classpath.
+//!
+//! `Any`, `String`, `Enum`, `Function`, `KProperty` and the handful of callables beside them are
+//! defined by the LANGUAGE: source that mentions them is valid with an empty classpath, so one
+//! symbol source has to answer for them. This module is that source's contents, kept apart from
+//! the library model it publishes into.
+
+use super::*;
+
+/// Publish the compiler-owned realization attached to each exact core declaration. These names
+/// define declarations in this provider; consumers receive the selected callable identity and its
+/// typed intrinsic and never classify a later source or JVM spelling.
+pub(crate) fn add_core_builtin_declarations(classifier: &mut LibraryType, owner: TypeName) {
+    fn member_function(
+        classifier: &mut LibraryType,
+        owner: TypeName,
+        receiver: Ty,
+        name: &str,
+        parameter: Option<Ty>,
+        result: Ty,
+        semantics: (CompilerIntrinsic, bool),
+    ) {
+        let (intrinsic, infix) = semantics;
+        let params = parameter.into_iter().collect::<Vec<_>>();
+        let mut callable =
+            LibraryCallable::library(owner, name, params.clone(), result, result, "");
+        callable.compiler_intrinsic = Some(intrinsic);
+        let mut declaration = FunctionInfo::plain(FnKind::Member, Some(receiver), callable);
+        declaration.call_sig = CallSig::metadata_plain(params.len());
+        declaration.flags.infix = infix;
+
+        if let Some(callables) = classifier.declared_callables.get_mut(name) {
+            let (mut functions, properties) = std::mem::take(callables).into_parts();
+            if let Some(existing) = functions.overloads.iter_mut().find(|candidate| {
+                candidate.kind == FnKind::Member
+                    && candidate.semantic_params().as_ref() == params.as_slice()
+                    && candidate.callable.ret.canonical_semantic() == result
+            }) {
+                existing.callable.compiler_intrinsic = Some(intrinsic);
+                existing.flags.infix |= infix;
+            } else {
+                functions.overloads.push(declaration);
+            }
+            *callables = Callables::from_parts(functions, properties);
+        } else {
+            classifier.insert_declared_callables(
+                name.to_string(),
+                Callables::Functions(FunctionSet {
+                    overloads: vec![declaration],
+                }),
+            );
+        }
+    }
+
+    fn member_property(
+        classifier: &mut LibraryType,
+        owner: TypeName,
+        name: &str,
+        ty: Ty,
+        intrinsic: CompilerIntrinsic,
+    ) {
+        if let Some(callables) = classifier.declared_callables.get_mut(name) {
+            let (functions, mut properties) = std::mem::take(callables).into_parts();
+            if !properties.overloads.is_empty() {
+                for property in &mut properties.overloads {
+                    property.getter.compiler_intrinsic = Some(intrinsic);
+                }
+                *callables = Callables::from_parts(functions, properties);
+                return;
+            }
+            *callables = Callables::from_parts(functions, properties);
+        }
+        let mut getter = LibraryCallable::library(owner, name, Vec::new(), ty, ty, "");
+        getter.compiler_intrinsic = Some(intrinsic);
+        let property = PropertyInfo {
+            return_value_status: None,
+            name: name.to_string(),
+            kind: PropKind::Member,
+            receiver: Some(Ty::obj_name(owner)),
+            associated_classifier: None,
+            associated_access_owner: None,
+            companion_associated: false,
+            formals: Vec::new(),
+            ty,
+            context_count: 0,
+            context_param_names: Vec::new(),
+            context_parameter_identities: Vec::new(),
+            getter,
+            setter: None,
+            setter_visibility: Visibility::Private,
+            setter_parameter_name: None,
+            is_const: false,
+            implicit_integer_coercion: false,
+            compile_time_constant: None,
+            metadata_constant_read: false,
+            deprecated_hidden: false,
+            accessor_availability: Default::default(),
+            is_final: false,
+            visibility: Visibility::Public,
+            owner,
+            receiver_rank: 0,
+            source_key: None,
+            stable_declaration: None,
+            source_visible: true,
+            getter_declaration: None,
+            setter_declaration: None,
+            source_member: None,
+            producer: PropertyProducer::KotlinAccessor,
+            read_stability: PropertyReadStability::Unstable,
+        };
+        if let Some(callables) = classifier.declared_callables.get_mut(name) {
+            let (functions, mut properties) = std::mem::take(callables).into_parts();
+            properties.overloads.push(property.clone());
+            *callables = Callables::from_parts(functions, properties);
+        } else {
+            classifier.insert_declared_callables(
+                name.to_string(),
+                Callables::Properties(PropertySet {
+                    overloads: vec![property],
+                }),
+            );
+        }
+    }
+
+    for (expected_owner, name, ty, intrinsic) in [
+        (
+            crate::types::type_name("kotlin/String"),
+            "length",
+            Ty::Int,
+            CompilerIntrinsic::StringLength,
+        ),
+        (
+            crate::types::wk::kotlin_enum(),
+            "name",
+            Ty::String,
+            CompilerIntrinsic::EnumName,
+        ),
+    ] {
+        if owner == expected_owner {
+            member_property(classifier, owner, name, ty, intrinsic);
+        }
+    }
+    if owner.matches("kotlin/Array") || Ty::primitive_array_element(owner.segment_ref()).is_some() {
+        member_property(
+            classifier,
+            owner,
+            "size",
+            Ty::Int,
+            CompilerIntrinsic::ArraySize,
+        );
+    }
+    let bit_receiver = if owner.matches("kotlin/Int") {
+        Some(Ty::Int)
+    } else if owner.matches("kotlin/Long") {
+        Some(Ty::Long)
+    } else if owner.matches("kotlin/Boolean") {
+        Some(Ty::Boolean)
+    } else {
+        None
+    };
+    if let Some(receiver) = bit_receiver {
+        for (name, intrinsic) in [
+            ("and", CompilerIntrinsic::PrimitiveBitAnd),
+            ("or", CompilerIntrinsic::PrimitiveBitOr),
+            ("xor", CompilerIntrinsic::PrimitiveBitXor),
+        ] {
+            member_function(
+                classifier,
+                owner,
+                receiver,
+                name,
+                Some(receiver),
+                receiver,
+                (intrinsic, true),
+            );
+        }
+        member_function(
+            classifier,
+            owner,
+            receiver,
+            "inv",
+            None,
+            receiver,
+            (CompilerIntrinsic::PrimitiveBitNot, false),
+        );
+        if matches!(receiver, Ty::Int | Ty::Long) {
+            for (name, intrinsic) in [
+                ("shl", CompilerIntrinsic::PrimitiveShiftLeft),
+                ("shr", CompilerIntrinsic::PrimitiveShiftRight),
+                ("ushr", CompilerIntrinsic::PrimitiveUnsignedShiftRight),
+            ] {
+                member_function(
+                    classifier,
+                    owner,
+                    receiver,
+                    name,
+                    Some(Ty::Int),
+                    receiver,
+                    (intrinsic, true),
+                );
+            }
+        }
+    }
+}
+
+impl EmptySymbolSource {
+    fn builtin_classifier(name: &str, internal: TypeName) -> Option<LibraryType> {
+        let known = Ty::from_name(name).is_some()
+            || Ty::primitive_array_element(name).is_some()
+            || matches!(
+                name,
+                "Array" | "Enum" | "Function" | "EqualityBound" | "Suppress"
+            );
+        if !known {
+            return None;
+        }
+
+        let mut classifier = LibraryType::declaration_header();
+        if name == "Function" {
+            classifier.kind = TypeKind::Interface;
+            classifier.type_parameters =
+                TypeParameters::invariant(vec!["R".to_string()], vec![Vec::new()]);
+        }
+        if name == "Enum" {
+            // `enum class E` has the implicit semantic supertype `Enum<E>` even with an empty
+            // target classpath. Publish the corresponding core declaration through the same symbol
+            // provider as the other language builtins, so checked IR never needs an emitter-only
+            // classifier exception merely to format that already-recorded type.
+            classifier.type_parameters =
+                TypeParameters::invariant(vec!["E".to_string()], vec![Vec::new()]);
+        }
+        if matches!(name, "EqualityBound" | "Suppress") {
+            classifier.kind = TypeKind::Annotation;
+        }
+        if name == "EqualityBound" {
+            classifier.named_parameter_lists.push(ParamList {
+                visibility: Visibility::Public,
+                names: vec!["bound".to_string()],
+                defaults: vec![false],
+                types: vec![Ty::obj_args(
+                    "kotlin/reflect/KClass",
+                    &[Ty::star_projection(Ty::nullable(Ty::obj("kotlin/Any")))],
+                )],
+                recv_fun: vec![false],
+                vararg: None,
+                annotation: None,
+            });
+            classifier.retention = Some("SOURCE".to_string());
+        }
+        if name == "Suppress" {
+            // `kotlin.Suppress` is a language builtin: parsing and visibility diagnostics must work
+            // even for a standalone frontend with no stdlib artifact. Publish its real Kotlin
+            // declaration shape at the provider boundary instead of teaching annotation checking a
+            // name-based exception.
+            classifier.named_parameter_lists.push(ParamList {
+                visibility: Visibility::Public,
+                names: vec!["names".to_string()],
+                defaults: vec![false],
+                types: vec![Ty::obj_args("kotlin/Array", &[Ty::String])],
+                recv_fun: vec![false],
+                vararg: Some(0),
+                annotation: None,
+            });
+            classifier.retention = Some("SOURCE".to_string());
+        }
+        if name == "Unit" {
+            classifier.kind = TypeKind::Object;
+        }
+        if name != "Any" && name != "Nothing" {
+            classifier.supertypes.push_name(crate::types::wk::any());
+            classifier
+                .supertype_templates
+                .push(Ty::obj_name(crate::types::wk::any()));
+        }
+        if name == "Nothing" {
+            // `Nothing` has no instances, but its expressions have every non-null type as a
+            // supertype; `Any` is the only declaration owner needed for member lookup here.
+            classifier.supertypes.push_name(crate::types::wk::any());
+            classifier
+                .supertype_templates
+                .push(Ty::obj_name(crate::types::wk::any()));
+        }
+        if name == "Any" {
+            classifier.constructors.push(LibraryMember::new(
+                "<init>".to_string(),
+                Vec::new(),
+                Ty::Unit,
+                "()V".to_string(),
+            ));
+            let declarations = [
+                (
+                    "equals",
+                    vec![Ty::nullable(Ty::obj_name(internal))],
+                    Ty::Boolean,
+                ),
+                ("hashCode", Vec::new(), Ty::Int),
+                ("toString", Vec::new(), Ty::String),
+            ];
+            for (name, params, ret) in declarations {
+                let mut callable =
+                    LibraryCallable::library(internal, name, params.clone(), ret, ret, "");
+                callable.semantic_role = super::builtin_declaration::semantic_call_role(
+                    super::builtin_declaration::BuiltinMemberDeclaration {
+                        owner: internal,
+                        name,
+                        params: &params,
+                        ret,
+                        is_property: false,
+                        is_operator: false,
+                        is_infix: false,
+                        annotations: &[],
+                    },
+                );
+                if callable.semantic_role == Some(crate::types::SemanticCallRole::KotlinAnyEquals) {
+                    callable.compiler_core_declaration =
+                        Some(CompilerCoreDeclaration::KotlinAnyEquals);
+                    callable.declaration_owner =
+                        Some(crate::types::SemanticCallableOwner::Classifier(internal));
+                }
+                if name == "toString" {
+                    // The target-free core provider has no dependency registry from which it could
+                    // allocate an `ExternalCallableId`. Preserve the selected declaration as the
+                    // backend-neutral Kotlin string-conversion operation instead. Target providers
+                    // that publish a concrete `Any.toString` declaration keep ordinary dispatch.
+                    callable.member_realization =
+                        MemberRealization::Intrinsic(CompilerIntrinsic::NullableAnyToString);
+                }
+                classifier.insert_declared_callables(
+                    name.to_string(),
+                    Callables::Functions(FunctionSet {
+                        overloads: vec![FunctionInfo::plain(FnKind::Member, None, callable)],
+                    }),
+                );
+            }
+        }
+        add_core_builtin_declarations(&mut classifier, internal);
+        Some(classifier)
+    }
+
+    fn builtin_kotlin_callables(name: &str) -> Callables {
+        let mut functions = FunctionSet::default();
+        let mut properties = PropertySet::default();
+        match name {
+            "plus" => {
+                let receiver = Ty::nullable(Ty::String);
+                let callable = LibraryCallable::library(
+                    crate::types::type_name("kotlin"),
+                    "plus",
+                    vec![receiver, Ty::nullable(Ty::obj("kotlin/Any"))],
+                    Ty::String,
+                    Ty::String,
+                    "",
+                );
+                let mut function = FunctionInfo::plain(FnKind::Extension, Some(receiver), callable);
+                function.call_sig = CallSig::metadata_plain(1);
+                function.flags.operator = true;
+                super::builtin_top_level_realization::attach_function_realization(
+                    crate::types::type_name("kotlin"),
+                    name,
+                    &mut function,
+                );
+                functions.overloads.push(function);
+            }
+            "toString" => {
+                let receiver = Ty::nullable(Ty::obj("kotlin/Any"));
+                let callable = LibraryCallable::library(
+                    crate::types::type_name("kotlin"),
+                    "toString",
+                    vec![receiver],
+                    Ty::String,
+                    Ty::String,
+                    "",
+                );
+                let mut function = FunctionInfo::plain(FnKind::Extension, Some(receiver), callable);
+                function.call_sig = CallSig::metadata_plain(0);
+                super::builtin_top_level_realization::attach_function_realization(
+                    crate::types::type_name("kotlin"),
+                    name,
+                    &mut function,
+                );
+                functions.overloads.push(function);
+            }
+            "code" => {
+                let owner = crate::types::type_name("kotlin/CharKt");
+                let getter = LibraryCallable::library(
+                    owner,
+                    "getCode",
+                    vec![Ty::Char],
+                    Ty::Int,
+                    Ty::Int,
+                    "",
+                );
+                let mut property = PropertyInfo {
+                    return_value_status: None,
+                    name: name.to_string(),
+                    kind: PropKind::Extension,
+                    receiver: Some(Ty::Char),
+                    associated_classifier: None,
+                    associated_access_owner: None,
+                    companion_associated: false,
+                    formals: Vec::new(),
+                    ty: Ty::Int,
+                    context_count: 0,
+                    context_param_names: Vec::new(),
+                    context_parameter_identities: Vec::new(),
+                    getter,
+                    setter: None,
+                    setter_visibility: Visibility::Private,
+                    setter_parameter_name: None,
+                    is_const: false,
+                    implicit_integer_coercion: false,
+                    compile_time_constant: None,
+                    metadata_constant_read: false,
+                    deprecated_hidden: false,
+                    accessor_availability: Default::default(),
+                    is_final: false,
+                    visibility: Visibility::Public,
+                    owner,
+                    receiver_rank: 0,
+                    source_key: None,
+                    stable_declaration: None,
+                    source_visible: true,
+                    getter_declaration: None,
+                    setter_declaration: None,
+                    source_member: None,
+                    producer: crate::libraries::PropertyProducer::KotlinAccessor,
+                    read_stability: PropertyReadStability::Unstable,
+                };
+                property.getter.compiler_intrinsic =
+                    super::builtin_top_level_realization::normalized_property_realization(
+                        crate::types::type_name("kotlin"),
+                        name,
+                        &property,
+                    );
+                properties.overloads.push(property);
+            }
+            _ => {}
+        }
+        Callables::from_parts(functions, properties)
+    }
+
+    fn builtin_text_callables(name: &str) -> Callables {
+        let signatures: &[(&[Ty], Ty)] = match name {
+            "substring" => &[(&[Ty::Int], Ty::String), (&[Ty::Int, Ty::Int], Ty::String)],
+            "indexOf" => &[(&[Ty::String], Ty::Int)],
+            "trimIndent" => &[(&[], Ty::String)],
+            "trimMargin" => &[(&[Ty::String], Ty::String)],
+            _ => return Callables::None,
+        };
+        let receiver = Ty::String;
+        let owner = crate::types::type_name("kotlin/text/StringsKt");
+        let overloads = signatures
+            .iter()
+            .map(|(params, ret)| {
+                let callable = LibraryCallable::library(
+                    owner,
+                    name,
+                    std::iter::once(receiver)
+                        .chain(params.iter().copied())
+                        .collect(),
+                    *ret,
+                    *ret,
+                    "",
+                );
+                let mut function = FunctionInfo::plain(FnKind::Extension, Some(receiver), callable);
+                if name == "trimMargin" {
+                    function.call_sig = CallSig::metadata_member(
+                        1,
+                        vec!["marginPrefix".to_string()],
+                        vec![true],
+                        None,
+                    );
+                }
+                super::builtin_top_level_realization::attach_function_realization(
+                    crate::types::type_name("kotlin/text"),
+                    name,
+                    &mut function,
+                );
+                function
+            })
+            .collect();
+        Callables::Functions(FunctionSet { overloads })
+    }
+
+    fn builtin_console_callables(name: &str) -> Callables {
+        let arities: &[usize] = match name {
+            "print" => &[1],
+            "println" => &[0, 1],
+            _ => return Callables::None,
+        };
+        let owner = crate::types::type_name("kotlin/io/ConsoleKt");
+        let message = Ty::nullable(Ty::obj_name(crate::types::wk::any()));
+        let overloads = arities
+            .iter()
+            .map(|arity| {
+                let params = if *arity == 0 {
+                    Vec::new()
+                } else {
+                    vec![message]
+                };
+                let callable =
+                    LibraryCallable::library(owner, name, params, Ty::Unit, Ty::Unit, "");
+                let mut function = FunctionInfo::plain(FnKind::TopLevel, None, callable);
+                super::builtin_top_level_realization::attach_function_realization(
+                    crate::types::type_name("kotlin/io"),
+                    name,
+                    &mut function,
+                );
+                function
+            })
+            .collect();
+        Callables::Functions(FunctionSet { overloads })
+    }
+
+    fn builtin_coroutine_intrinsic_callables(name: &str) -> Callables {
+        if name != "COROUTINE_SUSPENDED" {
+            return Callables::None;
+        }
+        let ty = Ty::obj_name(crate::types::wk::any());
+        let getter = LibraryCallable::library(
+            crate::types::type_name("kotlin/coroutines/intrinsics/IntrinsicsKt"),
+            "getCOROUTINE_SUSPENDED",
+            Vec::new(),
+            ty,
+            ty,
+            "()Ljava/lang/Object;",
+        );
+        let mut property = PropertyInfo {
+            return_value_status: None,
+            name: name.to_string(),
+            kind: PropKind::TopLevel,
+            receiver: None,
+            associated_classifier: None,
+            associated_access_owner: None,
+            companion_associated: false,
+            formals: Vec::new(),
+            ty,
+            context_count: 0,
+            context_param_names: Vec::new(),
+            context_parameter_identities: Vec::new(),
+            getter,
+            setter: None,
+            setter_visibility: Visibility::Private,
+            setter_parameter_name: None,
+            is_const: false,
+            implicit_integer_coercion: false,
+            compile_time_constant: None,
+            metadata_constant_read: false,
+            deprecated_hidden: false,
+            accessor_availability: Default::default(),
+            is_final: false,
+            visibility: Visibility::Public,
+            owner: crate::types::type_name("kotlin/coroutines/intrinsics/IntrinsicsKt"),
+            receiver_rank: 0,
+            source_key: None,
+            stable_declaration: None,
+            source_visible: true,
+            getter_declaration: None,
+            setter_declaration: None,
+            source_member: None,
+            producer: crate::libraries::PropertyProducer::KotlinAccessor,
+            read_stability: PropertyReadStability::Unstable,
+        };
+        property.getter.compiler_intrinsic =
+            super::builtin_top_level_realization::normalized_property_realization(
+                crate::types::type_name("kotlin/coroutines/intrinsics"),
+                name,
+                &property,
+            );
+        Callables::Properties(PropertySet {
+            overloads: vec![property],
+        })
+    }
+}
+
+impl crate::symbol_source::SymbolSource for EmptySymbolSource {
+    fn package_exists(&self, parent: TypeName, name: &str) -> bool {
+        (parent == TypeName::ROOT && name == "kotlin")
+            || (parent.matches("kotlin")
+                && matches!(name, "coroutines" | "io" | "reflect" | "text"))
+            || (parent.matches("kotlin/coroutines") && name == "intrinsics")
+    }
+
+    fn symbols(
+        &self,
+        namespace: crate::symbol_source::SymbolNamespace,
+        name: &str,
+    ) -> std::rc::Rc<ResolvedSymbols> {
+        let crate::symbol_source::SymbolNamespace::Package(package) = namespace else {
+            return std::rc::Rc::new(ResolvedSymbols::default());
+        };
+        if let Some(function) = super::function_classifiers::classifier_name_in(package, name)
+            .and_then(super::function_classifiers::classifier)
+        {
+            let internal = function.identity();
+            return std::rc::Rc::new(ResolvedSymbols {
+                classifier_name: Some(internal),
+                classifier_declaration: Some(ClassifierDeclaration::Ordinary(internal)),
+                classifier: Some(super::function_classifiers::synthetic(function)),
+                ..ResolvedSymbols::default()
+            });
+        }
+        if package.matches("kotlin/text") {
+            return std::rc::Rc::new(ResolvedSymbols {
+                callables: Self::builtin_text_callables(name),
+                ..ResolvedSymbols::default()
+            });
+        }
+        if package.matches("kotlin/io") {
+            return std::rc::Rc::new(ResolvedSymbols {
+                callables: Self::builtin_console_callables(name),
+                ..ResolvedSymbols::default()
+            });
+        }
+        if package.matches("kotlin/coroutines/intrinsics") {
+            return std::rc::Rc::new(ResolvedSymbols {
+                callables: Self::builtin_coroutine_intrinsic_callables(name),
+                ..ResolvedSymbols::default()
+            });
+        }
+        if package.matches("kotlin/reflect") {
+            // Reference base classifiers are language declarations. KProperty participates in the
+            // delegated-property convention; KFunction is the common supertype of compiler-minted
+            // KFunctionN declarations. Only their identity and result parameter are synthesized;
+            // an artifact may enrich the records with ordinary members.
+            let Some(internal) = matches!(name, "KProperty" | "KFunction")
+                .then(|| crate::types::type_name(&format!("kotlin/reflect/{name}")))
+            else {
+                return std::rc::Rc::new(ResolvedSymbols::default());
+            };
+            let mut classifier = LibraryType::declaration_header();
+            classifier.kind = TypeKind::Interface;
+            classifier.type_parameters =
+                TypeParameters::invariant(vec!["R".to_string()], vec![Vec::new()]);
+            return std::rc::Rc::new(ResolvedSymbols {
+                classifier_name: Some(internal),
+                classifier_declaration: Some(ClassifierDeclaration::Ordinary(internal)),
+                classifier: Some(std::sync::Arc::new(classifier)),
+                ..ResolvedSymbols::default()
+            });
+        }
+        if !package.matches("kotlin") {
+            return std::rc::Rc::new(ResolvedSymbols::default());
+        }
+        let callables = Self::builtin_kotlin_callables(name);
+        let internal = namespace.existing_classifier(name).or_else(|| {
+            // These annotations are language builtins even when the target has no stdlib artifact.
+            // Unlike scalar `Ty` spellings they have no earlier type construction that interns the
+            // identity, so the provider must publish the known declaration identity itself.
+            matches!(name, "EqualityBound" | "Suppress")
+                .then(|| crate::types::type_name(&format!("kotlin/{name}")))
+        });
+        let Some(internal) = internal else {
+            return std::rc::Rc::new(ResolvedSymbols {
+                callables,
+                ..ResolvedSymbols::default()
+            });
+        };
+        let Some(classifier) = Self::builtin_classifier(name, internal) else {
+            return std::rc::Rc::new(ResolvedSymbols {
+                callables,
+                ..ResolvedSymbols::default()
+            });
+        };
+        std::rc::Rc::new(ResolvedSymbols {
+            builtin_classifier: false,
+            classifier_name: Some(internal),
+            classifier_declaration: Some(ClassifierDeclaration::Ordinary(internal)),
+            classifier: Some(std::sync::Arc::new(classifier)),
+            callables,
+            importable_declaration: false,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn core_any_declarations_publish_their_semantic_roles() {
+        let classifier = EmptySymbolSource::builtin_classifier("Any", crate::types::wk::any())
+            .expect("core Any declaration");
+        let expected = [
+            ("equals", SemanticCallRole::KotlinAnyEquals),
+            ("hashCode", SemanticCallRole::KotlinAnyHashCode),
+            ("toString", SemanticCallRole::KotlinAnyToString),
+        ];
+        for (name, role) in expected {
+            let [declaration] = classifier.declared_callables[name].functions() else {
+                panic!("core Any.{name} declaration");
+            };
+            assert_eq!(declaration.callable.semantic_role, Some(role));
+        }
+    }
+
+    #[test]
+    fn enum_name_intrinsic_belongs_to_the_exact_core_declaration() {
+        let mut kotlin_enum = LibraryType::declaration_header();
+        add_core_builtin_declarations(&mut kotlin_enum, crate::types::wk::kotlin_enum());
+        let [name] = kotlin_enum.declared_callables["name"].properties() else {
+            panic!("core kotlin.Enum publishes one name property");
+        };
+        assert_eq!(
+            name.getter.compiler_intrinsic,
+            Some(CompilerIntrinsic::EnumName)
+        );
+
+        let mut same_spelling = LibraryType::declaration_header();
+        add_core_builtin_declarations(&mut same_spelling, crate::types::type_name("sample/Enum"));
+        assert!(!same_spelling.declared_callables.contains_key("name"));
+    }
+}

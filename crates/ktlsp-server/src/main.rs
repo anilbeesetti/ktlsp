@@ -18,7 +18,7 @@ fn main() {
         }
         [argument] if argument == "--help" || argument == "-h" => {
             println!(
-                "ktlsp — native Kotlin language server\n\nUsage: ktlsp [--stdio | --help | --version]\n\nWith no arguments or --stdio, runs LSP over stdio using UTF-16 incremental document synchronization.\nThe runtime and build require no JVM or JDK. Protocol messages use stdout; errors use stderr."
+                "ktlsp — native Kotlin language server\n\nUsage: ktlsp [--stdio | --help | --version]\n\nWith no arguments or --stdio, runs LSP over stdio using UTF-16 incremental document synchronization.\nDiagnostics remain lexical/structural by default. Matching sibling native workers and initializationOptions.nativeAnalysis=\"standalone\" opt pull clients into single-source compiler diagnostics with core builtins, not workspace or library analysis.\nThe runtime and build require no JVM or JDK. Protocol messages use stdout; errors use stderr."
             );
             0
         }

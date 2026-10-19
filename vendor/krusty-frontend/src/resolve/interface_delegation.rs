@@ -1,0 +1,1017 @@
+//! Pass-1 resolution of interface-delegation forwarding declarations.
+//!
+//! Providers expose direct declarations and direct supertypes. This module applies the delegated
+//! interface, closes that hierarchy through the common symbol source, selects one effective
+//! declaration per Kotlin override slot, and publishes only pending-free forwarding facts. Common
+//! lowering must never repeat this walk.
+
+use crate::fx_hash::HashSet;
+use std::collections::VecDeque;
+
+mod delegate_calls;
+
+pub(super) use delegate_calls::delegate_member_calls;
+
+use crate::fir::{
+    ResolvedDelegatedCall, ResolvedDelegatedCallTarget, ResolvedDelegatedContextParameter,
+    ResolvedDelegatedFunction, ResolvedDelegatedFunctionDeclaration, ResolvedDelegatedMember,
+    ResolvedDelegatedModuleTarget, ResolvedDelegatedProperty, ResolvedDelegatedPropertyDeclaration,
+    ResolvedDelegatedTypeParameter, ResolvedFunctionOverrideTarget,
+    ResolvedInterfaceDelegateSource, ResolvedInterfaceDelegation, ResolvedModuleIndex, ResolvedTy,
+};
+use crate::libraries::{FnKind, FunctionInfo, PropKind, PropertyInfo};
+use crate::symbol_source::{CompositeSource, SymbolSource};
+use crate::types::{Ty, TypeName};
+
+use super::SymbolTable;
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct FunctionSlot {
+    name: String,
+    context_count: usize,
+    extension: bool,
+    suspend: bool,
+    parameters: Vec<Ty>,
+}
+
+fn applied_function_parameters(function: &FunctionInfo) -> Vec<Ty> {
+    let mut parameters = function.semantic_params().to_vec();
+    if function.kind == FnKind::Extension {
+        let receiver = function
+            .semantic_receiver()
+            .expect("a normalized extension declaration has a receiver");
+        parameters.insert(function.context_count.min(parameters.len()), receiver);
+    }
+    parameters
+}
+
+fn function_slot(function: &FunctionInfo) -> FunctionSlot {
+    let formals = function
+        .generic_sig
+        .as_ref()
+        .map(|signature| signature.formals.as_slice())
+        .unwrap_or_default();
+    FunctionSlot {
+        name: function.callable.name.clone(),
+        context_count: function.context_count,
+        extension: function.kind == FnKind::Extension,
+        suspend: function.flags.suspend,
+        parameters: applied_function_parameters(function)
+            .into_iter()
+            .map(|parameter| crate::types::ty_canonicalize_params(parameter, formals))
+            .collect(),
+    }
+}
+
+fn hierarchy_names(source: &dyn SymbolSource, root: Ty) -> Option<Vec<String>> {
+    let mut queue = VecDeque::from([root]);
+    let mut seen = HashSet::default();
+    let mut names = Vec::new();
+    while let Some(current) = queue.pop_front() {
+        let classifier = current.kotlin_class_internal()?;
+        if !seen.insert(classifier) {
+            continue;
+        }
+        let declaration = source.classifier(classifier)?;
+        if declaration
+            .declared_callables
+            .keys()
+            .any(|name| !declaration.declared_callable_order.contains(name))
+        {
+            return None;
+        }
+        for name in declaration
+            .declared_callable_order
+            .iter()
+            .filter(|name| declaration.declared_callables.contains_key(*name))
+            .cloned()
+        {
+            if !names.contains(&name) {
+                names.push(name);
+            }
+        }
+        queue.extend(
+            crate::symbol_resolver::direct_supertypes(source, current)
+                .into_iter()
+                .filter(|supertype| {
+                    supertype
+                        .kotlin_class_internal()
+                        .and_then(|classifier| source.classifier(classifier))
+                        .is_some_and(|classifier| classifier.is_interface())
+                }),
+        );
+    }
+    Some(names)
+}
+
+fn interface_hierarchy(source: &dyn SymbolSource, root: Ty) -> Option<Vec<Ty>> {
+    let mut interfaces = Vec::new();
+    let mut queue = VecDeque::from([root]);
+    let mut seen = HashSet::default();
+    while let Some(current) = queue.pop_front() {
+        let owner = current.kotlin_class_internal()?;
+        if !seen.insert(owner) {
+            continue;
+        }
+        let declaration = source.classifier(owner)?;
+        if declaration.is_interface() {
+            interfaces.push(current);
+        }
+        queue.extend(
+            crate::symbol_resolver::direct_supertypes(source, current)
+                .into_iter()
+                .filter(|supertype| {
+                    supertype
+                        .kotlin_class_internal()
+                        .and_then(|classifier| source.classifier(classifier))
+                        .is_some_and(|classifier| classifier.is_interface())
+                }),
+        );
+    }
+    Some(interfaces)
+}
+
+fn interface_owners(source: &dyn SymbolSource, root: Ty) -> Option<HashSet<TypeName>> {
+    interface_hierarchy(source, root)?
+        .into_iter()
+        .map(|interface| interface.kotlin_class_internal())
+        .collect()
+}
+
+fn is_delegated_function(function: &FunctionInfo, interface_owners: &HashSet<TypeName>) -> bool {
+    function.kind == FnKind::Member
+        || function.kind == FnKind::Extension && interface_owners.contains(&function.callable.owner)
+}
+
+fn effective_function<'a>(
+    source: &dyn SymbolSource,
+    index: &ResolvedModuleIndex,
+    root: Ty,
+    candidates: impl IntoIterator<Item = &'a FunctionInfo>,
+) -> Option<&'a FunctionInfo> {
+    let candidates = candidates
+        .into_iter()
+        .map(|candidate| {
+            Some((
+                candidate,
+                applied_function_result(source, index, root, candidate)?,
+            ))
+        })
+        .collect::<Option<Vec<_>>>()?;
+    let nearest = candidates
+        .iter()
+        .map(|(candidate, _)| candidate.receiver_rank)
+        .min()?;
+    let nearest = candidates
+        .into_iter()
+        .filter(|(candidate, _)| candidate.receiver_rank == nearest)
+        .collect::<Vec<_>>();
+    let mut maximal = nearest
+        .iter()
+        .copied()
+        .filter(|(_, result)| {
+            !nearest.iter().copied().any(|(_, other_result)| {
+                other_result != *result
+                    && crate::symbol_resolver::resolution_subtype(source, other_result, *result)
+            })
+        })
+        .collect::<Vec<_>>();
+    let (selected, selected_result) = maximal.pop()?;
+    maximal
+        .iter()
+        .all(|(_, result)| *result == selected_result)
+        .then_some(selected)
+}
+
+fn effective_property<'a>(
+    source: &dyn SymbolSource,
+    index: &ResolvedModuleIndex,
+    root: Ty,
+    candidates: impl IntoIterator<Item = &'a PropertyInfo>,
+) -> Option<(&'a PropertyInfo, Option<&'a PropertyInfo>)> {
+    let candidates = candidates
+        .into_iter()
+        .map(|candidate| {
+            Some((
+                candidate,
+                applied_property_signature(source, index, root, candidate)?.1,
+            ))
+        })
+        .collect::<Option<Vec<_>>>()?;
+    let nearest = candidates
+        .iter()
+        .map(|(candidate, _)| candidate.receiver_rank)
+        .min()?;
+    let nearest = candidates
+        .into_iter()
+        .filter(|(candidate, _)| candidate.receiver_rank == nearest)
+        .collect::<Vec<_>>();
+    let mut maximal = nearest
+        .iter()
+        .copied()
+        .filter(|(_, candidate_ty)| {
+            !nearest.iter().copied().any(|(_, other_ty)| {
+                other_ty != *candidate_ty
+                    && crate::symbol_resolver::resolution_subtype(source, other_ty, *candidate_ty)
+            })
+        })
+        .collect::<Vec<_>>();
+    let (getter, getter_ty) = maximal.pop()?;
+    if !maximal.iter().all(|(_, ty)| *ty == getter_ty) {
+        return None;
+    }
+    let setter = nearest
+        .into_iter()
+        .find(|(candidate, ty)| candidate.setter.is_some() && *ty == getter_ty)
+        .map(|(candidate, _)| candidate);
+    Some((getter, setter))
+}
+
+fn resolved_types(types: impl IntoIterator<Item = Ty>) -> Option<Box<[ResolvedTy]>> {
+    types
+        .into_iter()
+        .map(ResolvedTy::new)
+        .collect::<Result<Vec<_>, _>>()
+        .ok()
+        .map(Vec::into_boxed_slice)
+}
+
+/// Find the applied occurrence of a declaration owner in the delegated interface hierarchy.
+///
+/// The module index stores the declaration's finalized signature in terms of its owner formals.
+/// Member lookup has already selected an applied declaration from this same hierarchy, so closing
+/// the delegation must instantiate that stable signature with the corresponding applied owner edge.
+/// This is semantic hierarchy state, not a source-name or provisional-type fallback.
+fn applied_owner_type(source: &dyn SymbolSource, root: Ty, owner: TypeName) -> Option<Ty> {
+    let mut queue = VecDeque::from([root]);
+    let mut seen = HashSet::default();
+    while let Some(current) = queue.pop_front() {
+        let current_owner = current.kotlin_class_internal()?;
+        if current_owner == owner {
+            return Some(current);
+        }
+        if !seen.insert(current_owner) {
+            continue;
+        }
+        source.classifier(current_owner)?;
+        queue.extend(crate::symbol_resolver::direct_supertypes(source, current));
+    }
+    None
+}
+
+fn stable_member_signature(
+    source: &dyn SymbolSource,
+    index: &ResolvedModuleIndex,
+    root: Ty,
+    owner: TypeName,
+    declaration: crate::fir::DeclarationId,
+) -> Option<(Vec<Ty>, Ty)> {
+    let applied_owner = applied_owner_type(source, root, owner)?;
+    let classifier = source.classifier(owner)?;
+    let bindings = crate::symbol_resolver::classifier_bindings(&classifier, applied_owner);
+    let signature = index.signature(declaration)?;
+    let parameters = signature
+        .parameters
+        .iter()
+        .map(|parameter| {
+            crate::symbol_resolver::specialize_signature_input_type(
+                source,
+                parameter.get(),
+                &bindings,
+            )
+        })
+        .collect();
+    let result = crate::symbol_resolver::specialize_signature_output_type(
+        source,
+        signature.result.get(),
+        &bindings,
+    );
+    Some((parameters, result))
+}
+
+fn applied_function_result(
+    source: &dyn SymbolSource,
+    index: &ResolvedModuleIndex,
+    root: Ty,
+    function: &FunctionInfo,
+) -> Option<Ty> {
+    match function.stable_declaration {
+        Some(declaration) => {
+            stable_member_signature(source, index, root, function.callable.owner, declaration)
+                .map(|(_, result)| result)
+        }
+        None => Some(function.ret.apply(function.callable.ret)),
+    }
+}
+
+fn applied_property_signature(
+    source: &dyn SymbolSource,
+    index: &ResolvedModuleIndex,
+    root: Ty,
+    property: &PropertyInfo,
+) -> Option<(Vec<Ty>, Ty)> {
+    match property.stable_declaration {
+        Some(declaration) => {
+            stable_member_signature(source, index, root, property.owner, declaration)
+        }
+        None => Some((
+            property
+                .getter
+                .params
+                .iter()
+                .take(property.context_count)
+                .copied()
+                .collect(),
+            property.ty,
+        )),
+    }
+}
+
+fn function_call(
+    source: &dyn SymbolSource,
+    index: &ResolvedModuleIndex,
+    receiver: Ty,
+    function: &FunctionInfo,
+) -> Option<ResolvedDelegatedCall> {
+    let (parameters, result, target, declared_result) = if let Some(declaration) =
+        function.stable_declaration
+    {
+        let callable = index.callable_for_declaration(declaration)?;
+        let signature = index.signature(declaration)?;
+        let (mut parameters, result) = stable_member_signature(
+            source,
+            index,
+            receiver,
+            function.callable.owner,
+            declaration,
+        )?;
+        if let Some(extension_receiver) = callable.shape.extension_receiver {
+            let applied_owner = applied_owner_type(source, receiver, function.callable.owner)?;
+            let classifier = source.classifier(function.callable.owner)?;
+            let bindings = crate::symbol_resolver::classifier_bindings(&classifier, applied_owner);
+            let extension_receiver = crate::symbol_resolver::specialize_signature_receiver_type(
+                source,
+                extension_receiver.get(),
+                &bindings,
+            );
+            parameters.insert(
+                callable
+                    .shape
+                    .context_parameter_count
+                    .min(parameters.len() as u32) as usize,
+                extension_receiver,
+            );
+        }
+        let mut declared_parameters = signature
+            .parameters
+            .iter()
+            .map(|parameter| *parameter)
+            .collect::<Vec<_>>();
+        if let Some(extension_receiver) = callable.shape.extension_receiver {
+            declared_parameters.insert(
+                callable
+                    .shape
+                    .context_parameter_count
+                    .min(declared_parameters.len() as u32) as usize,
+                extension_receiver,
+            );
+        }
+        let target = ResolvedDelegatedCallTarget::Module {
+            target: ResolvedDelegatedModuleTarget::Function(callable.id),
+            owner: function.callable.owner,
+            name: function.callable.name.clone().into_boxed_str(),
+            parameters: declared_parameters.into_boxed_slice(),
+            result: signature.result,
+            interface: function.callable.owner_is_interface,
+        };
+        (parameters, result, target, None)
+    } else {
+        let parameters = applied_function_parameters(function);
+        let result = function.ret.apply(function.callable.ret);
+        let target = ResolvedDelegatedCallTarget::External(function.callable.external_identity?);
+        let declared_result = function
+            .callable
+            .declared_ret
+            .map(ResolvedTy::new)
+            .transpose()
+            .ok()?;
+        (parameters, result, target, declared_result)
+    };
+    Some(ResolvedDelegatedCall {
+        target,
+        receiver: ResolvedTy::new(receiver).ok()?,
+        parameters: resolved_types(parameters)?,
+        result: ResolvedTy::new(result).ok()?,
+        declared_result,
+        suspend: function.flags.suspend,
+        extension_receiver_parameter: (function.kind == FnKind::Extension)
+            .then(|| u32::try_from(function.context_count).ok())
+            .flatten(),
+    })
+}
+
+fn delegated_function_declaration(
+    source: &dyn SymbolSource,
+    index: &ResolvedModuleIndex,
+    root: Ty,
+    function: &FunctionInfo,
+) -> Option<ResolvedDelegatedFunctionDeclaration> {
+    let (target, parameters, result, applied_parameters, applied_result, parameter_identities) =
+        if let Some(declaration) = function.stable_declaration {
+            let callable = index.callable_for_declaration(declaration)?;
+            let signature = index.signature(declaration)?;
+            let mut parameters = signature
+                .parameters
+                .iter()
+                .map(|parameter| parameter.get())
+                .collect::<Vec<_>>();
+            if let Some(receiver) = callable.shape.extension_receiver {
+                parameters.insert(
+                    callable
+                        .shape
+                        .context_parameter_count
+                        .min(parameters.len() as u32) as usize,
+                    receiver.get(),
+                );
+            }
+            // The module declaration's own typed identities: a context parameter is a context
+            // value, never an ordinary parameter a provider's call shape spells by its name.
+            let parameter_identities =
+                index.callable_parameter_identities(callable.id, parameters.len())?;
+            let (mut applied_parameters, applied_result) =
+                stable_member_signature(source, index, root, function.callable.owner, declaration)?;
+            if let Some(receiver) = callable.shape.extension_receiver {
+                let applied_owner = applied_owner_type(source, root, function.callable.owner)?;
+                let classifier = source.classifier(function.callable.owner)?;
+                let bindings =
+                    crate::symbol_resolver::classifier_bindings(&classifier, applied_owner);
+                let receiver = crate::symbol_resolver::specialize_signature_receiver_type(
+                    source,
+                    receiver.get(),
+                    &bindings,
+                );
+                applied_parameters.insert(
+                    callable
+                        .shape
+                        .context_parameter_count
+                        .min(applied_parameters.len() as u32) as usize,
+                    receiver,
+                );
+            }
+            (
+                ResolvedFunctionOverrideTarget::Module(callable.id),
+                parameters.into_boxed_slice(),
+                signature.result.get(),
+                applied_parameters,
+                applied_result,
+                parameter_identities,
+            )
+        } else {
+            let identity = function.callable.external_identity?;
+            // The member was found through the applied interface; the declaration it overrides is
+            // spelled as its provider normalized it.
+            let (parameters, result) =
+                super::override_plans::dependency_declaration_signature(source, identity);
+            let extension_position = (function.kind == FnKind::Extension
+                && parameters.len() == function.call_sig.parameter_identities.len() + 1)
+                .then_some(function.context_count);
+            let parameter_identities = function.call_sig.physical_parameter_identities(
+                parameters.len(),
+                function.context_count,
+                extension_position,
+            )?;
+            (
+                ResolvedFunctionOverrideTarget::External(identity),
+                parameters,
+                result,
+                applied_function_parameters(function),
+                function.ret.apply(function.callable.ret),
+                parameter_identities,
+            )
+        };
+    Some(ResolvedDelegatedFunctionDeclaration {
+        target,
+        owner: function.callable.owner,
+        semantic_role: function.callable.semantic_role,
+        collection_barrier: function.callable.collection_barrier,
+        parameter_identities,
+        context_count: function.context_count,
+        parameters: resolved_types(parameters.iter().copied())?,
+        result: ResolvedTy::new(result).ok()?,
+        applied_parameters: resolved_types(applied_parameters)?,
+        applied_result: ResolvedTy::new(applied_result).ok()?,
+        interface: function.callable.owner_is_interface,
+    })
+}
+
+fn delegated_forwarder_parameter_identities(
+    overridden: &[crate::fir::ResolvedParameterIdentity],
+) -> Box<[crate::fir::ResolvedParameterIdentity]> {
+    overridden
+        .iter()
+        .map(|identity| match identity {
+            crate::fir::ResolvedParameterIdentity::Unnamed { ordinal } => {
+                crate::fir::ResolvedParameterIdentity::InterfaceDelegationValue {
+                    ordinal: *ordinal,
+                }
+            }
+            identity => identity.clone(),
+        })
+        .collect()
+}
+
+/// The applied shape of one delegated accessor: its context parameters, the member-extension
+/// receiver when there is one, then the value a setter takes.
+#[derive(Clone, Copy)]
+struct PropertyCallShape<'a> {
+    setter: bool,
+    context_parameters: &'a [Ty],
+    extension_receiver: Option<Ty>,
+    property_type: Ty,
+}
+
+fn property_call(
+    index: &ResolvedModuleIndex,
+    receiver: Ty,
+    property: &PropertyInfo,
+    shape: PropertyCallShape<'_>,
+) -> Option<ResolvedDelegatedCall> {
+    let PropertyCallShape {
+        setter,
+        context_parameters,
+        extension_receiver,
+        property_type,
+    } = shape;
+    let mut parameters = context_parameters.to_vec();
+    parameters.extend(extension_receiver);
+    if setter {
+        parameters.push(property_type);
+    }
+    let result = setter.then_some(Ty::Unit).unwrap_or(property_type);
+    let callable = if setter {
+        property.setter.as_ref()?
+    } else {
+        &property.getter
+    };
+    let (target, declared_result) = if let Some(declaration) = property.stable_declaration {
+        let property_id = index.property_for_declaration(declaration)?;
+        let signature = index.signature(declaration)?;
+        let header = index.property(property_id)?;
+        let mut declared_parameters = signature
+            .parameters
+            .get(..header.context_parameter_count as usize)?
+            .to_vec();
+        declared_parameters.extend(header.extension_receiver);
+        if setter {
+            declared_parameters.push(signature.result);
+        }
+        (
+            ResolvedDelegatedCallTarget::Module {
+                target: if setter {
+                    ResolvedDelegatedModuleTarget::PropertySetter(property_id)
+                } else {
+                    ResolvedDelegatedModuleTarget::PropertyGetter(property_id)
+                },
+                owner: property.owner,
+                name: if setter {
+                    crate::names::property_setter_name(&property.name).into_boxed_str()
+                } else {
+                    crate::names::property_getter_name(&property.name).into_boxed_str()
+                },
+                parameters: declared_parameters.into_boxed_slice(),
+                result: if setter {
+                    ResolvedTy::new(Ty::Unit).ok()?
+                } else {
+                    signature.result
+                },
+                interface: callable.owner_is_interface,
+            },
+            None,
+        )
+    } else {
+        (
+            ResolvedDelegatedCallTarget::External(callable.external_identity?),
+            callable
+                .declared_ret
+                .map(ResolvedTy::new)
+                .transpose()
+                .ok()?,
+        )
+    };
+    Some(ResolvedDelegatedCall {
+        target,
+        receiver: ResolvedTy::new(receiver).ok()?,
+        parameters: resolved_types(parameters)?,
+        result: ResolvedTy::new(result).ok()?,
+        declared_result,
+        suspend: false,
+        extension_receiver_parameter: extension_receiver
+            .and_then(|_| u32::try_from(context_parameters.len()).ok()),
+    })
+}
+
+/// A delegated property obligation: an ordinary member, or a member extension on one applied
+/// receiver type. Two member extensions of one name on different receivers are distinct accessors.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PropertySlot {
+    Member,
+    MemberExtension(Ty),
+}
+
+fn property_slot(property: &PropertyInfo) -> Option<PropertySlot> {
+    match property.kind {
+        PropKind::Member => Some(PropertySlot::Member),
+        PropKind::MemberExtension => property.receiver.map(PropertySlot::MemberExtension),
+        PropKind::Extension | PropKind::TopLevel => None,
+    }
+}
+
+fn delegated_property(
+    source: &dyn SymbolSource,
+    index: &ResolvedModuleIndex,
+    delegating_classifier: Ty,
+    interface: Ty,
+    slot: PropertySlot,
+    candidates: Vec<&PropertyInfo>,
+    inherited_class_candidates: Vec<&PropertyInfo>,
+) -> Option<ResolvedDelegatedProperty> {
+    let (getter, setter) = effective_property(source, index, interface, candidates)?;
+    let (context_parameters, property_type) =
+        applied_property_signature(source, index, interface, getter)?;
+    if getter.context_param_names.len() != context_parameters.len()
+        || getter.context_parameter_identities.len() != context_parameters.len()
+    {
+        return None;
+    }
+    let extension_receiver = match slot {
+        PropertySlot::Member => None,
+        PropertySlot::MemberExtension(receiver) => Some(receiver),
+    };
+    let declaration = setter.unwrap_or(getter);
+    let declared = super::override_plans::property_declaration(index, declaration)?;
+    let mut overridden = vec![ResolvedDelegatedPropertyDeclaration {
+        target: declared.target,
+        owner: declaration.owner,
+        ty: ResolvedTy::new(declared.ty).ok()?,
+        applied_ty: ResolvedTy::new(property_type).ok()?,
+        receiver: match declared.receiver {
+            Some(receiver) => Some(ResolvedTy::new(receiver).ok()?),
+            None => None,
+        },
+        setter_value: setter.and_then(super::override_plans::setter_value),
+        interface: declaration.getter.owner_is_interface,
+        depth: 0,
+    }];
+    let inherited_class = inherited_class_candidates
+        .into_iter()
+        .filter_map(|candidate| {
+            let (_, applied_ty) =
+                applied_property_signature(source, index, delegating_classifier, candidate)?;
+            let compatible = if candidate.setter.is_some() {
+                applied_ty.canonical_semantic() == property_type.canonical_semantic()
+            } else {
+                crate::symbol_resolver::resolution_subtype(source, property_type, applied_ty)
+            };
+            compatible.then_some((candidate, applied_ty))
+        })
+        .min_by_key(|(candidate, _)| candidate.receiver_rank);
+    if let Some((inherited, applied_ty)) = inherited_class {
+        let declared = super::override_plans::property_declaration(index, inherited)?;
+        if !overridden
+            .iter()
+            .any(|known| known.target == declared.target)
+        {
+            overridden.push(ResolvedDelegatedPropertyDeclaration {
+                target: declared.target,
+                owner: inherited.owner,
+                ty: ResolvedTy::new(declared.ty).ok()?,
+                applied_ty: ResolvedTy::new(applied_ty).ok()?,
+                receiver: declared.receiver.map(ResolvedTy::new).transpose().ok()?,
+                setter_value: super::override_plans::setter_value(inherited),
+                interface: false,
+                depth: inherited.receiver_rank,
+            });
+        }
+    }
+    let accessor_call = |property: &PropertyInfo, setter: bool| {
+        property_call(
+            index,
+            interface,
+            property,
+            PropertyCallShape {
+                setter,
+                context_parameters: &context_parameters,
+                extension_receiver,
+                property_type,
+            },
+        )
+    };
+    Some(ResolvedDelegatedProperty {
+        overridden: overridden.into_boxed_slice(),
+        name: getter.name.clone().into_boxed_str(),
+        type_parameters: match declared.target {
+            crate::fir::ResolvedPropertyOverrideTarget::Module(_) => {
+                module_type_parameters(index, declaration.stable_declaration?)?
+            }
+            crate::fir::ResolvedPropertyOverrideTarget::External(_) => {
+                delegated_type_parameters(getter.getter.generic_sig.as_deref())?
+            }
+        },
+        ty: ResolvedTy::new(property_type).ok()?,
+        context_parameters: getter
+            .context_param_names
+            .iter()
+            .zip(getter.context_parameter_identities.iter())
+            .zip(&context_parameters)
+            .map(|((name, identity), ty)| {
+                let kind = match identity {
+                    crate::fir::ResolvedParameterIdentity::ContextValue { .. } => {
+                        crate::types::ContextParameterKind::Named
+                    }
+                    crate::fir::ResolvedParameterIdentity::AnonymousContextParameter { .. } => {
+                        crate::types::ContextParameterKind::Anonymous
+                    }
+                    crate::fir::ResolvedParameterIdentity::LegacyContextReceiver { .. } => {
+                        crate::types::ContextParameterKind::LegacyReceiver
+                    }
+                    _ => return None,
+                };
+                Some(ResolvedDelegatedContextParameter {
+                    name: name.clone().into_boxed_str(),
+                    kind,
+                    ty: ResolvedTy::new(*ty).ok()?,
+                })
+            })
+            .collect::<Option<Vec<_>>>()?
+            .into_boxed_slice(),
+        getter: accessor_call(getter, false)?,
+        setter: match setter {
+            Some(property) => Some(accessor_call(property, true)?),
+            None => None,
+        },
+    })
+}
+
+/// A module declaration's own type parameters, from its published type-parameter identities.
+fn module_type_parameters(
+    index: &ResolvedModuleIndex,
+    declaration: crate::fir::DeclarationId,
+) -> Option<Box<[ResolvedDelegatedTypeParameter]>> {
+    (0..)
+        .map_while(|ordinal| index.type_parameter(declaration, ordinal))
+        .map(|parameter| {
+            Some(ResolvedDelegatedTypeParameter {
+                name: index.type_parameter_name(parameter)?.into(),
+                semantic_name: index.type_parameter_semantic_name(parameter)?.into(),
+                bounds: index
+                    .type_parameter_header(parameter)?
+                    .bounds
+                    .iter()
+                    .map(|bound| bound.ty)
+                    .collect(),
+            })
+        })
+        .collect()
+}
+
+/// A delegated declaration's own type parameters, as its forwarder redeclares them.
+fn delegated_type_parameters(
+    signature: Option<&crate::libraries::GenericSig>,
+) -> Option<Box<[ResolvedDelegatedTypeParameter]>> {
+    let Some(signature) = signature else {
+        return Some(Box::default());
+    };
+    if signature.formals.len() != signature.formal_bounds.len() {
+        return None;
+    }
+    signature
+        .formals
+        .iter()
+        .zip(&signature.formal_bounds)
+        .map(|(semantic_name, bounds)| {
+            Some(ResolvedDelegatedTypeParameter {
+                name: crate::types::type_parameter_source_name(semantic_name).into(),
+                semantic_name: semantic_name.clone().into_boxed_str(),
+                bounds: resolved_types(bounds.iter().copied())?,
+            })
+        })
+        .collect::<Option<Vec<_>>>()
+        .map(Vec::into_boxed_slice)
+}
+
+fn delegation_members(
+    source: &dyn SymbolSource,
+    index: &ResolvedModuleIndex,
+    delegating_classifier: TypeName,
+    interface: Ty,
+) -> Option<Box<[ResolvedDelegatedMember]>> {
+    let interface_owners = interface_owners(source, interface)?;
+    let own = Ty::obj_name(delegating_classifier);
+    let mut members = Vec::new();
+    for name in hierarchy_names(source, interface)? {
+        let delegated = crate::symbol_resolver::members_in_hierarchy(source, interface, &name);
+        let own_callables = crate::symbol_resolver::members_in_hierarchy(source, own, &name);
+        let own_function_slots = own_callables
+            .functions()
+            .iter()
+            .filter(|function| {
+                function.receiver_rank == 0
+                    && (function.kind == FnKind::Member
+                        || function.kind == FnKind::Extension
+                            && function.callable.owner == delegating_classifier)
+            })
+            .map(function_slot)
+            .collect::<HashSet<_>>();
+        let own_property_slots = own_callables
+            .properties()
+            .iter()
+            .filter(|property| property.receiver_rank == 0)
+            .filter_map(property_slot)
+            .collect::<Vec<_>>();
+
+        let mut slots: Vec<(FunctionSlot, Vec<&FunctionInfo>)> = Vec::new();
+        for function in delegated
+            .functions()
+            .iter()
+            .filter(|function| is_delegated_function(function, &interface_owners))
+        {
+            let slot = function_slot(function);
+            if let Some((_, candidates)) =
+                slots.iter_mut().find(|(candidate, _)| *candidate == slot)
+            {
+                candidates.push(function);
+            } else {
+                slots.push((slot, vec![function]));
+            }
+        }
+        for (slot, candidates) in slots {
+            if own_function_slots.contains(&slot) {
+                continue;
+            }
+            let function = effective_function(source, index, interface, candidates)?;
+            if function.flags.inherited_by_delegation {
+                continue;
+            }
+            let call = function_call(source, index, interface, function)?;
+            let primary = delegated_function_declaration(source, index, interface, function)?;
+            let parameter_identities =
+                delegated_forwarder_parameter_identities(&primary.parameter_identities);
+            let type_parameters = delegated_type_parameters(function.generic_sig.as_ref())?;
+            let mut overridden = vec![primary];
+            // `members_in_hierarchy(own, name)` is an override view and deliberately coalesces
+            // identical slots. A generated forwarder still implements every exact interface
+            // declaration in that slot, so enumerate direct declarations from each applied
+            // interface occurrence and retain their stable identities independently.
+            for interface in interface_hierarchy(source, own)? {
+                let owner = interface.kotlin_class_internal()?;
+                let declarations =
+                    crate::symbol_resolver::members_in_hierarchy(source, interface, &name);
+                for obligation in declarations.functions().iter().filter(|obligation| {
+                    obligation.callable.owner == owner
+                        && obligation.receiver_rank == 0
+                        && obligation.visibility != crate::libraries::Visibility::Private
+                        && function_slot(obligation) == slot
+                        && applied_function_result(source, index, own, obligation).is_some_and(
+                            |result| {
+                                crate::symbol_resolver::resolution_subtype(
+                                    source,
+                                    call.result.get(),
+                                    result,
+                                )
+                            },
+                        )
+                }) {
+                    let obligation =
+                        delegated_function_declaration(source, index, own, obligation)?;
+                    if overridden
+                        .iter()
+                        .any(|known| known.target == obligation.target)
+                    {
+                        continue;
+                    }
+                    overridden.push(obligation);
+                }
+            }
+            members.push(ResolvedDelegatedMember::Function(
+                ResolvedDelegatedFunction {
+                    name: function.callable.name.clone().into_boxed_str(),
+                    parameter_identities,
+                    type_parameters,
+                    overridden: overridden.into_boxed_slice(),
+                    call,
+                },
+            ));
+        }
+
+        let mut property_slots: Vec<(PropertySlot, Vec<&PropertyInfo>)> = Vec::new();
+        for property in delegated
+            .properties()
+            .iter()
+            // Java accessor-derived properties are an additional source facet of the same JVM
+            // method, not another interface declaration. The function slot already forwards that
+            // exact external identity (`CharSequence.isEmpty`/`length`); emitting a Kotlin property
+            // accessor as well would duplicate or rename the physical method.
+            .filter(|property| !property.accessor_derived())
+        {
+            let Some(slot) = property_slot(property) else {
+                continue;
+            };
+            if let Some((_, candidates)) = property_slots
+                .iter_mut()
+                .find(|(candidate, _)| *candidate == slot)
+            {
+                candidates.push(property);
+            } else {
+                property_slots.push((slot, vec![property]));
+            }
+        }
+        for (slot, property_candidates) in property_slots {
+            if own_property_slots.contains(&slot) {
+                continue;
+            }
+            let inherited_class_candidates = own_callables
+                .properties()
+                .iter()
+                .filter(|property| property.receiver_rank != 0)
+                .filter(|property| property_slot(property) == Some(slot))
+                .filter(|property| {
+                    source
+                        .classifier(property.owner)
+                        .is_some_and(|classifier| !classifier.is_interface())
+                })
+                .collect();
+            members.push(ResolvedDelegatedMember::Property(delegated_property(
+                source,
+                index,
+                own,
+                interface,
+                slot,
+                property_candidates,
+                inherited_class_candidates,
+            )?));
+        }
+    }
+    Some(members.into_boxed_slice())
+}
+
+pub(super) fn resolve_interface_delegation(
+    table: &SymbolTable,
+    index: &ResolvedModuleIndex,
+    source_file: u32,
+    delegating_classifier: TypeName,
+    interface: Ty,
+    source: ResolvedInterfaceDelegateSource,
+) -> Option<ResolvedInterfaceDelegation> {
+    let module = crate::module_symbols::ModuleSymbols::for_file(table, source_file);
+    let symbols = CompositeSource::new(vec![
+        &module as &dyn SymbolSource,
+        table.libraries.as_ref() as &dyn SymbolSource,
+    ]);
+    let members = delegation_members(&symbols, index, delegating_classifier, interface)?;
+    Some(ResolvedInterfaceDelegation {
+        interface: ResolvedTy::new(interface).ok()?,
+        source,
+        members,
+    })
+}
+
+pub(super) fn resolve_streamed_interface_delegation(
+    platform: &dyn crate::libraries::SemanticPlatform,
+    index: &ResolvedModuleIndex,
+    source_file: u32,
+    delegating_classifier: TypeName,
+    interface: Ty,
+    source: ResolvedInterfaceDelegateSource,
+) -> Option<ResolvedInterfaceDelegation> {
+    let module = crate::fir::StreamedModuleSymbols::for_file(index, source_file);
+    let symbols = CompositeSource::new(vec![
+        &module as &dyn SymbolSource,
+        platform as &dyn SymbolSource,
+    ]);
+    let members = delegation_members(&symbols, index, delegating_classifier, interface)?;
+    Some(ResolvedInterfaceDelegation {
+        interface: ResolvedTy::new(interface).ok()?,
+        source,
+        members,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generated_forwarder_owns_unnamed_parameter_provenance() {
+        let identities = delegated_forwarder_parameter_identities(&[
+            crate::fir::ResolvedParameterIdentity::Unnamed { ordinal: 0 },
+            crate::fir::ResolvedParameterIdentity::Source("named".into()),
+        ]);
+        assert_eq!(
+            identities.as_ref(),
+            [
+                crate::fir::ResolvedParameterIdentity::InterfaceDelegationValue { ordinal: 0 },
+                crate::fir::ResolvedParameterIdentity::Source("named".into()),
+            ]
+        );
+    }
+}

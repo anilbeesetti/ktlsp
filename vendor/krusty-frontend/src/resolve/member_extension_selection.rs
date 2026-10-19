@@ -1,0 +1,733 @@
+use super::*;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum MemberExtensionSelection {
+    All,
+    Operators,
+    DelegateConventions,
+}
+
+/// Declaration-owned facts retained when a member extension is not selected as a delegate
+/// convention. These are captured before contextual instantiation: an unsatisfied context or an
+/// inapplicable generated-accessor argument is itself one reason the declaration must still appear
+/// in the diagnostic.
+#[derive(Clone)]
+pub(crate) struct MemberExtensionConventionDiagnosticCandidate {
+    pub(crate) stable_declaration: Option<crate::fir::DeclarationId>,
+    pub(crate) extension_receiver: Ty,
+    pub(crate) params: Vec<Ty>,
+    pub(crate) context_count: usize,
+    pub(crate) ret: Ty,
+    pub(crate) parameter_names: Vec<String>,
+}
+
+impl MemberExtensionConventionDiagnosticCandidate {
+    pub(super) fn from_shape(shape: &MemberExtensionFunctionShape) -> Self {
+        let signature = &shape.function.signature;
+        let declared_ret = signature
+            .generic_sig
+            .as_ref()
+            .map_or(signature.ret, |generic| generic.ret);
+        Self {
+            stable_declaration: signature.stable_declaration,
+            extension_receiver: shape.priority.declared_receiver,
+            params: shape.declared_params.clone(),
+            context_count: signature.context_count,
+            ret: apply_inference_bindings(declared_ret, &shape.class_bindings),
+            parameter_names: signature.call_sig().param_names,
+        }
+    }
+}
+
+pub(super) enum MemberExtensionFunctionSelection {
+    /// Boxed: the candidate is ~950 bytes while the diagnostic variants carry only a `Vec`.
+    Selected(Box<MemberExtensionFunctionCandidate>),
+    None(Box<MemberExtensionRejections>),
+    Ambiguous(Vec<MemberExtensionFunctionCandidate>),
+}
+
+/// Typed declarations retained by the original member-extension collection when no candidate is
+/// applicable. The caller reports from this result; it never searches providers again after
+/// selection has failed.
+pub(super) struct MemberExtensionRejections {
+    pub(super) convention_candidates: Vec<MemberExtensionConventionDiagnosticCandidate>,
+    pub(super) call_candidates: Vec<crate::libraries::FunctionInfo>,
+}
+
+/// Whether this scope-tower rung owns postponed lambda shaping. An ambiguous rung deliberately
+/// carries no shape but still claims the call, preventing lower-priority sources from turning the
+/// ambiguity into a declaration-order-dependent selection.
+pub(super) enum MemberExtensionLambdaShape {
+    Absent,
+    Ambiguous,
+    Selected(crate::symbol_resolver::LambdaCallShape),
+}
+
+pub(super) fn exclude_delegate_convention(
+    shape: &MemberExtensionFunctionShape,
+    selection: MemberExtensionSelection,
+    excluded: &mut Vec<MemberExtensionConventionDiagnosticCandidate>,
+) -> bool {
+    let exclude = selection == MemberExtensionSelection::DelegateConventions
+        && !delegated_properties::is_usable_delegate_convention(
+            shape.is_operator,
+            shape.function.signature.context_count,
+        );
+    if exclude {
+        excluded.push(MemberExtensionConventionDiagnosticCandidate::from_shape(
+            shape,
+        ));
+    }
+    exclude
+}
+
+pub(super) fn retain_inapplicable_delegate_convention(
+    shape: &MemberExtensionFunctionShape,
+    selection: MemberExtensionSelection,
+    excluded: &mut Vec<MemberExtensionConventionDiagnosticCandidate>,
+) {
+    if selection == MemberExtensionSelection::DelegateConventions {
+        excluded.push(MemberExtensionConventionDiagnosticCandidate::from_shape(
+            shape,
+        ));
+    }
+}
+
+pub(super) fn retain_selected(
+    candidates: &mut Vec<MemberExtensionFunctionCandidate>,
+    selection: MemberExtensionSelection,
+) {
+    if selection == MemberExtensionSelection::Operators {
+        candidates.retain(|candidate| candidate.is_operator);
+    }
+}
+
+/// A formal's call-site solution, or `None` when it is still the formal itself.
+pub(super) fn solved_member_extension_type_argument(
+    bindings: &crate::symbol_resolver::GSigBinds,
+    formal: &str,
+) -> Option<Ty> {
+    let solution = bindings.get(formal).copied()?;
+    (solution != Ty::Error
+        && !solution.mentions_pending()
+        && !matches!(solution.non_null(), Ty::TyParam(identity, _) if identity == formal))
+    .then_some(solution)
+}
+
+/// Retain a declaration whose source arguments have a valid structural mapping. This runs while
+/// the normalized selection shape is still in hand, before applicability is attempted, so a later
+/// failure can diagnose the exact same provider declaration without a second lookup.
+pub(super) fn mapped_rejected_candidate(
+    probes: MemberExtensionProbes<'_>,
+    call: &MemberExtensionFunctionCall<'_>,
+    selection: MemberExtensionSelection,
+    shape: &MemberExtensionFunctionShape,
+) -> Option<(
+    MemberExtensionPriority,
+    crate::libraries::FunctionInfo,
+    bool,
+)> {
+    if selection == MemberExtensionSelection::Operators && !shape.is_operator {
+        return None;
+    }
+    let candidate = shape.diagnostic_candidate.clone();
+    let signature = candidate.semantic_signature();
+    let type_arity_matches = call.explicit_type_args.is_empty()
+        || signature.formals.len() == call.explicit_type_args.len();
+    let visible = match contextual_call_shape_with(
+        probes.explicit_context_arguments,
+        probes.select_context_arguments,
+        &signature.params,
+        &candidate.call_sig,
+        candidate.context_count,
+        call.arg_names,
+    ) {
+        Ok(shape) => (shape.params.len(), shape.call_sig),
+        Err(_) => {
+            let context_count = candidate.context_count.min(signature.params.len());
+            let explicitly_named = |parameter: usize| {
+                probes.explicit_context_arguments
+                    && candidate
+                        .call_sig
+                        .param_names
+                        .get(parameter)
+                        .is_some_and(|parameter| {
+                            call.arg_names.is_some_and(|names| {
+                                names.iter().flatten().any(|argument| argument == parameter)
+                            })
+                        })
+            };
+            let indices = (context_count..signature.params.len())
+                .chain((0..context_count).filter(|&parameter| explicitly_named(parameter)))
+                .collect::<Vec<_>>();
+            (
+                indices.len(),
+                candidate.call_sig.select_parameters(&indices),
+            )
+        }
+    };
+    call_argument_parameter_indices(
+        call.args.len(),
+        visible.0,
+        call.arg_names,
+        call.trailing_lambda,
+        &visible.1,
+    )?;
+    Some((shape.priority, candidate, type_arity_matches))
+}
+
+pub(super) fn finish_rejected_candidates(
+    oracle: &dyn crate::assignable::TypeOracle,
+    mut candidates: Vec<(
+        MemberExtensionPriority,
+        crate::libraries::FunctionInfo,
+        bool,
+    )>,
+) -> Vec<crate::libraries::FunctionInfo> {
+    // A structurally mapped declaration fixes the dispatch rung even if its explicit type-argument
+    // arity is wrong. Arity filters only within that rung and cannot expose a farther receiver.
+    if let Some(nearest_dispatch) = candidates
+        .iter()
+        .map(|(priority, ..)| priority.dispatch_rank)
+        .min()
+    {
+        candidates.retain(|(priority, ..)| priority.dispatch_rank == nearest_dispatch);
+    }
+    if candidates
+        .iter()
+        .any(|(_, _, type_arity_matches)| *type_arity_matches)
+    {
+        candidates.retain(|(_, _, type_arity_matches)| *type_arity_matches);
+    }
+    maximal_member_extensions(oracle, &candidates, |candidate| candidate.0)
+        .into_iter()
+        .map(|index| candidates[index].1.clone())
+        .collect()
+}
+
+/// Member-extension dispatch prefers an ordinary implicit receiver over a context-parameter
+/// receiver. Both groups keep nearest-first order, and a context receiver stays eligible when no
+/// ordinary receiver declares the member.
+pub(super) fn ordinary_dispatch_first(
+    scope: &super::CheckerScope<'_>,
+    mut receivers: Vec<ImplicitReceiver>,
+) -> Vec<ImplicitReceiver> {
+    receivers.sort_by_key(|receiver| {
+        u8::from(scope.implicit_receiver_context(receiver.identity).is_some())
+    });
+    receivers
+}
+
+/// Kotlin overload specificity prefers a concrete receiver declaration over one whose receiver
+/// domain mentions a callable type parameter. Callers must apply this declaration-owned fact
+/// before comparing contextually instantiated callable shapes.
+pub(super) fn concrete_receiver_is_more_specific(left_generic: bool, right_generic: bool) -> bool {
+    !left_generic && right_generic
+}
+
+/// The declared receiver domain used to compare otherwise-applicable member extensions. Method
+/// parameters use their recursively substituted upper bounds, while enclosing-class parameters
+/// retain the applied dispatch bindings supplied by the caller.
+pub(super) fn receiver_domain(
+    receiver: Ty,
+    type_params: &[String],
+    type_param_bounds: &[Ty],
+    class_bindings: &HashMap<String, Ty>,
+) -> Ty {
+    let mut bindings = class_bindings.clone();
+    for parameter in type_params {
+        bindings.remove(parameter);
+    }
+    for (parameter, bound) in type_params.iter().zip(type_param_bounds) {
+        bindings.insert(parameter.clone(), *bound);
+    }
+    for _ in 0..type_params.len() {
+        let previous = bindings.clone();
+        for (parameter, bound) in type_params.iter().zip(type_param_bounds) {
+            bindings.insert(
+                parameter.clone(),
+                crate::symbol_resolver::ty_subst(*bound, &previous),
+            );
+        }
+    }
+    crate::symbol_resolver::ty_subst(receiver, &bindings)
+}
+
+pub(super) fn maximal_member_extensions<T>(
+    oracle: &dyn crate::assignable::TypeOracle,
+    candidates: &[T],
+    priority: impl Fn(&T) -> MemberExtensionPriority,
+) -> Vec<usize> {
+    let Some(nearest_dispatch) = candidates
+        .iter()
+        .map(|candidate| priority(candidate).dispatch_rank)
+        .min()
+    else {
+        return Vec::new();
+    };
+    candidates
+        .iter()
+        .enumerate()
+        .filter(|(_, candidate)| priority(candidate).dispatch_rank == nearest_dispatch)
+        .filter_map(|(index, candidate)| {
+            let candidate = priority(candidate);
+            let dominated = candidates.iter().enumerate().any(|(other_index, other)| {
+                if index == other_index {
+                    return false;
+                }
+                let other = priority(other);
+                if other.dispatch_rank != nearest_dispatch {
+                    return false;
+                }
+                // Among receivers applicable to this same call-site type, a concrete receiver
+                // is more specific than one whose shape had to infer a method parameter. This
+                // also covers invariant nested shapes (`Box<String>` versus `Box<T>`): comparing
+                // their instantiated `Box<String>`/`Box<Any>` views as ordinary subtypes loses
+                // the declaration-level genericity that Kotlin's specificity rule uses.
+                if candidate.generic_receiver != other.generic_receiver {
+                    return concrete_receiver_is_more_specific(
+                        other.generic_receiver,
+                        candidate.generic_receiver,
+                    );
+                }
+                let other_is_subtype = crate::assignable::is_assignable(
+                    &crate::assignable::TyCtx::new(),
+                    oracle,
+                    other.receiver_domain,
+                    candidate.receiver_domain,
+                );
+                let candidate_is_subtype = crate::assignable::is_assignable(
+                    &crate::assignable::TyCtx::new(),
+                    oracle,
+                    candidate.receiver_domain,
+                    other.receiver_domain,
+                );
+                if candidate.receiver_domain == other.receiver_domain
+                    || (other_is_subtype && candidate_is_subtype)
+                {
+                    let other_owner_is_subtype = crate::assignable::is_assignable(
+                        &crate::assignable::TyCtx::new(),
+                        oracle,
+                        Ty::obj_name(other.owner),
+                        Ty::obj_name(candidate.owner),
+                    );
+                    let candidate_owner_is_subtype = crate::assignable::is_assignable(
+                        &crate::assignable::TyCtx::new(),
+                        oracle,
+                        Ty::obj_name(candidate.owner),
+                        Ty::obj_name(other.owner),
+                    );
+                    if other_owner_is_subtype != candidate_owner_is_subtype {
+                        return other_owner_is_subtype;
+                    }
+                    return other.dispatch_depth < candidate.dispatch_depth;
+                }
+                other_is_subtype && !candidate_is_subtype
+            });
+            (!dominated).then_some(index)
+        })
+        .collect()
+}
+
+pub(super) fn candidate(
+    shape: &MemberExtensionFunctionShape,
+    instantiated: InstantiatedMemberExtension,
+) -> MemberExtensionFunctionCandidate {
+    MemberExtensionFunctionCandidate {
+        stable_declaration: shape.function.signature.stable_declaration,
+        external_identity: shape.function.external_identity,
+        external_default_provider: shape.function.external_default_provider,
+        diagnostic_candidate: shape.diagnostic_candidate.clone(),
+        priority: shape.priority,
+        dispatch_receiver: shape.dispatch_receiver,
+        score: instantiated.score,
+        physical_receiver: shape.function.physical_receiver,
+        extension_receiver: instantiated.extension_receiver,
+        params: instantiated.logical_params,
+        visible_params: instantiated.visible_params,
+        physical_params: shape.function.physical_params.clone(),
+        context_args: instantiated.context_sources,
+        context_count: shape.function.signature.context_count,
+        ret: instantiated.ret,
+        physical_ret: shape.function.signature.ret,
+        call_sig: instantiated.call_sig,
+        diagnostic_param_names: shape.function.signature.call_sig().param_names,
+        physical_vararg_index: instantiated.physical_vararg_index,
+        argument_parameters: instantiated.argument_parameters,
+        visibility: shape.function.signature.visibility,
+        is_operator: shape.is_operator,
+        deprecation: shape.diagnostic_candidate.callable.deprecation.clone(),
+        inline: InlineKind::from_flags(
+            shape.function.signature.is_inline(),
+            shape.function.signature.requires_splice(),
+        ),
+        inline_body_plan: shape.function.inline_body_plan.clone(),
+        suspend: shape.function.signature.is_suspend(),
+        generic_sig: shape
+            .function
+            .signature
+            .generic_sig
+            .clone()
+            .map(|mut signature| {
+                // Member-extension selection stores its source receiver beside `Signature`; ordinary
+                // generic signatures omit it because physical member parameters begin after that
+                // receiver. Publication needs the declaration-owned receiver shape on the selected
+                // target so a generic result can bind from the exact checked receiver expression.
+                signature.receiver = Some(shape.function.receiver_ty);
+                Box::new(signature)
+            }),
+        declared_params: shape
+            .function
+            .signature
+            .generic_sig
+            .as_ref()
+            .map(|signature| signature.params.clone())
+            .unwrap_or_else(|| shape.function.signature.params.clone()),
+        declared_ret: shape.function.declared_ret,
+        overridden_results: shape.function.overridden_results.clone(),
+        owner: shape.owner,
+        physical_name: shape.function.physical_name.clone(),
+        type_arguments: instantiated.type_arguments,
+        bindings: instantiated.bindings,
+        intersection_bindings: HashMap::default(),
+        lower_inputs: instantiated.lower_inputs,
+        parameter_indices: instantiated.parameter_indices,
+    }
+}
+
+impl MemberExtensionFunctionCandidate {
+    pub(super) fn resolved_call(
+        &self,
+        dispatch_receiver: ImplicitReceiverSelection,
+        interface: bool,
+    ) -> ResolvedCall {
+        ResolvedCall::MemberExtension {
+            stable_declaration: self.stable_declaration,
+            external_identity: self.external_identity,
+            external_default_provider: self.external_default_provider,
+            owner: self.owner,
+            dispatch_receiver,
+            // The receiver occupies a declaration parameter slot at the FIR/backend boundary.
+            // Retain the selected declaration type, after generic instantiation, rather than the
+            // source expression's possibly narrower type. The expression remains the receiver
+            // operand; this fact is its checked parameter contract.
+            extension_receiver: self.extension_receiver,
+            physical_receiver: self.physical_receiver,
+            // Selection and diagnostics used the Kotlin source name. Only the finalized emit target
+            // receives this provider-owned spelling, so a mangled dependency method cannot leak back
+            // into a diagnostic or become a parallel lookup key.
+            name: self.physical_name.clone(),
+            params: self.params.clone(),
+            physical_params: self.physical_params.clone(),
+            context_args: self.context_args.clone(),
+            ret: self.ret,
+            physical_ret: self.physical_ret,
+            deprecation: self.deprecation.clone(),
+            inline: self.inline,
+            inline_body_plan: self.inline_body_plan.clone(),
+            reified_type_parameter_ordinals: self
+                .call_sig
+                .reified_type_parameter_ordinals
+                .clone()
+                .into_boxed_slice(),
+            suspend: self.suspend,
+            generic_sig: self.generic_sig.clone(),
+            declared_ret: self.declared_ret,
+            overridden_results: self.overridden_results.clone(),
+            interface,
+            vararg_index: self.physical_vararg_index,
+        }
+    }
+}
+
+impl Checker<'_> {
+    pub(super) fn commit_member_extension_type_arguments(
+        &mut self,
+        call: ExprId,
+        explicit_type_args: &[Ty],
+        candidate: &mut MemberExtensionFunctionCandidate,
+    ) -> Ty {
+        let Some(signature) = candidate.generic_sig.clone() else {
+            self.clear_selected_generic_call(call);
+            return candidate.ret;
+        };
+        candidate.intersection_bindings =
+            self.intersection_bindings_from_lower_inputs(&candidate.lower_inputs);
+        let result = self.commit_selected_call_intersections(
+            call,
+            &signature,
+            explicit_type_args,
+            &candidate.parameter_indices,
+            &candidate.call_sig,
+            &mut candidate.bindings,
+            &mut candidate.intersection_bindings,
+            Default::default(),
+            candidate.ret,
+        );
+        candidate.ret = result;
+        candidate.type_arguments = signature
+            .formals
+            .iter()
+            .map(|formal| candidate.bindings.get(formal).copied())
+            .collect();
+        result
+    }
+
+    /// Select an operator declared as a member extension of an implicit dispatch receiver. This is
+    /// the same candidate engine used by explicit member-extension calls; the only syntax-specific
+    /// work here is recording the selected call under the operator convention key.
+    pub(super) fn member_extension_operator_call(
+        &mut self,
+        scope: &CheckerScope<'_>,
+        call: CallArgs<'_>,
+        extension_receiver: Ty,
+        name: &str,
+        span: Span,
+    ) -> Result<Option<(Ty, ResolvedCall)>, ()> {
+        let CallArgs {
+            call: expression,
+            args,
+            arg_tys,
+        } = call;
+        let request = MemberExtensionFunctionCall {
+            extension_receiver,
+            result_constraint: CallResultConstraint::direct(None),
+            name,
+            args,
+            arg_tys,
+            arg_names: None,
+            explicit_type_args: &[],
+            trailing_lambda: false,
+            inference_bindings: None,
+        };
+        let mut candidate = match self.member_extension_function(
+            scope,
+            request,
+            MemberExtensionSelection::Operators,
+        ) {
+            MemberExtensionFunctionSelection::Selected(candidate) => *candidate,
+            MemberExtensionFunctionSelection::None(_) => return Ok(None),
+            MemberExtensionFunctionSelection::Ambiguous(_) => {
+                self.diags.error(
+                    span,
+                    format!("overload resolution ambiguity for operator '{name}'"),
+                );
+                return Err(());
+            }
+        };
+        if candidate.visibility != Visibility::Public {
+            self.reject_callable_if_inaccessible(
+                candidate.visibility,
+                name,
+                candidate.owner,
+                candidate.external_identity,
+                span,
+            );
+        }
+        let mut validation_params = candidate.visible_params.clone();
+        if let Some(vararg) = candidate.call_sig.vararg_index {
+            if let Some(element) = validation_params.get_mut(vararg) {
+                *element = Ty::array(*element);
+            }
+        }
+        if !self.expect_selected_call_args(
+            scope,
+            CallArgs {
+                call: expression,
+                args,
+                arg_tys,
+            },
+            &validation_params,
+            &validation_params,
+            &candidate.call_sig,
+            None,
+        ) {
+            return Err(());
+        }
+        let interface = self
+            .resolver()
+            .classifier(candidate.owner)
+            .is_some_and(|shape| shape.is_interface());
+        let dispatch_receiver = self.implicit_receiver_selection(candidate.dispatch_receiver);
+        let result = self.commit_member_extension_type_arguments(expression, &[], &mut candidate);
+        let call = candidate.resolved_call(dispatch_receiver, interface);
+        self.mark_extension_receiver_used(expression, candidate.dispatch_receiver);
+        Ok(Some((result, call)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ordinary_dispatch_first, ImplicitReceiver, MemberExtensionFunctionSelection};
+    use crate::resolve::scope::{ContextReceiver, ContextReceiverKind, ScopeKind};
+    use crate::types::Ty;
+
+    #[test]
+    fn a_selection_carries_a_pointer_to_its_callable() {
+        assert_eq!(std::mem::size_of::<MemberExtensionFunctionSelection>(), 24);
+    }
+
+    #[test]
+    fn ordinary_dispatch_receivers_keep_their_relative_priority_before_context_receivers() {
+        let root: super::super::CheckerScope<'_> = super::super::CheckerScope::root();
+        let outer = root.child(ScopeKind::Class {
+            ty: Ty::obj("test/Outer"),
+            carries_outer: true,
+        });
+        let inner = outer.child(ScopeKind::Class {
+            ty: Ty::obj("test/Inner"),
+            carries_outer: true,
+        });
+        let scope = inner.function_child(
+            Some(Ty::obj("test/Extension")),
+            None,
+            &[
+                ContextReceiver::new(
+                    Ty::obj("test/FirstContext"),
+                    ContextReceiverKind::LegacyReceiver,
+                    None,
+                ),
+                ContextReceiver::new(
+                    Ty::obj("test/SecondContext"),
+                    ContextReceiverKind::LegacyReceiver,
+                    None,
+                ),
+            ],
+        );
+        let receivers = scope
+            .implicit_receivers_with_declarations()
+            .into_iter()
+            .enumerate()
+            .map(
+                |(receiver_depth, (ty, extension_receiver, identity, class_receiver))| {
+                    ImplicitReceiver {
+                        receiver_role: scope.implicit_receiver_role(identity),
+                        ty,
+                        declared_ty: ty,
+                        identity,
+                        extension_receiver,
+                        class_receiver,
+                        current: receiver_depth == 0,
+                        receiver_depth,
+                    }
+                },
+            )
+            .collect::<Vec<_>>();
+
+        let ordered = ordinary_dispatch_first(&scope, receivers);
+        assert_eq!(
+            ordered
+                .into_iter()
+                .map(|receiver| receiver.ty)
+                .collect::<Vec<_>>(),
+            vec![
+                Ty::obj("test/Extension"),
+                Ty::obj("test/Inner"),
+                Ty::obj("test/Outer"),
+                Ty::obj("test/SecondContext"),
+                Ty::obj("test/FirstContext"),
+            ]
+        );
+    }
+}
+
+/// The lambda shape a member-extension call gives its postponed arguments — the lambdas and
+/// callable references `call.partial_arg_tys` leaves untyped — from the unique best candidate, or
+/// the common shape of equally ranked candidates, among those the typed arguments admit.
+///
+/// The shape is the selected candidate's parameters under the call's evidence alone, with every
+/// method formal that evidence leaves open still itself and named in `generic_formals`. It is the
+/// same carrier a top-level or extension overload gives its lambdas, so the call's lambdas go
+/// through the same postponed-lambda analysis: one lambda's result solves a formal (`R` from
+/// `selector = { it }`) for the lambdas after it (`printer: (R, R) -> String`). Shaping from the
+/// fully instantiated candidate instead would fix each open formal to its bound before any lambda
+/// had been analyzed. Pass-2 checking and Pass-1 signature evaluation both shape member-extension
+/// lambdas here; only the probes and the symbol source they supply differ.
+pub(super) fn member_extension_lambda_shape_with(
+    source: &dyn SymbolSource,
+    oracle: &dyn crate::assignable::TypeOracle,
+    receivers: &[ImplicitReceiver],
+    probes: MemberExtensionProbes<'_>,
+    result_constraint: CallResultConstraint,
+    refresh_typed_postponed: bool,
+    call: MemberExtensionCall<'_>,
+) -> MemberExtensionLambdaShape {
+    let arguments = call.args.len();
+    let mut plans = Vec::new();
+    for shape in
+        member_extension_function_shapes_in(source, receivers, call.extension_receiver, call.name)
+    {
+        let Some(instantiated) =
+            instantiate_member_extension_with(probes, result_constraint, None, &shape, call)
+        else {
+            continue;
+        };
+        let mut lambda_shape = crate::symbol_resolver::LambdaCallShape {
+            generic_formals: instantiated.open_formals,
+            argument_parameters: vec![Ty::Error; arguments],
+            ..Default::default()
+        };
+        let mut param_types = vec![Vec::new(); arguments];
+        let mut expected_types = vec![None; arguments];
+        let mut lambda_receivers = vec![None; arguments];
+        let mut context_counts = vec![0; arguments];
+        // The evaluator's final fixed-point round retains every argument as typed. It still owns
+        // the original postponed-callable provenance, so recompute the selected parameter vector
+        // even though this boundary can no longer identify a postponed source form from `call`.
+        let mut shapes_postponed_argument = refresh_typed_postponed;
+        for &(parameter_index, source_index) in &instantiated.argument_parameters {
+            let Some(&parameter) = instantiated.open_visible_params.get(parameter_index) else {
+                continue;
+            };
+            lambda_shape.argument_parameters[source_index] = parameter;
+            let Ty::Fun(signature) = parameter.non_null() else {
+                continue;
+            };
+            shapes_postponed_argument |= call
+                .partial_arg_tys
+                .get(source_index)
+                .is_some_and(Option::is_none);
+            param_types[source_index] = signature.params.clone();
+            expected_types[source_index] = Some(parameter);
+            context_counts[source_index] = signature.context_count;
+            if instantiated
+                .call_sig
+                .lambda_receiver_params
+                .get(parameter_index)
+                .copied()
+                .unwrap_or(false)
+            {
+                lambda_receivers[source_index] =
+                    signature.params.get(signature.context_count).copied();
+            }
+        }
+        if !shapes_postponed_argument {
+            continue;
+        }
+        lambda_shape.param_types = Some(param_types);
+        lambda_shape.expected_types = Some(expected_types);
+        lambda_shape.receivers = lambda_receivers
+            .iter()
+            .any(Option::is_some)
+            .then_some(lambda_receivers);
+        lambda_shape.context_counts = context_counts
+            .iter()
+            .any(|count| *count > 0)
+            .then_some(context_counts);
+        plans.push((shape.priority, instantiated.score, lambda_shape));
+    }
+    let maximal = maximal_member_extensions(oracle, &plans, |(priority, ..)| *priority);
+    let Some(best_score) = maximal.iter().map(|index| plans[*index].1).max() else {
+        return MemberExtensionLambdaShape::Absent;
+    };
+    let mut best = maximal
+        .into_iter()
+        .filter(|index| plans[*index].1 == best_score);
+    let Some(selected) = best.next() else {
+        return MemberExtensionLambdaShape::Absent;
+    };
+    if best.any(|index| plans[index].2 != plans[selected].2) {
+        return MemberExtensionLambdaShape::Ambiguous;
+    }
+    MemberExtensionLambdaShape::Selected(plans.swap_remove(selected).2)
+}

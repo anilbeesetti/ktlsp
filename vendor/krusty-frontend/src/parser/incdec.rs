@@ -1,0 +1,624 @@
+//! Safe increment/decrement access expansion.
+//!
+//! A safe property update evaluates its receiver once and guards the complete read, operator call,
+//! and write. Keeping this shape together prevents nullable operator selection and eager updates.
+
+use super::*;
+
+impl Parser<'_> {
+    /// `receiver?.name[indices]` without parentheses. `access` is the member the index reads;
+    /// `element` is that index, so a later update can share its operands.
+    pub(super) fn safe_index_selector(
+        &mut self,
+        safe_call: ExprId,
+        indices: Vec<ExprId>,
+        span: Span,
+    ) -> Option<ExprId> {
+        if self.parenthesized_expressions.contains(&safe_call.0) {
+            return None;
+        }
+        let Expr::SafeCall {
+            receiver,
+            name,
+            args: None,
+        } = self.file.expr(safe_call).clone()
+        else {
+            return None;
+        };
+        let name_span = self.file.exact_member_name_spans.get(&safe_call.0).copied();
+        let access = self.file.add_expr(
+            Expr::Member {
+                receiver,
+                name: name.clone(),
+            },
+            span,
+        );
+        if let Some(name_span) = name_span {
+            self.file
+                .exact_member_name_spans
+                .insert(access.0, name_span);
+        }
+        let element = self.file.add_expr(
+            Expr::Index {
+                array: access,
+                indices: indices.clone(),
+            },
+            span,
+        );
+        Some(self.file.add_expr(
+            Expr::SafeIndex {
+                receiver,
+                access,
+                element,
+                indices,
+            },
+            span,
+        ))
+    }
+
+    /// A parenthesized safe index is an ordinary subscript of the nullable safe call.
+    pub(super) fn reopen_parenthesized_safe_index(&mut self, expression: ExprId) -> ExprId {
+        let Expr::SafeIndex {
+            receiver,
+            access,
+            indices,
+            ..
+        } = self.file.expr(expression).clone()
+        else {
+            return expression;
+        };
+        let Expr::Member { name, .. } = self.file.expr(access).clone() else {
+            return expression;
+        };
+        let span = self.file.expr_spans[expression.0 as usize];
+        let name_span = self.file.exact_member_name_spans.get(&access.0).copied();
+        let safe_call = self.file.add_expr(
+            Expr::SafeCall {
+                receiver,
+                name,
+                args: None,
+            },
+            span,
+        );
+        if let Some(name_span) = name_span {
+            self.file
+                .exact_member_name_spans
+                .insert(safe_call.0, name_span);
+        }
+        self.file.add_expr(
+            Expr::Index {
+                array: safe_call,
+                indices,
+            },
+            span,
+        )
+    }
+
+    /// Replace a provisional `IncDec` with the safe-index update it actually parsed.
+    pub(super) fn safe_index_incdec(
+        &mut self,
+        expression: ExprId,
+        target: ExprId,
+        dec: bool,
+        prefix: bool,
+    ) -> ExprId {
+        let Expr::SafeIndex {
+            receiver,
+            access,
+            element,
+            indices,
+        } = self.file.expr(target).clone()
+        else {
+            return expression;
+        };
+        let span = self.file.expr_spans[expression.0 as usize];
+        let updated = self.file.add_expr(Expr::NullLit, span);
+        self.file.expr_arena[expression.0 as usize] = Expr::SafeIndexIncDec {
+            receiver,
+            access,
+            element,
+            indices,
+            updated,
+            dec,
+            prefix,
+        };
+        expression
+    }
+
+    /// Build the store half shared by discarded-value and value-producing member/index inc/dec.
+    /// Centralizing this match keeps the accepted lvalue families, source spans, and future property
+    /// or index-store extensions identical across both syntactic contexts.
+    pub(super) fn finish_incdec_access_assignment(
+        &mut self,
+        target: ExprId,
+        value: ExprId,
+        start: Span,
+        target_span: Span,
+    ) -> Option<StmtId> {
+        let statement = match self.file.expr(target).clone() {
+            Expr::Member { receiver, name } => Stmt::AssignMember {
+                receiver,
+                name,
+                value,
+                safe: false,
+            },
+            Expr::SafeCall {
+                receiver,
+                name,
+                args: None,
+            } => Stmt::AssignMember {
+                receiver,
+                name,
+                value,
+                safe: true,
+            },
+            Expr::Index { array, indices } => Stmt::AssignIndex {
+                array,
+                indices,
+                value,
+            },
+            _ => return None,
+        };
+        Some(self.finish_assignment_stmt(statement, start, target_span))
+    }
+
+    pub(super) fn incdec_target(
+        &mut self,
+        e: ExprId,
+        dec: bool,
+        prefix: bool,
+        op_span: Span,
+        start: Span,
+    ) -> StmtId {
+        let target_span = self.assignment_target_span(e);
+        match self.file.expr(e).clone() {
+            Expr::Name(n) => self.parse_incdec(n, dec, prefix, start, target_span),
+            _ => {
+                self.diags.error(
+                    op_span,
+                    "krusty: '++'/'--' is only supported on a variable, property, or indexed access",
+                );
+                self.finish_stmt(Stmt::Expr(e), start)
+            }
+        }
+    }
+
+    pub(super) fn parse_incdec(
+        &mut self,
+        name: String,
+        dec: bool,
+        prefix: bool,
+        start: Span,
+        target: Span,
+    ) -> StmtId {
+        self.finish_assignment_stmt(Stmt::IncDec { name, dec, prefix }, start, target)
+    }
+
+    pub(super) fn safe_incdec_access_value_expr(
+        &mut self,
+        e: ExprId,
+        target: ExprId,
+        dec: bool,
+        prefix: bool,
+        start: Span,
+        target_span: Span,
+    ) -> Option<ExprId> {
+        let Expr::SafeCall {
+            receiver,
+            name,
+            args: None,
+        } = self.file.expr(target).clone()
+        else {
+            return None;
+        };
+        const RECEIVER: &str = "$$incDecReceiver";
+        let receiver_local = self.file.add_stmt(
+            Stmt::Local {
+                is_var: false,
+                name: RECEIVER.to_string(),
+                ty: None,
+                init: receiver,
+            },
+            start,
+        );
+        let receiver_read = self
+            .file
+            .add_expr(Expr::Name(RECEIVER.to_string()), target_span);
+        let member = self.file.add_expr(
+            Expr::Member {
+                receiver: receiver_read,
+                name,
+            },
+            target_span,
+        );
+        let update = self.incdec_access_value_expr(e, member, dec, prefix, start);
+
+        let condition_receiver = self
+            .file
+            .add_expr(Expr::Name(RECEIVER.to_string()), target_span);
+        let null = self.file.add_expr(Expr::NullLit, target_span);
+        let condition = self.file.add_expr(
+            Expr::Binary {
+                op: BinOp::Ne,
+                lhs: condition_receiver,
+                rhs: null,
+                operator_span: target_span,
+            },
+            target_span,
+        );
+        let null_result = self.file.add_expr(Expr::NullLit, target_span);
+        let guarded = self.file.add_expr(
+            Expr::If {
+                cond: condition,
+                then_branch: update,
+                else_branch: Some(null_result),
+            },
+            target_span,
+        );
+        Some(self.file.add_expr(
+            Expr::Block {
+                stmts: vec![receiver_local],
+                trailing: Some(guarded),
+            },
+            Span::new(start.lo, self.file.expr_spans[e.0 as usize].hi),
+        ))
+    }
+
+    /// Drop a postfix access increment's saved old value when it is used as a statement. A prefix
+    /// re-read stays, as a statement: kotlinc calls the getter or `get` again even when the result
+    /// is discarded. Safe updates have no operand record on their guarded outer block, so the
+    /// conditional stays live.
+    pub(super) fn discard_incdec_access_value(&mut self, expression: ExprId) -> bool {
+        let Some(access) = self.file.incdec_accesses.get(&expression) else {
+            return false;
+        };
+        let (keeps_reread, original) = (access.prefix, access.original);
+        let Expr::Block { stmts, trailing } = self.file.expr(expression).clone() else {
+            return false;
+        };
+        let Some(trailing) = trailing else {
+            return false;
+        };
+        let mut stmts = stmts;
+        stmts.retain(|&statement| Some(statement) != original);
+        let reread = keeps_reread.then(|| {
+            let span = self.file.expr_spans[trailing.0 as usize];
+            self.file.add_stmt(Stmt::Expr(trailing), span)
+        });
+        let Expr::Block {
+            stmts: slot,
+            trailing: trail,
+        } = &mut self.file.expr_arena[expression.0 as usize]
+        else {
+            return false;
+        };
+        *slot = stmts;
+        if let Some(reread) = reread {
+            slot.push(reread);
+        }
+        *trail = None;
+        true
+    }
+
+    /// Expand a member/index increment into an `Expr::Block`, letting it retain its value in an
+    /// initializer, argument, return, or larger expression. Receiver and index operands are saved
+    /// left-to-right before the read, so calls and custom access paths are evaluated exactly once.
+    /// A prefix result is a second read of that same access; a postfix result is the first read.
+    pub(super) fn incdec_access_value_expr(
+        &mut self,
+        e: ExprId,
+        target: ExprId,
+        dec: bool,
+        prefix: bool,
+        start: Span,
+    ) -> ExprId {
+        let target_span = self.assignment_target_span(target);
+        if let Some(guarded) =
+            self.safe_incdec_access_value_expr(e, target, dec, prefix, start, target_span)
+        {
+            return guarded;
+        }
+        let Some((operands, target_read, target_write)) =
+            self.share_incdec_access_target(target, target_span)
+        else {
+            self.diags.error(
+                self.file.expr_spans[e.0 as usize],
+                "krusty: '++'/'--' is only supported on a variable, property, or indexed access",
+            );
+            // Recover with the already-parsed target. Keeping the invalid `Expr::IncDec` reachable
+            // would make statement parsing and resolution report the same error again.
+            return target;
+        };
+        // Keep the working value in the parser's synthetic-name namespace. Even an escaped source
+        // binding with the same spelling cannot interfere: this generated block contains only its
+        // own local and generated reads, and repeated expansions have independent scopes.
+        const VALUE: &str = "$$incDecValue";
+        const ORIGINAL: &str = "$$incDecOriginal";
+        let mut statements = Vec::new();
+        let value_local = self.file.add_stmt(
+            Stmt::Local {
+                is_var: true,
+                name: VALUE.to_string(),
+                ty: None,
+                init: target_read,
+            },
+            start,
+        );
+        statements.push(value_local);
+        let original = (!prefix).then(|| {
+            let original_init = self
+                .file
+                .add_expr(Expr::Name(VALUE.to_string()), target_span);
+            let original = self.file.add_stmt(
+                Stmt::Local {
+                    is_var: false,
+                    name: ORIGINAL.to_string(),
+                    ty: None,
+                    init: original_init,
+                },
+                start,
+            );
+            statements.push(original);
+            original
+        });
+
+        // Preserve the canonical inc/dec node on a lexical variable. The resolver therefore owns
+        // operator-convention validation and exact overload selection instead of seeing an ordinary
+        // `.inc()` call manufactured by the parser.
+        let update = self.parse_incdec(VALUE.to_string(), dec, prefix, start, target_span);
+        statements.push(update);
+        let assigned_value = self
+            .file
+            .add_expr(Expr::Name(VALUE.to_string()), target_span);
+        let store = self
+            .finish_incdec_access_assignment(target_write, assigned_value, start, target_span)
+            .expect("cached member/index target has an assignment form");
+        statements.push(store);
+        let trailing = if prefix {
+            self.share_incdec_access_target(target, target_span)
+                .map(|(_, read, _)| read)
+                .expect("the first share already accepted this access")
+        } else {
+            self.file
+                .add_expr(Expr::Name(ORIGINAL.to_string()), target_span)
+        };
+        let block = self.file.add_expr(
+            Expr::Block {
+                stmts: statements,
+                trailing: Some(trailing),
+            },
+            Span::new(start.lo, self.file.expr_spans[e.0 as usize].hi),
+        );
+        self.file.incdec_accesses.insert(
+            block,
+            IncDecAccess {
+                operands,
+                value: value_local,
+                original,
+                update,
+                store,
+                prefix,
+            },
+        );
+        block
+    }
+
+    /// Share the receiver/index expression IDs between the read and write halves of a value-producing
+    /// access inc/dec. The block records those operands for lowering, where resolved value types can
+    /// distinguish runtime expressions (spill once) from package/classifier/`super` qualifiers.
+    fn share_incdec_access_target(
+        &mut self,
+        target: ExprId,
+        span: Span,
+    ) -> Option<(Vec<ExprId>, ExprId, ExprId)> {
+        match self.file.expr(target).clone() {
+            Expr::Member { receiver, name } => {
+                let read = self.file.add_expr(
+                    Expr::Member {
+                        receiver,
+                        name: name.clone(),
+                    },
+                    span,
+                );
+                let write = self.file.add_expr(Expr::Member { receiver, name }, span);
+                Some((vec![receiver], read, write))
+            }
+            Expr::SafeCall {
+                receiver,
+                name,
+                args: None,
+            } => {
+                let read = self.file.add_expr(
+                    Expr::SafeCall {
+                        receiver,
+                        name: name.clone(),
+                        args: None,
+                    },
+                    span,
+                );
+                let write = self.file.add_expr(
+                    Expr::SafeCall {
+                        receiver,
+                        name,
+                        args: None,
+                    },
+                    span,
+                );
+                Some((vec![receiver], read, write))
+            }
+            Expr::Index { array, indices } => {
+                let mut operands = Vec::with_capacity(indices.len() + 1);
+                operands.push(array);
+                operands.extend(indices.iter().copied());
+                let read = self.file.add_expr(
+                    Expr::Index {
+                        array,
+                        indices: indices.clone(),
+                    },
+                    span,
+                );
+                let write = self.file.add_expr(Expr::Index { array, indices }, span);
+                Some((operands, read, write))
+            }
+            _ => None,
+        }
+    }
+}
+
+impl Parser<'_> {
+    /// `receiver?.name[indices] = value`. The index stays inside the safe selector.
+    pub(super) fn finish_safe_index_assignment(
+        &mut self,
+        expression: ExprId,
+        start: Span,
+        target_span: Span,
+    ) -> StmtId {
+        let Expr::SafeIndex {
+            receiver,
+            access,
+            element,
+            indices,
+        } = self.file.expr(expression).clone()
+        else {
+            unreachable!("a safe index assignment target is a safe index");
+        };
+        let operator = self.bump().span;
+        self.skip_newlines();
+        let value = self.parse_unlabelled_expr();
+        self.file.value_operator_spans.insert(value.0, operator);
+        self.finish_assignment_stmt(
+            Stmt::AssignSafeIndex {
+                receiver,
+                access,
+                element,
+                indices,
+                value,
+            },
+            start,
+            target_span,
+        )
+    }
+
+    /// `receiver?.name[indices] op= value` reuses the index read as the operator's left operand.
+    pub(super) fn finish_compound_safe_index_assignment(
+        &mut self,
+        expression: ExprId,
+        op: BinOp,
+        op_span: Span,
+        start: Span,
+        target_span: Span,
+    ) -> StmtId {
+        let Expr::SafeIndex {
+            receiver,
+            access,
+            element,
+            indices,
+        } = self.file.expr(expression).clone()
+        else {
+            unreachable!("a compound safe index assignment target is a safe index");
+        };
+        self.bump();
+        self.skip_newlines();
+        let rhs = self.parse_unlabelled_expr();
+        let value = self.file.add_expr(
+            Expr::Binary {
+                op,
+                lhs: element,
+                rhs,
+                operator_span: op_span,
+            },
+            Span::new(target_span.lo, self.file.expr_spans[rhs.0 as usize].hi),
+        );
+        self.finish_assignment_stmt(
+            Stmt::AssignSafeIndex {
+                receiver,
+                access,
+                element,
+                indices,
+                value,
+            },
+            start,
+            target_span,
+        )
+    }
+
+    pub(super) fn assignment_target_span(&self, expression: ExprId) -> Span {
+        match self.file.expr(expression) {
+            Expr::Member { name, .. }
+            | Expr::SafeCall {
+                name, args: None, ..
+            } => self
+                .file
+                .exact_member_name_spans
+                .get(&expression.0)
+                .copied()
+                .unwrap_or_else(|| {
+                    let span = self.file.expr_spans[expression.0 as usize];
+                    Span::new(span.hi.saturating_sub(name.len() as u32), span.hi)
+                }),
+            Expr::SafeIndex { access, .. } | Expr::SafeIndexIncDec { access, .. } => {
+                let access = *access;
+                self.assignment_target_span(access)
+            }
+            _ => self.file.expr_spans[expression.0 as usize],
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lexer::lex;
+
+    fn tree(source: &str) -> String {
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(
+            !diagnostics.has_errors(),
+            "unexpected parse errors: {}",
+            diagnostics.render("test", source)
+        );
+        file.debug_tree()
+    }
+
+    #[test]
+    fn unparenthesized_safe_index_stays_one_selector() {
+        assert_eq!(
+            tree("fun f(arg: Any) { arg?.alias[42] }"),
+            "(fun f (param arg Any) (block =>(safe-index arg alias 42)))\n"
+        );
+        assert_eq!(
+            tree("fun f(arg: Any) { arg?.alias[42] = arg }"),
+            "(fun f (param arg Any) (block (set-safe-index arg alias 42 arg)))\n"
+        );
+        assert_eq!(
+            tree("fun f(arg: Any) { ++arg?.alias[42] }"),
+            "(fun f (param arg Any) (block =>(safe-index-pre arg alias 42)))\n"
+        );
+        assert_eq!(
+            tree("fun f(arg: Any) { arg?.alias[42]++ }"),
+            "(fun f (param arg Any) (block =>(safe-index-post arg alias 42)))\n"
+        );
+        assert_eq!(
+            tree("fun f(arg: Any) { (arg?.alias)[42] }"),
+            "(fun f (param arg Any) (block =>(index (?. arg alias) 42)))\n"
+        );
+        assert_eq!(
+            tree("fun f(arg: Any) { (arg?.alias[42]) }"),
+            "(fun f (param arg Any) (block =>(index (?. arg alias) 42)))\n"
+        );
+    }
+
+    #[test]
+    fn prefix_member_expansion_rereads_while_postfix_keeps_the_first_read() {
+        assert_eq!(
+            tree("fun f(probe: SyntheticProbe): Int = ++probe.value"),
+            "(fun f (param probe SyntheticProbe) :Int (block (var $$incDecValue (. probe value)) (inc $$incDecValue) (set-member probe value $$incDecValue) =>(. probe value)))\n"
+        );
+        assert_eq!(
+            tree("fun f(probe: SyntheticProbe): Int = probe.value++"),
+            "(fun f (param probe SyntheticProbe) :Int (block (var $$incDecValue (. probe value)) (val $$incDecOriginal $$incDecValue) (inc $$incDecValue) (set-member probe value $$incDecValue) =>$$incDecOriginal))\n"
+        );
+    }
+}

@@ -1,0 +1,703 @@
+//! Commitment of a selected callable's source arguments.
+//!
+//! Selection decides which callable won; this maps the call's named, default, vararg and
+//! trailing-lambda arguments onto that winner's parameters and commits each argument against its
+//! parameter slot, for every selected callable whatever its origin.
+
+use super::*;
+
+const SELECTED_INDEXED_ARGUMENT_MISMATCH: &str =
+    "selected indexed operator's arguments do not match its parameters";
+
+/// Argument slots and the declaration-owned default flags of the mapping that produced them.
+///
+/// The two travel together: a slot vector without its flags, or flags of a different length, is
+/// not a commitment checked FIR can read.
+#[derive(Clone, Debug)]
+pub struct SelectedArgumentCommitment {
+    pub slots: Vec<Option<ExprId>>,
+    pub declares_default: Vec<bool>,
+    /// Every written source argument mapped to its selected declaration slot. Repeated entries for
+    /// one slot are distinct vararg elements; `vararg_element` distinguishes those elements from a
+    /// named/spread whole-array argument.
+    pub argument_bindings: Vec<SelectedArgumentBinding>,
+}
+
+#[derive(Clone, Debug)]
+pub struct SelectedArgumentBinding {
+    pub argument: ExprId,
+    pub parameter: usize,
+    pub vararg_element: bool,
+    /// Declaration-owned occurrence read by this argument before contextual argument checking.
+    /// A non-lexical expression instead uses its final checked type: its probe can be an erased
+    /// provider upper face that is not the occurrence the selected call committed.
+    pub(super) source_declared_type: Option<Ty>,
+    /// Reified provenance of the same occurrence, captured while its lexical type-parameter scope
+    /// is available. Diagnostics consume this semantic tree and never recover declaration facts
+    /// from a source name.
+    pub(super) source_provenance: super::intersection_inference::ReifiedArgumentProvenance,
+    /// Complete source inference fact retained before contextual argument checking can replace the
+    /// expression's selected-call commitment with its expected denotable result.
+    pub(super) source_intersection: Option<super::intersection_inference::InferredIntersection>,
+}
+
+impl SelectedArgumentBinding {
+    pub(super) fn reified_occurrence(&self, checked: Ty) -> Ty {
+        self.source_declared_type.unwrap_or(checked)
+    }
+
+    /// Provenance of the element this binding contributes to a selected single-vararg call.
+    /// Expanded elements contribute their occurrence directly; a named or spread whole array
+    /// contributes the provenance nested under its array element.
+    pub(super) fn single_vararg_element_reified_provenance(
+        &self,
+    ) -> &super::intersection_inference::ReifiedArgumentProvenance {
+        if self.vararg_element {
+            &self.source_provenance
+        } else {
+            self.source_provenance
+                .argument(0)
+                .unwrap_or(super::intersection_inference::ReifiedArgumentProvenance::NONE)
+        }
+    }
+}
+
+impl std::ops::Deref for SelectedArgumentCommitment {
+    type Target = [Option<ExprId>];
+
+    fn deref(&self) -> &Self::Target {
+        &self.slots
+    }
+}
+
+impl IntoIterator for SelectedArgumentCommitment {
+    type Item = Option<ExprId>;
+    type IntoIter = std::vec::IntoIter<Option<ExprId>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.slots.into_iter()
+    }
+}
+
+impl Checker<'_> {
+    /// Freeze one selected argument only after its contextual check has committed the nested
+    /// winner. A pre-check snapshot can retain a discarded probe or miss an intersection that the
+    /// selected expectation finalizes.
+    fn finalized_selected_argument_binding(
+        &self,
+        scope: &CheckerScope<'_>,
+        argument: ExprId,
+        parameter: usize,
+        vararg_element: bool,
+        source_declared_type: Option<Ty>,
+        mut source_intersection: Option<super::intersection_inference::InferredIntersection>,
+        actual: Ty,
+    ) -> SelectedArgumentBinding {
+        let source_provenance = self.finalized_selected_argument_reified_provenance(
+            scope,
+            argument,
+            source_declared_type.unwrap_or(actual),
+        );
+        if let Some(intersection) = &mut source_intersection {
+            intersection.through_flexible |= source_provenance.crossed_flexible_boundary();
+        }
+        SelectedArgumentBinding {
+            argument,
+            parameter,
+            vararg_element,
+            source_declared_type,
+            source_provenance,
+            source_intersection,
+        }
+    }
+
+    /// Capture the source facts of an already-selected argument mapping before a later contextual
+    /// check can replace an expression's committed type or intersection. Constructors use this
+    /// seam because their generic class inference and concrete-parameter recheck are separate.
+    pub(super) fn capture_prechecked_argument_bindings(
+        &self,
+        scope: &CheckerScope<'_>,
+        arguments: &[ExprId],
+        actuals: &[Ty],
+        parameters: &[usize],
+        vararg: Option<usize>,
+        argument_names: Option<&[Option<String>]>,
+    ) -> Vec<SelectedArgumentBinding> {
+        arguments
+            .iter()
+            .zip(parameters)
+            .enumerate()
+            .map(|(source, (&argument, &parameter))| {
+                let whole_array = vararg == Some(parameter)
+                    && (self.file.is_spread_arg(argument)
+                        || argument_names
+                            .and_then(|names| names.get(source))
+                            .is_some_and(Option::is_some));
+                let source_declared_type = self.local_variable_read(scope, argument);
+                let source_provenance = self.finalized_selected_argument_reified_provenance(
+                    scope,
+                    argument,
+                    source_declared_type.unwrap_or(actuals[source]),
+                );
+                let mut source_intersection = self.inferred_expression_intersection_fact(argument);
+                if let Some(intersection) = &mut source_intersection {
+                    intersection.through_flexible |= source_provenance.crossed_flexible_boundary();
+                }
+                SelectedArgumentBinding {
+                    argument,
+                    parameter,
+                    vararg_element: vararg == Some(parameter) && !whole_array,
+                    source_declared_type,
+                    source_provenance,
+                    source_intersection,
+                }
+            })
+            .collect()
+    }
+
+    /// Commit an already-checked call whose semantic declaration is one vararg parameter. Compiler
+    /// supplied array creators use this after checking their operands so their reified element
+    /// diagnostics consume the same stable source facts as ordinary selected callables.
+    pub(super) fn commit_checked_single_vararg_arguments(
+        &mut self,
+        scope: &CheckerScope<'_>,
+        call: ExprId,
+        arguments: &[ExprId],
+        actuals: &[Ty],
+        whole_arrays: &[bool],
+    ) {
+        if arguments.len() != actuals.len() || arguments.len() != whole_arrays.len() {
+            debug_assert!(false, "checked vararg arguments must retain source arity");
+            return;
+        }
+        let argument_bindings = arguments
+            .iter()
+            .zip(actuals)
+            .zip(whole_arrays)
+            .map(|((&argument, &actual), &whole_array)| {
+                let source_declared_type = self.local_variable_read(scope, argument);
+                let source_provenance = self.finalized_selected_argument_reified_provenance(
+                    scope,
+                    argument,
+                    source_declared_type.unwrap_or(actual),
+                );
+                let mut source_intersection = self.inferred_expression_intersection_fact(argument);
+                if let Some(intersection) = &mut source_intersection {
+                    intersection.through_flexible |= source_provenance.crossed_flexible_boundary();
+                }
+                SelectedArgumentBinding {
+                    argument,
+                    parameter: 0,
+                    vararg_element: !whole_array,
+                    source_declared_type,
+                    source_provenance,
+                    source_intersection,
+                }
+            })
+            .collect::<Vec<_>>();
+        self.commit_selected_argument_mapping(call, 1, &argument_bindings, &[]);
+    }
+
+    /// Publish an exact source-to-parameter mapping through the checked commitment consumed by
+    /// every selected call. The first expanded vararg element occupies the parameter slot
+    /// (matching [`map_call_args`]); every element remains distinct in `argument_bindings`.
+    pub(super) fn commit_selected_argument_mapping(
+        &mut self,
+        call: ExprId,
+        parameter_count: usize,
+        argument_bindings: &[SelectedArgumentBinding],
+        omitted: &[usize],
+    ) {
+        let mut slots = vec![None; parameter_count];
+        for binding in argument_bindings {
+            if let Some(slot) = slots.get_mut(binding.parameter) {
+                slot.get_or_insert(binding.argument);
+            }
+        }
+        let mut declares_default = vec![false; parameter_count];
+        for &parameter in omitted {
+            if let Some(declared) = declares_default.get_mut(parameter) {
+                *declared = true;
+            }
+        }
+        self.resolved_call_arg_slots.insert(
+            call,
+            SelectedArgumentCommitment {
+                slots,
+                declares_default,
+                argument_bindings: argument_bindings.to_vec(),
+            },
+        );
+    }
+
+    /// Validate the source arguments of one already-selected callable and commit their semantic
+    /// parameter slots. Selection owns WHICH callable won; this origin-neutral seam owns Kotlin's
+    /// named/default/vararg/trailing-lambda mapping for every selected callable.
+    pub(super) fn expect_selected_call_args(
+        &mut self,
+        scope: &CheckerScope<'_>,
+        call_args: CallArgs<'_>,
+        params: &[Ty],
+        declared_params: &[Ty],
+        call_sig: &CallSig,
+        argument_expectations: Option<&HashMap<ExprId, Ty>>,
+    ) -> bool {
+        let CallArgs {
+            call,
+            args,
+            arg_tys,
+        } = call_args;
+        let arg_names = self.file.call_arg_names.get(&call.0).map(Vec::as_slice);
+        let trailing_lambda = self.file.call_has_trailing_lambda.contains(&call.0);
+        // Candidate probing and selected-call commitment must expose the same implicit label.
+        // Rechecking a postponed/SAM lambda against the winner otherwise drops `return@callee`
+        // even though the call syntax—and therefore the label—has not changed.
+        let implicit_lambda_label = call_implicit_lambda_label(self.file, call).map(str::to_string);
+        let slots = match map_call_args(
+            args,
+            arg_names,
+            &call_sig.param_names,
+            params.len(),
+            call_sig.required,
+            &call_sig.param_defaults,
+            call_sig.vararg_index,
+            trailing_lambda,
+        ) {
+            Ok(slots) => slots,
+            Err(error) => {
+                self.report_call_arg_mapping_error(call, args, error);
+                return false;
+            }
+        };
+        let Some(argument_parameters) = call_argument_parameter_indices(
+            args.len(),
+            params.len(),
+            arg_names,
+            trailing_lambda,
+            call_sig,
+        ) else {
+            debug_assert!(false, "successful argument mapping must be invertible");
+            return false;
+        };
+        let mut argument_bindings = Vec::with_capacity(args.len());
+        for (source, (&argument, &parameter)) in args.iter().zip(&argument_parameters).enumerate() {
+            let Some((&array_or_parameter, &probed_actual)) =
+                params.get(parameter).zip(arg_tys.get(source))
+            else {
+                debug_assert!(false, "selected call argument lies outside its signature");
+                return false;
+            };
+            let named = arg_names
+                .and_then(|names| names.get(source))
+                .is_some_and(Option::is_some);
+            let whole_array = call_sig.vararg_index == Some(parameter)
+                && (named || self.file.is_spread_arg(argument));
+            let source_declared_type = self.local_variable_read(scope, argument);
+            // The selected parameter check may replace a non-denotable source join with its
+            // denotable expected type. Retain that source fact now, then add flexible-boundary
+            // provenance only after the contextual check has finalized the value sidecar.
+            let source_intersection = self.inferred_expression_intersection_fact(argument);
+            let inferred = argument_expectations
+                .and_then(|expectations| expectations.get(&argument))
+                .copied();
+            let expected = if call_sig.vararg_index == Some(parameter) {
+                self.vararg_argument_expected(
+                    array_or_parameter,
+                    probed_actual,
+                    whole_array,
+                    inferred,
+                )
+            } else {
+                inferred.unwrap_or(array_or_parameter)
+            };
+            let actual = self.selected_argument_type(
+                scope,
+                argument,
+                probed_actual,
+                expected,
+                call_sig,
+                parameter,
+                implicit_lambda_label.as_deref(),
+            );
+            let vararg_element = call_sig.vararg_index == Some(parameter) && !whole_array;
+            if whole_array {
+                self.expect_whole_array_vararg_arg(
+                    Some(scope),
+                    argument,
+                    actual,
+                    array_or_parameter,
+                );
+                argument_bindings.push(self.finalized_selected_argument_binding(
+                    scope,
+                    argument,
+                    parameter,
+                    vararg_element,
+                    source_declared_type,
+                    source_intersection,
+                    actual,
+                ));
+                continue;
+            }
+            if self.commit_implicit_integer_coercion(
+                argument,
+                expected,
+                call_sig
+                    .implicit_integer_coercion
+                    .get(parameter)
+                    .copied()
+                    .unwrap_or(false),
+            ) {
+                argument_bindings.push(self.finalized_selected_argument_binding(
+                    scope,
+                    argument,
+                    parameter,
+                    vararg_element,
+                    source_declared_type,
+                    source_intersection,
+                    actual,
+                ));
+                continue;
+            }
+            let declared_parameter = declared_params[parameter];
+            let declared = if call_sig.vararg_index == Some(parameter) && !whole_array {
+                declared_parameter
+                    .array_read_elem()
+                    .unwrap_or(declared_parameter)
+            } else {
+                declared_parameter
+            };
+            self.expect_call_arg_labeled(
+                scope,
+                expected,
+                declared,
+                argument,
+                actual,
+                call_sig
+                    .lambda_receiver_params
+                    .get(parameter)
+                    .copied()
+                    .unwrap_or(false),
+                implicit_lambda_label.as_deref(),
+            );
+            argument_bindings.push(self.finalized_selected_argument_binding(
+                scope,
+                argument,
+                parameter,
+                vararg_element,
+                source_declared_type,
+                source_intersection,
+                actual,
+            ));
+        }
+        if !self.commit_selected_argument_slots(call, slots, &call_sig.param_defaults) {
+            return false;
+        }
+        self.resolved_call_arg_slots
+            .get_mut(&call)
+            .expect("the selected argument commitment was just inserted")
+            .argument_bindings = argument_bindings;
+        true
+    }
+
+    pub(super) fn require_value_parameter_defaults<'a>(
+        &mut self,
+        call: ExprId,
+        param_defaults: &'a [bool],
+        context_count: usize,
+        value_parameter_count: usize,
+    ) -> Option<&'a [bool]> {
+        let defaults =
+            value_parameter_defaults(param_defaults, context_count, value_parameter_count);
+        if defaults.is_none() {
+            self.report_inconsistent_parameter_defaults(call);
+        }
+        defaults
+    }
+
+    pub(super) fn report_inconsistent_parameter_defaults(&mut self, call: ExprId) {
+        self.diags.error(
+            self.span(call),
+            "selected callable's default-value flags do not match its parameters".to_string(),
+        );
+    }
+
+    /// Record one selected call's slots and the default flags of the same parameter mapping.
+    /// Checked FIR reads this one record. A table whose length is not the slot count is not
+    /// recorded.
+    #[must_use]
+    pub(super) fn commit_selected_argument_slots(
+        &mut self,
+        call: ExprId,
+        slots: Vec<Option<ExprId>>,
+        param_defaults: &[bool],
+    ) -> bool {
+        let Some(declares_default) = declares_default_for_slots(param_defaults, slots.len()) else {
+            self.report_inconsistent_parameter_defaults(call);
+            return false;
+        };
+        self.resolved_call_arg_slots.insert(
+            call,
+            SelectedArgumentCommitment {
+                slots,
+                declares_default,
+                argument_bindings: Vec::new(),
+            },
+        );
+        true
+    }
+
+    /// Commit a selected subscript operator: its value-parameter slots and, for a generic
+    /// operator, the type arguments its selection solved (as every other generic call publishes
+    /// them). The selected signature's default flags are its full table; the flags used are its
+    /// value-parameter suffix, and a missing suffix does not fall back to that full table.
+    pub(super) fn commit_indexed_operator_arguments(
+        &mut self,
+        expression: ExprId,
+        selected: &crate::libraries::FunctionInfo,
+        bindings: &crate::symbol_resolver::GSigBinds,
+        params: &[Ty],
+        vararg: Option<usize>,
+        indices: &[ExprId],
+    ) -> bool {
+        let slots = match required_indexed_operator_argument_slots(params, vararg, indices) {
+            Ok(slots) => slots,
+            Err(message) => {
+                self.diags.error(self.span(expression), message.to_string());
+                return false;
+            }
+        };
+        let Some(defaults) = value_parameter_defaults(
+            &selected.call_sig.param_defaults,
+            selected.context_count,
+            slots.len(),
+        ) else {
+            self.report_inconsistent_parameter_defaults(expression);
+            return false;
+        };
+        if let Some(signature) = selected.generic_sig.as_ref() {
+            let resolved = signature
+                .formals
+                .iter()
+                .map(|formal| bindings.get(formal).copied())
+                .collect::<Vec<_>>();
+            self.replace_selected_generic_call(expression, signature, &selected.call_sig, resolved);
+        } else {
+            self.clear_selected_generic_call(expression);
+        }
+        self.commit_selected_argument_slots(expression, slots, defaults)
+    }
+
+    pub(super) fn record_zero_arg_operator_slots(
+        &mut self,
+        site: Option<IncDecSite>,
+        name: &str,
+        count: usize,
+        param_defaults: &[bool],
+        context_count: usize,
+    ) -> bool {
+        if count == 0 {
+            return true;
+        }
+        let Some(defaults) = value_parameter_defaults(param_defaults, context_count, count) else {
+            let span = match site {
+                Some(IncDecSite::Expression(expression)) => self.span(expression),
+                Some(IncDecSite::Statement(statement)) => {
+                    self.file.stmt_spans[statement.0 as usize]
+                }
+                None => return false,
+            };
+            self.diags.error(
+                span,
+                "selected callable's default-value flags do not match its parameters".to_string(),
+            );
+            return false;
+        };
+        let slots = vec![None; count];
+        match site {
+            Some(IncDecSite::Expression(expression)) => {
+                self.commit_selected_argument_slots(expression, slots, defaults)
+            }
+            Some(IncDecSite::Statement(statement)) => {
+                self.resolved_stmt_operator_arg_slots.insert(
+                    (
+                        statement,
+                        SyntheticOperatorCall::from_name(name)
+                            .expect("zero-argument convention has a synthetic-call key"),
+                    ),
+                    slots,
+                );
+                true
+            }
+            None => true,
+        }
+    }
+
+    /// Project one declared vararg array onto the representation currently carried by its source
+    /// argument. A spread can be probed either as the array expression (`*xs: Array<T>`) or as the
+    /// contributed element (`*xs: T`); selection and final checking must accept both without losing
+    /// the full `Array<T>` expectation needed to contextually type an array-producing generic call.
+    fn vararg_argument_expected(
+        &self,
+        declared_array: Ty,
+        _actual: Ty,
+        whole_array_syntax: bool,
+        inferred_element: Option<Ty>,
+    ) -> Ty {
+        let declared_element = declared_array.array_read_elem().unwrap_or(declared_array);
+        let element = inferred_element.unwrap_or(declared_element);
+        if !whole_array_syntax {
+            return element;
+        }
+        match declared_array.non_null() {
+            Ty::Obj(owner, _) if owner.matches("kotlin/Array") => {
+                Ty::obj_args_name(owner, &[element])
+            }
+            _ => declared_array,
+        }
+    }
+}
+
+/// The value-parameter default flags of one selected signature.
+///
+/// An empty table is the provider's "no parameter declares a default" fact, including after a
+/// context prefix is removed. A non-empty table contributes exactly the suffix after
+/// `context_count`, and that suffix must be one flag per value parameter. A slice that does not
+/// exist is a miss: callers do not substitute an all-false table or the unsliced flags.
+fn value_parameter_defaults(
+    param_defaults: &[bool],
+    context_count: usize,
+    value_parameter_count: usize,
+) -> Option<&[bool]> {
+    if param_defaults.is_empty() {
+        return Some(param_defaults);
+    }
+    let declared = param_defaults.get(context_count..)?;
+    (declared.len() == value_parameter_count).then_some(declared)
+}
+
+/// An empty table means no parameter declares a default. Any other table is one flag per slot.
+fn declares_default_for_slots(param_defaults: &[bool], slot_count: usize) -> Option<Vec<bool>> {
+    if param_defaults.is_empty() {
+        Some(vec![false; slot_count])
+    } else if param_defaults.len() == slot_count {
+        Some(param_defaults.to_vec())
+    } else {
+        None
+    }
+}
+
+/// Map the written operands of an indexed operator to its declared value-parameter slots.
+///
+/// Indexed syntax is the one Kotlin call form where positional operands may surround a vararg:
+/// `a[i, j] = value` calls `set(vararg indices, value)`. Ordinary call mapping deliberately cannot
+/// admit that shape, because positional arguments after a vararg are otherwise forbidden. Keeping
+/// this mapping explicit lets selection, checking, and lowering agree without weakening normal calls.
+pub(super) fn indexed_operator_argument_parameters(
+    params: &[Ty],
+    vararg_index: Option<usize>,
+    argument_count: usize,
+    set: bool,
+) -> Option<Vec<usize>> {
+    let Some(vararg) = vararg_index else {
+        if argument_count > params.len() {
+            return None;
+        }
+        if !set {
+            return Some((0..argument_count).collect());
+        }
+        let index_count = argument_count.checked_sub(1)?;
+        if index_count >= params.len() {
+            return None;
+        }
+        let mut parameters = (0..index_count).collect::<Vec<_>>();
+        parameters.push(params.len() - 1);
+        return Some(parameters);
+    };
+    let trailing = usize::from(set);
+    if params.len() != vararg + 1 + trailing {
+        return None;
+    }
+    let packed = argument_count.checked_sub(vararg + trailing)?;
+    let mut parameters = Vec::with_capacity(argument_count);
+    parameters.extend(0..vararg);
+    parameters.extend(std::iter::repeat_n(vararg, packed));
+    if set {
+        parameters.push(params.len() - 1);
+    }
+    Some(parameters)
+}
+
+pub(super) fn indexed_operator_argument_slots(
+    params: &[Ty],
+    vararg_index: Option<usize>,
+    arguments: &[ExprId],
+    set: bool,
+) -> Option<Vec<Option<ExprId>>> {
+    let parameters =
+        indexed_operator_argument_parameters(params, vararg_index, arguments.len(), set)?;
+    let mut slots = vec![None; params.len()];
+    for (&argument, parameter) in arguments.iter().zip(parameters) {
+        if slots[parameter].is_none() {
+            slots[parameter] = Some(argument);
+        }
+    }
+    Some(slots)
+}
+
+fn required_indexed_operator_argument_slots(
+    params: &[Ty],
+    vararg_index: Option<usize>,
+    arguments: &[ExprId],
+) -> Result<Vec<Option<ExprId>>, &'static str> {
+    indexed_operator_argument_slots(params, vararg_index, arguments, false)
+        .ok_or(SELECTED_INDEXED_ARGUMENT_MISMATCH)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        required_indexed_operator_argument_slots, value_parameter_defaults,
+        SelectedArgumentBinding, Ty,
+    };
+    use crate::ast::ExprId;
+
+    #[test]
+    fn a_short_default_table_is_not_reread_as_value_parameter_flags() {
+        assert_eq!(value_parameter_defaults(&[], 0, 3), Some(&[][..]));
+        assert_eq!(value_parameter_defaults(&[], 1, 2), Some(&[][..]));
+        assert!(value_parameter_defaults(&[true, false], 3, 2).is_none());
+        assert!(value_parameter_defaults(&[true], 0, 2).is_none());
+        assert_eq!(
+            value_parameter_defaults(&[false, true], 1, 1),
+            Some(&[true][..])
+        );
+    }
+
+    #[test]
+    fn an_impossible_indexed_shape_fails_with_the_commitment_diagnostic() {
+        assert_eq!(
+            required_indexed_operator_argument_slots(&[Ty::Int], None, &[ExprId(1), ExprId(2)],),
+            Err("selected indexed operator's arguments do not match its parameters")
+        );
+    }
+
+    #[test]
+    fn only_a_lexical_occurrence_replaces_the_committed_argument_type() {
+        let declared = Ty::ty_param("owner:T", Ty::nullable(Ty::obj("kotlin/Any")));
+        let occurrence = Ty::ty_param("owner:T", Ty::obj("kotlin/Any"));
+        let binding = |source_declared_type| SelectedArgumentBinding {
+            argument: ExprId(1),
+            parameter: 0,
+            vararg_element: false,
+            source_declared_type,
+            source_provenance: Default::default(),
+            source_intersection: None,
+        };
+
+        assert_eq!(
+            binding(Some(occurrence)).reified_occurrence(declared),
+            occurrence
+        );
+        assert_eq!(binding(None).reified_occurrence(declared), declared);
+    }
+}

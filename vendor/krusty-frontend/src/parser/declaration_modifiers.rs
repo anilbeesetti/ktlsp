@@ -1,0 +1,496 @@
+//! Declaration modifiers: the source locations kept for modifier-owned diagnostics, and the
+//! modality a modifier list selects.
+
+use super::{Parser, TokenKind};
+use crate::ast::{
+    AnnotationRef, DeclarationPrefix, ExprId, ExternalModifierTarget, ExternalModifierUse,
+};
+use crate::diag::Span;
+use crate::types::Visibility;
+
+/// Map parsed class modifiers to their declaration modality. `sealed` wins because it implies
+/// abstract and open; otherwise an explicit abstract/open modifier wins over the final default.
+pub(super) fn modality_of(
+    is_open: bool,
+    is_abstract: bool,
+    is_sealed: bool,
+) -> crate::ast::Modality {
+    use crate::ast::Modality;
+    if is_sealed {
+        Modality::Sealed
+    } else if is_abstract {
+        Modality::Abstract
+    } else if is_open {
+        Modality::Open
+    } else {
+        Modality::Final
+    }
+}
+
+pub(super) fn modality_from_modifiers(modifiers: &[String]) -> crate::ast::Modality {
+    let sealed = modifiers.iter().any(|modifier| modifier == "sealed");
+    modality_of(
+        sealed || modifiers.iter().any(|modifier| modifier == "open"),
+        sealed || modifiers.iter().any(|modifier| modifier == "abstract"),
+        sealed,
+    )
+}
+
+/// The modifier list of the declaration being parsed, accumulated across its `skip_decl_prefix`
+/// runs (a context clause or `companion` may separate them) until the declaration records it.
+#[derive(Default)]
+pub(super) struct PrefixInProgress {
+    first_modifier: Option<Span>,
+    visibility: Option<Visibility>,
+}
+
+impl Parser<'_> {
+    /// Consume leading annotations (`@Foo`, `@file:Bar(...)`) and soft modifiers (`public`, `open`,
+    /// `inline`, `operator`, `suspend`, …) that precede a declaration. Modifiers that change the
+    /// declaration *kind* (`enum`, `annotation`, `data`, `object`, …) are left for their real
+    /// declaration productions rather than being mistaken for ordinary modifiers.
+    /// Take the annotations captured by the preceding `skip_decl_prefix`, clearing the buffer.
+    /// `parse_class`/`parse_enum`/… call this FIRST so member-prefix parsing doesn't clobber them.
+    pub(super) fn take_pending_annotations(&mut self) -> Vec<crate::ast::AnnotationRef> {
+        std::mem::take(&mut self.pending_annotations)
+    }
+
+    /// Take the per-annotation argument expressions captured by the preceding `skip_decl_prefix`
+    /// (parallel to [`Parser::take_pending_annotations`]), clearing the buffer.
+    pub(super) fn take_pending_annotation_args(&mut self) -> Vec<Vec<crate::ast::ExprId>> {
+        std::mem::take(&mut self.pending_annotation_args)
+    }
+
+    /// Consume one annotation and retain its complete classifier reference plus arguments. Property
+    /// use-site targets stay on the reference for frontend validation and later partitioning;
+    /// `@file:` and unsupported use-site targets return `None` here.
+    /// Keep a type-use annotation's non-empty argument list, keyed by the annotation's span.
+    pub(super) fn record_type_annotation_arguments(
+        &mut self,
+        annotation: Span,
+        arguments: Vec<ExprId>,
+    ) {
+        if !arguments.is_empty() {
+            let key = (annotation.lo, annotation.hi);
+            self.file.type_annotation_arguments.insert(key, arguments);
+        }
+    }
+
+    pub(super) fn parse_annotation(&mut self) -> (Option<AnnotationRef>, Vec<ExprId>) {
+        let at = self.tok().span.lo;
+        self.bump(); // '@'
+                     // optional use-site target: `file:`, `get:`, `param:`, ...
+        let mut use_site = false;
+        let mut target = String::new();
+        if self.at(TokenKind::Ident)
+            && self
+                .t
+                .get(self.i + 1)
+                .is_some_and(|t| t.kind == TokenKind::Colon)
+        {
+            target = self.text().to_string();
+            self.bump();
+            self.bump(); // ':'
+            use_site = true;
+        }
+        // Kotlin's grouped file-target form omits `@file:` from each entry:
+        // `@file:[JvmName("Facade") JvmMultifileClass]`. Each entry is still an independent file
+        // annotation with its own reference and arguments. Consume the group at the annotation
+        // grammar boundary so the following `package` remains an ordinary file directive.
+        if target == "file" && self.at(TokenKind::LBracket) {
+            self.bump(); // '['
+            loop {
+                self.skip_newlines();
+                if self.at(TokenKind::RBracket) || self.at(TokenKind::Eof) {
+                    break;
+                }
+                let (qname, annotation_span) = self.parse_annotation_reference();
+                let args = self.parse_annotation_args();
+                if !qname.is_empty() {
+                    let annotation = AnnotationRef {
+                        name: qname,
+                        at,
+                        span: annotation_span,
+                        property_site: None,
+                    };
+                    self.file.file_annotations.push((annotation, args));
+                }
+                if self.at(TokenKind::Comma) {
+                    self.bump();
+                }
+            }
+            self.eat(TokenKind::RBracket);
+            return (None, Vec::new());
+        }
+        let (qname, annotation_span) = self.parse_annotation_reference();
+        let args = self.parse_annotation_args();
+        if target == "file" && !qname.is_empty() {
+            let annotation = AnnotationRef {
+                name: qname.clone(),
+                at,
+                span: annotation_span,
+                property_site: None,
+            };
+            self.file.file_annotations.push((annotation, args.clone()));
+        }
+        if qname.is_empty() {
+            (None, args)
+        } else if matches!(
+            target.as_str(),
+            "field" | "property" | "param" | "get" | "set" | "setparam"
+        ) {
+            let property_site = match target.as_str() {
+                "field" => crate::types::PropertyAnnotationSite::Field,
+                "property" => crate::types::PropertyAnnotationSite::Property,
+                "param" => crate::types::PropertyAnnotationSite::ValueParameter,
+                "get" => crate::types::PropertyAnnotationSite::Getter,
+                "set" => crate::types::PropertyAnnotationSite::Setter,
+                "setparam" => crate::types::PropertyAnnotationSite::SetterParameter,
+                _ => unreachable!("matched property annotation use-site"),
+            };
+            (
+                Some(AnnotationRef {
+                    name: qname,
+                    at,
+                    span: annotation_span,
+                    property_site: Some(property_site),
+                }),
+                args,
+            )
+        } else if use_site {
+            (None, args)
+        } else {
+            (
+                Some(AnnotationRef {
+                    name: qname,
+                    at,
+                    span: annotation_span,
+                    property_site: None,
+                }),
+                args,
+            )
+        }
+    }
+
+    pub(super) fn skip_decl_prefix(&mut self) -> Vec<String> {
+        let mut mods = Vec::new();
+        self.pending_annotations.clear();
+        self.pending_annotation_args.clear();
+        loop {
+            self.skip_newlines();
+            if self.at(TokenKind::At) {
+                let (name, args) = self.parse_annotation();
+                if let Some(name) = name {
+                    self.pending_annotations.push(name);
+                    self.pending_annotation_args.push(args);
+                }
+            } else if self.at_modifier()
+                && self.t.get(self.i + 1).map(|t| t.kind) != Some(TokenKind::Colon)
+            {
+                // A modifier soft keyword immediately followed by `:` is a NAME, not a modifier
+                // (`fun f(open: Int)`, `@Anno sealed: T`) — a real modifier is never followed by a colon.
+                let text = self.text().to_string();
+                // `expect` and `actual` are legal only in a multiplatform project, and kotlinc's
+                // diagnostic points at the MODIFIER, so its span is captured here where the keyword
+                // is in hand. Every call site records, members included, because a member `actual`
+                // is reported too. Deduped by span: the `companion fun` lookahead consumes a prefix
+                // and rewinds, and the ordinary path then re-consumes the same keyword.
+                if text == "expect" || text == "actual" {
+                    let span = self.tok().span;
+                    if !self
+                        .file
+                        .multiplatform_modifiers
+                        .iter()
+                        .any(|(_, seen)| *seen == span)
+                    {
+                        self.file.multiplatform_modifiers.push((text.clone(), span));
+                    }
+                }
+                self.note_declaration_prefix_token(self.t[self.i].span);
+                let prefix = &mut self.declaration_prefix;
+                if matches!(
+                    text.as_str(),
+                    "public" | "protected" | "internal" | "private"
+                ) {
+                    prefix
+                        .visibility
+                        .get_or_insert(Visibility::from_modifier(&text));
+                }
+                if text == "value" {
+                    self.value_modifier_span = Some(self.tok().span);
+                }
+                if text == "external" {
+                    self.external_modifier_spans.push(self.tok().span);
+                }
+                mods.push(text);
+                self.bump();
+            } else {
+                break;
+            }
+        }
+        mods
+    }
+
+    /// Consume another modifier/annotation run belonging to the declaration whose prefix is
+    /// already buffered. Kotlin permits context and `companion` clauses between such runs, so a
+    /// later run must append annotations rather than erase the ones parsed before the clause.
+    pub(super) fn extend_decl_prefix(&mut self) -> Vec<String> {
+        let mut annotations = std::mem::take(&mut self.pending_annotations);
+        let mut annotation_args = std::mem::take(&mut self.pending_annotation_args);
+        let modifiers = self.skip_decl_prefix();
+        annotations.append(&mut self.pending_annotations);
+        annotation_args.append(&mut self.pending_annotation_args);
+        self.pending_annotations = annotations;
+        self.pending_annotation_args = annotation_args;
+        modifiers
+    }
+}
+
+impl Parser<'_> {
+    /// The `value` keyword in `modifiers`, if this prefix wrote one. Cleared so a nested class
+    /// parsed next records its own keyword.
+    pub(super) fn take_value_modifier_span(&mut self, modifiers: &[String]) -> Option<Span> {
+        let span = self.value_modifier_span.take();
+        modifiers
+            .iter()
+            .any(|modifier| modifier == "value")
+            .then_some(span)
+            .flatten()
+    }
+
+    /// Record the `external` keywords of a primary-constructor property whose prefix wrote
+    /// `modifiers`; kotlinc deprecates the first and rejects every repetition.
+    pub(super) fn record_external_property_parameter(&mut self, modifiers: &[String]) {
+        let spans = std::mem::take(&mut self.external_modifier_spans);
+        if modifiers.iter().any(|modifier| modifier == "external") {
+            self.file
+                .external_modifier_uses
+                .extend(
+                    spans
+                        .into_iter()
+                        .enumerate()
+                        .map(|(index, span)| ExternalModifierUse {
+                            target: ExternalModifierTarget::PropertyParameter,
+                            span,
+                            repeated: index > 0,
+                        }),
+                );
+        }
+    }
+
+    /// An enum entry's annotations and modifiers, before its name. Annotations are kept so they
+    /// reach the enum's static field (`@SerialName("system") SYSTEM(...)`, common in
+    /// kotlinx.serialization enums). `external` is the one modifier an entry may still write, and
+    /// kotlinc deprecates it (`ForbidExternalEnumEntriesAndPrimaryConstructorProperties`).
+    pub(super) fn parse_enum_entry_prefix(&mut self) -> (Vec<AnnotationRef>, Vec<Vec<ExprId>>) {
+        let mut annotations = Vec::new();
+        let mut annotation_args = Vec::new();
+        let mut external = Vec::new();
+        loop {
+            if self.at(TokenKind::At) {
+                let (name, args) = self.parse_annotation();
+                if let Some(name) = name {
+                    annotations.push(name);
+                    annotation_args.push(args);
+                }
+            } else if self.at_external_entry_modifier() {
+                external.push(self.tok().span);
+                self.bump();
+            } else {
+                break;
+            }
+            self.skip_newlines();
+        }
+        self.file
+            .external_modifier_uses
+            .extend(
+                external
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, span)| ExternalModifierUse {
+                        target: ExternalModifierTarget::EnumEntry,
+                        span,
+                        repeated: index > 0,
+                    }),
+            );
+        (annotations, annotation_args)
+    }
+
+    /// Whether an enum entry's prefix continues with an `external` modifier: the keyword followed,
+    /// past any line break, by an annotation or by the entry's name and what may follow an entry
+    /// name. An entry named `external`, and a member such as `external interface I` after the entry
+    /// list, are not entry modifiers.
+    pub(super) fn at_external_entry_modifier(&self) -> bool {
+        if !(self.at(TokenKind::Ident) && self.keyword_text("external")) {
+            return false;
+        }
+        let next = self.after_plain_newlines(self.i + 1);
+        let Some(next_token) = self.t.get(next).copied() else {
+            return false;
+        };
+        if next_token.kind == TokenKind::Ident && self.token_keyword_text(next_token, "external") {
+            return true;
+        }
+        match next_token.kind {
+            TokenKind::At => true,
+            TokenKind::Ident => matches!(
+                self.t.get(next + 1).map(|token| token.kind),
+                None | Some(
+                    TokenKind::LParen
+                        | TokenKind::LBrace
+                        | TokenKind::Comma
+                        | TokenKind::Newline
+                        | TokenKind::RBrace
+                        | TokenKind::Eof
+                )
+            ),
+            _ => false,
+        }
+    }
+
+    /// Start a declaration whose modifier list [`Parser::record_declaration_prefix`] will keep.
+    pub(super) fn begin_declaration_prefix(&mut self) {
+        self.declaration_prefix = PrefixInProgress::default();
+        self.external_modifier_spans.clear();
+    }
+
+    /// Note a token of the modifier list being consumed; the first one starts the list as kotlinc
+    /// reports it. Annotations are not noted: a report about the modifiers starts after them.
+    pub(super) fn note_declaration_prefix_token(&mut self, token: Span) {
+        self.declaration_prefix.first_modifier.get_or_insert(token);
+    }
+
+    /// Keep the modifier list consumed since [`Parser::begin_declaration_prefix`] for the
+    /// declaration starting at `start`, positioned on the token after that list. A classifier's
+    /// kind words (`data`, `enum`, `annotation`, `companion`, `fun interface`) are not modifiers to
+    /// the parser, so its keyword and name are found past them; each is a key the declaration can
+    /// find its prefix by.
+    pub(super) fn record_declaration_prefix(&mut self, start: u32) {
+        let prefix = std::mem::take(&mut self.declaration_prefix);
+        let after = self.tok().span;
+        let mut keys = vec![start, after.lo];
+        let mut classifier_keyword = None;
+        let mut index = self.i;
+        while self.t.get(index).is_some_and(|token| {
+            ["data", "enum", "annotation", "companion"]
+                .iter()
+                .any(|word| self.token_keyword_text(*token, word))
+                || (token.kind == TokenKind::KwFun
+                    && self
+                        .t
+                        .get(index + 1)
+                        .is_some_and(|next| self.token_keyword_text(*next, "interface")))
+        }) {
+            index += 1;
+        }
+        if let Some(keyword) = self.t.get(index).filter(|token| {
+            token.kind == TokenKind::KwClass
+                || self.token_keyword_text(**token, "object")
+                || self.token_keyword_text(**token, "interface")
+        }) {
+            keys.push(keyword.span.lo);
+            classifier_keyword = Some(keyword.span);
+            if let Some(name) = self.t.get(index + 1).filter(|t| t.kind == TokenKind::Ident) {
+                keys.push(name.span.lo);
+            }
+        }
+        self.file.declaration_prefixes.record(
+            &keys,
+            DeclarationPrefix {
+                start: prefix.first_modifier.unwrap_or(after),
+                visibility: prefix.visibility,
+                declaration_start: start,
+                classifier_keyword,
+            },
+        );
+    }
+}
+
+/// The function flags a modifier list declares.
+pub(super) fn function_flags(modifiers: &[String]) -> crate::ast::FdFlags {
+    let mut flags = crate::ast::FdFlags::default()
+        .with_has_visibility_modifier(has_visibility_modifier(modifiers));
+    let mut is_final = false;
+    let mut is_open = false;
+    for modifier in modifiers {
+        flags = match modifier.as_str() {
+            "inline" => flags.with_is_inline(true),
+            "final" => {
+                is_final = true;
+                flags.with_is_final(true)
+            }
+            "open" => {
+                is_open = true;
+                flags
+            }
+            "override" => {
+                is_open = true;
+                flags.with_is_override(true)
+            }
+            "abstract" => flags.with_is_abstract(true),
+            "suspend" => flags.with_is_suspend(true),
+            "tailrec" => flags.with_is_tailrec(true),
+            "operator" => flags.with_is_operator(true),
+            "infix" => flags.with_is_infix(true),
+            "companion" => flags.with_is_companion_extension(true),
+            "external" => flags.with_is_external(true),
+            "actual" => flags.with_is_actual(true),
+            _ => flags,
+        };
+    }
+    flags.with_is_open(is_open && !is_final)
+}
+
+/// The visibility a modifier list declares; a declaration that writes none is `public`.
+pub(super) fn visibility_of(modifiers: &[String]) -> Visibility {
+    modifiers
+        .iter()
+        .find(|m| matches!(m.as_str(), "private" | "protected" | "internal" | "public"))
+        .map(|m| Visibility::from_modifier(m))
+        .unwrap_or_default()
+}
+
+/// Whether the modifier list wrote a visibility keyword. An `override` with none keeps the
+/// overridden member's visibility rather than defaulting to `public`.
+pub(super) fn has_visibility_modifier(modifiers: &[String]) -> bool {
+    modifiers
+        .iter()
+        .any(|m| matches!(m.as_str(), "private" | "protected" | "internal" | "public"))
+}
+
+/// Return the source span of `modifier` when it was present in the parsed modifier set.
+///
+/// Declaration parsing consumes modifier tokens before the declaration-specific parser runs. Keep
+/// the reverse token lookup in one place so every diagnostic that belongs to a modifier points at
+/// that modifier rather than independently reconstructing its location.
+pub(super) fn span(parser: &Parser<'_>, modifiers: &[String], modifier: &str) -> Option<Span> {
+    modifiers
+        .iter()
+        .any(|candidate| candidate == modifier)
+        .then(|| {
+            parser.t[..parser.i]
+                .iter()
+                .rev()
+                .find(|token| parser.token_keyword_text(**token, modifier))
+                .map(|token| token.span)
+                .unwrap_or_else(|| panic!("a {modifier} modifier must retain its source token"))
+        })
+}
+
+/// Record a nested classifier that wrote `actual` as its own actualization target.
+///
+/// The enclosing declaration's `actual` does not cover it: the reference compiler reports every
+/// unmatched `actual` at its own name, a nested classifier's included. The top-level record keeps
+/// only the outermost declaration of a hoisted group, because a hoisted descendant carries the
+/// modifier only if it wrote one itself — which is knowable here, at the two sites that own the
+/// nested declaration's modifier list, and nowhere afterwards without pairing a keyword span with
+/// whichever declaration happens to follow it.
+pub(super) fn record_nested_actual(
+    file: &mut crate::ast::File,
+    modifiers: &[String],
+    nested: crate::ast::DeclId,
+) {
+    if modifiers.iter().any(|modifier| modifier == "actual") {
+        file.actual_decls.push(nested);
+    }
+}

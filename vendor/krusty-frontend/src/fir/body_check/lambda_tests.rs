@@ -1,0 +1,1563 @@
+use super::test_support::{
+    checked_function_body, checked_function_body_with_platform, jvm_semantics,
+    jvm_stdlib_semantics, root_expression,
+};
+use super::*;
+use crate::fir::{CallableId, FirSamConversionId, FirSamMethod, ResolvedFunctionOverrideTarget};
+
+#[test]
+fn valueless_nullable_unit_lambda_return_retains_its_unit_value() {
+    let (body, _) = checked_function_body(
+        "fun consume(block: () -> Unit?) {}\n\
+         fun test() { consume { if (true) return@consume; null } }\n",
+        "test",
+    );
+    let lambda = (0..body.expression_count())
+        .find_map(
+            |raw| match &body.expr(FirExprId::from_raw(raw as u32))?.kind {
+                FirExprKind::Lambda { body, .. } => Some(body.as_ref()),
+                _ => None,
+            },
+        )
+        .expect("checked nullable-Unit lambda");
+    let returned = (0..lambda.expression_count())
+        .find_map(
+            |raw| match &lambda.expr(FirExprId::from_raw(raw as u32))?.kind {
+                FirExprKind::Jump {
+                    kind: FirJumpKind::Return { target_depth: 0 },
+                    value: Some(value),
+                    ..
+                } => Some(*value),
+                _ => None,
+            },
+        )
+        .expect("local return with a checked value");
+    let FirExprKind::ImplicitConversion { value, conversion } =
+        &lambda.expr(returned).expect("return value").kind
+    else {
+        panic!("Unit must be explicitly widened to Unit?")
+    };
+    assert!(matches!(
+        conversion.kind,
+        FirConversionKind::NullabilityWidening { to }
+            if to.get() == Ty::nullable(Ty::Unit)
+    ));
+    assert!(matches!(
+        lambda.expr(*value).map(|expression| &expression.kind),
+        Some(FirExprKind::SingletonValue { classifier })
+            if classifier.matches("kotlin/Unit")
+    ));
+}
+
+#[test]
+fn capture_free_lambda_owns_a_body_local_callable_and_checked_body() {
+    let (body, _) = checked_function_body("fun make(): () -> Int = { 42 }\n", "make");
+    let FirExprKind::Lambda {
+        callable,
+        type_parameters,
+        body: lambda_body,
+        ..
+    } = &body.expr(root_expression(&body)).expect("lambda").kind
+    else {
+        panic!("lambda must become a body-local checked callable")
+    };
+    assert_eq!(lambda_body.local_callable(), Some(*callable));
+    assert!(type_parameters.is_empty());
+    assert!(lambda_body.parameters().is_empty());
+    assert!(matches!(
+        lambda_body
+            .statement(lambda_body.roots()[0])
+            .map(|statement| &statement.kind),
+        Some(FirStatementKind::Expression(_))
+    ));
+}
+
+#[test]
+fn lambda_publishes_exact_enclosing_type_parameter_identities_and_bound_closure() {
+    let (body, index) = checked_function_body(
+        "class Holder<T> {\n\
+             fun <V : T> make(value: V): (V) -> V = { value }\n\
+         }\n",
+        "make",
+    );
+    let FirExprKind::Lambda {
+        type_parameters, ..
+    } = &body.expr(root_expression(&body)).expect("lambda").kind
+    else {
+        panic!("generic function result must remain a checked lambda")
+    };
+    let names = type_parameters
+        .iter()
+        .map(|parameter| {
+            index
+                .type_parameter_name(*parameter)
+                .expect("published type parameter name")
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(names, ["V", "T"]);
+}
+
+/// The checked lambda body in `source`'s `test` function.
+fn only_lambda_body(body: &FirBody) -> &FirBody {
+    (0..body.expression_count())
+        .find_map(|raw| {
+            let expression = body.expr(FirExprId::from_raw(raw as u32))?;
+            let FirExprKind::Lambda { body, .. } = &expression.kind else {
+                return None;
+            };
+            Some(body.as_ref())
+        })
+        .expect("checked lambda")
+}
+
+#[test]
+fn effect_only_lambda_returns_unit_under_an_any_result() {
+    let (body, _) = checked_function_body(
+        "fun consume(block: () -> Any?) {}\n\
+         fun test() { consume { while (false) {} } }\n",
+        "test",
+    );
+    assert_eq!(
+        only_lambda_body(&body).result_type().map(ResolvedTy::get),
+        Some(Ty::Unit)
+    );
+}
+
+#[test]
+fn effect_only_lambda_result_publishes_its_unit_value_widening() {
+    let (body, _) = checked_function_body(
+        "fun consume(block: () -> Any?) {}\n\
+         fun test(flag: Boolean) { consume { if (flag) return@consume null; while (false) {} } }\n",
+        "test",
+    );
+    let lambda_body = only_lambda_body(&body);
+    assert_eq!(
+        lambda_body.result_type().map(ResolvedTy::get),
+        Some(Ty::nullable(Ty::obj("kotlin/Any")))
+    );
+    let result = lambda_body
+        .roots()
+        .iter()
+        .find_map(|&root| match lambda_body.statement(root)?.kind {
+            FirStatementKind::Expression(result) => Some(result),
+            _ => None,
+        })
+        .expect("lambda result root");
+    assert!(matches!(
+        lambda_body.expr(result).map(|expression| &expression.kind),
+        Some(FirExprKind::ImplicitConversion {
+            value,
+            conversion: FirConversion {
+                kind: FirConversionKind::NullabilityWidening { to },
+                ..
+            },
+        }) if to.get() == Ty::nullable(Ty::obj("kotlin/Any"))
+            && lambda_body.expr(*value).is_some_and(|value| value.ty.get() == Ty::Unit)
+    ));
+}
+
+#[test]
+fn lambda_parameters_get_body_local_value_identities() {
+    let (body, _) =
+        checked_function_body("fun make(): (Int) -> Int = { value -> value }\n", "make");
+    let FirExprKind::Lambda {
+        body: lambda_body, ..
+    } = &body.expr(root_expression(&body)).expect("lambda").kind
+    else {
+        panic!("lambda must become checked FIR")
+    };
+    let [parameter] = lambda_body.parameters() else {
+        panic!("lambda must publish its value parameter")
+    };
+    let FirStatementKind::Expression(result) = lambda_body
+        .statement(lambda_body.roots()[0])
+        .expect("lambda root")
+        .kind
+    else {
+        panic!("lambda root must be an expression")
+    };
+    assert!(matches!(
+        lambda_body.expr(result).map(|expression| &expression.kind),
+        Some(FirExprKind::Block {
+            result: Some(value),
+            ..
+        }) if matches!(
+            lambda_body.expr(*value).map(|expression| &expression.kind),
+            Some(FirExprKind::ValueRead(target)) if *target == parameter.value
+        )
+    ));
+}
+
+#[test]
+fn lambda_capture_uses_an_identity_path_instead_of_a_source_name() {
+    let (body, _) = checked_function_body("fun make(value: Int): () -> Int = { value }\n", "make");
+    let [source_parameter] = body.parameters() else {
+        panic!("enclosing function parameter")
+    };
+    let FirExprKind::Lambda {
+        body: lambda_body, ..
+    } = &body.expr(root_expression(&body)).expect("lambda").kind
+    else {
+        panic!("lambda must become checked FIR")
+    };
+    let [capture] = lambda_body.captures() else {
+        panic!("lambda must publish one capture")
+    };
+    assert_eq!(capture.enclosing_depth, 0);
+    assert_eq!(
+        capture.source,
+        crate::fir::FirCaptureSource::Value(source_parameter.value)
+    );
+}
+
+#[test]
+fn sibling_lambdas_use_one_shared_cell_when_either_writes_the_capture() {
+    let (body, _) = checked_function_body(
+        "fun consume(write: () -> Unit, read: () -> Double) {}\n\
+         fun use() {\n\
+             var value = 0.0\n\
+             consume({ value = 1.0 }, { value })\n\
+         }\n",
+        "use",
+    );
+    let captures = (0..body.expression_count())
+        .filter_map(|raw| {
+            let expression = body.expr(FirExprId::from_raw(u32::try_from(raw).ok()?))?;
+            let FirExprKind::Lambda {
+                body: lambda_body, ..
+            } = &expression.kind
+            else {
+                return None;
+            };
+            let [capture] = lambda_body.captures() else {
+                return None;
+            };
+            Some(*capture)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(captures.len(), 2);
+    assert_eq!(captures[0].source, captures[1].source);
+    assert!(captures.iter().all(|capture| capture.shared_cell));
+}
+
+#[test]
+fn lambda_read_of_enclosing_var_uses_a_shared_cell() {
+    let (body, _) = checked_function_body(
+        "fun read(): Int { var value = 1; val get = { value }; value = 2; return get() }\n",
+        "read",
+    );
+    let capture = (0..body.expression_count())
+        .find_map(|raw| {
+            let FirExprKind::Lambda {
+                body: lambda_body, ..
+            } = &body.expr(FirExprId::from_raw(raw as u32))?.kind
+            else {
+                return None;
+            };
+            lambda_body.captures().first().copied()
+        })
+        .expect("lambda must capture the enclosing var");
+    assert!(capture.shared_cell);
+}
+
+#[test]
+fn guarded_and_asserted_receivers_capture_their_non_null_flow_type() {
+    let (body, index) = checked_function_body(
+        "class Token\n\
+         fun <T> T.hold(block: (T) -> Unit) = block(this)\n\
+         fun consume(value: Token) {}\n\
+         fun test(value: Token?) {\n\
+             value?.hold { consume(value) }\n\
+             value!!.hold { consume(value) }\n\
+         }\n",
+        "test",
+    );
+    let captures = (0..body.expression_count())
+        .filter_map(|raw| {
+            let FirExprKind::Lambda {
+                body: lambda_body, ..
+            } = &body.expr(FirExprId::from_raw(raw as u32))?.kind
+            else {
+                return None;
+            };
+            let [capture] = lambda_body.captures() else {
+                return None;
+            };
+            let checked_smart_cast = (0..lambda_body.expression_count()).any(|raw| {
+                let Some(expression) = lambda_body.expr(FirExprId::from_raw(raw as u32)) else {
+                    return false;
+                };
+                let FirExprKind::Call(call) = &expression.kind else {
+                    return false;
+                };
+                let Some(target) = call.target.module() else {
+                    return false;
+                };
+                index.callable_name(target) == Some("consume")
+                    && matches!(
+                        call.arguments.as_ref(),
+                        [FirCallArgument::Expression {
+                            conversion: Some(FirConversion {
+                                kind: FirConversionKind::SmartCast { to },
+                                ..
+                            }),
+                            ..
+                        }] if to.get() == Ty::obj("Token")
+                    )
+            });
+            Some((*capture, checked_smart_cast))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(captures.len(), 2);
+    assert!(captures
+        .iter()
+        .all(|(capture, _)| !capture.ty.get().mentions_pending()));
+    assert!(captures.iter().all(|(_, checked)| *checked));
+}
+
+#[test]
+fn unreachable_trailing_lambda_is_erased_with_its_captured_locals() {
+    let (body, _) = checked_function_body_with_platform(
+        "// WITH_STDLIB\n\
+         fun consume(block: () -> Unit) { block() }\n\
+         fun remove() {\n\
+             throw Exception(\"stop\")\n\
+             var captured = 0\n\
+             consume { captured = 1 }\n\
+         }\n",
+        "remove",
+        jvm_stdlib_semantics(),
+    );
+    let FirExprKind::Block {
+        result: Some(result),
+        ..
+    } = &body
+        .expr(root_expression(&body))
+        .expect("checked function block")
+        .kind
+    else {
+        panic!("function must retain its checked block")
+    };
+    assert!(matches!(
+        body.expr(*result).map(|expression| &expression.kind),
+        Some(FirExprKind::Block {
+            statements,
+            result: None,
+        }) if statements.is_empty()
+    ));
+    assert!(!(0..body.expression_count()).any(|raw| matches!(
+        body.expr(FirExprId::from_raw(raw as u32))
+            .map(|expression| &expression.kind),
+        Some(FirExprKind::Lambda { .. })
+    )));
+}
+
+#[test]
+fn lambda_in_nested_inner_class_captures_full_outer_receiver_depth() {
+    let source = "class Outer {\n\
+                      val value = \"OK\"\n\
+                      inner class Inner1 {\n\
+                          inner class Inner2 {\n\
+                              fun read(): String = { value }()\n\
+                          }\n\
+                      }\n\
+                  }\n";
+    let (body, _) = checked_function_body(source, "read");
+
+    fn has_outer_capture(body: &FirBody) -> bool {
+        (0..body.expression_count()).any(|raw| {
+            let Some(expression) = body.expr(FirExprId::from_raw(raw as u32)) else {
+                return false;
+            };
+            match &expression.kind {
+                FirExprKind::CapturedImplicitReceiver {
+                    enclosing_depth: 0,
+                    current: false,
+                    depth: 2,
+                    ..
+                } => true,
+                FirExprKind::Lambda { body, .. } => has_outer_capture(body),
+                _ => false,
+            }
+        })
+    }
+
+    assert!(has_outer_capture(&body));
+}
+
+#[test]
+fn lambda_captures_current_dispatch_receiver_independently_of_named_context_values() {
+    let (body, _) = checked_function_body_with_platform(
+        "// LANGUAGE: +ContextParameters\n\
+         // WITH_STDLIB\n\
+         class Marker\n\
+         class Host {\n\
+             context(marker: Marker)\n\
+             fun result(): String = listOf(1).map { hostValue() }.single()\n\
+         }\n\
+         context(host: Host) fun hostValue(): String = \"OK\"\n",
+        "result",
+        jvm_stdlib_semantics(),
+    );
+
+    let lambda = (0..body.expression_count())
+        .find_map(
+            |raw| match &body.expr(FirExprId::from_raw(raw as u32))?.kind {
+                FirExprKind::Lambda { body, .. } => Some(body.as_ref()),
+                _ => None,
+            },
+        )
+        .expect("map lambda");
+    assert!(
+        (0..lambda.expression_count()).any(|raw| matches!(
+            lambda.expr(FirExprId::from_raw(raw as u32)),
+            Some(FirExpr {
+                ty,
+                kind: FirExprKind::CapturedImplicitReceiver {
+                    enclosing_depth: 0,
+                    current: true,
+                    depth: 0,
+                    ..
+                },
+                ..
+            }) if ty.get() == Ty::obj("Host")
+        )),
+        "named context values do not alter the semantic implicit-receiver tower"
+    );
+}
+
+#[test]
+fn receiver_lambda_records_receiver_type_and_selected_implicit_dispatch() {
+    let (body, index) = checked_function_body(
+        "class Box { fun answer(): Int = 42 }\nfun make(): Box.() -> Int = { answer() }\n",
+        "make",
+    );
+    let FirExprKind::Lambda {
+        body: lambda_body, ..
+    } = &body
+        .expr(root_expression(&body))
+        .expect("lambda expression")
+        .kind
+    else {
+        panic!("receiver lambda must become a checked local callable")
+    };
+    assert!(lambda_body.receiver_type().is_some());
+    let root = lambda_body
+        .expr(root_expression(lambda_body))
+        .expect("receiver member call");
+    let call_expression = match &root.kind {
+        FirExprKind::Block {
+            result: Some(result),
+            ..
+        } => lambda_body.expr(*result).expect("lambda block result"),
+        _ => root,
+    };
+    let FirExprKind::Call(call) = &call_expression.kind else {
+        panic!(
+            "receiver lambda body must retain the selected member call, got {:?}",
+            call_expression.kind
+        )
+    };
+    assert!(index.callable(call.target.module().unwrap()).is_some());
+    let receiver = call
+        .dispatch_receiver
+        .expect("receiver member call needs the lambda receiver");
+    assert!(matches!(
+        lambda_body
+            .expr(receiver.value)
+            .map(|expression| &expression.kind),
+        Some(FirExprKind::ImplicitReceiver {
+            current: true,
+            depth: 0,
+        })
+    ));
+}
+
+#[test]
+fn delegated_generic_inline_lambda_uses_expected_types_and_keeps_nested_trailing_lambdas() {
+    let (body, _) = checked_function_body_with_platform(
+        "interface Transform<A : Any, B : Any> {\n\
+             fun run(value: A): B\n\
+             companion object {\n\
+                 inline fun <reified A : Any, reified B : Any> build(\n\
+                     crossinline transform: (A) -> B\n\
+                 ): Transform<A, B> = object : Transform<A, B> {\n\
+                     override fun run(value: A): B = transform(value)\n\
+                 }\n\
+             }\n\
+         }\n\
+         class Input(val text: String)\n\
+         class Output { var text: String? = null }\n\
+         class Wrapped(val input: Input?)\n\
+         class Host {\n\
+             companion object : Transform<Wrapped, Output> by Transform.build(\n\
+                 transform = { Output().apply { text = it.input?.text } }\n\
+             )\n\
+         }\n\
+         fun use(): String = Host.run(Wrapped(Input(\"OK\"))).text ?: \"fail\"\n",
+        "use",
+        jvm_semantics(),
+    );
+
+    assert!(!body.roots().is_empty());
+}
+
+#[test]
+fn context_lambda_records_context_types_and_selected_receiver_coordinate() {
+    let (body, index) = checked_function_body(
+        "class Session(val token: String)\n\
+         fun action(): context(Session) () -> String = { token }\n",
+        "action",
+    );
+    let FirExprKind::Lambda {
+        body: lambda_body, ..
+    } = &body
+        .expr(root_expression(&body))
+        .expect("lambda expression")
+        .kind
+    else {
+        panic!("context lambda must become a checked local callable")
+    };
+    assert_eq!(lambda_body.context_receiver_types().len(), 1);
+    assert_eq!(
+        lambda_body.context_parameter_kinds(),
+        &[crate::types::ContextParameterKind::Anonymous]
+    );
+    assert!(lambda_body.receiver_type().is_none());
+    let root = lambda_body
+        .expr(root_expression(lambda_body))
+        .expect("lambda block");
+    let FirExprKind::Block {
+        result: Some(result),
+        ..
+    } = root.kind
+    else {
+        panic!("lambda must retain its block result")
+    };
+    let FirExprKind::PropertyRead {
+        target,
+        dispatch_receiver,
+        ..
+    } = &lambda_body
+        .expr(result)
+        .expect("context property read")
+        .kind
+    else {
+        panic!("context property access must retain its selected property")
+    };
+    assert!(index
+        .property_declaration(target.module().unwrap())
+        .is_some());
+    let receiver = dispatch_receiver.expect("context property needs its selected receiver");
+    assert!(matches!(
+        lambda_body
+            .expr(receiver.value)
+            .map(|expression| &expression.kind),
+        Some(FirExprKind::ImplicitReceiver { .. })
+    ));
+}
+
+#[test]
+fn selected_generic_receiver_lambda_uses_the_selected_context_shape() {
+    let (body, index) = checked_function_body_with_platform(
+        "// WITH_STDLIB\n\
+         // LANGUAGE: +ContextParameters\n\
+         typealias StringProvider = () -> String\n\
+         context(function: StringProvider) fun doSomething(): String = function()\n\
+         fun use(): String = with({ \"\" }) { doSomething() }\n",
+        "use",
+        jvm_stdlib_semantics(),
+    );
+
+    let FirExprKind::Call(with_call) = &body.expr(root_expression(&body)).expect("with call").kind
+    else {
+        panic!("generic receiver-lambda call must remain checked call FIR")
+    };
+    let FirCallArgument::Expression { value, .. } = &with_call.arguments[1] else {
+        panic!("with block must remain an explicit checked argument")
+    };
+    let FirExprKind::Lambda {
+        body: lambda_body, ..
+    } = &body.expr(*value).expect("with receiver lambda").kind
+    else {
+        panic!("with block must remain checked lambda FIR")
+    };
+    assert!(matches!(
+        lambda_body.receiver_type().map(ResolvedTy::get),
+        Some(Ty::Fun(signature)) if signature.params.is_empty() && signature.ret == Ty::String
+    ));
+
+    let call = (0..lambda_body.expression_count())
+        .find_map(|raw| {
+            let FirExprKind::Call(call) = &lambda_body.expr(FirExprId::from_raw(raw as u32))?.kind
+            else {
+                return None;
+            };
+            let target = call.target.module()?;
+            (index.callable_name(target) == Some("doSomething")).then_some(call)
+        })
+        .expect("contextual call inside specialized receiver lambda");
+    let [FirCallArgument::Expression {
+        value, parameter, ..
+    }] = call.arguments.as_ref()
+    else {
+        panic!("doSomething must retain exactly one selected context operand")
+    };
+    assert_eq!(*parameter, 0);
+    assert!(matches!(
+        lambda_body.expr(*value).map(|expression| &expression.kind),
+        Some(FirExprKind::ImplicitReceiver { .. })
+    ));
+}
+
+#[test]
+fn named_context_anonymous_function_binds_its_context_value() {
+    let (body, _) = checked_function_body(
+        "class Marker(val text: String)\n\
+         fun action(): context(Marker) () -> String =\n\
+             context(marker: Marker) fun(): String = marker.text\n",
+        "action",
+    );
+    let FirExprKind::Lambda {
+        body: lambda_body, ..
+    } = &body
+        .expr(root_expression(&body))
+        .expect("anonymous function")
+        .kind
+    else {
+        panic!("named context anonymous function must become checked FIR")
+    };
+    assert_eq!(lambda_body.context_receiver_types().len(), 1);
+    assert_eq!(lambda_body.context_value_count(), 1);
+    assert_eq!(lambda_body.parameters().len(), 1);
+}
+
+#[test]
+fn lambda_in_context_member_captures_the_outer_dispatch_coordinate() {
+    let (body, _) = checked_function_body(
+        "// LANGUAGE: +ContextParameters\n\
+         class Marker\n\
+         fun runOnce(block: () -> String): String = block()\n\
+         class Host {\n\
+             context(marker: Marker)\n\
+             fun result(): String = runOnce { hostValue() }\n\
+         }\n\
+         context(host: Host)\n\
+         fun hostValue(): String = \"OK\"\n",
+        "result",
+    );
+    let lambda_body = (0..body.expression_count()).find_map(|raw| {
+        let expression = FirExprId::from_raw(u32::try_from(raw).ok()?);
+        match &body.expr(expression)?.kind {
+            FirExprKind::Lambda { body, .. } => Some(body.as_ref()),
+            _ => None,
+        }
+    });
+    let lambda_body = lambda_body.expect("map argument lambda");
+    let [capture] = lambda_body.implicit_receiver_captures() else {
+        panic!("lambda must capture exactly the enclosing Host receiver")
+    };
+    assert_eq!(capture.enclosing_depth, 0);
+    assert!(capture.current);
+    assert_eq!(capture.depth, 0);
+    assert_eq!(
+        capture.ty.get().kotlin_class_internal(),
+        Some(crate::types::type_name("Host"))
+    );
+}
+
+#[test]
+fn sam_argument_retains_the_selected_interface_method_shape() {
+    let (body, _) = checked_function_body(
+        "fun interface Action { fun run(value: Int): String }\n\
+         fun consume(action: Action): String = \"OK\"\n\
+         fun make(): String = consume { value -> \"$value\" }\n",
+        "make",
+    );
+    let FirExprKind::Call(call) = &body.expr(root_expression(&body)).expect("call").kind else {
+        panic!("SAM argument must belong to the checked source call")
+    };
+    let FirCallArgument::Expression {
+        conversion:
+            Some(FirConversion {
+                kind: FirConversionKind::Sam(sam),
+                ..
+            }),
+        ..
+    } = call.arguments[0]
+    else {
+        panic!("selected SAM conversion must be explicit in FIR")
+    };
+    let sam = body.sam_conversion(sam).expect("body-local SAM target");
+    assert_eq!(sam.method.as_ref(), "run");
+    assert_eq!(sam.parameters.len(), 1);
+    assert_eq!(sam.parameters[0].get(), Ty::Int);
+    assert_eq!(sam.result.get(), Ty::String);
+    assert!(!sam.suspend);
+    assert!(!sam.nullable);
+}
+
+/// The selected method's slot carries the own results of the declarations it overrides, as
+/// declared: the frontend publishes them on the conversion and classifies none of them.
+#[test]
+fn sam_argument_records_the_overridden_results() {
+    let overrides = |source: &str| {
+        let (body, _) = checked_function_body(source, "make");
+        let FirExprKind::Call(call) = &body.expr(root_expression(&body)).expect("call").kind else {
+            panic!("SAM argument must belong to the checked source call")
+        };
+        let FirCallArgument::Expression {
+            conversion:
+                Some(FirConversion {
+                    kind: FirConversionKind::Sam(sam),
+                    ..
+                }),
+            ..
+        } = call.arguments[0]
+        else {
+            panic!("selected SAM conversion must be explicit in FIR")
+        };
+        let sam = body.sam_conversion(sam).expect("body-local SAM target");
+        assert_eq!(sam.result.get(), Ty::Int);
+        sam.overridden_results
+            .iter()
+            .map(|result| result.get())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        overrides(
+            "interface Base { fun f(): Any }\n\
+         fun interface Child : Base { override fun f(): Int }\n\
+         fun consume(child: Child): Int = 0\n\
+         fun make(): Int = consume { 1 }\n",
+        ),
+        vec![Ty::obj("kotlin/Any")]
+    );
+    assert_eq!(
+        overrides(
+            "fun interface Child { fun f(): Int }\n\
+         fun consume(child: Child): Int = 0\n\
+         fun make(): Int = consume { 1 }\n",
+        ),
+        Vec::<Ty>::new()
+    );
+    let results = overrides(
+        "interface Echo<T> { fun echo(x: T): T }\n\
+         fun interface Count : Echo<Int> { override fun echo(x: Int): Int }\n\
+         fun consume(count: Count): Int = 0\n\
+         fun make(): Int = consume { it }\n",
+    );
+    assert!(
+        results.len() == 1 && results[0].is_ty_param(),
+        "the overridden result stays the declared type parameter, got {results:?}"
+    );
+}
+
+#[test]
+fn generic_sam_accepts_the_same_nullable_lexical_type_parameter_result() {
+    let (body, _) = checked_function_body(
+        "class Box<T>(val value: T)\n\
+         fun interface Mapper<I, O> { fun map(value: I): O }\n\
+         fun <I, O> apply(value: I, mapper: Mapper<I, O>): O = mapper.map(value)\n\
+         fun <T> use(value: Box<T>?): T? = apply(value) { it?.value }\n",
+        "use",
+    );
+    let FirExprKind::Call(call) = &body.expr(root_expression(&body)).expect("apply call").kind
+    else {
+        panic!("generic SAM argument must belong to the checked source call")
+    };
+    let FirCallArgument::Expression {
+        conversion:
+            Some(FirConversion {
+                kind: FirConversionKind::Sam(sam),
+                ..
+            }),
+        ..
+    } = call.arguments[1]
+    else {
+        panic!("generic SAM conversion must be explicit in FIR")
+    };
+    let sam = body.sam_conversion(sam).expect("body-local SAM target");
+    assert_eq!(sam.parameters[0].get(), body.parameters()[0].ty.get());
+    assert!(sam.result.get().is_nullable());
+    assert!(sam.result.get().mentions_ty_param());
+}
+
+#[test]
+fn selected_sam_recheck_keeps_members_from_every_type_parameter_bound() {
+    let (body, index) = checked_function_body(
+        "interface X { fun foo(): String = \"O\" }\n\
+         interface Z { fun bar(): String = \"K\" }\n\
+         interface A : X, Z\n\
+         interface B : X, Z\n\
+         fun interface Action<T : X> { fun accept(value: T) }\n\
+         fun <T> select(left: T, right: T): T = left\n\
+         class G<T>(private val value: T) where T : X, T : Z {\n\
+             fun check(action: Action<in T>) { action.accept(value) }\n\
+         }\n\
+         fun run() {\n\
+             val g = select(G<A>(object : A {}), G<B>(object : B {}))\n\
+             g.check { it.foo(); it.bar() }\n\
+         }\n",
+        "run",
+    );
+
+    let lambda_body = (0..body.expression_count()).find_map(|raw| {
+        let expression = body.expr(FirExprId::from_raw(u32::try_from(raw).ok()?))?;
+        match &expression.kind {
+            FirExprKind::Lambda { body, .. } => Some(body.as_ref()),
+            _ => None,
+        }
+    });
+    let lambda_body = lambda_body.expect("selected SAM argument must remain checked FIR");
+    let selected = (0..lambda_body.expression_count())
+        .filter_map(|raw| {
+            let FirExprKind::Call(call) = &lambda_body
+                .expr(FirExprId::from_raw(u32::try_from(raw).ok()?))?
+                .kind
+            else {
+                return None;
+            };
+            let target = call.target.module()?;
+            let name = index
+                .callable(target)
+                .and_then(|callable| index.callable_name(callable.id))?;
+            let receiver = call.dispatch_receiver.as_ref()?;
+            let receiver_ty = match receiver.conversion {
+                Some(FirConversion {
+                    kind: FirConversionKind::SmartCast { to },
+                    ..
+                }) => to.get(),
+                None => lambda_body.expr(receiver.value)?.ty.get(),
+                Some(conversion) => panic!(
+                    "intersection member receiver must use a smart-cast conversion, got {conversion:?}"
+                ),
+            };
+            matches!(name, "foo" | "bar").then_some((name, receiver_ty))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        selected,
+        [("foo", Ty::obj("X")), ("bar", Ty::obj("Z")),],
+        "each intersection member must carry its concrete selected receiver view",
+    );
+}
+
+#[test]
+fn postponed_call_solution_rechecks_earlier_lambda_body_with_concrete_parameter() {
+    let (body, index) = checked_function_body(
+        "class Concrete\n\
+         open class TargetBase { val member: Concrete = Concrete() }\n\
+         class Target : TargetBase()\n\
+         class Builder<T>\n\
+         fun consume(value: TargetBase) {}\n\
+         fun <T> build(first: Builder<T>.(T) -> T, second: Builder<T>.(T) -> Unit) {}\n\
+         fun run() {\n\
+             build(\n\
+                 { it.member; Target() },\n\
+                 { consume(it) },\n\
+             )\n\
+         }\n",
+        "run",
+    );
+
+    let selected = (0..body.expression_count()).find_map(|raw| {
+        let expression = body.expr(FirExprId::from_raw(u32::try_from(raw).ok()?))?;
+        let FirExprKind::Lambda {
+            body: lambda_body, ..
+        } = &expression.kind
+        else {
+            return None;
+        };
+        let property = (0..lambda_body.expression_count()).find_map(|nested| {
+            let expression = lambda_body.expr(FirExprId::from_raw(u32::try_from(nested).ok()?))?;
+            matches!(expression.kind, FirExprKind::PropertyRead { .. }).then_some(expression)
+        })?;
+        Some((lambda_body.as_ref(), property))
+    });
+    let (lambda_body, property) =
+        selected.expect("first lambda must retain its checked member read");
+    let [parameter] = lambda_body.parameters() else {
+        panic!("receiver lambda must publish its one value parameter")
+    };
+    assert_eq!(
+        parameter.ty.get(),
+        Ty::obj("Target"),
+        "the later upper bound must not erase the concrete solution from the first result",
+    );
+    assert_eq!(property.ty.get(), Ty::obj("Concrete"));
+    let FirExprKind::PropertyRead {
+        target,
+        dispatch_receiver: Some(receiver),
+        ..
+    } = &property.kind
+    else {
+        panic!("concrete member must remain a selected property read")
+    };
+    assert!(index
+        .property_declaration(target.module().expect("source property target"))
+        .is_some());
+    assert_eq!(
+        lambda_body
+            .expr(receiver.value)
+            .expect("checked lambda parameter read")
+            .ty
+            .get(),
+        Ty::obj("Target"),
+        "the rechecked parameter read must carry the concrete postponed-call solution",
+    );
+}
+
+#[test]
+fn covariant_receiver_lambda_input_fixes_empty_nested_generic_results() {
+    let (body, index) = checked_function_body(
+        "class Flow<out T>\n\
+         class Collector<in T>\n\
+         fun <T> flow(block: suspend Collector<T>.() -> Unit): Flow<T> = Flow<T>()\n\
+         fun <T> Flow<T>.flatMap(mapper: suspend (T) -> Flow<T>): Flow<T> = this\n\
+         fun select(input: Flow<Int>): Flow<Int> = input.flatMap {\n\
+             if (it == 1) flow {} else flow {}\n\
+         }\n",
+        "select",
+    );
+
+    let outer = (0..body.expression_count()).find_map(|raw| {
+        let expression = body.expr(FirExprId::from_raw(u32::try_from(raw).ok()?))?;
+        match &expression.kind {
+            FirExprKind::Lambda { body, .. } => Some(body.as_ref()),
+            _ => None,
+        }
+    });
+    let outer = outer.expect("flatMap argument must remain a checked suspend lambda");
+    let nested_flows = (0..outer.expression_count())
+        .filter_map(|raw| {
+            let FirExprKind::Call(call) = &outer
+                .expr(FirExprId::from_raw(u32::try_from(raw).ok()?))?
+                .kind
+            else {
+                return None;
+            };
+            let target = call.target.module()?;
+            (index
+                .callable(target)
+                .and_then(|callable| index.callable_name(callable.id))
+                == Some("flow"))
+            .then_some(call)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(nested_flows.len(), 2);
+    for call in nested_flows {
+        assert_eq!(call.substitutions.len(), 1);
+        assert_eq!(call.substitutions[0].value.get(), Ty::Int);
+    }
+}
+
+#[test]
+fn nearer_source_extension_shapes_lambda_before_a_more_specific_imported_extension() {
+    let (body, _) = checked_function_body_with_platform(
+        "fun <T, R> T.map(transform: suspend (T) -> R): suspend () -> R =\n\
+             { transform(this) }\n\
+         fun use(): suspend () -> String? =\n\
+             Result.success(\"OK\").map<Result<String>, String?> { it.getOrNull() }\n",
+        "use",
+        jvm_stdlib_semantics(),
+    );
+
+    let lambda = (0..body.expression_count())
+        .find_map(|raw| {
+            let FirExprKind::Lambda { body, .. } = &body
+                .expr(FirExprId::from_raw(u32::try_from(raw).ok()?))?
+                .kind
+            else {
+                return None;
+            };
+            (!body.parameters().is_empty()).then_some(body.as_ref())
+        })
+        .expect("map transform must remain a checked suspend lambda");
+    assert_eq!(
+        lambda.parameters()[0].ty.get(),
+        Ty::obj_args("kotlin/Result", &[Ty::String]),
+    );
+}
+
+#[test]
+fn nullable_function_value_to_nullable_sam_records_conditional_conversion() {
+    let (body, _) = checked_function_body(
+        "fun interface Action { fun run() }\n\
+         fun consume(action: Action?) {}\n\
+         fun maybe(flag: Boolean): (() -> Unit)? = if (flag) null else {{}}\n\
+         fun use() { consume(maybe(true)) }\n",
+        "use",
+    );
+    let call = (0..body.expression_count()).find_map(|raw| {
+        let expression = FirExprId::from_raw(u32::try_from(raw).ok()?);
+        match &body.expr(expression)?.kind {
+            FirExprKind::Call(call)
+                if call.arguments.iter().any(|argument| {
+                    matches!(
+                        argument,
+                        FirCallArgument::Expression {
+                            conversion: Some(FirConversion {
+                                kind: FirConversionKind::Sam(_),
+                                ..
+                            }),
+                            ..
+                        }
+                    )
+                }) =>
+            {
+                Some(call)
+            }
+            _ => None,
+        }
+    });
+    let call = call.expect("consume call");
+    let FirCallArgument::Expression {
+        conversion:
+            Some(FirConversion {
+                kind: FirConversionKind::Sam(sam),
+                ..
+            }),
+        ..
+    } = call.arguments[0]
+    else {
+        panic!("nullable SAM conversion must be explicit in FIR")
+    };
+    assert!(
+        body.sam_conversion(sam)
+            .expect("body-local SAM target")
+            .nullable
+    );
+}
+
+/// Every SAM conversion the checker published in `body`, in publication order.
+fn sam_conversions(body: &FirBody) -> Vec<FirSamConversion> {
+    (0..)
+        .map_while(|raw| {
+            body.sam_conversion(FirSamConversionId::from_raw(raw))
+                .cloned()
+        })
+        .collect()
+}
+
+/// The callable of the member function `name` whose single parameter is `parameter`, declared
+/// directly in the classifier named `owner`.
+fn member_callable(
+    index: &ResolvedModuleIndex,
+    owner: &str,
+    name: &str,
+    parameter: crate::types::Ty,
+) -> CallableId {
+    let owner = crate::types::type_name(owner);
+    let matches = (0..index.declaration_count())
+        .map(|raw| DeclarationId::from_raw(raw as u32))
+        .filter(|declaration| {
+            index.declaration_name(*declaration) == Some(name)
+                && index
+                    .declaration_anchor(*declaration)
+                    .and_then(|anchor| anchor.owner)
+                    .and_then(|owner| index.classifier_header(owner))
+                    .is_some_and(|classifier| classifier.classifier == owner)
+                && index.signature(*declaration).is_some_and(|signature| {
+                    signature
+                        .parameters
+                        .iter()
+                        .map(|parameter| parameter.get())
+                        .eq([parameter])
+                })
+        })
+        .filter_map(|declaration| index.callable_for_declaration(declaration))
+        .map(|callable| callable.id)
+        .collect::<Vec<_>>();
+    let [callable] = matches[..] else {
+        panic!("one {owner:?}.{name}({parameter:?}), found {matches:?}")
+    };
+    callable
+}
+
+#[test]
+fn a_sam_conversion_names_the_selected_abstract_method_among_same_named_members() {
+    let (body, index) = checked_function_body(
+        "class Other(val size: Int)\n\
+         fun interface Pick {\n\
+             fun choose(value: Int): Int\n\
+             fun choose(value: Other): Int = value.size\n\
+         }\n\
+         class Chooser { fun choose(value: Int): Int = value }\n\
+         fun pick(p: Pick): Int = p.choose(2)\n\
+         fun direct(): Int = pick { it + 1 }\n",
+        "direct",
+    );
+    let abstract_choose = member_callable(&index, "Pick", "choose", crate::types::Ty::Int);
+    assert_ne!(
+        abstract_choose,
+        member_callable(&index, "Pick", "choose", crate::types::Ty::obj("Other"))
+    );
+    assert_ne!(
+        abstract_choose,
+        member_callable(&index, "Chooser", "choose", crate::types::Ty::Int)
+    );
+    let [conversion] = &sam_conversions(&body)[..] else {
+        panic!("one SAM conversion")
+    };
+    assert_eq!(
+        (
+            conversion.classifier,
+            conversion.method_target,
+            conversion.nullable
+        ),
+        (
+            crate::types::type_name("Pick"),
+            FirSamMethod::Declared(ResolvedFunctionOverrideTarget::Module(abstract_choose)),
+            false
+        )
+    );
+}
+
+#[test]
+fn a_function_type_supertype_contributes_its_invoke_as_the_sam_method() {
+    let (body, _) = checked_function_body(
+        "fun interface Task : () -> Unit\nfun task(): Task = Task { }\n",
+        "task",
+    );
+    let [conversion] = &sam_conversions(&body)[..] else {
+        panic!("one SAM conversion")
+    };
+    assert_eq!(
+        (&*conversion.method, conversion.method_target),
+        ("invoke", FirSamMethod::FunctionTypeInvoke)
+    );
+}
+
+#[test]
+fn a_nullable_function_value_conversion_names_the_dependency_method() {
+    let mut paths = crate::toolchain::classpath_jars_for("// WITH_STDLIB");
+    paths.extend(crate::toolchain::jdk_modules());
+    let classpath = std::rc::Rc::new(crate::jvm::classpath::Classpath::new(paths));
+    let (body, _) = checked_function_body_with_platform(
+        "fun start(g: (() -> Unit)?): Thread = Thread(g)\n",
+        "start",
+        Box::new(
+            crate::jvm::jvm_libraries::JvmLibraries::new(classpath.clone())
+                .expect("JVM provider initialization"),
+        ),
+    );
+    let [conversion] = &sam_conversions(&body)[..] else {
+        panic!("one SAM conversion")
+    };
+    let FirSamMethod::Declared(ResolvedFunctionOverrideTarget::External(method)) =
+        conversion.method_target
+    else {
+        panic!("a dependency method, found {:?}", conversion.method_target)
+    };
+    let realization = classpath
+        .external_callable(method)
+        .expect("the provider answers for its own identity");
+    assert_eq!(
+        (
+            realization.callable.owner,
+            realization.callable.name.as_str(),
+            realization.kind,
+            conversion.classifier,
+            conversion.nullable,
+        ),
+        (
+            crate::types::type_name("java/lang/Runnable"),
+            "run",
+            crate::libraries::ExternalCallableKind::Member,
+            crate::types::type_name("java/lang/Runnable"),
+            true,
+        )
+    );
+}
+
+/// A provider fun interface whose only abstract member publishes neither a module declaration nor
+/// an external callable. The checker cannot name that method, so the conversion fails closed.
+struct UnidentifiedSam {
+    action: crate::types::TypeName,
+    classifier: std::sync::Arc<crate::libraries::LibraryType>,
+}
+
+impl crate::symbol_source::SymbolSource for UnidentifiedSam {
+    fn package_exists(&self, parent: crate::types::TypeName, name: &str) -> bool {
+        parent == crate::types::TypeName::ROOT && name == "test"
+    }
+
+    fn symbols(
+        &self,
+        namespace: crate::symbol_source::SymbolNamespace,
+        name: &str,
+    ) -> std::rc::Rc<crate::libraries::ResolvedSymbols> {
+        let package =
+            crate::symbol_source::SymbolNamespace::Package(crate::types::type_name("test"));
+        if namespace == package && name == "Action" {
+            std::rc::Rc::new(crate::libraries::ResolvedSymbols {
+                classifier_name: Some(self.action),
+                classifier: Some(std::sync::Arc::clone(&self.classifier)),
+                ..crate::libraries::ResolvedSymbols::default()
+            })
+        } else {
+            std::rc::Rc::new(crate::libraries::ResolvedSymbols::default())
+        }
+    }
+}
+
+impl crate::libraries::SemanticPlatform for UnidentifiedSam {}
+
+fn unidentified_action() -> UnidentifiedSam {
+    let mut member = crate::libraries::LibraryMember::new(
+        "run".to_string(),
+        Vec::new(),
+        crate::types::Ty::Int,
+        String::new(),
+    );
+    member.set_is_abstract(true);
+    let mut classifier = crate::libraries::LibraryType::declaration_header();
+    classifier.is_kotlin = true;
+    classifier.kind = crate::libraries::TypeKind::Interface;
+    classifier.sam_eligible = true;
+    classifier.members = vec![member];
+    UnidentifiedSam {
+        action: crate::types::type_name("test/Action"),
+        classifier: std::sync::Arc::new(classifier),
+    }
+}
+
+struct DiscardBodies;
+
+impl CheckedBodySink for DiscardBodies {
+    fn accept_finalized(&mut self, _owner: BodyOwnerId, _body: FirBody) {}
+}
+
+#[test]
+fn a_provider_member_without_an_identity_fails_as_missing_stable_call_target() {
+    const SOURCE: &str = "fun feed(action: test.Action) {}\nfun use() { feed { 1 } }\n";
+    let mut diagnostics = crate::diag::DiagSink::new();
+    let mut analysis = crate::frontend::analyze_source_set_with_features(
+        &[crate::source::SourceInput::kotlin(SOURCE).with_file_stem("UnidentifiedSam")],
+        crate::frontend::PlatformProvider::jvm(Box::new(unidentified_action())),
+        &crate::features::LangFeatures::new(),
+        &mut diagnostics,
+    );
+    assert!(
+        diagnostics.diags.is_empty(),
+        "pass 1 accepts the provider shape: {:?}",
+        diagnostics.diags
+    );
+    let streamed = analysis.streamed.take().expect("Pass 1 must finalize");
+    let ordinary = streamed.ordinary_body_work(&analysis.files[0], SourceFileId::from_raw(0));
+    let (index, mut inline_bodies, _defaults, mut sources) = streamed.module.into_parts();
+    let info = analysis.types[0].as_ref().expect("checked source");
+    let mut sink = DiscardBodies;
+    let failures = ordinary
+        .into_iter()
+        .filter_map(|work| {
+            check_and_dispatch_body(
+                crate::fir::BodyCheckUnit {
+                    file: &analysis.files[0],
+                    info,
+                    source: SourceFileId::from_raw(0),
+                    index: &index,
+                },
+                work,
+                sources.origins_mut(),
+                &mut inline_bodies,
+                &mut sink,
+            )
+            .err()
+        })
+        .collect::<Vec<_>>();
+    let [CheckedBodyDriverFailure::Check(failure)] = &failures[..] else {
+        panic!("one body-check failure, got {failures:?}")
+    };
+    let file = &analysis.files[0];
+    let lambda_spans = (0..file.expr_arena.len())
+        .filter_map(|raw| {
+            let id = crate::ast::ExprId(raw as u32);
+            matches!(file.expr(id), crate::ast::Expr::Lambda { .. })
+                .then(|| file.expr_span(id))
+                .flatten()
+        })
+        .collect::<Vec<_>>();
+    let [lambda_span] = lambda_spans[..] else {
+        panic!("one lambda, got {lambda_spans:?}")
+    };
+    assert_eq!(
+        (failure.span, &failure.kind),
+        (
+            Some(lambda_span),
+            &BodyCheckFailureKind::MissingStableCallTarget
+        )
+    );
+}
+
+#[test]
+fn an_object_that_is_the_fun_interface_is_not_sam_converted() {
+    let (body, _) = checked_function_body(
+        "interface Mark\n\
+         object Token : Mark\n\
+         fun interface Foo : () -> Mark\n\
+         fun id(foo: Foo): Foo = foo\n\
+         fun use(): Foo {\n\
+             val value = object : Foo { override fun invoke() = Token }\n\
+             return id(value)\n\
+         }\n",
+        "use",
+    );
+    assert!(
+        sam_conversions(&body).is_empty(),
+        "an object that is already Foo must not be wrapped: {:?}",
+        sam_conversions(&body)
+    );
+}
+
+#[test]
+fn a_class_that_implements_a_fun_interface_and_a_function_type_is_not_sam_converted() {
+    let (body, _) = checked_function_body(
+        "interface Mark\n\
+         fun interface Worker { fun onStart(scope: Mark) }\n\
+         class Impl : Worker, (Mark) -> Unit {\n\
+             override fun onStart(scope: Mark) {}\n\
+             override fun invoke(value: Mark) {}\n\
+         }\n\
+         fun foo(worker: Worker) {}\n\
+         fun use() { foo(Impl()) }\n",
+        "use",
+    );
+    assert!(
+        sam_conversions(&body).is_empty(),
+        "Impl already is Worker: {:?}",
+        sam_conversions(&body)
+    );
+}
+
+#[test]
+fn a_generic_fun_interface_subtype_is_not_sam_converted() {
+    let (body, _) = checked_function_body(
+        "interface Mark\n\
+         fun interface Worker<E> { fun onStart(scope: E) }\n\
+         class Impl<F> : Worker<F>, (Mark) -> Unit {\n\
+             override fun onStart(scope: F) {}\n\
+             override fun invoke(value: Mark) {}\n\
+         }\n\
+         fun <T> foo(worker: Worker<T>) {}\n\
+         fun use() { foo(Impl<Mark>()) }\n",
+        "use",
+    );
+    assert!(
+        sam_conversions(&body).is_empty(),
+        "Impl<Mark> already is Worker<Mark>: {:?}",
+        sam_conversions(&body)
+    );
+}
+
+#[test]
+fn a_mismatched_fun_interface_instantiation_still_converts() {
+    let (body, _) = checked_function_body(
+        "interface TokenA\n\
+         interface TokenB\n\
+         fun interface Worker<E> { fun onStart(scope: E) }\n\
+         class Impl : Worker<TokenA>, (TokenB) -> Unit {\n\
+             override fun onStart(scope: TokenA) {}\n\
+             override fun invoke(value: TokenB) {}\n\
+         }\n\
+         fun take(worker: Worker<TokenB>) {}\n\
+         fun use() { take(Impl()) }\n",
+        "use",
+    );
+    let [conversion] = &sam_conversions(&body)[..] else {
+        panic!(
+            "Worker<TokenA> is not Worker<TokenB>, got {:?}",
+            sam_conversions(&body)
+        )
+    };
+    assert_eq!(conversion.classifier, crate::types::type_name("Worker"));
+    assert_eq!(
+        conversion
+            .parameters
+            .iter()
+            .map(|parameter| parameter.get())
+            .collect::<Vec<_>>(),
+        vec![Ty::obj("TokenB")]
+    );
+}
+
+#[test]
+fn a_star_projected_fun_interface_subtype_is_not_sam_converted() {
+    let (body, _) = checked_function_body(
+        "interface Token\n\
+         interface Mark\n\
+         fun interface Worker<E> { fun onStart(scope: E) }\n\
+         class Impl : Worker<Token>, (Mark) -> Unit {\n\
+             override fun onStart(scope: Token) {}\n\
+             override fun invoke(value: Mark) {}\n\
+         }\n\
+         fun take(worker: Worker<*>) {}\n\
+         fun use() { take(Impl()) }\n",
+        "use",
+    );
+    assert!(
+        sam_conversions(&body).is_empty(),
+        "Impl is Worker<*>: {:?}",
+        sam_conversions(&body)
+    );
+}
+
+#[test]
+fn a_contravariant_fun_interface_supertype_is_not_sam_converted() {
+    let (body, _) = checked_function_body(
+        "interface Token\n\
+         interface Sub : Token\n\
+         fun interface Worker<in E> { fun onStart(scope: E) }\n\
+         class Impl : Worker<Token>, (Sub) -> Unit {\n\
+             override fun onStart(scope: Token) {}\n\
+             override fun invoke(value: Sub) {}\n\
+         }\n\
+         fun take(worker: Worker<Sub>) {}\n\
+         fun use() { take(Impl()) }\n",
+        "use",
+    );
+    assert!(
+        sam_conversions(&body).is_empty(),
+        "Worker<in Token> is Worker<Sub>: {:?}",
+        sam_conversions(&body)
+    );
+}
+
+#[test]
+fn a_direct_fun_interface_overload_beats_a_sam_adapted_one() {
+    let (body, _) = checked_function_body(
+        "interface Mark\n\
+         fun interface Worker { fun onStart(scope: Mark) }\n\
+         fun interface Adapter { fun onStart(scope: Mark) }\n\
+         class Impl : Worker, (Mark) -> Unit {\n\
+             override fun onStart(scope: Mark) {}\n\
+             override fun invoke(value: Mark) {}\n\
+         }\n\
+         fun take(worker: Worker): Worker = worker\n\
+         fun take(adapter: Adapter): Adapter = adapter\n\
+         fun use(value: Impl): Worker = take(value)\n",
+        "use",
+    );
+    assert!(
+        sam_conversions(&body).is_empty(),
+        "the direct Worker overload must not adapt Impl: {:?}",
+        sam_conversions(&body)
+    );
+    let parameters = (0..body.expression_count())
+        .filter_map(|raw| {
+            let expression = FirExprId::from_raw(u32::try_from(raw).ok()?);
+            let FirExprKind::Call(call) = &body.expr(expression)?.kind else {
+                return None;
+            };
+            let [parameter] = call.parameter_types.as_ref() else {
+                return None;
+            };
+            Some(parameter.get())
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(parameters, vec![Ty::obj("Worker")]);
+}
+
+#[test]
+fn a_function_value_passed_to_a_fun_interface_still_converts() {
+    let (body, _) = checked_function_body(
+        "interface Mark\n\
+         fun interface Foo : () -> Mark\n\
+         fun id(foo: Foo): Foo = foo\n\
+         fun use(f: () -> Mark): Foo = id(f)\n",
+        "use",
+    );
+    let [conversion] = &sam_conversions(&body)[..] else {
+        panic!(
+            "a function value still converts to Foo, got {:?}",
+            sam_conversions(&body)
+        )
+    };
+    assert_eq!(conversion.classifier, crate::types::type_name("Foo"));
+}
+
+#[test]
+fn a_source_lambda_publishes_type_parameters_in_first_use_order() {
+    let (body, index) = checked_function_body("fun <T, U : T> id(u: U): () -> U = { u }\n", "id");
+    let FirExprKind::Lambda {
+        type_parameters, ..
+    } = &body.expr(root_expression(&body)).expect("lambda").kind
+    else {
+        panic!("the function body must be a checked lambda")
+    };
+    let owner = crate::fir::DeclarationId::from_raw(body.owner().raw());
+    assert_eq!(
+        type_parameters.as_ref(),
+        [
+            index
+                .type_parameter(owner, 1)
+                .expect("U is the second declared parameter"),
+            index
+                .type_parameter(owner, 0)
+                .expect("T is named by U's bound"),
+        ]
+    );
+}
+
+#[test]
+fn a_member_lambda_publishes_the_class_parameter_and_its_own() {
+    let (body, index) = checked_function_body(
+        "class Holder<T> {\n\
+             fun <V : T> pick(v: V): (T) -> V = { t: T -> v }\n\
+         }\n",
+        "pick",
+    );
+    let FirExprKind::Lambda {
+        type_parameters, ..
+    } = &body.expr(root_expression(&body)).expect("lambda").kind
+    else {
+        panic!("the member body must be a checked lambda")
+    };
+    let function = crate::fir::DeclarationId::from_raw(body.owner().raw());
+    let class_parameter = index
+        .declaration_anchor(function)
+        .and_then(|anchor| anchor.owner)
+        .and_then(|class| index.type_parameter(class, 0))
+        .expect("Holder declares T");
+    let own = index.type_parameter(function, 0).expect("pick declares V");
+    assert_eq!(type_parameters.as_ref(), [class_parameter, own]);
+    assert_ne!(class_parameter, own);
+}
+
+#[test]
+fn a_nested_type_parameter_shadows_the_class_parameter() {
+    let (body, index) = checked_function_body(
+        "class Box<T> {\n\
+             fun <T> inner(): (T) -> T = { t: T -> t }\n\
+         }\n",
+        "inner",
+    );
+    let FirExprKind::Lambda {
+        type_parameters, ..
+    } = &body.expr(root_expression(&body)).expect("lambda").kind
+    else {
+        panic!("the member body must be a checked lambda")
+    };
+    let function = crate::fir::DeclarationId::from_raw(body.owner().raw());
+    let own = index.type_parameter(function, 0).expect("inner declares T");
+    let class_parameter = index
+        .declaration_anchor(function)
+        .and_then(|anchor| anchor.owner)
+        .and_then(|class| index.type_parameter(class, 0))
+        .expect("Box declares T");
+    assert_eq!(type_parameters.as_ref(), [own]);
+    assert_ne!(own, class_parameter);
+}
+
+#[test]
+fn a_non_generic_lambda_publishes_no_type_parameters() {
+    let (body, _) = checked_function_body("fun make(): () -> Int = { 42 }\n", "make");
+    let FirExprKind::Lambda {
+        type_parameters, ..
+    } = &body.expr(root_expression(&body)).expect("lambda").kind
+    else {
+        panic!("the function body must be a checked lambda")
+    };
+    assert!(type_parameters.is_empty());
+}

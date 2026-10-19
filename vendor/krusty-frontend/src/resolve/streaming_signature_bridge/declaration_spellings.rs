@@ -1,0 +1,403 @@
+//! Stable metadata spelling publication from compact declaration headers.
+//!
+//! Source type aliases may be expanded by the parser before semantic resolution. The compact
+//! header arena owns both the expanded type and its as-written counterpart by `HeaderTypeId`, so
+//! production signature collection never reopens `File::alias_spellings` or walks declarations by
+//! parser coordinates.
+
+use super::super::{spelling_of_ref_with, spelling_scope, ClassNames, SymbolTable, TParams};
+use crate::fir::{
+    DeclarationId, DeclarationKind, HeaderDeclarationKind, HeaderTypeBoundRange, HeaderTypeId,
+    HeaderTypeParameterRange, StreamedHeaderModule,
+};
+use crate::spelling::{DeclaredSpellings, RecordedTypeAnnotations, Spelled};
+
+/// The module-wide inputs every declared-type spelling reads: source alias expansion templates and
+/// each file's recorded type-use annotations.
+struct SpellingContext {
+    expansions:
+        crate::fx_hash::HashMap<crate::types::TypeName, (Spelled, Vec<String>, crate::types::Ty)>,
+    annotations: crate::fx_hash::HashMap<crate::fir::SourceFileId, RecordedTypeAnnotations>,
+}
+
+fn type_parameter_names(
+    headers: &StreamedHeaderModule,
+    range: HeaderTypeParameterRange,
+) -> Option<Vec<String>> {
+    headers
+        .syntax
+        .type_parameters(range)
+        .iter()
+        .map(|parameter| headers.lookup_names.get(parameter.name).map(str::to_owned))
+        .collect()
+}
+
+fn classifier_scope_names(
+    headers: &StreamedHeaderModule,
+    declaration: DeclarationId,
+) -> Option<Vec<String>> {
+    let mut owner = Some(declaration);
+    while let Some(candidate) = owner {
+        if let Some(header) = headers.syntax.declaration(candidate) {
+            if let HeaderDeclarationKind::Classifier {
+                type_parameters,
+                lexical_type_parameter_captures,
+                ..
+            } = header.kind
+            {
+                let mut names = type_parameter_names(headers, lexical_type_parameter_captures)?;
+                names.extend(type_parameter_names(headers, type_parameters)?);
+                return Some(names);
+            }
+        }
+        owner = headers
+            .declarations
+            .anchor(candidate)
+            .and_then(|anchor| anchor.owner);
+    }
+    Some(Vec::new())
+}
+
+fn declaration_scope(
+    headers: &StreamedHeaderModule,
+    declaration: DeclarationId,
+    own: HeaderTypeParameterRange,
+) -> Option<(Vec<String>, TParams)> {
+    let anchor = headers.declarations.anchor(declaration)?;
+    let mut names = if anchor.kind == DeclarationKind::Classifier {
+        match headers.syntax.declaration(declaration)?.kind {
+            HeaderDeclarationKind::Classifier {
+                lexical_type_parameter_captures,
+                ..
+            } => type_parameter_names(headers, lexical_type_parameter_captures)?,
+            _ => return None,
+        }
+    } else {
+        match anchor.owner {
+            Some(owner) => classifier_scope_names(headers, owner)?,
+            None => Vec::new(),
+        }
+    };
+    let own = type_parameter_names(headers, own)?;
+    names.extend(own.iter().cloned());
+    let scope = spelling_scope(&names);
+    Some((own, scope))
+}
+
+fn spelling(
+    headers: &StreamedHeaderModule,
+    semantics: &super::ProductionSignatureSemantics<'_>,
+    scope_owner: DeclarationId,
+    ty: HeaderTypeId,
+    classes: &ClassNames,
+    scope: &TParams,
+    context: &SpellingContext,
+) -> Option<Spelled> {
+    let materialized = headers
+        .syntax
+        .transient_type_ref(ty, &headers.lookup_names)?;
+    let source_spellings = headers
+        .syntax
+        .transient_source_spellings(ty, &headers.lookup_names)?;
+    let signature_scope = crate::fir::SignatureScope {
+        owner: scope_owner,
+        source: headers.declarations.anchor(scope_owner)?.source,
+    };
+    let spellings = crate::spelling::SourceSpellings {
+        aliases: &source_spellings,
+        annotations: context.annotations.get(&signature_scope.source)?,
+    };
+    let mut resolve_argument = |argument: &crate::ast::TypeRef| {
+        semantics
+            .resolve_signature_type_reference(signature_scope, argument)
+            .unwrap_or(crate::types::Ty::Error)
+    };
+    Some(spelling_of_ref_with(
+        &materialized,
+        classes,
+        scope,
+        &context.expansions,
+        spellings,
+        &mut resolve_argument,
+    ))
+}
+
+fn bound_spellings(
+    semantics: &super::ProductionSignatureSemantics<'_>,
+    scope_owner: DeclarationId,
+    range: HeaderTypeBoundRange,
+    parameters: &[String],
+    classes: &ClassNames,
+    scope: &TParams,
+    context: &SpellingContext,
+) -> Option<Vec<Vec<Spelled>>> {
+    let headers = semantics.headers;
+    parameters
+        .iter()
+        .map(|parameter| {
+            headers
+                .syntax
+                .bounds(range)
+                .iter()
+                .filter(|bound| headers.lookup_names.get(bound.parameter) == Some(parameter))
+                .map(|bound| {
+                    spelling(
+                        headers,
+                        semantics,
+                        scope_owner,
+                        bound.ty,
+                        classes,
+                        scope,
+                        context,
+                    )
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// Populate only stable declaration-keyed metadata sidecars from the compact Pass-1 inventory.
+pub(in crate::resolve) fn collect_compact_declared_spellings(
+    table: &mut SymbolTable,
+    headers: &StreamedHeaderModule,
+    file_class_names: &[ClassNames],
+) {
+    let annotations = (0..headers.sources.len() as u32)
+        .map(crate::fir::SourceFileId::from_raw)
+        .map(|source| {
+            let annotations = crate::resolve::signature_collection::compact_source_type_annotations(
+                table, headers, source,
+            );
+            (source, annotations)
+        })
+        .collect();
+    let context = SpellingContext {
+        expansions: table.alias_expansion_spellings.clone(),
+        annotations,
+    };
+    let classifier_types = table
+        .classes
+        .values()
+        .filter_map(|classifier| {
+            classifier
+                .stable_declaration
+                .map(|declaration| (declaration, classifier.internal))
+        })
+        .collect();
+    let empty_receivers = crate::fx_hash::HashMap::default();
+    let semantics = super::ProductionSignatureSemantics {
+        headers,
+        table,
+        classifier_types: &classifier_types,
+        parameters: crate::fx_hash::HashMap::default(),
+        extension_receivers: &empty_receivers,
+        source_orders: crate::fx_hash::HashMap::default(),
+        signature_origins: crate::fx_hash::HashMap::default(),
+        stable_functions: super::stable_function_index::StableFunctionIndex::default(),
+        scoped_receivers: std::cell::RefCell::new(crate::fx_hash::HashMap::default()),
+        scoped_constraint_inputs: std::cell::RefCell::new(crate::fx_hash::HashMap::default()),
+        scoped_constraints: std::cell::RefCell::new(crate::fx_hash::HashMap::default()),
+        completed_scoped_constraints: std::cell::RefCell::new(crate::fx_hash::HashMap::default()),
+        scoped_constraint_checkpoints: std::cell::RefCell::new(Vec::new()),
+        diagnostics: std::cell::RefCell::new(Vec::new()),
+        selected_calls: Default::default(),
+        selected_types: Default::default(),
+        source_contracts: std::cell::RefCell::new(crate::fx_hash::HashMap::default()),
+        file_import_scopes: super::file_import_scopes::FileImportScopes::default(),
+        classifier_stubs_by_source: std::cell::RefCell::new(None),
+        extension_receivers_by_declaration: std::cell::RefCell::new(None),
+        property_type_parameters_by_declaration: std::cell::RefCell::new(None),
+    };
+    let mut records = Vec::new();
+    for stub in &headers.stubs {
+        let Some(declaration) = headers.syntax.declaration(stub.id) else {
+            continue;
+        };
+        let Some(classes) = file_class_names.get(stub.source.raw() as usize) else {
+            continue;
+        };
+        let record = (|| -> Option<DeclaredSpellings> {
+            match declaration.kind {
+                HeaderDeclarationKind::Callable {
+                    receiver,
+                    parameters,
+                    result,
+                    type_parameters,
+                    bounds,
+                    ..
+                } => {
+                    let (own, scope) = declaration_scope(headers, stub.id, type_parameters)
+                        .expect("compact callable scope must be materializable");
+                    let ret = match result {
+                        crate::fir::HeaderResultType::Explicit(result) => spelling(
+                            headers, &semantics, stub.id, result, classes, &scope, &context,
+                        ),
+                        crate::fir::HeaderResultType::ImplicitUnit
+                        | crate::fir::HeaderResultType::Inferred => Some(Spelled::default()),
+                    };
+                    Some(DeclaredSpellings {
+                        ret: ret?,
+                        params: headers
+                            .syntax
+                            .parameters(parameters)
+                            .iter()
+                            .map(|parameter| {
+                                spelling(
+                                    headers,
+                                    &semantics,
+                                    stub.id,
+                                    parameter.ty,
+                                    classes,
+                                    &scope,
+                                    &context,
+                                )
+                            })
+                            .collect::<Option<Vec<_>>>()?,
+                        receiver: match receiver {
+                            Some(receiver) => spelling(
+                                headers, &semantics, stub.id, receiver, classes, &scope, &context,
+                            )?,
+                            None => Spelled::default(),
+                        },
+                        type_param_bounds: bound_spellings(
+                            &semantics, stub.id, bounds, &own, classes, &scope, &context,
+                        )?,
+                        ..DeclaredSpellings::default()
+                    })
+                }
+                HeaderDeclarationKind::Property {
+                    receiver,
+                    declared_type,
+                    getter_type,
+                    type_parameters,
+                    bounds,
+                    context_parameters,
+                    ..
+                } => {
+                    let (own, scope) = declaration_scope(headers, stub.id, type_parameters)
+                        .expect("compact property scope must be materializable");
+                    Some(DeclaredSpellings {
+                        // An explicit getter return is the property's declared public type when
+                        // the property header itself omits one. Semantic header projection uses
+                        // this same stable pair; metadata spelling must join it to the property
+                        // declaration here instead of treating the body as inferred.
+                        ret: match declared_type.or(getter_type) {
+                            Some(ty) => spelling(
+                                headers, &semantics, stub.id, ty, classes, &scope, &context,
+                            )?,
+                            None => Spelled::default(),
+                        },
+                        receiver: match receiver {
+                            Some(ty) => spelling(
+                                headers, &semantics, stub.id, ty, classes, &scope, &context,
+                            )?,
+                            None => Spelled::default(),
+                        },
+                        params: headers
+                            .syntax
+                            .parameters(context_parameters)
+                            .iter()
+                            .map(|parameter| {
+                                spelling(
+                                    headers,
+                                    &semantics,
+                                    stub.id,
+                                    parameter.ty,
+                                    classes,
+                                    &scope,
+                                    &context,
+                                )
+                            })
+                            .collect::<Option<Vec<_>>>()?,
+                        type_param_bounds: bound_spellings(
+                            &semantics, stub.id, bounds, &own, classes, &scope, &context,
+                        )?,
+                        ..DeclaredSpellings::default()
+                    })
+                }
+                HeaderDeclarationKind::Classifier {
+                    type_parameters,
+                    bounds,
+                    supertypes,
+                    base,
+                    primary_parameters,
+                    ..
+                } => {
+                    let (own, scope) = declaration_scope(headers, stub.id, type_parameters)
+                        .expect("compact classifier scope must be materializable");
+                    Some(DeclaredSpellings {
+                        params: headers
+                            .syntax
+                            .parameters(primary_parameters)
+                            .iter()
+                            .map(|parameter| {
+                                spelling(
+                                    headers,
+                                    &semantics,
+                                    stub.id,
+                                    parameter.ty,
+                                    classes,
+                                    &scope,
+                                    &context,
+                                )
+                            })
+                            .collect::<Option<Vec<_>>>()?,
+                        superclass: match base {
+                            Some(ty) => spelling(
+                                headers, &semantics, stub.id, ty, classes, &scope, &context,
+                            )?,
+                            None => Spelled::default(),
+                        },
+                        supertypes: headers
+                            .syntax
+                            .type_operands(supertypes)
+                            .iter()
+                            .map(|ty| {
+                                spelling(
+                                    headers, &semantics, stub.id, *ty, classes, &scope, &context,
+                                )
+                            })
+                            .collect::<Option<Vec<_>>>()?,
+                        type_param_bounds: bound_spellings(
+                            &semantics, stub.id, bounds, &own, classes, &scope, &context,
+                        )?,
+                        ..DeclaredSpellings::default()
+                    })
+                }
+                HeaderDeclarationKind::Constructor {
+                    parameters,
+                    context_parameters: _,
+                } => {
+                    let (_, scope) =
+                        declaration_scope(headers, stub.id, HeaderTypeParameterRange::default())
+                            .expect("compact constructor scope must be materializable");
+                    Some(DeclaredSpellings {
+                        params: headers
+                            .syntax
+                            .parameters(parameters)
+                            .iter()
+                            .map(|parameter| {
+                                spelling(
+                                    headers,
+                                    &semantics,
+                                    stub.id,
+                                    parameter.ty,
+                                    classes,
+                                    &scope,
+                                    &context,
+                                )
+                            })
+                            .collect::<Option<Vec<_>>>()?,
+                        ..DeclaredSpellings::default()
+                    })
+                }
+                HeaderDeclarationKind::TypeAlias { .. } => None,
+            }
+        })();
+        if let Some(record) = record.filter(|record| !record.is_none()) {
+            records.push((stub.id, record));
+        }
+    }
+    drop(semantics);
+    table.stable_declared_spellings.extend(records);
+}

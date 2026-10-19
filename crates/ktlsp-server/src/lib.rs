@@ -2,6 +2,7 @@
 //! and finite authenticated local navigation. JSON source snapshots are opt-in.
 
 mod cache;
+mod compiler_diagnostics;
 mod document_symbols;
 mod file_uri;
 mod imported_definition;
@@ -13,6 +14,7 @@ mod structure;
 mod uri;
 mod workspace;
 mod workspace_symbols;
+use ktlsp_analysis::Analyzer;
 use ktlsp_parser::{FileKind, ParserError, PipedTimeoutSite, SourceSnapshot};
 use ktlsp_protocol::{FrameReader, write_frame};
 use ktlsp_text::{Document, MAX_CHANGES, TextChange};
@@ -39,7 +41,7 @@ pub const MAX_WORKSPACE_FOLDERS: usize = 128;
 /// Includes cancelled work until its thread has actually terminated.
 pub const MAX_PENDING_PARSER_REQUESTS: usize = 8;
 const CLEANUP_TIMEOUT: Duration = Duration::from_secs(1);
-// Parser and native import jobs share the same bounded owned-thread registry.
+// Parser, compiler and native import jobs share the bounded owned-thread registry.
 static PARSER_THREADS: Mutex<[Option<ParserThread>; MAX_PENDING_PARSER_REQUESTS]> =
     Mutex::new([const { None }; MAX_PENDING_PARSER_REQUESTS]);
 
@@ -278,6 +280,8 @@ pub struct Session {
     errors: Vec<String>,
     configuration: Configuration,
     parser_provider: Option<Arc<document_symbols::Provider>>,
+    analyzer: Option<Arc<Analyzer>>,
+    native_analysis: bool,
     symbol_client: document_symbols::Client,
     workspace_symbol_client: document_symbols::Client,
     hover_format: Option<semantic_navigation::HoverFormat>,
@@ -340,6 +344,8 @@ impl Session {
             errors: Vec::new(),
             configuration: Configuration::default(),
             parser_provider: None,
+            analyzer: None,
+            native_analysis: false,
             symbol_client: document_symbols::Client::default(),
             workspace_symbol_client: document_symbols::Client::default(),
             hover_format: Some(semantic_navigation::HoverFormat::Plaintext),
@@ -363,6 +369,27 @@ impl Session {
         let provider = document_symbols::Provider::new(worker.as_ref())?;
         let mut session = Self::new();
         session.parser_provider = Some(Arc::new(provider));
+        Ok(session)
+    }
+    /// Configure native compiler diagnostics in addition to parser consumers.
+    /// Pull clients must explicitly select `initializationOptions.nativeAnalysis:
+    /// "standalone"`; this analyzes one source with core builtins, not a project.
+    /// Both trusted workers must be installed in the same directory.
+    pub fn with_workers(
+        parser: impl AsRef<Path>,
+        analysis: impl AsRef<Path>,
+    ) -> Result<Self, ktlsp_analysis::Error> {
+        let invalid = || ktlsp_analysis::Error::Parser(ParserError::Io);
+        if !parser.as_ref().is_absolute() || !analysis.as_ref().is_absolute() {
+            return Err(invalid());
+        }
+        let parser = parser.as_ref().canonicalize().map_err(|_| invalid())?;
+        let analysis = analysis.as_ref().canonicalize().map_err(|_| invalid())?;
+        if parser.parent() != analysis.parent() {
+            return Err(invalid());
+        }
+        let mut session = Self::with_parser(parser).map_err(ktlsp_analysis::Error::Parser)?;
+        session.analyzer = Some(Arc::new(Analyzer::new(&analysis)?));
         Ok(session)
     }
     pub fn state(&self) -> State {
@@ -476,6 +503,13 @@ impl Session {
                 .and_then(|map| required(map, "initializationOptions"))
                 .and_then(|options| workspace::projects(Some(options)));
             return match projects {
+                Ok(projects) if self.native_analysis && !projects.is_empty() => {
+                    vec![response_error(
+                        id.clone(),
+                        -32602,
+                        "standalone compiler analysis cannot load workspace projects",
+                    )]
+                }
                 Ok(projects) => self.start_import(Some(id.clone()), projects),
                 Err(error) => vec![response_error(id.clone(), -32602, error)],
             };
@@ -497,6 +531,31 @@ impl Session {
             let admitted = workspace_symbols::query(params)
                 .and_then(|query| self.start_workspace_symbols(id.clone(), query, budget));
             return match admitted {
+                Ok(()) => Vec::new(),
+                Err((code, message)) => vec![response_error(id.clone(), code, message)],
+            };
+        }
+        if method == "textDocument/diagnostic"
+            && self.state == State::Running
+            && self.pull_diagnostics
+            && self.native_analysis
+            && self.analyzer.is_some()
+        {
+            // Reuse the shared escaped-ID/error-envelope admission policy.
+            match workspace_symbols::Budget::new("", id) {
+                Ok(_) => {}
+                Err(workspace_symbols::AdmissionError::UnreplyableId) => {
+                    return vec![response_error(
+                        Value::Null,
+                        -32600,
+                        "diagnostic request id cannot fit a response",
+                    )];
+                }
+                Err(workspace_symbols::AdmissionError::Resource(message)) => {
+                    return vec![response_error(id.clone(), -32803, message)];
+                }
+            }
+            return match self.start_parser(id.clone(), method, params) {
                 Ok(()) => Vec::new(),
                 Err((code, message)) => vec![response_error(id.clone(), code, message)],
             };
@@ -572,6 +631,31 @@ impl Session {
                 && rename_client.document_changes;
             let projects = workspace::projects(params.and_then(|p| p.get("initializationOptions")))
                 .map_err(|e| (-32602, e))?;
+            let native_analysis = compiler_diagnostics::standalone(
+                params.and_then(|params| params.get("initializationOptions")),
+            )
+            .map_err(|error| (-32602, error))?;
+            if native_analysis {
+                if !pull_diagnostics {
+                    return Err((
+                        -32602,
+                        "standalone compiler analysis requires pull diagnostics",
+                    ));
+                }
+                if self.analyzer.is_none() {
+                    return Err((
+                        -32803,
+                        "standalone compiler analysis requires a trusted analysis worker",
+                    ));
+                }
+                if !projects.is_empty() {
+                    return Err((
+                        -32602,
+                        "standalone compiler analysis cannot load workspace projects",
+                    ));
+                }
+            }
+            self.native_analysis = native_analysis;
             self.workspace.initial = projects;
             self.code_actions = code_actions;
             self.rename_client = rename_client;
@@ -633,19 +717,7 @@ impl Session {
                 Ok(Value::Null)
             }
             "textDocument/diagnostic" if self.pull_diagnostics => {
-                let map = params
-                    .ok_or((-32602, "diagnostic params missing"))
-                    .and_then(|p| object(p).map_err(|e| (-32602, e)))?;
-                for key in ["identifier", "previousResultId"] {
-                    if map.get(key).is_some_and(|value| !value.is_string()) {
-                        return Err((-32602, "diagnostic identifiers must be strings"));
-                    }
-                }
-                let uri = required(map, "textDocument")
-                    .and_then(object)
-                    .and_then(|d| required(d, "uri"))
-                    .and_then(uri_value)
-                    .map_err(|e| (-32602, e))?;
+                let uri = compiler_diagnostics::params(params)?;
                 let (_, diagnostics) = self
                     .document_diagnostics(uri)
                     .ok_or((-32602, "diagnostic refers to unopened document"))?;
@@ -787,6 +859,9 @@ impl Session {
             .and_then(|d| required(d, "uri"))
             .and_then(uri_value)
             .map_err(|e| (-32602, e))?;
+        if method == "textDocument/diagnostic" {
+            compiler_diagnostics::params(params)?;
+        }
         self.start_parser_uri(id, method, uri, Some(map), None)
     }
 
@@ -803,7 +878,14 @@ impl Session {
         } else {
             uri
         };
+        let compiler = method == "textDocument/diagnostic";
         let document = self.documents.get(document_uri);
+        if compiler {
+            document.ok_or((-32602, "diagnostic refers to unopened document"))?;
+            if compiler_diagnostics::is_script(document_uri) {
+                return Err((-32803, "compiler diagnostics do not support Kotlin scripts"));
+            }
+        }
         if document.is_some_and(|document| document.text().len() > ktlsp_parser::MAX_SOURCE_BYTES) {
             return Err((-32803, "request exceeds the parser's 64 KiB source limit"));
         }
@@ -825,7 +907,10 @@ impl Session {
             });
             return Ok(());
         }
-        let query = if method == "textDocument/documentSymbol" {
+        let query = if matches!(
+            method,
+            "textDocument/documentSymbol" | "textDocument/diagnostic"
+        ) {
             None
         } else if let Some(query) = supplied_query {
             Some(query)
@@ -977,6 +1062,23 @@ impl Session {
                     .and_then(|bytes| bytes.checked_add(2))
             })
             .ok_or((-32803, "hover response id limit exceeded"))?;
+        let analyzer =
+            compiler.then(|| Arc::clone(self.analyzer.as_ref().expect("configured analyzer")));
+        let lexical = if compiler {
+            let document = document.expect("compiler diagnostics require open source");
+            Some(
+                self.analysis_cache
+                    .get(
+                        document_uri,
+                        document,
+                        self.configuration.folding_range_limit,
+                    )
+                    .map_err(|error| (-32803, error))?
+                    .diagnostics(document.text()),
+            )
+        } else {
+            None
+        };
         let cancelled = Arc::new(AtomicBool::new(false));
         let worker_cancelled = Arc::clone(&cancelled);
         // Capture coherently on the Session owner before the thread starts.
@@ -1013,6 +1115,25 @@ impl Session {
                     matches!(&worker_authority, ParserAuthority::Imported { .. })
                         .then(ktlsp_import::source_inventory::Budget::default);
                 let result = (|| {
+                    if let Some(analyzer) = analyzer {
+                        let (analysis, clean) = analyzer
+                            .analyze_snapshot_with_cleanup(&worker_snapshot, &worker_cancelled);
+                        cleanup_confirmed &= clean;
+                        let analysis = analysis.map_err(compiler_diagnostics::failure)?;
+                        if !clean {
+                            return Err(ParserFailure::Protocol(
+                                -32803,
+                                "compiler worker I/O or cleanup failed",
+                            ));
+                        }
+                        return compiler_diagnostics::render(
+                            &analysis,
+                            &worker_snapshot,
+                            lexical.expect("compiler lexical diagnostics captured"),
+                            &worker_cancelled,
+                            response_id_bound,
+                        );
+                    }
                     if let Some(budget) = import_budget.as_mut() {
                         worker_authority.verify(budget, &worker_cancelled)?;
                     }
@@ -2235,18 +2356,41 @@ fn parse_initialize(params: Option<&Value>) -> Result<(Configuration, bool), &'s
 pub fn run<R: BufRead, W: Write, E: Write>(reader: &mut R, writer: &mut W, errors: &mut E) -> i32 {
     // Resolve only beside this executable, never PATH, cwd, or an environment
     // override. Distribution must install the worker from the same build here.
-    let mut session = std::env::current_exe()
-        .ok()
-        .and_then(|executable| {
-            executable.parent().map(|parent| {
-                parent.join(format!(
-                    "ktlsp-parser-worker{}",
-                    std::env::consts::EXE_SUFFIX
-                ))
-            })
-        })
-        .and_then(|worker| Session::with_parser(worker).ok())
-        .unwrap_or_default();
+    let mut session = Session::new();
+    if let Ok(executable) = std::env::current_exe()
+        && let Some(parent) = executable.parent()
+    {
+        let parser = parent.join(format!(
+            "ktlsp-parser-worker{}",
+            std::env::consts::EXE_SUFFIX
+        ));
+        let analysis = parent.join(format!(
+            "ktlsp-analysis-worker{}",
+            std::env::consts::EXE_SUFFIX
+        ));
+        match analysis.symlink_metadata() {
+            Ok(_) => match Session::with_workers(&parser, &analysis) {
+                Ok(configured) => session = configured,
+                Err(error) => {
+                    let _ = writeln!(
+                        errors,
+                        "ktlsp: trusted compiler workers unavailable: {error}"
+                    );
+                    return 1;
+                }
+            },
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                session = Session::with_parser(&parser).unwrap_or_default();
+            }
+            Err(error) => {
+                let _ = writeln!(
+                    errors,
+                    "ktlsp: trusted compiler worker unavailable: {error}"
+                );
+                return 1;
+            }
+        }
+    }
     let mut frames = FrameReader::default();
     let mut output_failed = false;
     let status = 'exchange: loop {

@@ -1,0 +1,3179 @@
+//! Streaming frontend ownership model.
+//!
+//! This module is the migration boundary between parser-owned syntax and checked FIR.  It contains
+//! only data structures: stable module identities, source origins, the temporary packed signature
+//! graph, and the pending-free signature index.  Signature evaluation deliberately does not live
+//! here; it must call the ordinary resolver/checker instead of growing a second typer.
+
+use crate::ast::{
+    ClassDecl, ClassInit, Decl, DeclId, Expr, File, FunBody, FunDecl, Param, PropDecl, PropParam,
+    TrFlags, TypeAliasDecl, TypeRef,
+};
+use crate::diag::{DiagSink, Severity, Span};
+use crate::features::LangFeatures;
+use crate::source::{SourceInput, SourceKind};
+use crate::types::Visibility;
+
+mod annotation_class_literals;
+mod annotation_strings;
+mod executable_owners;
+mod flags;
+mod nested_classifiers;
+mod property_flags;
+mod type_use_annotations;
+mod visibility_suppressions;
+
+use annotation_class_literals::annotation_class_literals;
+use annotation_strings::HeaderAnnotationStringArena;
+use executable_owners::local_executable_owner;
+pub use flags::{HeaderParameterFlags, HeaderTypeFlags, HeaderTypeParameterFlags};
+use nested_classifiers::{
+    bind_parser_identity, classifier_identity, companion_declarations, nested_classifier_owners,
+};
+use type_use_annotations::HeaderTypeUseAnnotationArena;
+pub(crate) use visibility_suppressions::HeaderVisibilitySuppressionApplication;
+use visibility_suppressions::HeaderVisibilitySuppressionArena;
+
+mod actualization;
+
+pub use actualization::{
+    actualization, actualized_declaration_pairs, matched_expect_declarations, Actualization,
+    ActualizationTypeBindings, ActualizedDeclarationPair, UnactualizedMembers,
+};
+
+pub use super::declaration_stub::*;
+pub use super::identities::*;
+pub use super::lookup_scope::*;
+use super::signature::InferredSignatureKind;
+
+pub use super::source_map::*;
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct HeaderTypeRange {
+    start: u32,
+    len: u32,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct HeaderParameterRange {
+    start: u32,
+    len: u32,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct HeaderTypeParameterRange {
+    start: u32,
+    len: u32,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct HeaderTypeBoundRange {
+    start: u32,
+    len: u32,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct HeaderInterfaceDelegationRange {
+    start: u32,
+    len: u32,
+}
+
+/// Allocation-free packed type node. Children live in shared `HeaderTypeArena` storage.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HeaderTypeKind {
+    Classifier {
+        detail: HeaderClassifierTypeId,
+        /// Kept to make the copy exhaustive if a parser producer uses `TypeRef::arg` outside
+        /// function syntax. Valid current classifier syntax leaves it unset.
+        abbreviated_argument: Option<HeaderTypeId>,
+    },
+    Function {
+        parameters: HeaderTypeRange,
+        result: Option<HeaderTypeId>,
+        context_count: u32,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HeaderClassifierType {
+    pub path: LookupNameRange,
+    pub arguments: HeaderTypeRange,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HeaderType {
+    pub kind: HeaderTypeKind,
+    pub flags: HeaderTypeFlags,
+    pub span: Span,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HeaderParameter {
+    /// Lookup input only. Selected call arguments later use a stable callable and parameter ordinal.
+    pub name: LookupNameId,
+    pub ty: HeaderTypeId,
+    pub context_kind: crate::types::ContextParameterKind,
+    pub flags: HeaderParameterFlags,
+    pub span: Span,
+    /// Declaration annotations attached to the value parameter.
+    pub annotations: HeaderTypeRange,
+    /// Annotations written on the parameter's declared type.
+    pub type_annotations: HeaderTypeRange,
+    /// Class-literal arguments attached to parameter annotations, keyed by annotation ordinal.
+    /// These are bounded declaration-header paths such as `pkg.Type` from `pkg.Type::class`;
+    /// no annotation expression or parser identity survives extraction.
+    pub annotation_class_literals: HeaderParameterAnnotationClassLiteralRange,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HeaderParameterAnnotationClassLiteral {
+    pub annotation_ordinal: u32,
+    pub classifier: LookupNameRange,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct HeaderParameterAnnotationClassLiteralRange {
+    start: u32,
+    len: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HeaderTypeParameter {
+    pub name: LookupNameId,
+    pub flags: HeaderTypeParameterFlags,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HeaderTypeBound {
+    pub parameter: LookupNameId,
+    pub ty: HeaderTypeId,
+}
+
+/// The runtime value source for one interface-delegation edge while compact header syntax exists.
+/// A direct source parameter is a declaration-header fact. Every other expression is checked in
+/// Pass 2 as part of the primary-constructor body; the packed delegation ordinal identifies it
+/// without retaining an AST coordinate.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HeaderInterfaceDelegateSource {
+    ConstructorParameter(u32),
+    /// A primary-constructor parameter declaring a read-only property: that property's backing
+    /// field is the delegate.
+    ConstructorProperty(u32),
+    ConstructorBodyInitializer,
+}
+
+/// One class interface-delegation edge in compact source order. The supertype ordinal refers to the
+/// neighboring packed classifier-header array; no source spelling survives signature finalization.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HeaderInterfaceDelegation {
+    pub supertype: u32,
+    pub source: HeaderInterfaceDelegateSource,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HeaderResultType {
+    Explicit(HeaderTypeId),
+    /// Block-body functions with no written return type are semantically `Unit` and need no graph.
+    ImplicitUnit,
+    /// Expression-body functions and expression-derived properties are attached to `SignatureGraph`.
+    Inferred,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HeaderDeclarationKind {
+    Callable {
+        receiver: Option<HeaderTypeId>,
+        parameters: HeaderParameterRange,
+        result: HeaderResultType,
+        type_parameters: HeaderTypeParameterRange,
+        bounds: HeaderTypeBoundRange,
+        context_count: u32,
+        /// Start of the declaration signature, used only to derive stable semantic identities for
+        /// callable type parameters after the parser-owned declaration has been released.
+        signature_start: u32,
+        /// End of the declaration signature. Together with `signature_start`, this preserves the
+        /// exact diagnostic origin without retaining the declaration or body AST.
+        signature_end: u32,
+    },
+    Property {
+        receiver: Option<HeaderTypeId>,
+        context_parameters: HeaderParameterRange,
+        /// Exact source name of a written setter parameter. An absent/default setter has no source
+        /// parameter declaration and is projected separately by each target.
+        setter_parameter_name: Option<LookupNameId>,
+        declared_type: Option<HeaderTypeId>,
+        getter_type: Option<HeaderTypeId>,
+        backing_field_type: Option<HeaderTypeId>,
+        type_parameters: HeaderTypeParameterRange,
+        bounds: HeaderTypeBoundRange,
+        mutable: bool,
+    },
+    Classifier {
+        /// Exact source declaration segment retained before parser hoisting gives a nested
+        /// classifier its qualified lookup/emission path. Recursive header scope consumes this
+        /// spelling directly; it must not recover a segment from `DeclarationStub::lookup_name`.
+        source_name: LookupNameId,
+        type_parameters: HeaderTypeParameterRange,
+        /// Enclosing declaration parameters used by a parser-hoisted local/anonymous classifier.
+        /// These bind existing semantic declarations; they are not formals owned by this classifier.
+        lexical_type_parameter_captures: HeaderTypeParameterRange,
+        bounds: HeaderTypeBoundRange,
+        /// Declared interface/function supertypes in source order.
+        supertypes: HeaderTypeRange,
+        /// The one superclass constructor target, kept distinct from interfaces so later semantic
+        /// graph construction never recovers class-vs-interface ownership from source spelling.
+        base: Option<HeaderTypeId>,
+        /// The callee name of the superclass constructor call (`Base` in `: pkg.Base(args)`).
+        /// The call names its classifier apart from `base`, and kotlinc checks its access there.
+        base_callee: Option<crate::diag::Span>,
+        /// Class context parameters in source order. They are shared by every constructor and are
+        /// implicit receivers of instance bodies.
+        context_parameters: HeaderParameterRange,
+        primary_parameters: HeaderParameterRange,
+        delegations: HeaderInterfaceDelegationRange,
+    },
+    Constructor {
+        context_parameters: HeaderParameterRange,
+        parameters: HeaderParameterRange,
+    },
+    TypeAlias {
+        type_parameters: HeaderTypeParameterRange,
+        target: HeaderTypeId,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HeaderDeclaration {
+    pub declaration: DeclarationId,
+    /// Declaration annotations as compact classifier-reference types. Resolution consumes this
+    /// temporary range during Pass 1 and publishes stable classifier identities.
+    pub annotations: HeaderTypeRange,
+    /// Class-literal arguments written on those annotations, keyed by annotation ordinal — the
+    /// declaration-level twin of [`HeaderParameter::annotation_class_literals`]. A class-level
+    /// `@Serializable(with = X::class)` is a semantic fact another file of the same module must be
+    /// able to read, and it cannot be recovered once the source AST is released.
+    pub annotation_class_literals: HeaderParameterAnnotationClassLiteralRange,
+    pub kind: HeaderDeclarationKind,
+}
+
+/// Temporary packed syntax required to resolve explicit declaration signatures after the source
+/// file AST has been released. It has no expression ids, statement ids, declaration-arena ids, or
+/// body syntax.
+#[derive(Default)]
+pub struct HeaderSyntaxArena {
+    types: Vec<HeaderType>,
+    /// As-written type syntax for nodes rewritten by the parser's same-file type-alias expansion.
+    /// Both keys and values are compact header identities. The parser's span-keyed rewrite table is
+    /// consumed while one source AST is live and never becomes cross-pass state.
+    source_spellings: crate::fx_hash::HashMap<HeaderTypeId, HeaderTypeId>,
+    classifier_types: Vec<HeaderClassifierType>,
+    type_operands: Vec<HeaderTypeId>,
+    path_segments: Vec<LookupNameId>,
+    parameters: Vec<HeaderParameter>,
+    parameter_annotation_class_literals: Vec<HeaderParameterAnnotationClassLiteral>,
+    declaration_annotation_class_literals: Vec<HeaderParameterAnnotationClassLiteral>,
+    type_parameters: Vec<HeaderTypeParameter>,
+    bounds: Vec<HeaderTypeBound>,
+    interface_delegations: Vec<HeaderInterfaceDelegation>,
+    declarations: Vec<Option<HeaderDeclaration>>,
+}
+
+impl HeaderSyntaxArena {
+    fn range<T>(storage: &mut Vec<T>, values: impl IntoIterator<Item = T>) -> (u32, u32) {
+        let start = next_id(storage.len(), "packed header operands");
+        storage.extend(values);
+        let end = next_id(storage.len(), "packed header operands");
+        (start, end - start)
+    }
+
+    fn add_type_range(
+        &mut self,
+        values: impl IntoIterator<Item = HeaderTypeId>,
+    ) -> HeaderTypeRange {
+        let (start, len) = Self::range(&mut self.type_operands, values);
+        HeaderTypeRange { start, len }
+    }
+
+    fn add_parameter_range(
+        &mut self,
+        values: impl IntoIterator<Item = HeaderParameter>,
+    ) -> HeaderParameterRange {
+        let (start, len) = Self::range(&mut self.parameters, values);
+        HeaderParameterRange { start, len }
+    }
+
+    fn add_parameter_annotation_class_literal_range(
+        &mut self,
+        values: impl IntoIterator<Item = HeaderParameterAnnotationClassLiteral>,
+    ) -> HeaderParameterAnnotationClassLiteralRange {
+        let (start, len) = Self::range(&mut self.parameter_annotation_class_literals, values);
+        HeaderParameterAnnotationClassLiteralRange { start, len }
+    }
+
+    fn add_declaration_annotation_class_literal_range(
+        &mut self,
+        values: impl IntoIterator<Item = HeaderParameterAnnotationClassLiteral>,
+    ) -> HeaderParameterAnnotationClassLiteralRange {
+        let (start, len) = Self::range(&mut self.declaration_annotation_class_literals, values);
+        HeaderParameterAnnotationClassLiteralRange { start, len }
+    }
+
+    fn add_type_parameter_range(
+        &mut self,
+        values: impl IntoIterator<Item = HeaderTypeParameter>,
+    ) -> HeaderTypeParameterRange {
+        let (start, len) = Self::range(&mut self.type_parameters, values);
+        HeaderTypeParameterRange { start, len }
+    }
+
+    fn add_bound_range(
+        &mut self,
+        values: impl IntoIterator<Item = HeaderTypeBound>,
+    ) -> HeaderTypeBoundRange {
+        let (start, len) = Self::range(&mut self.bounds, values);
+        HeaderTypeBoundRange { start, len }
+    }
+
+    fn add_interface_delegation_range(
+        &mut self,
+        values: impl IntoIterator<Item = HeaderInterfaceDelegation>,
+    ) -> HeaderInterfaceDelegationRange {
+        let (start, len) = Self::range(&mut self.interface_delegations, values);
+        HeaderInterfaceDelegationRange { start, len }
+    }
+
+    fn add_path(&mut self, spelling: &str, names: &mut LookupNames) -> LookupNameRange {
+        let segments = spelling
+            .split(['.', '/'])
+            .filter(|segment| !segment.is_empty())
+            .map(|segment| names.intern(segment))
+            .collect::<Vec<_>>();
+        let (start, len) = Self::range(&mut self.path_segments, segments);
+        LookupNameRange { start, len }
+    }
+
+    fn push_type(&mut self, ty: HeaderType) -> HeaderTypeId {
+        let id = HeaderTypeId::from_raw(next_id(self.types.len(), "header types"));
+        self.types.push(ty);
+        id
+    }
+
+    fn add_classifier_detail(
+        &mut self,
+        path: LookupNameRange,
+        arguments: HeaderTypeRange,
+    ) -> HeaderClassifierTypeId {
+        let id = HeaderClassifierTypeId::from_raw(next_id(
+            self.classifier_types.len(),
+            "header classifier type details",
+        ));
+        self.classifier_types
+            .push(HeaderClassifierType { path, arguments });
+        id
+    }
+
+    pub(crate) fn add_type(&mut self, ty: &TypeRef, names: &mut LookupNames) -> HeaderTypeId {
+        let flags = HeaderTypeFlags::from_type_ref(ty);
+        let kind = if ty.is_function_type_syntax() {
+            let parameters = ty
+                .fun_params
+                .iter()
+                .map(|parameter| self.add_type(parameter, names))
+                .collect::<Vec<_>>();
+            let parameters = self.add_type_range(parameters);
+            let result = ty.arg.as_deref().map(|result| self.add_type(result, names));
+            HeaderTypeKind::Function {
+                parameters,
+                result,
+                context_count: ty.fun_context_count,
+            }
+        } else {
+            let arguments = ty
+                .targs
+                .iter()
+                .map(|argument| self.add_type(argument, names))
+                .collect::<Vec<_>>();
+            let arguments = self.add_type_range(arguments);
+            let abbreviated_argument = ty
+                .arg
+                .as_deref()
+                .map(|argument| self.add_type(argument, names));
+            let path = self.add_path(&ty.name, names);
+            let detail = self.add_classifier_detail(path, arguments);
+            HeaderTypeKind::Classifier {
+                detail,
+                abbreviated_argument,
+            }
+        };
+        self.push_type(HeaderType {
+            kind,
+            flags,
+            span: ty.span,
+        })
+    }
+
+    /// Consume the parser's temporary alias-rewrite sidecar for the compact types added since
+    /// `first_type`. Associations are immediately converted from source spans to compact type
+    /// identities; later signature/metadata publication never needs the `File` table.
+    fn capture_source_spellings(
+        &mut self,
+        first_type: usize,
+        spellings: &crate::fx_hash::HashMap<Span, TypeRef>,
+        names: &mut LookupNames,
+    ) {
+        fn capture_descendants(
+            arena: &mut HeaderSyntaxArena,
+            root: HeaderTypeId,
+            spellings: &crate::fx_hash::HashMap<Span, TypeRef>,
+            names: &mut LookupNames,
+        ) {
+            let children = match arena
+                .ty(root)
+                .expect("newly inserted compact type must exist")
+                .kind
+            {
+                HeaderTypeKind::Classifier {
+                    detail,
+                    abbreviated_argument,
+                } => {
+                    let detail = arena
+                        .classifier_type(detail)
+                        .expect("compact classifier detail must exist");
+                    arena
+                        .type_operands(detail.arguments)
+                        .iter()
+                        .copied()
+                        .chain(abbreviated_argument)
+                        .collect::<Vec<_>>()
+                }
+                HeaderTypeKind::Function {
+                    parameters, result, ..
+                } => arena
+                    .type_operands(parameters)
+                    .iter()
+                    .copied()
+                    .chain(result)
+                    .collect::<Vec<_>>(),
+            };
+            for child in children {
+                let source = arena
+                    .ty(child)
+                    .and_then(|ty| spellings.get(&ty.span))
+                    .cloned();
+                if let Some(source) = source {
+                    let source = arena.add_type(&source, names);
+                    arena.source_spellings.insert(child, source);
+                    // The parser expands inner aliases before saving an outer alias's spelling.
+                    // Therefore its saved tree can contain an expanded child whose own source
+                    // spelling exists only in the span sidecar. Attach that spelling to the
+                    // compact SOURCE tree now, while the parser sidecar is still available.
+                    capture_descendants(arena, source, spellings, names);
+                } else {
+                    capture_descendants(arena, child, spellings, names);
+                }
+            }
+        }
+
+        let rewritten = self.types[first_type..]
+            .iter()
+            .enumerate()
+            .filter_map(|(offset, ty)| {
+                spellings.get(&ty.span).cloned().map(|spelling| {
+                    (
+                        HeaderTypeId::from_raw(
+                            u32::try_from(first_type + offset).expect("too many header types"),
+                        ),
+                        spelling,
+                    )
+                })
+            })
+            .collect::<Vec<_>>();
+        for (expanded, spelling) in rewritten {
+            let spelling = self.add_type(&spelling, names);
+            self.source_spellings.insert(expanded, spelling);
+            capture_descendants(self, spelling, spellings, names);
+        }
+    }
+
+    fn add_classifier_type(
+        &mut self,
+        spelling: &str,
+        arguments: &[TypeRef],
+        span: Span,
+        names: &mut LookupNames,
+    ) -> HeaderTypeId {
+        let arguments = arguments
+            .iter()
+            .map(|argument| self.add_type(argument, names))
+            .collect::<Vec<_>>();
+        let arguments = self.add_type_range(arguments);
+        let path = self.add_path(spelling, names);
+        let detail = self.add_classifier_detail(path, arguments);
+        self.push_type(HeaderType {
+            kind: HeaderTypeKind::Classifier {
+                detail,
+                abbreviated_argument: None,
+            },
+            flags: HeaderTypeFlags::default(),
+            span,
+        })
+    }
+
+    fn insert_declaration(&mut self, declaration: HeaderDeclaration) {
+        let index = declaration.declaration.raw() as usize;
+        if self.declarations.len() <= index {
+            self.declarations.resize(index + 1, None);
+        }
+        assert!(
+            self.declarations[index].replace(declaration).is_none(),
+            "compact header syntax may be published only once per stable declaration"
+        );
+    }
+
+    pub fn declaration(&self, id: DeclarationId) -> Option<HeaderDeclaration> {
+        self.declarations.get(id.raw() as usize).copied().flatten()
+    }
+
+    /// Direct type roots owned by one declaration header. Children are reached through
+    /// [`Self::ty`] and shared operand ranges; body/local type syntax is structurally absent.
+    pub fn declaration_type_roots(&self, id: DeclarationId) -> Vec<HeaderTypeId> {
+        fn add_parameters(
+            arena: &HeaderSyntaxArena,
+            roots: &mut Vec<HeaderTypeId>,
+            range: HeaderParameterRange,
+        ) {
+            roots.extend(arena.parameters(range).iter().map(|parameter| parameter.ty));
+        }
+        fn add_bounds(
+            arena: &HeaderSyntaxArena,
+            roots: &mut Vec<HeaderTypeId>,
+            range: HeaderTypeBoundRange,
+        ) {
+            roots.extend(arena.bounds(range).iter().map(|bound| bound.ty));
+        }
+        let Some(declaration) = self.declaration(id) else {
+            return Vec::new();
+        };
+        let mut roots = Vec::new();
+        match declaration.kind {
+            HeaderDeclarationKind::Callable {
+                receiver,
+                parameters,
+                result,
+                bounds,
+                ..
+            } => {
+                roots.extend(receiver);
+                add_parameters(self, &mut roots, parameters);
+                if let HeaderResultType::Explicit(result) = result {
+                    roots.push(result);
+                }
+                add_bounds(self, &mut roots, bounds);
+            }
+            HeaderDeclarationKind::Property {
+                receiver,
+                context_parameters,
+                declared_type,
+                getter_type,
+                backing_field_type,
+                bounds,
+                ..
+            } => {
+                roots.extend(receiver);
+                add_parameters(self, &mut roots, context_parameters);
+                roots.extend(declared_type);
+                roots.extend(getter_type);
+                roots.extend(backing_field_type);
+                add_bounds(self, &mut roots, bounds);
+            }
+            HeaderDeclarationKind::Classifier {
+                bounds,
+                supertypes,
+                base,
+                context_parameters,
+                primary_parameters,
+                ..
+            } => {
+                add_bounds(self, &mut roots, bounds);
+                roots.extend(self.type_operands(supertypes));
+                roots.extend(base);
+                add_parameters(self, &mut roots, context_parameters);
+                add_parameters(self, &mut roots, primary_parameters);
+            }
+            HeaderDeclarationKind::Constructor {
+                context_parameters,
+                parameters,
+            } => {
+                add_parameters(self, &mut roots, context_parameters);
+                add_parameters(self, &mut roots, parameters)
+            }
+            HeaderDeclarationKind::TypeAlias { target, .. } => roots.push(target),
+        }
+        roots
+    }
+
+    pub fn ty(&self, id: HeaderTypeId) -> Option<HeaderType> {
+        self.types.get(id.raw() as usize).copied()
+    }
+
+    /// Reconstruct one short-lived parser type for the existing resolver during migration. The
+    /// caller must resolve and drop it immediately; this never reconstructs a declaration or body
+    /// AST, and every child comes from the compact header arena.
+    pub fn transient_type_ref(&self, id: HeaderTypeId, names: &LookupNames) -> Option<TypeRef> {
+        let ty = self.ty(id)?;
+        let flags = TrFlags::default()
+            .with_nullable(ty.flags.nullable())
+            .with_definitely_non_null(ty.flags.definitely_non_null())
+            .with_fun_has_receiver(ty.flags.function_receiver())
+            .with_fun_suspend(ty.flags.suspend_function())
+            .with_in_projection(ty.flags.in_projection())
+            .with_out_projection(ty.flags.out_projection())
+            .with_import(ty.flags.is_import())
+            .with_star_projection(ty.flags.star_projection())
+            .with_class_literal_lhs(ty.flags.class_literal_lhs());
+        let (name, arg, targs, fun_params, fun_context_count) = match ty.kind {
+            HeaderTypeKind::Classifier {
+                detail,
+                abbreviated_argument,
+            } => {
+                let detail = self.classifier_type(detail)?;
+                let name = self
+                    .type_path(detail.path)
+                    .iter()
+                    .map(|segment| names.get(*segment))
+                    .collect::<Option<Vec<_>>>()?
+                    .join(".");
+                let mut targs = Vec::new();
+                for argument in self.type_operands(detail.arguments) {
+                    targs.push(self.transient_type_ref(*argument, names)?);
+                }
+                let arg = match abbreviated_argument {
+                    Some(argument) => Some(Box::new(self.transient_type_ref(argument, names)?)),
+                    None => None,
+                };
+                (name, arg, targs, Vec::new(), 0)
+            }
+            HeaderTypeKind::Function {
+                parameters,
+                result,
+                context_count,
+            } => {
+                let mut fun_params = Vec::new();
+                for parameter in self.type_operands(parameters) {
+                    fun_params.push(self.transient_type_ref(*parameter, names)?);
+                }
+                let arg = match result {
+                    Some(result) => Some(Box::new(self.transient_type_ref(result, names)?)),
+                    None => None,
+                };
+                ("<fun>".into(), arg, Vec::new(), fun_params, context_count)
+            }
+        };
+        Some(TypeRef {
+            name,
+            flags,
+            arg,
+            targs,
+            span: ty.span,
+            fun_params,
+            fun_context_count,
+        })
+    }
+
+    /// Reconstruct only the source-spelling substitutions reachable from one compact type root.
+    /// This is a short-lived adapter for metadata publication during Pass 1; the returned map is
+    /// dropped with the materialized `TypeRef` and never crosses into checked FIR.
+    pub(crate) fn transient_source_spellings(
+        &self,
+        root: HeaderTypeId,
+        names: &LookupNames,
+    ) -> Option<crate::fx_hash::HashMap<Span, TypeRef>> {
+        fn visit(
+            arena: &HeaderSyntaxArena,
+            id: HeaderTypeId,
+            names: &LookupNames,
+            out: &mut crate::fx_hash::HashMap<Span, TypeRef>,
+        ) -> Option<()> {
+            let ty = arena.ty(id)?;
+            if let Some(spelling) = arena.source_spellings.get(&id).copied() {
+                out.insert(ty.span, arena.transient_type_ref(spelling, names)?);
+                // Source spelling trees can themselves contain parser-expanded aliases. They are
+                // compactly linked by identity during header capture, so include those nested
+                // substitutions as well as substitutions in the semantic expansion tree.
+                visit(arena, spelling, names, out)?;
+            }
+            match ty.kind {
+                HeaderTypeKind::Classifier {
+                    detail,
+                    abbreviated_argument,
+                } => {
+                    let detail = arena.classifier_type(detail)?;
+                    for argument in arena.type_operands(detail.arguments) {
+                        visit(arena, *argument, names, out)?;
+                    }
+                    if let Some(argument) = abbreviated_argument {
+                        visit(arena, argument, names, out)?;
+                    }
+                }
+                HeaderTypeKind::Function {
+                    parameters, result, ..
+                } => {
+                    for parameter in arena.type_operands(parameters) {
+                        visit(arena, *parameter, names, out)?;
+                    }
+                    if let Some(result) = result {
+                        visit(arena, result, names, out)?;
+                    }
+                }
+            }
+            Some(())
+        }
+
+        let mut spellings = crate::fx_hash::HashMap::default();
+        visit(self, root, names, &mut spellings)?;
+        Some(spellings)
+    }
+
+    pub fn classifier_type(&self, id: HeaderClassifierTypeId) -> Option<HeaderClassifierType> {
+        self.classifier_types.get(id.raw() as usize).copied()
+    }
+
+    pub fn type_operands(&self, range: HeaderTypeRange) -> &[HeaderTypeId] {
+        let start = range.start as usize;
+        &self.type_operands[start..start + range.len as usize]
+    }
+
+    pub fn type_path(&self, range: LookupNameRange) -> &[LookupNameId] {
+        let start = range.start as usize;
+        &self.path_segments[start..start + range.len as usize]
+    }
+
+    pub fn parameters(&self, range: HeaderParameterRange) -> &[HeaderParameter] {
+        let start = range.start as usize;
+        &self.parameters[start..start + range.len as usize]
+    }
+
+    pub fn parameter_annotation_class_literals(
+        &self,
+        range: HeaderParameterAnnotationClassLiteralRange,
+    ) -> &[HeaderParameterAnnotationClassLiteral] {
+        let start = range.start as usize;
+        &self.parameter_annotation_class_literals[start..start + range.len as usize]
+    }
+
+    pub fn declaration_annotation_class_literals(
+        &self,
+        range: HeaderParameterAnnotationClassLiteralRange,
+    ) -> &[HeaderParameterAnnotationClassLiteral] {
+        let start = range.start as usize;
+        &self.declaration_annotation_class_literals[start..start + range.len as usize]
+    }
+
+    /// Mutable view of one declaration's packed parameters. Multiplatform actualization uses this
+    /// to publish an expect parameter's default-presence fact on the callable that survives as the
+    /// actual declaration. The expression remains expect-owned only while Pass-1 syntax is live;
+    /// checked default FIR is then stored under the surviving actual callable.
+    pub fn parameters_mut(&mut self, range: HeaderParameterRange) -> &mut [HeaderParameter] {
+        let start = range.start as usize;
+        &mut self.parameters[start..start + range.len as usize]
+    }
+
+    /// Publish default-presence facts selected by expect/actual matching.
+    pub fn set_parameter_defaults(&mut self, range: HeaderParameterRange, defaults: &[bool]) {
+        for (parameter, &has_default) in self.parameters_mut(range).iter_mut().zip(defaults) {
+            if has_default {
+                parameter.flags = parameter.flags.with(HeaderParameterFlags::DEFAULT, true);
+            }
+        }
+    }
+
+    pub fn type_parameters(&self, range: HeaderTypeParameterRange) -> &[HeaderTypeParameter] {
+        let start = range.start as usize;
+        &self.type_parameters[start..start + range.len as usize]
+    }
+
+    pub fn bounds(&self, range: HeaderTypeBoundRange) -> &[HeaderTypeBound] {
+        let start = range.start as usize;
+        &self.bounds[start..start + range.len as usize]
+    }
+
+    pub fn interface_delegations(
+        &self,
+        range: HeaderInterfaceDelegationRange,
+    ) -> &[HeaderInterfaceDelegation] {
+        let start = range.start as usize;
+        &self.interface_delegations[start..start + range.len as usize]
+    }
+
+    pub fn type_count(&self) -> usize {
+        self.types.len()
+    }
+
+    pub fn declaration_count(&self) -> usize {
+        self.declarations.iter().flatten().count()
+    }
+
+    pub(crate) fn storage_payload_bytes(&self) -> usize {
+        self.types.len() * std::mem::size_of::<HeaderType>()
+            + self.source_spellings.len() * std::mem::size_of::<(HeaderTypeId, HeaderTypeId)>()
+            + self.classifier_types.len() * std::mem::size_of::<HeaderClassifierType>()
+            + self.type_operands.len() * std::mem::size_of::<HeaderTypeId>()
+            + self.path_segments.len() * std::mem::size_of::<LookupNameId>()
+            + self.parameters.len() * std::mem::size_of::<HeaderParameter>()
+            + (self.parameter_annotation_class_literals.len()
+                + self.declaration_annotation_class_literals.len())
+                * std::mem::size_of::<HeaderParameterAnnotationClassLiteral>()
+            + self.type_parameters.len() * std::mem::size_of::<HeaderTypeParameter>()
+            + self.bounds.len() * std::mem::size_of::<HeaderTypeBound>()
+            + self.interface_delegations.len() * std::mem::size_of::<HeaderInterfaceDelegation>()
+            + self.declarations.len() * std::mem::size_of::<Option<HeaderDeclaration>>()
+    }
+}
+
+struct ExtractedFileStubs {
+    stubs: Vec<DeclarationStub>,
+    stable_by_transient: ParserDeclarationIdentities,
+    /// Stable identity parallel to every entry of the transient parser's `File::decls` array.
+    source_declarations: Vec<DeclarationId>,
+    /// The `expect` keyword each header declaration of this file was introduced by, recorded while
+    /// the parser unit is live because nothing afterwards can answer it.
+    expect_keywords: Vec<(DeclarationId, TextRange)>,
+    /// The generated-class position each `suspend` function's continuation holds, bound to that
+    /// function's stable identity. The parser pass that numbers the sequence is the only one that
+    /// can say which positions are free; this carries its answer past the AST.
+    continuation_ordinals: Vec<(DeclarationId, u32)>,
+    local_class_name_provenance: Vec<(DeclarationId, super::LocalClassNameProvenance)>,
+}
+
+#[derive(Clone, Copy)]
+enum LocalClassProvenanceOwnership {
+    Publish,
+    AlreadyPublished,
+}
+
+/// Extract syntax-independent declaration/body locations from one transient file AST. The returned
+/// stubs contain no parser arena ids or owned spellings; an optional temporary lookup-name id is not
+/// semantic identity. Stubs remain valid after `file` is dropped. This is the stable-identity portion
+/// of pass 1; signature syntax and constraints are attached by the resolver-facing extraction pass.
+fn extract_file_stub_inventory(
+    file: &File,
+    source: SourceFileId,
+    ids: &mut DeclarationIds,
+    names: &mut LookupNames,
+    provenance: LocalClassProvenanceOwnership,
+) -> ExtractedFileStubs {
+    fn body_range(file: &File, body: &FunBody) -> Option<TextRange> {
+        let expression = match body {
+            FunBody::Expr(expression) | FunBody::Block(expression) => *expression,
+            FunBody::None => return None,
+        };
+        file.expr_span(expression)
+    }
+
+    fn function_stub(
+        _file: &File,
+        source: SourceFileId,
+        ids: &mut DeclarationIds,
+        names: &mut LookupNames,
+        function: &FunDecl,
+        owner: Option<DeclarationId>,
+        sibling: u32,
+    ) -> DeclarationStub {
+        let id = ids.intern(DeclarationAnchor {
+            source,
+            range: function.span,
+            owner,
+            kind: DeclarationKind::Function,
+            sibling,
+        });
+        let has_executable_body = !matches!(&function.body, FunBody::None)
+            || function
+                .params
+                .iter()
+                .any(|parameter| parameter.default.is_some());
+        DeclarationStub {
+            id,
+            source,
+            range: function.span,
+            lookup_name: Some(names.intern(&function.name)),
+            // Defaults are checked/emitted with their callable even when the declaration has no
+            // ordinary body. Locate the whole declaration so a future range parser cannot omit its
+            // header expressions.
+            body: has_executable_body.then_some(BodyKind::Function),
+            signature_inference: match (&function.ret, &function.body) {
+                (None, FunBody::Expr(_)) if function.receiver.is_some() => {
+                    Some(InferredSignatureKind::ExtensionExpression)
+                }
+                (None, FunBody::Expr(_)) => Some(InferredSignatureKind::ExpressionFunction),
+                (Some(_), _) | (None, FunBody::Block(_) | FunBody::None) => None,
+            },
+            initialization_order: None,
+            kind: DeclarationKind::Function,
+            visibility: function.visibility,
+            flags: DeclarationFlags::default()
+                .with(DeclarationFlags::INLINE, function.is_inline())
+                .with(DeclarationFlags::FINAL, function.is_final())
+                .with(DeclarationFlags::OPEN, function.is_open())
+                .with(DeclarationFlags::OVERRIDE, function.is_override())
+                .with(DeclarationFlags::ABSTRACT, function.is_abstract())
+                .with(DeclarationFlags::SUSPEND, function.is_suspend())
+                .with(DeclarationFlags::TAILREC, function.is_tailrec())
+                .with(DeclarationFlags::OPERATOR, function.is_operator())
+                .with(DeclarationFlags::INFIX, function.is_infix())
+                .with(DeclarationFlags::ACTUAL, function.is_actual())
+                .with(
+                    DeclarationFlags::HAS_VISIBILITY_MODIFIER,
+                    function.has_visibility_modifier(),
+                )
+                .with(
+                    DeclarationFlags::COMPANION,
+                    function.is_companion_extension(),
+                )
+                .with(
+                    DeclarationFlags::COMPANION_BLOCK_MEMBER,
+                    function.is_companion_block_member(),
+                ),
+        }
+    }
+
+    fn generated_function_stub(
+        source: SourceFileId,
+        ids: &mut DeclarationIds,
+        names: &mut LookupNames,
+        owner: DeclarationId,
+        range: TextRange,
+        sibling: u32,
+        name: &str,
+        flags: DeclarationFlags,
+        visibility: Visibility,
+    ) -> DeclarationStub {
+        let id = ids.intern(DeclarationAnchor {
+            source,
+            range,
+            owner: Some(owner),
+            kind: DeclarationKind::Function,
+            sibling,
+        });
+        DeclarationStub {
+            id,
+            source,
+            range,
+            lookup_name: Some(names.intern(name)),
+            body: None,
+            signature_inference: None,
+            initialization_order: None,
+            kind: DeclarationKind::Function,
+            visibility,
+            flags: flags.with(DeclarationFlags::COMPILER_GENERATED, true),
+        }
+    }
+
+    fn property_stubs(
+        file: &File,
+        source: SourceFileId,
+        ids: &mut DeclarationIds,
+        names: &mut LookupNames,
+        property: &PropDecl,
+        owner: Option<DeclarationId>,
+        sibling: u32,
+        initialization_order: Option<u32>,
+        out: &mut Vec<DeclarationStub>,
+    ) {
+        let id = ids.intern(DeclarationAnchor {
+            source,
+            range: property.span,
+            owner,
+            kind: DeclarationKind::Property,
+            sibling,
+        });
+        let property_body = property
+            .delegate
+            .map(|_| BodyKind::Delegate)
+            .or_else(|| property.init.map(|_| BodyKind::Initializer));
+        let inferred_expression = if property
+            .explicit_backing_field
+            .as_ref()
+            .is_some_and(|field| field.ty.is_none())
+            && property.init.is_some()
+        {
+            Some((
+                property.init.expect("checked above"),
+                BodyKind::Initializer,
+                InferredSignatureKind::BackingFieldInitializer,
+            ))
+        } else if property.declared_ty().is_some() {
+            None
+        } else if let Some(delegate) = property.delegate {
+            Some((
+                delegate,
+                BodyKind::Delegate,
+                InferredSignatureKind::DelegatedProperty,
+            ))
+        } else if let Some(initializer) = property.init {
+            Some((
+                initializer,
+                BodyKind::Initializer,
+                if property.receiver.is_some() {
+                    InferredSignatureKind::ExtensionExpression
+                } else {
+                    InferredSignatureKind::PropertyInitializer
+                },
+            ))
+        } else {
+            match property.getter.as_ref() {
+                Some(FunBody::Expr(getter)) => Some((
+                    *getter,
+                    BodyKind::Getter,
+                    if property.receiver.is_some() {
+                        InferredSignatureKind::ExtensionExpression
+                    } else {
+                        InferredSignatureKind::ExpressionGetter
+                    },
+                )),
+                Some(FunBody::Block(_) | FunBody::None) | None => None,
+            }
+        };
+        out.push(DeclarationStub {
+            id,
+            source,
+            range: property.span,
+            lookup_name: Some(names.intern(&property.name)),
+            body: property_body,
+            signature_inference: inferred_expression.map(|(_, _, kind)| kind),
+            initialization_order,
+            kind: DeclarationKind::Property,
+            visibility: property.visibility,
+            flags: property_flags::from_property(
+                file,
+                property,
+                inferred_expression.map(|(_, _, kind)| kind),
+            ),
+        });
+
+        if property.getter_declared {
+            let getter = property.getter.as_ref();
+            let getter_id = ids.intern(DeclarationAnchor {
+                source,
+                range: getter
+                    .and_then(|body| body_range(file, body))
+                    .unwrap_or(property.span),
+                owner: Some(id),
+                kind: DeclarationKind::Accessor,
+                sibling: 0,
+            });
+            out.push(DeclarationStub {
+                id: getter_id,
+                source,
+                range: ids.anchor(getter_id).expect("new getter id").range,
+                lookup_name: None,
+                body: getter.and_then(|body| body_range(file, body).map(|_| BodyKind::Getter)),
+                signature_inference: None,
+                initialization_order: None,
+                kind: DeclarationKind::Accessor,
+                visibility: property.visibility,
+                flags: DeclarationFlags::default()
+                    .with(DeclarationFlags::INLINE, property.getter_inline),
+            });
+        }
+        if let Some(setter) = &property.setter {
+            let setter_body = setter
+                .body
+                .as_ref()
+                .and_then(|body| body_range(file, body).map(|_| BodyKind::Setter));
+            let setter_id = ids.intern(DeclarationAnchor {
+                source,
+                range: setter
+                    .body
+                    .as_ref()
+                    .and_then(|body| body_range(file, body))
+                    .unwrap_or(property.span),
+                owner: Some(id),
+                kind: DeclarationKind::Accessor,
+                sibling: 1,
+            });
+            out.push(DeclarationStub {
+                id: setter_id,
+                source,
+                range: ids.anchor(setter_id).expect("new setter id").range,
+                lookup_name: None,
+                body: setter_body,
+                signature_inference: None,
+                initialization_order: None,
+                kind: DeclarationKind::Accessor,
+                visibility: setter.visibility.unwrap_or(property.visibility),
+                flags: DeclarationFlags::default().with(DeclarationFlags::INLINE, setter.is_inline),
+            });
+        }
+    }
+
+    fn class_stubs(
+        file: &File,
+        source: SourceFileId,
+        ids: &mut DeclarationIds,
+        names: &mut LookupNames,
+        class: &ClassDecl,
+        is_companion: bool,
+        classifier_member: bool,
+        owner: Option<DeclarationId>,
+        sibling: u32,
+        out: &mut Vec<DeclarationStub>,
+    ) {
+        let class_id = ids.intern(DeclarationAnchor {
+            source,
+            range: class.span,
+            owner,
+            kind: DeclarationKind::Classifier,
+            sibling,
+        });
+        out.push(DeclarationStub {
+            id: class_id,
+            source,
+            range: class.span,
+            lookup_name: Some(names.intern(&class.name)),
+            body: None,
+            signature_inference: None,
+            initialization_order: None,
+            kind: DeclarationKind::Classifier,
+            visibility: class.visibility,
+            flags: DeclarationFlags::default()
+                .with(DeclarationFlags::INTERFACE, class.is_interface())
+                .with(DeclarationFlags::SINGLETON, class.is_singleton())
+                .with(DeclarationFlags::DATA, class.is_data)
+                .with(
+                    DeclarationFlags::VALUE,
+                    class.is_value && class.value_modifier_span.is_none(),
+                )
+                .with(
+                    DeclarationFlags::VALUE_KEYWORD,
+                    class.value_modifier_span.is_some(),
+                )
+                .with(DeclarationFlags::ENUM, class.is_enum())
+                .with(DeclarationFlags::FUN_INTERFACE, class.is_fun_interface)
+                .with(DeclarationFlags::OPEN, class.is_open())
+                .with(DeclarationFlags::ABSTRACT, class.is_abstract())
+                .with(DeclarationFlags::SEALED, class.is_sealed())
+                .with(DeclarationFlags::FINAL, class.is_final())
+                .with(DeclarationFlags::FINAL_MODIFIER, class.final_modifier)
+                .with(DeclarationFlags::ANNOTATION_CLASS, class.is_annotation())
+                .with(DeclarationFlags::INNER, class.inner_of.is_some())
+                .with(DeclarationFlags::COMPANION, is_companion)
+                .with(DeclarationFlags::CLASSIFIER_MEMBER, classifier_member),
+        });
+
+        if class.primary_ctor_annotations.is_some() && !class.is_interface() {
+            let constructor = ids.intern(DeclarationAnchor {
+                source,
+                range: class.span,
+                owner: Some(class_id),
+                kind: DeclarationKind::Constructor,
+                sibling: 0,
+            });
+            out.push(DeclarationStub {
+                id: constructor,
+                source,
+                range: class.span,
+                lookup_name: None,
+                body: Some(BodyKind::Constructor),
+                signature_inference: None,
+                initialization_order: None,
+                kind: DeclarationKind::Constructor,
+                visibility: class.primary_ctor_visibility,
+                flags: DeclarationFlags::default(),
+            });
+        }
+        if let Some(companion) = class.companion {
+            let Decl::Class(companion) = file.decl(companion) else {
+                panic!("a companion declaration edge must target a class")
+            };
+            class_stubs(
+                file,
+                source,
+                ids,
+                names,
+                companion,
+                true,
+                true,
+                Some(class_id),
+                0,
+                out,
+            );
+        }
+        for (index, property) in class.props.iter().enumerate() {
+            if !property.is_property {
+                continue;
+            }
+            let id = ids.intern(DeclarationAnchor {
+                source,
+                range: property.span,
+                owner: Some(class_id),
+                kind: DeclarationKind::Property,
+                sibling: u32::try_from(index).expect("too many constructor properties"),
+            });
+            out.push(DeclarationStub {
+                id,
+                source,
+                range: property.span,
+                lookup_name: Some(names.intern(&property.name)),
+                body: None,
+                signature_inference: None,
+                initialization_order: None,
+                kind: DeclarationKind::Property,
+                visibility: property.visibility,
+                flags: DeclarationFlags::default()
+                    .with(DeclarationFlags::PROPERTY_PARAMETER, true)
+                    .with(DeclarationFlags::MUTABLE, property.is_var)
+                    .with(DeclarationFlags::OPEN, property.is_open)
+                    .with(DeclarationFlags::FINAL_MODIFIER, property.is_final)
+                    .with(DeclarationFlags::OVERRIDE, property.is_override)
+                    .with(
+                        DeclarationFlags::HAS_VISIBILITY_MODIFIER,
+                        property.has_visibility_modifier,
+                    ),
+            });
+        }
+        // Data-class component/copy callables participate in ordinary overload selection during
+        // Pass 1 and therefore need stable identities just like written members. They have no AST
+        // declaration or body locator: their signatures come from the resolved primary-constructor
+        // properties and their common-IR bodies are synthesized after function predeclaration.
+        if class.is_data && !class.is_singleton() {
+            for (ordinal, property) in class
+                .props
+                .iter()
+                .filter(|property| property.is_property)
+                .enumerate()
+            {
+                let sibling = u32::MAX
+                    .checked_sub(ordinal as u32)
+                    .expect("too many generated data-class components");
+                out.push(generated_function_stub(
+                    source,
+                    ids,
+                    names,
+                    class_id,
+                    class.span,
+                    sibling,
+                    &format!("component{}", ordinal + 1),
+                    DeclarationFlags::default()
+                        .with(DeclarationFlags::OPERATOR, true)
+                        .with(DeclarationFlags::FINAL, true),
+                    property.visibility,
+                ));
+            }
+            out.push(generated_function_stub(
+                source,
+                ids,
+                names,
+                class_id,
+                class.span,
+                u32::MAX / 2,
+                "copy",
+                DeclarationFlags::default()
+                    .with(DeclarationFlags::FINAL, true)
+                    .with(DeclarationFlags::DATA_CLASS_COPY, true),
+                // Provisional: signature collection decides `copy`'s visibility from the language
+                // feature and the class's resolved copy-visibility annotations.
+                Visibility::Public,
+            ));
+        }
+        // A final `value class` gets the same structural trio as a data class. `componentN`/`copy`
+        // stay data-only. An abstract or sealed value class has no constructor properties and does
+        // not generate the trio, so a regular subclass keeps `Any`'s identity members. `@JvmInline`
+        // later suppresses these stubs and unboxes the class instead.
+        if class.is_data || (class.value_modifier_span.is_some() && class.is_final()) {
+            for (ordinal, (name, parameter_count)) in
+                [("toString", 0), ("hashCode", 0), ("equals", 1)]
+                    .into_iter()
+                    .enumerate()
+            {
+                if class.methods.iter().any(|method| {
+                    method.receiver.is_none()
+                        && method.name == name
+                        && method.params.len() == parameter_count
+                        && method.is_override()
+                }) {
+                    continue;
+                }
+                out.push(generated_function_stub(
+                    source,
+                    ids,
+                    names,
+                    class_id,
+                    class.span,
+                    u32::MAX / 2 - ordinal as u32 - 1,
+                    name,
+                    DeclarationFlags::default()
+                        .with(DeclarationFlags::OVERRIDE, true)
+                        .with(DeclarationFlags::OPERATOR, name == "equals")
+                        .with(DeclarationFlags::GENERATED_STRUCTURAL_MEMBER, true)
+                        .with(DeclarationFlags::FINAL, true),
+                    Visibility::Public,
+                ));
+            }
+        }
+        for (index, constructor) in class.secondary_ctors.iter().enumerate() {
+            let id = ids.intern(DeclarationAnchor {
+                source,
+                range: constructor.span,
+                owner: Some(class_id),
+                kind: DeclarationKind::Constructor,
+                sibling: u32::try_from(index + 1).expect("too many secondary constructors"),
+            });
+            out.push(DeclarationStub {
+                id,
+                source,
+                range: constructor.span,
+                lookup_name: None,
+                // A constructor is a body unit even when it has no explicit block: delegation and
+                // parameter defaults are executable, and an implicit return still reaches lowering.
+                body: Some(BodyKind::Constructor),
+                signature_inference: None,
+                initialization_order: None,
+                kind: DeclarationKind::Constructor,
+                visibility: constructor.visibility,
+                flags: DeclarationFlags::default()
+                    .with(DeclarationFlags::ACTUAL, constructor.is_actual),
+            });
+        }
+        for (index, method) in class.methods.iter().enumerate() {
+            out.push(function_stub(
+                file,
+                source,
+                ids,
+                names,
+                method,
+                Some(class_id),
+                u32::try_from(index).expect("too many class methods"),
+            ));
+        }
+        for (index, property) in class.body_props.iter().enumerate() {
+            property_stubs(
+                file,
+                source,
+                ids,
+                names,
+                property,
+                Some(class_id),
+                u32::try_from(index).expect("too many class properties"),
+                class
+                    .init_order
+                    .iter()
+                    .position(
+                        |step| matches!(step, ClassInit::PropInit(property) if *property == index),
+                    )
+                    .map(|order| u32::try_from(order).expect("too many class initializers")),
+                out,
+            );
+        }
+        for (index, initializer) in class.init_order.iter().enumerate() {
+            let ClassInit::Block(expression) = initializer else {
+                continue;
+            };
+            // Active Pass-1 default binding may revisit the compact declaration stream after an
+            // unrelated ordinary init body has been released. Its owner/kind/sibling structure is
+            // still exact; use the owning declaration range only as non-semantic diagnostic data.
+            let range = file.expr_span(*expression).unwrap_or(class.span);
+            let id = ids.intern(DeclarationAnchor {
+                source,
+                range,
+                owner: Some(class_id),
+                kind: DeclarationKind::Initializer,
+                sibling: u32::try_from(index).expect("too many class initializers"),
+            });
+            out.push(DeclarationStub {
+                id,
+                source,
+                range,
+                lookup_name: None,
+                body: Some(BodyKind::Initializer),
+                signature_inference: None,
+                initialization_order: Some(
+                    u32::try_from(index).expect("too many class initializers"),
+                ),
+                kind: DeclarationKind::Initializer,
+                visibility: Visibility::Private,
+                flags: DeclarationFlags::default(),
+            });
+        }
+        for (index, alias) in class.type_aliases.iter().enumerate() {
+            let id = ids.intern(DeclarationAnchor {
+                source,
+                range: alias.span,
+                owner: Some(class_id),
+                kind: DeclarationKind::TypeAlias,
+                sibling: u32::try_from(index).expect("too many nested type aliases"),
+            });
+            out.push(DeclarationStub {
+                id,
+                source,
+                range: alias.span,
+                lookup_name: Some(names.intern(&alias.name)),
+                body: None,
+                signature_inference: None,
+                initialization_order: None,
+                kind: DeclarationKind::TypeAlias,
+                visibility: Visibility::Public,
+                flags: DeclarationFlags::default(),
+            });
+        }
+        for (entry_index, entry) in class.enum_entries.iter().enumerate() {
+            let entry_id = ids.intern(DeclarationAnchor {
+                source,
+                range: entry.span,
+                owner: Some(class_id),
+                kind: DeclarationKind::EnumEntry,
+                sibling: u32::try_from(entry_index).expect("too many enum entries"),
+            });
+            out.push(DeclarationStub {
+                id: entry_id,
+                source,
+                range: entry.span,
+                lookup_name: Some(names.intern(&entry.name)),
+                // Every enum entry is constructed, including the zero-source-argument form. The
+                // backend supplies only physical name/ordinal parameters; the semantic primary
+                // constructor selection still belongs to checked FIR.
+                body: Some(BodyKind::EnumEntry),
+                signature_inference: None,
+                initialization_order: None,
+                kind: DeclarationKind::EnumEntry,
+                visibility: Visibility::Public,
+                flags: DeclarationFlags::default(),
+            });
+            for (method_index, method) in entry.methods.iter().enumerate() {
+                out.push(function_stub(
+                    file,
+                    source,
+                    ids,
+                    names,
+                    method,
+                    Some(entry_id),
+                    u32::try_from(method_index).expect("too many enum-entry methods"),
+                ));
+            }
+            for (property_index, property) in entry.props.iter().enumerate() {
+                property_stubs(
+                    file,
+                    source,
+                    ids,
+                    names,
+                    property,
+                    Some(entry_id),
+                    u32::try_from(property_index).expect("too many enum-entry properties"),
+                    entry
+                        .init_order
+                        .iter()
+                        .position(|step| {
+                            matches!(step, ClassInit::PropInit(property) if *property == property_index)
+                        })
+                        .map(|order| {
+                            u32::try_from(order).expect("too many enum-entry initializers")
+                        }),
+                    out,
+                );
+            }
+            for (initializer_index, initializer) in entry.init_order.iter().enumerate() {
+                let ClassInit::Block(expression) = initializer else {
+                    continue;
+                };
+                let range = file
+                    .expr_span(*expression)
+                    .expect("an enum-entry init body must have a source span");
+                let id = ids.intern(DeclarationAnchor {
+                    source,
+                    range,
+                    owner: Some(entry_id),
+                    kind: DeclarationKind::Initializer,
+                    sibling: u32::try_from(initializer_index)
+                        .expect("too many enum-entry initializers"),
+                });
+                out.push(DeclarationStub {
+                    id,
+                    source,
+                    range,
+                    lookup_name: None,
+                    body: Some(BodyKind::Initializer),
+                    signature_inference: None,
+                    initialization_order: Some(
+                        u32::try_from(initializer_index).expect("too many enum-entry initializers"),
+                    ),
+                    kind: DeclarationKind::Initializer,
+                    visibility: Visibility::Private,
+                    flags: DeclarationFlags::default(),
+                });
+            }
+        }
+    }
+
+    // Nested classifiers of a parser-hoisted local class are separate `file.decls` entries. Give
+    // them the stable classifier owner they have semantically before emitting any stubs; otherwise
+    // their apparent file-level position leaks through as module ownership and an inner class loses
+    // the enclosing-instance identity needed by checked FIR.
+    let nested_owners = nested_classifier_owners(file, source, ids);
+    let companion_declarations = companion_declarations(file);
+    let mut stubs = Vec::new();
+    let mut source_declarations = vec![None; file.decls.len()];
+    let mut stable_by_transient = crate::fx_hash::HashMap::default();
+    let mut declaration_blocks = Vec::new();
+    let mut expect_keywords = Vec::new();
+    for (index, declaration) in file.decls.iter().enumerate() {
+        if companion_declarations.contains(declaration) {
+            continue;
+        }
+        let first_stub = stubs.len();
+        match file.decl(*declaration) {
+            Decl::Fun(function) => stubs.push(function_stub(
+                file,
+                source,
+                ids,
+                names,
+                function,
+                None,
+                u32::try_from(index).expect("too many file declarations"),
+            )),
+            Decl::Property(property) => property_stubs(
+                file,
+                source,
+                ids,
+                names,
+                property,
+                None,
+                u32::try_from(index).expect("too many file declarations"),
+                None,
+                &mut stubs,
+            ),
+            Decl::Class(class) => {
+                let executable_root = file
+                    .local_class_decls
+                    .values()
+                    .any(|candidate| candidate == declaration);
+                let classifier_member = !executable_root
+                    && !file.is_anonymous_object_class(*declaration)
+                    && (file
+                        .hoisted_classifier_source_names
+                        .contains_key(declaration)
+                        || companion_declarations.contains(declaration));
+                class_stubs(
+                    file,
+                    source,
+                    ids,
+                    names,
+                    class,
+                    false,
+                    classifier_member,
+                    nested_owners.get(declaration).copied(),
+                    u32::try_from(index).expect("too many file declarations"),
+                    &mut stubs,
+                )
+            }
+        }
+        source_declarations[index] = Some(stubs[first_stub].id);
+        bind_parser_identity(&mut stable_by_transient, *declaration, stubs[first_stub].id);
+        if file.is_local_declaration(*declaration) {
+            for stub in &mut stubs[first_stub..] {
+                stub.flags = stub.flags.with(DeclarationFlags::LOCAL_CLASS, true);
+            }
+        }
+        if file
+            .anonymous_object_classes
+            .values()
+            .any(|anonymous| anonymous == declaration)
+        {
+            for stub in &mut stubs[first_stub..] {
+                stub.flags = stub.flags.with(DeclarationFlags::LOCAL_CLASS, true);
+            }
+            stubs[first_stub].flags = stubs[first_stub]
+                .flags
+                .with(DeclarationFlags::ANONYMOUS_OBJECT, true);
+        }
+        if let Some(expect) = file
+            .expect_decls
+            .iter()
+            .find(|expect| expect.declaration == *declaration)
+        {
+            stubs[first_stub].flags = stubs[first_stub].flags.with(DeclarationFlags::EXPECT, true);
+            expect_keywords.push((stubs[first_stub].id, expect.keyword));
+        }
+        // The mirror of the `expect` keyword: the parser records which declaration WROTE `actual`,
+        // including a classifier hoisted out of a body, which carries the modifier only when it
+        // wrote one itself. Nothing later can recover it — the keyword is gone by then, and the
+        // shape a declaration happens to have says nothing about whether it claimed to implement
+        // anything.
+        if file.actual_decls.contains(declaration) {
+            stubs[first_stub].flags = stubs[first_stub].flags.with(DeclarationFlags::ACTUAL, true);
+        }
+        declaration_blocks.push((*declaration, first_stub..stubs.len()));
+    }
+    // A companion classifier is emitted recursively with its owning class rather than as a second
+    // file-root block. Its stable anchor is nevertheless exact and occupies its parser declaration
+    // slot, so later signature publication does not need to rediscover it from names or ranges.
+    for (index, declaration) in file.decls.iter().copied().enumerate() {
+        if companion_declarations.contains(&declaration) {
+            source_declarations[index] = classifier_identity(file, source, ids, declaration);
+            if let Some(stable) = source_declarations[index] {
+                bind_parser_identity(&mut stable_by_transient, declaration, stable);
+            }
+        }
+    }
+    if !file.local_class_enclosing_declarations.is_empty() {
+        let blocks = declaration_blocks
+            .iter()
+            .cloned()
+            .collect::<crate::fx_hash::HashMap<_, _>>();
+        let mut declaration_order = Vec::with_capacity(declaration_blocks.len());
+        let mut added = crate::fx_hash::HashSet::default();
+        for declaration in file.decls.iter().copied() {
+            if companion_declarations.contains(&declaration)
+                || file
+                    .local_class_enclosing_declarations
+                    .contains_key(&declaration)
+            {
+                continue;
+            }
+            if blocks.contains_key(&declaration) && added.insert(declaration) {
+                declaration_order.push(declaration);
+            }
+            for local in file.decls.iter().copied().filter(|local| {
+                file.local_class_enclosing_declarations.get(local) == Some(&declaration)
+            }) {
+                if blocks.contains_key(&local) && added.insert(local) {
+                    declaration_order.push(local);
+                }
+            }
+        }
+        // Anonymous classifiers and recovered declarations can have another transient ownership
+        // representation. Preserve their parser order; the local-class relation above only moves
+        // declarations for which the parser supplied an explicit lexical edge.
+        for (declaration, _) in &declaration_blocks {
+            if added.insert(*declaration) {
+                declaration_order.push(*declaration);
+            }
+        }
+        let mut ordered = Vec::with_capacity(stubs.len());
+        for declaration in declaration_order {
+            if let Some(range) = blocks.get(&declaration) {
+                ordered.extend_from_slice(&stubs[range.clone()]);
+            }
+        }
+        debug_assert_eq!(ordered.len(), stubs.len());
+        stubs = ordered;
+    }
+    for (index, alias) in file.type_alias_decls.iter().enumerate() {
+        let id = ids.intern(DeclarationAnchor {
+            source,
+            range: alias.span,
+            owner: None,
+            kind: DeclarationKind::TypeAlias,
+            sibling: u32::try_from(index).expect("too many file type aliases"),
+        });
+        stubs.push(DeclarationStub {
+            id,
+            source,
+            range: alias.span,
+            lookup_name: Some(names.intern(&alias.name)),
+            body: None,
+            signature_inference: None,
+            initialization_order: None,
+            kind: DeclarationKind::TypeAlias,
+            visibility: file
+                .type_alias_visibility
+                .get(&alias.name)
+                .copied()
+                .unwrap_or(Visibility::Public),
+            // `actual typealias S = String` is how an `expect class` is actualized, so the alias
+            // carries the same flag every other implementation does.
+            flags: DeclarationFlags::default().with(
+                DeclarationFlags::ACTUAL,
+                file.actual_type_aliases.contains(&index),
+            ),
+        });
+    }
+    if let Some(script) = file.script_body {
+        let range = file
+            .expr_span(script)
+            .expect("a script body must have a parser-owned source span");
+        let id = ids.intern(DeclarationAnchor {
+            source,
+            range,
+            owner: None,
+            kind: DeclarationKind::Script,
+            sibling: 0,
+        });
+        stubs.push(DeclarationStub {
+            id,
+            source,
+            range,
+            lookup_name: None,
+            body: Some(BodyKind::Script),
+            signature_inference: None,
+            initialization_order: None,
+            kind: DeclarationKind::Script,
+            visibility: Visibility::Private,
+            flags: DeclarationFlags::default(),
+        });
+    }
+    let mut body_local = stubs
+        .iter()
+        .filter(|stub| stub.flags.has(DeclarationFlags::LOCAL_CLASS))
+        .map(|stub| stub.id)
+        .collect::<crate::fx_hash::HashSet<_>>();
+    loop {
+        let mut changed = false;
+        for stub in &mut stubs {
+            let inherited = ids
+                .anchor(stub.id)
+                .and_then(|anchor| anchor.owner)
+                .is_some_and(|owner| body_local.contains(&owner));
+            if inherited && body_local.insert(stub.id) {
+                stub.flags = stub.flags.with(DeclarationFlags::LOCAL_CLASS, true);
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    // The reservation the anonymous-object naming pass made for each suspend function, bound to the
+    // identity its own stub already interned. Look the anchor up, never intern one: a second anchor
+    // for a declaration that has one is a second identity for it.
+    let mut continuation_ordinals = file
+        .suspend_continuation_ordinals
+        .iter()
+        .filter_map(|(&function, &ordinal)| {
+            let declaration = match function {
+                crate::ast::AnonymousEnclosingFunction::TopLevel(declaration) => {
+                    let Decl::Fun(_) = file.decl(declaration) else {
+                        return None;
+                    };
+                    stable_by_transient.get(&declaration).copied()?
+                }
+                crate::ast::AnonymousEnclosingFunction::Member { class, method } => {
+                    let owner = stable_by_transient.get(&class).copied()?;
+                    let Decl::Class(class) = file.decl(class) else {
+                        return None;
+                    };
+                    ids.get(DeclarationAnchor {
+                        source,
+                        range: class.methods.get(method as usize)?.span,
+                        owner: Some(owner),
+                        kind: DeclarationKind::Function,
+                        sibling: method,
+                    })?
+                }
+            };
+            Some((declaration, ordinal))
+        })
+        .collect::<Vec<_>>();
+    // A map iterates in no order; the stubs this travels beside are a sequence.
+    continuation_ordinals.sort_unstable();
+    let local_class_name_provenance = super::local_class_names::stabilize_local_class_names(
+        file,
+        source,
+        &stable_by_transient,
+        &nested_owners,
+    );
+    if matches!(provenance, LocalClassProvenanceOwnership::Publish) {
+        super::local_class_names::assert_complete_local_classifier_provenance(
+            &local_class_name_provenance,
+            &stubs,
+        );
+    }
+    ExtractedFileStubs {
+        stubs,
+        stable_by_transient,
+        source_declarations: source_declarations
+            .into_iter()
+            .map(|declaration| {
+                declaration.expect("every parser declaration has a stable header identity")
+            })
+            .collect(),
+        expect_keywords,
+        continuation_ordinals,
+        local_class_name_provenance,
+    }
+}
+
+pub fn extract_file_stubs(
+    file: &File,
+    source: SourceFileId,
+    ids: &mut DeclarationIds,
+    names: &mut LookupNames,
+) -> Vec<DeclarationStub> {
+    extract_file_stub_inventory(
+        file,
+        source,
+        ids,
+        names,
+        LocalClassProvenanceOwnership::Publish,
+    )
+    .stubs
+}
+
+/// Recreate transient declaration anchors after the stable module index has already published local
+/// naming provenance. Inspection may call this after releasing body arenas, so this path never
+/// attempts to republish body-derived naming facts.
+pub(crate) fn extract_file_stubs_for_stable_binding(
+    file: &File,
+    source: SourceFileId,
+    ids: &mut DeclarationIds,
+    names: &mut LookupNames,
+) -> Vec<DeclarationStub> {
+    extract_file_stub_inventory(
+        file,
+        source,
+        ids,
+        names,
+        LocalClassProvenanceOwnership::AlreadyPublished,
+    )
+    .stubs
+}
+
+/// Put one file's declarations into the stable stream shared by Pass 1 and a fresh Pass-2 parse.
+///
+/// Parser-owned member families are stored separately, so source declarations are interleaved by
+/// their live hierarchical source order. Each top-level subtree must remain contiguous because Pass
+/// 2 reparses one such bounded unit at a time. Within an owner, compiler-generated data-class members
+/// have no source position and follow every written sibling in stable synthesis order. Only the
+/// resulting declaration-id stream survives the parse; the ranges and temporary hierarchy do not.
+pub(super) fn order_file_stubs(stubs: &mut [DeclarationStub], ids: &DeclarationIds) {
+    let ordering = stubs
+        .iter()
+        .enumerate()
+        .map(|(position, stub)| {
+            (
+                stub.id,
+                (
+                    stub.flags.has(DeclarationFlags::COMPILER_GENERATED),
+                    stub.range.lo,
+                    position,
+                ),
+            )
+        })
+        .collect::<crate::fx_hash::HashMap<_, _>>();
+    stubs.sort_by_cached_key(|stub| {
+        let mut path = Vec::new();
+        let mut current = Some(stub.id);
+        let mut remaining = ids.len().saturating_add(1);
+        while let Some(declaration) = current {
+            if remaining == 0 {
+                panic!("stable declaration ownership graph contains a cycle");
+            }
+            remaining -= 1;
+            // A hoisted local classifier can be owned by a stable lexical-function or accessor
+            // identity which deliberately has no declaration stub: the executable is represented
+            // by its enclosing checked body, not published as a module declaration. Skip that
+            // ordering-only rung while retaining its owner edge. Published ancestors still group
+            // the complete top-level subtree, and the classifier's own source order distinguishes
+            // sibling local declarations.
+            if let Some(order) = ordering.get(&declaration).copied() {
+                path.push(order);
+            }
+            current = ids
+                .anchor(declaration)
+                .unwrap_or_else(|| panic!("declaration {declaration:?} has no stable anchor"))
+                .owner;
+        }
+        path.reverse();
+        path
+    });
+}
+
+/// Copy every non-local declaration type from one transient file into packed header storage. This
+/// deliberately does not walk bodies: local declarations and body type uses are checked when their
+/// body unit is reparsed in Pass 2.
+pub fn extract_file_header_syntax(
+    file: &File,
+    source: SourceFileId,
+    ids: &mut DeclarationIds,
+    names: &mut LookupNames,
+    headers: &mut HeaderSyntaxArena,
+) {
+    fn id_for(
+        ids: &mut DeclarationIds,
+        source: SourceFileId,
+        range: Span,
+        owner: Option<DeclarationId>,
+        kind: DeclarationKind,
+        sibling: u32,
+    ) -> DeclarationId {
+        ids.intern(DeclarationAnchor {
+            source,
+            range,
+            owner,
+            kind,
+            sibling,
+        })
+    }
+
+    fn parameters(
+        file: &File,
+        headers: &mut HeaderSyntaxArena,
+        names: &mut LookupNames,
+        values: &[Param],
+        type_annotations: &crate::fx_hash::HashMap<u32, Vec<crate::ast::AnnotationRef>>,
+    ) -> HeaderParameterRange {
+        let mut packed = Vec::with_capacity(values.len());
+        for parameter in values {
+            let annotations = annotation_types(headers, names, &parameter.annotations);
+            let type_annotations = annotation_types(
+                headers,
+                names,
+                type_annotations
+                    .get(&parameter.ty.span.lo)
+                    .map(Vec::as_slice)
+                    .unwrap_or_default(),
+            );
+            let literals = annotation_class_literals(file, &parameter.annotation_args)
+                .into_iter()
+                .map(
+                    |(annotation_ordinal, path)| HeaderParameterAnnotationClassLiteral {
+                        annotation_ordinal,
+                        classifier: headers.add_path(&path, names),
+                    },
+                )
+                .collect::<Vec<_>>();
+            let annotation_class_literals =
+                headers.add_parameter_annotation_class_literal_range(literals);
+            packed.push(HeaderParameter {
+                name: names.intern(&parameter.name),
+                ty: headers.add_type(&parameter.ty, names),
+                context_kind: parameter.context_kind,
+                flags: HeaderParameterFlags::of_value_parameter(parameter),
+                span: parameter.ty.span,
+                annotations,
+                type_annotations,
+                annotation_class_literals,
+            });
+        }
+        headers.add_parameter_range(packed)
+    }
+
+    fn primary_parameters(
+        headers: &mut HeaderSyntaxArena,
+        names: &mut LookupNames,
+        values: &[PropParam],
+        type_annotations: &crate::fx_hash::HashMap<u32, Vec<crate::ast::AnnotationRef>>,
+    ) -> HeaderParameterRange {
+        let mut packed = Vec::with_capacity(values.len());
+        for parameter in values {
+            let annotations = annotation_types(headers, names, &parameter.annotations);
+            let type_annotations = annotation_types(
+                headers,
+                names,
+                type_annotations
+                    .get(&parameter.ty.span.lo)
+                    .map(Vec::as_slice)
+                    .unwrap_or_default(),
+            );
+            packed.push(HeaderParameter {
+                name: names.intern(&parameter.name),
+                ty: headers.add_type(&parameter.ty, names),
+                context_kind: crate::types::ContextParameterKind::None,
+                flags: HeaderParameterFlags::default()
+                    .with(HeaderParameterFlags::VARARG, parameter.is_vararg)
+                    .with(HeaderParameterFlags::DEFAULT, parameter.default.is_some())
+                    .with(HeaderParameterFlags::PROPERTY, parameter.is_property)
+                    .with(
+                        HeaderParameterFlags::MUTABLE_PROPERTY,
+                        parameter.is_property && parameter.is_var,
+                    ),
+                span: if parameter.span == Span::new(0, 0) {
+                    parameter.ty.span
+                } else {
+                    parameter.span
+                },
+                annotations,
+                type_annotations,
+                annotation_class_literals: HeaderParameterAnnotationClassLiteralRange::default(),
+            });
+        }
+        headers.add_parameter_range(packed)
+    }
+
+    fn annotation_types(
+        headers: &mut HeaderSyntaxArena,
+        names: &mut LookupNames,
+        annotations: &[crate::ast::AnnotationRef],
+    ) -> HeaderTypeRange {
+        let annotations = annotations.iter().map(TypeRef::from_annotation);
+        let types = annotations
+            .map(|annotation| headers.add_type(&annotation, names))
+            .collect::<Vec<_>>();
+        headers.add_type_range(types)
+    }
+
+    fn type_parameters(
+        headers: &mut HeaderSyntaxArena,
+        names: &mut LookupNames,
+        values: &[String],
+        variances: &[crate::types::TypeVariance],
+        non_null: impl Fn(&str) -> bool,
+        reified: impl Fn(&str) -> bool,
+    ) -> HeaderTypeParameterRange {
+        let packed = values
+            .iter()
+            .enumerate()
+            .map(|(index, name)| HeaderTypeParameter {
+                name: names.intern(name),
+                flags: HeaderTypeParameterFlags::new(
+                    variances
+                        .get(index)
+                        .copied()
+                        .unwrap_or(crate::types::TypeVariance::Invariant),
+                    non_null(name),
+                    reified(name),
+                ),
+            });
+        headers.add_type_parameter_range(packed.collect::<Vec<_>>())
+    }
+
+    fn bounds(
+        headers: &mut HeaderSyntaxArena,
+        names: &mut LookupNames,
+        values: &[(String, TypeRef)],
+    ) -> HeaderTypeBoundRange {
+        let mut packed = Vec::with_capacity(values.len());
+        for (parameter, ty) in values {
+            packed.push(HeaderTypeBound {
+                parameter: names.intern(parameter),
+                ty: headers.add_type(ty, names),
+            });
+        }
+        headers.add_bound_range(packed)
+    }
+
+    fn function(
+        file: &File,
+        source: SourceFileId,
+        owner: Option<DeclarationId>,
+        sibling: u32,
+        function: &FunDecl,
+        ids: &mut DeclarationIds,
+        names: &mut LookupNames,
+        headers: &mut HeaderSyntaxArena,
+    ) {
+        let declaration = id_for(
+            ids,
+            source,
+            function.span,
+            owner,
+            DeclarationKind::Function,
+            sibling,
+        );
+        let receiver = function
+            .receiver
+            .as_ref()
+            .map(|receiver| headers.add_type(receiver, names));
+        let parameters = parameters(
+            file,
+            headers,
+            names,
+            &function.params,
+            &file.type_annotations,
+        );
+        let annotations = annotation_types(headers, names, &function.annotations);
+        let result = match (&function.ret, &function.body) {
+            (Some(result), _) => HeaderResultType::Explicit(headers.add_type(result, names)),
+            (None, FunBody::Block(_) | FunBody::None) => HeaderResultType::ImplicitUnit,
+            (None, FunBody::Expr(_)) => HeaderResultType::Inferred,
+        };
+        let type_parameters = type_parameters(
+            headers,
+            names,
+            &function.type_params,
+            &[],
+            |name| function.non_null_type_params.contains(name),
+            |name| function.reified_type_params.contains(name),
+        );
+        let bounds = bounds(headers, names, &function.type_param_bounds);
+        headers.insert_declaration(HeaderDeclaration {
+            declaration,
+            annotations,
+            annotation_class_literals: HeaderParameterAnnotationClassLiteralRange::default(),
+            kind: HeaderDeclarationKind::Callable {
+                receiver,
+                parameters,
+                result,
+                type_parameters,
+                bounds,
+                context_count: u32::try_from(function.context_count)
+                    .expect("too many callable context parameters"),
+                signature_start: function.signature_span.lo,
+                signature_end: function.signature_span.hi,
+            },
+        });
+    }
+
+    fn property(
+        file: &File,
+        source: SourceFileId,
+        owner: Option<DeclarationId>,
+        sibling: u32,
+        property: &PropDecl,
+        ids: &mut DeclarationIds,
+        names: &mut LookupNames,
+        headers: &mut HeaderSyntaxArena,
+    ) {
+        let declaration = id_for(
+            ids,
+            source,
+            property.span,
+            owner,
+            DeclarationKind::Property,
+            sibling,
+        );
+        let receiver = property
+            .receiver
+            .as_ref()
+            .map(|receiver| headers.add_type(receiver, names));
+        let context_parameters = parameters(
+            file,
+            headers,
+            names,
+            &property.context_params,
+            &file.type_annotations,
+        );
+        let annotations = annotation_types(headers, names, &property.annotations);
+        let setter_parameter_name = property
+            .setter
+            .as_ref()
+            .and_then(|setter| setter.param.as_deref())
+            .map(|name| names.intern(name));
+        let declared_type = property.ty.as_ref().map(|ty| headers.add_type(ty, names));
+        let getter_type = property
+            .getter_ty
+            .as_ref()
+            .map(|ty| headers.add_type(ty, names));
+        let backing_field_type = property
+            .explicit_backing_field
+            .as_ref()
+            .and_then(|field| field.ty.as_ref())
+            .map(|ty| headers.add_type(ty, names));
+        let type_parameters = type_parameters(
+            headers,
+            names,
+            &property.type_params,
+            &[],
+            |_| false,
+            |name| property.reified_type_params.contains(name),
+        );
+        let bounds = bounds(headers, names, &property.type_param_bounds);
+        headers.insert_declaration(HeaderDeclaration {
+            declaration,
+            annotations,
+            annotation_class_literals: HeaderParameterAnnotationClassLiteralRange::default(),
+            kind: HeaderDeclarationKind::Property {
+                receiver,
+                context_parameters,
+                setter_parameter_name,
+                declared_type,
+                getter_type,
+                backing_field_type,
+                type_parameters,
+                bounds,
+                mutable: property.is_var,
+            },
+        });
+    }
+
+    fn alias(
+        source: SourceFileId,
+        owner: Option<DeclarationId>,
+        sibling: u32,
+        alias: &TypeAliasDecl,
+        ids: &mut DeclarationIds,
+        names: &mut LookupNames,
+        headers: &mut HeaderSyntaxArena,
+    ) {
+        let declaration = id_for(
+            ids,
+            source,
+            alias.span,
+            owner,
+            DeclarationKind::TypeAlias,
+            sibling,
+        );
+        let type_parameters = type_parameters(
+            headers,
+            names,
+            &alias.type_params,
+            &[],
+            |_| false,
+            |_| false,
+        );
+        let target = headers.add_type(&alias.target, names);
+        headers.insert_declaration(HeaderDeclaration {
+            declaration,
+            annotations: HeaderTypeRange::default(),
+            annotation_class_literals: HeaderParameterAnnotationClassLiteralRange::default(),
+            kind: HeaderDeclarationKind::TypeAlias {
+                type_parameters,
+                target,
+            },
+        });
+    }
+
+    fn classifier(
+        file: &File,
+        source: SourceFileId,
+        owner: Option<DeclarationId>,
+        sibling: u32,
+        source_name: &str,
+        class: &ClassDecl,
+        ids: &mut DeclarationIds,
+        names: &mut LookupNames,
+        headers: &mut HeaderSyntaxArena,
+    ) {
+        let declaration = id_for(
+            ids,
+            source,
+            class.span,
+            owner,
+            DeclarationKind::Classifier,
+            sibling,
+        );
+        let declared_type_parameters = type_parameters(
+            headers,
+            names,
+            class.type_params(),
+            class.type_param_variances(),
+            |_| false,
+            |_| false,
+        );
+        let lexical_type_parameter_captures = type_parameters(
+            headers,
+            names,
+            &class.lexical_type_parameter_captures,
+            &[],
+            |_| false,
+            |_| false,
+        );
+        let bounds = bounds(headers, names, class.type_param_bounds());
+        let supertype_ids = class
+            .supertypes
+            .iter()
+            .map(|ty| headers.add_type(ty, names))
+            .collect::<Vec<_>>();
+        let base = class.base_class.as_deref().map(|base| {
+            headers.add_classifier_type(
+                base,
+                &class.base_type_args,
+                class.base_class_span.unwrap_or(class.span),
+                names,
+            )
+        });
+        let supertypes = headers.add_type_range(supertype_ids);
+        let context_parameters = parameters(
+            file,
+            headers,
+            names,
+            &class.context_params,
+            &file.type_annotations,
+        );
+        let primary_parameters =
+            primary_parameters(headers, names, &class.props, &file.type_annotations);
+        let annotations = annotation_types(headers, names, &class.annotations);
+        // A class-level `@Serializable(with = X::class)` is read by ANOTHER file of this module,
+        // which never sees this AST. Capture it here, where the written argument still exists.
+        let annotation_class_literals = annotation_class_literals(file, &class.annotation_args)
+            .into_iter()
+            .map(
+                |(annotation_ordinal, path)| HeaderParameterAnnotationClassLiteral {
+                    annotation_ordinal,
+                    classifier: headers.add_path(&path, names),
+                },
+            )
+            .collect::<Vec<_>>();
+        let annotation_class_literals =
+            headers.add_declaration_annotation_class_literal_range(annotation_class_literals);
+        let delegations = headers.add_interface_delegation_range(
+            class.interface_delegations.iter().filter_map(|delegation| {
+                let supertype = delegation.supertype?;
+                class.supertypes.get(supertype as usize)?;
+                let source = delegation
+                    .bare_name
+                    .as_ref()
+                    .and_then(|parameter_name| {
+                        class
+                            .props
+                            .iter()
+                            .position(|parameter| parameter.name == *parameter_name)
+                    })
+                    .and_then(|position| {
+                        let ordinal = u32::try_from(position).ok()?;
+                        let parameter = &class.props[position];
+                        Some(if parameter.is_property && !parameter.is_var {
+                            HeaderInterfaceDelegateSource::ConstructorProperty(ordinal)
+                        } else {
+                            HeaderInterfaceDelegateSource::ConstructorParameter(ordinal)
+                        })
+                    })
+                    .unwrap_or(HeaderInterfaceDelegateSource::ConstructorBodyInitializer);
+                Some(HeaderInterfaceDelegation { supertype, source })
+            }),
+        );
+        headers.insert_declaration(HeaderDeclaration {
+            declaration,
+            annotations,
+            annotation_class_literals,
+            kind: HeaderDeclarationKind::Classifier {
+                source_name: names.intern(source_name),
+                type_parameters: declared_type_parameters,
+                lexical_type_parameter_captures,
+                bounds,
+                supertypes,
+                base,
+                base_callee: class
+                    .base_class_span
+                    .and_then(|span| file.base_class_callee_spans.get(&span.lo).copied()),
+                context_parameters,
+                primary_parameters,
+                delegations,
+            },
+        });
+
+        if class.primary_ctor_annotations.is_some() && !class.is_interface() {
+            let constructor = id_for(
+                ids,
+                source,
+                class.span,
+                Some(declaration),
+                DeclarationKind::Constructor,
+                0,
+            );
+            let annotations = annotation_types(
+                headers,
+                names,
+                class
+                    .primary_ctor_annotations
+                    .as_deref()
+                    .unwrap_or_default(),
+            );
+            headers.insert_declaration(HeaderDeclaration {
+                declaration: constructor,
+                annotations,
+                annotation_class_literals: HeaderParameterAnnotationClassLiteralRange::default(),
+                kind: HeaderDeclarationKind::Constructor {
+                    context_parameters,
+                    parameters: primary_parameters,
+                },
+            });
+        }
+        if let Some(companion_declaration) = class.companion {
+            let Decl::Class(companion) = file.decl(companion_declaration) else {
+                panic!("a companion declaration edge must target a class")
+            };
+            classifier(
+                file,
+                source,
+                Some(declaration),
+                0,
+                file.hoisted_classifier_source_names
+                    .get(&companion_declaration)
+                    .map(String::as_str)
+                    .unwrap_or(&companion.name),
+                companion,
+                ids,
+                names,
+                headers,
+            );
+        }
+        for (index, parameter) in class.props.iter().enumerate() {
+            if !parameter.is_property {
+                continue;
+            }
+            let property_id = id_for(
+                ids,
+                source,
+                parameter.span,
+                Some(declaration),
+                DeclarationKind::Property,
+                u32::try_from(index).expect("too many constructor properties"),
+            );
+            let declared_type = Some(headers.add_type(&parameter.ty, names));
+            let annotations = annotation_types(headers, names, &parameter.annotations);
+            headers.insert_declaration(HeaderDeclaration {
+                declaration: property_id,
+                annotations,
+                annotation_class_literals: HeaderParameterAnnotationClassLiteralRange::default(),
+                kind: HeaderDeclarationKind::Property {
+                    receiver: None,
+                    context_parameters: HeaderParameterRange::default(),
+                    setter_parameter_name: None,
+                    declared_type,
+                    getter_type: None,
+                    backing_field_type: None,
+                    type_parameters: HeaderTypeParameterRange::default(),
+                    bounds: HeaderTypeBoundRange::default(),
+                    mutable: parameter.is_var,
+                },
+            });
+        }
+        for (index, constructor) in class.secondary_ctors.iter().enumerate() {
+            let constructor_id = id_for(
+                ids,
+                source,
+                constructor.span,
+                Some(declaration),
+                DeclarationKind::Constructor,
+                u32::try_from(index + 1).expect("too many secondary constructors"),
+            );
+            let parameters = parameters(
+                file,
+                headers,
+                names,
+                &constructor.params,
+                &file.type_annotations,
+            );
+            let annotations = annotation_types(headers, names, &constructor.annotations);
+            headers.insert_declaration(HeaderDeclaration {
+                declaration: constructor_id,
+                annotations,
+                annotation_class_literals: HeaderParameterAnnotationClassLiteralRange::default(),
+                kind: HeaderDeclarationKind::Constructor {
+                    context_parameters,
+                    parameters,
+                },
+            });
+        }
+        for (index, method) in class.methods.iter().enumerate() {
+            function(
+                file,
+                source,
+                Some(declaration),
+                u32::try_from(index).expect("too many class methods"),
+                method,
+                ids,
+                names,
+                headers,
+            );
+        }
+        for (index, value) in class.body_props.iter().enumerate() {
+            property(
+                file,
+                source,
+                Some(declaration),
+                u32::try_from(index).expect("too many class properties"),
+                value,
+                ids,
+                names,
+                headers,
+            );
+        }
+        for (index, value) in class.type_aliases.iter().enumerate() {
+            alias(
+                source,
+                Some(declaration),
+                u32::try_from(index).expect("too many nested type aliases"),
+                value,
+                ids,
+                names,
+                headers,
+            );
+        }
+        for (entry_index, entry) in class.enum_entries.iter().enumerate() {
+            let entry_id = id_for(
+                ids,
+                source,
+                entry.span,
+                Some(declaration),
+                DeclarationKind::EnumEntry,
+                u32::try_from(entry_index).expect("too many enum entries"),
+            );
+            for (index, method) in entry.methods.iter().enumerate() {
+                function(
+                    file,
+                    source,
+                    Some(entry_id),
+                    u32::try_from(index).expect("too many enum-entry methods"),
+                    method,
+                    ids,
+                    names,
+                    headers,
+                );
+            }
+            for (index, value) in entry.props.iter().enumerate() {
+                property(
+                    file,
+                    source,
+                    Some(entry_id),
+                    u32::try_from(index).expect("too many enum-entry properties"),
+                    value,
+                    ids,
+                    names,
+                    headers,
+                );
+            }
+        }
+    }
+
+    let nested_owners = nested_classifier_owners(file, source, ids);
+    let companion_declarations = companion_declarations(file);
+    for (index, declaration) in file.decls.iter().enumerate() {
+        if companion_declarations.contains(declaration) {
+            continue;
+        }
+        match file.decl(*declaration) {
+            Decl::Fun(value) => function(
+                file,
+                source,
+                None,
+                u32::try_from(index).expect("too many file declarations"),
+                value,
+                ids,
+                names,
+                headers,
+            ),
+            Decl::Property(value) => property(
+                file,
+                source,
+                None,
+                u32::try_from(index).expect("too many file declarations"),
+                value,
+                ids,
+                names,
+                headers,
+            ),
+            Decl::Class(value) => classifier(
+                file,
+                source,
+                nested_owners.get(declaration).copied(),
+                u32::try_from(index).expect("too many file declarations"),
+                file.hoisted_classifier_source_names
+                    .get(declaration)
+                    .map(String::as_str)
+                    .unwrap_or(&value.name),
+                value,
+                ids,
+                names,
+                headers,
+            ),
+        }
+    }
+    for (index, value) in file.type_alias_decls.iter().enumerate() {
+        alias(
+            source,
+            None,
+            u32::try_from(index).expect("too many file type aliases"),
+            value,
+            ids,
+            names,
+            headers,
+        );
+    }
+}
+
+/// AST-free result of the streamed declaration-inventory pass. Signature extraction consumes this
+/// together with the callback's compact header/constraint output; it never stores a parsed file.
+pub struct StreamedHeaderModule {
+    pub sources: SourceMap,
+    /// Diagnostic origins owned by the temporary signature graph. They are deliberately separate
+    /// from `sources.origins`: consuming this header module destroys every signature-expression
+    /// coordinate, while the source map retains only origins referenced by checked inline/default
+    /// FIR.
+    pub(crate) signature_origins: super::body::OriginStore,
+    pub declarations: DeclarationIds,
+    pub lookup_names: LookupNames,
+    pub scopes: HeaderScopeArena,
+    pub syntax: HeaderSyntaxArena,
+    /// Detached declaration annotation/type occurrences needed by Pass-1 import and annotation
+    /// resolution. Their packed type nodes live in `syntax`; no parser `TypeRef` or arena identity
+    /// survives the active source parse.
+    pub(super) detached_types: Vec<(SourceFileId, HeaderTypeId)>,
+    annotation_strings: HeaderAnnotationStringArena,
+    visibility_suppressions: HeaderVisibilitySuppressionArena,
+    type_use_annotations: HeaderTypeUseAnnotationArena,
+    /// Read freely; append through [`StreamedHeaderModule::push_stub`] so the identity index below
+    /// covers the new stub (a direct push is still found — by a scan of the un-indexed tail).
+    pub stubs: Vec<DeclarationStub>,
+    /// Position in `stubs` of each inventoried declaration. Signature resolution asks for one stub
+    /// by identity per type reference it resolves; scanning `stubs` for it was quadratic in module
+    /// size.
+    stub_positions: crate::fx_hash::HashMap<DeclarationId, usize>,
+    /// How many leading entries of `stubs` the position table covers.
+    indexed_stubs: usize,
+    /// The `expect` KEYWORD each header declaration was introduced by.
+    ///
+    /// Every diagnostic about an unactualized header points there, and the keyword is knowable only
+    /// while the parser unit is live. Recorded here beside the `EXPECT` flag it belongs to rather
+    /// than recovered afterwards by searching a file's modifiers for the nearest one preceding the
+    /// declaration — a search with no answer for a synthesized declaration and a wrong one whenever
+    /// two headers share a line. One entry per `expect` declaration.
+    pub expect_keywords: crate::fx_hash::HashMap<DeclarationId, TextRange>,
+    /// The generated-class position each `suspend` function's continuation holds in its scope's
+    /// sequence, 1-based in declaration order. Only the parser pass that numbers that sequence can
+    /// answer it, so it is carried rather than recomputed. A backend builds the spelling.
+    pub continuation_ordinals: crate::fx_hash::HashMap<DeclarationId, u32>,
+    pub local_class_name_provenance:
+        crate::fx_hash::HashMap<DeclarationId, super::LocalClassNameProvenance>,
+    /// Complete parser declaration-stream order before semantic exclusions. These are stable
+    /// header identities, not source offsets or parser arena ids.
+    pub(super) inventory: Vec<DeclarationId>,
+    /// File-declaration roots in parser order, partitioned by source. Members/accessors remain
+    /// reachable through their stable owner edges and therefore do not appear here. Signature
+    /// publication iterates this structure instead of retaining `File::decls` as scaffolding.
+    source_declarations: Vec<Vec<DeclarationId>>,
+    /// Pass-1-only semantic containment for parser-hoisted local classifiers. Both sides are stable
+    /// declaration identities derived while the AST is live; no source coordinate or parser arena
+    /// identity is retained. Inline/default preparation consumes this before Pass 2.
+    pub(super) local_classifier_lexical_roots:
+        crate::fx_hash::HashMap<DeclarationId, DeclarationId>,
+    /// Whether each source contributed compact declaration headers. A Java input, or a Kotlin input
+    /// whose parse failed, has a stable file identity but no header inventory: its declarations were
+    /// never walked, so a header lookup against it must not be read as a missing-header defect.
+    pub(super) inventoried: Vec<bool>,
+    /// Stable declarations intentionally removed by expect/actual actualization. The transient
+    /// legacy signature bridge may still be walking the reparsed source file, so it must distinguish
+    /// an excluded header from an inventory defect.
+    pub(super) excluded: crate::fx_hash::HashSet<DeclarationId>,
+}
+
+impl StreamedHeaderModule {
+    fn index_stubs(stubs: &[DeclarationStub]) -> crate::fx_hash::HashMap<DeclarationId, usize> {
+        stubs
+            .iter()
+            .enumerate()
+            .map(|(position, stub)| (stub.id, position))
+            .collect()
+    }
+
+    fn reindex_stubs(&mut self) {
+        self.stub_positions = Self::index_stubs(&self.stubs);
+        self.indexed_stubs = self.stubs.len();
+    }
+
+    /// Append a stub and index it by identity.
+    pub fn push_stub(&mut self, stub: DeclarationStub) {
+        if self.indexed_stubs == self.stubs.len() {
+            self.stub_positions.insert(stub.id, self.stubs.len());
+            self.indexed_stubs += 1;
+        }
+        self.stubs.push(stub);
+    }
+
+    /// The inventoried stub of one declaration, if it has one (excluded subtrees have none).
+    pub fn stub(&self, declaration: DeclarationId) -> Option<&DeclarationStub> {
+        self.stub_position(declaration)
+            .map(|position| &self.stubs[position])
+    }
+
+    /// Position in `stubs` of one declaration's inventoried stub.
+    fn stub_position(&self, declaration: DeclarationId) -> Option<usize> {
+        if let Some(position) = self
+            .stub_positions
+            .get(&declaration)
+            .copied()
+            .filter(|position| {
+                self.stubs
+                    .get(*position)
+                    .is_some_and(|stub| stub.id == declaration)
+            })
+        {
+            return Some(position);
+        }
+        let tail = self.indexed_stubs.min(self.stubs.len());
+        self.stubs[tail..]
+            .iter()
+            .position(|stub| stub.id == declaration)
+            .map(|offset| tail + offset)
+    }
+
+    /// The inventoried stubs anchored directly under `owner`, in INVENTORY order — the order a
+    /// scan of `stubs` observes, which is source order within a file. Identity order differs:
+    /// a primary-constructor property is interned after the class body's, yet both carry
+    /// sibling 0, and the ordinal lookups that read this take the FIRST match.
+    /// The declaration's own source spelling: the last segment of its lookup path. A local
+    /// classifier's semantic identity is opaque, so lexical lookup by spelling must use this rather
+    /// than a segment of the identity.
+    pub fn source_simple_name(&self, stub: &DeclarationStub) -> Option<&str> {
+        let path = self.lookup_names.get(stub.lookup_name?)?;
+        path.rsplit('.').next()
+    }
+
+    pub fn owned_stubs(&self, owner: DeclarationId) -> impl Iterator<Item = &DeclarationStub> + '_ {
+        let mut positions = self
+            .declarations
+            .owned(owner)
+            .iter()
+            .filter_map(|declaration| self.stub_position(*declaration))
+            .collect::<Vec<_>>();
+        positions.sort_unstable();
+        positions.into_iter().map(|position| &self.stubs[position])
+    }
+
+    /// Stable declaration-stream order captured while the bounded source unit is active. Signature
+    /// solving may compare declaration order through these identities; it must never recover that
+    /// order from text offsets or parser arena coordinates.
+    pub(crate) fn declaration_inventory(&self) -> &[DeclarationId] {
+        &self.inventory
+    }
+
+    /// Stable file-declaration roots for one source, in source order.
+    pub(crate) fn source_declarations(&self, source: SourceFileId) -> &[DeclarationId] {
+        self.source_declarations
+            .get(source.raw() as usize)
+            .map(Vec::as_slice)
+            .unwrap_or_default()
+    }
+
+    /// Whether `source` contributed compact declaration headers. Semantic consumers that iterate a
+    /// whole parsed source set must consult this before requiring a compact header: an unparsable
+    /// file still owns a `SourceFileId` and still has recovered AST declarations.
+    pub fn has_headers(&self, source: SourceFileId) -> bool {
+        self.inventoried
+            .get(source.raw() as usize)
+            .copied()
+            .unwrap_or(false)
+    }
+
+    /// Qualified, JVM-neutral identities of non-local Kotlin classifiers published by this
+    /// source module. Platform source providers use this once during Pass 1 to resolve foreign
+    /// declaration headers against Kotlin declarations from the same compilation. Local and
+    /// anonymous classifiers are deliberately absent: another source file cannot name them.
+    pub fn source_classifier_names(&self) -> Vec<crate::types::TypeName> {
+        let mut names = self
+            .stubs
+            .iter()
+            .filter(|stub| stub.kind == DeclarationKind::Classifier)
+            .filter(|stub| {
+                !stub.flags.has(DeclarationFlags::LOCAL_CLASS)
+                    && !stub.flags.has(DeclarationFlags::ANONYMOUS_OBJECT)
+            })
+            .filter_map(|stub| {
+                let spelling = self.lookup_names.get(stub.lookup_name?)?;
+                let mut segments = spelling
+                    .split(['.', '$'])
+                    .filter(|segment| !segment.is_empty());
+                let first = segments.next()?;
+                let package = self.sources.get(stub.source)?.package;
+                let mut identity = crate::types::type_name_child(package, first);
+                for segment in segments {
+                    identity = crate::types::type_name_nested_child(identity, segment);
+                }
+                Some(identity)
+            })
+            .collect::<Vec<_>>();
+        let mut seen = crate::fx_hash::HashSet::default();
+        names.retain(|name| seen.insert(*name));
+        names
+    }
+
+    pub(crate) fn local_classifier_lexical_root(
+        &self,
+        declaration: DeclarationId,
+    ) -> Option<DeclarationId> {
+        self.local_classifier_lexical_roots
+            .get(&declaration)
+            .copied()
+    }
+
+    /// Remove declaration subtrees selected out of the module before signature extraction. Stable
+    /// anchors remain interned, but no excluded header can contribute lookup candidates,
+    /// constraints, or ordinary body-unit work. This is used by expect/actual actualization after compact
+    /// matching has selected an actual declaration and before ordinary signature resolution runs.
+    pub fn exclude_declaration_subtrees(&mut self, roots: &crate::fx_hash::HashSet<DeclarationId>) {
+        fn is_excluded(
+            declarations: &DeclarationIds,
+            roots: &crate::fx_hash::HashSet<DeclarationId>,
+            declaration: DeclarationId,
+        ) -> bool {
+            let mut current = Some(declaration);
+            let mut remaining = declarations.len().saturating_add(1);
+            while let Some(candidate) = current {
+                if roots.contains(&candidate) {
+                    return true;
+                }
+                if remaining == 0 {
+                    panic!("stable declaration ownership graph contains a cycle");
+                }
+                remaining -= 1;
+                current = declarations
+                    .anchor(candidate)
+                    .and_then(|anchor| anchor.owner);
+            }
+            false
+        }
+
+        let excluded = self
+            .stubs
+            .iter()
+            .filter(|stub| is_excluded(&self.declarations, roots, stub.id))
+            .map(|stub| stub.id)
+            .collect::<Vec<_>>();
+        self.excluded.extend(excluded);
+        self.stubs.retain(|stub| !self.excluded.contains(&stub.id));
+        self.reindex_stubs();
+        // `source_declarations` is positional with the transient parser's `File::decls` array.
+        // Keep excluded identities in that positional map; consumers cross-check `stubs`, where
+        // exclusion is authoritative. Removing an element here would shift every later source
+        // declaration onto the preceding parser sibling during compact signature publication.
+    }
+
+    /// Persistent payload controlled by this header inventory. Source text and transient AST arenas
+    /// are absent, so ordinary body growth cannot affect the result.
+    pub fn storage_payload_bytes(&self) -> usize {
+        self.sources.path_payload_bytes()
+            + self.signature_origins.storage_payload_bytes()
+            + self.declarations.storage_payload_bytes()
+            + self.lookup_names.storage_payload_bytes()
+            + self.scopes.storage_payload_bytes()
+            + self.syntax.storage_payload_bytes()
+            + self.detached_types.len() * std::mem::size_of::<(SourceFileId, HeaderTypeId)>()
+            + self.annotation_strings.storage_payload_bytes()
+            + self.visibility_suppressions.storage_payload_bytes()
+            + self.type_use_annotations.storage_payload_bytes()
+            + self.stubs.len() * std::mem::size_of::<DeclarationStub>()
+            + self.stub_positions.len()
+                * (std::mem::size_of::<DeclarationId>() + std::mem::size_of::<usize>())
+            + self.inventory.len() * std::mem::size_of::<DeclarationId>()
+            + self
+                .source_declarations
+                .iter()
+                .map(|declarations| declarations.len() * std::mem::size_of::<DeclarationId>())
+                .sum::<usize>()
+            + self.excluded.len() * std::mem::size_of::<DeclarationId>()
+    }
+
+    /// Constant string arguments attached to one declaration annotation. Pass 1 copies the values
+    /// while the bounded expression arena is live; signature consumers resolve the annotation at
+    /// the same declaration-local ordinal before interpreting them. No parser `ExprId` or source
+    /// coordinate crosses the pass boundary.
+    pub(crate) fn annotation_string_arguments(
+        &self,
+        declaration: DeclarationId,
+        annotation_ordinal: usize,
+    ) -> &[Box<str>] {
+        self.annotation_strings
+            .arguments(declaration, annotation_ordinal)
+    }
+
+    pub(crate) fn file_visibility_suppressions(
+        &self,
+        source: SourceFileId,
+    ) -> &[HeaderVisibilitySuppressionApplication] {
+        self.visibility_suppressions.file(source)
+    }
+
+    pub(crate) fn declaration_visibility_suppressions(
+        &self,
+        declaration: DeclarationId,
+    ) -> &[HeaderVisibilitySuppressionApplication] {
+        self.visibility_suppressions.declaration(declaration)
+    }
+
+    /// The identity this inventory interned for one parsed declaration, found by the EXACT anchor
+    /// it keys on.
+    ///
+    /// A declaration's identity IS its anchor here: the inventory interns every declaration under
+    /// `(source, range, owner, kind, sibling)` while the parser unit is live. A consumer looking
+    /// at the same syntax holds every one of those five, so it asks for the declaration it has
+    /// rather than for whatever was anchored somewhere.
+    ///
+    /// A range alone is NOT an identity, which is why the whole anchor is asked for: a
+    /// constructor property and its class share one, and so do a property and its accessor. A map
+    /// keyed by range could only answer with whichever of them it met first.
+    pub fn declaration_at(&self, anchor: crate::fir::DeclarationAnchor) -> Option<DeclarationId> {
+        self.declarations.get(anchor)
+    }
+
+    /// The parser declaration slot each stable identity of `source` was interned from, inverting
+    /// the positional record the inventory already keeps. Identity-keyed in both directions: no
+    /// coordinate is compared to find an entry.
+    pub fn source_declaration_slots(
+        &self,
+        source: SourceFileId,
+    ) -> crate::fx_hash::HashMap<DeclarationId, usize> {
+        self.source_declarations(source)
+            .iter()
+            .enumerate()
+            .map(|(slot, &declaration)| (declaration, slot))
+            .collect()
+    }
+
+    /// Annotated type occurrences of `source`, by start offset, each with its annotation spans in
+    /// source order.
+    pub(crate) fn type_use_annotations(
+        &self,
+        source: SourceFileId,
+    ) -> impl Iterator<Item = (u32, &[crate::diag::Span])> + '_ {
+        self.type_use_annotations.occurrences(source)
+    }
+
+    /// Each named function-type parameter of `source`: its type's start offset and its name, which
+    /// `@Metadata` records as a `@ParameterName` annotation on that type.
+    pub(crate) fn function_type_parameter_names(
+        &self,
+        source: SourceFileId,
+    ) -> impl Iterator<Item = (u32, &str)> + '_ {
+        self.type_use_annotations.parameter_names(source)
+    }
+
+    pub(crate) fn detached_type_roots(
+        &self,
+        source: SourceFileId,
+    ) -> impl Iterator<Item = HeaderTypeId> + '_ {
+        self.detached_types
+            .iter()
+            .filter(move |(candidate, _)| *candidate == source)
+            .map(|(_, ty)| *ty)
+    }
+}
+
+/// Parse sources one at a time, expose each transient AST only for compact pass-1 extraction, and
+/// drop it before parsing the next source. The callback cannot take ownership of the `File`; the
+/// returned module is structurally AST-free.
+///
+/// This is the file-streaming primitive, not yet the complete semantic pass: expect/actual matching
+/// and explicit-type resolution must be expressed over compact headers before the production driver
+/// can replace `analyze_source_set_impl` with it.
+pub fn stream_file_stub_inventory(
+    sources: &[SourceInput<'_>],
+    project_features: &LangFeatures,
+    diags: &mut DiagSink,
+    mut visit: impl FnMut(SourceFileId, &File, &[DeclarationStub]),
+) -> StreamedHeaderModule {
+    let mut builder = HeaderInventoryBuilder::default();
+
+    for (index, source) in sources.iter().enumerate() {
+        diags.set_file(index as u32);
+        if source.kind == SourceKind::Java {
+            builder.add_source(index, source, None);
+            continue;
+        }
+
+        let mut features = project_features.clone();
+        features.apply_source_directives(source.text);
+        let diagnostics_before = diags.diags.len();
+        let tokens = crate::lexer::lex(source.text, diags);
+        let mut file = match source.kind {
+            SourceKind::Kotlin => {
+                crate::parser::parse_with_features(source.text, &tokens, diags, &features)
+            }
+            SourceKind::KotlinScript => {
+                crate::parser::parse_script_with_features(source.text, &tokens, diags, &features)
+            }
+            SourceKind::Java => unreachable!(),
+        };
+        if diags.diags[diagnostics_before..]
+            .iter()
+            .any(|diagnostic| diagnostic.severity == Severity::Error)
+        {
+            continue;
+        }
+        if source.kind == SourceKind::Kotlin {
+            crate::frontend::record_local_class_name_provenance(&mut file);
+        }
+        let (source_id, stubs, _) = builder
+            .add_source(index, source, Some(&file))
+            .expect("Kotlin source must produce compact headers");
+        visit(source_id, &file, &stubs);
+        // `file` drops here, before the next loop iteration parses another source.
+    }
+
+    builder.finish()
+}
+
+#[derive(Default)]
+pub struct HeaderInventoryBuilder {
+    sources: SourceMap,
+    signature_origins: super::body::OriginStore,
+    declarations: DeclarationIds,
+    lookup_names: LookupNames,
+    scopes: HeaderScopeArena,
+    syntax: HeaderSyntaxArena,
+    detached_types: Vec<(SourceFileId, HeaderTypeId)>,
+    annotation_strings: HeaderAnnotationStringArena,
+    visibility_suppressions: HeaderVisibilitySuppressionArena,
+    type_use_annotations: HeaderTypeUseAnnotationArena,
+    stubs: Vec<DeclarationStub>,
+    inventory: Vec<DeclarationId>,
+    expect_keywords: crate::fx_hash::HashMap<DeclarationId, TextRange>,
+    continuation_ordinals: crate::fx_hash::HashMap<DeclarationId, u32>,
+    local_class_name_provenance:
+        crate::fx_hash::HashMap<DeclarationId, super::LocalClassNameProvenance>,
+    source_declarations: Vec<Vec<DeclarationId>>,
+    local_classifier_lexical_roots: crate::fx_hash::HashMap<DeclarationId, DeclarationId>,
+    inventoried: Vec<bool>,
+}
+
+impl HeaderInventoryBuilder {
+    pub fn source_origin(&mut self, source: SourceFileId, span: Span) -> OriginId {
+        self.signature_origins.source(source, span)
+    }
+
+    /// Add one source immediately after parsing it. Java sources receive a stable file identity but
+    /// no Kotlin declaration headers. The returned stubs borrow nothing from `file`.
+    pub fn add_source(
+        &mut self,
+        index: usize,
+        source: &SourceInput<'_>,
+        file: Option<&File>,
+    ) -> Option<(
+        SourceFileId,
+        Vec<DeclarationStub>,
+        ParserDeclarationIdentities,
+    )> {
+        let extension = match source.kind {
+            SourceKind::Kotlin => "kt",
+            SourceKind::KotlinScript => "kts",
+            SourceKind::Java => "java",
+        };
+        let path = source.file_stem.map_or_else(
+            || format!("<source-{index}>.{extension}"),
+            |stem| format!("{stem}.{extension}"),
+        );
+        let source_id = self.sources.insert(path);
+        let raw = source_id.raw() as usize;
+        if self.inventoried.len() <= raw {
+            self.inventoried.resize(raw + 1, false);
+        }
+        if self.source_declarations.len() <= raw {
+            self.source_declarations.resize_with(raw + 1, Vec::new);
+        }
+        if source.kind == SourceKind::Java {
+            assert!(file.is_none(), "Java input has no Kotlin AST header");
+            return None;
+        }
+        let file = file?;
+        self.sources.set_package(source_id, file.package.as_deref());
+        self.sources
+            .set_prioritized_enum_entries(source_id, file.prioritized_enum_entries);
+        self.inventoried[raw] = true;
+        let (stubs, stable_by_transient) = self.add_file(source_id, file, source.is_common);
+        Some((source_id, stubs, stable_by_transient))
+    }
+
+    fn add_file(
+        &mut self,
+        source: SourceFileId,
+        file: &File,
+        is_common: bool,
+    ) -> (Vec<DeclarationStub>, ParserDeclarationIdentities) {
+        let first_source_type = self.syntax.type_count();
+        self.scopes
+            .add_file(source, file, is_common, &mut self.lookup_names);
+        for ty in &file.detached_type_refs {
+            let ty = self.syntax.add_type(ty, &mut self.lookup_names);
+            self.detached_types.push((source, ty));
+        }
+        self.type_use_annotations.add_file(source, file);
+        let extracted = extract_file_stub_inventory(
+            file,
+            source,
+            &mut self.declarations,
+            &mut self.lookup_names,
+            LocalClassProvenanceOwnership::Publish,
+        );
+        let mut stubs = extracted.stubs;
+        let stable_by_transient = extracted.stable_by_transient;
+        order_file_stubs(&mut stubs, &self.declarations);
+        self.source_declarations[source.raw() as usize] = extracted.source_declarations;
+        self.expect_keywords.extend(extracted.expect_keywords);
+        self.continuation_ordinals
+            .extend(extracted.continuation_ordinals);
+        self.local_class_name_provenance
+            .extend(extracted.local_class_name_provenance);
+        self.visibility_suppressions.add_file(source, file, &stubs);
+        for (&local, &root) in &file.local_class_enclosing_declarations {
+            if let (Some(&local), Some(&root)) = (
+                stable_by_transient.get(&local),
+                stable_by_transient.get(&root),
+            ) {
+                self.local_classifier_lexical_roots.insert(local, root);
+            }
+        }
+        extract_file_header_syntax(
+            file,
+            source,
+            &mut self.declarations,
+            &mut self.lookup_names,
+            &mut self.syntax,
+        );
+        self.syntax.capture_source_spellings(
+            first_source_type,
+            &file.alias_spellings,
+            &mut self.lookup_names,
+        );
+        for &declaration in &file.decls {
+            let Some(&stable) = stable_by_transient.get(&declaration) else {
+                continue;
+            };
+            match file.decl(declaration) {
+                Decl::Fun(function) => {
+                    self.annotation_strings.add(
+                        stable,
+                        file,
+                        &function.annotations,
+                        &function.annotation_args,
+                    );
+                }
+                Decl::Class(class) => {
+                    self.annotation_strings.add(
+                        stable,
+                        file,
+                        &class.annotations,
+                        &class.annotation_args,
+                    );
+                }
+                Decl::Property(property) => {
+                    self.annotation_strings.add(
+                        stable,
+                        file,
+                        &property.annotations,
+                        &property.annotation_args,
+                    );
+                }
+            }
+        }
+        self.stubs.extend(stubs.iter().copied());
+        self.inventory.extend(stubs.iter().map(|stub| stub.id));
+        (stubs, stable_by_transient)
+    }
+
+    pub fn finish(self) -> StreamedHeaderModule {
+        let stub_positions = StreamedHeaderModule::index_stubs(&self.stubs);
+        let indexed_stubs = self.stubs.len();
+        StreamedHeaderModule {
+            stub_positions,
+            indexed_stubs,
+            sources: self.sources,
+            signature_origins: self.signature_origins,
+            declarations: self.declarations,
+            lookup_names: self.lookup_names,
+            scopes: self.scopes,
+            syntax: self.syntax,
+            detached_types: self.detached_types,
+            annotation_strings: self.annotation_strings,
+            visibility_suppressions: self.visibility_suppressions,
+            type_use_annotations: self.type_use_annotations,
+            stubs: self.stubs,
+            expect_keywords: self.expect_keywords,
+            continuation_ordinals: self.continuation_ordinals,
+            local_class_name_provenance: self.local_class_name_provenance,
+            inventory: self.inventory,
+            source_declarations: self.source_declarations,
+            local_classifier_lexical_roots: self.local_classifier_lexical_roots,
+            inventoried: self.inventoried,
+            excluded: crate::fx_hash::HashSet::default(),
+        }
+    }
+}
+
+/// Build the same AST-free Pass-1 inventory from files an existing driver has already parsed. This
+/// is the production migration seam: callers can switch semantic decisions to stable headers before
+/// replacing their parse loop with [`stream_file_stub_inventory`]. No AST reference enters the
+/// returned value.
+pub fn inventory_parsed_source_headers(
+    sources: &[SourceInput<'_>],
+    files: &[File],
+) -> StreamedHeaderModule {
+    assert_eq!(
+        sources.len(),
+        files.len(),
+        "source/header inventory inputs must stay positionally aligned"
+    );
+    let mut builder = HeaderInventoryBuilder::default();
+    for (index, (source, file)) in sources.iter().zip(files).enumerate() {
+        let file = (source.kind != SourceKind::Java).then_some(file);
+        builder.add_source(index, source, file);
+    }
+    builder.finish()
+}

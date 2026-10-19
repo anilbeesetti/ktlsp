@@ -1,0 +1,1954 @@
+//! Lexical scopes for the checker.
+//!
+//! A scope is created per binding construct and linked to its parent by BORROW, so the chain lives
+//! on the call stack: a scope cannot outlive its parent, cannot be left open by an early return,
+//! and nothing here borrows the checker, so `&Scope` and `&mut Checker` never conflict.
+//!
+//! The chain holds only what is genuinely lexical — locals, parameters, type parameters, and the
+//! implicit-receiver rungs. Class members, top-level declarations and the classpath are NOT scopes:
+//! they are indexed namespaces reached by fall-through AFTER the chain misses (a class scope would
+//! otherwise have to materialize its whole inherited member set on entry, and member visibility is
+//! order-free while local visibility is not).
+//!
+//! The binding payload `B` stays generic so this module does not depend on the checker's `Local`.
+//! The flow frame is concrete: narrowings are a property of lexical scopes, so they live here.
+
+use super::receiver_capture_identity::{LambdaReceiverSlot, ReceiverDeclarationRole};
+use crate::ast::{ExprId, StmtId};
+use crate::diag::Span;
+use crate::fx_hash::{HashMap, HashSet};
+use crate::types::{Ty, TypeName};
+use std::cell::RefCell;
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum ScopeKind {
+    /// File level: the root of every chain. Holds no bindings of its own — imports and top-level
+    /// declarations are fall-through namespaces, not lexical rungs.
+    File,
+    /// A class or object body.
+    Class {
+        /// Applied semantic receiver (`C<T>`), not merely the classifier name. Erasing the arguments
+        /// here makes `this@C` disagree with an explicitly written `C<T>` in the same body.
+        ty: Ty,
+        /// FALSE for a plain nested `class`, a named `object` and a companion: those cut the
+        /// implicit-receiver chain, so neither `this@Outer` nor the outer class's type parameters
+        /// are reachable. TRUE for `inner class`, a local class and an anonymous object, which
+        /// capture the enclosing instance.
+        carries_outer: bool,
+    },
+    /// A function body's signature scope: type parameters and value parameters. The block body is a
+    /// CHILD of this, which is what makes `fun f(x: Int) { val x = 1 }` shadowing (a warning)
+    /// rather than a redeclaration (an error).
+    Function {
+        /// The extension receiver, when there is one.
+        receiver: Option<Ty>,
+    },
+    /// Any other binding block: `if`/`when` branch, loop body, lambda body, `try`.
+    Block,
+}
+
+/// How a context entry entered its rung. It decides whether the entry is an implicit receiver and
+/// what a local class capturing it calls it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ContextReceiverKind {
+    /// `context(name: Type)`: an ordinary lexical value. It may satisfy another context parameter,
+    /// but its members are not available unqualified.
+    Named,
+    /// `context(_: Type)`.
+    Anonymous,
+    /// Legacy `context(Type)`.
+    LegacyReceiver,
+    /// A context parameter of the function type a lambda is checked against (`context(Type) () -> R`).
+    FunctionType,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ContextReceiver {
+    declaration: Option<Span>,
+    pub(crate) ty: Ty,
+    pub(crate) kind: ContextReceiverKind,
+    /// The source name, which only a named parameter has.
+    name: Option<String>,
+    pub(crate) label: Option<String>,
+}
+
+impl ContextReceiver {
+    /// An unnamed entry: anonymous, legacy or function-type.
+    pub(crate) fn new(ty: Ty, kind: ContextReceiverKind, label: Option<String>) -> Self {
+        assert_ne!(
+            kind,
+            ContextReceiverKind::Named,
+            "a named parameter carries its name"
+        );
+        let name = None;
+        Self {
+            declaration: None,
+            ty,
+            kind,
+            name,
+            label,
+        }
+    }
+
+    /// A named context parameter `context(name: Type)`.
+    pub(crate) fn named(ty: Ty, name: impl Into<String>) -> Self {
+        let (kind, name, label) = (ContextReceiverKind::Named, Some(name.into()), None);
+        Self {
+            declaration: None,
+            ty,
+            kind,
+            name,
+            label,
+        }
+    }
+
+    /// The parameter's source name, when it is a named one.
+    pub(crate) fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    pub(crate) fn with_declaration(mut self, declaration: Span) -> Self {
+        self.declaration = Some(declaration);
+        self
+    }
+
+    pub(crate) fn declaration_role(&self) -> Option<ReceiverDeclarationRole> {
+        self.declaration
+            .map(ReceiverDeclarationRole::ContextParameter)
+    }
+
+    /// Whether the entry joins the implicit-receiver tower: every kind but a named parameter.
+    pub(crate) fn implicit_receiver(&self) -> bool {
+        self.kind != ContextReceiverKind::Named
+    }
+}
+
+/// The context parameter an implicit receiver is: its kind, the types of its rung's context
+/// parameters of that kind in declaration order, and its position among them.
+pub(crate) struct ImplicitContext {
+    pub(crate) kind: ContextReceiverKind,
+    pub(crate) types: Vec<Ty>,
+    pub(crate) index: usize,
+}
+
+/// A STABLE ACCESS PATH a flow narrowing (smart cast) applies to: an immutable ROOT value followed
+/// by immutable property segments (`a.b.c`). A root-only path is the classic value narrowing;
+/// segments extend the same proofs (`==`/`!=` null checks, `is`/`!is` type tests, contract
+/// conclusions) to property reads, like kotlinc. One machinery serves every condition shape and
+/// application site — nothing keys on the condition's syntax.
+///
+/// Every component is a resolved identity recorded when the path's expression was checked, never
+/// a spelling: a proof about one receiver's property cannot be found by a read of a same-named
+/// property of another receiver, or of an overriding declaration.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct NarrowPath {
+    pub(crate) root: PathRoot,
+    pub(crate) segments: Vec<PathProperty>,
+}
+
+impl NarrowPath {
+    pub(crate) fn root_only(root: PathRoot) -> Self {
+        NarrowPath {
+            root,
+            segments: Vec::new(),
+        }
+    }
+
+    /// This path followed by one more selected property.
+    pub(crate) fn then(mut self, property: PathProperty) -> Self {
+        self.segments.push(property);
+        self
+    }
+}
+
+/// The value a [`NarrowPath`] starts from.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum PathRoot {
+    /// A lexical value, by the flow identity its declaration allocated. A narrowing shadow keeps
+    /// the identity of the value it narrows; a new declaration of the same name gets another.
+    Value(u32),
+    /// A receiver (`this`, an extension or dispatch receiver), by its receiver-tower coordinate.
+    Receiver((usize, usize)),
+    /// A top-level property, by its selected declaration.
+    TopLevel(PathProperty),
+}
+
+/// A selected property declaration, as the checker's selection of one read recorded it: the
+/// classifier (or file facade) declaring it, its declared name, the type that read has, and whether
+/// a second read through the same receiver returns the same value.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct PathProperty {
+    pub(crate) owner: TypeName,
+    pub(crate) name: String,
+    pub(crate) ty: Ty,
+    pub(crate) stable: bool,
+}
+
+/// A recorded property-path narrowing. It sits in the frame of the scope that proved it and dies
+/// with that scope; which receiver or value it is about is carried by the path's identities.
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub(crate) struct PathNarrowing {
+    pub(crate) ty: Ty,
+}
+
+/// A value or classifier a stable access path cannot denote on the current control-flow edge.
+/// These are body-local semantic facts: exhaustiveness consumes them while checking a `when`, and
+/// no complement/intersection pseudo-type can escape into checked FIR.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum FlowExclusion {
+    Boolean(bool),
+    EnumEntry { classifier: TypeName, name: String },
+    Singleton(TypeName),
+    Classifier(TypeName),
+    Null,
+}
+
+/// The facts one checked condition proves on one of its outcomes: positive narrowings and
+/// negative facts. A cast the stability gate declined where the condition was checked is no fact.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(super) struct ConditionFacts {
+    pub(super) narrowings: Vec<(NarrowPath, Ty)>,
+    pub(super) exclusions: Vec<(NarrowPath, FlowExclusion)>,
+}
+
+impl ConditionFacts {
+    pub(super) fn is_empty(&self) -> bool {
+        self.narrowings.is_empty() && self.exclusions.is_empty()
+    }
+
+    /// Drop the facts about `root`: a write replaced that value, so what the condition said about
+    /// the old one says nothing about the new one.
+    fn forget_root(&mut self, root: &PathRoot) {
+        self.narrowings.retain(|(path, _)| path.root != *root);
+        self.exclusions.retain(|(path, _)| path.root != *root);
+    }
+}
+
+/// What a stable local `Boolean` `val` implies about other values, by the value it holds: the
+/// facts its initializer proved for `true` and for `false` (Kotlin's data-flow implications bound
+/// to a stable boolean variable).
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(super) struct FlowExecutionIdentity {
+    /// A named local function is a separate execution even though entering it clears the enclosing
+    /// lambda chain. Its statement identity cannot collide with a lambda expression identity.
+    pub(super) local_function: Option<StmtId>,
+    /// Source lambda chain, including lambdas later selected for inline splicing. Keeping the full
+    /// chain makes the identity stable while overload selection is still deciding capture mode;
+    /// comparisons normalize both sides with the final inline decisions.
+    pub(super) lambdas: Vec<ExprId>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(super) struct BooleanImplications {
+    pub(super) when_true: ConditionFacts,
+    pub(super) when_false: ConditionFacts,
+    /// The execution the val was declared in: the materialized (not inline-spliced) lambdas
+    /// enclosing it, outermost first. Only a write in this same execution replaces a value under
+    /// the val's facts; a write in a nested callable runs at another time and is the stability
+    /// gate's business where the val is read.
+    pub(super) execution: FlowExecutionIdentity,
+}
+
+impl BooleanImplications {
+    pub(super) fn facts(&self, truth: bool) -> &ConditionFacts {
+        if truth {
+            &self.when_true
+        } else {
+            &self.when_false
+        }
+    }
+}
+
+/// Flow facts proven within one scope. Both kinds live HERE rather than on the binding they talk
+/// about, which is what makes them die with the scope that proved them — in both directions, with
+/// no reset step. A fact about a binding declared further out is still the inner scope's fact.
+#[derive(Clone, Default)]
+pub(crate) struct Flow {
+    /// Property paths (`a.b`) proven non-null or `is T` by an enclosing condition.
+    paths: HashMap<NarrowPath, PathNarrowing>,
+    /// All incomparable types proved for one stable access path. A Kotlin smart cast may produce
+    /// an intersection (`x is A && x is B`) even though the compact, globally shared [`Ty`] model
+    /// deliberately has no body-flow-only intersection variant. These facts stay in the lexical
+    /// flow frame and are discarded with the active body; a use site selects an ordinary bound and
+    /// publishes only that checked receiver type to FIR.
+    intersections: HashMap<NarrowPath, Vec<Ty>>,
+    /// Values and classifier regions excluded by preceding conditions on stable paths.
+    exclusions: HashMap<NarrowPath, Vec<FlowExclusion>>,
+    /// Straight-line READ types for a `var` assigned a non-null value (`var x: Int?; x = 10`
+    /// reads as `Int`). A nested lexical scope starts on the same execution edge and therefore sees
+    /// an enclosing fact until it shadows or writes that binding; branch-local facts still die with
+    /// the frame that established them.
+    locals: HashMap<String, Ty>,
+    /// Smart casts a condition ATTEMPTED but the stability gate declined because the root is a
+    /// local `var` a capturing closure mutates: the variable's name and the target type the
+    /// condition tried to prove. The fact dies with the guarded region like a real narrowing; a
+    /// later nullable-receiver use reports kotlinc's SMARTCAST_IMPOSSIBLE instead of the plain
+    /// unsafe-call error.
+    declined: Vec<(String, Ty)>,
+    /// Implications of stable Boolean `val`s declared in this frame, by the val's flow identity.
+    /// They live as long as the val and lose a fact when the value it talks about is written.
+    boolean_implications: HashMap<u32, BooleanImplications>,
+}
+
+/// A short-lived copy of the flow frames on one lexical scope chain. Control-flow constructs use
+/// this while checking sibling execution paths; it never survives body checking or crosses FIR.
+#[derive(Clone)]
+pub(crate) struct FlowSnapshot {
+    frames: Vec<Flow>,
+}
+
+/// Kotlin's namespaces are distinct: `fun Foo()` and `val Foo` may coexist in one scope, and a
+/// call site looks only in the function namespace. Redeclaration is an error only within the same
+/// scope AND the same namespace.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+pub(crate) enum Ns {
+    Value,
+    Function,
+    /// Types introduced lexically: a generic type parameter (`class C<T>`, `fun <T> f()`). One
+    /// namespace, different declaring RUNG — a class's parameters sit on its class rung, a
+    /// function's on its function rung, so each retires with the declaration that introduced it.
+    Classifier,
+}
+
+pub(crate) enum RootValue<B> {
+    Binding(B),
+    Receiver,
+    External,
+}
+
+/// One value available for implicit context-parameter binding. Scope owns the precedence between
+/// receiver rungs and lexical values; the resolver only checks type applicability.
+pub(crate) enum ContextValue {
+    ImplicitReceiver {
+        ty: Ty,
+        current: bool,
+        receiver_depth: usize,
+        context_name: Option<String>,
+        context_shadow_depth: usize,
+    },
+    Binding {
+        name: String,
+        shadow_depth: usize,
+    },
+}
+
+struct ScopedReceiver {
+    ty: Ty,
+    identity: (usize, usize),
+    extension_declaration: Option<Span>,
+    class_receiver: bool,
+    context_name: Option<String>,
+    context_shadow_depth: usize,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum FunctionReceiverKind {
+    Capturable,
+    Dispatch,
+    Singleton,
+}
+
+impl ScopedReceiver {
+    fn plain(ty: Ty, identity: (usize, usize)) -> Self {
+        Self {
+            ty,
+            identity,
+            extension_declaration: None,
+            class_receiver: true,
+            context_name: None,
+            context_shadow_depth: 0,
+        }
+    }
+}
+
+struct Binding<B> {
+    name: String,
+    ns: Ns,
+    payload: B,
+}
+
+pub(crate) struct Scope<'p, B> {
+    parent: Option<&'p Scope<'p, B>>,
+    kind: ScopeKind,
+    /// Context receivers belonging to this function rung, outermost first. The ordinary
+    /// extension/current receiver stays in [`ScopeKind::Function`]; keeping the remaining
+    /// receivers on the same rung lets every scope consumer (member lookup and context-argument
+    /// selection alike) observe the exact lambda shape.
+    context_receivers: RefCell<Vec<ContextReceiver>>,
+    /// Runtime binding of the function rung's current receiver. Ordinary extension receivers are
+    /// addressed as `this`; when the last context parameter occupies this slot, lowering binds it
+    /// under its declared name instead.
+    current_receiver_name: Option<String>,
+    /// A receiver lambda's label (explicit, or the called function's name) when this rung is one.
+    lambda_label: Option<String>,
+    lambda_expression: Option<Span>,
+    /// Runtime ownership of a `Function` rung's receiver. Scratch declaration checks still have a
+    /// class dispatch receiver even though they cannot use `ScopeKind::Class` (that would cut the
+    /// method/type-parameter scopes between it and the body). Constructor-header singletons take
+    /// part in lookup but are materialized from singleton storage, never closure captures.
+    function_receiver_kind: FunctionReceiverKind,
+    /// The context parameters of the function type a lambda rung is checked against, in order,
+    /// when the last of them is this rung's current receiver (no extension receiver took it).
+    current_receiver_context: Option<Vec<Ty>>,
+    /// Source declaration that introduced this rung's ordinary extension receiver. Receiver
+    /// lambdas have no declaration; extension functions and properties retain the exact span so a
+    /// selected outer receiver marks that declaration used without reconstructing identity from a
+    /// type or label.
+    extension_receiver_declaration: Option<Span>,
+    /// Source-declared receiver type label (`String` in `fun String.f`). This cannot be recovered
+    /// from the semantic type when the source used a type alias.
+    extension_receiver_label: Option<String>,
+    /// Classifier whose static scope this function rung opens: a companion extension or
+    /// `companion { … }` block member has no value receiver, only the companion-associated
+    /// declarations of its classifier in lexical scope.
+    companion_classifier: Option<crate::types::TypeName>,
+    /// Bindings introduced by THIS scope, in declaration order. Declaration order is what makes
+    /// `fun g(a: Int, b: Int = a)` resolve and `fun g(a: Int = b, b: Int)` not.
+    ///
+    /// Interior-mutable because a narrowing shadow is declared into the CURRENT scope while
+    /// checking a condition, when child scopes may already borrow this one: `&mut Scope` and a
+    /// live child cannot coexist.
+    bindings: RefCell<Vec<Binding<B>>>,
+    /// Flow facts recorded in this scope. Dropped with the scope, which is the Kotlin rule: a smart
+    /// cast established inside a branch does not survive it.
+    flow: RefCell<Flow>,
+}
+
+impl<B> Scope<'static, B> {
+    pub(crate) fn root() -> Scope<'static, B> {
+        Scope::with_parent(None, ScopeKind::File)
+    }
+}
+
+impl<'p, B> Scope<'p, B> {
+    fn with_parent(parent: Option<&'p Scope<'p, B>>, kind: ScopeKind) -> Scope<'p, B> {
+        Scope {
+            parent,
+            kind,
+            context_receivers: RefCell::new(Vec::new()),
+            current_receiver_name: None,
+            lambda_label: None,
+            lambda_expression: None,
+            function_receiver_kind: FunctionReceiverKind::Capturable,
+            current_receiver_context: None,
+            extension_receiver_declaration: None,
+            extension_receiver_label: None,
+            companion_classifier: None,
+            bindings: RefCell::new(Vec::new()),
+            flow: RefCell::new(Flow::default()),
+        }
+    }
+
+    pub(super) fn parent(&self) -> Option<&'p Scope<'p, B>> {
+        self.parent
+    }
+
+    /// Flow facts recorded in THIS frame, not inherited ones.
+    pub(super) fn own_local_flow_facts(&self) -> Vec<(String, Ty)> {
+        self.flow
+            .borrow()
+            .locals
+            .iter()
+            .map(|(name, ty)| (name.clone(), *ty))
+            .collect()
+    }
+
+    pub(crate) fn child(&'p self, kind: ScopeKind) -> Scope<'p, B> {
+        debug_assert!(
+            !matches!(kind, ScopeKind::File),
+            "the file scope is the root of the chain"
+        );
+        Scope::with_parent(Some(self), kind)
+    }
+
+    pub(crate) fn parameter_child(&'p self) -> Scope<'p, B> {
+        Scope::with_parent(Some(self), ScopeKind::Block)
+    }
+
+    /// Capture the flow state of this scope chain before checking a sibling execution path.
+    pub(crate) fn flow_snapshot(&self) -> FlowSnapshot {
+        FlowSnapshot {
+            frames: self
+                .ancestors()
+                .map(|scope| scope.flow.borrow().clone())
+                .collect(),
+        }
+    }
+
+    /// Restore a previously captured state for the same live scope chain.
+    pub(crate) fn restore_flow(&self, snapshot: &FlowSnapshot) {
+        let scopes = self.ancestors().collect::<Vec<_>>();
+        assert_eq!(
+            scopes.len(),
+            snapshot.frames.len(),
+            "flow snapshot must belong to the same lexical scope chain"
+        );
+        for (scope, flow) in scopes.into_iter().zip(&snapshot.frames) {
+            *scope.flow.borrow_mut() = flow.clone();
+        }
+    }
+
+    /// Keep only facts that hold on every supplied normal-exit edge, then install that joined state.
+    pub(crate) fn restore_common_flow(&self, snapshots: &[FlowSnapshot]) {
+        let Some(first) = snapshots.first() else {
+            return;
+        };
+        let mut common = first.clone();
+        for snapshot in &snapshots[1..] {
+            assert_eq!(
+                common.frames.len(),
+                snapshot.frames.len(),
+                "joined flow snapshots must share one lexical scope chain"
+            );
+            for (frame, other) in common.frames.iter_mut().zip(&snapshot.frames) {
+                frame
+                    .paths
+                    .retain(|path, fact| other.paths.get(path) == Some(fact));
+                frame
+                    .intersections
+                    .retain(|path, facts| other.intersections.get(path) == Some(facts));
+                frame
+                    .exclusions
+                    .retain(|path, facts| other.exclusions.get(path) == Some(facts));
+                frame
+                    .locals
+                    .retain(|name, ty| other.locals.get(name) == Some(ty));
+                frame.declined.retain(|fact| other.declined.contains(fact));
+                frame.boolean_implications.retain(|identity, implications| {
+                    other.boolean_implications.get(identity) == Some(implications)
+                });
+            }
+        }
+        self.restore_flow(&common);
+    }
+
+    /// Install `base`, then apply exactly the flow changes made between `effect_entry` and
+    /// `effect_exit`.
+    ///
+    /// A `finally` is checked from facts safe on every normal or abrupt try/catch exit, while its
+    /// effects run again on the normal-only continuation after the try. Rechecking the finalizer
+    /// would duplicate semantic work and diagnostics; this key-wise delta projects its removals,
+    /// replacements, and newly proved facts onto that continuation instead.
+    pub(crate) fn restore_flow_with_delta(
+        &self,
+        base: &FlowSnapshot,
+        effect_entry: &FlowSnapshot,
+        effect_exit: &FlowSnapshot,
+    ) {
+        assert_eq!(
+            base.frames.len(),
+            effect_entry.frames.len(),
+            "flow delta entry must share the base scope chain"
+        );
+        assert_eq!(
+            effect_entry.frames.len(),
+            effect_exit.frames.len(),
+            "flow delta exit must share the entry scope chain"
+        );
+
+        fn apply_map_delta<K, V>(
+            target: &mut HashMap<K, V>,
+            entry: &HashMap<K, V>,
+            exit: &HashMap<K, V>,
+        ) where
+            K: Clone + Eq + std::hash::Hash,
+            V: Clone + Eq,
+        {
+            for (key, entry_value) in entry {
+                if exit.get(key) == Some(entry_value) {
+                    continue;
+                }
+                if let Some(exit_value) = exit.get(key) {
+                    target.insert(key.clone(), exit_value.clone());
+                } else {
+                    target.remove(key);
+                }
+            }
+            for (key, exit_value) in exit {
+                if !entry.contains_key(key) {
+                    target.insert(key.clone(), exit_value.clone());
+                }
+            }
+        }
+
+        let mut projected = base.clone();
+        for ((target, entry), exit) in projected
+            .frames
+            .iter_mut()
+            .zip(&effect_entry.frames)
+            .zip(&effect_exit.frames)
+        {
+            apply_map_delta(&mut target.paths, &entry.paths, &exit.paths);
+            apply_map_delta(
+                &mut target.intersections,
+                &entry.intersections,
+                &exit.intersections,
+            );
+            apply_map_delta(&mut target.exclusions, &entry.exclusions, &exit.exclusions);
+            apply_map_delta(&mut target.locals, &entry.locals, &exit.locals);
+            apply_map_delta(
+                &mut target.boolean_implications,
+                &entry.boolean_implications,
+                &exit.boolean_implications,
+            );
+            target
+                .declined
+                .retain(|fact| !entry.declined.contains(fact) || exit.declined.contains(fact));
+            for fact in &exit.declined {
+                if !entry.declined.contains(fact) && !target.declined.contains(fact) {
+                    target.declined.push(fact.clone());
+                }
+            }
+        }
+        self.restore_flow(&projected);
+    }
+
+    pub(crate) fn function_child(
+        &'p self,
+        receiver: Option<Ty>,
+        receiver_name: Option<String>,
+        context_receivers: &[ContextReceiver],
+    ) -> Scope<'p, B> {
+        let mut child = Scope::with_parent(Some(self), ScopeKind::Function { receiver });
+        child.current_receiver_name = receiver_name;
+        child
+            .context_receivers
+            .get_mut()
+            .extend_from_slice(context_receivers);
+        child
+    }
+
+    pub(crate) fn singleton_receiver_child(&'p self, receiver: Option<Ty>) -> Scope<'p, B> {
+        let mut child = Scope::with_parent(Some(self), ScopeKind::Function { receiver });
+        if receiver.is_some() {
+            child.function_receiver_kind = FunctionReceiverKind::Singleton;
+        }
+        child
+    }
+
+    pub(crate) fn dispatch_receiver_child(&'p self, receiver: Ty) -> Scope<'p, B> {
+        let mut child = Scope::with_parent(
+            Some(self),
+            ScopeKind::Function {
+                receiver: Some(receiver),
+            },
+        );
+        child.function_receiver_kind = FunctionReceiverKind::Dispatch;
+        child
+    }
+
+    pub(crate) fn declaration_function_child_with_context(
+        &'p self,
+        receiver: Option<Ty>,
+        extension_declaration: Option<(Span, String)>,
+        context_receivers: &[ContextReceiver],
+    ) -> Scope<'p, B> {
+        debug_assert_eq!(receiver.is_some(), extension_declaration.is_some());
+        let mut child = Scope::with_parent(Some(self), ScopeKind::Function { receiver });
+        if let Some((declaration, label)) = extension_declaration {
+            child.extension_receiver_declaration = Some(declaration);
+            child.extension_receiver_label = Some(label);
+        }
+        child
+            .context_receivers
+            .get_mut()
+            .extend_from_slice(context_receivers);
+        child
+    }
+
+    /// Function rung of a companion extension or companion-block member of `classifier`: its
+    /// context receivers are implicit receivers, and `classifier`'s companion-associated
+    /// declarations are in lexical scope without any value receiver.
+    pub(crate) fn declaration_companion_function_child(
+        &'p self,
+        classifier: crate::types::TypeName,
+        context_receivers: &[ContextReceiver],
+    ) -> Scope<'p, B> {
+        let mut child = self.declaration_function_child_with_context(None, None, context_receivers);
+        child.companion_classifier = Some(classifier);
+        child
+    }
+
+    /// Classifiers whose companion-associated declarations are in lexical scope, innermost first.
+    pub(crate) fn companion_classifiers(&self) -> Vec<crate::types::TypeName> {
+        self.ancestors()
+            .filter_map(|rung| rung.companion_classifier)
+            .collect()
+    }
+
+    /// Attach classifier-owned context receivers after its type parameters have entered the class
+    /// rung and their types can be resolved. This mutates only the current lexical scope frame.
+    pub(crate) fn declare_context_receivers(&self, receivers: &[ContextReceiver]) {
+        self.context_receivers
+            .borrow_mut()
+            .extend_from_slice(receivers);
+    }
+
+    pub(crate) fn kind(&self) -> ScopeKind {
+        self.kind
+    }
+
+    /// Bind `name`, replacing any binding of the same namespace in THIS scope. Kotlin has no such
+    /// declaration; it exists for the narrowing shadow, which re-binds the SAME runtime value under
+    /// its proven type.
+    pub(crate) fn rebind(&self, name: &str, ns: Ns, payload: B) {
+        let mut bindings = self.bindings.borrow_mut();
+        if let Some(slot) = bindings.iter_mut().find(|b| b.ns == ns && b.name == name) {
+            slot.payload = payload;
+        } else {
+            bindings.push(Binding {
+                name: name.to_string(),
+                ns,
+                payload,
+            });
+        }
+    }
+
+    /// This scope and every enclosing one, innermost first.
+    pub(crate) fn ancestors<'s>(&'s self) -> impl Iterator<Item = &'s Scope<'p, B>> {
+        std::iter::successors(Some(self), |s: &&'s Scope<'p, B>| s.parent)
+    }
+
+    /// The rungs a CLASSIFIER lookup may consult, innermost first. Same cut as
+    /// [`Self::implicit_receivers`]: a class rung that does not carry its outer instance ends the
+    /// walk, because the outer declaration's type parameters are not reachable from it —
+    /// `class A<T> { class B { fun g(): T } }` is rejected by kotlinc, while an `inner class`, a
+    /// local class and an anonymous object all keep `T`.
+    ///
+    /// The FILE rung is always consulted, cut or not: it is the root of every chain, and nothing
+    /// that severs the receiver walk can put a declaration outside the file it was written in.
+    pub(crate) fn classifier_rungs<'s>(&'s self) -> impl Iterator<Item = &'s Scope<'p, B>> {
+        let mut cut = false;
+        self.ancestors().filter(move |rung| {
+            if matches!(rung.kind, ScopeKind::File) {
+                return true;
+            }
+            if cut {
+                return false;
+            }
+            cut = matches!(
+                rung.kind,
+                ScopeKind::Class {
+                    carries_outer: false,
+                    ..
+                }
+            );
+            true
+        })
+    }
+
+    /// A binding introduced by THIS scope only. The caller walks `ancestors` itself. A function
+    /// local outranks a same-named member of a classifier nested inside that function, and
+    /// implicit receivers are consulted separately from these bindings.
+    pub(crate) fn own_binding(&self, name: &str, ns: Ns) -> Option<B>
+    where
+        B: Clone,
+    {
+        self.bindings
+            .borrow()
+            .iter()
+            .rev()
+            .find(|b| b.ns == ns && b.name == name)
+            .map(|b| b.payload.clone())
+    }
+
+    fn own_value_root(&self, name: &str) -> Option<B>
+    where
+        B: Clone,
+    {
+        self.bindings
+            .borrow()
+            .iter()
+            .rev()
+            .find(|binding| {
+                binding.name == name
+                    && (binding.ns == Ns::Value
+                        || (binding.ns == Ns::Function
+                            && matches!(self.kind, ScopeKind::File | ScopeKind::Block)))
+            })
+            .map(|binding| binding.payload.clone())
+    }
+
+    /// Resolve the value half of an unqualified first segment through one scope-tower query. The
+    /// caller supplies provider-backed predicates; scope owns precedence and returns one normalized
+    /// value origin.
+    pub(crate) fn root_value(
+        &self,
+        name: &str,
+        mut receiver_has_value: impl FnMut(Ty) -> bool,
+        external_has_value: impl FnOnce() -> bool,
+    ) -> Option<RootValue<B>>
+    where
+        B: Clone,
+    {
+        for rung in self.ancestors() {
+            let cuts_outer = matches!(
+                rung.kind,
+                ScopeKind::Class {
+                    carries_outer: false,
+                    ..
+                }
+            );
+            if let Some(binding) = rung.own_value_root(name) {
+                return Some(RootValue::Binding(binding));
+            }
+            match rung.kind {
+                ScopeKind::Function {
+                    receiver: Some(receiver),
+                } if receiver_has_value(receiver) => {
+                    return Some(RootValue::Receiver);
+                }
+                ScopeKind::Class { ty, .. } => {
+                    if receiver_has_value(ty) {
+                        return Some(RootValue::Receiver);
+                    }
+                }
+                _ => {}
+            }
+            if !rung.context_receivers.borrow().is_empty() {
+                for receiver in rung.context_receivers.borrow().iter().rev() {
+                    if receiver_has_value(receiver.ty) {
+                        return Some(RootValue::Receiver);
+                    }
+                }
+            }
+            if cuts_outer {
+                break;
+            }
+        }
+        external_has_value().then_some(RootValue::External)
+    }
+
+    /// Whether THIS scope already binds `name` in `ns` — Kotlin's "conflicting declarations".
+    /// Shadowing an OUTER scope is legal, so this deliberately does not walk parents.
+    pub(crate) fn declared_here(&self, name: &str, ns: Ns) -> bool {
+        self.bindings
+            .borrow()
+            .iter()
+            .any(|b| b.ns == ns && b.name == name)
+    }
+
+    /// Every live binding in the chain, innermost scope first. Used by capture discovery, which
+    /// needs the whole visible set rather than one name.
+    pub(crate) fn visit_bindings(&self, ns: Ns, mut visit: impl FnMut(&str, &B)) {
+        for scope in self.ancestors() {
+            for binding in scope.bindings.borrow().iter().rev() {
+                if binding.ns == ns {
+                    visit(&binding.name, &binding.payload);
+                }
+            }
+        }
+    }
+
+    /// Select the nearest value that may fill one context parameter. Implicit receivers are ordered
+    /// innermost-first, then lexical bindings are ordered by their ordinary scope chain.
+    pub(crate) fn find_context_value(
+        &self,
+        mut receiver_matches: impl FnMut(Ty) -> bool,
+        mut binding_matches: impl FnMut(&B) -> bool,
+    ) -> Option<ContextValue>
+    where
+        B: Clone,
+    {
+        for (index, receiver) in self.implicit_receiver_values().into_iter().enumerate() {
+            let ty = receiver.ty;
+            if receiver_matches(ty) {
+                return Some(ContextValue::ImplicitReceiver {
+                    ty,
+                    current: index == 0,
+                    receiver_depth: index,
+                    context_name: receiver.context_name,
+                    context_shadow_depth: receiver.context_shadow_depth,
+                });
+            }
+        }
+        let mut same_name_depths = HashMap::<String, usize>::default();
+        for scope in self.ancestors() {
+            for binding in scope.bindings.borrow().iter().rev() {
+                if binding.ns != Ns::Value {
+                    continue;
+                }
+                let shadow_depth = *same_name_depths.get(&binding.name).unwrap_or(&0);
+                if binding_matches(&binding.payload) {
+                    return Some(ContextValue::Binding {
+                        name: binding.name.clone(),
+                        shadow_depth,
+                    });
+                }
+                *same_name_depths.entry(binding.name.clone()).or_default() += 1;
+            }
+        }
+        None
+    }
+
+    /// The `name` binding with `depth` nearer same-named bindings in front of it, the coordinate
+    /// [`Self::find_context_value`] reports.
+    pub(crate) fn shadowed_binding(&self, ns: Ns, name: &str, depth: usize) -> Option<B>
+    where
+        B: Clone,
+    {
+        self.ancestors()
+            .flat_map(|scope| {
+                let bindings = scope.bindings.borrow();
+                bindings
+                    .iter()
+                    .rev()
+                    .filter(|binding| binding.ns == ns && binding.name == name)
+                    .map(|binding| binding.payload.clone())
+                    .collect::<Vec<_>>()
+            })
+            .nth(depth)
+    }
+
+    /// Every binding THIS scope introduces in `ns`, in declaration order. The per-rung view a
+    /// namespace whose lookup is rung-sensitive needs (classifiers stop at [`Self::classifier_rungs`]).
+    pub(crate) fn own_bindings(&self, ns: Ns, mut visit: impl FnMut(&str, &B)) {
+        for binding in self.bindings.borrow().iter() {
+            if binding.ns == ns {
+                visit(&binding.name, &binding.payload);
+            }
+        }
+    }
+
+    /// Prove a property path in THIS scope. The proof dies with the scope, which is the Kotlin
+    /// rule: a smart cast established inside a branch does not survive it.
+    pub(crate) fn narrow_path(&self, path: NarrowPath, ty: Ty) {
+        self.flow
+            .borrow_mut()
+            .paths
+            .insert(path, PathNarrowing { ty });
+    }
+
+    /// Add one constituent of a flow intersection proved for `path` in this scope.
+    pub(crate) fn narrow_intersection(&self, path: NarrowPath, ty: Ty) {
+        let mut flow = self.flow.borrow_mut();
+        let types = flow.intersections.entry(path).or_default();
+        if !types.contains(&ty) {
+            types.push(ty);
+        }
+    }
+
+    /// Intersection constituents proved in THIS scope. The checker owns the ancestry walk because
+    /// it must stop at the binding/receiver boundary for the path, like ordinary path narrowing.
+    pub(crate) fn intersection_narrowing(&self, path: &NarrowPath) -> Vec<Ty> {
+        self.flow
+            .borrow()
+            .intersections
+            .get(path)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// Add one negative flow fact for `path` in this lexical frame.
+    pub(crate) fn exclude(&self, path: NarrowPath, exclusion: FlowExclusion) {
+        let mut flow = self.flow.borrow_mut();
+        let exclusions = flow.exclusions.entry(path).or_default();
+        if !exclusions.contains(&exclusion) {
+            exclusions.push(exclusion);
+        }
+    }
+
+    /// Negative facts proved in THIS scope. The checker owns the ancestry walk so it can stop at
+    /// the binding or receiver boundary that gives the path its identity.
+    pub(crate) fn exclusions(&self, path: &NarrowPath) -> Vec<FlowExclusion> {
+        self.flow
+            .borrow()
+            .exclusions
+            .get(path)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// The proof THIS scope holds for `path`, if any. Callers walk `ancestors` themselves because
+    /// the walk must stop at the rung owning the path's root.
+    pub(crate) fn path_narrowing(&self, path: &NarrowPath) -> Option<Ty> {
+        self.flow
+            .borrow()
+            .paths
+            .get(path)
+            .map(|narrowing| narrowing.ty)
+    }
+
+    /// The scope this frame was opened under.
+    pub(super) fn enclosing(&self) -> Option<&Scope<'p, B>> {
+        self.parent
+    }
+
+    /// Path facts proved in this frame, not facts inherited from an enclosing one.
+    pub(super) fn own_path_narrowings(&self) -> Vec<(NarrowPath, Ty)> {
+        self.flow
+            .borrow()
+            .paths
+            .iter()
+            .map(|(path, narrowing)| (path.clone(), narrowing.ty))
+            .collect()
+    }
+
+    /// Straight-line read types proved in this frame.
+    pub(super) fn own_local_narrowings(&self) -> Vec<(String, Ty)> {
+        self.flow
+            .borrow()
+            .locals
+            .iter()
+            .map(|(name, ty)| (name.clone(), *ty))
+            .collect()
+    }
+
+    /// Drop every path fact rooted at `root` in the whole chain: a write replaced that value.
+    pub(crate) fn forget_paths_rooted_at(&self, root: &PathRoot) {
+        for rung in self.ancestors() {
+            let mut flow = rung.flow.borrow_mut();
+            flow.paths.retain(|path, _| path.root != *root);
+            flow.intersections.retain(|path, _| path.root != *root);
+            flow.exclusions.retain(|path, _| path.root != *root);
+        }
+    }
+
+    /// Drop the Boolean-val facts about `root` that a write in `execution` invalidates: those of
+    /// every val declared in that same execution, in the whole chain.
+    pub(super) fn forget_implied_facts_rooted_at(
+        &self,
+        root: &PathRoot,
+        execution: &FlowExecutionIdentity,
+        is_inline_spliced: impl Fn(ExprId) -> bool,
+    ) {
+        for rung in self.ancestors() {
+            for implications in rung.flow.borrow_mut().boolean_implications.values_mut() {
+                let same_execution = implications.execution.local_function
+                    == execution.local_function
+                    && implications
+                        .execution
+                        .lambdas
+                        .iter()
+                        .copied()
+                        .filter(|&lambda| !is_inline_spliced(lambda))
+                        .eq(execution
+                            .lambdas
+                            .iter()
+                            .copied()
+                            .filter(|&lambda| !is_inline_spliced(lambda)));
+                if same_execution {
+                    implications.when_true.forget_root(root);
+                    implications.when_false.forget_root(root);
+                }
+            }
+        }
+    }
+
+    /// Bind a stable Boolean `val`'s implications to the frame declaring it.
+    pub(super) fn record_boolean_implications(
+        &self,
+        identity: u32,
+        implications: BooleanImplications,
+    ) {
+        self.flow
+            .borrow_mut()
+            .boolean_implications
+            .insert(identity, implications);
+    }
+
+    /// The implications recorded for the val with flow identity `identity`, from the frame that
+    /// declared it.
+    pub(super) fn boolean_implications(&self, identity: u32) -> Option<BooleanImplications> {
+        self.ancestors().find_map(|rung| {
+            rung.flow
+                .borrow()
+                .boolean_implications
+                .get(&identity)
+                .cloned()
+        })
+    }
+
+    /// Record a continuation fact on THIS frame only. A control-flow join uses this for a type
+    /// every completing edge proved: the fact must not wipe an enclosing frame the way a nested
+    /// write does, because the enclosing frame outlives the conditional.
+    pub(super) fn record_local_flow_fact(&self, name: &str, ty: Ty) {
+        self.flow.borrow_mut().locals.insert(name.to_string(), ty);
+    }
+
+    /// Record the straight-line read type of `name` for the rest of THIS scope, or with `None`
+    /// drop it.
+    ///
+    /// Proving is scope-local, but INVALIDATION is not: an assignment inside a nested scope
+    /// disproves a narrowing an enclosing scope established (`var x: Int? = 10; if (c) { x = null }`
+    /// — the outer proof is dead once the branch can run), so `None` clears the whole chain.
+    pub(crate) fn narrow_local(&self, name: &str, ty: Option<Ty>) {
+        match ty {
+            Some(ty) => {
+                self.flow.borrow_mut().locals.insert(name.to_string(), ty);
+                // A nested write invalidates an enclosing straight-line fact for the same binding.
+                if self.declared_here(name, Ns::Value) {
+                    return;
+                }
+                for rung in self.ancestors().skip(1) {
+                    rung.flow.borrow_mut().locals.remove(name);
+                    if rung.declared_here(name, Ns::Value) {
+                        return;
+                    }
+                }
+            }
+            None => {
+                // Stop at the rung DECLARING `name`: an assignment to a shadowing variable of the
+                // same name says nothing about the binding it shadows.
+                for rung in self.ancestors() {
+                    rung.flow.borrow_mut().locals.remove(name);
+                    if rung.declared_here(name, Ns::Value) {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    /// The nearest visible straight-line read type proven for `name`. A nested block inherits facts
+    /// from its entry edge, but a same-named declaration cuts the walk exactly like value lookup.
+    pub(crate) fn local_narrowing(&self, name: &str) -> Option<Ty> {
+        for rung in self.ancestors() {
+            if let Some(ty) = rung.flow.borrow().locals.get(name).copied() {
+                return Some(ty);
+            }
+            if rung.declared_here(name, Ns::Value) {
+                return None;
+            }
+        }
+        None
+    }
+
+    /// Record that a condition guarding THIS scope tried to smart-cast `name` to `ty` but the
+    /// proof was declined — the variable is a local `var` a capturing closure mutates.
+    pub(crate) fn decline_cast(&self, name: &str, ty: Ty) {
+        self.flow.borrow_mut().declined.push((name.to_string(), ty));
+    }
+
+    /// Record a declined cast at the rung that owns the active binding.
+    pub(crate) fn decline_cast_at_binding(&self, name: &str, ty: Ty) {
+        for rung in self.ancestors() {
+            if rung.declared_here(name, Ns::Value) {
+                rung.flow.borrow_mut().declined.push((name.to_string(), ty));
+                return;
+            }
+        }
+    }
+
+    /// The target a condition tried to smart-cast `name` to in THIS or an enclosing scope, if
+    /// any. Walks outward like a read of the variable and stops at the rung declaring it: a
+    /// shadowing binding is not the variable the condition spoke about.
+    pub(crate) fn declined_cast(&self, name: &str) -> Option<Ty> {
+        for rung in self.ancestors() {
+            if let Some((_, ty)) = rung
+                .flow
+                .borrow()
+                .declined
+                .iter()
+                .rev()
+                .find(|(n, _)| n == name)
+            {
+                return Some(*ty);
+            }
+            if rung.declared_here(name, Ns::Value) {
+                return None;
+            }
+        }
+        None
+    }
+
+    /// Replace the payload of the innermost `name` binding in `ns` wherever it lives in the
+    /// chain, returning how many rungs up it was found (0 = THIS rung). Unlike [`Self::rebind`]
+    /// (this rung only) this follows the binding: a smart-cast shadow of a `var` must track a
+    /// reassignment even when the write sits in a nested block under the shadow's rung. The
+    /// closure receives the current payload and the rung depth.
+    pub(crate) fn rebind_nearest(
+        &self,
+        name: &str,
+        ns: Ns,
+        f: impl FnOnce(&B, usize) -> B,
+    ) -> Option<usize> {
+        for (depth, rung) in self.ancestors().enumerate() {
+            let mut bindings = rung.bindings.borrow_mut();
+            if let Some(slot) = bindings
+                .iter_mut()
+                .rev()
+                .find(|b| b.ns == ns && b.name == name)
+            {
+                slot.payload = f(&slot.payload, depth);
+                return Some(depth);
+            }
+        }
+        None
+    }
+
+    /// Every visible straight-line narrowing, innermost fact first and cut by shadowing bindings.
+    pub(crate) fn local_narrowings(&self) -> HashMap<String, Ty> {
+        let mut visible = HashMap::default();
+        let mut shadowed = crate::fx_hash::HashSet::default();
+        for rung in self.ancestors() {
+            for (name, &ty) in rung.flow.borrow().locals.iter() {
+                if !shadowed.contains(name.as_str()) {
+                    visible.entry(name.clone()).or_insert(ty);
+                }
+            }
+            for binding in rung.bindings.borrow().iter().rev() {
+                if binding.ns == Ns::Value {
+                    shadowed.insert(binding.name.clone());
+                }
+            }
+        }
+        visible
+    }
+
+    /// Implicit receivers, innermost first: extension receivers and `this@Class` rungs. Stops at
+    /// the first class scope that does not carry its outer instance.
+    pub(crate) fn implicit_receivers(&self) -> Vec<Ty> {
+        self.implicit_receiver_values()
+            .into_iter()
+            .map(|receiver| receiver.ty)
+            .collect()
+    }
+
+    /// Implicit receivers paired with the extension declaration, if any, that introduced their
+    /// runtime value. Ordering is identical to [`Self::implicit_receivers`].
+    pub(crate) fn implicit_receivers_with_declarations(
+        &self,
+    ) -> Vec<(Ty, Option<Span>, (usize, usize), bool)> {
+        self.implicit_receiver_values()
+            .into_iter()
+            .map(|receiver| {
+                (
+                    receiver.ty,
+                    receiver.extension_declaration,
+                    receiver.identity,
+                    receiver.class_receiver,
+                )
+            })
+            .collect()
+    }
+
+    pub(crate) fn implicit_receiver_context_name(
+        &self,
+        identity: (usize, usize),
+    ) -> Option<String> {
+        self.implicit_receiver_values()
+            .into_iter()
+            .find(|receiver| receiver.identity == identity)
+            .and_then(|receiver| receiver.context_name)
+    }
+
+    pub(crate) fn implicit_receiver_has_context_label(
+        &self,
+        identity: (usize, usize),
+        label: &str,
+    ) -> bool {
+        self.ancestors().any(|scope| {
+            let scope_identity = scope as *const Self as usize;
+            scope
+                .context_receivers
+                .borrow()
+                .iter()
+                .rev()
+                .enumerate()
+                .any(|(index, receiver)| {
+                    (scope_identity, index + 1) == identity
+                        && receiver.label.as_deref() == Some(label)
+                })
+        })
+    }
+
+    /// The context parameter that is the implicit receiver `identity`, if it is one: an entry of
+    /// its rung's context list, or a function-type lambda's last context parameter standing as the
+    /// rung's current receiver.
+    pub(crate) fn implicit_receiver_context(
+        &self,
+        identity: (usize, usize),
+    ) -> Option<ImplicitContext> {
+        let scope = self
+            .ancestors()
+            .find(|scope| *scope as *const Self as usize == identity.0)?;
+        let Some(ordinal) = identity.1.checked_sub(1) else {
+            let types = scope.current_receiver_context.clone()?;
+            let index = types.len() - 1;
+            return Some(ImplicitContext {
+                kind: ContextReceiverKind::FunctionType,
+                types,
+                index,
+            });
+        };
+        let receivers = scope.context_receivers.borrow();
+        let implicit = receivers
+            .iter()
+            .filter(|receiver| receiver.implicit_receiver())
+            .collect::<Vec<_>>();
+        let receiver = *implicit.get(implicit.len().checked_sub(ordinal + 1)?)?;
+        let same_kind = receivers
+            .iter()
+            .filter(|candidate| candidate.kind == receiver.kind)
+            .collect::<Vec<_>>();
+        let index = same_kind
+            .iter()
+            .position(|candidate| std::ptr::eq(*candidate, receiver))?;
+        // A function type's context list continues into the current receiver when it took the last.
+        let types = match (&scope.current_receiver_context, receiver.kind) {
+            (Some(types), ContextReceiverKind::FunctionType) => types.clone(),
+            _ => same_kind.iter().map(|candidate| candidate.ty).collect(),
+        };
+        Some(ImplicitContext {
+            kind: receiver.kind,
+            types,
+            index,
+        })
+    }
+
+    /// The label of the receiver lambda whose rung introduced the receiver `identity`.
+    pub(crate) fn implicit_receiver_lambda_label(
+        &self,
+        identity: (usize, usize),
+    ) -> Option<String> {
+        self.ancestors()
+            .find(|scope| (*scope as *const Self as usize, 0) == identity)
+            .and_then(|scope| scope.lambda_label.clone())
+    }
+
+    /// This receiver lambda rung's label.
+    pub(crate) fn with_lambda_label(mut self, label: Option<String>) -> Self {
+        self.lambda_label = label;
+        self
+    }
+
+    pub(crate) fn with_lambda_expression(mut self, expression: Span) -> Self {
+        self.lambda_expression = Some(expression);
+        self
+    }
+
+    /// Declaration provenance of the selected live rung, independent of its scope address, type,
+    /// label and relative tower depth. Context slots use their source declaration order.
+    pub(crate) fn implicit_receiver_role(
+        &self,
+        identity: (usize, usize),
+    ) -> Option<ReceiverDeclarationRole> {
+        let scope = self
+            .ancestors()
+            .find(|scope| (*scope as *const Self as usize) == identity.0)?;
+        if identity.1 == 0 {
+            if let Some(declaration) = scope.extension_receiver_declaration {
+                return Some(ReceiverDeclarationRole::Extension(declaration));
+            }
+            let expression = scope.lambda_expression?;
+            let slot = if scope.current_receiver_context.is_some() {
+                LambdaReceiverSlot::Context(
+                    u32::try_from(scope.context_receivers.borrow().len())
+                        .expect("too many lambda context parameters"),
+                )
+            } else {
+                LambdaReceiverSlot::Extension
+            };
+            return Some(ReceiverDeclarationRole::Lambda { expression, slot });
+        }
+        let receivers = scope.context_receivers.borrow();
+        let (index, receiver) = receivers
+            .iter()
+            .enumerate()
+            .filter(|(_, receiver)| receiver.implicit_receiver())
+            .rev()
+            .nth(identity.1 - 1)?;
+        if let Some(declaration) = receiver.declaration {
+            return Some(ReceiverDeclarationRole::ContextParameter(declaration));
+        }
+        Some(ReceiverDeclarationRole::Lambda {
+            expression: scope.lambda_expression?,
+            slot: LambdaReceiverSlot::Context(
+                u32::try_from(index).expect("too many lambda context parameters"),
+            ),
+        })
+    }
+
+    pub(crate) fn implicit_receiver_is_singleton(&self, identity: (usize, usize)) -> bool {
+        identity.1 == 0
+            && self.ancestors().any(|scope| {
+                (scope as *const Self as usize) == identity.0
+                    && scope.function_receiver_kind == FunctionReceiverKind::Singleton
+            })
+    }
+
+    /// This lambda rung's function-type context parameters, when the last is its current receiver.
+    pub(crate) fn with_current_receiver_context(mut self, types: Option<Vec<Ty>>) -> Self {
+        self.current_receiver_context = types;
+        self
+    }
+
+    pub(crate) fn implicit_receiver_context_label(
+        &self,
+        identity: (usize, usize),
+    ) -> Option<String> {
+        self.ancestors().find_map(|scope| {
+            let scope_identity = scope as *const Self as usize;
+            scope
+                .context_receivers
+                .borrow()
+                .iter()
+                .rev()
+                .enumerate()
+                .find_map(|(index, receiver)| {
+                    ((scope_identity, index + 1) == identity)
+                        .then(|| receiver.label.clone())
+                        .flatten()
+                })
+        })
+    }
+
+    pub(crate) fn implicit_receiver_has_extension_label(
+        &self,
+        identity: (usize, usize),
+        label: &str,
+    ) -> bool {
+        self.ancestors().any(|scope| {
+            let scope_identity = scope as *const Self as usize;
+            (scope_identity, 0) == identity
+                && matches!(scope.kind, ScopeKind::Function { receiver: Some(_) })
+                && scope.extension_receiver_label.as_deref() == Some(label)
+        })
+    }
+
+    /// Identity of the innermost class receiver rung, if this lexical chain has one.
+    ///
+    /// Receiver types are not identities: a context parameter, extension receiver, and class
+    /// receiver may all have the same applied type while denoting different runtime values.
+    pub(crate) fn innermost_class_receiver_identity(&self) -> Option<(usize, usize)> {
+        self.ancestors().find_map(|scope| {
+            (matches!(scope.kind, ScopeKind::Class { .. })
+                || (matches!(scope.kind, ScopeKind::Function { receiver: Some(_) })
+                    && scope.function_receiver_kind == FunctionReceiverKind::Dispatch))
+                .then_some((scope as *const Self as usize, 0))
+        })
+    }
+
+    fn implicit_receiver_values(&self) -> Vec<ScopedReceiver> {
+        let mut out = Vec::new();
+        let mut same_name_depths = HashMap::<String, usize>::default();
+        let push = |out: &mut Vec<ScopedReceiver>,
+                    same_name_depths: &mut HashMap<String, usize>,
+                    ty,
+                    identity,
+                    context_name: Option<String>,
+                    extension_declaration: Option<Span>| {
+            let context_shadow_depth = context_name
+                .as_ref()
+                .map(|name| {
+                    let depth = *same_name_depths.get(name).unwrap_or(&0);
+                    *same_name_depths.entry(name.clone()).or_default() += 1;
+                    depth
+                })
+                .unwrap_or(0);
+            out.push(ScopedReceiver {
+                ty,
+                identity,
+                extension_declaration,
+                class_receiver: false,
+                context_name,
+                context_shadow_depth,
+            });
+        };
+        // Shadow depths are read only for named receivers, so only bindings of those names count.
+        // Skipping the rest keeps a class body of thousands of members from rescanning them all on
+        // every receiver query.
+        let receiver_names: HashSet<&str> = self
+            .ancestors()
+            .filter_map(|scope| scope.current_receiver_name.as_deref())
+            .collect();
+        for scope in self.ancestors() {
+            let scope_identity = scope as *const Self as usize;
+            let cuts_outer = matches!(
+                scope.kind,
+                ScopeKind::Class {
+                    carries_outer: false,
+                    ..
+                }
+            );
+            let mut receiver_binding_counts = HashMap::<String, usize>::default();
+            if let Some(name) = scope.current_receiver_name.as_ref() {
+                *receiver_binding_counts.entry(name.clone()).or_default() += 1;
+            }
+            let bindings = scope.bindings.borrow();
+            let counted: &[_] = if receiver_names.is_empty() {
+                &[]
+            } else {
+                &bindings
+            };
+            for binding in counted.iter().rev() {
+                if binding.ns != Ns::Value || !receiver_names.contains(binding.name.as_str()) {
+                    continue;
+                }
+                if receiver_binding_counts
+                    .get_mut(&binding.name)
+                    .is_some_and(|remaining| {
+                        if *remaining == 0 {
+                            false
+                        } else {
+                            *remaining -= 1;
+                            true
+                        }
+                    })
+                {
+                    continue;
+                }
+                *same_name_depths.entry(binding.name.clone()).or_default() += 1;
+            }
+            match scope.kind {
+                ScopeKind::Function {
+                    receiver: Some(receiver),
+                } => {
+                    push(
+                        &mut out,
+                        &mut same_name_depths,
+                        receiver,
+                        (scope_identity, 0),
+                        scope.current_receiver_name.clone(),
+                        scope.extension_receiver_declaration,
+                    );
+                    if scope.function_receiver_kind == FunctionReceiverKind::Dispatch {
+                        out.last_mut()
+                            .expect("a function receiver was just added")
+                            .class_receiver = true;
+                    }
+                }
+                ScopeKind::Class { ty, .. } => {
+                    out.push(ScopedReceiver::plain(ty, (scope_identity, 0)));
+                }
+                _ => {}
+            }
+            if !scope.context_receivers.borrow().is_empty() {
+                for (index, receiver) in scope
+                    .context_receivers
+                    .borrow()
+                    .iter()
+                    .filter(|receiver| receiver.implicit_receiver())
+                    .rev()
+                    .enumerate()
+                {
+                    push(
+                        &mut out,
+                        &mut same_name_depths,
+                        receiver.ty,
+                        (scope_identity, index + 1),
+                        None,
+                        None,
+                    );
+                }
+            }
+            if cuts_outer {
+                break;
+            }
+        }
+        out
+    }
+
+    /// Implicit receivers encountered before the first lexical binding of `name` in `ns`.
+    ///
+    /// Unqualified lookup is a rung-by-rung tower, not "all lexical bindings, then all receivers":
+    /// a binding on the current rung wins there, while a nearer extension/receiver-lambda receiver
+    /// wins over a binding on an outer rung. This projection lets the checker query receiver members
+    /// before committing the ordinary chain-wide binding lookup without copying scope traversal.
+    pub(crate) fn implicit_receiver_identities_before_binding(
+        &self,
+        name: &str,
+        ns: Ns,
+    ) -> Vec<(usize, usize)> {
+        let mut out = Vec::new();
+        for scope in self.ancestors() {
+            let scope_identity = scope as *const Self as usize;
+            let cuts_outer = matches!(
+                scope.kind,
+                ScopeKind::Class {
+                    carries_outer: false,
+                    ..
+                }
+            );
+            if scope.declared_here(name, ns) {
+                break;
+            }
+            match scope.kind {
+                ScopeKind::Function {
+                    receiver: Some(receiver),
+                } => {
+                    let _ = receiver;
+                    out.push((scope_identity, 0));
+                }
+                ScopeKind::Class { ty, .. } => {
+                    let _ = ty;
+                    out.push((scope_identity, 0));
+                }
+                _ => {}
+            }
+            if !scope.context_receivers.borrow().is_empty() {
+                out.extend(
+                    scope
+                        .context_receivers
+                        .borrow()
+                        .iter()
+                        .rev()
+                        .enumerate()
+                        .map(|(index, _)| (scope_identity, index + 1)),
+                );
+            }
+            if cuts_outer {
+                break;
+            }
+        }
+        out
+    }
+
+    #[cfg(test)]
+    pub(crate) fn implicit_receivers_before_binding(&self, name: &str, ns: Ns) -> Vec<Ty> {
+        let identities = self.implicit_receiver_identities_before_binding(name, ns);
+        self.implicit_receiver_values()
+            .into_iter()
+            .filter(|receiver| identities.contains(&receiver.identity))
+            .map(|receiver| receiver.ty)
+            .collect()
+    }
+
+    /// The type a bare `this` denotes.
+    pub(crate) fn this_ty(&self) -> Option<Ty> {
+        self.implicit_receivers().into_iter().next()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::type_name;
+
+    fn class(name: &str, carries_outer: bool) -> ScopeKind {
+        ScopeKind::Class {
+            ty: Ty::Obj(type_name(name), &[]),
+            carries_outer,
+        }
+    }
+
+    fn obj(name: &str) -> Ty {
+        Ty::Obj(type_name(name), &[])
+    }
+
+    #[test]
+    fn context_receiver_coordinate_counts_same_named_shadows() {
+        let root: Scope<'_, u32> = Scope::root();
+        let outer = root.function_child(Some(Ty::String), Some("value".to_string()), &[]);
+        let inner = outer.function_child(Some(Ty::Int), Some("value".to_string()), &[]);
+        inner.rebind("value", Ns::Value, 1);
+        let body = inner.child(ScopeKind::Block);
+        body.rebind("value", Ns::Value, 2);
+
+        let selected = body.find_context_value(|ty| ty == Ty::String, |_| false);
+        assert!(matches!(
+            selected,
+            Some(ContextValue::ImplicitReceiver {
+                ty: Ty::String,
+                context_name: Some(name),
+                context_shadow_depth: 2,
+                ..
+            }) if name == "value"
+        ));
+    }
+
+    #[test]
+    fn named_context_parameter_binding_aliases_its_parent_receiver() {
+        let root: Scope<'_, u32> = Scope::root();
+        let receiver = ContextReceiver::named(Ty::String, "value");
+        let function = root.function_child(None, None, std::slice::from_ref(&receiver));
+        let parameters = function.parameter_child();
+        parameters.rebind("value", Ns::Value, 1);
+
+        let selected = parameters.find_context_value(|ty| ty == Ty::String, |value| *value == 1);
+        assert!(matches!(
+            selected,
+            Some(ContextValue::Binding { name, shadow_depth: 0 }) if name == "value"
+        ));
+    }
+
+    #[test]
+    fn shadowing_is_legal_and_scoped_to_the_scope_that_declares_it() {
+        let root: Scope<'_, u32> = Scope::root();
+        let outer = root.child(ScopeKind::Function { receiver: None });
+        outer.rebind("x", Ns::Value, 1);
+        assert!(outer.declared_here("x", Ns::Value));
+
+        let inner = outer.child(ScopeKind::Block);
+        assert!(
+            !inner.declared_here("x", Ns::Value),
+            "`declared_here` must not walk parents — shadowing an outer scope is legal in Kotlin, \
+             a redeclaration in the SAME scope is not"
+        );
+        inner.rebind("x", Ns::Value, 2);
+        assert_eq!(inner.own_binding("x", Ns::Value), Some(2));
+        assert_eq!(
+            outer.own_binding("x", Ns::Value),
+            Some(1),
+            "the inner binding must not disturb the one it shadows"
+        );
+    }
+
+    #[test]
+    fn a_parameter_is_an_outer_scope_to_the_body() {
+        // `fun f(x: Int) { val x = 1 }` is a warning in Kotlin, not "conflicting declarations",
+        // which holds only if params and body are DIFFERENT scopes (unlike Java).
+        let root: Scope<'_, u32> = Scope::root();
+        let params = root.child(ScopeKind::Function { receiver: None });
+        params.rebind("x", Ns::Value, 1);
+        let body = params.child(ScopeKind::Block);
+        assert!(!body.declared_here("x", Ns::Value));
+    }
+
+    #[test]
+    fn nested_class_cuts_the_receiver_chain_but_inner_does_not() {
+        let root: Scope<'_, u32> = Scope::root();
+        let outer = root.child(class("A", false));
+
+        let nested = outer.child(class("A$C", false));
+        assert_eq!(
+            nested.implicit_receivers(),
+            vec![obj("A$C")],
+            "a plain nested class has no outer instance: `this@A` is unreachable"
+        );
+
+        let inner = outer.child(class("A$B", true));
+        assert_eq!(
+            inner.implicit_receivers(),
+            vec![obj("A$B"), obj("A")],
+            "an `inner class` keeps the enclosing instance"
+        );
+    }
+
+    #[test]
+    fn extension_receiver_is_a_rung_between_class_rungs() {
+        let root: Scope<'_, u32> = Scope::root();
+        let class_scope = root.child(class("A", false));
+        let ext = class_scope.child(ScopeKind::Function {
+            receiver: Some(obj("kotlin/String")),
+        });
+        assert_eq!(
+            ext.implicit_receivers(),
+            vec![obj("kotlin/String"), obj("A")],
+            "the extension receiver is nearer than the enclosing class"
+        );
+        assert_eq!(ext.this_ty(), Some(obj("kotlin/String")));
+    }
+
+    #[test]
+    fn a_static_singleton_rung_keeps_exact_non_capture_provenance() {
+        let root: Scope<'_, u32> = Scope::root();
+        let singleton = root.singleton_receiver_child(Some(obj("test/Owner$Companion")));
+        let lambda = singleton
+            .function_child(Some(obj("test/Receiver")), None, &[])
+            .with_lambda_expression(Span { lo: 7, hi: 19 });
+        let receivers = lambda.implicit_receivers_with_declarations();
+
+        assert_eq!(receivers.len(), 2);
+        assert!(!lambda.implicit_receiver_is_singleton(receivers[0].2));
+        assert!(lambda.implicit_receiver_is_singleton(receivers[1].2));
+    }
+
+    #[test]
+    fn a_scratch_dispatch_rung_is_still_a_class_receiver() {
+        let root: Scope<'_, u32> = Scope::root();
+        let dispatch = root.dispatch_receiver_child(obj("test/Owner"));
+        let parameter_scope = dispatch.child(ScopeKind::Function { receiver: None });
+        let receivers = parameter_scope.implicit_receivers_with_declarations();
+
+        assert_eq!(receivers.len(), 1);
+        assert!(receivers[0].3);
+        assert!(!parameter_scope.implicit_receiver_is_singleton(receivers[0].2));
+    }
+
+    #[test]
+    fn class_receiver_identity_is_not_a_same_typed_legacy_context_receiver() {
+        let root: Scope<'_, u32> = Scope::root();
+        let class_scope = root.child(class("A", false));
+        let function = class_scope.function_child(
+            None,
+            None,
+            &[ContextReceiver::new(
+                obj("A"),
+                ContextReceiverKind::LegacyReceiver,
+                None,
+            )],
+        );
+
+        let receivers = function.implicit_receivers_with_declarations();
+        let class_identity = function
+            .innermost_class_receiver_identity()
+            .expect("class receiver identity");
+
+        assert_eq!(receivers.len(), 2);
+        assert_eq!(receivers[0].0, obj("A"));
+        assert_eq!(receivers[1].0, obj("A"));
+        assert_ne!(receivers[0].2, class_identity);
+        assert_eq!(receivers[1].2, class_identity);
+    }
+
+    #[test]
+    fn extension_receiver_precedes_an_outer_constructor_binding() {
+        let root: Scope<'_, u32> = Scope::root();
+        let class_scope = root.child(class("Container", false));
+        let constructor_body = class_scope.child(ScopeKind::Block);
+        constructor_body.rebind("value", Ns::Value, 1);
+        let accessor = constructor_body.child(ScopeKind::Function {
+            receiver: Some(obj("Token")),
+        });
+
+        assert_eq!(
+            accessor.implicit_receivers_before_binding("value", Ns::Value),
+            vec![obj("Token")]
+        );
+        assert!(accessor
+            .implicit_receivers_before_binding("local", Ns::Value)
+            .contains(&obj("Container")));
+    }
+
+    #[test]
+    fn a_local_class_inside_a_member_function_sees_both_receivers() {
+        // class A { fun f() { class B { fun g() { <here> } } } }
+        let root: Scope<'_, u32> = Scope::root();
+        let a = root.child(class("A", false));
+        let f = a.child(ScopeKind::Function { receiver: None });
+        let b = f.child(class("B", true));
+        let g = b.child(ScopeKind::Function { receiver: None });
+        assert_eq!(g.implicit_receivers(), vec![obj("B"), obj("A")]);
+    }
+
+    /// The innermost classifier binding for `name`, as the checker's type-parameter lookup does it.
+    fn classifier(scope: &Scope<'_, u32>, name: &str) -> Option<u32> {
+        scope
+            .classifier_rungs()
+            .find_map(|rung| rung.own_binding(name, Ns::Classifier))
+    }
+
+    #[test]
+    fn a_plain_nested_class_cuts_the_type_parameter_walk_but_a_local_class_does_not() {
+        // kotlinc 2.4.10: `class A<T> { class B { fun g(): T } }` is "unresolved reference 'T'",
+        // while a local class or an anonymous object inside a member of `A` still sees `T`.
+        let root: Scope<'_, u32> = Scope::root();
+        let a = root.child(class("A", false));
+        a.rebind("T", Ns::Classifier, 1);
+
+        let nested = a.child(class("A$B", false));
+        assert_eq!(
+            classifier(&nested, "T"),
+            None,
+            "a plain nested class cannot reach the outer class's type parameters"
+        );
+
+        let member = a.child(ScopeKind::Function { receiver: None });
+        let local = member.child(class("L", true));
+        assert_eq!(
+            classifier(&local, "T"),
+            Some(1),
+            "a local class carries the outer instance, so `T` stays reachable"
+        );
+    }
+
+    #[test]
+    fn a_type_parameter_retires_with_the_rung_that_declared_it() {
+        // A declaration's type parameters (and their `reified` marks) must not stay visible to the
+        // next declaration checked from the same enclosing scope.
+        let root: Scope<'_, u32> = Scope::root();
+        {
+            let first = root.child(ScopeKind::Block);
+            first.rebind("T", Ns::Classifier, 1);
+            assert_eq!(classifier(&first, "T"), Some(1));
+        }
+        let second = root.child(ScopeKind::Block);
+        assert_eq!(
+            classifier(&second, "T"),
+            None,
+            "a sibling declaration must not inherit the previous one's type parameters"
+        );
+    }
+
+    #[test]
+    fn a_function_rung_does_not_cut_the_type_parameter_walk() {
+        // `class C<T> { fun <U> m() { … } }`: the method's parameters sit on ITS rung and the
+        // class's on the class rung — one namespace, different declaring rung — and the body sees
+        // both. Only a class rung that drops its outer instance ends the walk.
+        let root: Scope<'_, u32> = Scope::root();
+        let class_scope = root.child(class("C", false));
+        class_scope.rebind("T", Ns::Classifier, 1);
+        let method = class_scope.child(ScopeKind::Function { receiver: None });
+        method.rebind("U", Ns::Classifier, 2);
+        let body = method.child(ScopeKind::Block);
+        assert_eq!(classifier(&body, "U"), Some(2));
+        assert_eq!(classifier(&body, "T"), Some(1));
+        assert_eq!(
+            classifier(&class_scope, "U"),
+            None,
+            "the method's parameters retire with the method's rung"
+        );
+    }
+
+    #[test]
+    fn an_inner_type_parameter_shadows_an_enclosing_one_of_the_same_name() {
+        let root: Scope<'_, u32> = Scope::root();
+        let class_scope = root.child(class("A", false));
+        class_scope.rebind("T", Ns::Classifier, 1);
+        let method = class_scope.child(ScopeKind::Block);
+        method.rebind("T", Ns::Classifier, 2);
+        assert_eq!(classifier(&method, "T"), Some(2));
+        assert_eq!(classifier(&class_scope, "T"), Some(1));
+    }
+
+    #[test]
+    fn the_file_rung_survives_the_classifier_cut() {
+        // A plain nested class ends the classifier walk, but the FILE rung is the root of every
+        // chain: nothing that severs the receiver chain can put a declaration outside its own file.
+        let root: Scope<'_, u32> = Scope::root();
+        root.rebind("FileWide", Ns::Classifier, 7);
+        let a = root.child(class("A", false));
+        a.rebind("T", Ns::Classifier, 1);
+        let nested = a.child(class("A$B", false));
+
+        assert_eq!(
+            classifier(&nested, "T"),
+            None,
+            "the outer class's type parameters stop at the cut"
+        );
+        assert_eq!(
+            classifier(&nested, "FileWide"),
+            Some(7),
+            "the file rung is consulted past the cut"
+        );
+    }
+
+    #[test]
+    fn an_enclosing_flow_fact_holds_on_nested_scope_entry_and_a_write_invalidates_it() {
+        let root: Scope<'_, u32> = Scope::root();
+        let function = root.child(ScopeKind::Function { receiver: None });
+        function.rebind("x", Ns::Value, 1);
+        function.narrow_local("x", Some(Ty::Int));
+
+        let branch = function.child(ScopeKind::Block);
+        assert_eq!(
+            branch.local_narrowing("x"),
+            Some(Ty::Int),
+            "a nested scope starts with the enclosing execution-edge fact"
+        );
+        branch.narrow_local("x", Some(Ty::Long));
+        drop(branch);
+        assert_eq!(
+            function.local_narrowing("x"),
+            None,
+            "a branch write invalidates the enclosing fact"
+        );
+    }
+
+    #[test]
+    fn ancestors_runs_innermost_first_and_terminates_at_the_root() {
+        let root: Scope<'_, u32> = Scope::root();
+        let a = root.child(class("A", false));
+        let f = a.child(ScopeKind::Function { receiver: None });
+        let b = f.child(ScopeKind::Block);
+        let kinds: Vec<_> = b
+            .ancestors()
+            .map(|s| std::mem::discriminant(&s.kind()))
+            .collect();
+        assert_eq!(kinds.len(), 4);
+        assert_eq!(kinds[0], std::mem::discriminant(&ScopeKind::Block));
+        assert_eq!(kinds[3], std::mem::discriminant(&ScopeKind::File));
+    }
+}

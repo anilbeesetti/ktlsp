@@ -1,0 +1,84 @@
+//! Where a lambda or local function sits among the callables its declaration lifts.
+
+/// Where a lambda or local function sits among the callables kotlinc lifts out of one declaration:
+/// the sequence (its lexical `owner` and outermost declaration name `container`, as the source
+/// spells them) and one step per enclosing local callable, down to this one. `lifted` is `false`
+/// for a callable kotlinc turns into a class of its own (a suspend lambda), which takes no place.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FirLiftingSite {
+    pub owner: Box<str>,
+    pub container: Box<str>,
+    pub path: Box<[FirLiftingStep]>,
+    pub lifted: bool,
+}
+
+/// One enclosing local callable of a [`FirLiftingSite`]: its semantic role, optional source name,
+/// and position in the sequence's source order.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FirLiftingStep {
+    pub kind: crate::lifting_provenance::LiftingCallableKind,
+    pub name: Option<Box<str>>,
+    pub position: u32,
+}
+
+impl FirLiftingSite {
+    pub fn from_source(site: &crate::ast::LiftingSite, lifted: bool) -> Self {
+        Self {
+            owner: site.owner.as_str().into(),
+            container: site.container.as_str().into(),
+            path: site
+                .path
+                .iter()
+                .map(|step| FirLiftingStep {
+                    kind: step.kind,
+                    name: step.name.as_deref().map(Into::into),
+                    position: step.position,
+                })
+                .collect(),
+            lifted,
+        }
+    }
+}
+
+impl super::FirBody {
+    pub fn set_lifting_site(&mut self, site: FirLiftingSite) {
+        assert!(
+            self.lifting_site.replace(site).is_none(),
+            "a FIR body has one lifting site"
+        );
+    }
+
+    pub fn lifting_site(&self) -> Option<&FirLiftingSite> {
+        self.lifting_site.as_ref()
+    }
+
+    /// Record a local function's declaration span. A target reports a clash between the methods
+    /// two local functions realize at their declarations, which only the checker can locate.
+    pub(crate) fn set_declaration_span(&mut self, span: crate::diag::Span) {
+        self.declaration_span = Some(span);
+    }
+
+    pub(crate) fn declaration_span(&self) -> Option<crate::diag::Span> {
+        self.declaration_span
+    }
+
+    pub fn add_bodiless_lifting_site(&mut self, site: FirLiftingSite) {
+        self.bodiless_lifting_sites.push(site);
+    }
+
+    /// Every lifting site this body and the callables nested in it declare, its own included.
+    pub fn collect_lifting_sites<'a>(&'a self, out: &mut Vec<&'a FirLiftingSite>) {
+        out.extend(self.lifting_site.iter());
+        out.extend(self.bodiless_lifting_sites.iter());
+        for statement in &self.statements {
+            if let super::FirStatementKind::LocalFunction { body, .. } = &statement.kind {
+                body.collect_lifting_sites(out);
+            }
+        }
+        for expression in &self.expressions {
+            if let super::FirExprKind::Lambda { body, .. } = &expression.kind {
+                body.collect_lifting_sites(out);
+            }
+        }
+    }
+}

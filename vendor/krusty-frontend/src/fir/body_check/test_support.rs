@@ -1,0 +1,298 @@
+use crate::ast::{Decl, FunBody};
+use crate::diag::DiagSink;
+use crate::features::LangFeatures;
+use crate::libraries::{EmptySymbolSource, SemanticPlatform};
+use crate::source::SourceInput;
+
+use super::*;
+
+struct SingletonExtensionSource {
+    callable: crate::libraries::FunctionInfo,
+}
+
+impl crate::symbol_source::SymbolSource for SingletonExtensionSource {
+    fn symbols(
+        &self,
+        namespace: crate::symbol_source::SymbolNamespace,
+        name: &str,
+    ) -> std::rc::Rc<crate::libraries::ResolvedSymbols> {
+        let matches = namespace
+            == crate::symbol_source::SymbolNamespace::Package(crate::types::TypeName::ROOT)
+            && name == "read";
+        std::rc::Rc::new(crate::libraries::ResolvedSymbols {
+            builtin_classifier: false,
+            classifier_name: None,
+            classifier_declaration: None,
+            classifier: None,
+            callables: if matches {
+                crate::libraries::Callables::Functions(crate::libraries::FunctionSet {
+                    overloads: vec![self.callable.clone()],
+                })
+            } else {
+                crate::libraries::Callables::None
+            },
+            importable_declaration: matches,
+        })
+    }
+}
+
+impl SemanticPlatform for SingletonExtensionSource {}
+
+pub(super) fn singleton_extension_source() -> Box<dyn SemanticPlatform> {
+    let singleton = Ty::obj("Token");
+    let mut callable = crate::libraries::LibraryCallable::library(
+        "dependency/ExtensionsKt",
+        "read",
+        vec![singleton],
+        Ty::Int,
+        Ty::Int,
+        "",
+    );
+    callable.external_identity = Some(crate::fir::ExternalCallableId::from_raw(702));
+    Box::new(SingletonExtensionSource {
+        callable: crate::libraries::FunctionInfo::plain(
+            crate::libraries::FnKind::Extension,
+            Some(singleton),
+            callable,
+        ),
+    })
+}
+
+pub(super) fn checked_function_body(
+    source: &str,
+    function_name: &str,
+) -> (FirBody, ResolvedModuleIndex) {
+    checked_function_body_with_platform(source, function_name, Box::new(EmptySymbolSource))
+}
+
+pub(super) fn checked_source_set_function_body(
+    sources: &[&str],
+    source_index: usize,
+    function_name: &str,
+) -> (FirBody, ResolvedModuleIndex) {
+    let inputs = sources
+        .iter()
+        .map(|source| SourceInput::kotlin(source))
+        .collect::<Vec<_>>();
+    try_checked_source_set_function_body_rewriting(
+        &inputs,
+        source_index,
+        function_name,
+        Box::new(EmptySymbolSource),
+        &LangFeatures::new(),
+        |_, _| {},
+    )
+    .expect("body must build checked FIR")
+}
+
+pub(super) fn checked_function_body_with_platform(
+    source: &str,
+    function_name: &str,
+    platform: Box<dyn SemanticPlatform>,
+) -> (FirBody, ResolvedModuleIndex) {
+    checked_function_body_with_platform_and_features(
+        source,
+        function_name,
+        platform,
+        &LangFeatures::new(),
+    )
+}
+
+pub(super) fn checked_function_body_with_features(
+    source: &str,
+    function_name: &str,
+    features: &LangFeatures,
+) -> (FirBody, ResolvedModuleIndex) {
+    checked_function_body_with_platform_and_features(
+        source,
+        function_name,
+        Box::new(EmptySymbolSource),
+        features,
+    )
+}
+
+pub(super) fn checked_function_body_with_platform_and_features(
+    source: &str,
+    function_name: &str,
+    platform: Box<dyn SemanticPlatform>,
+    features: &LangFeatures,
+) -> (FirBody, ResolvedModuleIndex) {
+    checked_function_body_rewriting(source, function_name, platform, features, |_, _| {})
+}
+
+pub(super) fn checked_function_body_rewriting(
+    source: &str,
+    function_name: &str,
+    platform: Box<dyn SemanticPlatform>,
+    features: &LangFeatures,
+    rewrite: impl FnOnce(&mut crate::ast::File, &mut crate::resolve::TypeInfo),
+) -> (FirBody, ResolvedModuleIndex) {
+    try_checked_function_body_rewriting(source, function_name, platform, features, rewrite)
+        .expect("body must build checked FIR")
+}
+
+pub(super) fn try_checked_function_body_rewriting(
+    source: &str,
+    function_name: &str,
+    platform: Box<dyn SemanticPlatform>,
+    features: &LangFeatures,
+    rewrite: impl FnOnce(&mut crate::ast::File, &mut crate::resolve::TypeInfo),
+) -> Result<(FirBody, ResolvedModuleIndex), BodyCheckFailure> {
+    let inputs = [SourceInput::kotlin(source).with_file_stem("FirBody")];
+    try_checked_source_set_function_body_rewriting(
+        &inputs,
+        0,
+        function_name,
+        platform,
+        features,
+        rewrite,
+    )
+}
+
+fn try_checked_source_set_function_body_rewriting(
+    inputs: &[SourceInput<'_>],
+    source_index: usize,
+    function_name: &str,
+    platform: Box<dyn SemanticPlatform>,
+    features: &LangFeatures,
+    rewrite: impl FnOnce(&mut crate::ast::File, &mut crate::resolve::TypeInfo),
+) -> Result<(FirBody, ResolvedModuleIndex), BodyCheckFailure> {
+    let mut diagnostics = DiagSink::new();
+    let mut analysis = crate::frontend::analyze_source_set_with_features(
+        inputs,
+        crate::frontend::PlatformProvider::jvm(platform),
+        features,
+        &mut diagnostics,
+    );
+    assert!(diagnostics.diags.is_empty(), "{:?}", diagnostics.diags);
+    let types = analysis.types[source_index].as_mut().expect("checked file");
+    rewrite(&mut analysis.files[source_index], types);
+    let streamed = analysis.streamed.take().expect("Pass 1 must finalize");
+    let (mut index, _, _, mut sources) = streamed.module.into_parts();
+    let file = &analysis.files[source_index];
+    let source = SourceFileId::from_raw(
+        u32::try_from(source_index).expect("focused FIR source index exceeds u32"),
+    );
+    crate::resolve::publish_checked_local_signatures(
+        file,
+        source,
+        &analysis.symbols,
+        analysis.types[source_index].as_ref().expect("checked file"),
+        &mut index,
+    )
+    .expect("checked local signatures must publish before FIR body checking");
+    let active = ActiveSourceDeclarations::bind_complete_source(file, source, &index)
+        .expect("focused FIR tests must bind the live parser arena to stable declarations");
+    let function = file
+        .decls
+        .iter()
+        .find_map(|declaration| match file.decl(*declaration) {
+            Decl::Fun(function) if function.name == function_name => Some(function),
+            Decl::Class(class) => class.methods.iter().find(|function| {
+                function.name == function_name && !matches!(function.body, FunBody::None)
+            }),
+            Decl::Fun(_) | Decl::Property(_) => None,
+        })
+        .expect("function declaration");
+    let root = match function.body {
+        FunBody::Expr(root) | FunBody::Block(root) => root,
+        FunBody::None => panic!("function must have a body"),
+    };
+    let declaration = (0..index.declaration_count())
+        .map(|raw| DeclarationId::from_raw(raw as u32))
+        .filter(|declaration| {
+            active
+                .function(file, *declaration)
+                .is_some_and(|candidate| std::ptr::eq(candidate, function))
+        })
+        .max_by_key(|declaration| index.declaration_header(*declaration).is_some())
+        .expect("stable function declaration");
+    let signature = index.signature(declaration).expect("resolved signature");
+    let callable = index
+        .callable_for_declaration(declaration)
+        .expect("resolved callable");
+    let context_count = callable.shape.context_parameter_count as usize;
+    let parameters = function
+        .params
+        .iter()
+        .zip(signature.parameters.iter().copied())
+        .map(|(parameter, ty)| CheckedBodyParameter {
+            name: parameter.name.as_str(),
+            ty,
+            span: parameter.ty.span,
+            context_kind: parameter.context_kind,
+            inline_modifier: crate::types::InlineParameterModifier::written(
+                parameter.is_materialized_lambda,
+                parameter.is_crossinline,
+            ),
+            name_binding: super::CheckedBodyParameterNameBinding::Lexical,
+        })
+        .collect::<Vec<_>>();
+    let mut session = BodyCheckSession::default();
+    session.install_active_source(&active);
+    let body = check_body_unit_with_parameters_and_defaults(
+        BodyCheckUnit {
+            file,
+            info: analysis.types[source_index].as_ref().expect("checked file"),
+            source,
+            index: &index,
+        },
+        CheckedBodyRoot {
+            owner: BodyOwnerId::from_raw(declaration.raw()),
+            span: file.expr_span(root).expect("function body span"),
+            expression: Some(root),
+            property_storage_type: None,
+            value_target: matches!(function.body, FunBody::Expr(_)).then_some(signature.result),
+        },
+        CheckedBodySignature {
+            parameters: &parameters,
+            defaults: &[],
+            receiver_shape: CheckedBodyReceiverShape {
+                context_receivers: &signature.parameters[..context_count],
+                extension_receiver: super::driver::body_extension_receiver(
+                    &index,
+                    declaration,
+                    callable.shape.extension_receiver,
+                ),
+            },
+        },
+        sources.origins_mut(),
+        &mut session,
+    )?;
+    Ok((body, index))
+}
+
+pub(super) fn root_expression(body: &FirBody) -> FirExprId {
+    let FirStatementKind::Expression(root) = body
+        .statement(body.roots()[0])
+        .expect("root statement")
+        .kind
+    else {
+        panic!("root statement must contain an expression")
+    };
+    root
+}
+
+pub(super) fn jvm_semantics() -> Box<dyn SemanticPlatform> {
+    Box::new(
+        crate::jvm::jvm_libraries::JvmLibraries::new(std::rc::Rc::new(
+            crate::jvm::classpath::Classpath::new(crate::toolchain::jvm_classpath_jars_for(
+                "// WITH_REFLECT",
+            )),
+        ))
+        .expect("JVM provider initialization"),
+    )
+}
+
+pub(super) fn jvm_stdlib_semantics() -> Box<dyn SemanticPlatform> {
+    let mut classpath = crate::toolchain::classpath_jars_for("// WITH_STDLIB\n// WITH_REFLECT");
+    if let Some(jdk) = crate::toolchain::jdk_modules() {
+        classpath.push(jdk);
+    }
+    Box::new(
+        crate::jvm::jvm_libraries::JvmLibraries::new(std::rc::Rc::new(
+            crate::jvm::classpath::Classpath::new(classpath),
+        ))
+        .expect("JVM provider initialization"),
+    )
+}

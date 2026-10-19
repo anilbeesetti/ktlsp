@@ -18,3 +18,20 @@ jobs:
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - name: Tests
         run: cargo test --locked --workspace
+      - name: Build matching native analysis smoke binaries
+        run: cargo build --locked -p ktlsp-server -p ktlsp-parser -p ktlsp-analysis --bins
+      - name: Build isolated Rust protocol recorder
+        run: cargo build --locked --manifest-path tools/oracle/Cargo.toml --bin ktlsp-oracle-record
+      - name: Exercise native compiler diagnostics and a genuine UTF-16 correction
+        run: |
+          tools/oracle/target/debug/ktlsp-oracle-record --synthetic-only \
+            tools/oracle/fixtures/krusty-standalone/script.json \
+            "$RUNNER_TEMP/krusty-standalone" -- "$PWD/target/debug/ktlsp"
+      - name: Preserve original native analysis smoke
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: krusty-standalone-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/krusty-standalone
+          if-no-files-found: ignore
+          retention-days: 14

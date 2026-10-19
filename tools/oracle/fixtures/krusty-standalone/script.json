@@ -1,0 +1,10 @@
+[
+  {"jsonrpc":"2.0","id":"initialize","method":"initialize","params":{"capabilities":{"textDocument":{"diagnostic":{}}},"initializationOptions":{"nativeAnalysis":"standalone"}}},
+  {"jsonrpc":"2.0","method":"initialized","params":{}},
+  {"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///native-analysis/Main.kt","languageId":"kotlin","version":1,"text":"// 😀\r\nfun answer(): Int {\r\n var value = 1 + 2\r\n return \"bad😀\"\r\n}\r\n"}}},
+  {"jsonrpc":"2.0","id":"wrong-return","method":"textDocument/diagnostic","params":{"textDocument":{"uri":"file:///native-analysis/Main.kt"}}},
+  {"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"file:///native-analysis/Main.kt","version":2},"contentChanges":[{"range":{"start":{"line":3,"character":8},"end":{"line":3,"character":15}},"text":"value"}]}},
+  {"jsonrpc":"2.0","id":"fixed-return","method":"textDocument/diagnostic","params":{"textDocument":{"uri":"file:///native-analysis/Main.kt"}}},
+  {"jsonrpc":"2.0","id":"shutdown","method":"shutdown"},
+  {"jsonrpc":"2.0","method":"exit"}
+]

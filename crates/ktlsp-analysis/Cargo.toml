@@ -1,0 +1,15 @@
+[package]
+name = "ktlsp-analysis"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "ktlsp-analysis-worker"
+path = "src/main.rs"
+
+[dependencies]
+ktlsp-parser = { path = "../ktlsp-parser" }
+krusty-frontend = { path = "../../vendor/krusty-frontend" }
+serde.workspace = true
+serde_json.workspace = true

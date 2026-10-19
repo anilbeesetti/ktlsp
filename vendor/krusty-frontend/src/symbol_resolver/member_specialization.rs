@@ -1,0 +1,889 @@
+//! Receiver-bound specialization of declared member signatures.
+
+use super::{
+    infer_generic_call_bindings_from_symbols, merge_call_argument_bindings,
+    merge_specialized_return, seed_undeclared_return_bindings, seeded_gsig_binds, ty_subst,
+    ty_subst_keep_unbound, unify_ty_from_symbols, CallArgKind, GSigBinds,
+};
+use crate::libraries::{
+    GenericSig, InlineBodyPlan, InlineCollectionAppend, InlineCollectionCapacity,
+    InlineIterationTraversal, LibraryCallable, LibraryMember, PropertyInfo,
+};
+use crate::symbol_source::SymbolSource;
+use crate::types::Ty;
+
+#[derive(Clone, Copy)]
+pub(crate) enum TypePosition {
+    In,
+    Out,
+    Invariant,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum UnboundSpecialization {
+    Preserve,
+    UseUpperBound,
+}
+
+pub(super) fn bind_member_return(
+    source: &dyn SymbolSource,
+    gsig: &GenericSig,
+    receiver: Ty,
+    args: &[Ty],
+    type_args: &[Ty],
+    provider_ret: Ty,
+) -> Ty {
+    let args = args
+        .iter()
+        .copied()
+        .map(CallArgKind::Typed)
+        .collect::<Vec<_>>();
+    bind_member_return_from_call_args_tracking(
+        source,
+        gsig,
+        receiver,
+        &args,
+        type_args,
+        None,
+        &[],
+        provider_ret,
+    )
+    .0
+}
+
+pub(super) fn bind_member_return_from_call_args_tracking(
+    source: &dyn SymbolSource,
+    gsig: &GenericSig,
+    receiver: Ty,
+    args: &[CallArgKind],
+    type_args: &[Ty],
+    vararg_index: Option<usize>,
+    no_infer_params: &[bool],
+    provider_ret: Ty,
+) -> (Ty, GSigBinds) {
+    let mut binds = seeded_gsig_binds(gsig, type_args);
+    if let Ty::Obj(owner, arguments) = receiver.non_null() {
+        if let Some(classifier) = source.classifier(owner) {
+            for (formal, argument) in classifier.type_params.iter().zip(arguments) {
+                if !gsig.formals.iter().any(|method| method == formal) {
+                    binds.entry(formal.clone()).or_insert(*argument);
+                }
+            }
+        }
+    }
+    if let Some(declared_receiver) = gsig.receiver {
+        unify_ty_from_symbols(source, declared_receiver, receiver, &mut binds);
+        preserve_receiver_identity_bindings(declared_receiver, receiver, &mut binds);
+    } else {
+        seed_undeclared_return_bindings(gsig.ret, provider_ret, &gsig.formals, &mut binds);
+    }
+    let receiver_bindings = binds.clone();
+    let inferred = infer_generic_call_bindings_from_symbols(
+        source,
+        gsig,
+        gsig.params.iter().zip(args).enumerate().filter_map(
+            |(parameter, (&declared, argument))| {
+                (!no_infer_params.get(parameter).copied().unwrap_or(false)
+                    && !argument.is_omitted_default()
+                    && (!argument.is_expected_type_callable()
+                        || argument.result_is_input_constrained()))
+                .then_some((
+                    parameter,
+                    argument.inference_type(source, declared),
+                    argument.is_spread(),
+                ))
+            },
+        ),
+        vararg_index,
+    );
+    merge_call_argument_bindings(
+        source,
+        gsig,
+        type_args,
+        &receiver_bindings,
+        &mut binds,
+        inferred,
+    );
+    crate::trace_compiler!(
+        "expected_call",
+        "bind member return declared={:?} provider={provider_ret:?} bindings={binds:?}",
+        gsig.ret,
+    );
+    let ret = instantiate_slot(
+        source,
+        Some(gsig),
+        gsig.ret,
+        &binds,
+        TypePosition::Out,
+        UnboundSpecialization::UseUpperBound,
+    );
+    // A direct METHOD-owned return variable specializes to the inferred argument even when its
+    // erased provider return is a non-top upper bound (`<A : Annotation> … : A` physically returns
+    // `Annotation`). Owner variables are deliberately excluded: their provider-specialized return
+    // is the receiver binding that `seed_undeclared_return_bindings` recovered above.
+    let direct_method_return = gsig
+        .ret
+        .non_null()
+        .ty_param_name()
+        .is_some_and(|name| gsig.formals.iter().any(|formal| formal == name));
+    let ret = if direct_method_return {
+        ret
+    } else {
+        merge_specialized_return(provider_ret, ret)
+    };
+    (ret, binds)
+}
+
+/// Receiver substitution must preserve a caller's still-symbolic type parameter. General call
+/// inference intentionally ignores `T = T`, but a selected member on `Owner<T>` returning that same
+/// `T` must not erase it to its upper bound while the enclosing generic declaration is being checked.
+pub(super) fn preserve_receiver_identity_bindings(
+    declared: Ty,
+    actual: Ty,
+    bindings: &mut GSigBinds,
+) {
+    match (declared.non_null(), actual.non_null()) {
+        (Ty::TyParam(declared, _), actual @ Ty::TyParam(found, _)) if declared == found => {
+            bindings.entry(declared.to_string()).or_insert(actual);
+        }
+        (Ty::Obj(declared, declared_args), Ty::Obj(found, actual_args)) if declared == found => {
+            for (&declared, &actual) in declared_args.iter().zip(actual_args) {
+                preserve_receiver_identity_bindings(declared, actual, bindings);
+            }
+        }
+        (Ty::InProjection(declared), Ty::InProjection(actual))
+        | (Ty::OutProjection(declared), Ty::OutProjection(actual)) => {
+            preserve_receiver_identity_bindings(*declared, *actual, bindings);
+        }
+        _ => {}
+    }
+}
+
+fn compose_position(position: TypePosition, variance: crate::types::TypeVariance) -> TypePosition {
+    use crate::types::TypeVariance;
+    match (position, variance) {
+        (TypePosition::Invariant, _) | (_, TypeVariance::Invariant) => TypePosition::Invariant,
+        (TypePosition::Out, TypeVariance::Out) | (TypePosition::In, TypeVariance::In) => {
+            TypePosition::Out
+        }
+        (TypePosition::Out, TypeVariance::In) | (TypePosition::In, TypeVariance::Out) => {
+            TypePosition::In
+        }
+    }
+}
+
+/// Substitute receiver-bound type parameters through a member signature while retaining use-site
+/// projection semantics. Projection belongs to the classifier argument (`Box<out X>`); a value type
+/// never becomes `out X`: reads expose `X`, writes admit `Nothing`, and nested function/class variance
+/// composes with the surrounding position.
+fn specialize_member_type_with_unbound(
+    source: &dyn SymbolSource,
+    ty: Ty,
+    bindings: &GSigBinds,
+    position: TypePosition,
+    unbound: UnboundSpecialization,
+) -> Ty {
+    match ty {
+        Ty::TyParam(name, bound) => {
+            let Some(binding) = bindings.get(name).copied() else {
+                return match unbound {
+                    UnboundSpecialization::Preserve => ty,
+                    UnboundSpecialization::UseUpperBound => bound.non_null(),
+                };
+            };
+            let adjusted = |binding: Ty| {
+                if bound.upper_bound_admits_null() {
+                    binding
+                } else {
+                    binding.non_null()
+                }
+            };
+            match (position, binding) {
+                // The projection already carries the capture's readable bound. Applying the
+                // declaration bound again would silently narrow the actual capture before a
+                // selected-call or recovery consumer observes its value type.
+                (TypePosition::Out, Ty::OutProjection(inner) | Ty::StarProjection(inner)) => *inner,
+                (TypePosition::In, Ty::OutProjection(_) | Ty::StarProjection(_)) => Ty::Nothing,
+                (TypePosition::Out, Ty::InProjection(_)) => *bound,
+                (TypePosition::In, Ty::InProjection(inner)) => adjusted(*inner),
+                (
+                    TypePosition::Invariant,
+                    projected
+                    @ (Ty::InProjection(_) | Ty::OutProjection(_) | Ty::StarProjection(_)),
+                ) => projected,
+                (_, binding) => adjusted(binding),
+            }
+        }
+        Ty::Fun(signature) => Ty::fun_with_shape(
+            signature
+                .params
+                .iter()
+                .map(|parameter| {
+                    specialize_member_type_with_unbound(
+                        source,
+                        *parameter,
+                        bindings,
+                        compose_position(position, crate::types::TypeVariance::In),
+                        unbound,
+                    )
+                })
+                .collect(),
+            specialize_member_type_with_unbound(source, signature.ret, bindings, position, unbound),
+            signature.context_count,
+            signature.has_receiver,
+            signature.suspend,
+        ),
+        Ty::Nullable(inner) => Ty::nullable(specialize_member_type_with_unbound(
+            source, *inner, bindings, position, unbound,
+        )),
+        Ty::PlatformNullable(inner) => {
+            let declared = *inner;
+            let specialized =
+                specialize_member_type_with_unbound(source, declared, bindings, position, unbound);
+            // A flexible variable is the interval `T..T?`. A nullable binding makes both faces
+            // identical and therefore produces that rigid nullable type; every other binding
+            // retains the flexible wrapper. This belongs to selected-slot instantiation, not the
+            // general type-substitution walk used by aliases, hierarchy projection, and bounds.
+            if matches!(declared, Ty::TyParam(..)) && specialized.is_nullable() {
+                specialized
+            } else {
+                Ty::platform_nullable(specialized)
+            }
+        }
+        Ty::InProjection(inner) => Ty::in_projection(specialize_member_type_with_unbound(
+            source,
+            *inner,
+            bindings,
+            compose_position(position, crate::types::TypeVariance::In),
+            unbound,
+        )),
+        Ty::OutProjection(inner) => Ty::out_projection(specialize_member_type_with_unbound(
+            source,
+            *inner,
+            bindings,
+            compose_position(position, crate::types::TypeVariance::Out),
+            unbound,
+        )),
+        Ty::StarProjection(inner) => Ty::star_projection(specialize_member_type_with_unbound(
+            source,
+            *inner,
+            bindings,
+            compose_position(position, crate::types::TypeVariance::Out),
+            unbound,
+        )),
+        Ty::Obj(internal, arguments) if !arguments.is_empty() => {
+            let variances = source
+                .classifier(internal)
+                .map(|classifier| classifier.type_param_variances.clone())
+                .unwrap_or_default();
+            Ty::obj_args_name(
+                internal,
+                &arguments
+                    .iter()
+                    .enumerate()
+                    .map(|(index, argument)| {
+                        specialize_member_type_with_unbound(
+                            source,
+                            *argument,
+                            bindings,
+                            compose_position(
+                                position,
+                                variances.get(index).copied().unwrap_or_default(),
+                            ),
+                            unbound,
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        }
+        _ => ty,
+    }
+}
+
+pub(super) fn specialize_member_type(
+    source: &dyn SymbolSource,
+    ty: Ty,
+    bindings: &GSigBinds,
+    position: TypePosition,
+) -> Ty {
+    specialize_member_type_with_unbound(
+        source,
+        ty,
+        bindings,
+        position,
+        UnboundSpecialization::Preserve,
+    )
+}
+
+/// THE decision point for what a projected type argument means to a consumer. A binding map may
+/// legitimately carry a use-site projection (`List<*>` binds a formal to `out Any?` — the stand-in
+/// for kotlinc's captured type); what that capture means depends only on the POSITION of the slot
+/// being instantiated, never on the callee: a read sees the projection's readable bound, a write
+/// admits `Nothing`, and a classifier-argument position keeps the projection, because `List<out X>`
+/// is a legal type. Raw `ty_subst`/`ty_subst_keep_unbound` ARE that invariant rule and stay correct
+/// wherever a receiver or classifier argument is formed; every slot that types a VALUE — parameter,
+/// return, lambda input — instantiates through here instead. `signature` supplies `formal_bounds`
+/// for bound-aware reads, since the inline `TyParam` bound is not always populated.
+pub(crate) fn instantiate_slot(
+    source: &dyn SymbolSource,
+    signature: Option<&GenericSig>,
+    ty: Ty,
+    bindings: &GSigBinds,
+    position: TypePosition,
+    unbound: UnboundSpecialization,
+) -> Ty {
+    if !bindings
+        .values()
+        .any(|binding| binding.projection_inner().is_some())
+        && !contains_flexible_variable(ty)
+    {
+        return match unbound {
+            UnboundSpecialization::Preserve => ty_subst_keep_unbound(ty, bindings),
+            UnboundSpecialization::UseUpperBound => ty_subst(ty, bindings),
+        };
+    }
+    let ty = signature.map_or(ty, |signature| {
+        let bounds: crate::fx_hash::HashMap<String, Ty> = signature
+            .formals
+            .iter()
+            .zip(&signature.formal_bounds)
+            .filter_map(|(formal, bounds)| bounds.first().map(|bound| (formal.clone(), *bound)))
+            .collect();
+        if bounds.is_empty() {
+            ty
+        } else {
+            crate::types::ty_with_param_bounds(ty, &bounds)
+        }
+    });
+    specialize_member_type_with_unbound(source, ty, bindings, position, unbound)
+}
+
+/// Instantiate every value-parameter slot from one semantic declaration signature. Keeping the
+/// walk here makes projected/flexible slot policy one responsibility; candidate selection supplies
+/// bindings but does not duplicate the substitution contract.
+pub(crate) fn instantiate_signature_parameters(
+    source: &dyn SymbolSource,
+    signature: &GenericSig,
+    bindings: &GSigBinds,
+    unbound: UnboundSpecialization,
+) -> Vec<Ty> {
+    signature
+        .params
+        .iter()
+        .map(|parameter| {
+            instantiate_slot(
+                source,
+                Some(signature),
+                *parameter,
+                bindings,
+                TypePosition::In,
+                unbound,
+            )
+        })
+        .collect()
+}
+
+/// Instantiate the result slot from one semantic declaration signature under the same policy as
+/// [`instantiate_signature_parameters`].
+pub(crate) fn instantiate_signature_result(
+    source: &dyn SymbolSource,
+    signature: &GenericSig,
+    bindings: &GSigBinds,
+    unbound: UnboundSpecialization,
+) -> Ty {
+    instantiate_slot(
+        source,
+        Some(signature),
+        signature.ret,
+        bindings,
+        TypePosition::Out,
+        unbound,
+    )
+}
+
+/// Instantiate the source element type when the selected trailing array parameter is consumed as
+/// a vararg. Equal arity alone is not enough: one ordinary element and one spread array both have
+/// one argument, so the already-applied parameter and actual shapes decide which call was selected.
+pub(crate) fn instantiate_vararg_element(
+    source: &dyn SymbolSource,
+    signature: &GenericSig,
+    applied_parameters: &[Ty],
+    actual_arguments: &[CallArgKind],
+    bindings: &GSigBinds,
+) -> Option<Ty> {
+    let vararg = applied_parameters
+        .last()
+        .is_some_and(|parameter| parameter.array_elem().is_some())
+        && (applied_parameters.len() != actual_arguments.len()
+            || actual_arguments.last().is_some_and(|argument| {
+                !argument.is_spread()
+                    && applied_parameters
+                        .last()
+                        .is_some_and(|parameter| argument.ty() != *parameter)
+            }));
+    if !vararg || signature.params.is_empty() {
+        return None;
+    }
+    let inner = signature.params.last()?.array_read_elem()?;
+    Some(instantiate_slot(
+        source,
+        Some(signature),
+        inner,
+        bindings,
+        TypePosition::In,
+        UnboundSpecialization::UseUpperBound,
+    ))
+}
+
+fn contains_flexible_variable(ty: Ty) -> bool {
+    match ty {
+        Ty::PlatformNullable(inner) if matches!(*inner, Ty::TyParam(..)) => true,
+        Ty::DefinitelyNotNull(inner)
+        | Ty::Nullable(inner)
+        | Ty::PlatformNullable(inner)
+        | Ty::InProjection(inner)
+        | Ty::OutProjection(inner)
+        | Ty::StarProjection(inner) => contains_flexible_variable(*inner),
+        Ty::Obj(_, arguments) | Ty::Intersection(arguments) => {
+            arguments.iter().copied().any(contains_flexible_variable)
+        }
+        Ty::Fun(signature) => {
+            signature
+                .params
+                .iter()
+                .copied()
+                .any(contains_flexible_variable)
+                || contains_flexible_variable(signature.ret)
+        }
+        _ => false,
+    }
+}
+
+pub(crate) fn specialize_signature_input_type(
+    source: &dyn SymbolSource,
+    ty: Ty,
+    bindings: &GSigBinds,
+) -> Ty {
+    specialize_member_type_with_unbound(
+        source,
+        ty,
+        bindings,
+        TypePosition::In,
+        UnboundSpecialization::Preserve,
+    )
+}
+
+pub(crate) fn specialize_signature_output_type(
+    source: &dyn SymbolSource,
+    ty: Ty,
+    bindings: &GSigBinds,
+) -> Ty {
+    specialize_member_type_with_unbound(
+        source,
+        ty,
+        bindings,
+        TypePosition::Out,
+        UnboundSpecialization::Preserve,
+    )
+}
+
+pub(super) fn specialize_final_signature_output_type(
+    source: &dyn SymbolSource,
+    ty: Ty,
+    bindings: &GSigBinds,
+) -> Ty {
+    specialize_member_type_with_unbound(
+        source,
+        ty,
+        bindings,
+        TypePosition::Out,
+        UnboundSpecialization::UseUpperBound,
+    )
+}
+
+pub(crate) fn specialize_signature_receiver_type(
+    source: &dyn SymbolSource,
+    ty: Ty,
+    bindings: &GSigBinds,
+) -> Ty {
+    specialize_member_type_with_unbound(
+        source,
+        ty,
+        bindings,
+        TypePosition::Invariant,
+        UnboundSpecialization::Preserve,
+    )
+}
+
+/// Apply an already-selected provider member declaration to one concrete dispatch receiver.
+/// Unlike ordinary member resolution this performs no name lookup or overload selection: decoded
+/// inline-body plans use it to specialize the exact stable declaration named by their bytecode.
+fn specialize_fixed_member_receiver(
+    source: &dyn SymbolSource,
+    receiver: Ty,
+    member: &LibraryMember,
+) -> Option<LibraryMember> {
+    let owner = member.owner?;
+    let classifier = source.classifier(owner)?;
+    let applied_owner = super::applied_hierarchy(source, receiver)
+        .into_iter()
+        .find_map(|(candidate, applied, _)| (candidate == owner).then_some(applied))?;
+    let bindings = super::classifier_bindings(&classifier, applied_owner);
+    let declaration_formals = classifier
+        .type_params()
+        .iter()
+        .chain(
+            member
+                .generic_sig
+                .as_ref()
+                .into_iter()
+                .flat_map(|signature| &signature.formals),
+        )
+        .cloned()
+        .collect::<Vec<_>>();
+    let mut specialized = member.clone();
+    // `params`/`ret` are the erased callable realization for classpath members. Kotlin metadata's
+    // generic signature is the semantic declaration and retains the owning classifier's type
+    // parameters (`Map<K, V>.entries: Set<Map.Entry<K, V>>`, `Iterator<T>.next(): T`). Apply the
+    // already-selected receiver to that declaration; using the erased fields here would turn the
+    // exact stable chain back into `Set`/`Iterator`/`Any` after resolution.
+    let (declared_params, declared_ret) = member
+        .generic_sig
+        .as_ref()
+        .map_or((member.params.as_slice(), member.ret), |signature| {
+            (signature.params.as_slice(), signature.ret)
+        });
+    specialized.params = declared_params
+        .iter()
+        .map(|parameter| specialize_signature_input_type(source, *parameter, &bindings))
+        .collect();
+    specialized.ret = specialize_signature_output_type(source, declared_ret, &bindings);
+    member_slots_are_applied(&specialized.params, specialized.ret, &declaration_formals)
+        .then_some(specialized)
+}
+
+fn member_slots_are_applied(params: &[Ty], ret: Ty, declaration_formals: &[String]) -> bool {
+    !params
+        .iter()
+        .any(|parameter| crate::types::ty_mentions_param(*parameter, declaration_formals))
+        && !crate::types::ty_mentions_param(ret, declaration_formals)
+}
+
+/// Specialize the exact member chain decoded for an iteration body. The declaration identities are
+/// already fixed by the provider; this applies receiver type arguments only and never performs a
+/// spelling lookup or overload scan.
+pub(crate) fn specialize_inline_iteration_traversal(
+    source: &dyn SymbolSource,
+    receiver: Ty,
+    traversal: &mut InlineIterationTraversal,
+) -> Option<()> {
+    match traversal {
+        InlineIterationTraversal::Iterator {
+            prepare,
+            has_next,
+            next,
+        } => {
+            let mut current = receiver;
+            for member in prepare {
+                *member = specialize_fixed_member_receiver(source, current, member)?;
+                current = member.ret;
+            }
+            **has_next = specialize_fixed_member_receiver(source, current, has_next)?;
+            **next = specialize_fixed_member_receiver(source, current, next)?;
+        }
+        InlineIterationTraversal::Array => {}
+        InlineIterationTraversal::Counted { size, get } => {
+            **size = specialize_fixed_member_receiver(source, receiver, size)?;
+            **get = specialize_fixed_member_receiver(source, receiver, get)?;
+        }
+    }
+    Some(())
+}
+
+fn specialize_fixed_extension(
+    source: &dyn SymbolSource,
+    receiver: Ty,
+    arguments: &[Ty],
+    callable: &LibraryCallable,
+) -> Option<LibraryCallable> {
+    let signature = callable.generic_sig.as_deref()?;
+    let declared_receiver = signature.receiver?;
+    if signature.params.len() != arguments.len() {
+        return None;
+    }
+    let mut bindings = GSigBinds::default();
+    super::unify_ty_from_symbols(source, declared_receiver, receiver, &mut bindings);
+    for (&declared, &actual) in signature.params.iter().zip(arguments) {
+        super::unify_ty_from_symbols(source, declared, actual, &mut bindings);
+    }
+    let mut specialized = callable.clone();
+    specialized.params = std::iter::once(specialize_signature_receiver_type(
+        source,
+        declared_receiver,
+        &bindings,
+    ))
+    .chain(
+        signature
+            .params
+            .iter()
+            .map(|parameter| specialize_signature_input_type(source, *parameter, &bindings)),
+    )
+    .collect();
+    specialized.ret = specialize_signature_output_type(source, signature.ret, &bindings);
+    specialized.source_receiver = specialized.params.first().copied();
+    let [specialized_receiver, specialized_arguments @ ..] = specialized.params.as_slice() else {
+        return None;
+    };
+    (member_slots_are_applied(&specialized.params, specialized.ret, &signature.formals)
+        && super::semantic_arg_assignable(source, specialized_receiver, &receiver)
+        && specialized_arguments
+            .iter()
+            .zip(arguments)
+            .all(|(declared, actual)| super::semantic_arg_assignable(source, declared, actual)))
+    .then_some(specialized)
+}
+
+/// Apply selected receiver/output types to every exact dependency in a decoded collection body.
+/// The provider already fixed each declaration identity; this only specializes its metadata
+/// signature and never performs callable lookup or name-based dispatch.
+pub(crate) fn specialize_inline_collection_transform(
+    source: &dyn SymbolSource,
+    receiver: Ty,
+    part: Ty,
+    output: Ty,
+    plan: &mut InlineBodyPlan,
+) -> Option<()> {
+    let InlineBodyPlan::CollectionTransform {
+        traversal,
+        factory,
+        capacity,
+        append,
+        ..
+    } = plan
+    else {
+        return None;
+    };
+    specialize_inline_iteration_traversal(source, receiver, traversal)?;
+    let factory_owner = factory.owner?;
+    if source.classifier(factory_owner)?.type_params().len() != 1 {
+        return None;
+    }
+    let accumulator = Ty::obj_args_name(factory_owner, &[output]);
+    if let Some(capacity) = capacity {
+        match capacity {
+            InlineCollectionCapacity::Member(member) => {
+                **member = specialize_fixed_member_receiver(source, receiver, member)?;
+            }
+            InlineCollectionCapacity::Extension { callable, .. } => {
+                **callable = specialize_fixed_extension(source, receiver, &[Ty::Int], callable)?;
+            }
+        }
+    }
+    match append {
+        InlineCollectionAppend::Member(member) => {
+            **member = specialize_fixed_member_receiver(source, accumulator, member)?;
+        }
+        InlineCollectionAppend::Extension(callable) => {
+            **callable = specialize_fixed_extension(source, accumulator, &[part], callable)?;
+        }
+    }
+    Some(())
+}
+
+pub(super) fn specialize_callable(
+    source: &dyn SymbolSource,
+    callable: &mut LibraryCallable,
+    bindings: &GSigBinds,
+) {
+    callable.params = callable
+        .params
+        .iter()
+        .map(|ty| specialize_member_type(source, *ty, bindings, TypePosition::In))
+        .collect();
+    callable.ret = specialize_member_type(source, callable.ret, bindings, TypePosition::Out);
+    callable.source_receiver = callable
+        .source_receiver
+        .map(|ty| specialize_member_type(source, ty, bindings, TypePosition::Invariant));
+    // A declared bare type parameter stays one: bound to a value class it is still a box read out
+    // of an erased slot, and only the unsubstituted declaration says so.
+    callable.declared_ret = callable.declared_ret.map(|ty| match ty {
+        Ty::TyParam(..) => ty,
+        _ => specialize_member_type(source, ty, bindings, TypePosition::Out),
+    });
+}
+
+/// Apply already-solved declaration type arguments to one selected Kotlin property.
+///
+/// Property type parameters can be constrained by more than the extension receiver: context
+/// parameters are declaration inputs too.  Selection owns that inference and publishes one fully
+/// specialized semantic property; consumers must not try to recover it from an accessor spelling
+/// or from a backend realization.
+pub(crate) fn apply_property_bindings(
+    source: &dyn SymbolSource,
+    property: &mut PropertyInfo,
+    bindings: &GSigBinds,
+) {
+    property.receiver = property
+        .receiver
+        .map(|ty| specialize_member_type(source, ty, bindings, TypePosition::Invariant));
+    property.ty = specialize_member_type(source, property.ty, bindings, TypePosition::Out);
+    specialize_callable(source, &mut property.getter, bindings);
+    property.getter.ret = property.ty;
+    if let Some(setter) = &mut property.setter {
+        specialize_callable(source, setter, bindings);
+    }
+}
+
+pub(super) fn specialize_call_sig(
+    source: &dyn SymbolSource,
+    call_sig: &mut crate::libraries::CallSig,
+    bindings: &GSigBinds,
+) {
+    for parameters in &mut call_sig.lambda_param_types {
+        for parameter in parameters {
+            *parameter = specialize_member_type(source, *parameter, bindings, TypePosition::Out);
+        }
+    }
+    for receiver in &mut call_sig.lambda_receivers {
+        *receiver =
+            receiver.map(|ty| specialize_member_type(source, ty, bindings, TypePosition::Out));
+    }
+}
+
+#[cfg(test)]
+mod projected_member_view_tests {
+    use super::{
+        instantiate_slot, instantiate_vararg_element, member_slots_are_applied,
+        specialize_member_type, CallArgKind, GSigBinds, TypePosition, UnboundSpecialization,
+    };
+    use crate::libraries::{GenericReturnPolicy, GenericSig, LibraryType};
+    use crate::symbol_source::SymbolSource;
+    use crate::types::{type_name, Ty, TypeName};
+
+    struct Source;
+
+    impl SymbolSource for Source {
+        fn classifier(&self, _internal: TypeName) -> Option<std::sync::Arc<LibraryType>> {
+            None
+        }
+    }
+
+    fn bindings(projected: Ty) -> GSigBinds {
+        GSigBinds::from_iter([("T".to_string(), projected)])
+    }
+
+    #[test]
+    fn projected_classifier_arguments_become_read_and_write_views() {
+        let parameter = Ty::ty_param("T", Ty::nullable(Ty::obj("kotlin/Any")));
+        let out = bindings(Ty::out_projection(Ty::String));
+        assert_eq!(
+            specialize_member_type(&Source, parameter, &out, TypePosition::Out),
+            Ty::String
+        );
+        assert_eq!(
+            specialize_member_type(&Source, parameter, &out, TypePosition::In),
+            Ty::Nothing
+        );
+
+        let input = bindings(Ty::in_projection(Ty::String));
+        assert_eq!(
+            specialize_member_type(&Source, parameter, &input, TypePosition::Out),
+            Ty::nullable(Ty::obj("kotlin/Any"))
+        );
+        assert_eq!(
+            specialize_member_type(&Source, parameter, &input, TypePosition::In),
+            Ty::String
+        );
+    }
+
+    #[test]
+    fn function_parameter_position_reverses_the_member_position() {
+        let parameter = Ty::ty_param("T", Ty::nullable(Ty::obj("kotlin/Any")));
+        let callback = Ty::fun(vec![parameter], Ty::Unit);
+        let out = bindings(Ty::out_projection(Ty::String));
+        assert_eq!(
+            specialize_member_type(&Source, callback, &out, TypePosition::In),
+            Ty::fun(vec![Ty::String], Ty::Unit)
+        );
+    }
+
+    #[test]
+    fn projected_binding_stays_projected_in_invariant_nested_position() {
+        let parameter = Ty::ty_param("T", Ty::nullable(Ty::obj("kotlin/Any")));
+        let nested = Ty::obj_args_name(type_name("sample/Invariant"), &[parameter]);
+        let out = bindings(Ty::out_projection(Ty::String));
+        assert_eq!(
+            specialize_member_type(&Source, nested, &out, TypePosition::Out),
+            Ty::obj_args("sample/Invariant", &[Ty::out_projection(Ty::String)])
+        );
+    }
+
+    #[test]
+    fn applied_member_slots_preserve_an_enclosing_declaration_identity() {
+        let provider_formals = ["T".to_owned()];
+        let provider_t = Ty::ty_param("T", Ty::nullable(Ty::obj("kotlin/Any")));
+        let source_e = Ty::ty_param("\0tp:source:emit:E", Ty::nullable(Ty::obj("kotlin/Any")));
+
+        assert!(member_slots_are_applied(&[], source_e, &provider_formals));
+        assert!(!member_slots_are_applied(
+            &[],
+            provider_t,
+            &provider_formals
+        ));
+    }
+
+    #[test]
+    fn flexible_variable_instantiation_collapses_only_a_nullable_binding() {
+        let variable = Ty::ty_param("T", Ty::platform_nullable(Ty::obj("kotlin/Any")));
+        let flexible = Ty::platform_nullable(variable);
+
+        assert_eq!(
+            instantiate_slot(
+                &Source,
+                None,
+                flexible,
+                &bindings(Ty::nullable(Ty::String)),
+                TypePosition::Out,
+                UnboundSpecialization::Preserve,
+            ),
+            Ty::nullable(Ty::String)
+        );
+        assert_eq!(
+            instantiate_slot(
+                &Source,
+                None,
+                flexible,
+                &bindings(Ty::String),
+                TypePosition::Out,
+                UnboundSpecialization::Preserve,
+            ),
+            Ty::platform_nullable(Ty::String)
+        );
+    }
+
+    #[test]
+    fn a_spread_array_is_not_reclassified_as_one_vararg_element() {
+        let variable = Ty::ty_param("T", Ty::platform_nullable(Ty::obj("kotlin/Any")));
+        let signature = GenericSig {
+            formals: vec!["T".to_string()],
+            formal_bounds: vec![vec![Ty::platform_nullable(Ty::obj("kotlin/Any"))]],
+            receiver: None,
+            params: vec![Ty::platform_nullable(Ty::array(variable))],
+            ret: variable,
+            return_policy: GenericReturnPolicy::Exact,
+        };
+        let applied = [Ty::platform_nullable(Ty::array(Ty::nullable(Ty::String)))];
+        let spread = [CallArgKind::Spread(Ty::array(Ty::nullable(Ty::String)))];
+
+        assert_eq!(
+            instantiate_vararg_element(
+                &Source,
+                &signature,
+                &applied,
+                &spread,
+                &bindings(Ty::nullable(Ty::String)),
+            ),
+            None
+        );
+    }
+}

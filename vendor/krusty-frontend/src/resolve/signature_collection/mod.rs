@@ -1,0 +1,199 @@
+//! Source signature collection.
+//!
+//! This phase turns a parsed source set plus its compact Pass-1 headers into the semantic
+//! `SymbolTable` that overload selection and body checking read. It owns declared shape
+//! validation, annotation occurrence binding, the compact-header projection of packages and
+//! imports, the declaration walk itself, and the whole-module decisions that can only be made once
+//! every declaration is known: supertype cycles and conflicting top-level overloads.
+//!
+//! It does not own body checking, overload selection, or lowering.
+
+use crate::compilation_target::CompilationTarget;
+use crate::plugins::registry::NativePlugins;
+use crate::resolve::*;
+
+mod annotation_occurrences;
+mod collection;
+mod compact_source_projection;
+mod contributed_companion;
+mod data_class_copy;
+mod declaration_facts;
+mod declaration_validation;
+mod declared_classifier_inventory;
+mod member_signatures;
+mod referenced_type_names;
+mod source_alias_publication;
+mod source_declaration_spellings;
+mod supertype_cycles;
+mod top_level_conflict_identity;
+mod top_level_overload_conflicts;
+mod type_universe;
+mod value_class_declaration;
+mod written_supertypes;
+
+pub(in crate::resolve) use annotation_occurrences::*;
+pub(in crate::resolve) use collection::*;
+pub(in crate::resolve) use compact_source_projection::*;
+use contributed_companion::*;
+use data_class_copy::*;
+pub(in crate::resolve) use declaration_facts::*;
+pub(in crate::resolve) use declaration_validation::*;
+pub(in crate::resolve) use declared_classifier_inventory::*;
+pub(in crate::resolve) use member_signatures::*;
+use referenced_type_names::*;
+pub(in crate::resolve) use source_alias_publication::*;
+pub(in crate::resolve) use source_declaration_spellings::*;
+pub(in crate::resolve) use supertype_cycles::*;
+pub(in crate::resolve) use top_level_conflict_identity::*;
+pub(in crate::resolve) use top_level_overload_conflicts::*;
+pub(in crate::resolve) use type_universe::*;
+use value_class_declaration::*;
+pub(in crate::resolve) use written_supertypes::*;
+
+/// Stage C: collect top-level function + class signatures across all files. Two passes so that a
+/// class type can be referenced before its declaration (and across files).
+/// Convenience wrapper — uses an empty classpath (no stdlib type scanning) and JVM source rules.
+#[cfg(test)]
+pub fn collect_signatures(files: &[File], diags: &mut DiagSink) -> SymbolTable {
+    collect_signatures_with_cp(files, Box::new(EmptySymbolSource), diags)
+}
+
+/// Like `collect_signatures` but also seeds class names and type aliases from the target's
+/// libraries (a JVM classpath, a klib), eliminating the need for any hardcoded type lists. No native
+/// compiler plugin runs; see [`collect_signatures_with_cp_and_plugins`]. Sources are checked under
+/// JVM rules.
+#[cfg(test)]
+pub fn collect_signatures_with_cp(
+    files: &[File],
+    libraries: Box<dyn SemanticPlatform>,
+    diags: &mut DiagSink,
+) -> SymbolTable {
+    collect_signatures_with_cp_and_plugins(
+        files,
+        libraries,
+        NativePlugins::none(),
+        CompilationTarget::Jvm,
+        diags,
+    )
+}
+
+/// The plugins as the reference compiler bundles them: one activated without a jar naming its own
+/// release follows the release this compilation is checked against.
+fn with_reference_release(native_plugins: NativePlugins) -> NativePlugins {
+    native_plugins.with_reference_release(crate::kotlin_version::target().to_string())
+}
+
+/// [`collect_signatures_with_cp`] with the native compiler plugins the compilation runs: they add
+/// their generated declarations (a `@Serializable` class's `serializer()`) to the collected table,
+/// which keeps the selection for every later phase.
+pub(crate) fn collect_signatures_with_cp_and_plugins(
+    files: &[File],
+    libraries: Box<dyn SemanticPlatform>,
+    native_plugins: NativePlugins,
+    target: CompilationTarget,
+    diags: &mut DiagSink,
+) -> SymbolTable {
+    // Signature collection structurally infers expression-body literal types (`infer_lit_ty_p`, a
+    // per-operand recursion over the body), so a deep expression recurses here BEFORE any wrapped
+    // check runs — it needs the same grown stack segment (see [`crate::wide_stack`]).
+    crate::wide_stack::on_wide_stack(move || {
+        let native_plugins = with_reference_release(native_plugins);
+        let host = native_plugins.host("main");
+        let mut table =
+            collect_signatures_with_cp_impl(files, libraries, &host, diags, None, None, target);
+        table.native_plugins = native_plugins;
+        table
+    })
+}
+
+/// Test-only entry for exercising compact headers. Reconstruct the same declaration-bound local
+/// context from the still-live test AST; production captures it while each Pass-1 source is active
+/// through [`collect_signatures_with_cp_headers_and_local_contexts`]. Sources are checked under
+/// JVM rules.
+#[cfg(test)]
+pub(crate) fn collect_signatures_with_cp_headers(
+    files: &[File],
+    headers: &crate::fir::StreamedHeaderModule,
+    libraries: Box<dyn SemanticPlatform>,
+    diags: &mut DiagSink,
+) -> SymbolTable {
+    crate::wide_stack::on_wide_stack(move || {
+        let no_plugins = crate::plugins::PluginHost::new();
+        let local_contexts = files
+            .iter()
+            .enumerate()
+            .map(|(source, file)| {
+                let source = crate::fir::SourceFileId::from_raw(
+                    u32::try_from(source).expect("too many source files"),
+                );
+                let stable_by_transient: crate::fir::ParserDeclarationIdentities = file
+                    .decls
+                    .iter()
+                    .copied()
+                    .zip(headers.source_declarations(source).iter().copied())
+                    .collect();
+                let stubs = headers
+                    .stubs
+                    .iter()
+                    .filter(|stub| stub.source == source)
+                    .copied()
+                    .collect::<Vec<_>>();
+                if file.local_class_decls.is_empty() && file.anonymous_object_classes.is_empty() {
+                    let parser_classifier_identities = stable_by_transient
+                        .iter()
+                        .filter_map(|(&parser, &stable)| {
+                            let stub = headers.stub(stable)?;
+                            (stub.kind == crate::fir::DeclarationKind::Classifier)
+                                .then(|| compact_classifier_identity(headers, stub))?
+                                .map(|(_, identity)| (parser, identity))
+                        })
+                        .collect();
+                    PassOneLocalClassContext {
+                        parser_declaration_identities: stable_by_transient,
+                        parser_classifier_identities,
+                        ..PassOneLocalClassContext::default()
+                    }
+                } else {
+                    pass_one_local_class_context(file, &stubs, &stable_by_transient)
+                }
+            })
+            .collect::<Vec<_>>();
+        collect_signatures_with_cp_impl(
+            files,
+            libraries,
+            &no_plugins,
+            diags,
+            Some(headers),
+            Some(&local_contexts),
+            CompilationTarget::Jvm,
+        )
+    })
+}
+
+/// Production compact-header entry with body-derived lexical classifier context extracted while
+/// each source was the active Pass-1 parse. The context owns no expression or statement identity.
+pub(crate) fn collect_signatures_with_cp_headers_and_local_contexts(
+    files: &[File],
+    headers: &crate::fir::StreamedHeaderModule,
+    local_contexts: &[PassOneLocalClassContext],
+    libraries: Box<dyn SemanticPlatform>,
+    native_plugins: NativePlugins,
+    target: CompilationTarget,
+    diags: &mut DiagSink,
+) -> SymbolTable {
+    crate::wide_stack::on_wide_stack(move || {
+        let native_plugins = with_reference_release(native_plugins);
+        let host = native_plugins.host("main");
+        let mut table = collect_signatures_with_cp_impl(
+            files,
+            libraries,
+            &host,
+            diags,
+            Some(headers),
+            Some(local_contexts),
+            target,
+        );
+        table.native_plugins = native_plugins;
+        table
+    })
+}

@@ -1,0 +1,1041 @@
+//! The ONE assignability relation over the full [`Ty`] lattice.
+//!
+//! Kotlin subtyping — "is a value of type `sub` assignable where `sup` is expected" — for every `Ty`
+//! variant in one place: primitives, generic `Obj` (with covariant type arguments), function types
+//! (`Fun`, contravariant parameters / covariant return), arrays (covariant element), `Nullable`, the
+//! bottom `Nothing`, the `null` literal, and type variables (`TyParam`) checked against their declared
+//! bound and resolved through a [`TyCtx`]. The class hierarchy walk and value-class underlying are
+//! provided by a [`TypeOracle`] the caller supplies (federated over the user module + classpath), so the
+//! relation is platform-neutral: no JVM descriptors, no classpath strings scattered per call site.
+//!
+//! This replaces the former scatter (`reference_subtype`, `is_classpath_subtype`, `obj_is_subtype`,
+//! `arg_subtype_assignable`, `ref_subtype_fits`, `arg_assignable`, `descriptor_arg_subtype_of_param`,
+//! `array_covariant_assignable`, `elem_covariant_assignable`, the receiver-argument covariance in
+//! `ReceiverMro`), each of which re-implemented one slice — usually erased (dropping type
+//! arguments and nullability) and without a type-variable context.
+
+use crate::fx_hash::HashMap;
+use crate::types::{Ty, TypeName};
+
+/// The class-hierarchy oracle the assignability relation walks. Direct supertypes retain their applied
+/// type arguments: `Child<String> : Producer<String>` must not collapse to the bare name `Producer`
+/// before declaration-site variance is checked.
+pub trait TypeOracle {
+    /// The direct applied superclass + superinterfaces of `ty`. Empty when the classifier is unknown
+    /// or has none (`kotlin/Any`).
+    fn direct_supertypes(&self, ty: Ty) -> Vec<Ty>;
+
+    /// Id-backed class identity comparison used by assignability/coercion walks. Platforms that unify
+    /// multiple source names onto one runtime class override this without rendering full internal names.
+    fn same_class_name(&self, a: TypeName, b: TypeName) -> bool {
+        a == b
+    }
+
+    /// Declaration-site variance of one type parameter. Querying one slot avoids cloning complete
+    /// variance vectors in the assignability hot path.
+    fn type_param_variance(
+        &self,
+        _internal: TypeName,
+        _index: usize,
+    ) -> crate::types::TypeVariance {
+        crate::types::TypeVariance::Invariant
+    }
+
+    /// Readable intersection upper bounds of one classifier type parameter. An empty declaration
+    /// has Kotlin's implicit `Any?` bound.
+    fn type_param_upper_bounds(&self, _internal: TypeName, _index: usize) -> Vec<Ty> {
+        vec![Ty::nullable(Ty::obj("kotlin/Any"))]
+    }
+
+    /// Upper bound paired with a platform type's retained lower bound. JVM mapped collections
+    /// override this with their read-only face (`MutableList<T>` -> `List<T>`); common array
+    /// projection flexibility is added by the assignability relation itself.
+    fn platform_flexible_upper_bound(&self, lower: Ty) -> Ty {
+        lower
+    }
+
+    /// Every declared upper bound of type variable `name` (`where T : A, T : B` declares both),
+    /// in no particular order. `Ty::TyParam` carries one of them, which need not be the first a
+    /// declaration lists. Empty when the oracle does not know the variable. A variable is a
+    /// subtype of every one of its bounds.
+    fn type_variable_bounds(&self, _name: &str) -> Vec<Ty> {
+        Vec::new()
+    }
+}
+
+/// Whether the source type variable `name` meets `sup`: through its inferred binding when it has
+/// one, otherwise through its upper bound. A variable with several declared bounds is bounded by
+/// their intersection, so it meets `sup` exactly when that intersection does.
+fn variable_bound_assignable(
+    cx: &TyCtx,
+    oracle: &dyn TypeOracle,
+    sub: Ty,
+    name: &str,
+    bound: Ty,
+    sup: Ty,
+) -> bool {
+    let upper = cx
+        .lookup(name)
+        .unwrap_or_else(|| declared_upper_bound(oracle, name, bound, |bound| bound));
+    upper != sub && assignable_inner(cx, oracle, upper, sup)
+}
+
+/// The intersection of type variable `name`'s bounds: `bound`, which `Ty::TyParam` carries, and
+/// every bound the oracle reports as declared, each passed through `shape`. The carried bound is
+/// one of the declared ones, and the canonical intersection keeps one copy of each.
+fn declared_upper_bound(
+    oracle: &dyn TypeOracle,
+    name: &str,
+    bound: Ty,
+    shape: impl Fn(Ty) -> Ty,
+) -> Ty {
+    let declared = oracle.type_variable_bounds(name);
+    if declared.is_empty() {
+        return shape(bound);
+    }
+    let bounds = std::iter::once(bound)
+        .chain(declared)
+        .map(shape)
+        .collect::<Vec<_>>();
+    Ty::intersection(&bounds)
+}
+
+/// Target-independent upper shape of a flexible type whose lower bound is retained in [`Ty`].
+/// Array projection flexibility is Kotlin type semantics; the JVM provider only decides that an
+/// external declaration has a platform type and supplies its lower bound.
+pub(crate) fn platform_shape_upper_bound(lower: Ty) -> Ty {
+    match lower {
+        Ty::Obj(owner, arguments)
+            if lower.is_reference_array()
+                && matches!(arguments, [argument] if argument.projection_inner().is_none()) =>
+        {
+            Ty::obj_args_name(owner, &[Ty::out_projection(arguments[0])])
+        }
+        _ => lower,
+    }
+}
+
+/// Inferred type-variable bindings. Declared bounds remain on `Ty::TyParam`; keeping the two states
+/// separate prevents ordinary subtype checking from treating an unbound `T : Any?` as `Any?`.
+#[derive(Default, Clone)]
+pub struct TyCtx {
+    vars: HashMap<String, Ty>,
+}
+
+impl TyCtx {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Bind a type variable to its inferred type.
+    pub fn with_var(mut self, name: &str, ty: Ty) -> Self {
+        self.vars.insert(name.to_string(), ty);
+        self
+    }
+
+    /// Insert a variable binding in place.
+    pub fn bind(&mut self, name: &str, ty: Ty) {
+        self.vars.insert(name.to_string(), ty);
+    }
+
+    fn lookup(&self, name: &str) -> Option<Ty> {
+        self.vars.get(name).copied()
+    }
+}
+
+fn is_any(t: Ty) -> bool {
+    matches!(t, Ty::Obj(n, _)
+        if crate::types::same(n, crate::types::wk::any())
+            || crate::types::same(n, crate::types::wk::java_object()))
+}
+
+/// A JVM primitive-family scalar (Kotlin has no implicit widening among these — assignability is exact).
+fn is_scalar(t: Ty) -> bool {
+    matches!(
+        t,
+        Ty::Int
+            | Ty::Byte
+            | Ty::Short
+            | Ty::Long
+            | Ty::Float
+            | Ty::Double
+            | Ty::Boolean
+            | Ty::Char
+            | Ty::UByte
+            | Ty::UShort
+            | Ty::UInt
+            | Ty::ULong
+    )
+}
+
+/// Whether a value of type `sub` is assignable where `sup` is expected, under Kotlin subtyping.
+///
+/// - `Nothing` is assignable to everything; `null` to any nullable type; `Error` fits either side
+///   (a type error is already reported — do not cascade).
+/// - `T` (non-null) is assignable to `T?`; `T?` is NOT assignable to non-null `T`.
+/// - `Any`/`Object` (non-null) accepts every non-null value, primitives included (boxing).
+/// - Primitives are assignable only to the SAME primitive (no `Int` → `Long`).
+/// - `Fun` is contravariant in parameters, covariant in return, matched by arity.
+/// - `Array` is covariant in its element (krusty's array model).
+/// - `Obj` walks the class hierarchy (via `oracle`) and applies the target classifier's declared
+///   variance. Invariant arguments compare after resolving type-variable bindings/bounds.
+/// - A value/inline-class value is assignable where its underlying representation is expected.
+/// - A `TyParam` is checked through `cx` against its bound.
+pub fn is_assignable(cx: &TyCtx, oracle: &dyn TypeOracle, sub: Ty, sup: Ty) -> bool {
+    assignable_inner(cx, oracle, sub, sup)
+}
+
+/// Pure Kotlin SUBTYPING — like [`is_assignable`] but WITHOUT the value/inline-class erasure step (an
+/// `Aid` is NOT a subtype of its underlying `String`). Use where a genuine type-hierarchy relation is
+/// meant (a classpath supertype walk, a `when`-branch reachability), not a JVM-ABI boundary.
+pub fn is_subtype(cx: &TyCtx, oracle: &dyn TypeOracle, sub: Ty, sup: Ty) -> bool {
+    assignable_inner(cx, oracle, sub, sup)
+}
+
+fn assignable_inner(cx: &TyCtx, oracle: &dyn TypeOracle, sub: Ty, sup: Ty) -> bool {
+    if sub == sup {
+        return true;
+    }
+    // A type parameter's semantic identity is its key. The carried bound is constraint metadata and
+    // may be normalized differently while a generic call is instantiated (`Any` versus `Any?`).
+    if matches!((sub, sup), (Ty::TyParam(a, _), Ty::TyParam(b, _)) if a == b) {
+        return true;
+    }
+    // `T & Any` is a subtype of the original parameter and of the non-null intersection of that
+    // parameter's upper bounds (`T : Any?` satisfies `Any`; `T : Throwable?` satisfies
+    // `Throwable`; `where T : A?, T : B?` satisfies both `A` and `B`). It does not satisfy an
+    // unrelated non-null bound.
+    if let Ty::DefinitelyNotNull(original) = sub {
+        if assignable_inner(cx, oracle, *original, sup) {
+            return true;
+        }
+        if let Ty::TyParam(name, bound) = *original {
+            let tightened = declared_upper_bound(oracle, name, *bound, Ty::non_null);
+            if tightened != *original && assignable_inner(cx, oracle, tightened, sup) {
+                return true;
+            }
+        }
+        return false;
+    }
+    if sub == Ty::Error || sup == Ty::Error {
+        return true;
+    }
+    if sub == Ty::Nothing {
+        return true;
+    }
+    // A target intersection requires the source to meet every component. Checked before the
+    // source arm so `Int & String & Number` is still a subtype of `Int & String`. `Nothing` is
+    // already a subtype of every intersection via the arm above.
+    if let Ty::Intersection(parts) = sup {
+        return parts
+            .iter()
+            .copied()
+            .all(|part| assignable_inner(cx, oracle, sub, part));
+    }
+    // `A & B` is a subtype of each component, so it meets a target that any component meets.
+    if let Ty::Intersection(parts) = sub {
+        return parts
+            .iter()
+            .copied()
+            .any(|part| assignable_inner(cx, oracle, part, sup));
+    }
+    // Projection wrappers are meaningful only as generic arguments. When they reach a recursive
+    // comparison, consume their readable bound; `obj_assignable` handles their direction.
+    if let Ty::InProjection(inner) | Ty::OutProjection(inner) | Ty::StarProjection(inner) = sup {
+        return assignable_inner(cx, oracle, sub, *inner);
+    }
+    if let Ty::InProjection(inner) | Ty::OutProjection(inner) | Ty::StarProjection(inner) = sub {
+        return assignable_inner(cx, oracle, *inner, sup);
+    }
+
+    // A Java platform type `T!` is the flexible interval `T..T?`: as a source it may be consumed at
+    // either bound, and as a target it accepts values admitted by the nullable upper bound.
+    if let Ty::PlatformNullable(inner) = sup {
+        let upper = platform_shape_upper_bound(oracle.platform_flexible_upper_bound(*inner));
+        return assignable_inner(cx, oracle, sub, Ty::nullable(upper));
+    }
+    if let Ty::PlatformNullable(inner) = sub {
+        return assignable_inner(cx, oracle, *inner, sup)
+            || assignable_inner(cx, oracle, Ty::nullable(*inner), sup);
+    }
+
+    // Nullability. `null` fits any nullable target; `T` fits `T?`; `T?` does not fit non-null `T`.
+    if sub == Ty::Null {
+        return matches!(sup, Ty::Nullable(_)) || sup == Ty::Null;
+    }
+    if let Ty::Nullable(inner) = sup {
+        // `X? <: Y?` compares the non-null face of `X` against the nullable target. Stripping the
+        // target's mark as well would reject a symbolic `X : Any?` from `Any?`, even though the
+        // complete nullable occurrence is valid. This is the relation used when a nullable value
+        // fixes a flexible Java variable (`Foo? <: T!`) and that solution is checked against T's
+        // nullable upper bound.
+        if let Ty::Nullable(sub_inner) = sub {
+            return assignable_inner(cx, oracle, *sub_inner, sup);
+        }
+        // A symbolic source has the nullability of its upper bound. Follow that bound before
+        // stripping the target's `?`: `<T : Any?>` is a subtype of `Any?` (and therefore fits a
+        // star projection), but is not a subtype of non-null `Any`. Preserve the direct `T <: T?`
+        // relation without expanding T to an unrelated upper bound first.
+        if matches!(sub, Ty::TyParam(source, _) if matches!(*inner, Ty::TyParam(target, _) if source == target))
+        {
+            return true;
+        }
+        if let Ty::TyParam(name, bound) = sub {
+            return variable_bound_assignable(cx, oracle, sub, name, *bound, sup);
+        }
+        return is_assignable(cx, oracle, sub.non_null(), *inner);
+    }
+    if matches!(sub, Ty::Nullable(_)) {
+        // sup is non-null here (the `Nullable` sup arm returned above).
+        return false;
+    }
+
+    // A source type variable is a subtype of its declared upper bound, including another variable
+    // (`<R, T : R>` means `T <: R`). Check this before rejecting an unbound target variable; otherwise
+    // the target arm hides the only declared proof of that relation.
+    if let (Ty::TyParam(source_name, source_bound), Ty::TyParam(target_name, _)) = (sub, sup) {
+        if source_name != target_name {
+            return variable_bound_assignable(cx, oracle, sub, source_name, *source_bound, sup);
+        }
+    }
+
+    // An unbound target type variable is not its upper bound: `String <: Any?` does not prove
+    // `String <: T`. Generic inference must bind T before ordinary assignability is asked. This comes
+    // AFTER nullability so the same symbolic type still obeys Kotlin's ordinary `T <: T?` relation;
+    // expanding the source `T` to its bound first loses that identity.
+    if let Ty::TyParam(name, _) = sup {
+        return cx
+            .lookup(name)
+            .is_some_and(|target| target != sup && assignable_inner(cx, oracle, sub, target));
+    }
+    if let Ty::TyParam(name, bound) = sub {
+        return variable_bound_assignable(cx, oracle, sub, name, *bound, sup);
+    }
+
+    // Everything (a boxed primitive included) is assignable to `Any`/`Object`.
+    if is_any(sup) {
+        return true;
+    }
+
+    // A scalar TARGET admits only the identical scalar — no implicit numeric widening in Kotlin, and no
+    // reference is assignable to a primitive. A scalar SOURCE against a reference target boxes and is
+    // decided by the boxed class's hierarchy below (`Int` <: `Number`/`Comparable`).
+    if is_scalar(sup) {
+        return sub == sup;
+    }
+
+    match (sub, sup) {
+        (Ty::Fun(a), Ty::Fun(b)) => {
+            a.params.len() == b.params.len()
+                // A `suspend` function is never a regular one: nothing converts that way.
+                && (!a.suspend || b.suspend)
+                // Parameters are CONTRAVARIANT: the supertype function's parameter must be assignable to
+                // the subtype's (a function taking `Any` is-a function taking `String`).
+                && a.params
+                    .iter()
+                    .zip(b.params.iter())
+                    .all(|(sp, pp)| assignable_inner(cx, oracle, *pp, *sp))
+                // Return is COVARIANT.
+                && assignable_inner(cx, oracle, a.ret, b.ret)
+        }
+        // A function type projects onto `kotlin/Function<R>` with its own result as the
+        // type argument, so the argument check applies: `() -> String` is not a `Function<Int>`.
+        (Ty::Obj(_, _) | Ty::Fun(_), Ty::Obj(_, _)) => obj_assignable(cx, oracle, sub, sup),
+        _ => {
+            // Remaining mixed reference shapes (`Ty::String` vs `Ty::Obj("kotlin/CharSequence")`) compare
+            // through their Kotlin class identity.
+            class_assignable(oracle, sub, sup)
+        }
+    }
+}
+
+/// Two `Obj` reference types: the sub-class reaches the super-class in the hierarchy AND every type
+/// argument matches covariantly.
+fn obj_assignable(cx: &TyCtx, oracle: &dyn TypeOracle, sub: Ty, sup: Ty) -> bool {
+    let Some(applied_sub) = applied_supertype(oracle, sub, sup) else {
+        return false;
+    };
+    let target = sup.obj_internal();
+    sup.type_args()
+        .iter()
+        .zip(applied_sub.type_args().iter())
+        .enumerate()
+        .all(|(index, (&p, &a))| {
+            match p {
+                // `A<B> <: A<*>` for every argument `B`: a star projection contains every argument
+                // of its parameter. Its carried readable bound is derived from the declaration
+                // (kotlinc's `isSubtypeForSameConstructor` skips a star super-argument outright),
+                // so it never decides containment: a classpath `Frame<*>` whose bound the metadata
+                // reader leaves at `Any?` is the same type as a source `Frame<*>` reading `Bound`.
+                Ty::StarProjection(_) => return true,
+                Ty::OutProjection(expected) => {
+                    if matches!(a, Ty::InProjection(_)) {
+                        let readable = target
+                            .map(|owner| oracle.type_param_upper_bounds(owner, index))
+                            .filter(|bounds| !bounds.is_empty())
+                            .unwrap_or_else(|| vec![Ty::nullable(Ty::obj("kotlin/Any"))]);
+                        return readable
+                            .into_iter()
+                            .any(|bound| assignable_inner(cx, oracle, bound, *expected));
+                    }
+                    let mut captured = cx.clone();
+                    capture_projection_parameters(&mut captured, oracle, *expected, a);
+                    return assignable_inner(
+                        &captured,
+                        oracle,
+                        a.projection_inner().unwrap_or(a),
+                        *expected,
+                    );
+                }
+                Ty::InProjection(expected) => {
+                    if matches!(a, Ty::OutProjection(_) | Ty::StarProjection(_)) {
+                        return *expected == Ty::Nothing;
+                    }
+                    return assignable_inner(
+                        cx,
+                        oracle,
+                        *expected,
+                        a.projection_inner().unwrap_or(a),
+                    );
+                }
+                _ => {}
+            }
+            match target
+                .map(|owner| oracle.type_param_variance(owner, index))
+                .unwrap_or(crate::types::TypeVariance::Invariant)
+            {
+                crate::types::TypeVariance::Out => assignable_inner(cx, oracle, a, p),
+                crate::types::TypeVariance::In => assignable_inner(cx, oracle, p, a),
+                crate::types::TypeVariance::Invariant => same_flexible_type_with(
+                    oracle,
+                    normalized_type_argument(cx, a),
+                    normalized_type_argument(cx, p),
+                ),
+            }
+        })
+}
+
+/// Bind the declaration variables occurring inside an `out` projection's bound to the corresponding
+/// actual shape. F-bounds such as `S : Entity<D, S>` otherwise leave `S` unbound and reject
+/// `EntityImpl<D> : Entity<D, EntityImpl<D>>` as an argument of `Entity<D, out Entity<D, S>>`.
+fn capture_projection_parameters(
+    cx: &mut TyCtx,
+    oracle: &dyn TypeOracle,
+    template: Ty,
+    actual: Ty,
+) {
+    match template {
+        Ty::TyParam(name, _) => {
+            if cx.lookup(name).is_none() && actual != template {
+                cx.bind(name, actual.projection_inner().unwrap_or(actual));
+            }
+        }
+        Ty::Obj(_, template_args) => {
+            let Some(applied) = applied_supertype(oracle, actual, template) else {
+                return;
+            };
+            for (&template, &actual) in template_args.iter().zip(applied.type_args()) {
+                capture_projection_parameters(cx, oracle, template, actual);
+            }
+        }
+        Ty::Fun(template) => {
+            let Ty::Fun(actual) = actual.projection_inner().unwrap_or(actual) else {
+                return;
+            };
+            for (&template, &actual) in template.params.iter().zip(&actual.params) {
+                capture_projection_parameters(cx, oracle, template, actual);
+            }
+            capture_projection_parameters(cx, oracle, template.ret, actual.ret);
+        }
+        Ty::DefinitelyNotNull(template)
+        | Ty::Nullable(template)
+        | Ty::PlatformNullable(template)
+        | Ty::InProjection(template)
+        | Ty::OutProjection(template)
+        | Ty::StarProjection(template) => capture_projection_parameters(
+            cx,
+            oracle,
+            *template,
+            actual.projection_inner().unwrap_or(actual).non_null(),
+        ),
+        Ty::Intersection(parts) => {
+            for &part in parts {
+                capture_projection_parameters(cx, oracle, part, actual);
+            }
+        }
+        Ty::Unit | Ty::Pending | Ty::Nothing | Ty::Null | Ty::Error => {}
+    }
+}
+
+fn same_type_argument_with(oracle: &dyn TypeOracle, left: Ty, right: Ty) -> bool {
+    match (left, right) {
+        (Ty::TyParam(a, _), Ty::TyParam(b, _)) => a == b,
+        (Ty::Obj(a, aa), Ty::Obj(b, ba)) => {
+            a == b
+                && aa.len() == ba.len()
+                && aa
+                    .iter()
+                    .zip(ba)
+                    .all(|(&left, &right)| same_flexible_type_with(oracle, left, right))
+        }
+        (Ty::Nullable(a), Ty::Nullable(b))
+        | (Ty::PlatformNullable(a), Ty::PlatformNullable(b))
+        | (Ty::InProjection(a), Ty::InProjection(b))
+        | (Ty::OutProjection(a), Ty::OutProjection(b)) => same_flexible_type_with(oracle, *a, *b),
+        // Two stars in one argument slot are one projection, whatever readable bound each carries:
+        // the bound is derived from the declaration, not part of the projection's identity.
+        (Ty::StarProjection(_), Ty::StarProjection(_)) => true,
+        // A star projection is the `out` projection of its readable bound: `Resp<*>` is
+        // `Resp<out Any?>`, and a Java wildcard `Resp<?>` arrives as `Resp<out Any!>`. Inside an
+        // invariant argument the two spellings are one type.
+        (Ty::StarProjection(bound), Ty::OutProjection(other))
+        | (Ty::OutProjection(other), Ty::StarProjection(bound)) => {
+            same_flexible_type_with(oracle, *bound, *other)
+        }
+        (Ty::Fun(a), Ty::Fun(b)) => {
+            a.context_count == b.context_count
+                && a.has_receiver == b.has_receiver
+                && a.suspend == b.suspend
+                && a.params.len() == b.params.len()
+                && a.params
+                    .iter()
+                    .zip(&b.params)
+                    .all(|(&left, &right)| same_flexible_type_with(oracle, left, right))
+                && same_flexible_type_with(oracle, a.ret, b.ret)
+        }
+        _ => left == right,
+    }
+}
+
+/// Semantic type-shape equality with Java platform nullability treated as its flexible interval.
+/// This is shared by invariant type-argument comparison and declaration override-slot matching;
+/// neither operation may turn the provider's `T!` into a fixed nullable or non-null type.
+/// Callers outside assignability compare nullability only; the hierarchy oracle supplies a
+/// collection's read-only upper face when one is in scope.
+pub(crate) fn same_flexible_type(left: Ty, right: Ty) -> bool {
+    same_flexible_type_with(&NullOracle, left, right)
+}
+
+struct NullOracle;
+
+impl TypeOracle for NullOracle {
+    fn direct_supertypes(&self, _ty: Ty) -> Vec<Ty> {
+        Vec::new()
+    }
+}
+
+fn same_flexible_type_with(oracle: &dyn TypeOracle, left: Ty, right: Ty) -> bool {
+    match (left, right) {
+        (Ty::PlatformNullable(left), Ty::PlatformNullable(right)) => {
+            flexible_bound_matches(oracle, *left, *right)
+                || flexible_bound_matches(oracle, *right, *left)
+        }
+        (Ty::PlatformNullable(inner), other) | (other, Ty::PlatformNullable(inner)) => {
+            flexible_bound_matches(oracle, *inner, other)
+        }
+        _ => same_type_argument_with(oracle, left, right),
+    }
+}
+
+/// `other` matches `inner` at either bound of its flexible interval: the retained lower bound,
+/// that bound made nullable, or the oracle's read-only collection face of the lower bound.
+fn flexible_bound_matches(oracle: &dyn TypeOracle, inner: Ty, other: Ty) -> bool {
+    let upper = platform_shape_upper_bound(oracle.platform_flexible_upper_bound(inner));
+    same_type_argument_with(oracle, other, inner)
+        || same_type_argument_with(oracle, other, Ty::nullable(inner))
+        || (upper != inner
+            && (same_type_argument_with(oracle, other, upper)
+                || same_type_argument_with(oracle, other, Ty::nullable(upper))))
+}
+
+/// Resolve a generic argument only for invariant identity comparison. A free type parameter becomes
+/// its declared bound; an inferred parameter becomes its binding. It is deliberately not a wildcard:
+/// `Box<T : Any>` is therefore not assignable to `Box<String>` until inference binds `T` to `String`.
+fn normalized_type_argument(cx: &TyCtx, ty: Ty) -> Ty {
+    fn resolve(cx: &TyCtx, current: Ty, origin: Ty) -> Ty {
+        let Ty::TyParam(name, _) = current else {
+            return current;
+        };
+        let Some(next) = cx.lookup(name) else {
+            return current;
+        };
+        if next == current || next == origin {
+            current
+        } else {
+            resolve(cx, next, origin)
+        }
+    }
+
+    resolve(cx, ty, ty)
+}
+
+/// Map `sub` through its applied generic hierarchy to the classifier denoted by `sup`, keeping the
+/// type arguments the hierarchy carries (`Login` against `BaseCmd` → `BaseCmd<Cmd>`). This single
+/// walk serves both erased class reachability and generic argument comparison, so no caller can
+/// observe the class relationship while silently discarding the supertype template.
+pub(crate) fn applied_supertype(oracle: &dyn TypeOracle, sub: Ty, sup: Ty) -> Option<Ty> {
+    let target = sup.kotlin_class_internal()?;
+    let mut seen = crate::fx_hash::HashSet::default();
+    // A FUNCTION TYPE has no class identity of its own — `(P) -> R` names no classifier — but it
+    // has supertypes: the oracle answers `kotlin.Function<R>` for it, which is Kotlin's own
+    // hierarchy. So the walk starts from `sub` whether or not `sub` can name itself, and only the
+    // match test needs a name. Requiring one up front made this return `None` for every function
+    // type, so a lambda was not assignable to a `Function<R>` parameter at all.
+    if let Some(start) = sub.kotlin_class_internal() {
+        seen.insert(start);
+    }
+    let mut stack = vec![sub];
+    while let Some(cur) = stack.pop() {
+        if cur
+            .kotlin_class_internal()
+            .is_some_and(|owner| oracle.same_class_name(owner, target))
+        {
+            return Some(cur);
+        }
+        let direct = oracle.direct_supertypes(cur);
+        stack.extend(direct.into_iter().filter(|supertype| {
+            supertype
+                .kotlin_class_internal()
+                .is_some_and(|name| seen.insert(name))
+        }));
+    }
+    None
+}
+
+fn class_assignable(oracle: &dyn TypeOracle, sub: Ty, sup: Ty) -> bool {
+    applied_supertype(oracle, sub, sup).is_some()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::Ty;
+
+    /// A tiny hand-wired hierarchy oracle for the relation's unit tests.
+    struct Fake;
+    impl TypeOracle for Fake {
+        fn direct_supertypes(&self, ty: Ty) -> Vec<Ty> {
+            // What `hierarchy_projection` states for the real oracle: `(P) -> R` is a
+            // `kotlin.Function<R>`.
+            if let Ty::Fun(signature) = ty.non_null() {
+                return vec![Ty::obj_args("kotlin/Function", &[signature.ret])];
+            }
+            let Some(internal) = ty.kotlin_class_internal() else {
+                return Vec::new();
+            };
+            if internal.matches("app/Exact") {
+                return vec![g("app/Source", ty.type_args())];
+            }
+            if internal.matches("app/Anonymous") {
+                return vec![g("app/Box", ty.type_args())];
+            }
+            if internal.matches("app/EntityImpl") {
+                let data = ty
+                    .type_args()
+                    .first()
+                    .copied()
+                    .unwrap_or_else(|| s("kotlin/Any"));
+                return vec![g("app/Entity", &[data, g("app/EntityImpl", &[data])])];
+            }
+            let s: &[&str] = match internal {
+                n if n.matches("kotlin/String") => &["kotlin/CharSequence", "kotlin/Comparable"],
+                n if n.matches("kotlin/CharSequence") => &["kotlin/Any"],
+                n if n.matches("kotlin/Comparable") => &["kotlin/Any"],
+                n if n.matches("kotlin/collections/List") => &["kotlin/collections/Iterable"],
+                n if n.matches("kotlin/collections/MutableList") => &["kotlin/collections/List"],
+                n if n.matches("kotlin/collections/Iterable") => &["kotlin/Any"],
+                n if n.matches("kotlin/Int") || n.matches("kotlin/Double") => &["kotlin/Number"],
+                n if n.matches("kotlin/Number") => &["kotlin/Any"],
+                n if n.matches("app/Dog") => &["app/Animal"],
+                n if n.matches("app/Animal") => &["kotlin/Any"],
+                _ => &[],
+            };
+            s.iter().map(|x| Ty::obj(x)).collect()
+        }
+        fn same_class_name(&self, a: TypeName, b: TypeName) -> bool {
+            a == b
+                || ((a.matches("canonical/Readonly") || a.matches("canonical/Mutable"))
+                    && (b.matches("canonical/Readonly") || b.matches("canonical/Mutable")))
+        }
+        fn type_param_variance(
+            &self,
+            internal: TypeName,
+            _index: usize,
+        ) -> crate::types::TypeVariance {
+            if internal.matches("app/Sink") {
+                crate::types::TypeVariance::In
+            } else if internal.matches("kotlin/collections/List")
+                || internal.matches("kotlin/collections/Iterable")
+                || internal.matches("kotlin/Function")
+                || internal.matches("app/Source")
+            {
+                crate::types::TypeVariance::Out
+            } else {
+                crate::types::TypeVariance::Invariant
+            }
+        }
+        fn platform_flexible_upper_bound(&self, lower: Ty) -> Ty {
+            match lower {
+                Ty::Obj(owner, arguments) if owner.matches("kotlin/collections/MutableList") => {
+                    Ty::obj_args("kotlin/collections/List", &arguments)
+                }
+                _ => lower,
+            }
+        }
+    }
+
+    fn ok(sub: Ty, sup: Ty) -> bool {
+        is_assignable(&TyCtx::new(), &Fake, sub, sup)
+    }
+    fn s(n: &str) -> Ty {
+        Ty::obj(n)
+    }
+    fn g(n: &str, args: &[Ty]) -> Ty {
+        Ty::obj_args(n, args)
+    }
+
+    #[test]
+    fn identity_and_error_and_nothing() {
+        assert!(ok(Ty::Int, Ty::Int));
+        assert!(ok(s("app/Dog"), s("app/Dog")));
+        assert!(ok(Ty::Error, Ty::Int));
+        assert!(ok(Ty::Int, Ty::Error));
+        assert!(ok(Ty::Nothing, s("app/Dog")));
+        assert!(ok(Ty::Nothing, Ty::Int));
+    }
+
+    #[test]
+    fn nullability() {
+        assert!(ok(Ty::Null, Ty::nullable(s("app/Dog"))));
+        assert!(!ok(Ty::Null, s("app/Dog")));
+        assert!(ok(s("app/Dog"), Ty::nullable(s("app/Dog"))));
+        assert!(ok(s("app/Dog"), Ty::nullable(s("app/Animal"))));
+        assert!(!ok(Ty::nullable(s("app/Dog")), s("app/Dog")));
+        assert!(ok(
+            Ty::nullable(s("app/Dog")),
+            Ty::nullable(s("app/Animal"))
+        ));
+
+        let parameter = Ty::ty_param("T", Ty::nullable(s("kotlin/Any")));
+        assert!(ok(parameter, Ty::nullable(parameter)));
+        assert!(ok(parameter, Ty::nullable(s("kotlin/Any"))));
+        assert!(ok(Ty::nullable(parameter), Ty::nullable(s("kotlin/Any"))));
+        assert!(!ok(parameter, s("kotlin/Any")));
+        assert!(!ok(Ty::nullable(parameter), parameter));
+    }
+
+    #[test]
+    fn java_platform_type_is_flexible_between_non_null_and_nullable_bounds() {
+        let dog = s("app/Dog");
+        let animal = s("app/Animal");
+        let platform_dog = Ty::platform_nullable(dog);
+        assert!(ok(platform_dog, dog));
+        assert!(ok(platform_dog, Ty::nullable(dog)));
+        assert!(ok(platform_dog, animal));
+        assert!(ok(dog, platform_dog));
+        assert!(ok(Ty::nullable(dog), platform_dog));
+        assert!(ok(Ty::Null, platform_dog));
+        assert!(ok(
+            Ty::array(dog),
+            Ty::platform_nullable(Ty::array(platform_dog))
+        ));
+
+        let platform_array =
+            Ty::platform_nullable(g("kotlin/Array", &[Ty::platform_nullable(Ty::Int)]));
+        assert!(ok(platform_array, g("kotlin/Array", &[Ty::Int])));
+        assert!(ok(
+            platform_array,
+            Ty::nullable(g("kotlin/Array", &[Ty::out_projection(Ty::Int)],)),
+        ));
+        assert!(ok(
+            g("kotlin/Array", &[Ty::out_projection(Ty::Int)]),
+            platform_array,
+        ));
+    }
+
+    #[test]
+    fn primitives_exact_no_widening() {
+        assert!(ok(Ty::Int, Ty::Int));
+        assert!(!ok(Ty::Int, Ty::Long));
+        assert!(!ok(Ty::Byte, Ty::Int));
+        // Boxing to Any.
+        assert!(ok(Ty::Int, s("kotlin/Any")));
+        // A reference is never assignable to a primitive.
+        assert!(!ok(s("app/Dog"), Ty::Int));
+    }
+
+    #[test]
+    fn reference_subtyping() {
+        assert!(ok(s("app/Dog"), s("app/Animal")));
+        assert!(ok(s("app/Dog"), s("kotlin/Any")));
+        assert!(!ok(s("app/Animal"), s("app/Dog")));
+        assert!(ok(Ty::String, s("kotlin/CharSequence")));
+        assert!(ok(Ty::Int, s("kotlin/Number")));
+    }
+
+    #[test]
+    fn function_type_reaches_its_provider_neutral_function_supertype() {
+        struct FunctionOracle;
+
+        impl TypeOracle for FunctionOracle {
+            fn direct_supertypes(&self, ty: Ty) -> Vec<Ty> {
+                match ty.non_null() {
+                    Ty::Fun(signature) => {
+                        vec![Ty::obj_args("kotlin/Function", &[signature.ret])]
+                    }
+                    _ => Vec::new(),
+                }
+            }
+        }
+
+        let function = Ty::fun(vec![Ty::Int], Ty::String);
+        let semantic_supertype = Ty::obj_args("kotlin/Function", &[Ty::String]);
+        assert_eq!(
+            applied_supertype(&FunctionOracle, function, semantic_supertype),
+            Some(semantic_supertype),
+        );
+    }
+
+    #[test]
+    fn id_class_aliases_match_through_assignability() {
+        assert!(ok(s("canonical/Mutable"), s("canonical/Readonly")));
+    }
+
+    #[test]
+    fn generic_covariance() {
+        assert!(ok(
+            g("kotlin/collections/List", &[Ty::Int]),
+            g("kotlin/collections/Iterable", &[Ty::Int])
+        ));
+        // Covariant read position: List<Int> <: Iterable<Any>.
+        assert!(ok(
+            g("kotlin/collections/List", &[Ty::Int]),
+            g("kotlin/collections/Iterable", &[s("kotlin/Any")])
+        ));
+        // Nested: List<List<Int>> <: Iterable<Iterable<Any>>.
+        assert!(ok(
+            g(
+                "kotlin/collections/List",
+                &[g("kotlin/collections/List", &[Ty::Int])]
+            ),
+            g(
+                "kotlin/collections/Iterable",
+                &[g("kotlin/collections/Iterable", &[s("kotlin/Any")])]
+            )
+        ));
+        // Element mismatch (the reduction-family case): Iterable<Double> is NOT <: Iterable<Int>.
+        assert!(!ok(
+            g("kotlin/collections/Iterable", &[Ty::Double]),
+            g("kotlin/collections/Iterable", &[Ty::Int])
+        ));
+        assert!(ok(
+            g("kotlin/collections/MutableList", &[Ty::Int]),
+            g("kotlin/collections/List", &[Ty::Int])
+        ));
+    }
+
+    #[test]
+    fn generic_supertype_is_applied_before_target_variance() {
+        assert!(ok(
+            g("app/Exact", &[Ty::String]),
+            g("app/Source", &[s("kotlin/Any")])
+        ));
+    }
+
+    #[test]
+    fn platform_collection_target_accepts_its_read_only_upper_bound() {
+        assert!(ok(
+            g("kotlin/collections/List", &[Ty::String]),
+            Ty::platform_nullable(g(
+                "kotlin/collections/MutableList",
+                &[Ty::platform_nullable(Ty::String)],
+            )),
+        ));
+    }
+
+    #[test]
+    fn invariant_argument_accepts_the_read_only_face_of_a_platform_collection() {
+        let read_only = g("kotlin/collections/List", &[Ty::String]);
+        let flexible = Ty::platform_nullable(g(
+            "kotlin/collections/MutableList",
+            &[Ty::platform_nullable(Ty::String)],
+        ));
+        assert!(ok(g("app/Box", &[read_only]), g("app/Box", &[flexible])));
+        assert!(!ok(
+            g("app/Box", &[read_only]),
+            g(
+                "app/Box",
+                &[g("kotlin/collections/MutableList", &[Ty::String])]
+            ),
+        ));
+    }
+
+    #[test]
+    fn invariant_star_projection_accepts_a_nullable_bounded_argument() {
+        let parameter = Ty::ty_param("T", Ty::nullable(s("kotlin/Any")));
+        assert!(ok(
+            g("app/Box", &[parameter]),
+            g(
+                "app/Box",
+                &[Ty::out_projection(Ty::nullable(s("kotlin/Any")))]
+            )
+        ));
+    }
+
+    #[test]
+    fn f_bounded_star_projection_captures_its_self_type() {
+        let data = Ty::ty_param("D", s("kotlin/Any"));
+        let self_reference = Ty::ty_param("S", s("kotlin/Any"));
+        let self_bound = g("app/Entity", &[data, self_reference]);
+
+        assert!(ok(
+            g("app/EntityImpl", &[data]),
+            g("app/Entity", &[data, Ty::star_projection(self_bound)])
+        ));
+    }
+
+    #[test]
+    fn a_star_projection_contains_every_argument_whatever_bound_it_carries() {
+        // A classpath `Frame<*>` read from `@Metadata` carries the decoder's `Any?` bound; a written
+        // `Frame<*>` carries the declared parameter bound. They are one type.
+        let read = g(
+            "app/Frame",
+            &[Ty::star_projection(Ty::nullable(s("kotlin/Any")))],
+        );
+        let written = g("app/Frame", &[Ty::star_projection(s("app/Animal"))]);
+        assert!(ok(read, written));
+        assert!(ok(written, read));
+        assert!(ok(g("app/Box", &[read]), g("app/Box", &[written])));
+        assert!(ok(g("app/Frame", &[s("app/Dog")]), written));
+        assert!(!ok(g("app/Box", &[s("app/Dog")]), written));
+    }
+
+    #[test]
+    fn invariant_type_argument_requires_a_binding_not_a_wildcard() {
+        let variable = Ty::ty_param("T", s("kotlin/Any"));
+        let generic = g("app/Box", &[variable]);
+        let concrete = g("app/Box", &[Ty::String]);
+
+        assert!(!is_assignable(&TyCtx::new(), &Fake, generic, concrete));
+        assert!(!is_assignable(&TyCtx::new(), &Fake, concrete, generic));
+        assert!(is_assignable(
+            &TyCtx::new().with_var("T", Ty::String),
+            &Fake,
+            generic,
+            concrete
+        ));
+
+        let sink_of_any = g("app/Sink", &[s("kotlin/Any")]);
+        let sink_of_variable = g("app/Sink", &[variable]);
+        assert!(is_assignable(
+            &TyCtx::new(),
+            &Fake,
+            sink_of_any,
+            sink_of_variable
+        ));
+        assert!(!is_assignable(
+            &TyCtx::new(),
+            &Fake,
+            g("app/Anonymous", &[variable]),
+            g("app/Box", &[s("kotlin/Any")])
+        ));
+    }
+
+    #[test]
+    fn function_variance() {
+        // (Animal) -> Dog  <:  (Dog) -> Animal   [param contravariant, ret covariant]
+        let sub = Ty::fun(vec![s("app/Animal")], s("app/Dog"));
+        let sup = Ty::fun(vec![s("app/Dog")], s("app/Animal"));
+        assert!(ok(sub, sup));
+        assert!(!ok(sup, sub));
+        assert!(ok(
+            Ty::fun(Vec::new(), Ty::Nothing),
+            Ty::fun(Vec::new(), Ty::nullable(s("kotlin/Any")))
+        ));
+        // arity mismatch
+        assert!(!ok(
+            Ty::fun(vec![], Ty::Int),
+            Ty::fun(vec![Ty::Int], Ty::Int)
+        ));
+    }
+
+    /// A function type is a `kotlin.Function<R>` for its OWN result `R`, not for every `R`. Reaching
+    /// `Function` in the hierarchy is not enough: the argument must match too, covariantly, since
+    /// `Function` is declared `Function<out R>`. Without the argument check `(Int) -> String` was
+    /// assignable to `Function<Int>`, a program kotlinc rejects with an argument type mismatch.
+    #[test]
+    fn a_function_type_is_a_function_of_its_own_result() {
+        let lambda = Ty::fun(vec![Ty::Int], s("kotlin/String"));
+        let function = |result: Ty| Ty::obj_args("kotlin/Function", &[result]);
+
+        assert!(ok(lambda, function(s("kotlin/String"))), "its own result");
+        assert!(
+            ok(lambda, function(s("kotlin/Any"))),
+            "a supertype of it: `out R`"
+        );
+        assert!(
+            ok(lambda, s("kotlin/Any")),
+            "a function type is still an `Any`"
+        );
+        assert!(
+            ok(lambda, function(s("kotlin/CharSequence"))),
+            "String is a CharSequence: `out R` admits a supertype of the result"
+        );
+        assert!(!ok(lambda, function(Ty::Int)), "an unrelated result");
+    }
+
+    #[test]
+    fn array_invariance() {
+        assert!(!ok(Ty::array(s("app/Dog")), Ty::array(s("app/Animal"))));
+        assert!(!ok(Ty::array(s("app/Animal")), Ty::array(s("app/Dog"))));
+    }
+
+    #[test]
+    fn type_variables() {
+        // T with bound CharSequence: String <: T (via bound), and T <: Any.
+        let cx = TyCtx::new().with_var("T", s("kotlin/CharSequence"));
+        let tv = Ty::ty_param("T", s("kotlin/CharSequence"));
+        assert!(is_assignable(&cx, &Fake, Ty::String, tv));
+        assert!(is_assignable(&cx, &Fake, tv, s("kotlin/Any")));
+        // A bound constrains T but is not a binding: Dog <: Any does not prove Dog <: T.
+        let tv2 = Ty::ty_param("T", s("kotlin/Any"));
+        assert!(!is_assignable(&TyCtx::new(), &Fake, s("app/Dog"), tv2));
+        // A bound that rejects: Int is not <: T:CharSequence.
+        assert!(!is_assignable(&cx, &Fake, Ty::Int, tv));
+
+        // Nullability of a bound does not turn it into a binding either.
+        let nullable_tv = Ty::ty_param("N", Ty::nullable(s("kotlin/Any")));
+        assert!(!is_assignable(
+            &TyCtx::new(),
+            &Fake,
+            Ty::nullable(s("app/Dog")),
+            nullable_tv
+        ));
+        let nonnull_tv = Ty::ty_param("N", s("kotlin/Any"));
+        assert!(!is_assignable(
+            &TyCtx::new(),
+            &Fake,
+            Ty::nullable(s("app/Dog")),
+            nonnull_tv
+        ));
+
+        let result = Ty::ty_param("R", Ty::nullable(s("kotlin/Any")));
+        let derived = Ty::ty_param("T", result);
+        assert!(is_assignable(&TyCtx::new(), &Fake, derived, result));
+        assert!(!is_assignable(&TyCtx::new(), &Fake, result, derived));
+        assert!(!is_assignable(&TyCtx::new(), &Fake, Ty::Null, result));
+        assert!(!is_assignable(&TyCtx::new(), &Fake, Ty::Null, derived));
+        assert!(is_assignable(
+            &TyCtx::new(),
+            &Fake,
+            Ty::Null,
+            Ty::nullable(derived)
+        ));
+    }
+
+    #[test]
+    fn value_class_is_not_assignable_to_its_storage_type() {
+        assert!(!ok(s("app/Aid"), Ty::String));
+        assert!(!ok(s("app/Aid"), s("kotlin/String")));
+    }
+}

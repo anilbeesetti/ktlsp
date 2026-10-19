@@ -1,0 +1,24 @@
+[package]
+name = "krusty-frontend"
+version = "0.0.1"
+edition = "2021"
+description = "Selected Krusty Kotlin frontend and semantic analysis library"
+license = "Apache-2.0"
+repository = "https://github.com/qnox/krusty"
+build = false
+autobins = false
+autotests = false
+
+[workspace]
+
+[lib]
+name = "krusty_frontend"
+path = "src/lib.rs"
+
+[dependencies]
+ahash = "0.8.12"
+unicode-general-category = "1"
+zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+
+[features]
+trace = []

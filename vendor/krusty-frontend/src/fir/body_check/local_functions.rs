@@ -1,0 +1,669 @@
+//! Checked FIR for body-local function declarations and calls.
+
+use super::*;
+use crate::ast::{FunBody, FunDecl};
+use crate::resolve::ResolvedLocalFunctionCall;
+
+impl BodyFirChecker<'_> {
+    pub(super) fn local_function_statement(
+        &mut self,
+        statement: StmtId,
+        function: &FunDecl,
+        origin: OriginId,
+    ) -> Result<FirStatementId, BodyCheckFailure> {
+        let callable = self.local_callable(statement).ok_or_else(|| {
+            self.failure(
+                self.file.stmt_spans.get(statement.0 as usize).copied(),
+                BodyCheckFailureKind::MissingStableCallTarget,
+            )
+        })?;
+        let declaration =
+            body_local_callable_declaration(self.file, self.index, self.body.owner(), statement)
+                .ok_or_else(|| {
+                    self.failure(
+                        self.file.stmt_spans.get(statement.0 as usize).copied(),
+                        BodyCheckFailureKind::MissingStableCallTarget,
+                    )
+                })?;
+        let Some(StmtLowering::LocalFunction(info)) = self.info.stmt_lowers.get(&statement) else {
+            return Err(self.failure(
+                self.file.stmt_spans.get(statement.0 as usize).copied(),
+                BodyCheckFailureKind::UnsupportedStatement(StatementForm::LocalFunction),
+            ));
+        };
+        // The body sees the function's own type parameters; only the lifted method's descriptor
+        // erases them.
+        let (params, result, receiver) = match &info.sig.generic_sig {
+            Some(generic) => (generic.params.as_slice(), generic.ret, generic.receiver),
+            None => (info.sig.params.as_slice(), info.sig.ret, info.receiver),
+        };
+        if function.params.len() != params.len() {
+            return Err(self.failure(
+                Some(function.span),
+                BodyCheckFailureKind::UnsupportedCallShape,
+            ));
+        }
+        let (root, implicit_return) = match function.body {
+            FunBody::Expr(root) => (root, true),
+            FunBody::Block(root) => (root, false),
+            FunBody::None => {
+                return Err(self.failure(
+                    Some(function.span),
+                    BodyCheckFailureKind::UnsupportedStatement(StatementForm::LocalFunction),
+                ));
+            }
+        };
+
+        let mut body = FirBody::new_local(self.body.owner(), callable);
+        if let Some(owner) = self.body.lexical_class_owner() {
+            body.set_lexical_class_owner(Some(owner));
+        }
+        body.set_result_type(self.resolved_type(function.span, result)?);
+        if implicit_return {
+            body.set_implicit_return();
+        } else {
+            body.set_close_line(
+                self.file
+                    .expr_end_lines
+                    .get(root.0 as usize)
+                    .copied()
+                    .unwrap_or(0),
+            );
+        }
+        body.set_debug_name(function.name.clone());
+        body.set_type_parameters(self.local_function_type_parameters(function)?);
+        if let Some(site) = self.file.local_function_lifting_sites.get(&statement) {
+            body.set_lifting_site(crate::fir::FirLiftingSite::from_source(site, true));
+        }
+        body.set_declaration_span(function.span);
+        let context_count = info.sig.context_count.min(info.sig.params.len());
+        if let Some(vararg) = info.sig.vararg_index {
+            body.set_vararg_parameter(crate::fir::FirVarargParameter {
+                index: vararg
+                    .checked_sub(context_count)
+                    .and_then(|index| u32::try_from(index).ok())
+                    .ok_or_else(|| {
+                        self.failure(
+                            Some(function.span),
+                            BodyCheckFailureKind::UnsupportedCallShape,
+                        )
+                    })?,
+                is_last: vararg + 1 == info.sig.params.len(),
+            });
+        }
+        body.set_context_receiver_types(
+            params[..context_count]
+                .iter()
+                .map(|ty| self.resolved_type(function.span, *ty))
+                .collect::<Result<Vec<_>, _>>()?,
+        );
+        body.set_context_parameter_kinds(
+            function.params[..context_count]
+                .iter()
+                .map(|parameter| parameter.context_kind)
+                .collect(),
+        );
+        if let Some(receiver) = receiver {
+            let receiver_span = function
+                .receiver
+                .as_ref()
+                .map_or(function.span, |receiver| receiver.span);
+            body.set_receiver_type(self.resolved_type(receiver_span, receiver)?);
+        }
+        let return_target = body.add_control_target(FirControlTarget {
+            origin,
+            kind: FirControlTargetKind::Body(self.body.owner()),
+        });
+        // Preserve the complete lexical environment while checking the independently streamed
+        // local body. Ordinary reads still add captures on demand; the wider transient view also
+        // lets a checked local-class constructor operand publish a capture dependency that the
+        // legacy name-based resolver inventory could not see through the constructor boundary.
+        let mut visible = self
+            .outer_values
+            .iter()
+            .map(|(name, (depth, binding))| {
+                (
+                    name.clone(),
+                    (
+                        depth.checked_add(1).expect("too many nested bodies"),
+                        *binding,
+                    ),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        for scope in &self.scopes {
+            visible.extend(
+                scope
+                    .iter()
+                    .map(|(name, binding)| (name.clone(), (0, *binding))),
+            );
+        }
+        let mut visible_delegates = self
+            .outer_delegates
+            .iter()
+            .map(|(name, (depth, binding))| {
+                (
+                    name.clone(),
+                    (
+                        depth.checked_add(1).expect("too many nested bodies"),
+                        binding.clone(),
+                    ),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        for scope in &self.delegate_scopes {
+            visible_delegates.extend(
+                scope
+                    .iter()
+                    .map(|(name, binding)| (name.clone(), (0, binding.clone()))),
+            );
+        }
+        visible.extend(
+            visible_delegates
+                .iter()
+                .filter_map(|(name, (depth, binding))| {
+                    binding
+                        .storage
+                        .local()
+                        .map(|storage| (name.clone(), (*depth, storage)))
+                }),
+        );
+        let outer_callables = self.nested_outer_callables();
+        let receiver_frame = self.receiver_frame();
+        let class_values = self.nested_class_values()?;
+        let class_capture_values = self.nested_class_capture_values()?;
+        let class_delegates = self.nested_class_delegates()?;
+        // Named context parameters are lexical values, not implicit-receiver tower rungs.
+        let implicit_context_count = context_count
+            .checked_sub(function.context_value_count())
+            .expect("local-function context values exceed its context parameters");
+        let owned_receiver_count =
+            u32::try_from(implicit_context_count + usize::from(info.receiver.is_some()))
+                .expect("too many local-function receiver rungs");
+        let class_receivers = self.nested_class_receivers(owned_receiver_count)?;
+        let mut nested = BodyFirChecker {
+            file: self.file,
+            info: self.info,
+            source: self.source,
+            index: self.index,
+            origins: self.origins,
+            body,
+            scopes: vec![HashMap::default()],
+            delegate_scopes: vec![HashMap::default()],
+            outer_values: visible,
+            outer_delegates: visible_delegates,
+            class_values,
+            class_capture_values,
+            class_delegates,
+            class_receivers,
+            counted_loop_variables: HashSet::default(),
+            enclosing_property: self.enclosing_property,
+            session: self.session,
+            return_target,
+            lambda_return_source: None,
+            outer_lambda_return_depths: HashMap::default(),
+            function_return_depth: 0,
+            loops: Vec::new(),
+            local_callable_scopes: vec![HashMap::default()],
+            expression_substitutions: HashMap::default(),
+            lambda_binding_name: None,
+            outer_callables,
+            streamed_outer_callables: self.streamed_outer_callables.clone(),
+            nested_body_depth: self
+                .nested_body_depth
+                .checked_add(1)
+                .expect("too many nested bodies"),
+            expression_depth: 0,
+            owned_receiver_count,
+            outer_receiver_frames: std::iter::once(receiver_frame)
+                .chain(self.outer_receiver_frames.iter().cloned())
+                .collect(),
+            constructor_prefix_capture_access: false,
+            hoist_anonymous_super_argument: false,
+        };
+        for (ordinal, (parameter, ty)) in function
+            .params
+            .iter()
+            .zip(params.iter().copied())
+            .enumerate()
+        {
+            if let Some(default) = parameter.default {
+                let target = nested.resolved_type(parameter.ty.span, params[ordinal])?;
+                let value = nested.value_at_selected_boundary(default, target)?;
+                let default_origin = nested.expression_origin(default)?;
+                nested.body.add_default_value(FirDefaultValue {
+                    origin: default_origin,
+                    parameter: u32::try_from(ordinal).map_err(|_| {
+                        nested.failure(
+                            Some(function.span),
+                            BodyCheckFailureKind::UnsupportedCallShape,
+                        )
+                    })?,
+                    ty: target,
+                    value,
+                });
+            }
+            if ordinal < context_count
+                && parameter.context_kind != crate::types::ContextParameterKind::Named
+            {
+                continue;
+            }
+            let ty = nested.resolved_type(parameter.ty.span, ty)?;
+            let value = if parameter.name == "_" {
+                nested.allocate_local()
+            } else {
+                nested.bind_local(&parameter.name, ty)
+            };
+            let origin = nested.origins.source(nested.source, parameter.ty.span);
+            nested
+                .body
+                .add_parameter(FirValueParameter::bound(origin, value, ty));
+        }
+        for capture in &info.captures {
+            if let Some((depth, binding)) = nested.outer_values.get(&capture.name).copied() {
+                nested.body.add_capture(FirCapture {
+                    origin,
+                    enclosing_depth: depth,
+                    source: FirCaptureSource::Value(binding.value),
+                    ty: binding.ty,
+                    shared_cell: capture.shared_cell,
+                });
+            } else if nested.class_values.contains_key(&capture.name)
+                || nested.class_delegates.contains_key(&capture.name)
+            {
+                // The legacy capture inventory is name-based and includes values already stored in
+                // an enclosing local classifier. Checked FIR captures that classifier receiver when
+                // the body materializes the field read; inventing a LocalValueId here would create
+                // a second, impossible capture ABI.
+            } else {
+                return Err(nested.failure(Some(function.span), BodyCheckFailureKind::UnknownLocal));
+            }
+        }
+        let result = if implicit_return {
+            nested.value_at_selected_boundary(
+                root,
+                nested
+                    .body
+                    .result_type()
+                    .expect("local function result was installed before body checking"),
+            )?
+        } else {
+            nested.expression(root)?
+        };
+        let result_origin = nested.expression_origin(root)?;
+        let root_statement = nested.body.add_statement(FirStatement {
+            origin: result_origin,
+            kind: FirStatementKind::Expression(result),
+        });
+        nested.body.push_root(root_statement);
+        let order = super::capture_order::first_use_captures(
+            &nested.body,
+            declaration,
+            &nested.session.local_function_captures,
+            nested.origins,
+        );
+        nested.body.order_captures(&order);
+        nested
+            .session
+            .local_function_captures
+            .insert(declaration, nested.body.captures().into());
+        Ok(self.body.add_statement(FirStatement {
+            origin,
+            kind: FirStatementKind::LocalFunction {
+                declaration,
+                callable,
+                suspend: function.is_suspend(),
+                tailrec: function.is_tailrec(),
+                body: Box::new(nested.body),
+            },
+        }))
+    }
+
+    /// The function's own type parameters, as the resolver identified and bounded them.
+    fn local_function_type_parameters(
+        &self,
+        function: &FunDecl,
+    ) -> Result<Vec<crate::fir::FirLocalTypeParameter>, BodyCheckFailure> {
+        let semantic_names = self
+            .info
+            .resolved_declaration_type_parameters(function.signature_span.lo);
+        if semantic_names.len() != function.type_params.len() {
+            return Err(self.failure(
+                Some(function.span),
+                BodyCheckFailureKind::UnresolvedTypeSyntax,
+            ));
+        }
+        function
+            .type_params
+            .iter()
+            .zip(semantic_names)
+            .map(|(name, semantic_name)| {
+                let bounds = function
+                    .type_param_bounds
+                    .iter()
+                    .filter(|(owner, _)| owner == name)
+                    .map(|(_, bound)| {
+                        let (ty, is_interface) =
+                            self.info.resolved_type_bound(bound).ok_or_else(|| {
+                                self.failure(
+                                    Some(bound.span),
+                                    BodyCheckFailureKind::UnresolvedTypeSyntax,
+                                )
+                            })?;
+                        Ok(crate::fir::ResolvedTypeParameterBound {
+                            ty: self.resolved_type(bound.span, ty)?,
+                            is_interface,
+                        })
+                    })
+                    .collect::<Result<Box<[_]>, BodyCheckFailure>>()?;
+                Ok(crate::fir::FirLocalTypeParameter {
+                    name: name.as_str().into(),
+                    semantic_name: semantic_name.as_str().into(),
+                    bounds,
+                    reified: function.reified_type_params.contains(name),
+                })
+            })
+            .collect()
+    }
+
+    pub(super) fn local_function_call(
+        &mut self,
+        expression: ExprId,
+        arguments: &[ExprId],
+        selected: ResolvedLocalFunctionCall,
+    ) -> Result<FirExprKind, BodyCheckFailure> {
+        if selected.provided_arg_count != arguments.len() {
+            return Err(self.failure(
+                self.file.expr_span(expression),
+                BodyCheckFailureKind::UnsupportedCallShape,
+            ));
+        }
+        let cause = self.expression_origin(expression)?;
+        let target = self
+            .local_callable_ref(selected.stmt_id, cause)?
+            .ok_or_else(|| {
+                self.failure(
+                    self.file.expr_span(expression),
+                    BodyCheckFailureKind::MissingStableCallTarget,
+                )
+            })?;
+        Ok(FirExprKind::LocalCall {
+            target,
+            extension_receiver: selected
+                .receiver
+                .map(|receiver| {
+                    if let Some(implicit) = self
+                        .info
+                        .implicit_receiver_selections
+                        .get(&receiver)
+                        .cloned()
+                    {
+                        let cause = self.expression_origin(expression)?;
+                        return self
+                            .materialize_implicit_receiver(
+                                cause,
+                                self.file.expr_span(receiver),
+                                &implicit,
+                            )?
+                            .ok_or_else(|| {
+                                self.failure(
+                                    self.file.expr_span(receiver),
+                                    BodyCheckFailureKind::UnsupportedCallShape,
+                                )
+                            });
+                    }
+                    Ok(FirReceiver {
+                        value: self.expression(receiver)?,
+                        conversion: None,
+                    })
+                })
+                .transpose()?,
+            arguments: self.call_arguments_with_context(
+                expression,
+                arguments,
+                &selected.sig.params,
+                selected.context_args.iter().map(Some),
+                selected.sig.vararg_index,
+            )?,
+        })
+    }
+
+    /// Publish an operator selected from the lexical local-function scope. The receiver may be a
+    /// synthesized read produced by an increment/assignment operation rather than an AST call
+    /// operand, so checked local-call FIR is assembled from the selected signature and stable
+    /// body-local callable identity directly.
+    pub(super) fn local_operator_call_on_value(
+        &mut self,
+        span: Option<Span>,
+        cause: OriginId,
+        selected: &ResolvedLocalFunctionCall,
+        receiver: FirExprId,
+        operands: &[ExprId],
+    ) -> Result<FirExprKind, BodyCheckFailure> {
+        if selected.provided_arg_count != operands.len()
+            || selected.sig.source_receiver.is_none()
+            || selected.sig.vararg_index.is_some()
+        {
+            return Err(self.failure(span, BodyCheckFailureKind::UnsupportedCallShape));
+        }
+        let target = self
+            .local_callable_ref(selected.stmt_id, cause)?
+            .ok_or_else(|| self.failure(span, BodyCheckFailureKind::MissingStableCallTarget))?;
+        let context_count = selected.sig.context_count.min(selected.sig.params.len());
+        if selected.context_args.len() != context_count
+            || selected.sig.params.len() != context_count + operands.len()
+        {
+            return Err(self.failure(span, BodyCheckFailureKind::UnsupportedCallShape));
+        }
+        let mut arguments = selected
+            .context_args
+            .iter()
+            .zip(&selected.sig.params[..context_count])
+            .enumerate()
+            .map(|(parameter, (argument, expected))| {
+                let receiver = self.materialize_context_argument_at(span, cause, argument)?;
+                let actual = self.body.expr(receiver.value).ok_or_else(|| {
+                    self.failure(span, BodyCheckFailureKind::UnsupportedCallShape)
+                })?;
+                let expected = ResolvedTy::new(*expected).map_err(|error| {
+                    self.failure(span, BodyCheckFailureKind::UnpublishableType(error))
+                })?;
+                Ok(FirCallArgument::Expression {
+                    parameter: u32::try_from(parameter).map_err(|_| {
+                        self.failure(span, BodyCheckFailureKind::UnsupportedCallShape)
+                    })?,
+                    value: receiver.value,
+                    conversion: receiver
+                        .conversion
+                        .or_else(|| self.selected_type_conversion(actual.ty, expected, cause)),
+                })
+            })
+            .collect::<Result<Vec<_>, BodyCheckFailure>>()?;
+        for (offset, operand) in operands.iter().copied().enumerate() {
+            let parameter = context_count + offset;
+            let expected = ResolvedTy::new(selected.sig.params[parameter]).map_err(|error| {
+                self.failure(span, BodyCheckFailureKind::UnpublishableType(error))
+            })?;
+            let value = self.expression(operand)?;
+            arguments.push(FirCallArgument::Expression {
+                parameter: u32::try_from(parameter)
+                    .map_err(|_| self.failure(span, BodyCheckFailureKind::UnsupportedCallShape))?,
+                value,
+                conversion: self.selected_value_conversion(operand, value, expected, cause)?,
+            });
+        }
+        let expected_receiver = ResolvedTy::new(
+            selected
+                .sig
+                .source_receiver
+                .expect("validated local extension receiver"),
+        )
+        .map_err(|error| self.failure(span, BodyCheckFailureKind::UnpublishableType(error)))?;
+        let actual_receiver = self
+            .body
+            .expr(receiver)
+            .ok_or_else(|| self.failure(span, BodyCheckFailureKind::UnsupportedCallShape))?
+            .ty;
+        Ok(FirExprKind::LocalCall {
+            target,
+            extension_receiver: Some(FirReceiver {
+                value: receiver,
+                conversion: self.selected_type_conversion(
+                    actual_receiver,
+                    expected_receiver,
+                    cause,
+                ),
+            }),
+            arguments: arguments.into_boxed_slice(),
+        })
+    }
+
+    fn local_callable(&self, statement: StmtId) -> Option<LocalCallableId> {
+        self.local_callable_scopes
+            .iter()
+            .rev()
+            .find_map(|scope| scope.get(&statement).copied())
+    }
+
+    pub(super) fn local_callable_ref(
+        &mut self,
+        statement: StmtId,
+        origin: OriginId,
+    ) -> Result<Option<FirLocalCallableRef>, BodyCheckFailure> {
+        let Some(declaration) =
+            body_local_callable_declaration(self.file, self.index, self.body.owner(), statement)
+        else {
+            return Ok(None);
+        };
+        if let Some(callable) = self.local_callable(statement) {
+            return Ok(Some(FirLocalCallableRef {
+                body_depth: 0,
+                callable,
+                declaration: Some(declaration),
+                external_capture_arguments: None,
+            }));
+        }
+        let Some((body_depth, callable)) = self.outer_callables.get(&declaration).copied() else {
+            return Ok(None);
+        };
+        let external_capture_arguments = if self.streamed_outer_callables.contains(&declaration) {
+            let requirements = self
+                .session
+                .local_callables
+                .get(&declaration)
+                .cloned()
+                .ok_or_else(|| self.failure(None, BodyCheckFailureKind::MissingStableCallTarget))?;
+            let value_captures = match self.info.stmt_lowers.get(&statement) {
+                Some(StmtLowering::LocalFunction(function)) => function.captures.clone(),
+                _ => return Err(self.failure(None, BodyCheckFailureKind::MissingStableCallTarget)),
+            };
+            if value_captures.len() != requirements.captures.len()
+                || requirements.declaration_ordinals.len() != requirements.captures.len()
+            {
+                return Err(self.failure(None, BodyCheckFailureKind::UnsupportedCallShape));
+            }
+            let mut arguments = Vec::with_capacity(
+                requirements.captures.len() + requirements.implicit_receiver_captures.len(),
+            );
+            // The resolver lists the captures as they were declared; the target takes them in
+            // its own order.
+            for (&ordinal, required) in requirements
+                .declaration_ordinals
+                .iter()
+                .zip(&requirements.captures)
+            {
+                let capture = &value_captures[ordinal as usize];
+                let binding = self
+                    .class_values
+                    .get(&capture.name)
+                    .copied()
+                    .or_else(|| {
+                        self.class_delegates
+                            .get(&capture.name)
+                            .and_then(|delegate| match delegate.storage {
+                                DelegateStorage::ClassField(binding) => Some(binding),
+                                DelegateStorage::Local(_) => None,
+                            })
+                    })
+                    .ok_or_else(|| {
+                        self.failure(None, BodyCheckFailureKind::MissingStableCallTarget)
+                    })?;
+                if binding.ty != required.ty || binding.shared_cell != required.shared_cell {
+                    return Err(self.failure(None, BodyCheckFailureKind::UnsupportedCallShape));
+                }
+                // A shared capture parameter carries the cell holder, not its Kotlin element. The
+                // enclosing class field already is that holder, so suppress the ordinary semantic
+                // dereference while publishing this physical closure operand.
+                let kind = self.class_storage_read_kind(
+                    ClassCaptureBinding {
+                        shared_cell: false,
+                        ..binding
+                    },
+                    origin,
+                )?;
+                arguments.push(self.body.add_expr(FirExpr {
+                    origin,
+                    ty: required.ty,
+                    kind,
+                }));
+            }
+            for required in &requirements.implicit_receiver_captures {
+                let depth = required
+                    .depth
+                    .checked_add(self.owned_receiver_count)
+                    .ok_or_else(|| {
+                        self.failure(None, BodyCheckFailureKind::UnsupportedCallShape)
+                    })?;
+                let binding = self
+                    .class_receiver_binding_at(depth)
+                    .filter(|binding| binding.ty == required.ty)
+                    .ok_or_else(|| {
+                        self.failure(None, BodyCheckFailureKind::MissingStableCallTarget)
+                    })?;
+                let kind = self.class_storage_read_kind(binding, origin)?;
+                arguments.push(self.body.add_expr(FirExpr {
+                    origin,
+                    ty: required.ty,
+                    kind,
+                }));
+            }
+            Some(arguments.into_boxed_slice())
+        } else {
+            None
+        };
+        Ok(Some(FirLocalCallableRef {
+            body_depth,
+            callable,
+            declaration: Some(declaration),
+            external_capture_arguments,
+        }))
+    }
+
+    pub(super) fn nested_outer_callables(
+        &self,
+    ) -> HashMap<BodyLocalCallableDeclarationId, (u32, LocalCallableId)> {
+        self.outer_callables
+            .iter()
+            .map(|(statement, (depth, callable))| {
+                (
+                    *statement,
+                    (
+                        depth.checked_add(1).expect("too many nested bodies"),
+                        *callable,
+                    ),
+                )
+            })
+            .chain(self.local_callable_scopes.iter().flat_map(|scope| {
+                scope.iter().filter_map(|(statement, callable)| {
+                    body_local_callable_declaration(
+                        self.file,
+                        self.index,
+                        self.body.owner(),
+                        *statement,
+                    )
+                    .map(|declaration| (declaration, (1, *callable)))
+                })
+            }))
+            .collect()
+    }
+}

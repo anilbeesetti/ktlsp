@@ -1,0 +1,566 @@
+//! Function-parameter identity, defaults, and compiler-generated provenance.
+
+use super::{ExprId, FunId, IrFile};
+
+/// What one physical common-IR parameter means to the Kotlin declaration.
+///
+/// This is deliberately independent of every target spelling. In particular, captures, receivers,
+/// and unnamed context parameters do not acquire JVM `$...`, `<this>`, or positional names here.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IrParameterRole {
+    Value,
+    /// A lambda's `_` parameter, which binds no name.
+    UnusedValue,
+    /// A lambda parameter written as a destructuring declaration `(a, b)`.
+    DestructuredValue,
+    ContextValue,
+    AnonymousContextParameter {
+        ordinal: u32,
+    },
+    ContextReceiver {
+        ordinal: u32,
+    },
+    ExtensionReceiver,
+    CapturedValue {
+        ordinal: u32,
+        capture: IrValueCapture,
+    },
+    CapturedReceiver {
+        ordinal: u32,
+    },
+    PropertySetterValue,
+    Generated(IrGeneratedParameterRole),
+}
+
+/// What a lifted callable's captured value was declared as, and what kind of callable captures
+/// it. Both are source facts; a target that names the lifted parameter after them (kotlinc's
+/// `LocalDeclarationsLowering` keeps a variable's own name for a named local function or an
+/// anonymous function, and `$`-prefixes everything else) reads them here.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct IrValueCapture {
+    pub declaration: IrCapturedDeclaration,
+    pub capturer: IrCapturingCallable,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IrCapturedDeclaration {
+    /// A local `val`/`var`, a loop or catch variable, or a destructured component.
+    Variable,
+    /// A value parameter of an enclosing callable, or a constructor's capture-prefix value.
+    Parameter,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IrCapturingCallable {
+    /// A named local function (`fun local() { … }`).
+    LocalFunction,
+    /// An anonymous function expression (`fun() { … }`).
+    AnonymousFunction,
+    /// A lambda literal (`{ … }`).
+    Lambda,
+}
+
+/// A compiler-created parameter's semantic job. Targets own any physical spelling and flags.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IrGeneratedParameterRole {
+    Positional {
+        ordinal: u32,
+    },
+    Continuation,
+    /// The resume value passed to a generated continuation class's `invokeSuspend`.
+    ContinuationResult,
+    /// The dispatch receiver stored by a generated continuation class.
+    ContinuationDispatchReceiver,
+    HolderReceiver,
+    /// The enclosing instance an inner class's constructor takes first.
+    OuterInstance,
+    ValueClassCarrier,
+    ValueClassEqualsOperand {
+        ordinal: u8,
+    },
+    AccessorValue {
+        ordinal: u32,
+    },
+    /// A value parameter of the `invoke` a callable-reference class declares for its target.
+    ReferenceInvokeValue {
+        ordinal: u32,
+    },
+    /// A parameter of the `FunctionN.invoke` a generated function class overrides, by its position
+    /// in the interface's parameter list. A suspend function type's continuation is one of them:
+    /// it is the interface's last parameter, not a declared completion.
+    FunctionInvokeValue {
+        ordinal: u32,
+    },
+    /// The function value captured by a generated semantic SAM adapter.
+    SamAdapterCapture {
+        ordinal: u32,
+    },
+    /// One logical input forwarded by a generated semantic SAM adapter.
+    SamAdapterValue {
+        ordinal: u32,
+    },
+    /// The value a suspend lambda's `create` receives for the lambda's one parameter, ahead of the
+    /// completion.
+    SuspendLambdaCreateValue,
+    /// Value parameter of an `interface by` forwarding declaration. The JVM backend formats the
+    /// producer-owned ordinal for metadata/debug ABI surfaces.
+    InterfaceDelegationValue {
+        ordinal: u32,
+    },
+    /// Stored delegate operand of a target-generated local delegated-property accessor.
+    LocalDelegateStorage,
+    /// Enclosing instance a member-extension local delegated accessor receives ahead of the
+    /// delegate. The JVM spells it `this$0`.
+    LocalDelegateDispatch,
+    /// The owner or extension receiver a generated property-delegate accessor receives for its
+    /// property. The JVM spells it `<this>`.
+    DelegateMethodReceiver,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IrParameterProvenance {
+    SourceDeclared,
+    CompilerGenerated,
+    /// A caller lambda's capture transferred into a declaration closure specialized at an inline
+    /// call site. The semantic identity stays the captured declaration's; a target may distinguish
+    /// the regenerated storage from a capture the declaration closure owned itself.
+    InlinedCapture,
+}
+
+/// Stable identity of one physical function parameter.
+///
+/// `source_name` is present only when the source or a generated-declaration producer published a
+/// semantic name. Its absence is a fact, not permission for a later phase to invent `pN`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IrParameterIdentity {
+    pub source_name: Option<String>,
+    pub role: IrParameterRole,
+    pub provenance: IrParameterProvenance,
+}
+
+impl IrParameterIdentity {
+    /// Convert a frontend-published semantic identity without adding a target spelling.
+    pub fn resolved(identity: &crate::fir::ResolvedParameterIdentity) -> Self {
+        use crate::fir::ResolvedParameterIdentity as Resolved;
+
+        match identity {
+            Resolved::Source(name) => Self::source(name.as_ref()),
+            Resolved::InterfaceDelegationValue { ordinal } => Self::generated(
+                IrGeneratedParameterRole::InterfaceDelegationValue { ordinal: *ordinal },
+                None,
+            ),
+            Resolved::Unnamed { .. } => Self {
+                source_name: None,
+                role: IrParameterRole::Value,
+                provenance: IrParameterProvenance::SourceDeclared,
+            },
+            Resolved::ContextValue { source_name, .. } => Self::context_value(source_name.as_ref()),
+            Resolved::AnonymousContextParameter { ordinal } => {
+                Self::anonymous_context_parameter(*ordinal)
+            }
+            Resolved::LegacyContextReceiver { ordinal } => Self::context_receiver(*ordinal),
+            Resolved::ExtensionReceiver => Self::extension_receiver(),
+            Resolved::PropertySetterValue => Self::property_setter_value(),
+            Resolved::SuspendCompletion => {
+                Self::generated(IrGeneratedParameterRole::Continuation, None)
+            }
+        }
+    }
+
+    pub fn source(name: impl Into<String>) -> Self {
+        Self {
+            source_name: Some(name.into()),
+            role: IrParameterRole::Value,
+            provenance: IrParameterProvenance::SourceDeclared,
+        }
+    }
+
+    pub fn producer_value(name: impl Into<String>) -> Self {
+        Self {
+            source_name: Some(name.into()),
+            role: IrParameterRole::Value,
+            provenance: IrParameterProvenance::CompilerGenerated,
+        }
+    }
+
+    pub fn context_value(name: impl Into<String>) -> Self {
+        Self {
+            source_name: Some(name.into()),
+            role: IrParameterRole::ContextValue,
+            provenance: IrParameterProvenance::SourceDeclared,
+        }
+    }
+
+    pub fn context_receiver(ordinal: u32) -> Self {
+        Self {
+            source_name: None,
+            role: IrParameterRole::ContextReceiver { ordinal },
+            provenance: IrParameterProvenance::SourceDeclared,
+        }
+    }
+
+    pub fn anonymous_context_parameter(ordinal: u32) -> Self {
+        Self {
+            source_name: None,
+            role: IrParameterRole::AnonymousContextParameter { ordinal },
+            provenance: IrParameterProvenance::SourceDeclared,
+        }
+    }
+
+    pub fn extension_receiver() -> Self {
+        Self {
+            source_name: None,
+            role: IrParameterRole::ExtensionReceiver,
+            provenance: IrParameterProvenance::SourceDeclared,
+        }
+    }
+
+    pub fn property_setter_value() -> Self {
+        Self {
+            source_name: None,
+            role: IrParameterRole::PropertySetterValue,
+            provenance: IrParameterProvenance::CompilerGenerated,
+        }
+    }
+
+    pub fn captured_value(
+        source_name: Option<String>,
+        ordinal: u32,
+        capture: IrValueCapture,
+    ) -> Self {
+        Self {
+            source_name,
+            role: IrParameterRole::CapturedValue { ordinal, capture },
+            provenance: IrParameterProvenance::CompilerGenerated,
+        }
+    }
+
+    pub fn captured_receiver(ordinal: u32) -> Self {
+        Self {
+            source_name: None,
+            role: IrParameterRole::CapturedReceiver { ordinal },
+            provenance: IrParameterProvenance::CompilerGenerated,
+        }
+    }
+
+    pub fn generated(role: IrGeneratedParameterRole, source_name: Option<String>) -> Self {
+        Self {
+            source_name,
+            role: IrParameterRole::Generated(role),
+            provenance: IrParameterProvenance::CompilerGenerated,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IrParameterCheck {
+    NonNull,
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct FnParamInfo {
+    pub identities: Vec<IrParameterIdentity>,
+    pub defaults: Option<Vec<Option<ExprId>>>,
+    /// The registered `defaults` serve only the `$default` stub. A call site must not reuse them to
+    /// fill an omitted argument. This is set for extensions whose defaults are not all constant.
+    pub stub_only: bool,
+    /// The checked declaration whose default contract supplied at least one registered expression.
+    /// `None` means this declaration owns every default itself. Kotlin forbids an override to write
+    /// a default value, so consumers that emit declaration-owned entries must preserve this exact
+    /// identity rather than treating inherited defaults as if the implementation declared them.
+    pub inherited_default_provider: Option<crate::fir::ResolvedFunctionOverrideTarget>,
+    /// Parallel to `identities` for a source declaration; empty for one the source did not write.
+    pub inline_modifiers: Vec<crate::types::InlineParameterModifier>,
+    /// Parallel to `identities`. Empty when the declaration did not publish an expansion mode;
+    /// expansion then declines instead of guessing splice or copy.
+    pub expansion_modes: Vec<crate::types::InlineExpansionMode>,
+    /// What each captured implicit receiver is, by its `CapturedReceiver` ordinal.
+    pub captured_receivers: Vec<super::IrCapturedReceiver>,
+}
+
+impl FnParamInfo {
+    pub fn source_names(names: Vec<String>) -> Self {
+        Self {
+            identities: names.into_iter().map(IrParameterIdentity::source).collect(),
+            defaults: None,
+            stub_only: false,
+            inherited_default_provider: None,
+            inline_modifiers: Vec::new(),
+            expansion_modes: Vec::new(),
+            captured_receivers: Vec::new(),
+        }
+    }
+
+    pub fn identities(identities: Vec<IrParameterIdentity>) -> Self {
+        Self {
+            identities,
+            defaults: None,
+            stub_only: false,
+            inherited_default_provider: None,
+            inline_modifiers: Vec::new(),
+            expansion_modes: Vec::new(),
+            captured_receivers: Vec::new(),
+        }
+    }
+
+    pub fn source_defaults(names: Vec<String>, defaults: Vec<Option<ExprId>>) -> Self {
+        let mut info = Self::source_names(names);
+        info.defaults = Some(defaults);
+        info
+    }
+
+    /// [`Self::defaults`] with the stub-only marker set — see [`Self::stub_only`].
+    pub fn source_stub_only_defaults(names: Vec<String>, defaults: Vec<Option<ExprId>>) -> Self {
+        let mut info = Self::source_defaults(names, defaults);
+        info.stub_only = true;
+        info
+    }
+
+    pub(crate) fn prepend_generated(&mut self, identity: IrParameterIdentity) {
+        assert_eq!(
+            identity.provenance,
+            IrParameterProvenance::CompilerGenerated,
+            "a prepended generated parameter carries generated provenance"
+        );
+        self.identities.insert(0, identity);
+        if !self.inline_modifiers.is_empty() {
+            self.inline_modifiers
+                .insert(0, crate::types::InlineParameterModifier::None);
+        }
+        if !self.expansion_modes.is_empty() {
+            self.expansion_modes
+                .insert(0, crate::types::InlineExpansionMode::Materialize);
+        }
+    }
+}
+
+impl IrFile {
+    /// The exact checked declaration that supplied inherited defaults for `fid`.
+    pub(crate) fn inherited_param_default_provider(
+        &self,
+        fid: u32,
+    ) -> Option<crate::fir::ResolvedFunctionOverrideTarget> {
+        self.fn_params.get(&fid)?.inherited_default_provider
+    }
+
+    /// The defaults `fid` declares itself: none when they were inherited through an override.
+    pub fn declared_param_defaults(&self, fid: u32) -> Option<&Vec<Option<ExprId>>> {
+        self.fn_params
+            .get(&fid)
+            .filter(|info| info.inherited_default_provider.is_none())?
+            .defaults
+            .as_ref()
+    }
+
+    /// The inline modifier each value parameter of `fid` wrote, extension receiver excluded; empty
+    /// for a function the source did not declare.
+    pub fn declared_inline_modifiers(
+        &self,
+        fid: u32,
+    ) -> Vec<crate::types::InlineParameterModifier> {
+        let Some(info) = self.fn_params.get(&fid) else {
+            return Vec::new();
+        };
+        info.identities
+            .iter()
+            .zip(&info.inline_modifiers)
+            .filter(|(identity, _)| !matches!(identity.role, IrParameterRole::ExtensionReceiver))
+            .map(|(_, modifier)| *modifier)
+            .collect()
+    }
+
+    /// The single common-IR contract for a function's complete source parameter identities.
+    ///
+    /// Source lowering and a generated-member producer publish through different owning records,
+    /// but consumers must not branch on that origin. Presence is optional for functions that have
+    /// no source/debug parameter surface; when present, the identities are complete and exactly
+    /// parallel to the current semantic parameter list.
+    pub(crate) fn function_parameter_identities(
+        &self,
+        function: FunId,
+    ) -> Option<&[IrParameterIdentity]> {
+        let source = self
+            .fn_params
+            .get(&function)
+            .map(|parameters| parameters.identities.as_slice());
+        let generated = self
+            .generated_function_publication(function)
+            .map(|publication| publication.parameter_identities.as_slice());
+        assert!(
+            source.is_none() || generated.is_none(),
+            "one function has one owning parameter-identity contract"
+        );
+        let identities = source.or(generated)?;
+        let semantic_arity = self
+            .functions
+            .get(function as usize)
+            .expect("parameter identities name an existing function")
+            .params
+            .len();
+        assert_eq!(
+            identities.len(),
+            semantic_arity,
+            "parameter identities exactly match semantic function arity"
+        );
+        assert!(
+            identities
+                .iter()
+                .all(|identity| identity.source_name.as_deref() != Some("")),
+            "published source parameter identities are never empty"
+        );
+        Some(identities)
+    }
+
+    /// Expansion modes parallel to [`Self::function_parameter_identities`]. `None` when the
+    /// declaration published no mode or the two records disagree: the caller declines.
+    pub(crate) fn inline_expansion_modes(
+        &self,
+        function: FunId,
+    ) -> Option<&[crate::types::InlineExpansionMode]> {
+        let info = self.fn_params.get(&function)?;
+        let identities = self.function_parameter_identities(function)?;
+        (info.expansion_modes.len() == identities.len()).then_some(info.expansion_modes.as_slice())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ir::{
+        IrFunction, IrGeneratedDeclarationDebug, IrGeneratedFunctionMetadataScope,
+        IrGeneratedFunctionPublication, IrGeneratedMemberPublication,
+    };
+    use crate::types::{type_name, Ty};
+
+    fn add_function(file: &mut IrFile, name: &str, arity: usize) -> FunId {
+        file.add_fun(IrFunction {
+            name: name.to_string(),
+            params: vec![Ty::Int; arity],
+            ret: Ty::Unit,
+            body: None,
+            is_static: false,
+            dispatch_receiver: None,
+            param_checks: Vec::new(),
+        })
+    }
+
+    #[test]
+    fn source_and_generated_parameters_share_one_exact_identity_view() {
+        let mut file = IrFile::default();
+        let source = add_function(&mut file, "source", 2);
+        file.fn_params.insert(
+            source,
+            FnParamInfo::source_names(["left", "right"].map(String::from).to_vec()),
+        );
+        let generated = add_function(&mut file, "generated", 1);
+        file.publish_generated_members(
+            type_name("sample/Generated"),
+            IrGeneratedMemberPublication {
+                metadata_scope: IrGeneratedFunctionMetadataScope::Exclusive,
+                functions: vec![IrGeneratedFunctionPublication {
+                    function: generated,
+                    parameter_identities: vec![IrParameterIdentity::producer_value("value")],
+                    metadata: None,
+                    debug: IrGeneratedDeclarationDebug::LocalsOnly,
+                }],
+            },
+        );
+
+        assert_eq!(
+            file.function_parameter_identities(source),
+            Some(
+                &[
+                    IrParameterIdentity::source("left"),
+                    IrParameterIdentity::source("right"),
+                ][..]
+            )
+        );
+        assert_eq!(
+            file.function_parameter_identities(generated),
+            Some(&[IrParameterIdentity::producer_value("value")][..])
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "parameter identities exactly match semantic function arity")]
+    fn parameter_identity_view_rejects_partial_source_lists() {
+        let mut file = IrFile::default();
+        let function = add_function(&mut file, "partial", 2);
+        file.fn_params.insert(
+            function,
+            FnParamInfo::source_names(vec!["onlyOne".to_string()]),
+        );
+        let _ = file.function_parameter_identities(function);
+    }
+
+    const LOCAL_VARIABLE: IrValueCapture = IrValueCapture {
+        declaration: IrCapturedDeclaration::Variable,
+        capturer: IrCapturingCallable::LocalFunction,
+    };
+
+    #[test]
+    fn parameter_roles_carry_source_identity_without_target_spelling() {
+        let identities = [
+            IrParameterIdentity::captured_value(Some("ledger".to_string()), 0, LOCAL_VARIABLE),
+            IrParameterIdentity::captured_value(None, 1, LOCAL_VARIABLE),
+            IrParameterIdentity::captured_receiver(0),
+            IrParameterIdentity::context_value("audit"),
+            IrParameterIdentity::context_receiver(1),
+            IrParameterIdentity::extension_receiver(),
+            IrParameterIdentity::source("entry"),
+            IrParameterIdentity::source("limit"),
+        ];
+        assert_eq!(
+            identities
+                .iter()
+                .map(|identity| identity.source_name.as_deref())
+                .collect::<Vec<_>>(),
+            [
+                Some("ledger"),
+                None,
+                None,
+                Some("audit"),
+                None,
+                None,
+                Some("entry"),
+                Some("limit"),
+            ]
+        );
+        assert_eq!(
+            identities
+                .iter()
+                .map(|identity| identity.role)
+                .collect::<Vec<_>>(),
+            [
+                IrParameterRole::CapturedValue {
+                    ordinal: 0,
+                    capture: LOCAL_VARIABLE
+                },
+                IrParameterRole::CapturedValue {
+                    ordinal: 1,
+                    capture: LOCAL_VARIABLE
+                },
+                IrParameterRole::CapturedReceiver { ordinal: 0 },
+                IrParameterRole::ContextValue,
+                IrParameterRole::ContextReceiver { ordinal: 1 },
+                IrParameterRole::ExtensionReceiver,
+                IrParameterRole::Value,
+                IrParameterRole::Value,
+            ]
+        );
+        assert!(identities.iter().all(|identity| {
+            identity.source_name.as_deref().is_none_or(|name| {
+                !name.starts_with('$') && name != "<this>" && !name.starts_with('p')
+            })
+        }));
+    }
+}
+
+/// The `vararg` parameter of a declared function.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct IrVarargParameter {
+    /// SOURCE index among the value parameters (receiver excluded).
+    pub index: usize,
+    /// No value parameter follows it.
+    pub is_last: bool,
+}

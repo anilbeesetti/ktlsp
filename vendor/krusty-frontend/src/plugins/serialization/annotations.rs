@@ -1,0 +1,207 @@
+//! Source-annotation queries and annotations synthesized on serialization-plugin declarations.
+
+use crate::ir::{
+    AnnoValue, AppliedAnnotation, ClassId, DeclarationAnnotations, IrConst, IrFile,
+    RetainedAnnotation,
+};
+use crate::kt_string::KtString;
+use crate::plugins::PluginContext;
+use crate::types::{type_name, AnnotationRetention};
+
+use super::SERIALIZABLE_FQ;
+
+pub(super) const SERIAL_NAME_FQ: &str = "kotlinx/serialization/SerialName";
+const CONTEXTUAL_FQ: &str = "kotlinx/serialization/Contextual";
+const USE_CONTEXTUAL_SERIALIZATION_FQ: &str = "kotlinx/serialization/UseContextualSerialization";
+
+/// `write$Self` is a Kotlin static helper, not merely a static JVM realization.
+pub(super) fn write_self_annotations() -> DeclarationAnnotations {
+    DeclarationAnnotations::new(vec![RetainedAnnotation {
+        retention: AnnotationRetention::Runtime,
+        annotation: AppliedAnnotation {
+            internal: type_name("kotlin/jvm/JvmStatic"),
+            values: Vec::new(),
+        },
+        facts: Default::default(),
+    }])
+}
+
+/// `@JvmField` on a private plugin cache (`$childSerializers`, a generic class's
+/// `$cachedDescriptor`): kotlinc marks the field as the storage itself, not a property behind
+/// accessors. It is written ahead of the field's nullability annotation.
+pub(super) fn jvm_field_annotations() -> DeclarationAnnotations {
+    DeclarationAnnotations::new(vec![RetainedAnnotation {
+        retention: AnnotationRetention::Binary,
+        annotation: AppliedAnnotation {
+            internal: type_name("kotlin/jvm/JvmField"),
+            values: Vec::new(),
+        },
+        facts: Default::default(),
+    }])
+}
+
+pub(super) fn custom_serializer_of(
+    ctx: &PluginContext,
+    ir: &IrFile,
+    class_id: ClassId,
+) -> Option<crate::types::TypeName> {
+    ctx.class_annotation_class_literal(ir, class_id, type_name(SERIALIZABLE_FQ))
+}
+
+/// The serializer a property-level `@Serializable(with = S::class) val v: T` names. This is the
+/// PROPERTY's annotation, which kotlinc also preserves on the `get<V>$annotations()` marker.
+pub(super) fn field_serializer_of(
+    ctx: &PluginContext,
+    ir: &IrFile,
+    class_id: ClassId,
+    property: &str,
+) -> Option<crate::types::TypeName> {
+    ctx.property_annotation_class_literal(ir, class_id, property, type_name(SERIALIZABLE_FQ))
+}
+
+/// The serializer a property's elements are written and read with when the declaration names one:
+/// the property-level annotation, or the same annotation on the declared type itself
+/// (`val v: @Serializable(with = S::class) T`), which kotlinc honours identically but does not
+/// preserve on a property marker.
+pub(super) fn declared_serializer_of(
+    ctx: &PluginContext,
+    ir: &IrFile,
+    class_id: ClassId,
+    property: &str,
+) -> Option<crate::types::TypeName> {
+    field_serializer_of(ctx, ir, class_id, property).or_else(|| {
+        super::type_argument_serializers::named_serializer(
+            ctx.property_declared_type(ir, class_id, property),
+        )
+    })
+}
+
+pub(super) fn serial_name_of(
+    ctx: &PluginContext,
+    ir: &IrFile,
+    class_id: ClassId,
+    property: &str,
+) -> Option<KtString> {
+    ctx.property_annotation_const_string(ir, class_id, property, type_name(SERIAL_NAME_FQ))
+}
+
+/// The class name used in the serial form: a declared `@SerialName("…")`, or the stable qualified
+/// source name recorded by common lowering. The plugin must not reinterpret `$` in a JVM/internal
+/// name because it is also a legal source identifier.
+pub(super) fn class_serial_name(ir: &IrFile, class_id: ClassId) -> KtString {
+    class_serial_name_override(ir, class_id).unwrap_or_else(|| {
+        ir.class_source_qualified_name(class_id)
+            .expect("a serializable source classifier has a qualified declaration name")
+    })
+}
+
+/// Whether this declaration carries an annotation whose resolved classifier is marked
+/// `@SerialInfo`. The provider performs the meta-annotation lookup; this query never infers the
+/// role from an annotation's spelling.
+pub(super) fn class_has_serial_info(ctx: &PluginContext, ir: &IrFile, class_id: ClassId) -> bool {
+    ir.classes[class_id as usize]
+        .applied_annotations
+        .applications()
+        .any(|application| ctx.is_serial_info_annotation(application.internal))
+}
+
+/// A class-level `@SerialName("…")`. An application whose value is not its `String` constant is a
+/// frontend defect, not a reason to fall back to the qualified name.
+fn class_serial_name_override(ir: &IrFile, class_id: ClassId) -> Option<KtString> {
+    let serial_name = type_name(SERIAL_NAME_FQ);
+    let application = ir.classes[class_id as usize]
+        .applied_annotations
+        .applications()
+        .find(|application| application.internal == serial_name)?;
+    match application.values.first() {
+        Some((_, crate::ir::AnnoValue::Const(crate::ir::IrConst::String(value)))) => {
+            Some(value.clone())
+        }
+        other => panic!("a class-level `@SerialName` carries its String value, not {other:?}"),
+    }
+}
+
+/// Whether a property is serialized with a `ContextualSerializer`: it is marked `@Contextual`, or
+/// its type is named by the file's `@UseContextualSerialization`. A serializer the declaration names
+/// itself (`@Serializable(with = S::class)` on the property or its type) takes precedence over both,
+/// as kotlinc consults a property's own serializer before the contextual rules.
+pub(super) fn property_is_contextual(
+    ctx: &PluginContext,
+    ir: &IrFile,
+    class_id: ClassId,
+    property: &str,
+) -> bool {
+    if declared_serializer_of(ctx, ir, class_id, property).is_some() {
+        return false;
+    }
+    if ctx.property_has_annotation(ir, class_id, property, type_name(CONTEXTUAL_FQ)) {
+        return true;
+    }
+    ctx.property_canonical_type(ir, class_id, property)
+        .is_some_and(|canonical| {
+            ctx.file_annotation_mentions_canonical_type(
+                ir,
+                type_name(USE_CONTEXTUAL_SERIALIZATION_FQ),
+                canonical,
+            )
+        })
+}
+
+/// Whether a TYPE is named by the file's `@UseContextualSerialization`. This is the ELEMENT form of
+/// the property rule above: `List<FlexibleMap>` serializes its ELEMENTS contextually, so the
+/// collection's element serializer is a `ContextualSerializer` even though no property of that type
+/// exists.
+pub(super) fn type_is_contextual(
+    ctx: &PluginContext,
+    ir: &IrFile,
+    internal: crate::types::TypeName,
+) -> bool {
+    ctx.file_annotation_mentions_canonical_type(
+        ir,
+        type_name(USE_CONTEXTUAL_SERIALIZATION_FQ),
+        internal,
+    )
+}
+
+/// kotlinc hides the generated `$serializer` implementation from source resolution while keeping
+/// it callable by compiler-generated code.
+pub(super) fn generated_serializer_annotations() -> DeclarationAnnotations {
+    DeclarationAnnotations::new(vec![RetainedAnnotation {
+        retention: AnnotationRetention::Runtime,
+        annotation: AppliedAnnotation {
+            internal: type_name("kotlin/Deprecated"),
+            values: vec![
+                (
+                    "message".to_string(),
+                    AnnoValue::Const(IrConst::String(KtString::from(
+                        "This synthesized declaration should not be used directly",
+                    ))),
+                ),
+                (
+                    "level".to_string(),
+                    AnnoValue::Enum(type_name("kotlin/DeprecationLevel"), "HIDDEN".to_string()),
+                ),
+            ],
+        },
+        facts: crate::types::AnnotationSemanticFacts {
+            deprecated_hidden: true,
+            deprecated_error: false,
+            optional_expectation: false,
+        },
+    }])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::write_self_annotations;
+    use crate::types::type_name;
+
+    #[test]
+    fn write_self_has_exact_jvm_static_annotation() {
+        let annotations = write_self_annotations();
+        let applications = annotations.applications().collect::<Vec<_>>();
+        assert_eq!(applications.len(), 1);
+        assert_eq!(applications[0].internal, type_name("kotlin/jvm/JvmStatic"));
+        assert!(applications[0].values.is_empty());
+    }
+}

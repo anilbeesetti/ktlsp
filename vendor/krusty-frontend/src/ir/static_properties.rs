@@ -1,0 +1,131 @@
+//! A static property's storage and how each of its accessors comes about: the facade (or owner
+//! class) field a top-level or hoisted property lives in.
+
+use super::{ExprId, IrAccessorLines};
+use crate::types::{Ty, TypeName};
+
+/// How each of a static property's accessors comes about.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct IrStaticAccessors {
+    pub getter: IrStaticAccessor,
+    /// Meaningful only for a `var`.
+    pub setter: IrStaticAccessor,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum IrStaticAccessor {
+    /// The compiler supplies it, unless the property's own visibility hides it.
+    Default,
+    /// Source declares it: an ordinary function whose body sees `field` as this static.
+    Declared,
+    /// No method exists: compiler-internal storage, or a bodiless `private set`, whose default
+    /// setter is private and therefore never generated.
+    Absent,
+}
+
+impl IrStaticAccessors {
+    pub const DEFAULT: Self = Self {
+        getter: IrStaticAccessor::Default,
+        setter: IrStaticAccessor::Default,
+    };
+    pub const ABSENT: Self = Self {
+        getter: IrStaticAccessor::Absent,
+        setter: IrStaticAccessor::Absent,
+    };
+
+    /// Whether source declared either accessor.
+    pub fn any_declared(self) -> bool {
+        self.getter == IrStaticAccessor::Declared || self.setter == IrStaticAccessor::Declared
+    }
+}
+
+/// A top-level (module) property: a static field on the file facade, initialized in `<clinit>`.
+#[derive(Clone, Debug)]
+pub struct IrStatic {
+    pub name: String,
+    pub ty: Ty,
+    /// The initializer expression, run in `<clinit>` in declaration order. `None` when source
+    /// declares none (a `lateinit var`): the field starts at its JVM default and `<clinit>` has
+    /// nothing to run for it.
+    pub init: Option<ExprId>,
+    /// `var` (mutable) ⇒ a setter is emitted and the backing field is non-`final`.
+    pub is_var: bool,
+    /// `const val` ⇒ kotlinc keeps the field `static final` (inlined at use) with no accessor, at the
+    /// DECLARATION's own visibility: `private const val` is a private field, while `internal` and
+    /// `public` are both public (`internal` is a Kotlin boundary with no JVM spelling). A plain
+    /// top-level `val`/`var` is `private static [final]` + a `public static` getter/setter whatever
+    /// the source said, because every reader goes through the accessor.
+    pub is_const: bool,
+    /// `lateinit var`. A hoisted companion field follows the exact companion setter's visibility; a
+    /// public or internal setter makes it `public static`, while a private or protected setter keeps
+    /// that JVM restriction. The default getter throws while the field is null. An `isInitialized`
+    /// probe is recorded separately and reads the field without the guard.
+    pub is_lateinit: bool,
+    /// The class this static field belongs to. `None` = the file facade (a top-level property). `Some`
+    /// = a specific class. A class companion's `const val` lives on the OUTER class (`public static
+    /// final` + `ConstantValue`). An interface companion's public or internal const is stored on both
+    /// the interface and the companion; a private const stays on the companion only, because an
+    /// interface field cannot be private.
+    pub owner: Option<TypeName>,
+    /// Declaration visibility (`public` by default). A PRIVATE top-level property gets NO public
+    /// accessors; cross-class reads inside the file go through a synthesized `access$get<X>$p` bridge
+    /// (kotlinc's shape).
+    pub visibility: crate::types::Visibility,
+    /// The default getter's JVM name when it is not the ordinary `get<X>` spelling: an internal
+    /// `companion { … }` block property's is `get<X>$<module>`. `None` ⇒ the ordinary name.
+    pub getter_jvm_name: Option<String>,
+    /// The setter's JVM name when it is not the ordinary `set<X>` spelling — a value-class-typed
+    /// property mangles it, because a value-class PARAMETER always does, and an internal
+    /// `companion { … }` block setter takes the module suffix. `None` ⇒ the ordinary name.
+    pub setter_jvm_name: Option<String>,
+    /// The type this static was DECLARED with, when the JVM pass erased its storage to a value
+    /// class's carrier (a file facade's property, which kotlinc erases the same way). `None` ⇒ the
+    /// storage keeps the boxed value-class object, or holds no value class at all.
+    ///
+    /// The whole declared type, not just the classifier: once `ty` holds the carrier, every fact
+    /// the accessors still need — which value class it is AND whether it was nullable — is only
+    /// here. Reading them back off the erased type made a `var x: Label?` publish a non-null
+    /// `String` setter, which then refused the `null` the property accepts. Every reader consults
+    /// this rather than re-deciding, so a read of the field and the field itself cannot disagree.
+    pub erased_declared_ty: Option<Ty>,
+    /// Which of the property's accessors source declared. A declared `getX`/`setX` is an ordinary
+    /// function (its body lowered with `field` bound to this static); the one source left out is
+    /// the compiler default.
+    pub accessors: IrStaticAccessors,
+    /// 1-based source line of the property declaration (0 = unknown). kotlinc maps the accessors'
+    /// LineNumberTables to this line; a `<clinit>` store opens on its initializer's own line.
+    pub line: u32,
+    /// Lines of the written accessors and of the declaration's end, recorded with [`Self::line`].
+    pub accessor_lines: IrAccessorLines,
+    /// Source byte offset of the declaration (`u32::MAX` for a target/plugin synthetic). This is the
+    /// exact ordering key when class metadata interleaves static and instance properties.
+    pub source_order: u32,
+    /// A delegated property's `x$delegate` storage: it holds the delegate, not a property value.
+    pub property_delegate: bool,
+}
+
+impl IrStatic {
+    /// The JVM name of the compiler-default getter.
+    pub fn default_getter_jvm_name(&self) -> String {
+        self.getter_jvm_name
+            .clone()
+            .unwrap_or_else(|| crate::names::property_getter_name(&self.name))
+    }
+
+    /// The JVM name of the compiler-default setter.
+    pub fn default_setter_jvm_name(&self) -> String {
+        self.setter_jvm_name
+            .clone()
+            .unwrap_or_else(|| crate::names::property_setter_name(&self.name))
+    }
+
+    pub fn is_facade_owned(&self) -> bool {
+        self.owner.is_none()
+    }
+
+    pub fn owner_matches(&self, internal: &str) -> bool {
+        self.owner
+            .as_ref()
+            .is_some_and(|owner| owner.matches(internal))
+    }
+}

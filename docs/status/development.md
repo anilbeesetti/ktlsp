@@ -5222,3 +5222,69 @@ are complete: do not restart, retry unchanged code, add probes, raise limits,
 reorder readiness before deadline or weaken healthy assertions. All historical
 FAILED/UNKNOWN and native-only/T004/#96/B3/oracle holds remain unchanged.
 
+## Original446 Rust-only Krusty adoption and standalone diagnostics
+
+Reviewed implementation head `41fc1f8b02cb4c2b4845f59898f70cc9c613cabd`
+reuses Krusty `3b0d3b926857564d3fdc65b66d7003564ef6a9ad` without JVM,
+backend/codegen or C/native stack helpers. Two independent source reviews and
+finding rechecks covered extraction/resource boundaries and the standard-LSP bridge.
+Original attempt-1 [Linux native39204512022](https://github.com/anilbeesetti/ktlsp/actions/runs/39204512022)
+and [macOS/Windows platform39204511983](https://github.com/anilbeesetti/ktlsp/actions/runs/39204511983)
+passed full workspace checks; separate Rust synthetic tools39204512026 passed.
+Local checks were compiler-only; #96 local runtime admission is unchanged.
+
+Linux's actual CLI recording (artifact12164969034, test merge
+`99a659ebe69c7f50a99bcb2738586b71640ddc0b`) returned a real Krusty Int/String
+return mismatch at UTF-16 `(3,8)..(3,15)`, then an empty full report after the
+recorded ranged replacement of `"bad😀"` with `value`. Shutdown returned null,
+exit0 was observed, stderr was empty and capture completed. This is synthetic
+native-server execution, not official oracle acceptance. The first original head
+`53353aa` failed two unsupported `"Int"` debug-format expectations on all hosts;
+tests now check genuine cross-file type equality and Boolean inequality instead,
+without formatter changes or relaxed resource bounds.
+
+This adds opt-in standalone diagnostics and a bounded multi-source analysis API,
+not full Kotlin LSP parity, project/stdlib/JDK linkage or native inferred hover.
+Default providers and historical UNKNOWN/HOLD records remain unchanged.
+Current packaging source includes all three matching executables and frontend
+notices; old exact66676 archives do not contain the new worker. Final documentation
+head reviews, its OWN original CI, guarded merge and independent OWNER+ROOT
+original exact-main acceptance remain separate gates in [PR447](https://github.com/anilbeesetti/ktlsp/pull/447).
+
+Final documentation head `6fa3eecdd14acddfa0013c07fa3237729cd095e9`
+passed original Linux39205865563 and macOS39205865525 checks, but Windows
+job117908448148 failed the existing declaration-hover fixture with
+`parserTimeoutSite=supervisor_poll`. That fixture uses the default parser,
+not the standalone compiler worker. The original failure and its cause remain
+UNKNOWN; no production fix or deadline/assertion change was established.
+
+The separately authorized [#448 capture and independent raw-data audits](https://github.com/anilbeesetti/ktlsp/pull/449#issuecomment-6262528709)
+completed at reviewed8352625: all five original checks passed, with 16 complete
+18-stage worker streams and actual successful wire replies. Those instrumented
+healthy samples do not diagnose the earlier failure. The observation-only PR449
+closed unmerged; none of its temporary collector enters this integration.
+The user explicitly authorized one original CI cohort for a new reviewed clean
+integration head with unchanged production Rust, Cargo, tests and workflows.
+This is acceptance validation, not an incident fix; preserve all old results.
+Merge remains conditional on that exact head's five passing checks, fresh
+exclusive expected-head/base/scope/configuration guards and independent
+OWNER+ROOT original exact-main acceptance.
+
+Clean head `c4190ec7908cb4f07c8388e8925f6e29b02c6972` passed original
+native39220859817, Windows39220859588 and tools39220859664, but macOS
+job117955558469 failed the existing parser snapshot fixture at
+`aggregate-remaining-12: Timeout`. Its cause and cleanup remain UNKNOWN;
+the plain Unix error records neither worker phase nor cleanup confirmation.
+The user then instructed proceeding and merging only if good.
+
+The separately reviewed [#450 macOS capture](https://github.com/anilbeesetti/ktlsp/pull/451#issuecomment-6263967460)
+completed at a2a5cc1 with all five original checks passing. One exact 16724-byte
+fixture yielded all 18 worker markers, 4429 tree elements, 414684 output bytes,
+and observed exit0/Confirmed cleanup. This healthy instrumented sample does
+not diagnose or repair c419. PR451 closed unmerged; every collector remains
+excluded from this clean integration. Post-investigation acceptance requires
+one original cohort for the reviewed clean final head, unchanged production
+Rust/Cargo/tests/workflows, all five checks passing, fresh exclusive guards,
+then independent OWNER+ROOT original exact-main acceptance. Preserve every
+older failure and UNKNOWN classification; no retry-until-green or parity claim.
+

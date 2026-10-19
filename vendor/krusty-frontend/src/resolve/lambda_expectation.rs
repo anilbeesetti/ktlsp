@@ -1,0 +1,355 @@
+use crate::libraries::{CallSig, SemanticPlatform};
+use crate::symbol_source::SymbolSource;
+use crate::types::Ty;
+
+use super::{
+    call_argument_parameter_indices, generic_member_lambda_params, module_member_lambda_params,
+    ContextualCallShape, GenericMemberPlan,
+};
+
+/// Contextual lambda shapes supplied by one selected module member, in source-argument order.
+pub(super) struct MemberLambdaShape {
+    pub(super) param_types: Vec<Option<Vec<Ty>>>,
+    pub(super) expected_types: Vec<Option<Ty>>,
+    pub(super) signatures: Vec<Option<&'static crate::types::FnSig>>,
+    pub(super) receivers: Vec<Option<Ty>>,
+    /// Per argument, whether the selected parameter inlines a lambda into the caller's frame.
+    pub(super) inlined: Vec<bool>,
+}
+
+pub(super) fn module_member_lambda_shape(
+    source: &dyn SymbolSource,
+    member: &crate::libraries::LibraryMember,
+    generic_member: Option<&GenericMemberPlan>,
+    contextual: &ContextualCallShape,
+    args: &[crate::ast::ExprId],
+    names: Option<&[Option<String>]>,
+    trailing_lambda: bool,
+) -> Option<MemberLambdaShape> {
+    let visible_indices = call_argument_parameter_indices(
+        args.len(),
+        contextual.params.len(),
+        names,
+        trailing_lambda,
+        &contextual.call_sig,
+    )?;
+    let indices = visible_indices
+        .into_iter()
+        .map(|parameter| contextual.parameter_indices.get(parameter).copied())
+        .collect::<Option<Vec<_>>>()?;
+    Some(MemberLambdaShape {
+        param_types: indices
+            .iter()
+            .map(|&parameter| {
+                generic_member
+                    .and_then(|plan| generic_member_lambda_params(source, plan, parameter))
+                    .or_else(|| module_member_lambda_params(source, member, parameter))
+            })
+            .collect(),
+        expected_types: indices
+            .iter()
+            .map(|&parameter| {
+                generic_member
+                    .and_then(|plan| {
+                        plan.method
+                            .signature
+                            .params
+                            .get(parameter)
+                            .copied()
+                            .map(|shape| {
+                                crate::symbol_resolver::ty_subst_keep_unbound(
+                                    shape,
+                                    &plan.call_bindings,
+                                )
+                            })
+                    })
+                    .or_else(|| member.params.get(parameter).copied())
+            })
+            .collect(),
+        signatures: indices
+            .iter()
+            .map(|&parameter| {
+                let semantic = generic_member
+                    .and_then(|plan| {
+                        plan.method
+                            .signature
+                            .params
+                            .get(parameter)
+                            .copied()
+                            .map(|shape| {
+                                crate::symbol_resolver::ty_subst_keep_unbound(
+                                    shape,
+                                    &plan.call_bindings,
+                                )
+                            })
+                    })
+                    .or_else(|| {
+                        member
+                            .generic_sig
+                            .as_ref()
+                            .and_then(|signature| signature.params.get(parameter).copied())
+                    })
+                    .or_else(|| member.params.get(parameter).copied());
+                match semantic {
+                    Some(Ty::Fun(signature)) => Some(signature),
+                    _ => None,
+                }
+            })
+            .collect(),
+        receivers: indices
+            .iter()
+            .map(|&parameter| {
+                member
+                    .call_sig
+                    .lambda_receivers
+                    .get(parameter)
+                    .copied()
+                    .flatten()
+            })
+            .collect(),
+        inlined: indices
+            .iter()
+            .map(|&parameter| {
+                member.inline.can_inline()
+                    && crate::types::InlineParameterModifier::runs_parameter_in_caller_frame(
+                        &member.call_sig.inline_modifiers,
+                        parameter,
+                    )
+            })
+            .collect(),
+    })
+}
+
+/// Whether the parameter selected for source argument `argument` inlines a lambda into the
+/// caller's frame, from the call's member shape, else its extension shape.
+pub(super) fn shaped_argument_inlining(
+    module: Option<&MemberLambdaShape>,
+    extension: Option<&crate::symbol_resolver::LambdaCallShape>,
+    argument: usize,
+) -> Option<bool> {
+    match module {
+        Some(shape) => shape.inlined.get(argument).copied(),
+        None => extension.and_then(|shape| shape.inlines_argument(argument)),
+    }
+}
+
+/// The `crossinline`/`noinline` modifier a source parameter wrote.
+pub(in crate::resolve) fn written_inline_modifier(
+    parameter: &crate::ast::Param,
+) -> crate::types::InlineParameterModifier {
+    crate::types::InlineParameterModifier::written(
+        parameter.is_materialized_lambda,
+        parameter.is_crossinline,
+    )
+}
+
+/// The functional shape at one argument position of a selected provider candidate. Lambdas consume
+/// the split context/receiver/value inputs; callable references consume `callable_type`. Keeping one
+/// carrier prevents the two syntax forms from running separate candidate selection paths.
+#[derive(Clone, Debug)]
+pub(super) struct FunctionalArgumentExpectation {
+    pub(super) context_types: Vec<Ty>,
+    pub(super) value_params: Vec<Ty>,
+    pub(super) receiver: Option<Ty>,
+    /// The parameter's declared result. A lambda whose expected result is `Unit` ends in statement
+    /// position, which is what makes a trailing `when` with no `else` legal in every builder block.
+    /// `None` when the parameter shape was recovered from metadata alone and carries no result.
+    pub(super) result: Option<Ty>,
+    pub(super) callable_type: Option<Ty>,
+    pub(super) sam_conversion: bool,
+    /// The selected parameter inlines a lambda into the caller's frame: the callable is inline and
+    /// the parameter is neither `crossinline` nor `noinline`.
+    pub(super) inlined: bool,
+    /// Stable identities of the selected callable's own type parameters. A result that mentions one
+    /// remains open until this call's inference solves it. Other type parameters belong to an
+    /// enclosing declaration and are fixed inside the body being checked.
+    callee_formals: Vec<String>,
+}
+
+impl FunctionalArgumentExpectation {
+    /// The result the lambda body is checked against once the selected declaration has fixed it.
+    pub(super) fn fixed_result(&self) -> Option<Ty> {
+        self.result.filter(|result| {
+            !result.mentions_error()
+                && !result.mentions_pending()
+                && !crate::types::ty_mentions_param(*result, &self.callee_formals)
+        })
+    }
+}
+
+/// Derive the expected shape of a lambda argument from its selected candidate parameter. Kotlin
+/// function types contribute context, receiver, value, and result types; Java SAMs contribute their
+/// single abstract method, its first parameter as the receiver under kotlinc's sam-with-receiver
+/// convention, which `sam_source` (the federated module and dependency providers) carries. Any
+/// other parameter gives no expectation. `callee` is the selected callable's own generic signature;
+/// only its formals remain open in the expected result.
+pub(super) fn functional_argument_expectation(
+    platform: &dyn SemanticPlatform,
+    sam_source: &dyn crate::symbol_source::SymbolSource,
+    call_sig: &CallSig,
+    inline: bool,
+    index: usize,
+    param: Ty,
+    callee: Option<&crate::libraries::GenericSig>,
+) -> Option<FunctionalArgumentExpectation> {
+    let callee_formals = callee.map_or_else(Vec::new, |signature| signature.formals.clone());
+    let inlined = inline
+        && crate::types::InlineParameterModifier::runs_parameter_in_caller_frame(
+            &call_sig.inline_modifiers,
+            index,
+        );
+    let has_receiver = call_sig
+        .lambda_receiver_params
+        .get(index)
+        .copied()
+        .unwrap_or(false);
+    let metadata_receiver = call_sig.lambda_receivers.get(index).copied().flatten();
+    match param.non_null() {
+        Ty::Fun(signature) => {
+            let (receiver, skip) = if has_receiver {
+                // Prefer the call-site-substituted function input: it retains declaration type
+                // arguments and nullability. The compact metadata receiver is recovery data for an
+                // erased function shape, never a precision upgrade.
+                let receiver = signature
+                    .params
+                    .get(signature.context_count)
+                    .copied()
+                    .or(metadata_receiver)?;
+                (Some(receiver), signature.context_count + 1)
+            } else {
+                (None, signature.context_count)
+            };
+            Some(FunctionalArgumentExpectation {
+                context_types: signature.params
+                    [..signature.context_count.min(signature.params.len())]
+                    .to_vec(),
+                value_params: signature.params.get(skip..).unwrap_or_default().to_vec(),
+                receiver,
+                result: Some(signature.ret),
+                callable_type: Some(Ty::Fun(signature)),
+                sam_conversion: false,
+                inlined,
+                callee_formals,
+            })
+        }
+        param if has_receiver => {
+            // This recovery arm exists precisely because the function type was erased. Metadata
+            // retains receiver/input facts but cannot supply a declared result.
+            let receiver = metadata_receiver?;
+            let context_count = call_sig
+                .lambda_context_counts
+                .get(index)
+                .copied()
+                .unwrap_or_default();
+            let decoded = call_sig.lambda_param_types.get(index);
+            let value_params = decoded
+                .filter(|params| !params.is_empty())
+                .map(|params| params.get(context_count + 1..).unwrap_or_default().to_vec())
+                .unwrap_or_else(|| {
+                    let arity = platform.function_like_arity(param).unwrap_or(1);
+                    vec![Ty::Error; arity.saturating_sub(context_count + 1)]
+                });
+            Some(FunctionalArgumentExpectation {
+                context_types: decoded
+                    .map(|params| {
+                        params
+                            .get(..context_count.min(params.len()))
+                            .unwrap_or_default()
+                            .to_vec()
+                    })
+                    .unwrap_or_default(),
+                value_params,
+                receiver: Some(receiver),
+                result: None,
+                callable_type: None,
+                sam_conversion: false,
+                inlined,
+                callee_formals,
+            })
+        }
+        param => crate::symbol_resolver::semantic_sam_signature(sam_source, param).map(|sam| {
+            let callable_type = Ty::fun_with_shape(
+                sam.params.clone(),
+                sam.ret,
+                sam.context_count,
+                sam.has_receiver,
+                sam.suspend,
+            );
+            let (context_types, receiver, value_params) = if sam.has_receiver {
+                let mut params = sam.params;
+                let value_params = params.split_off(sam.context_count + 1);
+                let receiver = params.pop();
+                (params, receiver, value_params)
+            } else {
+                (Vec::new(), None, sam.params)
+            };
+            FunctionalArgumentExpectation {
+                context_types,
+                value_params,
+                receiver,
+                result: Some(sam.ret),
+                callable_type: Some(callable_type),
+                sam_conversion: true,
+                inlined,
+                callee_formals,
+            }
+        }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn expectation(result: Ty, callee_formals: &[&str]) -> FunctionalArgumentExpectation {
+        FunctionalArgumentExpectation {
+            context_types: Vec::new(),
+            value_params: Vec::new(),
+            receiver: None,
+            result: Some(result),
+            callable_type: None,
+            sam_conversion: false,
+            inlined: false,
+            callee_formals: callee_formals
+                .iter()
+                .map(|formal| (*formal).to_string())
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn an_enclosing_declarations_type_parameter_is_a_fixed_lambda_result() {
+        let enclosing = "\0tp:enclosing:T";
+        let any = Ty::nullable(Ty::obj("kotlin/Any"));
+        let result = Ty::obj_args(
+            "kotlin/collections/MutableList",
+            &[Ty::ty_param(enclosing, any)],
+        );
+
+        assert_eq!(
+            expectation(result, &["\0tp:callee:R"]).fixed_result(),
+            Some(result)
+        );
+    }
+
+    #[test]
+    fn the_selected_callables_own_type_parameter_keeps_the_lambda_result_open() {
+        let callee = "\0tp:callee:R";
+        let any = Ty::nullable(Ty::obj("kotlin/Any"));
+        let result = Ty::obj_args(
+            "kotlin/collections/MutableList",
+            &[Ty::ty_param(callee, any)],
+        );
+
+        assert_eq!(expectation(result, &[callee]).fixed_result(), None);
+    }
+
+    #[test]
+    fn unresolved_markers_keep_the_lambda_result_open() {
+        let pending = Ty::obj_args("kotlin/collections/List", &[Ty::Pending]);
+        let error = Ty::obj_args("kotlin/collections/List", &[Ty::Error]);
+
+        assert_eq!(expectation(pending, &[]).fixed_result(), None);
+        assert_eq!(expectation(error, &[]).fixed_result(), None);
+    }
+}

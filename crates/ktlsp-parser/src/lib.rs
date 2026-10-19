@@ -614,6 +614,59 @@ impl Parser {
             });
         (result, cleanup)
     }
+    /// Exchange one bounded analysis request with the trusted worker.
+    ///
+    /// Shares parser admission, deadlines, I/O and same-child cleanup. Input and
+    /// output are analysis JSON rather than a CST; the analysis consumer must
+    /// authenticate and validate the complete reply before publication.
+    pub fn exchange_analysis_with_cleanup(
+        &self,
+        request: &str,
+        cancelled: &AtomicBool,
+    ) -> (Result<Vec<u8>, ParserError>, bool) {
+        let mut cleanup_status = true;
+        let result = (|| {
+            if request.len() > MAX_SOURCE_BYTES {
+                return Err(ParserError::InputLimit);
+            }
+            if cancelled.load(Ordering::Relaxed) {
+                return Err(ParserError::Cancelled);
+            }
+            #[cfg(unix)]
+            let mut lease = admission::reserve()?;
+            if cancelled.load(Ordering::Relaxed) {
+                return Err(ParserError::Cancelled);
+            }
+            let mut command = Command::new(&self.worker);
+            command.arg("--analyze");
+            #[cfg(unix)]
+            let mut cleanup = (admission::Cleanup::Failed, true);
+            let bytes = supervise(
+                command,
+                request,
+                cancelled,
+                #[cfg(not(unix))]
+                &mut cleanup_status,
+                #[cfg(unix)]
+                None,
+                #[cfg(unix)]
+                false,
+                #[cfg(unix)]
+                &mut lease,
+                #[cfg(unix)]
+                &mut cleanup,
+            );
+            #[cfg(unix)]
+            {
+                cleanup_status = cleanup.1;
+            }
+            if cancelled.load(Ordering::Relaxed) {
+                return Err(ParserError::Cancelled);
+            }
+            bytes
+        })();
+        (result, cleanup_status)
+    }
     /// Finite Unix observation; overhead is unmeasured and missing receipts are inconclusive.
     #[cfg(unix)]
     #[doc(hidden)]

@@ -1,0 +1,1067 @@
+//! Common-IR semantic boundary validation.
+//!
+//! `Ty::Pending` and `Ty::Error` are frontend/checker states, not Kotlin types. This module walks
+//! every common-IR type carrier before the IR crosses into a backend. The matches over semantic
+//! operation enums are deliberately exhaustive: adding a new IR node requires deciding where its
+//! types live instead of silently creating an unchecked backend path.
+
+use crate::types::Ty;
+
+mod completeness;
+pub use completeness::IncompleteIrFact;
+
+use super::{
+    Callee, CtorDelegateTarget, FuncRef, IrCheckedArgument, IrCheckedConstructorTarget,
+    IrCheckedOperation, IrCheckedSubstitution, IrClass, IrExpr, IrFile, IrGenericSig, IrIntrinsic,
+    IrSamTarget, IrTypeParameter, MemberExtProp, PropRef,
+};
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UndeterminedIrType {
+    pub location: &'static str,
+    pub ty: Ty,
+}
+
+/// A cross-field common-IR invariant that must hold before any backend sees the file.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum InvalidIrContract {
+    NullableSam {
+        expression: u32,
+        violation: NullableSamContractViolation,
+    },
+    /// `shared_secondary_super_capture_parameters` names a constructor that does not delegate
+    /// to the superclass, or a parameter that constructor does not have.
+    SecondarySuperCapture {
+        class: u32,
+        secondary: u32,
+        parameter: u32,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NullableSamContractViolation {
+    MissingFunctionAdapter,
+    CaptureCount { actual: usize },
+    CaptureType { ty: Option<Ty> },
+}
+
+fn reject(location: &'static str, ty: Ty) -> Result<(), UndeterminedIrType> {
+    if ty.mentions_pending() || ty.mentions_error() {
+        Err(UndeterminedIrType { location, ty })
+    } else {
+        Ok(())
+    }
+}
+
+fn reject_all(
+    location: &'static str,
+    types: impl IntoIterator<Item = Ty>,
+) -> Result<(), UndeterminedIrType> {
+    for ty in types {
+        reject(location, ty)?;
+    }
+    Ok(())
+}
+
+fn validate_intrinsic(operation: &IrIntrinsic) -> Result<(), UndeterminedIrType> {
+    match operation {
+        IrIntrinsic::PrimitiveCompare { operand, .. }
+        | IrIntrinsic::UnsignedCompare { operand }
+        | IrIntrinsic::Ieee754Equals { operand } => reject("intrinsic operand", *operand),
+        IrIntrinsic::UnsignedToString { source } => reject("intrinsic source", *source),
+        IrIntrinsic::PrimitiveArrayNew { element } => reject("intrinsic array element", *element),
+        IrIntrinsic::EnumValueOf { classifier } => reject("enum valueOf classifier", *classifier),
+        IrIntrinsic::EnumEntries { classifier } => reject("enum entries classifier", *classifier),
+        IrIntrinsic::TypeOf { ty } => reject("typeOf type argument", *ty),
+        IrIntrinsic::GeneratedPropertyEquals { ty }
+        | IrIntrinsic::GeneratedPropertyHash { ty }
+        | IrIntrinsic::DataClassArrayToString { ty } => reject("intrinsic property", *ty),
+        IrIntrinsic::Assert { .. }
+        | IrIntrinsic::ArrayGet
+        | IrIntrinsic::ArraySet
+        | IrIntrinsic::ArraySize
+        | IrIntrinsic::StringGet
+        | IrIntrinsic::StringLength
+        | IrIntrinsic::EnumName
+        | IrIntrinsic::NullableAnyToString
+        | IrIntrinsic::CoroutineContext => Ok(()),
+    }
+}
+
+fn validate_callee(callee: &Callee) -> Result<(), UndeterminedIrType> {
+    match callee {
+        Callee::Intrinsic { operation, ret } => {
+            validate_intrinsic(operation)?;
+            reject("callee result", *ret)
+        }
+        Callee::External {
+            params,
+            ret,
+            substitutions,
+            ..
+        } => {
+            reject_all("callee parameter", params.iter().copied())?;
+            reject("callee result", *ret)?;
+            for substitution in substitutions {
+                validate_substitution(substitution)?;
+            }
+            Ok(())
+        }
+        Callee::CrossFile { params, ret, .. }
+        | Callee::Module { params, ret, .. }
+        | Callee::Super { params, ret, .. } => {
+            reject_all("callee parameter", params.iter().copied())?;
+            reject("callee result", *ret)
+        }
+        Callee::ModuleWithDefaults {
+            params,
+            ret,
+            dispatch_receiver_ty,
+            ..
+        } => {
+            reject_all("callee parameter", params.iter().copied())?;
+            reject("callee result", *ret)?;
+            if let Some(receiver) = dispatch_receiver_ty {
+                reject("callee dispatch receiver", *receiver)?;
+            }
+            Ok(())
+        }
+        Callee::Virtual { params, .. } => {
+            if let Some((params, ret)) = params {
+                reject_all("virtual callee parameter", params.iter().copied())?;
+                reject("virtual callee result", *ret)?;
+            }
+            Ok(())
+        }
+        Callee::Local(_)
+        | Callee::LocalWithDefaults { .. }
+        | Callee::ClassStatic { .. }
+        | Callee::ClassStaticWithDefaults { .. }
+        | Callee::ClassStaticDefault { .. }
+        | Callee::LocalDefault(_)
+        | Callee::Static { .. }
+        | Callee::Special { .. } => Ok(()),
+    }
+}
+
+fn validate_argument(argument: &IrCheckedArgument) -> Result<(), UndeterminedIrType> {
+    match argument {
+        IrCheckedArgument::Vararg { array_type, .. } => reject("checked vararg array", *array_type),
+        IrCheckedArgument::Expression { .. } | IrCheckedArgument::Default { .. } => Ok(()),
+    }
+}
+
+fn validate_substitution(substitution: &IrCheckedSubstitution) -> Result<(), UndeterminedIrType> {
+    reject("checked substitution", substitution.value)?;
+    reject("checked reified substitution", substitution.reified_runtime)?;
+    reject_all(
+        "checked substitution bound",
+        substitution.additional_bounds.iter().copied(),
+    )
+}
+
+fn validate_constructor_target(
+    target: &IrCheckedConstructorTarget,
+) -> Result<(), UndeterminedIrType> {
+    match target {
+        IrCheckedConstructorTarget::External { parameters, .. } => {
+            reject_all("checked constructor parameter", parameters.iter().copied())
+        }
+        IrCheckedConstructorTarget::Module(_) => Ok(()),
+    }
+}
+
+fn validate_checked_operation(operation: &IrCheckedOperation) -> Result<(), UndeterminedIrType> {
+    match operation {
+        IrCheckedOperation::Call {
+            arguments,
+            substitutions,
+            ..
+        } => {
+            for argument in arguments {
+                validate_argument(argument)?;
+            }
+            for substitution in substitutions {
+                validate_substitution(substitution)?;
+            }
+            Ok(())
+        }
+        IrCheckedOperation::PropertyRead { substitutions, .. }
+        | IrCheckedOperation::PropertyWrite { substitutions, .. } => {
+            for substitution in substitutions {
+                validate_substitution(substitution)?;
+            }
+            Ok(())
+        }
+        IrCheckedOperation::ExternalPropertyRead {
+            parameters,
+            result,
+            source_receiver,
+            ..
+        }
+        | IrCheckedOperation::ExternalPropertyWrite {
+            parameters,
+            result,
+            source_receiver,
+            ..
+        } => {
+            reject_all("external property parameter", parameters.iter().copied())?;
+            reject("external property result", *result)?;
+            if let Some(receiver) = source_receiver {
+                reject("external property receiver", *receiver)?;
+            }
+            Ok(())
+        }
+        IrCheckedOperation::ConstructorDelegation {
+            target,
+            outer_parameter,
+            arguments,
+            substitutions,
+            ..
+        } => {
+            validate_constructor_target(target)?;
+            if let Some(outer) = outer_parameter {
+                reject("constructor outer parameter", *outer)?;
+            }
+            for argument in arguments {
+                validate_argument(argument)?;
+            }
+            for substitution in substitutions {
+                validate_substitution(substitution)?;
+            }
+            Ok(())
+        }
+        IrCheckedOperation::RangeConstruction {
+            start_type,
+            end_type,
+            result,
+            ..
+        } => {
+            reject("range start", *start_type)?;
+            reject("range end", *end_type)?;
+            reject("range result", *result)
+        }
+        IrCheckedOperation::RangeContains { counter, .. }
+        | IrCheckedOperation::RangeLoop { counter, .. } => reject("range counter", *counter),
+        IrCheckedOperation::IllegalProgressionStep { .. } => Ok(()),
+        IrCheckedOperation::PropertyReference { substitutions, .. } => {
+            for substitution in substitutions {
+                validate_substitution(substitution)?;
+            }
+            Ok(())
+        }
+        IrCheckedOperation::LateinitFieldRead { .. }
+        | IrCheckedOperation::BackingFieldRead { .. }
+        | IrCheckedOperation::BackingFieldWrite { .. } => Ok(()),
+    }
+}
+
+fn validate_sam(sam: &IrSamTarget) -> Result<(), UndeterminedIrType> {
+    reject_all("SAM parameter", sam.parameters.iter().copied())?;
+    reject("SAM result", sam.result)?;
+    reject_all(
+        "SAM declared parameter",
+        sam.declared_parameters.iter().copied(),
+    )?;
+    reject("SAM declared result", sam.declared_result)
+}
+
+fn validate_expr(expression: &IrExpr) -> Result<(), UndeterminedIrType> {
+    match expression {
+        IrExpr::Checked(operation) => validate_checked_operation(operation),
+        IrExpr::CallableReference(reference) => {
+            reject("callable-reference type", reference.function_type)?;
+            reject_all(
+                "callable-reference declaration parameter",
+                reference.declaration_parameters.iter().copied(),
+            )?;
+            reject(
+                "callable-reference declaration result",
+                reference.declaration_result,
+            )?;
+            if let Some(adaptation) = &reference.adaptation {
+                reject_all(
+                    "callable-reference adapted parameter",
+                    adaptation
+                        .parameter_types
+                        .iter()
+                        .map(|parameter| parameter.get()),
+                )?;
+                reject(
+                    "callable-reference adapted result",
+                    adaptation.result_type.get(),
+                )?;
+            }
+            Ok(())
+        }
+        IrExpr::KClassLiteral { classifier, .. } => {
+            classifier.map_or(Ok(()), |ty| reject("class literal", ty))
+        }
+        IrExpr::LocalPropertyReference(reference) => {
+            reject("local property reference", reference.property_type)
+        }
+        IrExpr::LocalDelegateAccess(_) => Ok(()),
+        IrExpr::Call { callee, .. } => validate_callee(callee),
+        IrExpr::PluginPlaceholder { types, .. } => {
+            reject_all("plugin operation type", types.iter().copied())
+        }
+        IrExpr::TypeOp { type_operand, .. } => reject("type operation", *type_operand),
+        IrExpr::Variable { ty, .. } => reject("local variable", *ty),
+        IrExpr::PrimitiveNeg { ty, .. } => reject("primitive negation", *ty),
+        IrExpr::PropertyRead { ty, .. } | IrExpr::PropertyWrite { ty, .. } => {
+            reject("property operation", *ty)
+        }
+        IrExpr::New { ctor_params, .. } => {
+            if let Some(params) = ctor_params {
+                reject_all("constructor parameter", params.iter().copied())?;
+            }
+            Ok(())
+        }
+        IrExpr::Lambda { sam, .. } => sam.as_ref().map_or(Ok(()), validate_sam),
+        IrExpr::InvokeFunction { params, ret, .. } => {
+            reject_all("function-value parameter", params.iter().copied())?;
+            reject("function-value result", *ret)
+        }
+        IrExpr::RefNew { elem, .. } | IrExpr::RefGet { elem, .. } | IrExpr::RefSet { elem, .. } => {
+            reject("shared local element", *elem)
+        }
+        IrExpr::Vararg { array_type, .. } | IrExpr::NewArray { array_type, .. } => {
+            reject("array type", *array_type)
+        }
+        IrExpr::Try {
+            result, catches, ..
+        } => {
+            reject("try result", *result)?;
+            reject_all("catch type", catches.iter().map(|catch| catch.ty))
+        }
+        IrExpr::Const(_)
+        | IrExpr::BottomValue { .. }
+        | IrExpr::ClassConst { .. }
+        | IrExpr::SingletonValue { .. }
+        | IrExpr::GetValue(_)
+        | IrExpr::ForwardedSuperArgument { .. }
+        | IrExpr::SetValue { .. }
+        | IrExpr::SetFrameResult { .. }
+        | IrExpr::Return(_)
+        | IrExpr::Block { .. }
+        | IrExpr::When { .. }
+        | IrExpr::While { .. }
+        | IrExpr::Break { .. }
+        | IrExpr::Continue { .. }
+        | IrExpr::PrimitiveBinOp { .. }
+        | IrExpr::Equality { .. }
+        | IrExpr::StringConcat(_)
+        | IrExpr::EnclosingInstance { .. }
+        | IrExpr::GetField { .. }
+        | IrExpr::LateinitInitialized { .. }
+        | IrExpr::SetField { .. }
+        | IrExpr::GetStatic(_)
+        | IrExpr::SetStatic { .. }
+        | IrExpr::MethodCall { .. }
+        | IrExpr::EnumEntry { .. }
+        | IrExpr::StaticInstance { .. }
+        | IrExpr::ExternalStaticField { .. }
+        | IrExpr::EnumValues { .. }
+        | IrExpr::EnumValueOf { .. }
+        | IrExpr::EnumEntries { .. }
+        | IrExpr::EnumSwitchOrdinal { .. }
+        | IrExpr::EnumSwitchKey { .. }
+        | IrExpr::ReifiedClassMarker { .. }
+        | IrExpr::ReifiedTypeOp { .. }
+        | IrExpr::UnitInstance
+        | IrExpr::CurrentContinuation
+        | IrExpr::InlineFrameMarker
+        | IrExpr::NotNullAssert { .. }
+        | IrExpr::LateinitCheck { .. }
+        | IrExpr::ExternalStaticInstance { .. }
+        | IrExpr::Throw { .. } => Ok(()),
+    }
+}
+
+fn validate_type_parameter(parameter: &IrTypeParameter) -> Result<(), UndeterminedIrType> {
+    reject_all(
+        "type-parameter bound",
+        parameter.bounds.iter().map(|(ty, _)| *ty),
+    )
+}
+
+fn validate_generic_signature(signature: &IrGenericSig) -> Result<(), UndeterminedIrType> {
+    for parameter in &signature.type_params {
+        validate_type_parameter(parameter)?;
+    }
+    reject_all(
+        "generic signature parameter",
+        signature.params.iter().copied(),
+    )?;
+    if let Some(ret) = signature.ret {
+        reject("generic signature result", ret)?;
+    }
+    reject_all(
+        "generic signature supertype",
+        signature.supers.iter().copied(),
+    )
+}
+
+fn validate_func_ref(reference: &FuncRef) -> Result<(), UndeterminedIrType> {
+    if let Some(ty) = reference.reflection_target_ret_ty {
+        reject("function-reference reflected result", ty)?;
+    }
+    if let Some(params) = &reference.reflection_target_param_tys {
+        reject_all(
+            "function-reference reflected parameter",
+            params.iter().copied(),
+        )?;
+    }
+    reject_all(
+        "function-reference parameter",
+        reference.param_tys.iter().copied(),
+    )?;
+    reject("function-reference result", reference.ret_ty)?;
+    reject_all(
+        "function-reference target parameter",
+        reference.target_param_tys.iter().copied(),
+    )?;
+    reject("function-reference target result", reference.target_ret_ty)
+}
+
+fn validate_prop_ref(reference: &PropRef) -> Result<(), UndeterminedIrType> {
+    reject("property-reference type", reference.prop_ty)
+}
+
+fn validate_member_extension(property: &MemberExtProp) -> Result<(), UndeterminedIrType> {
+    reject("member-extension receiver", property.receiver)?;
+    reject("member-extension property", property.ty)?;
+    for parameter in &property.type_params {
+        validate_type_parameter(parameter)?;
+    }
+    Ok(())
+}
+
+fn validate_class(class: &IrClass) -> Result<(), UndeterminedIrType> {
+    reject_all(
+        "class type-parameter bound",
+        class.type_param_bounds.iter().map(|(_, ty)| *ty),
+    )?;
+    reject_all("class supertype", class.supertypes.iter().copied())?;
+    for property in &class.properties {
+        reject_all(
+            "property context parameter",
+            property.context_params.iter().map(|(_, _, ty)| *ty),
+        )?;
+        reject("property declaration", property.ty)?;
+        if let Some(storage) = property.storage_ty {
+            reject("property storage", storage)?;
+        }
+    }
+    for field in &class.fields {
+        reject("class field", field.ty)?;
+    }
+    for argument in &class.ctor_args {
+        reject("constructor argument", argument.ty)?;
+        if let Some(declared) = argument.declared_ty {
+            reject("declared constructor argument", declared)?;
+        }
+    }
+    reject_all(
+        "super-constructor parameter",
+        class.super_ctor_params.iter().copied(),
+    )?;
+    if let Some(reference) = &class.prop_ref {
+        validate_prop_ref(reference)?;
+    }
+    if let Some(reference) = &class.func_ref {
+        validate_func_ref(reference)?;
+    }
+    for bridge in &class.bridges {
+        reject_all(
+            "bridge erased parameter",
+            bridge.erased_params.iter().copied(),
+        )?;
+        reject("bridge erased result", bridge.erased_ret)?;
+        reject_all(
+            "bridge concrete parameter",
+            bridge.concrete_params.iter().copied(),
+        )?;
+        reject("bridge concrete result", bridge.concrete_ret)?;
+    }
+    for constructor in &class.secondary_ctors {
+        reject_all(
+            "secondary constructor prefix",
+            constructor.prefix_params.iter().copied(),
+        )?;
+        reject_all(
+            "secondary constructor parameter",
+            constructor.params.iter().copied(),
+        )?;
+        reject_all(
+            "declared secondary constructor parameter",
+            constructor.named_params.iter().map(|(_, ty)| *ty),
+        )?;
+        match &constructor.delegate {
+            CtorDelegateTarget::This { target_params, .. }
+            | CtorDelegateTarget::Super { target_params, .. } => reject_all(
+                "secondary constructor delegation parameter",
+                target_params.iter().copied(),
+            )?,
+            CtorDelegateTarget::ImplicitEnumBase => {}
+        }
+    }
+    Ok(())
+}
+
+impl IrFile {
+    /// Prove that common IR contains only semantic Kotlin types before a backend is invoked.
+    pub fn validate_determined_types(&self) -> Result<(), UndeterminedIrType> {
+        for function in &self.functions {
+            reject_all("function parameter", function.params.iter().copied())?;
+            reject("function result", function.ret)?;
+        }
+        for constructor in self.checked_constructor_bodies.values() {
+            reject_all(
+                "checked constructor-body parameter",
+                constructor.parameters.iter().map(|(_, ty)| *ty),
+            )?;
+        }
+        for property in self.checked_properties.values() {
+            reject("checked property", property.ty)?;
+            if let Some(storage) = property.storage_ty {
+                reject("checked property storage", storage)?;
+            }
+        }
+        reject_all(
+            "shared capture parameter",
+            self.shared_capture_parameters.values().copied(),
+        )?;
+        reject_all(
+            "shared class capture field",
+            self.shared_class_capture_fields.values().copied(),
+        )?;
+        reject_all(
+            "shared superclass-constructor capture parameter",
+            self.shared_super_capture_parameters.values().copied(),
+        )?;
+        reject_all(
+            "shared secondary superclass-constructor capture parameter",
+            self.shared_secondary_super_capture_parameters
+                .values()
+                .copied(),
+        )?;
+        for class in &self.classes {
+            validate_class(class)?;
+        }
+        for aliases in self.class_type_aliases.values() {
+            reject_all(
+                "type-alias expansion",
+                aliases.iter().map(|alias| alias.expansion),
+            )?;
+        }
+        for function in &self.package_functions {
+            reject_all(
+                "package-function parameter",
+                function.params.iter().map(|(_, ty)| *ty),
+            )?;
+            reject("package-function result", function.ret)?;
+            if let Some(receiver) = function.receiver {
+                reject("package-function receiver", receiver)?;
+            }
+            reject_all(
+                "package-function type-parameter bound",
+                function
+                    .type_params
+                    .iter()
+                    .flat_map(|parameter| parameter.bounds.iter().copied()),
+            )?;
+        }
+        for property in &self.package_properties {
+            reject("package-property type", property.ty)?;
+            if let Some(receiver) = property.receiver {
+                reject("package-property receiver", receiver)?;
+            }
+            reject_all(
+                "package-property context parameter",
+                property.context_parameters.iter().copied(),
+            )?;
+            reject_all(
+                "package-property type-parameter bound",
+                property
+                    .type_params
+                    .iter()
+                    .flat_map(|parameter| parameter.bounds.iter().copied()),
+            )?;
+        }
+        for property in self.referenced_module_properties.values() {
+            reject("referenced module property", property.ty)?;
+            reject_all(
+                "referenced module property context parameter",
+                property.context_parameters.iter().copied(),
+            )?;
+            if let Some(receiver) = property.extension_receiver {
+                reject("referenced module property receiver", receiver)?;
+            }
+        }
+        for hierarchy in self.classifier_hierarchies.values() {
+            reject_all(
+                "applied classifier hierarchy",
+                hierarchy.iter().map(|entry| entry.applied),
+            )?;
+        }
+        for overrides in self.property_overrides.values() {
+            for edge in overrides {
+                reject("overridden property declaration type", edge.declared_type)?;
+                reject("overridden property applied type", edge.applied_type)?;
+                reject("overriding property type", edge.implementation_type)?;
+            }
+        }
+        for overrides in self.function_overrides.values() {
+            for edge in overrides {
+                reject_all(
+                    "overridden function declaration parameter",
+                    edge.declared_parameters.iter().copied(),
+                )?;
+                reject(
+                    "overridden function declaration result",
+                    edge.declared_result,
+                )?;
+                reject_all(
+                    "overridden function applied parameter",
+                    edge.applied_parameters.iter().copied(),
+                )?;
+                reject("overridden function applied result", edge.applied_result)?;
+                reject_all(
+                    "overriding function parameter",
+                    edge.implementation_parameters.iter().copied(),
+                )?;
+                reject("overriding function result", edge.implementation_result)?;
+            }
+        }
+        reject_all(
+            "package type-alias expansion",
+            self.package_type_aliases
+                .iter()
+                .map(|alias| alias.expansion),
+        )?;
+        for property in &self.statics {
+            reject("static property", property.ty)?;
+        }
+        for expression in &self.exprs {
+            validate_expr(expression)?;
+        }
+        for construction in self.annotation_constructions.values() {
+            reject_all(
+                "annotation member",
+                construction.members.iter().map(|(_, ty)| *ty),
+            )?;
+        }
+        reject_all("logical expression", self.logical_types.values().copied())?;
+        reject_all(
+            "deferred local declaration",
+            self.deferred_local_types.values().copied(),
+        )?;
+        reject_all("inline declaration", self.inline_declared_types())?;
+        reject_all("exhaustive when", self.whens.exhaustive.values().copied())?;
+        reject_all("physical expression", self.physical_types.values().copied())?;
+        for properties in self.member_ext_props.values() {
+            for property in properties {
+                validate_member_extension(property)?;
+            }
+        }
+        reject_all(
+            "default-stub boxed parameter",
+            self.default_stub_boxed_params
+                .values()
+                .flatten()
+                .map(|(_, ty)| *ty),
+        )?;
+        reject_all(
+            "value-class constructor parameter",
+            self.vc_ctor_declared_param_types(),
+        )?;
+        for (params, ret) in self.suspend_declared_sigs.values() {
+            reject_all("suspend declaration parameter", params.iter().copied())?;
+            reject("suspend declaration result", *ret)?;
+        }
+        for (_, params, ret) in self.vc_declared_sigs.values() {
+            reject_all("value-class declaration parameter", params.iter().copied())?;
+            reject("value-class declaration result", *ret)?;
+        }
+        reject_all("suspend call", self.suspend_calls.values().copied())?;
+        reject_all(
+            "overridden suspend result",
+            self.suspend_call_overridden_results
+                .values()
+                .flat_map(|results| results.iter().copied()),
+        )?;
+        reject_all(
+            "intrinsic suspension point",
+            self.intrinsic_suspension_points
+                .values()
+                .map(|point| point.result),
+        )?;
+        for signature in self
+            .signatures
+            .values()
+            .chain(self.class_signatures.values())
+        {
+            validate_generic_signature(signature)?;
+        }
+        for parameters in self.callable_bound_type_parameters.values() {
+            for parameter in parameters {
+                validate_type_parameter(parameter)?;
+            }
+        }
+        for (params, ret) in self.member_semantic_sigs.values() {
+            reject_all("member semantic parameter", params.iter().copied())?;
+            reject("member semantic result", *ret)?;
+        }
+        reject_all(
+            "external value-class storage",
+            self.external_value_classes.values().copied(),
+        )?;
+        reject_all(
+            "erased value construction",
+            self.erased_value_constructions.values().map(|(_, ty)| *ty),
+        )?;
+        reject_all(
+            "reified call substitution",
+            self.reified_call_subst
+                .values()
+                .flatten()
+                .map(|(_, ty)| *ty),
+        )?;
+        reject_all(
+            "inline call type argument",
+            self.inline_call_type_arguments
+                .values()
+                .flatten()
+                .map(|(_, ty)| *ty),
+        )?;
+        reject_all(
+            "extension call receiver",
+            self.ext_call_source_receiver.values().copied(),
+        )?;
+        reject_all(
+            "member dispatch class",
+            self.dispatch_classes.values().copied().map(Ty::obj_name),
+        )?;
+        reject_all(
+            "declared call result",
+            self.call_declared_ret.values().copied(),
+        )?;
+        reject_all(
+            "declared call parameter",
+            self.call_declared_params.values().flatten().copied(),
+        )?;
+        reject_all(
+            "declared construction parameter",
+            self.construction_declared_params
+                .values()
+                .flatten()
+                .copied(),
+        )?;
+        reject_all(
+            "custom serializer constructor parameter",
+            self.custom_serializer_constructions
+                .values()
+                .chain(self.type_use_serializer_constructions.values())
+                .flat_map(|construction| construction.parameters.iter().copied()),
+        )?;
+        reject_all(
+            "property declaration type",
+            self.property_declaration_types.values().copied(),
+        )?;
+        reject_all(
+            "selected property accessor",
+            self.property_selected_accessors.values().map(|(_, ty)| *ty),
+        )?;
+        reject_all(
+            "property accessor realization",
+            self.property_accessor_jvm_realizations
+                .values()
+                .map(|(_, ty)| *ty),
+        )?;
+        for (params, ret) in self
+            .lambda_sam_signature
+            .values()
+            .chain(self.lambda_sam_jvm_signature.values())
+        {
+            reject_all("lambda SAM parameter", params.iter().copied())?;
+            reject("lambda SAM result", *ret)?;
+        }
+        Ok(())
+    }
+
+    /// Prove cross-field semantic contracts whose validity cannot be expressed by one IR node's
+    /// Rust type. Backends consume these facts directly and must not recover from a malformed shape.
+    pub fn validate_semantic_contracts(&self) -> Result<(), InvalidIrContract> {
+        for (expression, node) in self.exprs.iter().enumerate() {
+            let IrExpr::Lambda {
+                captures,
+                sam: Some(sam),
+                ..
+            } = node
+            else {
+                continue;
+            };
+            if !sam.nullable {
+                continue;
+            }
+            let expression = expression as u32;
+            if !sam.wraps_function_value {
+                return Err(InvalidIrContract::NullableSam {
+                    expression,
+                    violation: NullableSamContractViolation::MissingFunctionAdapter,
+                });
+            }
+            let [capture] = captures.as_slice() else {
+                return Err(InvalidIrContract::NullableSam {
+                    expression,
+                    violation: NullableSamContractViolation::CaptureCount {
+                        actual: captures.len(),
+                    },
+                });
+            };
+            let ty = self.logical_types.get(capture).copied();
+            if !ty.is_some_and(|ty| ty.is_nullable() && ty.is_reference()) {
+                return Err(InvalidIrContract::NullableSam {
+                    expression,
+                    violation: NullableSamContractViolation::CaptureType { ty },
+                });
+            }
+        }
+        for &(class, secondary, parameter) in self.shared_secondary_super_capture_parameters.keys()
+        {
+            let delegates_super = self
+                .classes
+                .get(class as usize)
+                .and_then(|declaration| declaration.secondary_ctors.get(secondary as usize))
+                .is_some_and(|constructor| {
+                    matches!(
+                        &constructor.delegate,
+                        CtorDelegateTarget::Super { target_params, .. }
+                            if (parameter as usize) < target_params.len()
+                    )
+                });
+            if !delegates_super {
+                return Err(InvalidIrContract::SecondarySuperCapture {
+                    class,
+                    secondary,
+                    parameter,
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ir::{IrConst, IrExpr, IrFunction};
+
+    fn nullable_sam_target() -> IrSamTarget {
+        IrSamTarget {
+            classifier: crate::types::type_name("Action"),
+            method: "invoke".to_string(),
+            method_target: crate::ir::IrSamMethod::FunctionTypeInvoke,
+            parameters: Vec::new(),
+            contravariant_parameters: Vec::new(),
+            result: Ty::Unit,
+            declared_parameters: Vec::new(),
+            declared_result: Ty::Unit,
+            context_count: 0,
+            has_receiver: false,
+            suspend: false,
+            source_suspend: false,
+            overridden_results: Vec::new(),
+            function_adapter: false,
+            wraps_function_value: true,
+            nullable: true,
+            kotlin_interface: false,
+            parameter_identities: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn rejects_an_undetermined_declaration_signature() {
+        let mut ir = IrFile::default();
+        ir.functions.push(IrFunction {
+            name: "broken".to_owned(),
+            params: vec![Ty::Pending],
+            ret: Ty::Unit,
+            body: None,
+            is_static: true,
+            dispatch_receiver: None,
+            param_checks: Vec::new(),
+        });
+
+        assert_eq!(
+            ir.validate_determined_types(),
+            Err(UndeterminedIrType {
+                location: "function parameter",
+                ty: Ty::Pending,
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_an_undetermined_nested_operation_type() {
+        let mut ir = IrFile::default();
+        ir.exprs.push(IrExpr::Call {
+            callee: Callee::CrossFile {
+                facade: crate::types::type_name("OtherKt"),
+                name: "broken".to_owned(),
+                params: vec![Ty::String],
+                ret: Ty::Error,
+                module_target: None,
+                module_default_call: false,
+            },
+            dispatch_receiver: None,
+            args: Vec::new(),
+        });
+
+        assert_eq!(
+            ir.validate_determined_types(),
+            Err(UndeterminedIrType {
+                location: "callee result",
+                ty: Ty::Error,
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_a_nullable_sam_without_its_single_capture() {
+        let mut ir = IrFile::default();
+        ir.exprs.push(IrExpr::Lambda {
+            impl_fn: 0,
+            arity: 0,
+            captures: Vec::new(),
+            sam: Some(nullable_sam_target()),
+            inline_body: None,
+        });
+
+        assert_eq!(
+            ir.validate_semantic_contracts(),
+            Err(InvalidIrContract::NullableSam {
+                expression: 0,
+                violation: NullableSamContractViolation::CaptureCount { actual: 0 },
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_a_nullable_sam_that_is_not_a_function_value_adapter() {
+        let mut ir = IrFile::default();
+        let capture = ir.add_expr(IrExpr::Const(IrConst::Null));
+        ir.logical_types
+            .insert(capture, Ty::nullable(Ty::fun(Vec::new(), Ty::Unit)));
+        let mut sam = nullable_sam_target();
+        sam.wraps_function_value = false;
+        ir.exprs.push(IrExpr::Lambda {
+            impl_fn: 0,
+            arity: 0,
+            captures: vec![capture],
+            sam: Some(sam),
+            inline_body: None,
+        });
+
+        assert_eq!(
+            ir.validate_semantic_contracts(),
+            Err(InvalidIrContract::NullableSam {
+                expression: 1,
+                violation: NullableSamContractViolation::MissingFunctionAdapter,
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_a_nullable_sam_with_a_non_reference_capture() {
+        let mut ir = IrFile::default();
+        let capture = ir.add_expr(IrExpr::Const(IrConst::Int(1)));
+        ir.logical_types.insert(capture, Ty::Int);
+        ir.exprs.push(IrExpr::Lambda {
+            impl_fn: 0,
+            arity: 0,
+            captures: vec![capture],
+            sam: Some(nullable_sam_target()),
+            inline_body: None,
+        });
+
+        assert_eq!(
+            ir.validate_semantic_contracts(),
+            Err(InvalidIrContract::NullableSam {
+                expression: 1,
+                violation: NullableSamContractViolation::CaptureType { ty: Some(Ty::Int) },
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_a_secondary_capture_that_is_not_a_super_delegation() {
+        let mut ir = IrFile::default();
+        let mut class = crate::ir::IrClass::synthetic(crate::types::type_name("Child"));
+        class.secondary_ctors.push(crate::ir::IrSecondaryCtor {
+            annotations: crate::ir::DeclarationAnnotations::default(),
+            source_order: u32::MAX,
+            lines: crate::ir::IrSecondaryCtorLines::default(),
+            prefix_params: Vec::new(),
+            params: vec![Ty::Int],
+            declared_spellings: crate::spelling::DeclaredSpellings::default(),
+            named_params: Vec::new(),
+            metadata_visibility: None,
+            generated_debug: crate::ir::IrGeneratedDeclarationDebug::None,
+            vararg_index: None,
+            defaults: Vec::new(),
+            delegate_prelude: Vec::new(),
+            delegate_args: Vec::new(),
+            default_parameters: Vec::new(),
+            body: None,
+            delegate: CtorDelegateTarget::This {
+                target_params: vec![Ty::Int],
+                target: crate::ir::IrConstructorTarget::UNRESTRICTED_PRIMARY,
+                default_masks: Vec::new(),
+            },
+            synthetic: false,
+            vc_params: false,
+            param_checks: Vec::new(),
+        });
+        let class = ir.add_class(class);
+        ir.shared_secondary_super_capture_parameters
+            .insert((class, 0, 0), Ty::String);
+
+        assert_eq!(
+            ir.validate_semantic_contracts(),
+            Err(InvalidIrContract::SecondarySuperCapture {
+                class,
+                secondary: 0,
+                parameter: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_an_undetermined_catch_type() {
+        let mut ir = IrFile::default();
+        let body = ir.add_expr(IrExpr::Const(IrConst::Int(0)));
+        ir.exprs.push(IrExpr::Try {
+            body,
+            catches: vec![crate::ir::IrCatch::generated(
+                0,
+                crate::types::type_name("java/lang/Throwable"),
+                body,
+            )],
+            finally: None,
+            result: Ty::Unit,
+        });
+        if let IrExpr::Try { catches, .. } = ir.exprs.last_mut().unwrap() {
+            catches[0].ty = Ty::Error;
+        }
+
+        assert_eq!(
+            ir.validate_determined_types(),
+            Err(UndeterminedIrType {
+                location: "catch type",
+                ty: Ty::Error,
+            })
+        );
+    }
+}

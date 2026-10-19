@@ -1,0 +1,367 @@
+//! Cross-phase contract for metadata and debug publication of generated class members.
+
+use super::{FunId, IrFile, IrParameterIdentity, IrParameterProvenance};
+use crate::types::{TypeName, Visibility};
+use std::num::NonZeroU32;
+
+/// Where an owner-static initializer belongs relative to the source declaration's initializer.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) enum GeneratedStaticInitialization {
+    #[default]
+    BeforeSource,
+    AfterSource,
+}
+
+/// Independent facts about storage generated without a source declaration. Compiler-generated
+/// provenance controls field metadata; initialization placement controls only `<clinit>` order.
+#[derive(Clone, Copy, Debug, Default)]
+pub(super) struct GeneratedStaticFacts {
+    compiler_generated: bool,
+    initialization: GeneratedStaticInitialization,
+}
+
+/// Source/debug representation explicitly owned by a generated declaration's producer.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum IrGeneratedDeclarationDebug {
+    #[default]
+    None,
+    LocalsOnly,
+    DeclarationLine(NonZeroU32),
+    /// Map the declaration body to `line` and an emitter-owned implicit void return to
+    /// `fallthrough`. The producer opts into this role explicitly; a backend never infers it from
+    /// the function's name, owner, return type, or generated status.
+    DeclarationLineWithFallthrough {
+        line: NonZeroU32,
+        fallthrough: NonZeroU32,
+    },
+}
+
+impl IrGeneratedDeclarationDebug {
+    /// Retain a known declaration line while making the frontend's `0 = unknown` convention an
+    /// explicit locals-only publication rather than an invalid enum state.
+    pub fn declaration_line(line: u32) -> Self {
+        NonZeroU32::new(line).map_or(Self::LocalsOnly, Self::DeclarationLine)
+    }
+
+    pub fn declaration_line_with_fallthrough(line: u32, fallthrough: u32) -> Self {
+        match (NonZeroU32::new(line), NonZeroU32::new(fallthrough)) {
+            (Some(line), Some(fallthrough)) => {
+                Self::DeclarationLineWithFallthrough { line, fallthrough }
+            }
+            (Some(line), None) => Self::DeclarationLine(line),
+            (None, _) => Self::LocalsOnly,
+        }
+    }
+
+    pub fn records_locals(self) -> bool {
+        !matches!(self, Self::None)
+    }
+
+    pub fn line(self) -> Option<u32> {
+        match self {
+            Self::DeclarationLine(line) | Self::DeclarationLineWithFallthrough { line, .. } => {
+                Some(line.get())
+            }
+            Self::None | Self::LocalsOnly => None,
+        }
+    }
+
+    pub fn fallthrough_line(self) -> Option<u32> {
+        match self {
+            Self::DeclarationLineWithFallthrough { fallthrough, .. } => Some(fallthrough.get()),
+            Self::None | Self::LocalsOnly | Self::DeclarationLine(_) => None,
+        }
+    }
+}
+
+/// The `Any` member a value class's synthesis generated because source did not declare it. Each
+/// is published in `@Metadata` like kotlinc's synthesized override, in this declaration order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum IrValueClassAnyMember {
+    Equals,
+    HashCode,
+    ToString,
+}
+
+/// Whether generated function metadata replaces the class's inferred declared-function set or is
+/// appended to a source-declared class.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IrGeneratedFunctionMetadataScope {
+    Exclusive,
+    Additive,
+}
+
+/// Kotlin declaration facts for one generated function. JVM spelling/shape stays on its exact
+/// [`super::IrFunction`] identity; this record contains only language-level publication facts.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IrGeneratedFunctionMetadata {
+    pub source_name: String,
+    pub visibility: Visibility,
+}
+
+/// The single metadata/debug contract for one compiler-generated function.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IrGeneratedFunctionPublication {
+    pub function: FunId,
+    /// Complete semantic parameter identities, exactly parallel to `IrFunction::params`.
+    pub parameter_identities: Vec<IrParameterIdentity>,
+    /// `None` means the physical function has no Kotlin `Function` record (for example a generated
+    /// property's getter). Debug publication remains independent and explicit.
+    pub metadata: Option<IrGeneratedFunctionMetadata>,
+    pub debug: IrGeneratedDeclarationDebug,
+}
+
+/// One producer-owned generated-member surface for a class.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IrGeneratedMemberPublication {
+    pub metadata_scope: IrGeneratedFunctionMetadataScope,
+    /// Metadata-bearing entries are in Kotlin declaration order. Debug-only entries may follow.
+    pub functions: Vec<IrGeneratedFunctionPublication>,
+}
+
+/// A compiler-generated function's semantic role within its owner. The producer records this
+/// exact edge when it declares the function; a later phase completing the function finds it here,
+/// never by its name, arity or synthetic flag.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum IrGeneratedFunctionRole {
+    SerializationDescriptor,
+    SerializationSerialize,
+    SerializationDeserialize,
+    SerializationChildSerializers,
+    SerializationTypeParameterSerializers,
+    /// kotlinx.serialization's `write$Self` on a serialized class.
+    SerializationWriteSelf,
+    /// A generic `$serializer`'s private `getTypeSerial<k>()` for type parameter `k`.
+    SerializationTypeSerializerGetter(u32),
+}
+
+/// A compiler-generated classifier's semantic role within its source owner.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum IrGeneratedClassRole {
+    /// kotlinx.serialization's nested `$serializer` classifier.
+    SerializationSerializer,
+}
+
+impl IrFile {
+    pub(crate) fn record_generated_class(
+        &mut self,
+        owner: TypeName,
+        role: IrGeneratedClassRole,
+        class: super::ClassId,
+    ) {
+        assert!(
+            self.generated_classes
+                .insert((owner, role), class)
+                .is_none(),
+            "a generated classifier role has one exact declaration"
+        );
+    }
+
+    pub(crate) fn generated_class(
+        &self,
+        owner: TypeName,
+        role: IrGeneratedClassRole,
+    ) -> Option<super::ClassId> {
+        self.generated_classes.get(&(owner, role)).copied()
+    }
+
+    pub(crate) fn record_generated_function(
+        &mut self,
+        owner: TypeName,
+        role: IrGeneratedFunctionRole,
+        function: FunId,
+    ) {
+        assert!(
+            self.generated_functions
+                .insert((owner, role), function)
+                .is_none(),
+            "a generated function role has one exact declaration"
+        );
+    }
+
+    pub(crate) fn generated_function(
+        &self,
+        owner: TypeName,
+        role: IrGeneratedFunctionRole,
+    ) -> Option<FunId> {
+        self.generated_functions.get(&(owner, role)).copied()
+    }
+
+    /// Whether `function` is a member kotlinc's IR plugin adds to `owner` after its declared
+    /// members and constructors.
+    pub(crate) fn follows_declared_constructors(&self, owner: TypeName, function: FunId) -> bool {
+        self.generated_functions
+            .iter()
+            .any(|(&(member_owner, role), &member)| {
+                member_owner == owner
+                    && member == function
+                    && matches!(
+                        role,
+                        IrGeneratedFunctionRole::SerializationTypeSerializerGetter(_)
+                    )
+            })
+    }
+
+    pub(crate) fn publish_generated_members(
+        &mut self,
+        owner: TypeName,
+        publication: IrGeneratedMemberPublication,
+    ) {
+        let mut identities = crate::fx_hash::HashSet::default();
+        for member in &publication.functions {
+            assert!(
+                identities.insert(member.function),
+                "a generated function has one publication entry"
+            );
+            assert!(
+                self.generated_function_publication(member.function)
+                    .is_none(),
+                "a generated function has one owning publication"
+            );
+            assert!(
+                !self.fn_params.contains_key(&member.function),
+                "a generated publication is the function's sole parameter-identity contract"
+            );
+            let function = self
+                .functions
+                .get(member.function as usize)
+                .expect("a generated publication names an existing function");
+            assert_eq!(
+                member.parameter_identities.len(),
+                function.params.len(),
+                "generated parameter identities exactly match semantic function arity"
+            );
+            assert!(
+                member
+                    .parameter_identities
+                    .iter()
+                    .all(|identity| identity.source_name.as_deref() != Some("")),
+                "generated semantic parameter identities are never empty"
+            );
+            assert!(
+                member.parameter_identities.iter().all(|identity| {
+                    identity.provenance == IrParameterProvenance::CompilerGenerated
+                }),
+                "a generated declaration publishes generated parameter provenance"
+            );
+            assert!(
+                member.debug.fallthrough_line().is_none() || function.ret == crate::types::Ty::Unit,
+                "only a Unit function can publish implicit void-return debug provenance"
+            );
+        }
+        assert!(
+            self.generated_member_publications
+                .insert(owner, publication)
+                .is_none(),
+            "one producer owns a class's generated-member publication"
+        );
+    }
+
+    /// Append a debug-only entry to `owner`'s publication: a member a later phase generates that
+    /// has no Kotlin `Function` record.
+    pub(crate) fn publish_generated_debug_function(
+        &mut self,
+        owner: TypeName,
+        member: IrGeneratedFunctionPublication,
+    ) {
+        assert!(
+            member.metadata.is_none(),
+            "an appended generated function publishes debug only"
+        );
+        assert!(
+            self.generated_function_publication(member.function)
+                .is_none(),
+            "a generated function has one owning publication"
+        );
+        self.generated_member_publications
+            .get_mut(&owner)
+            .expect("an appended generated function joins its owner's publication")
+            .functions
+            .push(member);
+    }
+
+    pub(crate) fn generated_member_publication(
+        &self,
+        owner: TypeName,
+    ) -> Option<&IrGeneratedMemberPublication> {
+        self.generated_member_publications.get(&owner)
+    }
+
+    pub(crate) fn generated_function_publication(
+        &self,
+        function: FunId,
+    ) -> Option<&IrGeneratedFunctionPublication> {
+        self.generated_member_publications
+            .values()
+            .flat_map(|publication| publication.functions.iter())
+            .find(|member| member.function == function)
+    }
+
+    /// Record generated provenance independently of initializer placement. The JVM backend maps
+    /// this semantic fact to `ACC_SYNTHETIC` and omission of declaration nullability annotations.
+    pub fn mark_compiler_generated_static(&mut self, index: u32) {
+        self.generated_static_facts
+            .entry(index)
+            .or_default()
+            .compiler_generated = true;
+    }
+
+    pub fn is_compiler_generated_static(&self, index: u32) -> bool {
+        self.generated_static_facts
+            .get(&index)
+            .is_some_and(|facts| facts.compiler_generated)
+    }
+
+    /// Place this initializer after the owner's source property/init sequence. This is an explicit
+    /// ordering fact, not a consequence of the field being compiler-generated.
+    pub fn place_static_initializer_after_source(&mut self, index: u32) {
+        self.generated_static_facts
+            .entry(index)
+            .or_default()
+            .initialization = GeneratedStaticInitialization::AfterSource;
+    }
+
+    pub fn static_initializer_is_after_source(&self, index: u32) -> bool {
+        self.generated_static_facts
+            .get(&index)
+            .is_some_and(|facts| facts.initialization == GeneratedStaticInitialization::AfterSource)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{IrFile, IrGeneratedDeclarationDebug};
+
+    #[test]
+    fn generated_static_provenance_and_initializer_placement_are_independent() {
+        let mut ir = IrFile::default();
+        ir.mark_compiler_generated_static(2);
+        ir.place_static_initializer_after_source(7);
+
+        assert!(ir.is_compiler_generated_static(2));
+        assert!(!ir.static_initializer_is_after_source(2));
+        assert!(!ir.is_compiler_generated_static(7));
+        assert!(ir.static_initializer_is_after_source(7));
+    }
+
+    #[test]
+    fn unknown_declaration_line_is_an_explicit_locals_only_contract() {
+        assert_eq!(
+            IrGeneratedDeclarationDebug::declaration_line(0),
+            IrGeneratedDeclarationDebug::LocalsOnly
+        );
+        assert_eq!(
+            IrGeneratedDeclarationDebug::declaration_line(7).line(),
+            Some(7)
+        );
+        assert_eq!(
+            IrGeneratedDeclarationDebug::declaration_line_with_fallthrough(7, 11)
+                .fallthrough_line(),
+            Some(11)
+        );
+        assert_eq!(
+            IrGeneratedDeclarationDebug::declaration_line_with_fallthrough(7, 0),
+            IrGeneratedDeclarationDebug::declaration_line(7)
+        );
+    }
+}

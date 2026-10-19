@@ -1,0 +1,442 @@
+//! Stable override decisions published while the declaration providers are live.
+//!
+//! An override edge is a Kotlin semantic fact. It records the exact declarations and the raw and
+//! applied language types; it does not record a JVM descriptor, erased storage type, accessor
+//! spelling, or bridge method. A backend may use the edge to decide whether its representation
+//! requires a bridge, but it must not repeat property lookup or infer an override from a name.
+
+use super::{
+    CallableId, DeclarationId, DeclarationKind, ExternalCallableId, PropertyId,
+    ResolvedModuleIndex, ResolvedTy,
+};
+use crate::fx_hash::HashMap;
+use crate::libraries::CompilerCoreDeclaration;
+use crate::types::TypeName;
+
+/// Source identity or semantic compiler-generated role of a callable parameter. Target backends
+/// format generated roles for their ABI; common phases never invent a platform spelling.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ResolvedParameterIdentity {
+    Source(Box<str>),
+    /// The declaration/provider publishes no source name for this parameter. The ordinal is stable
+    /// semantic position only. A target may format it on a platform surface whose contract requires
+    /// a positional name; source and reflection metadata must keep it unnamed.
+    Unnamed {
+        ordinal: u32,
+    },
+    /// Value parameter of a compiler-generated `interface by` forwarding declaration. The
+    /// ordinal is semantic producer provenance; a target owns any `pN` spelling.
+    InterfaceDelegationValue {
+        ordinal: u32,
+    },
+    ContextValue {
+        ordinal: u32,
+        source_name: Box<str>,
+    },
+    AnonymousContextParameter {
+        ordinal: u32,
+    },
+    LegacyContextReceiver {
+        ordinal: u32,
+    },
+    ExtensionReceiver,
+    PropertySetterValue,
+    SuspendCompletion,
+}
+
+impl ResolvedParameterIdentity {
+    /// The value parameter of a property setter: its declared spelling (`set(given)`), or the
+    /// synthetic value of an implicit setter, which declares none.
+    pub(crate) fn setter_value(declared_name: Option<&str>) -> Self {
+        declared_name.map_or(Self::PropertySetterValue, |name| Self::Source(name.into()))
+    }
+
+    /// Build one source declaration identity while its typed context role is still available.
+    /// Spelling is payload only; it never decides whether a parameter is contextual.
+    pub(crate) fn declared(
+        ordinal: u32,
+        source_name: &str,
+        context_kind: crate::types::ContextParameterKind,
+    ) -> Self {
+        match context_kind {
+            crate::types::ContextParameterKind::Named => Self::ContextValue {
+                ordinal,
+                source_name: source_name.into(),
+            },
+            crate::types::ContextParameterKind::Anonymous => {
+                Self::AnonymousContextParameter { ordinal }
+            }
+            crate::types::ContextParameterKind::LegacyReceiver => {
+                Self::LegacyContextReceiver { ordinal }
+            }
+            crate::types::ContextParameterKind::None if source_name.is_empty() => {
+                Self::Unnamed { ordinal }
+            }
+            crate::types::ContextParameterKind::None => Self::Source(source_name.into()),
+        }
+    }
+}
+
+/// Stable identity of the overridden property declaration.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum ResolvedPropertyOverrideTarget {
+    Module(PropertyId),
+    External(ExternalCallableId),
+}
+
+/// One exact property override selected in Pass 1.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResolvedPropertyOverride {
+    /// The source property that implements this edge.
+    pub implementation: ResolvedPropertyOverrideTarget,
+    pub implementation_owner: TypeName,
+    /// Exact declaration being overridden, independent of its source spelling.
+    pub overridden: ResolvedPropertyOverrideTarget,
+    pub overridden_owner: TypeName,
+    pub overridden_is_interface: bool,
+    pub name: Box<str>,
+    /// Declaration-side type before applying the implementing class's supertype arguments. A target
+    /// backend erases this type according to its own representation rules.
+    pub declared_type: ResolvedTy,
+    /// The same property as viewed through the implementing class's applied supertype.
+    pub applied_type: ResolvedTy,
+    /// Declaration-side type of the implementation before applying the inheriting class's type
+    /// arguments. This is the type a representation backend erases for the target accessor.
+    pub implementation_type: ResolvedTy,
+    /// A member extension's declared receiver on each side (`val T.x` over `val String.x`); `None`
+    /// for a member property. Like the types, a target backend erases these for its accessors.
+    pub declared_receiver: Option<ResolvedTy>,
+    pub implementation_receiver: Option<ResolvedTy>,
+    /// The overridden setter's value parameter, or `None` when the overridden property is a `val`.
+    /// A setter bridge names its parameter after it, as a function bridge names its parameters
+    /// after the overridden function's.
+    pub overridden_setter_value: Option<ResolvedParameterIdentity>,
+    pub implementation_mutable: bool,
+    /// Return-value status the overridden declaration's provider recorded. `None` for a
+    /// current-module declaration, whose status is derived from its own edges, and for a Java
+    /// declaration, which records none; see [`crate::libraries::LibraryMember::return_value_status`].
+    pub overridden_return_value_status: Option<crate::types::ReturnValueStatus>,
+    /// The overridden declaration's visibility as its provider records it. An override written
+    /// without a visibility modifier keeps it: the effective visibility is the most permissive of
+    /// the declarations it overrides, transitively.
+    pub overridden_visibility: crate::types::Visibility,
+    /// Whether a Kotlin superclass declaration among the implementation's other overridden
+    /// properties itself overrides `overridden`. A target realization of `overridden` (such as a
+    /// JVM renamed-builtin bridge) may therefore already be owned by that superclass.
+    pub has_kotlin_superclass_override: bool,
+    pub depth: u32,
+}
+
+/// Declaration status a function takes from the declarations it overrides, as kotlinc's status
+/// resolution derives it: the return-value status of the first overridden declaration that records
+/// one, and the `operator` / `infix` modifiers when any overridden declaration has them. The
+/// language role travels the same way: an override of `Any.toString` is a `toString` too.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct InheritedCallableStatus {
+    pub return_value: crate::types::ReturnValueStatus,
+    pub operator: bool,
+    pub infix: bool,
+    /// The language role of the nearest overridden declaration that has one.
+    pub semantic_role: Option<crate::types::SemanticCallRole>,
+}
+
+/// Stable identity of the overridden function declaration.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum ResolvedFunctionOverrideTarget {
+    Module(CallableId),
+    External(ExternalCallableId),
+}
+
+/// Exact overridden declaration selected for the `operator fun equals` convention check.
+///
+/// This relation is intentionally weaker than a backend-valid override edge: FIR selects the
+/// overridden symbol before separately diagnosing a missing `override`, suspend mismatch or
+/// incompatible result type. The selected identity and owner remain explicit so later checks do
+/// not reconstruct the relation from the source declaration's spelling or signature.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResolvedOperatorEqualsOverride {
+    pub overridden: ResolvedOperatorEqualsTarget,
+    pub overridden_owner: TypeName,
+    pub overridden_semantic_role: Option<crate::types::SemanticCallRole>,
+    pub overridden_result: ResolvedTy,
+    pub overridden_suspend: bool,
+}
+
+/// Stable identity of the `Any.equals` declaration selected by the convention relation.
+///
+/// A target dependency assigns the ordinary opaque callable identity. The compiler-owned core
+/// declaration exists even when no stdlib artifact supplies a physical `kotlin.Any` declaration;
+/// its provider-normalized semantic role is therefore its exact declaration identity, not a
+/// spelling-derived substitute for one.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ResolvedOperatorEqualsTarget {
+    Callable(ResolvedFunctionOverrideTarget),
+    CompilerCore(CompilerCoreDeclaration),
+}
+
+/// Frontend relations selected while declaration providers and finalized signatures coexist.
+/// These facts are weaker than backend-valid override plans and are consumed only by semantic
+/// declaration checks.
+#[derive(Debug, Default, PartialEq)]
+pub(super) struct OverrideRelations {
+    property: HashMap<DeclarationId, Box<[ResolvedPropertyOverride]>>,
+    function: HashMap<DeclarationId, Box<[ResolvedFunctionOverride]>>,
+    operator_equals: HashMap<DeclarationId, ResolvedOperatorEqualsOverride>,
+}
+
+impl OverrideRelations {
+    pub(super) fn is_empty(&self) -> bool {
+        self.property.is_empty() && self.function.is_empty() && self.operator_equals.is_empty()
+    }
+
+    pub(super) fn storage_bytes(&self) -> usize {
+        self.property.len()
+            * (std::mem::size_of::<DeclarationId>()
+                + std::mem::size_of::<Box<[ResolvedPropertyOverride]>>())
+            + self
+                .property
+                .values()
+                .map(|relations| relations.len() * std::mem::size_of::<ResolvedPropertyOverride>())
+                .sum::<usize>()
+            + self.function.len()
+                * (std::mem::size_of::<DeclarationId>()
+                    + std::mem::size_of::<Box<[ResolvedFunctionOverride]>>())
+            + self
+                .function
+                .values()
+                .map(|relations| {
+                    relations.len() * std::mem::size_of::<ResolvedFunctionOverride>()
+                        + relations
+                            .iter()
+                            .map(|edge| {
+                                (edge.declared_parameters.len()
+                                    + edge.applied_parameters.len()
+                                    + edge.implementation_parameters.len())
+                                    * std::mem::size_of::<ResolvedTy>()
+                            })
+                            .sum::<usize>()
+                })
+                .sum::<usize>()
+            + self.operator_equals.len()
+                * std::mem::size_of::<(DeclarationId, ResolvedOperatorEqualsOverride)>()
+    }
+}
+
+/// One exact function override selected in Pass 1. All types are Kotlin semantic types; the
+/// declaration-side shape remains unapplied so each backend can perform its own erasure.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResolvedFunctionOverride {
+    pub implementation: ResolvedFunctionOverrideTarget,
+    pub implementation_owner: TypeName,
+    pub overridden: ResolvedFunctionOverrideTarget,
+    pub overridden_owner: TypeName,
+    /// Exact language role published by the overridden declaration's provider. Backends consume
+    /// this from the selected edge instead of recognizing an ABI slot from its source spelling.
+    pub overridden_semantic_role: Option<crate::types::SemanticCallRole>,
+    /// Provider-normalized JVM collection ABI role of the exact overridden declaration.
+    pub collection_barrier: Option<crate::libraries::CollectionBarrierOutcome>,
+    /// The overridden owner is an interface. This is a semantic classifier fact, retained so a
+    /// representation backend does not re-query the declaration provider merely to distinguish
+    /// superclass and interface dispatch obligations.
+    pub overridden_is_interface: bool,
+    /// Semantic declaration name. Physical spellings remain behind external callable identities and
+    /// are selected only by a target backend.
+    pub name: Box<str>,
+    /// The overridden declaration's own parameters (extension receiver in place) and result,
+    /// before any substitution. For a dependency declaration this is its declared value-class
+    /// spelling, else its generic signature, else the shape its provider published.
+    pub declared_parameters: Box<[ResolvedTy]>,
+    pub declared_result: ResolvedTy,
+    pub applied_parameters: Box<[ResolvedTy]>,
+    pub applied_result: ResolvedTy,
+    /// Declaration-side implementation shape before applying the inheriting class's type arguments.
+    /// The frontend has already selected the declaration; a backend only erases this shape.
+    pub implementation_parameters: Box<[ResolvedTy]>,
+    pub implementation_parameter_identities: Box<[ResolvedParameterIdentity]>,
+    /// Parameter identities of the overridden declaration, parallel to `declared_parameters`. A
+    /// bridge carries the overridden declaration's signature, parameter names included.
+    pub overridden_parameter_identities: Box<[ResolvedParameterIdentity]>,
+    pub implementation_result: ResolvedTy,
+    /// Default availability exposed by the overridden declaration at this exact applied edge.
+    /// Kept beside the stable provider identity so module-to-dependency inheritance never has to
+    /// reopen metadata after the override graph is frozen.
+    pub overridden_parameter_defaults: Box<[bool]>,
+    pub overridden_default_provider: Option<ResolvedFunctionOverrideTarget>,
+    /// See [`ResolvedPropertyOverride::overridden_return_value_status`].
+    pub overridden_return_value_status: Option<crate::types::ReturnValueStatus>,
+    /// Whether the overridden declaration is an `operator` / `infix` function as its provider
+    /// records it. An override inherits both modifiers, so its own metadata repeats them.
+    pub overridden_operator: bool,
+    pub overridden_infix: bool,
+    /// See [`ResolvedPropertyOverride::overridden_visibility`].
+    pub overridden_visibility: crate::types::Visibility,
+    pub suspend: bool,
+    /// Whether a Kotlin superclass declaration among the implementation's other overridden
+    /// functions itself overrides `overridden`; see
+    /// [`ResolvedPropertyOverride::has_kotlin_superclass_override`].
+    pub has_kotlin_superclass_override: bool,
+    pub depth: u32,
+}
+
+impl ResolvedModuleIndex {
+    /// Exact overridden-symbol relation used for this source declaration's `equals` convention.
+    /// This is a frontend convention fact, not a backend override plan.
+    pub fn operator_equals_override(
+        &self,
+        declaration: DeclarationId,
+    ) -> Option<ResolvedOperatorEqualsOverride> {
+        self.override_relations
+            .operator_equals
+            .get(&declaration)
+            .copied()
+    }
+
+    pub(crate) fn publish_operator_equals_override(
+        &mut self,
+        declaration: DeclarationId,
+        selected: ResolvedOperatorEqualsOverride,
+    ) {
+        assert!(
+            self.declaration_header(declaration)
+                .is_some_and(|header| header.kind == DeclarationKind::Function),
+            "an operator equals relation belongs to a stable function declaration"
+        );
+        match self.override_relations.operator_equals.entry(declaration) {
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(selected);
+            }
+            std::collections::hash_map::Entry::Occupied(entry) => {
+                assert_eq!(
+                    *entry.get(),
+                    selected,
+                    "one source declaration must retain one exact Any.equals target"
+                );
+            }
+        }
+    }
+
+    pub fn property_overrides(&self, classifier: DeclarationId) -> &[ResolvedPropertyOverride] {
+        self.override_relations
+            .property
+            .get(&classifier)
+            .map(Box::as_ref)
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn has_property_override_plan(&self, classifier: DeclarationId) -> bool {
+        self.override_relations.property.contains_key(&classifier)
+    }
+
+    pub(crate) fn publish_property_overrides(
+        &mut self,
+        owner: DeclarationId,
+        overrides: impl IntoIterator<Item = ResolvedPropertyOverride>,
+    ) {
+        assert!(
+            self.classifier_header(owner).is_some()
+                || self
+                    .declaration_header(owner)
+                    .is_some_and(|header| header.kind == DeclarationKind::EnumEntry),
+            "property overrides require a published classifier or enum-entry owner"
+        );
+        let overrides = overrides.into_iter().collect::<Vec<_>>().into_boxed_slice();
+        assert!(
+            self.override_relations
+                .property
+                .insert(owner, overrides)
+                .is_none(),
+            "a source classifier or enum entry may publish property overrides only once"
+        );
+    }
+
+    pub fn function_overrides(&self, classifier: DeclarationId) -> &[ResolvedFunctionOverride] {
+        self.override_relations
+            .function
+            .get(&classifier)
+            .map(Box::as_ref)
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn has_function_override_plan(&self, classifier: DeclarationId) -> bool {
+        self.override_relations.function.contains_key(&classifier)
+    }
+
+    pub(crate) fn publish_function_overrides(
+        &mut self,
+        owner: DeclarationId,
+        overrides: impl IntoIterator<Item = ResolvedFunctionOverride>,
+    ) {
+        assert!(
+            self.classifier_header(owner).is_some()
+                || self
+                    .declaration_header(owner)
+                    .is_some_and(|header| header.kind == DeclarationKind::EnumEntry),
+            "function overrides require a published classifier or enum-entry owner"
+        );
+        let overrides = overrides.into_iter().collect::<Vec<_>>().into_boxed_slice();
+        assert!(
+            self.override_relations
+                .function
+                .insert(owner, overrides)
+                .is_none(),
+            "a source classifier or enum entry may publish function overrides only once"
+        );
+    }
+
+    /// What a current-module function inherits from the declarations it overrides.
+    pub fn callable_inherited_status(&self, callable: CallableId) -> InheritedCallableStatus {
+        self.callable_inherited_statuses
+            .get(&callable)
+            .copied()
+            .unwrap_or_default()
+    }
+
+    /// Every current-module function that inherits a language role, with that role.
+    pub fn inherited_semantic_roles(
+        &self,
+    ) -> impl Iterator<Item = (CallableId, crate::types::SemanticCallRole)> + '_ {
+        self.callable_inherited_statuses
+            .iter()
+            .filter_map(|(&callable, status)| status.semantic_role.map(|role| (callable, role)))
+    }
+
+    pub fn property_return_value_status(
+        &self,
+        property: PropertyId,
+    ) -> crate::types::ReturnValueStatus {
+        self.property_return_value_statuses
+            .get(&property)
+            .copied()
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn publish_callable_inherited_status(
+        &mut self,
+        callable: CallableId,
+        status: InheritedCallableStatus,
+    ) {
+        if status != InheritedCallableStatus::default() {
+            assert!(
+                self.callable_inherited_statuses
+                    .insert(callable, status)
+                    .is_none(),
+                "a callable may publish its inherited status only once"
+            );
+        }
+    }
+
+    pub(crate) fn publish_property_return_value_status(
+        &mut self,
+        property: PropertyId,
+        status: crate::types::ReturnValueStatus,
+    ) {
+        if status != crate::types::ReturnValueStatus::Unspecified {
+            assert!(
+                self.property_return_value_statuses
+                    .insert(property, status)
+                    .is_none(),
+                "a property may publish its return-value status only once"
+            );
+        }
+    }
+}

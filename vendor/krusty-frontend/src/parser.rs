@@ -1,0 +1,6783 @@
+//! Stage B: tokens → arena AST. Recursive descent for decls/stmts, Pratt for expressions with the
+//! Kotlin precedence table. Newlines (their own token) act as statement/expression terminators;
+//! they are skipped after binary operators and between statements/declarations.
+
+use crate::ast::*;
+use crate::diag::{DiagSink, Span};
+use crate::features::LangFeatures;
+use crate::fx_hash::HashMap;
+use crate::kt_string::{KtString, KtStringBuf};
+use crate::token::{decode_char_literal_content, Token, TokenKind};
+use crate::types::Visibility;
+
+mod anonymous_functions;
+mod class_recovery;
+mod companion_declarations;
+mod constructors;
+mod context_clause;
+mod debug_lines;
+mod declaration_bodies;
+mod declaration_modifiers;
+mod declaration_stream;
+mod destructuring;
+mod expressions;
+mod file_features;
+mod for_loops;
+mod function_types;
+mod incdec;
+mod interface_delegation;
+mod lambda_literals;
+mod lexical_type_parameters;
+mod line_breaks;
+mod nesting;
+mod properties;
+mod return_labels;
+mod statements;
+mod superclass_references;
+mod type_annotations;
+mod type_parameters;
+mod value_parameters;
+use class_recovery::error_class_decl;
+use declaration_modifiers::{
+    function_flags, has_visibility_modifier, modality_from_modifiers, modality_of, visibility_of,
+};
+pub(crate) use declaration_stream::visit_declaration_units_with_features;
+use file_features::apply_file_features;
+use lexical_type_parameters::LexicalTypeParameters;
+use superclass_references::fixup_parenless_base_classes;
+
+/// Parse with the default language feature set.
+pub fn parse(src: &str, tokens: &[Token], diags: &mut DiagSink) -> File {
+    parse_with_features(src, tokens, diags, &LangFeatures::default())
+}
+
+/// Parse under an explicit language-feature set. Square-bracket destructuring is always parsed;
+/// without `NameBasedDestructuring` it is reported as a language-version error, matching kotlinc.
+pub fn parse_with_features(
+    src: &str,
+    tokens: &[Token],
+    diags: &mut DiagSink,
+    features: &LangFeatures,
+) -> File {
+    parse_with_features_and_script(src, tokens, diags, features, false)
+}
+
+/// Parse a Kotlin script.
+pub fn parse_script_with_features(
+    src: &str,
+    tokens: &[Token],
+    diags: &mut DiagSink,
+    features: &LangFeatures,
+) -> File {
+    parse_with_features_and_script(src, tokens, diags, features, true)
+}
+
+fn parse_with_features_and_script(
+    src: &str,
+    tokens: &[Token],
+    diags: &mut DiagSink,
+    features: &LangFeatures,
+    is_script: bool,
+) -> File {
+    let mut p = Parser::new(src, tokens, diags, features, is_script);
+    // Run the parse with the recursion-bound stack reserve already in place (like the checker's
+    // and lowering's pass entries): without this, the calling thread's remaining stack is
+    // (almost) always under the reserve, so the FIRST `parse_bp` of every top-level expression
+    // would allocate and free a fresh grown segment — per statement. With it, the per-level
+    // checks in `parse_bp` are a stack-pointer read that only grows on genuinely deep nesting.
+    crate::wide_stack::on_wide_stack(|| p.parse_file());
+    p.skip_newlines();
+    if !p.at(TokenKind::Eof) || p.i + 1 != p.t.len() {
+        p.diags.error(
+            p.tok().span,
+            "parser did not consume every non-trivia token",
+        );
+    }
+    if !p.script_stmts.is_empty() {
+        let first = p.file.stmt_spans[p.script_stmts[0].0 as usize];
+        let last = p.file.stmt_spans[p.script_stmts[p.script_stmts.len() - 1].0 as usize];
+        let stmts = std::mem::take(&mut p.script_stmts);
+        let body = p.file.add_expr(
+            Expr::Block {
+                stmts,
+                trailing: None,
+            },
+            Span::new(first.lo, last.hi),
+        );
+        p.file.script_body = Some(body);
+    }
+    apply_file_features(&mut p.file, features);
+    let script_scope = is_script.then(|| {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        src.hash(&mut hasher);
+        hasher.finish()
+    });
+    hoist_local_classes(&mut p.file, script_scope);
+    fixup_parenless_base_classes(&mut p.file);
+    debug_lines::attach(&mut p.file, src);
+    p.file.binary_reference_tokens =
+        crate::ast::BinaryReferenceTokens::new(tokens, std::mem::take(&mut p.function_spans));
+    if !p.diags.has_errors() {
+        if let Err(error) = p.file.validate_integrity(src) {
+            p.diags
+                .error(Span::new(0, 0), format!("invalid parser AST: {error}"));
+        }
+    }
+    p.file
+}
+
+/// A non-nullable, non-generic type reference.
+fn simple_type_ref(name: &str, span: crate::diag::Span) -> TypeRef {
+    TypeRef {
+        name: name.to_string(),
+        flags: TrFlags::default()
+            .with_nullable(false)
+            .with_definitely_non_null(false),
+        arg: None,
+        targs: Vec::new(),
+        span,
+        fun_params: Vec::new(),
+        fun_context_count: 0,
+    }
+}
+
+/// Hoist every local class (`class`/`interface`/… declared inside a function body, parsed as
+/// `Stmt::LocalClass`) to a top-level `Decl::Class`, so signature collection and lowering treat it
+/// like any other class. The `Stmt::LocalClass` stays in the body and is where the CHECKER enters
+/// the class (`File::local_class_decls` links the two), so it is checked in the lexical scope it
+/// was written in.
+///
+/// The hoisted declaration is named after the declaration it was written in, as a DOTTED path
+/// (`box.Local`, `Outer.m.Local`) — the same spelling a nested class uses, so `class_internal` turns
+/// it into `Outer$m$Local` and every lexical-prefix walk already in the compiler finds it without
+/// being taught anything new. It is also how kotlinc names a local class. Nothing in the source is
+/// rewritten to match: the SOURCE name is what the checker binds in `Ns::Classifier`, so a reference
+/// resolves where it was written.
+fn hoist_local_classes(file: &mut File, script_scope: Option<u64>) {
+    use crate::ast::{Decl, FunBody, Stmt, StmtId};
+    let mut owners: Vec<(StmtId, String, Option<String>, Option<DeclId>)> = Vec::new();
+    let record =
+        |file: &File,
+         body: &FunBody,
+         owner: String,
+         classifier_scope: Option<String>,
+         enclosing: Option<DeclId>,
+         out: &mut Vec<(StmtId, String, Option<String>, Option<DeclId>)>| {
+            let (FunBody::Expr(root) | FunBody::Block(root)) = body else {
+                return;
+            };
+            for stmt in local_class_stmts(file, *root) {
+                out.push((stmt, owner.clone(), classifier_scope.clone(), enclosing));
+            }
+        };
+    let record_property =
+        |file: &File,
+         property: &PropDecl,
+         owner: String,
+         classifier_scope: Option<String>,
+         enclosing: Option<DeclId>,
+         out: &mut Vec<(StmtId, String, Option<String>, Option<DeclId>)>| {
+            for body in property
+                .context_params
+                .iter()
+                .filter_map(|parameter| parameter.default)
+                .map(FunBody::Expr)
+                .chain(
+                    property
+                        .init
+                        .map(FunBody::Expr)
+                        .into_iter()
+                        .chain(property.delegate.map(FunBody::Expr))
+                        .chain(property.getter.iter().cloned())
+                        .chain(
+                            property
+                                .setter
+                                .iter()
+                                .filter_map(|setter| setter.body.clone()),
+                        ),
+                )
+            {
+                record(
+                    file,
+                    &body,
+                    owner.clone(),
+                    classifier_scope.clone(),
+                    enclosing,
+                    out,
+                );
+            }
+        };
+    for &declaration in &file.decls {
+        match file.decl(declaration) {
+            Decl::Fun(f) => {
+                for default in f.params.iter().filter_map(|parameter| parameter.default) {
+                    record(
+                        file,
+                        &FunBody::Expr(default),
+                        f.name.clone(),
+                        None,
+                        Some(declaration),
+                        &mut owners,
+                    );
+                }
+                record(
+                    file,
+                    &f.body,
+                    f.name.clone(),
+                    None,
+                    Some(declaration),
+                    &mut owners,
+                );
+            }
+            Decl::Class(c) => {
+                for m in &c.methods {
+                    for default in m.params.iter().filter_map(|parameter| parameter.default) {
+                        record(
+                            file,
+                            &FunBody::Expr(default),
+                            format!("{}.{}", c.name, m.name),
+                            None,
+                            Some(declaration),
+                            &mut owners,
+                        );
+                    }
+                    record(
+                        file,
+                        &m.body,
+                        format!("{}.{}", c.name, m.name),
+                        None,
+                        Some(declaration),
+                        &mut owners,
+                    );
+                }
+                // A class body's `init` blocks and property initializers run in the constructor;
+                // kotlinc names a local class declared there after the CLASS.
+                for step in &c.init_order {
+                    if let crate::ast::ClassInit::Block(b) = step {
+                        record(
+                            file,
+                            &FunBody::Block(*b),
+                            c.name.clone(),
+                            None,
+                            Some(declaration),
+                            &mut owners,
+                        );
+                    }
+                }
+                for p in &c.body_props {
+                    record_property(
+                        file,
+                        p,
+                        c.name.clone(),
+                        None,
+                        Some(declaration),
+                        &mut owners,
+                    );
+                }
+                // A primary-constructor parameter default is evaluated in the constructor too.
+                for default in c.props.iter().filter_map(|p| p.default) {
+                    record(
+                        file,
+                        &FunBody::Expr(default),
+                        c.name.clone(),
+                        None,
+                        Some(declaration),
+                        &mut owners,
+                    );
+                }
+                for expression in c.base_args.iter().copied().chain(
+                    c.interface_delegations
+                        .iter()
+                        .map(|delegation| delegation.value),
+                ) {
+                    record(
+                        file,
+                        &FunBody::Expr(expression),
+                        c.name.clone(),
+                        None,
+                        Some(declaration),
+                        &mut owners,
+                    );
+                }
+                for constructor in &c.secondary_ctors {
+                    for expression in constructor
+                        .params
+                        .iter()
+                        .filter_map(|parameter| parameter.default)
+                        .chain(match &constructor.delegation {
+                            crate::ast::CtorDelegation::This(call)
+                            | crate::ast::CtorDelegation::Super(call) => call.args.iter().copied(),
+                            crate::ast::CtorDelegation::None => [].iter().copied(),
+                        })
+                        .chain(constructor.body)
+                    {
+                        record(
+                            file,
+                            &FunBody::Expr(expression),
+                            c.name.clone(),
+                            None,
+                            Some(declaration),
+                            &mut owners,
+                        );
+                    }
+                }
+                // An enum entry's anonymous subclass is a real lexical classifier scope even though
+                // it has no standalone `Decl`. Preserve both its naming path and its exact classifier
+                // owner so a hoisted local class can see entry-local nested declarations.
+                for entry in &c.enum_entries {
+                    let entry_scope = format!("{}.{}", c.name, entry.name);
+                    for expression in entry.args.iter().copied() {
+                        record(
+                            file,
+                            &FunBody::Expr(expression),
+                            entry_scope.clone(),
+                            Some(entry_scope.clone()),
+                            Some(declaration),
+                            &mut owners,
+                        );
+                    }
+                    for method in &entry.methods {
+                        for default in method
+                            .params
+                            .iter()
+                            .filter_map(|parameter| parameter.default)
+                        {
+                            record(
+                                file,
+                                &FunBody::Expr(default),
+                                format!("{entry_scope}.{}", method.name),
+                                Some(entry_scope.clone()),
+                                Some(declaration),
+                                &mut owners,
+                            );
+                        }
+                        record(
+                            file,
+                            &method.body,
+                            format!("{entry_scope}.{}", method.name),
+                            Some(entry_scope.clone()),
+                            Some(declaration),
+                            &mut owners,
+                        );
+                    }
+                    for property in &entry.props {
+                        record_property(
+                            file,
+                            property,
+                            entry_scope.clone(),
+                            Some(entry_scope.clone()),
+                            Some(declaration),
+                            &mut owners,
+                        );
+                    }
+                    for step in &entry.init_order {
+                        if let crate::ast::ClassInit::Block(body) = step {
+                            record(
+                                file,
+                                &FunBody::Block(*body),
+                                entry_scope.clone(),
+                                Some(entry_scope.clone()),
+                                Some(declaration),
+                                &mut owners,
+                            );
+                        }
+                    }
+                }
+            }
+            Decl::Property(p) => {
+                record_property(
+                    file,
+                    p,
+                    p.name.clone(),
+                    None,
+                    Some(declaration),
+                    &mut owners,
+                );
+            }
+        }
+    }
+    if let Some(root) = file.script_body {
+        // A script re-parses each snippet into the same facade, so the snippet identity separates
+        // two local classes that would otherwise share a name and an (empty) owner.
+        let owner = format!("script${:x}", script_scope.unwrap_or_default());
+        for stmt in local_class_stmts(file, root) {
+            owners.push((stmt, owner.clone(), None, None));
+        }
+    }
+    let owner_of: crate::fx_hash::HashMap<StmtId, (String, Option<String>, Option<DeclId>)> =
+        owners
+            .into_iter()
+            .map(|(statement, owner, classifier_scope, enclosing)| {
+                (statement, (owner, classifier_scope, enclosing))
+            })
+            .collect();
+    let hoisted: Vec<(StmtId, crate::ast::ClassDecl)> = file
+        .stmt_arena
+        .iter()
+        .enumerate()
+        .filter_map(|(index, s)| match s {
+            Stmt::LocalClass(c) => Some((StmtId(index as u32), c.clone())),
+            _ => None,
+        })
+        .collect();
+    // Two local classes of the same name under the same owner (declared in sibling blocks) still
+    // need telling apart; the statement index is unique by construction.
+    let mut taken: crate::fx_hash::HashSet<String> = crate::fx_hash::HashSet::default();
+    for (stmt, mut c) in hoisted {
+        let mut name = match owner_of.get(&stmt) {
+            Some((owner, _, _)) => format!("{owner}.{}", c.name),
+            None => format!("loc{}.{}", stmt.0, c.name),
+        };
+        if !taken.insert(name.clone()) {
+            name = format!("{name}{}", stmt.0);
+            taken.insert(name.clone());
+        }
+        // A nested type hoisted out of this local class was named from the local class's SOURCE
+        // name (`Local.Inner`); requalifying the outer without it would orphan the nested one.
+        let qualifier = name.strip_suffix(&c.name).map(str::to_string);
+        let classifier_scope = owner_of
+            .get(&stmt)
+            .and_then(|(_, classifier_scope, _)| classifier_scope.clone());
+        let enclosing = owner_of.get(&stmt).and_then(|(_, _, enclosing)| *enclosing);
+        if let (Some(qualifier), Some(nested)) =
+            (qualifier, file.local_class_nested.get(&stmt).cloned())
+        {
+            let source = c.name.clone();
+            for did in nested {
+                if let Decl::Class(nc) = file.decl_mut(did) {
+                    nc.name = format!("{qualifier}{}", nc.name);
+                    // An `inner class` names its enclosing class by the same path, and its
+                    // synthetic outer-instance field is typed from it.
+                    if let Some(outer) = nc.inner_of.as_deref() {
+                        if outer == source || outer.starts_with(&format!("{source}.")) {
+                            nc.inner_of = Some(format!("{qualifier}{outer}"));
+                        }
+                    }
+                }
+                // A classifier nested in a local class is local as well even though the parser
+                // stores the nested declaration separately. Pass-1 signature publication must not
+                // mistake its members for module declarations merely because they were hoisted
+                // before the enclosing local class received its qualified runtime name.
+                file.mark_local_declaration(did);
+                if let Some(enclosing) = enclosing {
+                    file.local_class_enclosing_declarations
+                        .insert(did, enclosing);
+                }
+                if let Some(classifier_scope) = &classifier_scope {
+                    file.local_class_lexical_classifier_owners
+                        .insert(did, classifier_scope.clone());
+                }
+            }
+        }
+        c.name = name;
+        let id = file.add_decl(Decl::Class(c));
+        file.decls.push(id);
+        file.mark_local_declaration(id);
+        file.local_class_decls.insert(stmt, id);
+        if let Some(enclosing) = enclosing {
+            file.local_class_enclosing_declarations
+                .insert(id, enclosing);
+        }
+        if let Some(classifier_scope) = classifier_scope {
+            file.local_class_lexical_classifier_owners
+                .insert(id, classifier_scope);
+        }
+    }
+}
+
+/// The `Stmt::LocalClass` statements reachable from `root`, including those inside the member bodies
+/// of a local class declared there (`any_child_stmt` stops at the local class, but its members are
+/// written in the same lexical scope).
+fn local_class_stmts(file: &File, root: ExprId) -> Vec<StmtId> {
+    use crate::ast::{FunBody, Stmt};
+    let mut exprs: Vec<ExprId> = vec![root];
+    let mut stmts: Vec<StmtId> = Vec::new();
+    let mut out: Vec<StmtId> = Vec::new();
+    loop {
+        if let Some(e) = exprs.pop() {
+            file.any_child_expr(
+                e,
+                &mut |child| {
+                    exprs.push(child);
+                    false
+                },
+                &mut |child| {
+                    stmts.push(child);
+                    false
+                },
+            );
+        } else if let Some(s) = stmts.pop() {
+            file.any_child_stmt(s, &mut |child| {
+                exprs.push(child);
+                false
+            });
+            if let Stmt::LocalClass(c) = file.stmt(s) {
+                out.push(s);
+                for m in &c.methods {
+                    if let FunBody::Expr(e) | FunBody::Block(e) = m.body {
+                        exprs.push(e);
+                    }
+                }
+            }
+        } else {
+            break;
+        }
+    }
+    out
+}
+
+type TypeAliasShapes = crate::fx_hash::HashMap<String, (Vec<String>, TypeRef)>;
+
+/// Replace every leaf reference to one of `params` in `ty` with the corresponding use-site type
+/// argument. The occurrence's nullability, variance, and source span stay on the substituted node:
+/// `MutableMap<in Y, X?>` keeps `in` and `?` after `Y` and `X` are replaced.
+fn substitute_type_alias_parameters(ty: &mut TypeRef, params: &[String], args: &[TypeRef]) {
+    if ty.fun_params.is_empty() && ty.name != "<fun>" && ty.targs.is_empty() {
+        if let Some(index) = params.iter().position(|param| *param == ty.name) {
+            let nullable = ty.nullable();
+            let span = ty.span;
+            *ty = args[index].clone();
+            ty.set_nullable(ty.nullable() || nullable);
+            ty.span = span;
+            return;
+        }
+    }
+    if let Some(argument) = &mut ty.arg {
+        substitute_type_alias_parameters(argument, params, args);
+    }
+    for argument in &mut ty.targs {
+        substitute_type_alias_parameters(argument, params, args);
+    }
+    for parameter in &mut ty.fun_params {
+        substitute_type_alias_parameters(parameter, params, args);
+    }
+}
+
+fn expand_type_alias_ref(
+    ty: &mut TypeRef,
+    aliases: &TypeAliasShapes,
+    depth: u32,
+    spellings: &mut HashMap<Span, TypeRef>,
+) {
+    if depth > 8 {
+        crate::wide_stack::exceed(crate::wide_stack::LimitExceeded::TypeAliasExpansionDepth);
+    }
+    if ty.fun_params.is_empty() && ty.name != "<fun>" {
+        if let Some((params, target)) = aliases.get(&ty.name) {
+            if ty.targs.len() == params.len() {
+                for argument in &mut ty.targs {
+                    expand_type_alias_ref(argument, aliases, depth + 1, spellings);
+                }
+                let nullable = ty.nullable();
+                // A USE-SITE PROJECTION belongs to the reference, not to the alias's target:
+                // `List<out Cargo>` must stay `out` after `Cargo` expands to `Payload`. The
+                // wholesale `*ty = expanded` below replaces the flags word, so carry these across
+                // exactly as nullability is carried.
+                let in_projection = ty.in_projection();
+                let out_projection = ty.out_projection();
+                let span = ty.span;
+                // The spelling this rewrite is about to destroy — its name and AS-SPELLED type
+                // arguments — kept for `@Metadata`'s `Type.abbreviated_type` (`File::alias_spellings`).
+                let spelled = ty.clone();
+                let mut expanded = target.clone();
+                if !params.is_empty() {
+                    substitute_type_alias_parameters(&mut expanded, params, &ty.targs);
+                }
+                *ty = expanded;
+                ty.set_nullable(ty.nullable() || nullable);
+                ty.set_projection(
+                    ty.in_projection() || in_projection,
+                    ty.out_projection() || out_projection,
+                );
+                ty.span = span;
+                expand_type_alias_ref(ty, aliases, depth + 1, spellings);
+                // AFTER the recursive expansion, so an alias chain records the OUTERMOST spelling:
+                // `typealias Chain = Cargo` used as `Chain` writes `Chain`, as kotlinc does.
+                spellings.insert(span, spelled);
+                return;
+            }
+        }
+    }
+    if let Some(argument) = &mut ty.arg {
+        expand_type_alias_ref(argument, aliases, depth + 1, spellings);
+    }
+    for argument in &mut ty.targs {
+        expand_type_alias_ref(argument, aliases, depth + 1, spellings);
+    }
+    for parameter in &mut ty.fun_params {
+        expand_type_alias_ref(parameter, aliases, depth + 1, spellings);
+    }
+}
+
+/// Fully expand aliases declared in `file` inside one declaration target. Resolution later binds the
+/// remaining classifier spellings through that declaration file's imports and scope.
+pub(crate) fn expanded_type_alias_target(
+    declarations: &[(String, Vec<String>, TypeRef)],
+    target: &TypeRef,
+    spellings: &mut HashMap<Span, TypeRef>,
+) -> TypeRef {
+    let aliases: TypeAliasShapes = declarations
+        .iter()
+        .map(|(name, params, target)| (name.clone(), (params.clone(), target.clone())))
+        .collect();
+    let mut expanded = target.clone();
+    expand_type_alias_ref(&mut expanded, &aliases, 0, spellings);
+    expanded
+}
+
+struct Parser<'a> {
+    src: &'a str,
+    t: &'a [Token],
+    i: usize,
+    file: File,
+    diags: &'a mut DiagSink,
+    /// `NameBasedDestructuring` language feature: allow square-bracket destructuring (`[a, b]`).
+    name_based_destructuring: bool,
+    explicit_backing_fields: bool,
+    /// `+EnableNameBasedDestructuringShortForm`: a plain paren entry `(a, b)` binds each variable to
+    /// the RECEIVER PROPERTY of the same name (not `componentN`). An explicit `(a = prop)` still
+    /// renames. Bracket `[a, b]` stays positional.
+    short_form_destructuring: bool,
+    multi_dollar_interpolation: bool,
+    context_parameters: bool,
+    context_receivers: bool,
+    when_guards: bool,
+    /// When set, `parse_postfix` does NOT attach a trailing `{ … }` to a call as a lambda argument —
+    /// used where a following `{` belongs to an enclosing construct (a `: I by Impl()` delegate, whose
+    /// `{` opens the class body, not a lambda on the delegate call).
+    no_trailing_lambda: bool,
+    /// Whether the statement list currently being parsed belongs to a block whose trailing
+    /// expression is semantically consumed (lambda and `if`/`when`/`try` value blocks). Function,
+    /// accessor, constructor, init, loop, and `finally` blocks discard a trailing expression; they
+    /// must keep inc/dec on the statement path, especially for an implicit-receiver property name.
+    /// Saved/restored at every nested block boundary so syntax context, not a lambda-only special
+    /// case, owns the decision.
+    block_trailing_is_value: bool,
+    /// Set by `parse_branch` for the bare body of an `if`/`when` branch, which is an expression
+    /// position: the statement it parses keeps an inc/dec as its value instead of re-routing it to
+    /// the statement path. Taken when that statement starts, so nested statements never see it.
+    bare_branch_value: bool,
+    /// Span of a `value` modifier consumed by the most recent declaration prefix. Class registration
+    /// takes it before the class body is parsed, so a nested `value class` cannot overwrite it.
+    value_modifier_span: Option<Span>,
+    /// Spans of the `external` modifiers consumed by the current declaration prefix, in source
+    /// order.
+    external_modifier_spans: Vec<Span>,
+    /// Type parameters visible to hoisted anonymous classifiers in the current parser context.
+    lexical_type_parameters: LexicalTypeParameters,
+    /// Simple names of annotations consumed by the most recent `skip_decl_prefix`, awaiting attachment
+    /// to the declaration that follows (e.g. `@Serializable` → `["Serializable"]`). A `parse_X` reads
+    /// it via `take_pending_annotations()` *before* parsing members (member prefixes overwrite it).
+    pending_annotations: Vec<AnnotationRef>,
+    /// The argument expressions of each pending annotation (parallel to `pending_annotations`). Only the
+    /// direct, ordinary-expression args are kept (array/nested-annotation args record an empty vec), which
+    /// is all an extension reading a value annotation (`@SerialName("x")`) needs.
+    pending_annotation_args: Vec<Vec<ExprId>>,
+    /// Context parameters parsed at a declaration prefix (`context(a: A)`), consumed by the next
+    /// `parse_fun` (mirrors `pending_annotations`). Cleared when taken.
+    pending_context_params: Vec<Param>,
+    /// Set while an `expect` classifier (and so every classifier nested in it) is being parsed.
+    /// Such a class declares only the constructors it writes: it gets no implicit primary one.
+    in_expect_classifier: bool,
+    /// Span of the `context` keyword introducing the buffered clause. Diagnostics about the clause
+    /// itself are anchored here rather than on some later modifier, which is where kotlinc puts them.
+    pending_context_span: Option<Span>,
+    /// Where the member declaration prefix most recently read by `parse_member_decl_prefix` began,
+    /// with the token index at which that prefix ended. A body property whose `val`/`var` sits at
+    /// exactly that index starts its declaration there, modifiers and annotations included; any
+    /// other declaration never reads a stale prefix, because its keyword is elsewhere.
+    member_declaration_prefix: Option<(u32, usize)>,
+    /// Span of the identifier most recently read as a DECLARATION's name (every declaration head
+    /// takes its name through `ident_or_error`). A declaration head reads this immediately after
+    /// obtaining its name, before parsing anything that could read another one. Kotlin diagnostics
+    /// about a declaration as a whole point at its name rather than at its keyword.
+    declaration_name_span: Span,
+    declaration_prefix: declaration_modifiers::PrefixInProgress,
+    /// The type parameters of the declaration whose `<…>` list was parsed last, with their spans,
+    /// so its `where` clause can name the parameter each bound constrains.
+    type_parameter_spans: Vec<(String, crate::diag::Span)>,
+    is_script: bool,
+    script_stmts: Vec<StmtId>,
+    /// Current expression-recursion depth (see [`Parser::parse_bp`]). Bounded by
+    /// [`EXPR_DEPTH_LIMIT`] so a pathologically nested expression (`((((…x…))))`) degrades to an
+    /// error expression instead of overflowing the stack — the same "degrade, never crash"
+    /// contract as the checker's and lowering's `expr_depth` guards.
+    expr_depth: u32,
+    /// Current TYPE-recursion depth (see [`Parser::parse_type`]). Types recurse outside `parse_bp`
+    /// (declaration position: `val x: ((((Int))))`, `List<List<…>>`), so they need their own
+    /// bounded, stack-grown funnel with the same degrade-never-crash contract.
+    type_depth: u32,
+    /// Current statement/declaration structural-recursion depth (see [`Parser::parse_stmt`] and
+    /// the class-like declaration parsers). Nested blocks (`while { while { … } }`) and nested
+    /// type declarations (`class A { class B { … } }`) recurse outside `parse_bp` too; one shared
+    /// counter bounds any interleaving of the two shapes.
+    stmt_depth: u32,
+    /// In `fun R.(...)`, `.(` terminates the receiver instead of beginning the function-type
+    /// grammar `R.(...) -> T`.
+    parsing_anonymous_function_receiver: bool,
+    /// Expression IDs returned directly from an explicit parenthesized expression. The AST does
+    /// not need a permanent parentheses node, but postfix parsing must distinguish `f() { ... }`
+    /// (a trailing argument of `f`) from `(f()) { ... }` (an `invoke` on the value returned by
+    /// `f`). This state is parser-local and disappears with the parser.
+    parenthesized_expressions: crate::fx_hash::HashSet<u32>,
+    /// Each function parsed so far in this unit, for [`crate::ast::BinaryReferenceTokens`].
+    function_spans: Vec<Span>,
+    lambda_label_scopes: lambda_literals::LambdaLabelScopes,
+}
+
+/// Semantic parser-recursion funnels governed by one depth/recovery mechanism.
+///
+/// Statement and declaration entries intentionally select the same counter: a local class inside
+/// a loop, or a loop inside an initializer of a local class, must not evade the bound by alternating
+/// declaration origins. Type recovery alone treats angle brackets as delimiters because only type
+/// grammar gives `<`/`>` that unconditional structural meaning.
+#[derive(Clone, Copy)]
+enum ParserNesting {
+    Expression,
+    Type,
+    Statement,
+    Declaration,
+}
+
+impl ParserNesting {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Expression => "expression",
+            Self::Type => "type",
+            Self::Statement => "statement",
+            Self::Declaration => "declaration",
+        }
+    }
+
+    fn counter_mut<'parser, 'source>(
+        self,
+        parser: &'parser mut Parser<'source>,
+    ) -> &'parser mut u32 {
+        match self {
+            Self::Expression => &mut parser.expr_depth,
+            Self::Type => &mut parser.type_depth,
+            Self::Statement | Self::Declaration => &mut parser.stmt_depth,
+        }
+    }
+
+    fn angle_brackets(self) -> bool {
+        matches!(self, Self::Type)
+    }
+}
+
+/// Maximum expression-parse recursion depth, counted in `parse_bp` ENTRIES — not semantic nesting
+/// levels. One semantic level can cost up to two entries (a binary operator's right operand is one
+/// `parse_bp` recursion, and a parenthesized operand re-enters via `parse_expr` → another), so a
+/// 450-level `0+(0+(…))` chain — which the checker and lowering admit under their 500-level
+/// `expr_depth` guards — consumes ~900 entries. Twice the shared semantic bound therefore admits
+/// every shape the later passes admit at up to two entries per level (redundant nesting like
+/// doubled parens spends entries faster and trips sooner), while still bounding the parser's
+/// recursion (degrade with a diagnostic, never crash). Derive this value rather than copying 1000
+/// so parser/checker/lowering cannot silently drift to incompatible limits.
+///
+/// The type and statement/declaration funnels (`parse_type`, `parse_stmt`, the class-like
+/// declaration parsers) reuse this limit as a conservative shared bound: their shapes cost one
+/// entry per nesting level, so 1000 admits strictly deeper nesting there than any later pass
+/// admits for expressions — the guard exists to bound the stack, not to define type/statement
+/// acceptance.
+const EXPR_DEPTH_LIMIT: u32 = crate::wide_stack::MAX_SEMANTIC_EXPR_DEPTH * 2;
+
+impl<'a> Parser<'a> {
+    fn new(
+        src: &'a str,
+        tokens: &'a [Token],
+        diags: &'a mut DiagSink,
+        features: &LangFeatures,
+        is_script: bool,
+    ) -> Self {
+        let mut file = File::default();
+        file.is_script = is_script;
+        Self {
+            src,
+            t: tokens,
+            i: 0,
+            file,
+            diags,
+            name_based_destructuring: features.has("NameBasedDestructuring"),
+            short_form_destructuring: features.has("EnableNameBasedDestructuringShortForm"),
+            multi_dollar_interpolation: features.has("MultiDollarInterpolation"),
+            explicit_backing_fields: features.has("ExplicitBackingFields"),
+            context_parameters: features.has("ContextParameters"),
+            context_receivers: features.has("ContextReceivers"),
+            when_guards: features.has("WhenGuards"),
+            no_trailing_lambda: false,
+            block_trailing_is_value: false,
+            bare_branch_value: false,
+            value_modifier_span: None,
+            external_modifier_spans: Vec::new(),
+            lexical_type_parameters: LexicalTypeParameters::default(),
+            pending_annotations: Vec::new(),
+            pending_annotation_args: Vec::new(),
+            pending_context_params: Vec::new(),
+            in_expect_classifier: false,
+            pending_context_span: None,
+            member_declaration_prefix: None,
+            declaration_name_span: Span::new(0, 0),
+            declaration_prefix: Default::default(),
+            type_parameter_spans: Vec::new(),
+            is_script,
+            script_stmts: Vec::new(),
+            expr_depth: 0,
+            type_depth: 0,
+            stmt_depth: 0,
+            parsing_anonymous_function_receiver: false,
+            parenthesized_expressions: Default::default(),
+            function_spans: Vec::new(),
+            lambda_label_scopes: Default::default(),
+        }
+    }
+
+    fn push_lexical_type_params(
+        &mut self,
+        params: &[String],
+        bounds: &[(String, TypeRef)],
+    ) -> usize {
+        self.lexical_type_parameters.push(params, bounds)
+    }
+
+    fn pop_lexical_type_params(&mut self, old_len: usize) {
+        self.lexical_type_parameters.pop(old_len);
+    }
+
+    fn current_lexical_type_params(&self) -> Vec<String> {
+        self.lexical_type_parameters.names()
+    }
+
+    fn cut_lexical_type_parameter_scope(&mut self) -> LexicalTypeParameters {
+        std::mem::take(&mut self.lexical_type_parameters)
+    }
+
+    fn restore_lexical_type_parameter_scope(&mut self, scope: LexicalTypeParameters) {
+        debug_assert!(self.lexical_type_parameters.names().is_empty());
+        self.lexical_type_parameters = scope;
+    }
+
+    // ---- cursor helpers ----
+    fn kind(&self) -> TokenKind {
+        self.t[self.i].kind
+    }
+    fn tok(&self) -> Token {
+        self.t[self.i]
+    }
+    fn text(&self) -> &'a str {
+        self.t[self.i].text(self.src)
+    }
+    /// Whether the current token was written BACKTICK-QUOTED. The lexer reports such a token as an
+    /// `Ident` whose span is the content between the backticks, so its text alone cannot be told
+    /// apart from a bare name — and Kotlin's rule is that an escaped name is ALWAYS an identifier.
+    /// A construct selected by token TEXT (`break`, `continue`, and the soft keywords) must
+    /// therefore ask this before reading the spelling as a keyword: `` `continue` `` is the
+    /// Kubernetes pagination parameter, not a jump.
+    fn token_is_escaped_ident(&self, token: Token) -> bool {
+        if token.kind != TokenKind::Ident || token.span.lo == 0 {
+            return false;
+        }
+        // BOTH backticks, as `syntactic_ident_span` requires: in `` `a`b ``, the bare `b` is
+        // byte-preceded by the PREVIOUS name's closing backtick, and treating it as escaped would
+        // stop a real keyword from being read as one.
+        let bytes = self.src.as_bytes();
+        bytes.get(token.span.lo as usize - 1) == Some(&b'`')
+            && bytes.get(token.span.hi as usize) == Some(&b'`')
+    }
+    fn escaped_ident(&self) -> bool {
+        self.token_is_escaped_ident(self.t[self.i])
+    }
+    fn token_keyword_text(&self, token: Token, keyword: &str) -> bool {
+        token.kind == TokenKind::Ident
+            && token.text(self.src) == keyword
+            && !self.token_is_escaped_ident(token)
+    }
+    fn token_is_modifier(&self, token: Token) -> bool {
+        token.kind == TokenKind::Ident
+            && is_modifier(token.text(self.src))
+            && !self.token_is_escaped_ident(token)
+    }
+    fn at_modifier(&self) -> bool {
+        self.token_is_modifier(self.t[self.i])
+    }
+    /// The current token spells one of `keywords` AS A KEYWORD — the multi-word form of
+    /// [`Self::keyword_text`], for a dispatch that gates on several spellings at once.
+    fn keyword_text_any(&self, keywords: &[&str]) -> bool {
+        keywords.iter().any(|keyword| self.text() == *keyword) && !self.escaped_ident()
+    }
+    /// The current token spells `keyword` AS A KEYWORD — see [`Self::escaped_ident`].
+    fn keyword_text(&self, keyword: &str) -> bool {
+        self.text() == keyword && !self.escaped_ident()
+    }
+    fn at(&self, k: TokenKind) -> bool {
+        self.kind() == k
+    }
+    /// At the start of a named argument `name = value`: an identifier followed by a single `=` (NOT
+    /// `==`, which the lexer produces as one `EqEq` token and which begins an equality expression).
+    fn at_named_arg(&self) -> bool {
+        self.at(TokenKind::Ident)
+            && self
+                .t
+                .get(self.i + 1)
+                .is_some_and(|t| t.kind == TokenKind::Eq)
+    }
+    fn bump(&mut self) -> Token {
+        let t = self.t[self.i];
+        if self.i + 1 < self.t.len() {
+            self.i += 1;
+        }
+        t
+    }
+    fn eat(&mut self, k: TokenKind) -> bool {
+        if self.at(k) {
+            self.bump();
+            true
+        } else {
+            false
+        }
+    }
+    fn eat_span(&mut self, k: TokenKind) -> Option<Span> {
+        self.at(k).then(|| self.bump().span)
+    }
+    /// The lexer exposes an identifier's decoded-content span. Extend it to the raw syntactic token for
+    /// backticked identifiers while the parser still has source access; no source string is retained.
+    fn syntactic_ident_span(&self, token: Token) -> Span {
+        let bytes = self.src.as_bytes();
+        let lo = token.span.lo as usize;
+        let hi = token.span.hi as usize;
+        if token.kind == TokenKind::Ident
+            && lo > 0
+            && hi < bytes.len()
+            && bytes[lo - 1] == b'`'
+            && bytes[hi] == b'`'
+        {
+            Span::new(token.span.lo - 1, token.span.hi + 1)
+        } else {
+            token.span
+        }
+    }
+    fn expect(&mut self, k: TokenKind, what: &str) -> bool {
+        if self.eat(k) {
+            true
+        } else {
+            self.diags
+                .error(self.tok().span, format!("expected {what}"));
+            false
+        }
+    }
+    /// True when the current token is a `;` (the lexer emits it as a `Newline`, but its source text is
+    /// `";"` — distinguishing an explicit statement terminator from a plain line break). Used to detect
+    /// an EMPTY loop body (`while (c);`), which must not swallow the following statement as the body.
+    fn at_semicolon(&self) -> bool {
+        self.at(TokenKind::Newline) && self.text() == ";"
+    }
+    /// Parse a loop body after the header's closing `)`. An explicit `;` is an EMPTY body (`while (c);`,
+    /// `for (…);`) — consumed here so the following statement is NOT mistaken for the body; otherwise the
+    /// body is the next statement/expression (possibly on the next line, so plain line breaks are skipped
+    /// first). `parse_branch` handles a bare statement body (`while (c) i++`), not just an expression.
+    fn parse_loop_body(&mut self) -> ExprId {
+        if self.at_semicolon() {
+            let sp = self.tok().span;
+            self.bump();
+            self.file.add_expr(
+                Expr::Block {
+                    stmts: Vec::new(),
+                    trailing: None,
+                },
+                sp,
+            )
+        } else {
+            self.skip_newlines();
+            self.parse_branch(false)
+        }
+    }
+    // ---- file / decls ----
+    /// Publish a top-level classifier after its syntax-specific parser has filled in kind-specific
+    /// facts. Declaration modifiers belong to the common classifier boundary: visibility and list
+    /// placement must not drift between class, object, data, annotation, enum, and interface arms.
+    fn register_top_level_classifier(
+        &mut self,
+        mut declaration: ClassDecl,
+        modifiers: &[String],
+        declaration_index: usize,
+    ) {
+        declaration.visibility = visibility_of(modifiers);
+        let id = self.file.add_decl(Decl::Class(declaration));
+        self.file.decls.insert(declaration_index, id);
+        self.file
+            .adopt_hoisted_classifiers(id, declaration_index + 1);
+    }
+
+    fn parse_file(&mut self) {
+        self.parse_file_with_declaration_sink(&mut |_| {});
+    }
+
+    fn parse_file_with_declaration_sink(&mut self, sink: &mut impl FnMut(&mut Parser<'a>)) {
+        self.skip_newlines();
+        if self.at(TokenKind::KwPackage) {
+            self.bump();
+            self.file.package = Some(self.parse_qualified_name());
+        }
+        loop {
+            self.skip_newlines();
+            if self.at(TokenKind::Eof) {
+                break;
+            }
+            self.pending_context_params.clear();
+            if self.at_file_annotation() {
+                if self.is_script && !self.script_stmts.is_empty() {
+                    self.diags.error(
+                        self.tok().span,
+                        "file annotations must precede script statements",
+                    );
+                }
+                self.parse_annotation();
+                continue;
+            }
+            let script_file_item =
+                matches!(self.kind(), TokenKind::KwPackage | TokenKind::KwImport)
+                    || (self.at(TokenKind::Ident) && self.keyword_text("typealias"));
+            if self.is_script && script_file_item && !self.script_stmts.is_empty() {
+                self.diags.error(
+                    self.tok().span,
+                    "package, import, and typealias directives must precede script statements",
+                );
+            }
+            if self.is_script && !script_file_item {
+                let stmt = self.parse_stmt();
+                self.script_stmts.push(stmt);
+                continue;
+            }
+            // Consume leading annotations + declaration modifiers. `open`/`abstract` are applied to
+            // the following class; the rest are ignored (krusty treats everything as public).
+            //
+            // Where this declaration's own multiplatform keywords begin. Every diagnostic about an
+            // `expect` points at the keyword, so it is captured here, while it is being consumed,
+            // rather than searched for afterwards among the file's modifiers.
+            let modifiers_before = self.file.multiplatform_modifiers.len();
+            let declaration_start = self.tok().span.lo;
+            self.begin_declaration_prefix();
+            let mut mods = if self.at(TokenKind::At) || self.at_modifier() {
+                let m = self.skip_decl_prefix();
+                self.skip_newlines();
+                m
+            } else {
+                Vec::new()
+            };
+            self.take_top_level_companion_modifier(&mut mods);
+            // `context` is a soft keyword and only starts a clause before a declaration. Like any
+            // modifier, `companion` may follow it (`context(_: A) companion fun C.f()`).
+            mods.extend(self.maybe_parse_context_receivers());
+            self.take_top_level_companion_modifier(&mut mods);
+            self.record_declaration_prefix(declaration_start);
+            // A `sealed` class is implicitly abstract and open (subclasses live in the same module).
+            let is_sealed = mods.iter().any(|m| m == "sealed");
+            // `expect` (multiplatform header): whatever declaration the arm below pushes is
+            // recorded so expect/actual matching can drop it once an `actual` provides the body.
+            let expect_keyword = mods
+                .iter()
+                .any(|m| m == "expect")
+                .then(|| {
+                    self.file.multiplatform_modifiers[modifiers_before..]
+                        .iter()
+                        .find(|(modifier, _)| modifier == "expect")
+                        .map(|(_, span)| *span)
+                })
+                .flatten();
+            let is_expect = expect_keyword.is_some();
+            // `actual` is otherwise inert, but an `actual` with no `expect` to actualize is an
+            // error, so the declarations carrying it are recorded exactly as the expects are.
+            let is_actual = mods.iter().any(|m| m == "actual");
+            let decls_before = self.file.decls.len();
+            // Every classifier nested in an `expect` one is itself `expect`.
+            self.in_expect_classifier = is_expect;
+            match self.kind() {
+                TokenKind::Eof => break,
+                // A `package` directive may follow file-level annotations (`@file:...`), so also
+                // accept it here (the common case is consumed before the loop).
+                TokenKind::KwPackage => {
+                    self.bump(); // 'package'
+                    let pkg = self.parse_qualified_name();
+                    if self.file.package.is_none() && !pkg.is_empty() {
+                        self.file.package = Some(pkg);
+                    }
+                }
+                TokenKind::KwImport => {
+                    self.bump(); // 'import'
+                    let import_span = self.tok().span;
+                    let segments = self.parse_qualified_name_segments();
+                    let fq = segments
+                        .iter()
+                        .map(|(segment, _)| segment.as_str())
+                        .collect::<Vec<_>>()
+                        .join(".");
+                    // `import a.b.*` — the segment scan consumes the trailing `.` (it only keeps a
+                    // segment when an `Ident` follows), leaving us at `*`. Recover the wildcard so it is
+                    // recorded as `a.b.*` (the form the import-level builder recognizes).
+                    let mut wildcard = false;
+                    if self.at(TokenKind::Star) {
+                        self.bump(); // '*'
+                        wildcard = true;
+                    }
+                    let mut alias = None;
+                    if self.at(TokenKind::Ident) && self.keyword_text("as") {
+                        self.bump(); // 'as'
+                        if self.at(TokenKind::Ident) {
+                            alias = Some(self.text().to_string());
+                            self.bump();
+                        }
+                    }
+                    if !fq.is_empty() {
+                        if !wildcard {
+                            let mut reference = simple_type_ref(&fq, import_span);
+                            reference.flags = reference.flags.with_import(true);
+                            self.file.detached_type_refs.push(reference);
+                        }
+                        self.file.import_paths.push(crate::ast::ImportPath {
+                            segments,
+                            wildcard,
+                            alias,
+                        });
+                    }
+                }
+                // `fun interface F { fun m(…): R }` — a SAM interface (parsed as an interface).
+                TokenKind::KwFun
+                    if self
+                        .t
+                        .get(self.i + 1)
+                        .map_or(false, |t| self.token_keyword_text(*t, "interface")) =>
+                {
+                    self.bump(); // 'fun'
+                    let mut d = self.parse_interface();
+                    d.is_fun_interface = true;
+                    self.register_top_level_classifier(d, &mods, decls_before);
+                }
+                TokenKind::KwFun => {
+                    let d = self.parse_fun(&mods);
+                    let id = self.file.add_decl(Decl::Fun(d));
+                    self.file.decls.push(id);
+                }
+                TokenKind::KwClass => {
+                    let is_value = mods.iter().any(|m| m == "inline" || m == "value");
+                    let value_modifier_span = self.take_value_modifier_span(&mods);
+                    let mut d = self.parse_class();
+                    d.modality = modality_from_modifiers(&mods);
+                    d.final_modifier = mods.iter().any(|modifier| modifier == "final");
+                    d.is_value = is_value;
+                    d.value_modifier_span = value_modifier_span;
+                    self.register_top_level_classifier(d, &mods, decls_before);
+                }
+                // top-level property: `val`/`var name (: Type)? = init`
+                TokenKind::KwVal | TokenKind::KwVar => {
+                    // An `expect val/var` is a HEADER — legally initializer- and accessor-less
+                    // (the matched actual supplies them; expect/actual stripping removes it).
+                    let mut d = self.parse_top_property_c(
+                        mods.iter().any(|m| m == "lateinit"),
+                        is_expect,
+                        mods.iter().any(|m| m == "const"),
+                        false,
+                    );
+                    Self::mark_inline_accessors(&mut d, &mods);
+                    d.visibility = visibility_of(&mods);
+                    d.has_visibility_modifier = has_visibility_modifier(&mods);
+                    d.is_override = mods.iter().any(|m| m == "override");
+                    d.is_external |= mods.iter().any(|m| m == "external");
+                    d.is_expect = is_expect;
+                    d.is_actual = is_actual;
+                    d.is_companion_extension = mods.iter().any(|m| m == "companion");
+                    let id = self.file.add_decl(Decl::Property(d));
+                    self.file.decls.push(id);
+                }
+                // `data class` / `data object` — `data` is a soft keyword (a plain identifier elsewhere).
+                TokenKind::Ident
+                    if self.keyword_text("data")
+                        && self.t.get(self.i + 1).map_or(false, |t| {
+                            t.kind == TokenKind::KwClass || self.token_keyword_text(*t, "object")
+                        }) =>
+                {
+                    self.bump(); // 'data'
+                    let is_obj = self.at(TokenKind::Ident) && self.keyword_text("object");
+                    let mut d = if is_obj {
+                        self.parse_object()
+                    } else {
+                        self.parse_class()
+                    };
+                    d.is_data = true;
+                    self.register_top_level_classifier(d, &mods, decls_before);
+                }
+                // `object Name { … }` — a singleton (soft keyword `object` + a name).
+                TokenKind::Ident
+                    if self.keyword_text("object")
+                        && self
+                            .t
+                            .get(self.i + 1)
+                            .map_or(false, |t| t.kind == TokenKind::Ident) =>
+                {
+                    let d = self.parse_object();
+                    self.register_top_level_classifier(d, &mods, decls_before);
+                }
+                // `annotation class Name(...)` — emitted as an interface extending
+                // `java/lang/annotation/Annotation` with an accessor per primary-ctor property;
+                // instantiation synthesizes an impl class (see emit).
+                TokenKind::Ident
+                    if self.keyword_text("annotation")
+                        && self
+                            .t
+                            .get(self.i + 1)
+                            .map_or(false, |t| t.kind == TokenKind::KwClass) =>
+                {
+                    self.bump(); // 'annotation'
+                    let mut d = self.parse_class();
+                    d.kind = ClassKind::Annotation;
+                    self.register_top_level_classifier(d, &mods, decls_before);
+                }
+                // `enum class Name { A, B, C }` (soft keyword `enum` + `class`).
+                TokenKind::Ident
+                    if self.keyword_text("enum")
+                        && self
+                            .t
+                            .get(self.i + 1)
+                            .map_or(false, |t| t.kind == TokenKind::KwClass) =>
+                {
+                    let d = self.parse_enum();
+                    self.register_top_level_classifier(d, &mods, decls_before);
+                }
+                // `interface Name { … }` (soft keyword `interface` + a name). A `sealed interface` carries
+                // `is_sealed` so it serializes as a `SealedClassSerializer` (closed polymorphism), like a
+                // `sealed class` — not the open `PolymorphicSerializer` a plain interface gets.
+                TokenKind::Ident
+                    if self.keyword_text("interface")
+                        && self
+                            .t
+                            .get(self.i + 1)
+                            .map_or(false, |t| t.kind == TokenKind::Ident) =>
+                {
+                    let mut d = self.parse_interface();
+                    if is_sealed {
+                        d.modality = crate::ast::Modality::Sealed;
+                    }
+                    self.register_top_level_classifier(d, &mods, decls_before);
+                }
+                // `typealias Name[<T,...>] = Type`
+                TokenKind::Ident if self.keyword_text("typealias") => {
+                    let declaration = self.parse_type_alias_syntax();
+                    if !declaration.type_params.is_empty() {
+                        self.file
+                            .type_alias_declaration_starts
+                            .insert(declaration.span.lo);
+                    }
+                    self.file.type_alias_fun.push((
+                        declaration.name.clone(),
+                        declaration.type_params.clone(),
+                        declaration.target.clone(),
+                    ));
+                    if declaration.target.name != "<fun>" {
+                        self.file
+                            .type_aliases
+                            .push((declaration.name.clone(), declaration.target.name.clone()));
+                    }
+                    if is_actual {
+                        self.file
+                            .actual_type_aliases
+                            .push(self.file.type_alias_decls.len());
+                    }
+                    self.file.type_alias_decls.push(declaration.clone());
+                    // The alias's declared visibility survives into `@Metadata`, including aliases
+                    // whose target is a function type and therefore has no legacy classifier edge.
+                    let vis = visibility_of(&mods);
+                    if vis != Visibility::Public {
+                        self.file
+                            .type_alias_visibility
+                            .insert(declaration.name, vis);
+                    }
+                }
+                _ => {
+                    self.diags
+                        .error(self.tok().span, "expected a top-level declaration");
+                    self.recover_to_decl_boundary();
+                }
+            }
+            if let Some(keyword) = expect_keyword {
+                let after = self.file.decls.len();
+                let declarations = self.file.decls[decls_before..after].to_vec();
+                self.file
+                    .expect_decls
+                    .extend(declarations.into_iter().map(|declaration| {
+                        crate::ast::ExpectDeclaration {
+                            declaration,
+                            keyword,
+                        }
+                    }));
+            }
+            if is_actual {
+                // Only the declaration that WROTE the modifier. A classifier arm also pushes the
+                // nested classifiers it hoists out of the body, and those carry `actual` only if
+                // they wrote it themselves — so take the outermost, which is the one whose span
+                // starts first (a nested declaration always starts inside its owner).
+                let after = self.file.decls.len();
+                let outermost = self.file.decls[decls_before..after]
+                    .iter()
+                    .copied()
+                    .min_by_key(|&declaration| match self.file.decl(declaration) {
+                        Decl::Fun(function) => function.span.lo,
+                        Decl::Class(class) => class.span.lo,
+                        Decl::Property(property) => property.span.lo,
+                    });
+                self.file.actual_decls.extend(outermost);
+            }
+            if self.file.decls.len() > decls_before {
+                sink(self);
+            }
+        }
+    }
+
+    /// Whether `index` can start a declaration — a declaration keyword, an annotation `@`, or a
+    /// soft-keyword/modifier identifier. Lookaheads use this at physical-line boundaries; the
+    /// mutating parser uses [`Self::at_decl_start`] for its current token.
+    fn token_starts_declaration_at(&self, index: usize) -> bool {
+        use TokenKind::*;
+        let Some(token) = self.t.get(index).copied() else {
+            return false;
+        };
+        match token.kind {
+            KwFun | KwClass | KwVal | KwVar | KwImport | KwPackage | At => true,
+            Ident => {
+                self.token_is_modifier(token)
+                    || (!self.token_is_escaped_ident(token)
+                        && matches!(
+                            token.text(self.src),
+                            "object"
+                                | "interface"
+                                | "enum"
+                                | "annotation"
+                                | "typealias"
+                                | "data"
+                                | "companion"
+                        ))
+            }
+            _ => false,
+        }
+    }
+
+    /// Whether the current token can START a top-level declaration. Used by error recovery to
+    /// resynchronize without duplicating the lookahead's declaration-boundary policy.
+    fn at_decl_start(&self) -> bool {
+        self.token_starts_declaration_at(self.i)
+    }
+
+    fn at_file_annotation(&self) -> bool {
+        self.at(TokenKind::At)
+            && self
+                .t
+                .get(self.i + 1)
+                .is_some_and(|token| self.token_keyword_text(*token, "file"))
+            && self
+                .t
+                .get(self.i + 2)
+                .is_some_and(|token| token.kind == TokenKind::Colon)
+    }
+
+    /// Return the token after a context parameter list, or `None` for a `context(...)` call.
+    fn context_parameter_list_end_at(&self, open: usize) -> Option<usize> {
+        if self.t.get(open)?.kind != TokenKind::LParen {
+            return None;
+        }
+        let mut j = open + 1;
+        loop {
+            while self
+                .t
+                .get(j)
+                .is_some_and(|token| token.kind == TokenKind::Newline)
+            {
+                if self.t[j].text(self.src) == ";" {
+                    return None;
+                }
+                j += 1;
+            }
+            if self.t.get(j)?.kind == TokenKind::RParen {
+                return Some(j + 1);
+            }
+            loop {
+                let token = self.t.get(j)?;
+                if token.kind == TokenKind::At {
+                    j = self.annotation_end_at(j)?;
+                    continue;
+                }
+                if self.token_is_modifier(*token)
+                    && self.t.get(j + 1).map(|next| next.kind) != Some(TokenKind::Colon)
+                {
+                    j += 1;
+                    continue;
+                }
+                break;
+            }
+            if self.t.get(j)?.kind != TokenKind::Ident {
+                return None;
+            }
+            if self.t.get(j + 1)?.kind == TokenKind::Colon {
+                j += 2;
+            } else if !self.context_receivers {
+                return None;
+            }
+
+            let mut parens = 0usize;
+            let mut brackets = 0usize;
+            let mut braces = 0usize;
+            let mut angles = 0usize;
+            let mut saw_type = false;
+            loop {
+                let token = self.t.get(j)?;
+                match token.kind {
+                    TokenKind::LParen => parens += 1,
+                    TokenKind::RParen if parens > 0 => parens -= 1,
+                    TokenKind::LBracket => brackets += 1,
+                    TokenKind::RBracket if brackets > 0 => brackets -= 1,
+                    TokenKind::LBrace => braces += 1,
+                    TokenKind::RBrace if braces > 0 => braces -= 1,
+                    TokenKind::Lt => angles += 1,
+                    TokenKind::Gt if angles > 0 => angles -= 1,
+                    TokenKind::Comma
+                        if parens == 0 && brackets == 0 && braces == 0 && angles == 0 =>
+                    {
+                        if !saw_type {
+                            return None;
+                        }
+                        j += 1;
+                        break;
+                    }
+                    TokenKind::RParen if brackets == 0 && braces == 0 && angles == 0 => {
+                        return saw_type.then_some(j + 1);
+                    }
+                    TokenKind::Eof => return None,
+                    TokenKind::Newline if token.text(self.src) == ";" => return None,
+                    _ => {}
+                }
+                saw_type |= !matches!(token.kind, TokenKind::Newline);
+                j += 1;
+            }
+        }
+    }
+
+    /// Skip an unparseable top-level construct to the next declaration boundary, descending through
+    /// balanced `{}` so a declaration keyword inside a body isn't mistaken for a boundary. Always makes
+    /// progress (the current token is not a declaration start — that is why recovery was invoked).
+    fn recover_to_decl_boundary(&mut self) {
+        // Always consume the offending token first — it reached recovery precisely because no
+        // declaration arm could parse it (it may even LOOK like a declaration start, e.g. `object`
+        // with no name), so returning on it without progress would loop the caller forever.
+        if !self.at(TokenKind::Eof) {
+            self.bump();
+        }
+        let mut depth = 0i32;
+        loop {
+            match self.kind() {
+                TokenKind::Eof => return,
+                TokenKind::LBrace => {
+                    depth += 1;
+                    self.bump();
+                }
+                TokenKind::RBrace => {
+                    depth -= 1;
+                    self.bump();
+                }
+                _ if depth <= 0 && self.at_decl_start() => return,
+                _ => {
+                    self.bump();
+                }
+            }
+        }
+    }
+
+    /// Consume an `init` keyword and its block, recording the KEYWORD's span against the resulting
+    /// block expression. A diagnostic about an initializer block points at `init`, which the block
+    /// expression's own span (starting at `{`) does not cover.
+    fn parse_init_block(&mut self) -> ExprId {
+        let keyword = self.tok().span;
+        self.bump(); // 'init'
+        let block = self.parse_block_expr(false);
+        self.file.init_block_keywords.insert(block, keyword);
+        block
+    }
+
+    /// Parse a nested type declaration (`class`/`object`/`interface`/`data|enum|annotation class`/
+    /// `sealed …`) through the *real* parsers — never by skipping a balanced body. The current
+    /// `class`-body/`object`-body/`enum`-body grammar doesn't support nested types, so the caller
+    /// discards the result; a *reference* to the (dropped) nested type then fails to resolve and the
+    /// file is cleanly skipped, never miscompiled.
+    /// Whether the statement at the cursor begins a local TYPE declaration: a `class` keyword, an
+    /// `interface Name`, or a soft-keyword class form (`data`/`enum`/`sealed`/`annotation`/`value` +
+    /// `class`, possibly through modifiers like `open`/`abstract`/`inner`/`private`). Lookahead only —
+    /// doesn't consume. Excludes `object` (a bare `object` may be an anonymous-object expression).
+    fn looks_like_local_type_decl(&self) -> bool {
+        let mut j = self.i;
+        loop {
+            let Some(tk) = self.t.get(j) else {
+                return false;
+            };
+            if tk.kind == TokenKind::KwClass {
+                return true;
+            }
+            if tk.kind != TokenKind::Ident {
+                return false;
+            }
+            // `interface Name` — a named local interface (the next token is the name).
+            if self.token_keyword_text(*tk, "interface") {
+                return matches!(self.t.get(j + 1), Some(n) if n.kind == TokenKind::Ident);
+            }
+            // `object Name` — a named local object DECLARATION. A bare `object :`/`object {` is an
+            // anonymous-object EXPRESSION (no name), which stays on the expression path.
+            if self.token_keyword_text(*tk, "object") {
+                return matches!(self.t.get(j + 1), Some(n) if n.kind == TokenKind::Ident);
+            }
+            // A class-introducing soft keyword or a declaration modifier (`open`/`abstract`/`private`/
+            // `inner`/…) — keep scanning toward `class`/`interface`. The scan only returns `true` if it
+            // actually reaches a type keyword, so a soft-keyword used as a value (`data.x`, `value.foo()`)
+            // doesn't misfire.
+            if ["data", "enum", "sealed", "annotation", "value"]
+                .iter()
+                .any(|keyword| self.token_keyword_text(*tk, keyword))
+                || self.token_is_modifier(*tk)
+            {
+                j += 1;
+                continue;
+            }
+            return false;
+        }
+    }
+
+    fn parse_nested_type_decl(&mut self) -> ClassDecl {
+        match self.kind() {
+            TokenKind::KwClass => self.parse_class(),
+            TokenKind::Ident if self.keyword_text("object") => self.parse_object(),
+            TokenKind::Ident if self.keyword_text("interface") => self.parse_interface(),
+            TokenKind::Ident if self.keyword_text("enum") => self.parse_enum(),
+            TokenKind::Ident if self.keyword_text("data") => {
+                self.bump();
+                let mut d = if self.at(TokenKind::Ident) && self.keyword_text("object") {
+                    self.parse_object()
+                } else {
+                    self.parse_class()
+                };
+                d.is_data = true;
+                d
+            }
+            TokenKind::Ident if self.keyword_text("annotation") => {
+                self.bump();
+                let mut declaration = self.parse_class();
+                declaration.kind = ClassKind::Annotation;
+                declaration
+            }
+            TokenKind::Ident if self.keyword_text("sealed") => {
+                self.bump();
+                self.parse_nested_type_decl()
+            }
+            _ => self.parse_class(),
+        }
+    }
+
+    /// Consume the classifier reference (and optional type arguments) shared by declaration, type-use,
+    /// and type-parameter annotations. The source spelling is retained only until the common classifier
+    /// resolver commits the exact annotation identity for this occurrence.
+    fn parse_annotation_reference(&mut self) -> (String, Span) {
+        let annotation_span = self.tok().span;
+        let qname = self.parse_qualified_name();
+        if !qname.is_empty() {
+            let mut reference = simple_type_ref(&qname, annotation_span);
+            reference.flags = reference.flags.with_annotation(true);
+            self.file.detached_type_refs.push(reference);
+            let suppressions = self
+                .pending_annotations
+                .iter()
+                .zip(&self.pending_annotation_args)
+                .filter(|(annotation, _)| {
+                    annotation
+                        .name
+                        .rsplit('.')
+                        .next()
+                        .is_some_and(|name| name == "Suppress")
+                })
+                .flat_map(|(_, arguments)| arguments)
+                .filter_map(|argument| self.file.const_string_value(*argument))
+                .map(|value| value.to_lossy().to_owned())
+                .collect::<Vec<_>>();
+            if !suppressions.is_empty() {
+                self.file
+                    .detached_type_ref_suppressions
+                    .insert(annotation_span.lo, suppressions);
+            }
+        }
+        self.parse_type_args(); // `@Foo<Bar>` (rare) — real type-arg parse
+        (qname, annotation_span)
+    }
+
+    /// Parse an annotation argument list `( (name =)? value ,* )` through the real grammar. Values
+    /// the checker cannot model retain an explicit [`UnsupportedAnnotationArgument`] node so the
+    /// annotation-consumption site can reject them without fabricating a resolvable name.
+    fn parse_annotation_args(&mut self) -> Vec<ExprId> {
+        let mut out = Vec::new();
+        if !self.eat(TokenKind::LParen) {
+            return out;
+        }
+        self.skip_newlines();
+        while !self.at(TokenKind::RParen) && !self.at(TokenKind::Eof) {
+            // optional named argument `name = value` — the label binds the value to an element by
+            // NAME, so it is recorded rather than skipped (annotation elements have defaults and
+            // may appear in any order).
+            let mut argument_name = None;
+            if self.at_named_arg() {
+                argument_name = Some(self.text().to_string());
+                self.bump(); // name
+                self.bump(); // '='
+            }
+            if let Some(e) = self.parse_annotation_value() {
+                if let Some(name) = argument_name {
+                    self.file.annotation_arg_names.insert(e.0, name);
+                }
+                out.push(e);
+            }
+            self.skip_newlines();
+            if !self.eat(TokenKind::Comma) {
+                break;
+            }
+            self.skip_newlines();
+        }
+        self.expect(TokenKind::RParen, "')'");
+        out
+    }
+
+    /// A single annotation argument value: an array literal `[…]`, a nested annotation `@Foo(…)`,
+    /// or an ordinary expression (including `Foo::class`).
+    fn parse_annotation_value(&mut self) -> Option<ExprId> {
+        // Annotation arrays, nested annotations, and spreads recurse while a declaration prefix is
+        // still being consumed, before `parse_bp` or a class-like parser is necessarily entered.
+        // They are expression syntax, so join the shared expression lane instead of owning another
+        // origin-specific counter/recovery policy.
+        self.with_nesting_guard(
+            ParserNesting::Expression,
+            |_parser, _span| None,
+            Self::parse_annotation_value_inner,
+        )
+    }
+
+    fn parse_annotation_value_inner(&mut self) -> Option<ExprId> {
+        if self.at(TokenKind::LBracket) {
+            let start = self.tok().span;
+            self.bump(); // '['
+            self.skip_newlines();
+            // The elements are kept AS PARSED. Which array factory they belong to follows the
+            // annotation element's declared type, which the parser cannot see, so the checker
+            // folds this literal against that type.
+            let mut elements = Vec::new();
+            while !self.at(TokenKind::RBracket) && !self.at(TokenKind::Eof) {
+                if let Some(element) = self.parse_annotation_value() {
+                    elements.push(element);
+                }
+                self.skip_newlines();
+                if !self.eat(TokenKind::Comma) {
+                    break;
+                }
+                self.skip_newlines();
+            }
+            self.expect(TokenKind::RBracket, "']'");
+            Some(
+                self.file
+                    .add_expr(Expr::AnnotationArrayLiteral(elements), start),
+            )
+        } else if self.at(TokenKind::At) {
+            let start = self.tok().span;
+            let _ = self.parse_annotation();
+            Some(self.file.add_expr(
+                Expr::UnsupportedAnnotationArgument(
+                    crate::ast::UnsupportedAnnotationArgument::NestedAnnotation,
+                ),
+                start,
+            ))
+        } else if self.at(TokenKind::Star) {
+            // A spread argument in an annotation (`@A(*arrayOf("O"), "K")` — a `vararg` annotation
+            // parameter). Preserve the same spread fact as an ordinary call argument; checking uses
+            // it to type the whole array and constant folding flattens its elements into the vararg.
+            self.bump(); // '*'
+            let argument = self.parse_annotation_value()?;
+            self.file.spread_arg_ids.insert(argument.0);
+            Some(argument)
+        } else {
+            Some(self.parse_expr())
+        }
+    }
+
+    /// Parse the complete declaration-shaped part of a type alias. Semantic registration differs
+    /// between file, classifier, and local scopes, but no scope is allowed to skip its tokens.
+    fn parse_type_alias_syntax(&mut self) -> crate::ast::TypeAliasDecl {
+        let start = self.tok().span;
+        self.bump(); // `typealias`
+        let name = self.ident_or_error("typealias name");
+        let name_span = self.declaration_name_span;
+        let type_params = if self.at(TokenKind::Lt) {
+            self.parse_type_params(start.lo).0
+        } else {
+            Vec::new()
+        };
+        self.expect(TokenKind::Eq, "'='");
+        self.skip_plain_newlines();
+        let target = self.parse_type();
+        let end = self.t[self.i.saturating_sub(1)].span;
+        crate::ast::TypeAliasDecl {
+            name,
+            type_params,
+            target,
+            span: Span::new(start.lo, end.hi),
+            name_span,
+        }
+    }
+
+    /// Parse a property declaration. Whether an absent initializer is legal belongs to semantic
+    /// checking, because the answer depends on declaration ownership and modifiers.
+    /// Consume an initializer's `=` when the next non-newline token is one.
+    ///
+    /// Kotlin's property grammar is `… (NL* '=' NL* expression)?`, so a declaration may put its
+    /// initializer on the following line:
+    ///
+    /// ```kotlin
+    /// val a: Map<String, Int>
+    ///     = mapOf("x" to 1)
+    /// ```
+    ///
+    /// Stopping the declaration at the newline instead leaves the `=` to be read as the start of the
+    /// next declaration or statement, which is not a recoverable position — nothing else in the
+    /// grammar begins with `=`, so looking past the newlines cannot swallow anything but this
+    /// property's own initializer.
+    fn eat_initializer_eq(&mut self) -> Option<Span> {
+        self.skip_plain_newlines_before(TokenKind::Eq);
+        self.eat_span(TokenKind::Eq)
+    }
+
+    /// Return the first token after an annotation without mutating parser state.
+    fn annotation_end_at(&self, mut i: usize) -> Option<usize> {
+        if !self
+            .t
+            .get(i)
+            .is_some_and(|token| token.kind == TokenKind::At)
+        {
+            return None;
+        }
+        i += 1;
+        if self
+            .t
+            .get(i)
+            .is_some_and(|token| token.kind == TokenKind::Ident)
+            && self
+                .t
+                .get(i + 1)
+                .is_some_and(|token| token.kind == TokenKind::Colon)
+        {
+            i += 2;
+        }
+        if !self
+            .t
+            .get(i)
+            .is_some_and(|token| token.kind == TokenKind::Ident)
+        {
+            return None;
+        }
+        i += 1;
+        while self
+            .t
+            .get(i)
+            .is_some_and(|token| token.kind == TokenKind::Dot)
+            && self
+                .t
+                .get(i + 1)
+                .is_some_and(|token| token.kind == TokenKind::Ident)
+        {
+            i += 2;
+        }
+        if !self
+            .t
+            .get(i)
+            .is_some_and(|token| token.kind == TokenKind::LParen)
+        {
+            return Some(i);
+        }
+        let mut depth = 0usize;
+        loop {
+            match self.t.get(i).map(|token| token.kind) {
+                Some(TokenKind::LParen) => depth += 1,
+                Some(TokenKind::RParen) => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some(i + 1);
+                    }
+                }
+                Some(TokenKind::Eof) | None => return None,
+                _ => {}
+            }
+            i += 1;
+        }
+    }
+
+    /// Detect an explicit primary-constructor prefix without consuming sibling annotations.
+    fn primary_constructor_header_follows(&self) -> bool {
+        let mut i = self.i;
+        loop {
+            i = self.after_plain_newlines(i);
+            let Some(token) = self.t.get(i) else {
+                return false;
+            };
+            if token.kind == TokenKind::At {
+                let Some(end) = self.annotation_end_at(i) else {
+                    return false;
+                };
+                i = end;
+                continue;
+            }
+            if token.kind == TokenKind::Ident
+                && self.token_is_modifier(*token)
+                && self
+                    .t
+                    .get(i + 1)
+                    .is_none_or(|next| next.kind != TokenKind::Colon)
+            {
+                i += 1;
+                continue;
+            }
+            return self.token_keyword_text(*token, "constructor");
+        }
+    }
+
+    /// Whether the expression tree at `e` reads the property backing field — a bare `field`
+    /// identifier. Used to detect that a custom getter (`get() = field + …`) has a backing field.
+    fn expr_reads_field(&self, e: ExprId) -> bool {
+        if let Expr::Name(n) = self.file.expr(e) {
+            if n == "field" {
+                return true;
+            }
+        }
+        self.file
+            .any_child_expr(e, &mut |c| self.expr_reads_field(c), &mut |_| false)
+    }
+
+    /// Consume an accessor's `()`. Returns `Some(())` on success. `require` controls whether a
+    /// missing `(` is an error (getter) — setters route through `parse_setter_param` instead.
+    fn eat_accessor_parens(&mut self, require: bool) -> Option<()> {
+        if !self.at(TokenKind::LParen) {
+            if require {
+                self.i -= 1; // un-consume `get` so the caller can bail cleanly
+            }
+            return None;
+        }
+        self.expect(TokenKind::LParen, "'('");
+        self.expect(TokenKind::RParen, "')'");
+        Some(())
+    }
+
+    /// Parse a setter's optional `(param)` and return its parameter name.
+    ///
+    /// Kotlin gives setter parameters a deliberately narrower grammar than ordinary function
+    /// parameters: annotations are allowed, while the property supplies the value type. Keep this
+    /// parser narrow instead of routing through `parse_param_list`, which would require a type and
+    /// admit unrelated modifiers/defaults. The parameter's annotations are returned beside its name.
+    fn parse_setter_param(&mut self) -> (Option<String>, Vec<crate::ast::AccessorAnnotation>) {
+        let mut annotations = Vec::new();
+        if !self.eat(TokenKind::LParen) {
+            return (None, annotations);
+        }
+        self.skip_plain_newlines();
+        while self.at(TokenKind::At) {
+            annotations.extend(self.parse_accessor_annotation());
+            self.skip_plain_newlines();
+        }
+        let name = if self.at(TokenKind::Ident) {
+            let n = self.text().to_string();
+            self.bump();
+            Some(n)
+        } else {
+            None
+        };
+        self.skip_plain_newlines();
+        // Keep accepting the historical optional type annotation for recovery/compatibility, but use
+        // the ordinary type parser so a complex type cannot desynchronize the enclosing class body.
+        if self.eat(TokenKind::Colon) {
+            self.skip_plain_newlines();
+            let _ = self.parse_type();
+            self.skip_plain_newlines();
+        }
+        // Kotlin permits a trailing comma in a multiline parameter list. There is exactly one setter
+        // parameter, so consume only the comma; a second parameter remains visible to `expect` as an
+        // error instead of being silently accepted.
+        if self.eat(TokenKind::Comma) {
+            self.skip_plain_newlines();
+        }
+        self.expect(TokenKind::RParen, "')'");
+        (name, annotations)
+    }
+
+    /// Parse a getter body after its `()`: `= expr` or `{ block }`.
+    fn parse_accessor_body(&mut self) -> FunBody {
+        if self.eat(TokenKind::Eq) {
+            self.skip_newlines();
+            FunBody::Expr(self.parse_expr())
+        } else if self.at(TokenKind::LBrace) {
+            FunBody::Block(self.parse_block_expr(false))
+        } else {
+            self.diags.error(
+                self.tok().span,
+                "expected '=' or '{' for a property getter".to_string(),
+            );
+            FunBody::None
+        }
+    }
+
+    /// Parse `companion object [Name]` as an ordinary nested singleton class
+    /// and return its arena id.
+    /// The enclosing declaration keeps only this relationship edge; all declaration data belongs to
+    /// the nested class itself.
+    fn parse_companion(&mut self, outer: &str, modifiers: &[String]) -> DeclId {
+        // A companion is a static nested classifier. Its header and members cannot mention the
+        // containing class's type parameters unless they introduce their own declaration parameters.
+        // In particular, an anonymous object in a companion property must not acquire the outer
+        // class's parameters merely because the recursive-descent parser is still inside its body.
+        let enclosing_type_parameters = std::mem::take(&mut self.lexical_type_parameters);
+        let nested_start = self.file.decls.len();
+        let annotations = self.take_pending_annotations();
+        let annotation_args = self.take_pending_annotation_args();
+        let start = self.tok().span;
+        self.bump(); // 'companion'
+        let has_object_keyword = self.at(TokenKind::Ident) && self.keyword_text("object");
+        let object_keyword = has_object_keyword.then(|| self.tok().span);
+        if has_object_keyword {
+            self.bump(); // 'object'
+        }
+        // `companion object Named` names itself; a bare `companion object` is named by its `object`
+        // keyword, which is where the reference compiler points every diagnostic about it. The
+        // `companion` keyword is a modifier on that declaration, not the declaration's own token.
+        let name_span = if has_object_keyword && self.at(TokenKind::Ident) {
+            self.tok().span
+        } else {
+            object_keyword.unwrap_or(start)
+        };
+        let simple_name = if has_object_keyword && self.at(TokenKind::Ident) {
+            self.bump().text(self.src).to_string()
+        } else {
+            "Companion".to_string()
+        };
+        let name = format!("{outer}.{simple_name}");
+        let lexical_scope = self.cut_lexical_type_parameter_scope();
+        let (
+            supertypes,
+            base_class,
+            base_class_span,
+            base_type_args,
+            base_args,
+            interface_delegations,
+        ) = self.parse_supertypes();
+        let mut methods = Vec::new();
+        let mut props = Vec::new();
+        let mut init_order = Vec::new();
+        let mut type_aliases = Vec::new();
+        if self.eat_optional_declaration_body_open() {
+            loop {
+                self.skip_newlines();
+                let mods = self.parse_member_decl_prefix();
+                if self.parse_and_register_nested_classifier(&name, &mods, false) {
+                    continue;
+                }
+                match self.kind() {
+                    TokenKind::RBrace | TokenKind::Eof => break,
+                    TokenKind::KwFun => {
+                        let function = self.parse_fun(&mods);
+                        methods.push(function);
+                    }
+                    TokenKind::KwVal | TokenKind::KwVar => {
+                        let property = self.parse_member_property(&mods, false, false);
+                        init_order.push(ClassInit::PropInit(props.len()));
+                        props.push(property);
+                    }
+                    TokenKind::Ident
+                        if self.keyword_text("init")
+                            && self
+                                .t
+                                .get(self.i + 1)
+                                .is_some_and(|token| token.kind == TokenKind::LBrace) =>
+                    {
+                        init_order.push(ClassInit::Block(self.parse_init_block()));
+                    }
+                    TokenKind::Ident if self.keyword_text("typealias") => {
+                        type_aliases.push(self.parse_type_alias_syntax());
+                    }
+                    _ => {
+                        self.diags.error(
+                            self.tok().span,
+                            "expected a companion-object member declaration",
+                        );
+                        self.bump();
+                    }
+                }
+            }
+            self.expect(TokenKind::RBrace, "'}'");
+        }
+        let end = self.t[self.i.saturating_sub(1)].span;
+        self.restore_lexical_type_parameter_scope(lexical_scope);
+        let declaration = ClassDecl {
+            name_span,
+            primary_ctor_visibility: Visibility::Public,
+            primary_ctor_visibility_span: None,
+            name,
+            visibility: visibility_of(modifiers),
+            annotations,
+            annotation_args,
+            type_parameters: crate::ast::ClassTypeParameters::new(
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            ),
+            context_params: Vec::new(),
+            lexical_type_parameter_captures: Vec::new(),
+            props: Vec::new(),
+            methods,
+            companion: None,
+            body_props: props,
+            init_order,
+            kind: ClassKind::Class,
+            singleton: true,
+            is_data: false,
+            is_value: false,
+            value_modifier_span: None,
+            primary_constructor_parameters_span: None,
+            enum_entries: Vec::new(),
+            is_fun_interface: false,
+            modality: crate::ast::Modality::Final,
+            final_modifier: false,
+            inner_of: None,
+            supertypes,
+            interface_delegations,
+            base_class,
+            base_class_span,
+            base_type_args,
+            base_args,
+            secondary_ctors: Vec::new(),
+            type_aliases,
+            primary_ctor_annotations: Some(Vec::new()),
+            primary_ctor_annotation_args: Vec::new(),
+            span: Span::new(start.lo, end.hi),
+            primary_ctor_lines: PrimaryCtorLines::default(),
+            companion_block_members: Vec::new(),
+            decl_line: 0,
+            decl_start_line: 0,
+            decl_end_line: 0,
+        };
+        let id = self.file.add_decl(Decl::Class(declaration));
+        self.file.decls.insert(nested_start, id);
+        self.file.adopt_hoisted_classifiers(id, nested_start + 1);
+        declaration_modifiers::record_nested_actual(&mut self.file, modifiers, id);
+        debug_assert!(self.lexical_type_parameters.names().is_empty());
+        self.lexical_type_parameters = enclosing_type_parameters;
+        id
+    }
+
+    /// `enum class Name { A, B, C }` — v0: simple entries (no constructor args, no class body).
+    fn parse_enum_inner(&mut self) -> ClassDecl {
+        let annotations = self.take_pending_annotations();
+        let annotation_args = self.take_pending_annotation_args();
+        let context_params = std::mem::take(&mut self.pending_context_params);
+        let start = self.tok().span;
+        self.bump(); // 'enum'
+        self.bump(); // 'class'
+        let name = self.ident_or_error("enum name");
+        let name_span = self.declaration_name_span;
+        // Optional explicit `constructor` keyword and primary constructor:
+        // `enum class C constructor(val rgb: Int, …)`.
+        let mut ctor_open_offset = 0u32;
+        // `NL* primaryConstructor`: the `constructor` keyword may also start on a later line.
+        if self.primary_constructor_header_follows() {
+            self.skip_newlines();
+        }
+        if self.at(TokenKind::Ident) && self.keyword_text("constructor") {
+            ctor_open_offset = self.tok().span.lo;
+            self.bump();
+        }
+        let mut props = Vec::new();
+        // `NL* primaryConstructor`: the parameter list may start on a later line.
+        self.skip_plain_newlines_before(TokenKind::LParen);
+        if ctor_open_offset == 0 && self.at(TokenKind::LParen) {
+            ctor_open_offset = self.tok().span.lo;
+        }
+        let has_primary_ctor = self.eat(TokenKind::LParen);
+        if has_primary_ctor {
+            self.skip_newlines();
+            while !self.at(TokenKind::RParen) && !self.at(TokenKind::Eof) {
+                let declaration_start = self.tok().span.lo;
+                self.begin_declaration_prefix();
+                let epmods = self.skip_decl_prefix();
+                self.record_declaration_prefix(declaration_start);
+                let is_vararg = epmods.iter().any(|m| m == "vararg");
+                let is_property = self.at(TokenKind::KwVal) || self.at(TokenKind::KwVar);
+                let is_var = self.at(TokenKind::KwVar);
+                if is_property {
+                    self.record_external_property_parameter(&epmods);
+                    self.bump();
+                }
+                let pspan = self.tok().span;
+                let pname = self.ident_or_error("parameter name");
+                self.expect(TokenKind::Colon, "':'");
+                self.skip_newlines(); // a wrapped declaration puts the type on the next line (`val x:\n  T`)
+                let ty = self.parse_vararg_aware_type(is_vararg);
+                // A default value (`enum class C(val x: Int = 1)`) — same as a regular class ctor param;
+                // each enum entry that omits the argument gets it at its construction site.
+                let default = if self.eat(TokenKind::Eq) {
+                    self.skip_newlines();
+                    Some(self.parse_expr())
+                } else {
+                    None
+                };
+                let declaration_end = self.t[self.i.saturating_sub(1)].span.hi;
+                props.push(PropParam {
+                    name: pname,
+                    ty,
+                    span: pspan,
+                    declaration_span: Span::new(declaration_start, declaration_end),
+                    decl_line: 0,
+                    decl_start_line: 0,
+                    is_vararg,
+                    is_var,
+                    is_property,
+                    is_actual: epmods.iter().any(|modifier| modifier == "actual"),
+                    is_override: epmods.iter().any(|modifier| modifier == "override"),
+                    has_open_modifier: epmods.iter().any(|modifier| modifier == "open"),
+                    is_final: epmods.iter().any(|modifier| modifier == "final"),
+                    is_open: !epmods.iter().any(|modifier| modifier == "final")
+                        && epmods
+                            .iter()
+                            .any(|modifier| modifier == "open" || modifier == "override"),
+                    visibility: visibility_of(&epmods),
+                    has_visibility_modifier: has_visibility_modifier(&epmods),
+                    default,
+                    annotations: Vec::new(),
+                    annotation_args: Vec::new(),
+                });
+                self.skip_newlines();
+                if !self.eat(TokenKind::Comma) {
+                    break;
+                }
+                self.skip_newlines();
+            }
+            self.expect(TokenKind::RParen, "')'");
+        }
+        // Optional supertype list (`enum class E : I1, I2`): an enum may implement interfaces; the
+        // abstract members are satisfied by the enum's own methods or per-entry overrides. (An enum can't
+        // extend a class, so only the interface supertypes are kept.)
+        // Always enter the shared optional parser. Besides avoiding a declaration-specific colon
+        // branch, this lets enum headers honor the same `NL* ':'` grammar as class, interface, object,
+        // companion-object, and anonymous-object headers.
+        let (enum_supertypes, _base, _base_span, _base_targs, _args, _delegations) =
+            self.parse_supertypes();
+        let mut entries: Vec<AstEnumEntry> = Vec::new();
+        let mut methods = Vec::new();
+        // Enum body member properties (`enum class C { A; val x = … }`) and their initializer order.
+        let mut body_props: Vec<PropDecl> = Vec::new();
+        let mut init_order: Vec<ClassInit> = Vec::new();
+        // `companion object { … }` and `companion { … }` in the enum body (`enum class E { A; … }`).
+        let mut companions = companion_declarations::ClassifierCompanions::default();
+        let mut secondary_ctors: Vec<SecondaryCtor> = Vec::new();
+        let mut type_aliases = Vec::new();
+        if self.eat_optional_declaration_body_open() {
+            // `enum class E {; ... }` has no entries. The lexer represents `;` and a physical line
+            // break with the same token kind, but retains the source spelling; consume the separator
+            // run once and remember whether it explicitly ended the entry list.
+            let mut members_only = false;
+            while self.at(TokenKind::Newline) {
+                members_only |= self.text() == ";";
+                self.bump();
+            }
+            if !members_only {
+                loop {
+                    let (entry_ann_names, entry_ann_args) = self.parse_enum_entry_prefix();
+                    if !self.at(TokenKind::Ident) {
+                        break;
+                    }
+                    let entry_span = self.tok().span;
+                    let entry_name = self.text().to_string();
+                    self.bump();
+                    // Optional constructor arguments: `RED(0xFF0000)`, incl. named `RED(rgb = 0xFF0000)`.
+                    let mut args = Vec::new();
+                    let mut arg_names: Vec<Option<String>> = Vec::new();
+                    if self.eat(TokenKind::LParen) {
+                        self.skip_newlines();
+                        while !self.at(TokenKind::RParen) && !self.at(TokenKind::Eof) {
+                            // A named argument `name = value` — the identifier is followed by `=` (but not
+                            // `==`). Capture the name so the lowering can reorder to constructor order.
+                            let named = self.at_named_arg();
+                            if named {
+                                arg_names.push(Some(self.text().to_string()));
+                                self.bump(); // name
+                                self.bump(); // '='
+                                self.skip_newlines();
+                            } else {
+                                arg_names.push(None);
+                            }
+                            args.push(self.parse_expr());
+                            self.skip_newlines();
+                            if !self.eat(TokenKind::Comma) {
+                                break;
+                            }
+                            self.skip_newlines();
+                        }
+                        self.expect(TokenKind::RParen, "')'");
+                    }
+                    // A per-entry class body (`RED { override fun m() = … }`) is an anonymous subclass.
+                    // Capture its method overrides and `val`/`var` properties; anything else bails cleanly.
+                    let mut body = Vec::new();
+                    let mut bprops = Vec::new();
+                    let mut init_order = Vec::new();
+                    if self.eat(TokenKind::LBrace) {
+                        let entry_nested_start = self.file.decls.len();
+                        self.skip_newlines();
+                        while !self.at(TokenKind::RBrace) && !self.at(TokenKind::Eof) {
+                            let bmods = self.parse_member_decl_prefix();
+                            let entry_owner = format!("{name}.{entry_name}");
+                            let nested_start = self.file.decls.len();
+                            if self.parse_and_register_nested_classifier(&entry_owner, &bmods, true)
+                            {
+                                if let Some(&declaration) = self.file.decls.get(nested_start) {
+                                    self.file
+                                        .enum_entry_nested_classifier_owners
+                                        .insert(declaration, entry_span);
+                                }
+                                // An `inner` classifier declared by an enum entry captures the entry value,
+                                // whose source type is the enum—not a separately nameable entry-subclass
+                                // type. Keep the JVM/source nesting path (`Enum.ENTRY.Inner`) while recording
+                                // the semantic dispatch receiver (`Enum`) independently.
+                                if bmods.iter().any(|modifier| modifier == "inner") {
+                                    if let Some(&declaration) = self.file.decls.get(nested_start) {
+                                        if let Decl::Class(nested) = self.file.decl_mut(declaration)
+                                        {
+                                            nested.inner_of = Some(name.clone());
+                                        }
+                                    }
+                                }
+                            } else if self.at(TokenKind::KwFun) {
+                                body.push(self.parse_fun(&bmods));
+                            } else if self.at(TokenKind::KwVal) || self.at(TokenKind::KwVar) {
+                                let property = self.parse_member_property(
+                                    &bmods,
+                                    false,
+                                    bmods.iter().any(|m| m == "abstract"),
+                                );
+                                init_order.push(ClassInit::PropInit(bprops.len()));
+                                bprops.push(property);
+                            } else if self.at(TokenKind::Ident)
+                                && self.keyword_text("init")
+                                && self
+                                    .t
+                                    .get(self.i + 1)
+                                    .is_some_and(|token| token.kind == TokenKind::LBrace)
+                            {
+                                init_order.push(ClassInit::Block(self.parse_init_block()));
+                            } else {
+                                self.diags.error(
+                                    self.tok().span,
+                                    "expected an enum-entry member declaration",
+                                );
+                                while !self.at(TokenKind::RBrace) && !self.at(TokenKind::Eof) {
+                                    self.bump();
+                                }
+                            }
+                            self.skip_newlines();
+                        }
+                        self.expect(TokenKind::RBrace, "'}'");
+                        // Classifiers are parser-hoisted out of an enum-entry body. Retain the
+                        // structural entry boundary for every outermost classifier created while
+                        // parsing that body, including anonymous objects in properties, methods,
+                        // and init blocks. Descendants remain owned by their containing classifier
+                        // through source containment; attaching all newly created declarations
+                        // directly to the entry would flatten anonymous/named nesting.
+                        let nested = self.file.decls[entry_nested_start..]
+                            .iter()
+                            .copied()
+                            .filter(|declaration| {
+                                matches!(self.file.decl(*declaration), Decl::Class(_))
+                            })
+                            .collect::<Vec<_>>();
+                        for &declaration in &nested {
+                            let Decl::Class(class) = self.file.decl(declaration) else {
+                                continue;
+                            };
+                            let has_nested_owner = nested.iter().copied().any(|candidate| {
+                                if candidate == declaration {
+                                    return false;
+                                }
+                                matches!(self.file.decl(candidate), Decl::Class(owner)
+                                    if owner.span.lo <= class.span.lo
+                                        && class.span.hi <= owner.span.hi)
+                            });
+                            if !has_nested_owner {
+                                self.file
+                                    .enum_entry_nested_classifier_owners
+                                    .entry(declaration)
+                                    .or_insert(entry_span);
+                            }
+                        }
+                    }
+                    entries.push(AstEnumEntry {
+                        name: entry_name,
+                        span: entry_span,
+                        decl_line: 0,
+                        annotations: entry_ann_names,
+                        annotation_args: entry_ann_args,
+                        args,
+                        arg_names,
+                        methods: body,
+                        props: bprops,
+                        init_order,
+                    });
+                    self.skip_newlines();
+                    if !self.eat(TokenKind::Comma) {
+                        break;
+                    }
+                    // After a trailing comma, the `;` (lexed as a newline) still ends the entry
+                    // list: `A, ; constructor(…)` declares a member, not an entry `constructor`.
+                    let mut ends_entries = false;
+                    while self.at(TokenKind::Newline) {
+                        ends_entries |= self.text() == ";";
+                        self.bump();
+                    }
+                    if ends_entries {
+                        break;
+                    }
+                }
+            }
+            // Members follow a `;` separator (lexed as a newline): `enum class C { A, B; fun f() … }`.
+            loop {
+                self.skip_newlines();
+                let emods = self.parse_member_decl_prefix();
+                if self.parse_and_register_nested_classifier(&name, &emods, true) {
+                    continue;
+                }
+                match self.kind() {
+                    TokenKind::KwFun => {
+                        let f = self.parse_fun(&emods);
+                        methods.push(f);
+                    }
+                    // A body member property (`enum class C { A; val x = … }`): a field + accessor on
+                    // the enum class, initialized in declaration order in the primary constructor.
+                    TokenKind::KwVal | TokenKind::KwVar => {
+                        let property = self.parse_member_property(
+                            &emods,
+                            true,
+                            emods.iter().any(|m| m == "abstract"),
+                        );
+                        init_order.push(ClassInit::PropInit(body_props.len()));
+                        body_props.push(property);
+                    }
+                    TokenKind::Ident
+                        if self.keyword_text("init")
+                            && self
+                                .t
+                                .get(self.i + 1)
+                                .is_some_and(|token| token.kind == TokenKind::LBrace) =>
+                    {
+                        init_order.push(ClassInit::Block(self.parse_init_block()));
+                    }
+                    TokenKind::Ident if self.keyword_text("constructor") => {
+                        secondary_ctors.push(self.parse_secondary_constructor(&emods));
+                    }
+                    TokenKind::Ident if self.at_companion_declaration() => {
+                        self.parse_classifier_companion(&name, &emods, &mut companions);
+                    }
+                    TokenKind::Ident if self.keyword_text("typealias") => {
+                        type_aliases.push(self.parse_type_alias_syntax());
+                    }
+                    _ => break,
+                }
+            }
+            self.skip_newlines();
+            if !self.at(TokenKind::RBrace) {
+                self.diags
+                    .error(self.tok().span, "expected an enum member declaration");
+                while !self.at(TokenKind::RBrace) && !self.at(TokenKind::Eof) {
+                    self.bump();
+                }
+            }
+            self.expect(TokenKind::RBrace, "'}'");
+        }
+        let end = self.t[self.i.saturating_sub(1)].span;
+        let has_primary_ctor = has_primary_ctor || secondary_ctors.is_empty();
+        ClassDecl {
+            primary_ctor_visibility: Visibility::Public,
+            primary_ctor_visibility_span: None,
+            name,
+            name_span,
+            visibility: Visibility::Public,
+            annotations,
+            annotation_args,
+            type_parameters: crate::ast::ClassTypeParameters::new(
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            ),
+            context_params,
+            lexical_type_parameter_captures: Vec::new(),
+            props,
+            methods,
+            companion: companions.object,
+            body_props,
+            init_order,
+            is_data: false,
+            is_value: false,
+            value_modifier_span: None,
+            primary_constructor_parameters_span: None,
+            kind: ClassKind::Enum,
+            singleton: false,
+            enum_entries: entries,
+            is_fun_interface: false,
+            modality: crate::ast::Modality::Final,
+            final_modifier: false,
+            inner_of: None,
+            supertypes: enum_supertypes,
+            interface_delegations: Vec::new(),
+            base_class: None,
+            base_class_span: None,
+            base_type_args: Vec::new(),
+            base_args: Vec::new(),
+            secondary_ctors,
+            type_aliases,
+            // As for an ordinary class, an enum with no explicit secondary constructor has an
+            // implicit no-arg primary constructor. An enum that declares only secondary
+            // constructors has no primary constructor; normalizing that distinction here keeps
+            // every later phase on the same constructor graph.
+            primary_ctor_annotations: has_primary_ctor.then_some(Vec::new()),
+            primary_ctor_annotation_args: Vec::new(),
+            span: Span::new(start.lo, end.hi),
+            primary_ctor_lines: PrimaryCtorLines {
+                open_line: ctor_open_offset,
+                ..PrimaryCtorLines::default()
+            },
+            companion_block_members: companions.block_members,
+            decl_line: 0,
+            decl_start_line: 0,
+            decl_end_line: 0,
+        }
+    }
+
+    fn parse_qualified_name(&mut self) -> String {
+        self.parse_qualified_name_segments()
+            .into_iter()
+            .map(|(segment, _)| segment)
+            .collect::<Vec<_>>()
+            .join(".")
+    }
+
+    fn parse_qualified_name_segments(&mut self) -> Vec<(String, crate::diag::Span)> {
+        let mut segments = Vec::new();
+        if self.at(TokenKind::Ident) {
+            segments.push((self.text().to_string(), self.tok().span));
+            self.bump();
+            while self.at(TokenKind::Dot) {
+                self.bump();
+                if self.at(TokenKind::Ident) {
+                    segments.push((self.text().to_string(), self.tok().span));
+                    self.bump();
+                }
+            }
+        }
+        segments
+    }
+
+    fn parse_fun(&mut self, modifiers: &[String]) -> FunDecl {
+        // Annotations consumed by `skip_decl_prefix` before this function, attached here (mirrors how
+        // classes take them) so function-annotation plugins can see them; otherwise they are discarded.
+        let annotations = self.take_pending_annotations();
+        let annotation_args = self.take_pending_annotation_args();
+        let start = self.tok().span;
+        let declaration_start = match self.member_declaration_prefix.take() {
+            Some((prefix_start, prefix_end)) if prefix_end == self.i => prefix_start,
+            _ => start.lo,
+        };
+        let override_span = declaration_modifiers::span(self, modifiers, "override");
+        let operator_span = declaration_modifiers::span(self, modifiers, "operator");
+        // `tailrec` keeps its own span for the same reason `operator` does: the diagnostic that
+        // rejects it points at the modifier, not at the function's name.
+        let tailrec_span = declaration_modifiers::span(self, modifiers, "tailrec");
+        self.bump(); // 'fun'
+        let (type_params, non_null_type_params, reified_type_params, type_param_bounds, _) =
+            if self.at(TokenKind::Lt) {
+                self.parse_type_params(start.lo)
+            } else {
+                (
+                    Vec::new(),
+                    crate::fx_hash::HashSet::default(),
+                    crate::fx_hash::HashSet::default(),
+                    Vec::new(),
+                    Vec::new(),
+                )
+            };
+        let lexical_type_param_lens =
+            self.push_lexical_type_params(&type_params, &type_param_bounds);
+        while self.at(TokenKind::At) {
+            let _ = self.parse_annotation(); // receiver use-site annotation
+            self.skip_plain_newlines();
+        }
+        let (receiver, name) = self.parse_receiver_and_declaration_name("extension function name");
+        let name_span = self.declaration_name_span;
+        let mut params = self.parse_param_list();
+        // Context parameters (`context(a: A) fun f()`), parsed at the declaration site into
+        // `pending_context_params`, become LEADING value parameters (kotlinc's ABI) — prepend them and
+        // record how many so the call-site resolver fills them implicitly.
+        let context_count = self.pending_context_params.len();
+        let context_span = self.pending_context_span.take();
+        if context_count > 0 {
+            let mut merged = std::mem::take(&mut self.pending_context_params);
+            merged.append(&mut params);
+            params = merged;
+        }
+        let ret = if self.eat(TokenKind::Colon) {
+            Some(self.parse_type())
+        } else {
+            None
+        };
+        // A `where` bound is the same constraint as the inline `<T : Bound>` form; join them so every
+        // consumer sees one list.
+        let mut type_param_bounds = type_param_bounds;
+        type_param_bounds.extend(self.parse_where_clause(&type_params, &name));
+        let signature_end = self.t[self.i.saturating_sub(1)].span.hi;
+        // A `=`-body or block body may sit on a following line (`fun f(): T\n{ … }`). Skip plain line
+        // breaks to find it, restoring the position if what follows is neither — an abstract/no-body
+        // function (no valid member/declaration begins with a bare `=` or `{`, so this is unambiguous).
+        let body_save = self.i;
+        self.skip_newlines();
+        let body = if self.eat(TokenKind::Eq) {
+            self.skip_newlines();
+            FunBody::Expr(self.parse_expr())
+        } else if self.at(TokenKind::LBrace) {
+            FunBody::Block(self.parse_block_expr(false))
+        } else {
+            self.i = body_save;
+            FunBody::None
+        };
+        let end = self.t[self.i.saturating_sub(1)].span;
+        self.pop_lexical_type_params(lexical_type_param_lens);
+        self.function_spans.push(Span::new(start.lo, end.hi));
+        FunDecl {
+            name,
+            receiver,
+            params,
+            context_count,
+            ret,
+            body,
+            type_params,
+            type_param_bounds,
+            non_null_type_params,
+            reified_type_params,
+            span: Span::new(start.lo, end.hi),
+            declaration_span: Span::new(declaration_start, end.hi),
+            name_span,
+            signature_span: Span::new(start.lo, signature_end),
+            override_span,
+            operator_span,
+            context_span,
+            tailrec_span,
+            flags: function_flags(modifiers),
+            visibility: visibility_of(modifiers),
+            annotations,
+            annotation_args,
+            decl_line: 0,
+            sig_line: 0,
+            body_lines: crate::ast::FunBodyLines::default(),
+        }
+    }
+
+    fn parse_member_decl_prefix(&mut self) -> Vec<String> {
+        let start = self.tok().span.lo;
+        self.pending_context_params.clear();
+        self.begin_declaration_prefix();
+        let mut modifiers = if self.at(TokenKind::At) || self.at_modifier() {
+            let modifiers = self.skip_decl_prefix();
+            self.skip_newlines();
+            modifiers
+        } else {
+            Vec::new()
+        };
+        modifiers.extend(self.maybe_parse_context_receivers());
+        self.record_declaration_prefix(start);
+        self.member_declaration_prefix = Some((start, self.i));
+        modifiers
+    }
+
+    fn local_declaration_after_prefix(&self) -> Option<TokenKind> {
+        let mut i = self.i;
+        let mut saw_context = false;
+        loop {
+            i = self.after_plain_newlines(i);
+            let token = self.t.get(i)?;
+            if token.kind == TokenKind::At {
+                i = self.annotation_end_at(i)?;
+                continue;
+            }
+            if self.token_is_modifier(*token)
+                && self
+                    .t
+                    .get(i + 1)
+                    .is_none_or(|next| next.kind != TokenKind::Colon)
+            {
+                i += 1;
+                continue;
+            }
+            if !saw_context
+                && self.token_keyword_text(*token, "context")
+                && self
+                    .t
+                    .get(i + 1)
+                    .is_some_and(|next| next.kind == TokenKind::LParen)
+            {
+                i = self.context_parameter_list_end_at(i + 1)?;
+                saw_context = true;
+                continue;
+            }
+            return match token.kind {
+                TokenKind::KwFun
+                    if !self
+                        .t
+                        .get(i + 1)
+                        .is_some_and(|next| next.kind == TokenKind::LParen) =>
+                {
+                    Some(TokenKind::KwFun)
+                }
+                TokenKind::KwVal | TokenKind::KwVar => Some(token.kind),
+                _ => None,
+            };
+        }
+    }
+
+    /// Parse a value-argument list after its opening parenthesis.
+    fn parse_call_argument_list(
+        &mut self,
+    ) -> (Vec<ExprId>, Vec<Option<String>>, Vec<Option<Span>>) {
+        // A delegation guard applies to the delegate expression's OUTER postfix chain only. Calls
+        // nested inside its parentheses still own their trailing lambdas (`by make({ x.apply {
+        // ... } })`); carrying the guard into the argument parser split those lambdas into unrelated
+        // expressions and left the member spelling unresolved during checking.
+        let outer_trailing_lambda_guard = std::mem::replace(&mut self.no_trailing_lambda, false);
+        let mut args = Vec::new();
+        let mut names: Vec<Option<String>> = Vec::new();
+        let mut name_spans: Vec<Option<Span>> = Vec::new();
+        self.skip_newlines();
+        while !self.at(TokenKind::RParen) && !self.at(TokenKind::Eof) {
+            if self.at_named_arg() {
+                let name_span = self.syntactic_ident_span(self.tok());
+                let n = self.text().to_string();
+                self.bump(); // name
+                self.bump(); // '='
+                self.skip_newlines();
+                names.push(Some(n));
+                name_spans.push(Some(name_span));
+            } else {
+                names.push(None);
+                name_spans.push(None);
+            }
+            let spread = self.eat(TokenKind::Star);
+            let arg = self.parse_expr();
+            if spread {
+                self.file.spread_arg_ids.insert(arg.0);
+            }
+            args.push(arg);
+            self.skip_newlines();
+            if !self.eat(TokenKind::Comma) {
+                break;
+            }
+            self.skip_newlines();
+        }
+        self.no_trailing_lambda = outer_trailing_lambda_guard;
+        (args, names, name_spans)
+    }
+
+    fn parse_call_arguments_with_names(&mut self) -> (Vec<ExprId>, Vec<Option<String>>) {
+        if !self.eat(TokenKind::LParen) {
+            return (Vec::new(), Vec::new());
+        }
+        let (args, names, _) = self.parse_call_argument_list();
+        self.expect(TokenKind::RParen, "')'");
+        (args, names)
+    }
+
+    /// v0 class: `class Name(val/var p: Type, ...)` with an optional empty body `{}`.
+    /// Every primary-constructor parameter must be a `val`/`var` property (no plain params yet).
+    /// Extend the names of nested types hoisted DURING a child class's parse (decls `start..`) with the
+    /// enclosing class's name, so `A { B { C } }` yields the FULL path `A.B.C` (internal `A$B$C`) instead
+    /// of the truncated `B.C` the immediate-parent prefix alone produces. Applied at each level, this
+    /// builds the complete path incrementally.
+    fn reprefix_hoisted(&mut self, outer: &str, start: usize) {
+        for k in start..self.file.decls.len() {
+            let did = self.file.decls[k];
+            if self.reprefix_companion_receiver(did, outer) {
+                continue;
+            }
+            if let crate::ast::Decl::Class(nc) = self.file.decl_mut(did) {
+                let previous_root = nc.name.split('.').next().unwrap_or_default().to_string();
+                nc.name = format!("{outer}.{}", nc.name);
+                // `inner_of` is a semantic receiver identity, but at this point both it and the
+                // descendant name are still relative to the child currently being published. Move
+                // the receiver identity with the declaration path. Enum-entry inner classes replace
+                // this field with their enum owner after registration, so their distinct semantic
+                // receiver remains explicit rather than being inferred from the lexical path.
+                if let Some(receiver) = nc.inner_of.as_deref() {
+                    if receiver == previous_root
+                        || receiver.starts_with(&format!("{previous_root}."))
+                    {
+                        nc.inner_of = Some(format!("{outer}.{receiver}"));
+                    }
+                }
+            }
+        }
+    }
+
+    /// Publish one already-parsed nested classifier and every descendant it hoisted while parsing.
+    /// This is the single owner-identity boundary for class-like declarations: syntax-specific parsers
+    /// may set class flags first, but visibility, lexical prefixing, and declaration-list registration
+    /// must remain identical for class, object, interface, enum, and interface-member entry points.
+    fn register_hoisted_nested_classifier(
+        &mut self,
+        outer: &str,
+        start: usize,
+        mut nested: ClassDecl,
+        modifiers: &[String],
+    ) {
+        self.reprefix_hoisted(outer, start);
+        nested.visibility = visibility_of(modifiers);
+        let id = self.file.add_hoisted_classifier(nested, outer, start);
+        declaration_modifiers::record_nested_actual(&mut self.file, modifiers, id);
+    }
+
+    /// Parse and register any class-like declaration that this parser can represent as a hoisted
+    /// nested classifier. Class and object bodies deliberately share this funnel: the declaration's
+    /// lexical owner, not the kind of its enclosing declaration, determines its source/JVM identity.
+    ///
+    /// `start` must precede the child parse because that parse may itself hoist descendants. Prefixing
+    /// that complete suffix before registering the child preserves paths such as `A.B.C`; doing this in
+    /// individual enum/class/object arms previously let otherwise-equivalent branches drift apart.
+    fn parse_and_register_nested_classifier(
+        &mut self,
+        outer: &str,
+        modifiers: &[String],
+        enclosing_instance_exists: bool,
+    ) -> bool {
+        let value_modifier_span = self.take_value_modifier_span(modifiers);
+        let is_inner = modifiers.iter().any(|modifier| modifier == "inner");
+        // Only an `inner class` has the containing instance and therefore the containing class's
+        // type parameters in scope. All other nested classifier kinds are static lexical boundaries.
+        let inherits_enclosing_type_parameters = is_inner
+            && (self.at(TokenKind::KwClass)
+                || (self.at(TokenKind::Ident)
+                    && self.keyword_text("data")
+                    && self
+                        .t
+                        .get(self.i + 1)
+                        .is_some_and(|token| token.kind == TokenKind::KwClass)));
+        let enclosing_type_parameters = (!inherits_enclosing_type_parameters)
+            .then(|| std::mem::take(&mut self.lexical_type_parameters));
+        let start = self.file.decls.len();
+        let (mut nested, supports_inner) = match self.kind() {
+            TokenKind::KwClass => {
+                let nested = self.parse_class();
+                (nested, true)
+            }
+            TokenKind::KwFun
+                if self
+                    .t
+                    .get(self.i + 1)
+                    .is_some_and(|token| self.token_keyword_text(*token, "interface")) =>
+            {
+                self.bump(); // `fun`
+                let mut nested = self.parse_interface();
+                nested.is_fun_interface = true;
+                (nested, false)
+            }
+            TokenKind::Ident
+                if self.keyword_text("data")
+                    && self.t.get(self.i + 1).is_some_and(|token| {
+                        token.kind == TokenKind::KwClass
+                            || self.token_keyword_text(*token, "object")
+                    }) =>
+            {
+                self.bump(); // `data`
+                let (mut nested, supports_inner) =
+                    if self.at(TokenKind::Ident) && self.keyword_text("object") {
+                        (self.parse_object(), false)
+                    } else {
+                        (self.parse_class(), true)
+                    };
+                nested.is_data = true;
+                (nested, supports_inner)
+            }
+            TokenKind::Ident if self.keyword_text("interface") => (self.parse_interface(), false),
+            TokenKind::Ident
+                if self.keyword_text("annotation")
+                    && self
+                        .t
+                        .get(self.i + 1)
+                        .is_some_and(|token| token.kind == TokenKind::KwClass) =>
+            {
+                self.bump(); // `annotation`
+                let mut nested = self.parse_class();
+                nested.kind = ClassKind::Annotation;
+                (nested, false)
+            }
+            TokenKind::Ident
+                if self.keyword_text("enum")
+                    && self
+                        .t
+                        .get(self.i + 1)
+                        .is_some_and(|token| token.kind == TokenKind::KwClass) =>
+            {
+                (self.parse_enum(), false)
+            }
+            TokenKind::Ident if self.keyword_text("object") => (self.parse_object(), false),
+            _ => {
+                if let Some(enclosing_type_parameters) = enclosing_type_parameters {
+                    self.lexical_type_parameters = enclosing_type_parameters;
+                }
+                return false;
+            }
+        };
+        if let Some(enclosing_type_parameters) = enclosing_type_parameters {
+            debug_assert!(self.lexical_type_parameters.names().is_empty());
+            self.lexical_type_parameters = enclosing_type_parameters;
+        }
+
+        if is_inner && supports_inner && !enclosing_instance_exists {
+            // An object is a singleton, so it cannot provide the per-instance receiver an `inner
+            // class` requires. Consume the unsupported declaration without publishing a falsely
+            // constructible classifier. The child parse may have tentatively hoisted descendants,
+            // so remove that declaration-list suffix with the unsupported owner as one atomic unit.
+            // Other classifier kinds ignore an inapplicable `inner` modifier rather than acquiring
+            // class-only capture metadata.
+            self.file.decls.truncate(start);
+            return true;
+        }
+
+        if matches!(nested.kind, ClassKind::Class | ClassKind::Interface) {
+            nested.modality = modality_from_modifiers(modifiers);
+            nested.final_modifier = modifiers.iter().any(|modifier| modifier == "final");
+            // `value class` (and the legacy `inline class` spelling) — like top-level registration,
+            // `value`/`inline` is a MODIFIER consumed into `modifiers` before the `class` keyword.
+            // Without this a nested value class registers as a PLAIN class and miscompiles: a public
+            // `<init>` instead of `constructor-impl`/`box-impl`, identity `equals`, and unmangled
+            // member names at use sites.
+            nested.is_value = modifiers
+                .iter()
+                .any(|modifier| modifier == "inline" || modifier == "value");
+            nested.value_modifier_span = value_modifier_span;
+        }
+        if is_inner && supports_inner {
+            nested.inner_of = Some(outer.to_string());
+        }
+        self.register_hoisted_nested_classifier(outer, start, nested, modifiers);
+        true
+    }
+
+    /// Depth-guarded entries for the class-like declaration parsers. Nested type declarations
+    /// (`class A { class B { … } }`, nested interfaces/objects/enums, and mixed chains) recurse
+    /// through these without ever passing through `parse_bp` or `parse_stmt`, so they share their
+    /// own bounded, stack-grown funnel (one counter with `parse_stmt`, bounding any interleaving).
+    /// Past [`EXPR_DEPTH_LIMIT`] the declaration degrades to an error declaration with a
+    /// diagnostic and a balanced skip — degrade, never crash.
+    fn parse_class(&mut self) -> ClassDecl {
+        self.guarded_class_like(Self::parse_class_inner)
+    }
+
+    fn parse_object(&mut self) -> ClassDecl {
+        self.guarded_class_like(Self::parse_object_inner)
+    }
+
+    fn parse_interface(&mut self) -> ClassDecl {
+        self.guarded_class_like(Self::parse_interface_inner)
+    }
+
+    fn parse_enum(&mut self) -> ClassDecl {
+        self.guarded_class_like(Self::parse_enum_inner)
+    }
+
+    fn guarded_class_like(&mut self, inner: fn(&mut Self) -> ClassDecl) -> ClassDecl {
+        self.with_nesting_guard(
+            ParserNesting::Declaration,
+            |parser, span| {
+                // The rejected declaration's pending prefix (annotations, context params) dies
+                // with it — otherwise it would attach to the next declaration after recovery.
+                parser.pending_annotations.clear();
+                parser.pending_annotation_args.clear();
+                parser.pending_context_params.clear();
+                error_class_decl(span)
+            },
+            inner,
+        )
+    }
+
+    fn parse_class_inner(&mut self) -> ClassDecl {
+        let annotations = self.take_pending_annotations();
+        let annotation_args = self.take_pending_annotation_args();
+        let context_params = std::mem::take(&mut self.pending_context_params);
+        let start = self.tok().span;
+        // `class`, then the name — the grammar lets it follow on a later line (`value class⏎N(…)`).
+        self.bump();
+        self.skip_plain_newlines();
+        let name = self.ident_or_error("class name");
+        let name_span = self.declaration_name_span;
+        let (type_params, _, _, type_param_bounds, type_param_variances) = if self.at(TokenKind::Lt)
+        {
+            self.parse_type_params(start.lo)
+        } else {
+            (
+                Vec::new(),
+                crate::fx_hash::HashSet::default(),
+                crate::fx_hash::HashSet::default(),
+                Vec::new(),
+                Vec::new(),
+            )
+        };
+        let lexical_type_param_lens =
+            self.push_lexical_type_params(&type_params, &type_param_bounds);
+        let mut primary_constructor_annotations = Vec::new();
+        let mut primary_constructor_annotation_args = Vec::new();
+        // An explicit constructor prefix may continue across physical newlines.
+        let mut primary_ctor_visibility = Visibility::Public;
+        // The primary constructor starts at its first modifier, annotation, `constructor` keyword,
+        // or `(`; a KDoc before it is not part of it.
+        let mut ctor_open_offset = 0u32;
+        let mut primary_ctor_visibility_span = None;
+        if self.primary_constructor_header_follows() {
+            self.skip_newlines();
+            ctor_open_offset = self.tok().span.lo;
+            if self.at(TokenKind::At) || self.at_modifier() {
+                let prefix_start = self.i;
+                let ctor_mods = self.skip_decl_prefix();
+                primary_ctor_visibility_span = self.t[prefix_start..self.i]
+                    .iter()
+                    .find(|token| {
+                        token.kind == TokenKind::Ident
+                            && matches!(
+                                token.text(self.src),
+                                "private" | "protected" | "internal" | "public"
+                            )
+                    })
+                    .map(|token| token.span);
+                // The declared constructor visibility survives into `@Metadata` (and, for
+                // `protected`, the JVM `<init>` access flags).
+                primary_ctor_visibility = visibility_of(&ctor_mods);
+                primary_constructor_annotations = self.take_pending_annotations();
+                primary_constructor_annotation_args = self.take_pending_annotation_args();
+            }
+        }
+        let header_ctor_kw = self.at(TokenKind::Ident) && self.keyword_text("constructor");
+        let mut ctor_decl_offset = header_ctor_kw.then(|| self.tok().span.lo).unwrap_or(0);
+        if header_ctor_kw {
+            self.bump();
+        }
+        let mut props = Vec::new();
+        let mut ctor_close_lo = 0u32;
+        // `NL* primaryConstructor`: the parameter list may start on a later line, even after a
+        // KDoc comment between the class name and `(`.
+        self.skip_plain_newlines_before(TokenKind::LParen);
+        let primary_ctor_open = self.tok().span.lo;
+        if ctor_open_offset == 0 && self.at(TokenKind::LParen) {
+            ctor_open_offset = primary_ctor_open;
+        }
+        if ctor_decl_offset == 0 && self.at(TokenKind::LParen) {
+            ctor_decl_offset = primary_ctor_open;
+        }
+        let has_primary_ctor_parens = self.eat(TokenKind::LParen);
+        let mut primary_constructor_parameters_span = None;
+        let header_has_primary = header_ctor_kw || has_primary_ctor_parens;
+        if has_primary_ctor_parens {
+            self.skip_newlines();
+            while !self.at(TokenKind::RParen) && !self.at(TokenKind::Eof) {
+                let declaration_start = self.tok().span.lo;
+                let mut pannos = Vec::new();
+                let mut pannos_args = Vec::new();
+                let mut cpmods = Vec::new();
+                self.begin_declaration_prefix();
+                if self.at(TokenKind::At)
+                    || (self.at(TokenKind::Ident) && self.at_modifier() && self.text() != "value")
+                {
+                    cpmods = self.skip_decl_prefix(); // `private val x`, `@Anno val y`, `vararg xs`
+                    pannos = self.take_pending_annotations();
+                    pannos_args = self.take_pending_annotation_args();
+                }
+                self.record_declaration_prefix(declaration_start);
+                let is_vararg = cpmods.iter().any(|m| m == "vararg");
+                let (is_property, is_var) = match self.kind() {
+                    TokenKind::KwVal => {
+                        self.bump();
+                        (true, false)
+                    }
+                    TokenKind::KwVar => {
+                        self.bump();
+                        (true, true)
+                    }
+                    _ => (false, false), // a plain constructor parameter (not a property)
+                };
+                if is_property {
+                    self.record_external_property_parameter(&cpmods);
+                }
+                let pspan = self.tok().span;
+                let pname = self.ident_or_error("parameter name");
+                self.expect(TokenKind::Colon, "':'");
+                self.skip_newlines(); // a wrapped declaration puts the type on the next line (`val x:\n  T`)
+                let ty = self.parse_vararg_aware_type(is_vararg);
+                let default = if self.eat(TokenKind::Eq) {
+                    self.skip_newlines();
+                    Some(self.parse_expr())
+                } else {
+                    None
+                };
+                let declaration_end = self.t[self.i.saturating_sub(1)].span.hi;
+                props.push(PropParam {
+                    name: pname,
+                    ty,
+                    span: pspan,
+                    declaration_span: Span::new(declaration_start, declaration_end),
+                    decl_line: 0,
+                    decl_start_line: 0,
+                    is_vararg,
+                    is_var,
+                    is_property,
+                    is_actual: cpmods.iter().any(|modifier| modifier == "actual"),
+                    is_override: cpmods.iter().any(|modifier| modifier == "override"),
+                    has_open_modifier: cpmods.iter().any(|modifier| modifier == "open"),
+                    is_final: cpmods.iter().any(|modifier| modifier == "final"),
+                    is_open: !cpmods.iter().any(|modifier| modifier == "final")
+                        && cpmods
+                            .iter()
+                            .any(|modifier| modifier == "open" || modifier == "override"),
+                    visibility: visibility_of(&cpmods),
+                    has_visibility_modifier: has_visibility_modifier(&cpmods),
+                    default,
+                    annotations: pannos,
+                    annotation_args: pannos_args,
+                });
+                self.skip_newlines();
+                if !self.eat(TokenKind::Comma) {
+                    break;
+                }
+                self.skip_newlines();
+            }
+            // The byte offset of the primary ctor's `)` — rewritten to a source LINE by the
+            // decl-line post-pass; kotlinc maps the ctor `$default`'s `return` to it.
+            ctor_close_lo = self.tok().span.lo;
+            let close = self.tok().span;
+            if self.expect(TokenKind::RParen, "')'") {
+                primary_constructor_parameters_span = Some(Span::new(primary_ctor_open, close.hi));
+            }
+        }
+        // Optional supertype list: `: Iface1, Base(args), Iface2`. Supertypes with `()` are the
+        // base class (v0: unsupported → flagged); the rest are implemented interfaces.
+        let (
+            supertypes,
+            base_class,
+            base_class_span,
+            base_type_args,
+            base_args,
+            interface_delegations,
+        ) = self.parse_supertypes();
+        // `class Derived<T> : Base<T>() where T : I1, T : I2` — generic constraints after the
+        // supertype list, before the body. Same constraint as the inline form; one joined list.
+        let mut type_param_bounds = type_param_bounds;
+        type_param_bounds.extend(self.parse_where_clause(&type_params, &name));
+        // Optional class body: member `fun`s, body properties (`val`/`var`), and `init { }` blocks.
+        let mut methods = Vec::new();
+        let mut body_props: Vec<PropDecl> = Vec::new();
+        let mut init_order: Vec<ClassInit> = Vec::new();
+        let mut companions = companion_declarations::ClassifierCompanions::default();
+        let mut secondary_ctors: Vec<SecondaryCtor> = Vec::new();
+        let mut type_aliases = Vec::new();
+        if self.eat_optional_declaration_body_open() {
+            loop {
+                self.skip_newlines();
+                let mods = self.parse_member_decl_prefix();
+                let is_abstract = mods.iter().any(|m| m == "abstract");
+                // All representable nested classifier kinds share one registration path. Keeping
+                // this outside the member-kind match prevents class/object/enum syntax branches from
+                // acquiring subtly different visibility or lexical-name behavior.
+                if self.parse_and_register_nested_classifier(&name, &mods, true) {
+                    continue;
+                }
+                match self.kind() {
+                    TokenKind::RBrace | TokenKind::Eof => break,
+                    TokenKind::KwFun => {
+                        let f = self.parse_fun(&mods);
+                        methods.push(f);
+                    }
+                    TokenKind::KwVal | TokenKind::KwVar => {
+                        // Non-abstract body props may omit the initializer (init blocks supply the
+                        // value); an `abstract` property has no field and is marked accordingly.
+                        let property = self.parse_member_property(&mods, !is_abstract, is_abstract);
+                        init_order.push(ClassInit::PropInit(body_props.len()));
+                        body_props.push(property);
+                    }
+                    TokenKind::Ident
+                        if self.keyword_text("init")
+                            && self
+                                .t
+                                .get(self.i + 1)
+                                .map_or(false, |t| t.kind == TokenKind::LBrace) =>
+                    {
+                        init_order.push(ClassInit::Block(self.parse_init_block()));
+                    }
+                    // A companion object, or a block whose members join this class's static scope.
+                    TokenKind::Ident if self.at_companion_declaration() => {
+                        self.parse_classifier_companion(&name, &mods, &mut companions);
+                    }
+                    TokenKind::Ident
+                        if self.keyword_text("annotation")
+                            && self
+                                .t
+                                .get(self.i + 1)
+                                .map_or(false, |t| t.kind == TokenKind::KwClass) =>
+                    {
+                        let _ = self.parse_nested_type_decl();
+                    }
+                    TokenKind::Ident if self.keyword_text("constructor") => {
+                        secondary_ctors.push(self.parse_secondary_constructor(&mods));
+                    }
+                    TokenKind::Ident if self.keyword_text("typealias") => {
+                        type_aliases.push(self.parse_type_alias_syntax());
+                    }
+                    _ => {
+                        self.diags
+                            .error(self.tok().span, "expected a class member declaration");
+                        self.bump();
+                    }
+                }
+            }
+            self.expect(TokenKind::RBrace, "'}'");
+        }
+        let end = self.t[self.i.saturating_sub(1)].span;
+        self.pop_lexical_type_params(lexical_type_param_lens);
+        ClassDecl {
+            name_span,
+            primary_ctor_visibility,
+            primary_ctor_visibility_span,
+            name,
+            visibility: Visibility::Public,
+            annotations,
+            annotation_args,
+            type_parameters: crate::ast::ClassTypeParameters::new(
+                type_params,
+                type_param_bounds,
+                type_param_variances,
+            ),
+            context_params,
+            lexical_type_parameter_captures: Vec::new(),
+            props,
+            methods,
+            companion: companions.object,
+            body_props,
+            init_order,
+            is_data: false,
+            is_value: false,
+            value_modifier_span: None,
+            primary_constructor_parameters_span,
+            kind: ClassKind::Class,
+            singleton: false,
+            enum_entries: Vec::new(),
+            is_fun_interface: false,
+            modality: crate::ast::Modality::Final,
+            final_modifier: false,
+            inner_of: None,
+            supertypes,
+            interface_delegations,
+            base_class,
+            base_class_span,
+            base_type_args,
+            base_args,
+            // A class has a primary constructor when it wrote one (parens / `constructor` keyword) OR
+            // declares no secondary constructors at all (then an implicit no-arg primary exists). A
+            // class with secondary ctors and no header ctor has NO primary, and neither has an
+            // `expect` class that wrote none: kotlinc gives it no default constructor.
+            primary_ctor_annotations: (header_has_primary
+                || (secondary_ctors.is_empty() && !self.in_expect_classifier))
+                .then_some(primary_constructor_annotations),
+            primary_ctor_annotation_args: primary_constructor_annotation_args,
+            secondary_ctors,
+            type_aliases,
+            span: Span::new(start.lo, end.hi),
+            primary_ctor_lines: PrimaryCtorLines {
+                open_line: ctor_open_offset,
+                decl_line: ctor_decl_offset,
+                close_line: ctor_close_lo,
+            },
+            companion_block_members: companions.block_members,
+            decl_line: 0,
+            decl_start_line: 0,
+            decl_end_line: 0,
+        }
+    }
+
+    /// Parse an optional `: Base(args), Iface1, Iface2` supertype list. A supertype with `()` is the
+    /// base class (returns its name + ctor-arg expressions); the rest are implemented interfaces.
+    #[allow(clippy::type_complexity)]
+    fn parse_supertypes(
+        &mut self,
+    ) -> (
+        Vec<TypeRef>,
+        Option<String>,
+        Option<Span>,
+        Vec<TypeRef>,
+        Vec<ExprId>,
+        Vec<InterfaceDelegation>,
+    ) {
+        let mut ifaces: Vec<TypeRef> = Vec::new();
+        let mut base: Option<String> = None;
+        let mut base_span = None;
+        let mut base_type_args = Vec::new();
+        let mut base_args = Vec::new();
+        let mut interface_delegations = Vec::new();
+        // Kotlin declaration headers permit physical line breaks before the supertype-list colon.
+        // The shared lookahead deliberately stops at `;`, which terminates the declaration even though
+        // the lexer represents it with the same token kind as a line break.
+        self.skip_plain_newlines_before(TokenKind::Colon);
+        if self.eat(TokenKind::Colon) {
+            loop {
+                self.skip_newlines();
+                let sup_span = self.tok().span;
+                let mut supertype_annotations = Vec::new();
+                while self.at(TokenKind::At) {
+                    let (annotation, arguments) = self.parse_annotation();
+                    if let Some(annotation) = annotation {
+                        self.record_type_annotation_arguments(annotation.span, arguments);
+                        supertype_annotations.push(annotation);
+                    }
+                    self.skip_plain_newlines();
+                }
+                // Keyed by the annotated reference's span start, which for a supertype is `sup_span`.
+                if !supertype_annotations.is_empty() {
+                    let annotated = sup_span.lo;
+                    self.file
+                        .type_annotations
+                        .insert(annotated, supertype_annotations);
+                }
+                // A FUNCTION-TYPE supertype (`class C : () -> R`, `(A) -> R`, `Recv.() -> R`): retain
+                // Kotlin's semantic `kotlin/FunctionN` classifier (arity N = value parameters, with an
+                // extension receiver folded in as the first). The JVM backend alone maps that identity
+                // to `kotlin/jvm/functions/FunctionN`. A suspend function-type supertype maps to a
+                // different (`SuspendFunctionN`) shape krusty doesn't model — preserve it for a later
+                // semantic rejection instead of encoding a target representation here.
+                if self.at_function_type_supertype() {
+                    let ft = self.parse_type();
+                    let arity = ft.fun_params.len();
+                    if ft.fun_suspend() || arity > 22 {
+                        // Preserve source-valid suspend and big-arity function supertypes in their
+                        // semantic Kotlin shape. Signature collection may reject an unsupported
+                        // representation later; parsing must not erase the declared supertype.
+                        ifaces.push(ft);
+                    } else {
+                        let mut targs = ft.fun_params.clone();
+                        if let Some(ret) = ft.arg.as_deref() {
+                            targs.push(ret.clone());
+                        }
+                        ifaces.push(TypeRef {
+                            name: format!("kotlin/Function{arity}"),
+                            // Keep the exact semantic function shape beside its classifier. Receiver/
+                            // context flags cannot be reconstructed from arity or the classifier name
+                            // after parsing.
+                            flags: ft
+                                .flags
+                                .with_nullable(false)
+                                .with_definitely_non_null(false),
+                            arg: ft.arg.clone(),
+                            targs,
+                            span: sup_span,
+                            fun_params: ft.fun_params.clone(),
+                            fun_context_count: ft.fun_context_count,
+                        });
+                    }
+                    if let Some(delegation) = self.parse_interface_delegation(
+                        u32::try_from(ifaces.len() - 1).ok(),
+                        ifaces[ifaces.len() - 1].name.clone(),
+                        false,
+                    ) {
+                        interface_delegations.push(delegation);
+                    }
+                    if !self.eat(TokenKind::Comma) {
+                        break;
+                    }
+                    continue;
+                }
+                let segments = self.parse_qualified_name_segments();
+                let callee_span = segments.last().map(|(_, span)| *span);
+                let name = segments
+                    .into_iter()
+                    .map(|(segment, _)| segment)
+                    .collect::<Vec<_>>()
+                    .join(".");
+                let simple = name.rsplit('.').next().unwrap_or(&name).to_string();
+                // Fully-qualified name (e.g. java.util.RandomAccess) → JVM internal format.
+                let effective = if name.contains('.') {
+                    name.replace('.', "/")
+                } else {
+                    simple.clone()
+                };
+                // Type arguments (`A<Int, Number>`) are erased in JVM DESCRIPTORS, but kotlinc records them
+                // in the class `Signature` attribute (`LOperation<Lkotlin/Result<..>;>;`) so a reader
+                // recovers a member's concrete generic return — kept on the interface `TypeRef`. Also note
+                // whether any is a non-nullable primitive (`A<Long>` delegation needs substituted bridges).
+                let targs: Vec<TypeRef> = if self.at(TokenKind::Lt) {
+                    self.parse_type_args()
+                } else {
+                    Vec::new()
+                };
+                let has_primitive_targ = targs.iter().any(|ta| {
+                    !ta.nullable()
+                        && matches!(
+                            ta.name.as_str(),
+                            "Int"
+                                | "Long"
+                                | "Short"
+                                | "Byte"
+                                | "Char"
+                                | "Boolean"
+                                | "Double"
+                                | "Float"
+                        )
+                });
+                let mut delegation_supertype = None;
+                if self.eat(TokenKind::LParen) {
+                    // constructor call → base class. Arguments may be NAMED (`Base(name = …, addr = …)`);
+                    // the per-arg name is recorded so the checker/lowerer reorder to the base ctor order.
+                    self.skip_newlines();
+                    let mut args = Vec::new();
+                    let mut arg_names: Vec<Option<String>> = Vec::new();
+                    while !self.at(TokenKind::RParen) && !self.at(TokenKind::Eof) {
+                        let named = self.at_named_arg();
+                        if named {
+                            arg_names.push(Some(self.text().to_string()));
+                            self.bump(); // name
+                            self.bump(); // '='
+                            self.skip_newlines();
+                        } else {
+                            arg_names.push(None);
+                        }
+                        // Spread `*expr` — an array spread into the base ctor's `vararg` parameter.
+                        let spread = self.eat(TokenKind::Star);
+                        let arg = self.parse_expr();
+                        if spread {
+                            self.file.spread_arg_ids.insert(arg.0);
+                        }
+                        args.push(arg);
+                        self.skip_newlines();
+                        if !self.eat(TokenKind::Comma) {
+                            break;
+                        }
+                        self.skip_newlines();
+                    }
+                    self.expect(TokenKind::RParen, "')'");
+                    let mut reference = simple_type_ref(&name, sup_span);
+                    reference.targs = targs.clone();
+                    reference.flags = reference.flags.with_superclass(true);
+                    self.file.detached_type_refs.push(reference);
+                    if let Some(callee) = callee_span {
+                        self.file
+                            .base_class_callee_spans
+                            .insert(sup_span.lo, callee);
+                    }
+                    base = Some(effective.clone());
+                    base_span = Some(sup_span);
+                    base_type_args = targs;
+                    if arg_names.iter().any(|n| n.is_some()) {
+                        if let Some(first) = args.first() {
+                            self.file.base_arg_names.insert(first.0, arg_names);
+                        }
+                    }
+                    base_args = args;
+                } else if !effective.is_empty() {
+                    ifaces.push(TypeRef {
+                        name: effective.clone(),
+                        flags: TrFlags::default()
+                            .with_nullable(false)
+                            .with_definitely_non_null(false),
+                        arg: None,
+                        targs,
+                        span: sup_span,
+                        fun_params: Vec::new(),
+                        fun_context_count: 0,
+                    });
+                    delegation_supertype = u32::try_from(ifaces.len() - 1).ok();
+                }
+                if let Some(delegation) = self.parse_interface_delegation(
+                    delegation_supertype,
+                    effective.clone(),
+                    has_primitive_targ,
+                ) {
+                    interface_delegations.push(delegation);
+                }
+                if !self.eat(TokenKind::Comma) {
+                    break;
+                }
+            }
+        }
+        (
+            ifaces,
+            base,
+            base_span,
+            base_type_args,
+            base_args,
+            interface_delegations,
+        )
+    }
+
+    /// `interface Name { fun sig(): T }` — abstract member functions only (v0).
+    fn parse_interface_inner(&mut self) -> ClassDecl {
+        let annotations = self.take_pending_annotations();
+        let annotation_args = self.take_pending_annotation_args();
+        let context_params = std::mem::take(&mut self.pending_context_params);
+        let start = self.tok().span;
+        self.bump(); // 'interface'
+        let name = self.ident_or_error("interface name");
+        let name_span = self.declaration_name_span;
+        let (type_params, _, _, type_param_bounds, type_param_variances) = if self.at(TokenKind::Lt)
+        {
+            self.parse_type_params(start.lo)
+        } else {
+            (
+                Vec::new(),
+                crate::fx_hash::HashSet::default(),
+                crate::fx_hash::HashSet::default(),
+                Vec::new(),
+                Vec::new(),
+            )
+        };
+        let (supertypes, _base, _base_span, _base_type_args, _base_args, _) =
+            self.parse_supertypes();
+        // `interface I<T> where T : Bound` — generic constraints after the supertype list, before the
+        // body. Same constraint as the inline form; one joined list.
+        let mut type_param_bounds = type_param_bounds;
+        type_param_bounds.extend(self.parse_where_clause(&type_params, &name));
+        let mut methods = Vec::new();
+        let mut body_props: Vec<PropDecl> = Vec::new();
+        let mut companions = companion_declarations::ClassifierCompanions::default();
+        let mut type_aliases = Vec::new();
+        if self.eat_optional_declaration_body_open() {
+            loop {
+                self.skip_newlines();
+                let imods = self.parse_member_decl_prefix();
+                // Nested classifiers (`class`/`object`/`interface`/`enum class`/…) share the class-body
+                // registration funnel: a nested classifier's identity comes from its lexical owner, not
+                // the kind of the enclosing declaration, so `interface C { class K; fun g(): K? }`
+                // hoists `C.K` exactly like a class owner would (kotlinc accepts these members).
+                // Interfaces provide no enclosing instance, so `inner` is unsupported here.
+                if self.parse_and_register_nested_classifier(&name, &imods, false) {
+                    continue;
+                }
+                match self.kind() {
+                    TokenKind::RBrace | TokenKind::Eof => break,
+                    TokenKind::KwFun => {
+                        let mut f = self.parse_fun(&imods);
+                        let final_member = imods.iter().any(|modifier| modifier == "final");
+                        if !final_member && !f.visibility.is_private() {
+                            // A visible interface member is implicitly abstract when body-less and
+                            // implicitly open when it has a default body. Publish that language
+                            // modality in the declaration itself so every later phase—including
+                            // dependency metadata—observes the same override semantics.
+                            f.flags = f
+                                .flags
+                                .with_is_open(true)
+                                .with_is_abstract(matches!(f.body, crate::ast::FunBody::None));
+                        }
+                        methods.push(f);
+                    }
+                    // Abstract interface property: `val`/`var x: T` (no initializer/getter).
+                    TokenKind::KwVal | TokenKind::KwVar => {
+                        let explicit_abstract = imods.iter().any(|m| m == "abstract");
+                        let override_span = declaration_modifiers::span(self, &imods, "override");
+                        let mut p = self.parse_top_property_c(
+                            false,
+                            true,
+                            imods.iter().any(|m| m == "const"),
+                            explicit_abstract,
+                        );
+                        Self::mark_inline_accessors(&mut p, &imods);
+                        if p.init.is_none() && p.getter.is_none() {
+                            p.is_abstract = true;
+                        }
+                        p.visibility = visibility_of(&imods);
+                        p.has_visibility_modifier = has_visibility_modifier(&imods);
+                        p.is_open =
+                            !imods.iter().any(|m| m == "final") && !p.visibility.is_private();
+                        p.is_override = override_span.is_some();
+                        p.override_span = override_span;
+                        p.is_external |= imods.iter().any(|m| m == "external");
+                        p.is_expect = imods.iter().any(|m| m == "expect");
+                        p.is_actual = imods.iter().any(|m| m == "actual");
+                        body_props.push(p);
+                    }
+                    TokenKind::Ident if self.keyword_text("typealias") => {
+                        type_aliases.push(self.parse_type_alias_syntax());
+                    }
+                    // `interface I { companion object { … } }` — same as a class companion.
+                    TokenKind::Ident if self.at_companion_declaration() => {
+                        self.parse_classifier_companion(&name, &imods, &mut companions);
+                    }
+                    _ => {
+                        self.diags
+                            .error(self.tok().span, "expected an interface member declaration");
+                        self.bump();
+                    }
+                }
+            }
+            self.expect(TokenKind::RBrace, "'}'");
+        }
+        let end = self.t[self.i.saturating_sub(1)].span;
+        ClassDecl {
+            name_span,
+            primary_ctor_visibility: Visibility::Public,
+            primary_ctor_visibility_span: None,
+            name,
+            visibility: Visibility::Public,
+            annotations,
+            annotation_args,
+            type_parameters: crate::ast::ClassTypeParameters::new(
+                type_params,
+                type_param_bounds,
+                type_param_variances,
+            ),
+            context_params,
+            lexical_type_parameter_captures: Vec::new(),
+            props: Vec::new(),
+            methods,
+            companion: companions.object,
+            body_props,
+            init_order: Vec::new(),
+            is_data: false,
+            is_value: false,
+            value_modifier_span: None,
+            primary_constructor_parameters_span: None,
+            kind: ClassKind::Interface,
+            singleton: false,
+            enum_entries: Vec::new(),
+            is_fun_interface: false,
+            modality: crate::ast::Modality::Final,
+            final_modifier: false,
+            inner_of: None,
+            supertypes,
+            interface_delegations: Vec::new(),
+            base_class: None,
+            base_class_span: None,
+            base_type_args: Vec::new(),
+            base_args: Vec::new(),
+            secondary_ctors: Vec::new(),
+            type_aliases,
+            primary_ctor_annotations: Some(Vec::new()),
+            primary_ctor_annotation_args: Vec::new(),
+            span: Span::new(start.lo, end.hi),
+            primary_ctor_lines: PrimaryCtorLines::default(),
+            companion_block_members: companions.block_members,
+            decl_line: 0,
+            decl_start_line: 0,
+            decl_end_line: 0,
+        }
+    }
+
+    /// `object Name { fun … }` — a singleton with member functions (no primary constructor).
+    /// Parse an object/anonymous-object body `{ fun…/val…/init… }`, returning its members.
+    fn parse_object_body(
+        &mut self,
+        owner: &str,
+    ) -> (
+        Vec<FunDecl>,
+        Vec<PropDecl>,
+        Vec<ClassInit>,
+        Vec<crate::ast::TypeAliasDecl>,
+    ) {
+        let mut methods = Vec::new();
+        let mut body_props: Vec<PropDecl> = Vec::new();
+        let mut init_order: Vec<ClassInit> = Vec::new();
+        let mut type_aliases = Vec::new();
+        if self.eat_optional_declaration_body_open() {
+            loop {
+                self.skip_newlines();
+                let mods = self.parse_member_decl_prefix();
+                if self.parse_and_register_nested_classifier(owner, &mods, true) {
+                    continue;
+                }
+                match self.kind() {
+                    TokenKind::RBrace | TokenKind::Eof => break,
+                    TokenKind::KwFun => {
+                        let f = self.parse_fun(&mods);
+                        methods.push(f);
+                    }
+                    TokenKind::KwVal | TokenKind::KwVar => {
+                        let property = self.parse_member_property(&mods, true, false);
+                        init_order.push(ClassInit::PropInit(body_props.len()));
+                        body_props.push(property);
+                    }
+                    TokenKind::Ident
+                        if self.keyword_text("init")
+                            && self
+                                .t
+                                .get(self.i + 1)
+                                .map_or(false, |t| t.kind == TokenKind::LBrace) =>
+                    {
+                        init_order.push(ClassInit::Block(self.parse_init_block()));
+                    }
+                    TokenKind::Ident if self.keyword_text("typealias") => {
+                        type_aliases.push(self.parse_type_alias_syntax());
+                    }
+                    _ => {
+                        self.diags
+                            .error(self.tok().span, "expected an object member declaration");
+                        self.bump();
+                    }
+                }
+            }
+            self.expect(TokenKind::RBrace, "'}'");
+        }
+        (methods, body_props, init_order, type_aliases)
+    }
+
+    fn parse_anon_object(&mut self, span: Span) -> ExprId {
+        self.bump(); // 'object'
+        let name = format!("Anon$anon${}", span.lo);
+        let (
+            supertypes,
+            base_class,
+            base_class_span,
+            base_type_args,
+            base_args,
+            interface_delegations,
+        ) = self.parse_supertypes();
+        let (methods, body_props, init_order, type_aliases) = self.parse_object_body(&name);
+        let end = self.t[self.i.saturating_sub(1)].span;
+        let synth = ClassDecl {
+            primary_ctor_visibility: Visibility::Public,
+            primary_ctor_visibility_span: None,
+            name: name.clone(),
+            name_span: span,
+            visibility: Visibility::Public,
+            annotations: Vec::new(),
+            annotation_args: Vec::new(),
+            type_parameters: crate::ast::ClassTypeParameters::default(),
+            context_params: Vec::new(),
+            lexical_type_parameter_captures: self.current_lexical_type_params(),
+            props: Vec::new(),
+            methods,
+            companion: None,
+            body_props,
+            init_order,
+            is_data: false,
+            is_value: false,
+            value_modifier_span: None,
+            primary_constructor_parameters_span: None,
+            kind: ClassKind::Class,
+            singleton: false,
+            enum_entries: Vec::new(),
+            is_fun_interface: false,
+            modality: crate::ast::Modality::Final,
+            final_modifier: false,
+            inner_of: None,
+            supertypes,
+            interface_delegations,
+            base_class,
+            base_class_span,
+            base_type_args,
+            base_args,
+            secondary_ctors: Vec::new(),
+            type_aliases,
+            primary_ctor_annotations: Some(Vec::new()),
+            primary_ctor_annotation_args: Vec::new(),
+            span: Span::new(span.lo, end.hi),
+            primary_ctor_lines: PrimaryCtorLines::default(),
+            companion_block_members: Vec::new(),
+            decl_line: 0,
+            decl_start_line: 0,
+            decl_end_line: 0,
+        };
+        let did = self.file.add_decl(Decl::Class(synth));
+        self.file.decls.push(did);
+        let callee = self.file.add_expr(Expr::Name(name), span);
+        let construction = self.file.add_expr(
+            Expr::Call {
+                callee,
+                args: Vec::new(),
+            },
+            Span::new(span.lo, end.hi),
+        );
+        self.file.anonymous_object_classes.insert(construction, did);
+        construction
+    }
+
+    fn parse_object_inner(&mut self) -> ClassDecl {
+        let annotations = self.take_pending_annotations();
+        let annotation_args = self.take_pending_annotation_args();
+        let context_params = std::mem::take(&mut self.pending_context_params);
+        let start = self.tok().span;
+        self.bump(); // 'object'
+        let name = self.ident_or_error("object name");
+        let name_span = self.declaration_name_span;
+        // Capture the object's implemented INTERFACES (`object X : KSerializer<C>`) AND a base class
+        // (`object A : Sealed()`): the general class lowering/emit handles the `extends` + `super(args)`.
+        let (
+            supertypes,
+            base_class,
+            base_class_span,
+            base_type_args,
+            base_args,
+            interface_delegations,
+        ) = self.parse_supertypes();
+        let mut methods = Vec::new();
+        let mut body_props: Vec<PropDecl> = Vec::new();
+        let mut init_order: Vec<ClassInit> = Vec::new();
+        let mut type_aliases = Vec::new();
+        if self.eat_optional_declaration_body_open() {
+            loop {
+                self.skip_newlines();
+                let mods = self.parse_member_decl_prefix();
+                // Named singleton owners use the same classifier-registration invariant as class
+                // owners. The flag only excludes `inner` classes, whose semantics require an
+                // enclosing instance that a singleton cannot supply. Anonymous-object bodies use
+                // `parse_object_body` instead and have no stable owner identity to publish here.
+                if self.parse_and_register_nested_classifier(&name, &mods, false) {
+                    continue;
+                }
+                match self.kind() {
+                    TokenKind::RBrace | TokenKind::Eof => break,
+                    TokenKind::KwFun => {
+                        let f = self.parse_fun(&mods);
+                        methods.push(f);
+                    }
+                    TokenKind::KwVal | TokenKind::KwVar => {
+                        // Init blocks may supply the value, so a missing initializer is retained.
+                        let property = self.parse_member_property(&mods, true, false);
+                        init_order.push(ClassInit::PropInit(body_props.len()));
+                        body_props.push(property);
+                    }
+                    TokenKind::Ident
+                        if self.keyword_text("init")
+                            && self
+                                .t
+                                .get(self.i + 1)
+                                .map_or(false, |t| t.kind == TokenKind::LBrace) =>
+                    {
+                        init_order.push(ClassInit::Block(self.parse_init_block()));
+                    }
+                    TokenKind::Ident
+                        if self.keyword_text("annotation")
+                            && self
+                                .t
+                                .get(self.i + 1)
+                                .map_or(false, |t| t.kind == TokenKind::KwClass) =>
+                    {
+                        let _ = self.parse_nested_type_decl();
+                    }
+                    TokenKind::Ident if self.keyword_text("typealias") => {
+                        type_aliases.push(self.parse_type_alias_syntax());
+                    }
+                    _ => {
+                        self.diags
+                            .error(self.tok().span, "expected an object member declaration");
+                        self.bump();
+                    }
+                }
+            }
+            self.expect(TokenKind::RBrace, "'}'");
+        }
+        let end = self.t[self.i.saturating_sub(1)].span;
+        ClassDecl {
+            name_span,
+            primary_ctor_visibility: Visibility::Public,
+            primary_ctor_visibility_span: None,
+            name,
+            visibility: Visibility::Public,
+            annotations,
+            annotation_args,
+            type_parameters: crate::ast::ClassTypeParameters::new(
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            ),
+            context_params,
+            lexical_type_parameter_captures: Vec::new(),
+            props: Vec::new(),
+            methods,
+            companion: None,
+            body_props,
+            init_order,
+            is_data: false,
+            is_value: false,
+            value_modifier_span: None,
+            primary_constructor_parameters_span: None,
+            kind: ClassKind::Class,
+            singleton: true,
+            enum_entries: Vec::new(),
+            is_fun_interface: false,
+            modality: crate::ast::Modality::Final,
+            final_modifier: false,
+            inner_of: None,
+            supertypes,
+            interface_delegations,
+            base_class,
+            base_class_span,
+            base_type_args,
+            base_args,
+            secondary_ctors: Vec::new(),
+            type_aliases,
+            primary_ctor_annotations: Some(Vec::new()),
+            primary_ctor_annotation_args: Vec::new(),
+            span: Span::new(start.lo, end.hi),
+            primary_ctor_lines: PrimaryCtorLines::default(),
+            companion_block_members: Vec::new(),
+            decl_line: 0,
+            decl_start_line: 0,
+            decl_end_line: 0,
+        }
+    }
+
+    /// Eat a `?` nullable-type marker, but NOT the `?` of an `?:` elvis. A nullable type is never
+    /// validly followed by `:`, so a `?` immediately before `:` is the elvis operator (e.g.
+    /// `x as? T ?: y` — the cast type is `T`, then `?: y`), which `parse_type` must leave for the caller.
+    fn eat_type_nullable(&mut self) -> bool {
+        if self.at(TokenKind::Question)
+            && self
+                .t
+                .get(self.i + 1)
+                .is_none_or(|t| t.kind != TokenKind::Colon)
+        {
+            self.bump();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Depth-guarded entry for the type parser. Every type recursion funnels through here —
+    /// nested parens (`((((Int))))`), generic arguments (`parse_type_args`), function-type
+    /// parameters/returns, and `Array<…>` elements all re-enter via `parse_type` — so this single
+    /// guard bounds all of it. Type recursion runs OUTSIDE `parse_bp` in declaration position, so
+    /// the expression guard never sees it. Past [`EXPR_DEPTH_LIMIT`] the type degrades to an error
+    /// type with a diagnostic and an angle-aware balanced skip — degrade, never crash.
+    fn parse_type(&mut self) -> TypeRef {
+        self.with_nesting_guard(
+            ParserNesting::Type,
+            |_parser, span| simple_type_ref("<error>", span),
+            Self::parse_type_inner,
+        )
+    }
+
+    /// Parse a type, folding a trailing definitely-non-null intersection `T & Any` (the only legal
+    /// intersection in Kotlin source) into the left operand with `nullable = false`. `T & Any` erases
+    /// identically to `T`; its only observable effect is that a value of it is non-null, which the
+    /// `as` cast enforces at runtime (a null assertion). The checker verifies that the left side denotes
+    /// a type parameter; the parser validates and consumes the required bare `Any` right side.
+    fn parse_type_inner(&mut self) -> TypeRef {
+        let mut ty = self.parse_type_atom();
+        while self.at(TokenKind::Amp) {
+            self.bump(); // '&'
+            let any = self.parse_type_atom();
+            let valid_lhs = !ty.nullable()
+                && !ty.definitely_non_null()
+                && ty.arg.is_none()
+                && ty.targs.is_empty()
+                && ty.fun_params.is_empty();
+            let valid_rhs = any.name == "Any"
+                && !any.nullable()
+                && !any.definitely_non_null()
+                && any.arg.is_none()
+                && any.targs.is_empty()
+                && any.fun_params.is_empty();
+            if !valid_lhs || !valid_rhs {
+                self.diags.error(
+                    if valid_lhs { any.span } else { ty.span },
+                    "a definitely non-null type must have the form 'T & Any'",
+                );
+            }
+            ty.set_nullable(false);
+            ty.set_definitely_non_null(true);
+        }
+        ty
+    }
+
+    fn parse_type_atom(&mut self) -> TypeRef {
+        let span = self.parse_leading_type_annotations();
+        // `suspend` modifier on a function type: `suspend (A) -> B` — consume and parse as function type.
+        let mut fun_suspend = false;
+        if self.at(TokenKind::Ident) && self.keyword_text("suspend") {
+            self.bump(); // 'suspend'
+            fun_suspend = true;
+        }
+        // Context-receiver function type (`+ContextParameters`): `context(A, B) (params) -> R`. A context
+        // receiver is modeled as a LEADING function-type parameter — identical to `(A, B, params) -> R`,
+        // matching how context parameters lower (and so a plain function type converts to a context one).
+        // Only recognized before a `(`-started function type; `context` stays a valid ordinary type name.
+        let mut context_types: Vec<TypeRef> = Vec::new();
+        if self.at(TokenKind::Ident)
+            && self.keyword_text("context")
+            && self
+                .t
+                .get(self.i + 1)
+                .is_some_and(|t| t.kind == TokenKind::LParen)
+        {
+            self.bump(); // 'context'
+            self.bump(); // '('
+            while !self.at(TokenKind::RParen) && !self.at(TokenKind::Eof) {
+                // Optional `name: Type` — a named context receiver.
+                if self.at(TokenKind::Ident)
+                    && self
+                        .t
+                        .get(self.i + 1)
+                        .is_some_and(|t| t.kind == TokenKind::Colon)
+                {
+                    self.bump(); // name
+                    self.bump(); // ':'
+                }
+                context_types.push(self.parse_type());
+                if !self.eat(TokenKind::Comma) {
+                    break;
+                }
+            }
+            self.expect(TokenKind::RParen, "')'");
+            // A `(`-started plain function type absorbs the context receivers as leading params below. An
+            // EXTENSION function type (`context(O) K.(A) -> R`) folds them in ahead of its receiver — the
+            // `Ident`-started branch prepends `context_types` to `[receiver, params…]`. A context receiver
+            // on a NON-function type is invalid; the guard at that branch's tail rejects it (never a
+            // silently mis-arity function type).
+        }
+        // Function type: `(A, B) -> R` — starts with `(`.
+        if self.at(TokenKind::LParen) {
+            let params = self.parse_function_type_parameters();
+            if self.eat(TokenKind::Arrow) {
+                let ret = self.parse_type();
+                let nullable = self.eat_type_nullable();
+                let fun_context_count = context_types.len() as u32;
+                let mut fun_params = context_types;
+                fun_params.extend(params);
+                TypeRef {
+                    name: "<fun>".to_string(),
+                    flags: TrFlags::default()
+                        .with_nullable(nullable)
+                        .with_definitely_non_null(false)
+                        .with_fun_suspend(fun_suspend),
+                    arg: Some(Box::new(ret)),
+                    targs: Vec::new(),
+                    span,
+                    fun_params,
+                    fun_context_count,
+                }
+            } else if let [_] = params.as_slice() {
+                // A PARENTHESIZED type used for grouping (no `->` follows the `)`), most commonly to make
+                // a function type nullable: `(() -> Unit)?` ≡ `Function0<Unit>?`. The parens wrap a single
+                // type; an optional trailing `?` applies to it. (Kotlin permits redundant parens around any
+                // type — `(Int)`, `(String)?`.) A grouped type may be an extension function type's
+                // receiver: `context(C) (String).() -> R`.
+                let mut inner = params.into_iter().next().unwrap();
+                if self.eat_type_nullable() {
+                    inner.set_nullable(true);
+                }
+                if self.at_extension_function_type_tail() {
+                    self.parse_extension_function_type(inner, context_types, fun_suspend, span)
+                } else if fun_suspend || !context_types.is_empty() {
+                    self.diags.error(span, "expected '->' for function type");
+                    Self::error_type_ref(span)
+                } else {
+                    inner
+                }
+            } else {
+                // Parenthesized multi-element type (a tuple) — krusty doesn't support tuple types.
+                self.diags.error(span, "expected '->' for function type");
+                Self::error_type_ref(span)
+            }
+        } else if self.at(TokenKind::Ident) {
+            let mut name = self.text().to_string();
+            self.bump();
+            // A qualified type name — a nested class `Outer.Inner` (registered as `Outer.Inner`) or a
+            // package-qualified type (`kotlin.reflect.KClass`). Consume the dotted path.
+            while self.at(TokenKind::Dot)
+                && self
+                    .t
+                    .get(self.i + 1)
+                    .map_or(false, |t| t.kind == TokenKind::Ident)
+            {
+                self.bump(); // '.'
+                name.push('.');
+                name.push_str(self.text());
+                self.bump();
+            }
+            // Every classifier uses the same type-argument structure. Projection semantics belong to
+            // resolution; the parser retains exactly what was written.
+            let mut targs = self.parse_type_args();
+            let arg = None;
+            // A generic-qualified nested type `Outer<A>.Inner<B>.Innermost<C>`: the dotted-path loop
+            // above stops at the `<` after `Outer`, so continue consuming `.Nested` segments. The
+            // final classifier's semantic application is ordered own arguments then captured
+            // arguments, nearest owner first: `[C, B, A]`. Descriptors erase these, but resolution
+            // must retain them so an inner classifier/property is specialized before FIR.
+            while self.at(TokenKind::Dot)
+                && self
+                    .t
+                    .get(self.i + 1)
+                    .is_some_and(|t| t.kind == TokenKind::Ident)
+            {
+                self.bump(); // '.'
+                name.push('.');
+                name.push_str(self.text());
+                self.bump(); // nested type name
+                let mut segment_targs = if self.at(TokenKind::Lt) {
+                    self.parse_type_args()
+                } else {
+                    Vec::new()
+                };
+                segment_targs.extend(targs);
+                targs = segment_targs;
+            }
+            let nullable = self.eat_type_nullable(); // `T?`
+            let base = TypeRef {
+                name,
+                flags: TrFlags::default()
+                    .with_nullable(nullable)
+                    .with_definitely_non_null(false),
+                arg,
+                targs,
+                span,
+                fun_params: Vec::new(),
+                fun_context_count: 0,
+            };
+            // Receiver (extension) function type `Recv.() -> R` ≡ `Function1<Recv, R>`, and
+            // `Recv.(A) -> R` ≡ `Function2<Recv, A, R>`. The receiver folds in as the first function
+            // parameter, exactly how Kotlin lowers an extension-function type to `FunctionN` — so the
+            // rest of the pipeline sees a plain `(Recv, …) -> R`. (The dotted-path loop above stops at
+            // `.` `(` since `(` is not an `Ident`, leaving us positioned here.)
+            if self.at_extension_function_type_tail() {
+                return self.parse_extension_function_type(base, context_types, fun_suspend, span);
+            }
+            // A `context(…)` receiver must precede a FUNCTION type; on a plain type it is invalid — reject
+            // rather than silently dropping the context receivers (which would mis-type the value).
+            if !context_types.is_empty() {
+                self.diags.error(
+                    span,
+                    "krusty: a context receiver is only valid on a function type".to_string(),
+                );
+                return Self::error_type_ref(span);
+            }
+            base
+        } else {
+            self.diags.error(span, "expected a type");
+            Self::error_type_ref(span)
+        }
+    }
+
+    fn skip_variance(&mut self) -> (bool, bool, Option<Span>) {
+        if self.at(TokenKind::KwIn) {
+            let span = self.tok().span;
+            self.bump();
+            return (true, false, Some(span));
+        }
+        if self.at(TokenKind::Ident) && self.keyword_text("out") {
+            let span = self.tok().span;
+            self.bump();
+            return (false, true, Some(span));
+        }
+        (false, false, None)
+    }
+
+    /// Parse a generic type-argument list `< (variance? type | *),+ >` via the real grammar
+    /// (recursing through `parse_type`, so nested generics like `Map<K, List<V>>` parse correctly).
+    /// The arguments are returned for completeness but JVM-erased, so callers may discard them.
+    fn parse_type_args(&mut self) -> Vec<TypeRef> {
+        self.parse_type_argument_list().0
+    }
+
+    /// [`Self::parse_type_args`], also returning the span of the written `<…>` list.
+    fn parse_type_argument_list(&mut self) -> (Vec<TypeRef>, Span) {
+        let open = self.tok().span;
+        let args = self.parse_type_argument_list_contents();
+        let close = self.t[self.i.saturating_sub(1)].span;
+        (args, Span::new(open.lo, close.hi.max(open.hi)))
+    }
+
+    fn parse_type_argument_list_contents(&mut self) -> Vec<TypeRef> {
+        let mut args = Vec::new();
+        if !self.eat(TokenKind::Lt) {
+            return args;
+        }
+        self.skip_newlines();
+        while !self.at(TokenKind::Gt) && !self.at(TokenKind::Eof) {
+            let (in_projection, out_projection, projection_span) = self.skip_variance();
+            self.skip_plain_newlines();
+            if self.at(TokenKind::Star) {
+                // Star projection `<*>` — erased to `Any?`.
+                let span = self.tok().span;
+                self.bump();
+                args.push(TypeRef {
+                    name: "Any".to_string(),
+                    flags: TrFlags::default()
+                        .with_nullable(true)
+                        .with_definitely_non_null(false)
+                        // `Any?` is the correct semantic bound, while this marker retains the one
+                        // source distinction needed by erased runtime checks. Without it,
+                        // `Function1<*, *>` and `Function1<Any?, Any?>` become indistinguishable:
+                        // Kotlin permits the former in `is` and rejects the latter as erased.
+                        .with_star_projection(true),
+                    arg: None,
+                    targs: Vec::new(),
+                    span,
+                    fun_params: Vec::new(),
+                    fun_context_count: 0,
+                });
+            } else {
+                let mut argument = self.parse_type();
+                argument.set_projection(in_projection, out_projection);
+                if let Some(projection_span) = projection_span {
+                    self.file
+                        .type_projection_spans
+                        .insert(argument.span, projection_span);
+                }
+                args.push(argument);
+            }
+            self.skip_newlines();
+            if !self.eat(TokenKind::Comma) {
+                break;
+            }
+            self.skip_newlines();
+        }
+        self.expect(TokenKind::Gt, "'>'");
+        args
+    }
+
+    fn parse_receiver_and_declaration_name(
+        &mut self,
+        name_context: &'static str,
+    ) -> (Option<TypeRef>, String) {
+        if self.at(TokenKind::LParen) {
+            let receiver_start = self.tok().span.lo;
+            let mut receiver = self.parse_type();
+            let receiver_hi = self.t[self.i.saturating_sub(1)].span.hi;
+            receiver.span = Span::new(receiver_start, receiver_hi);
+            self.expect(TokenKind::Dot, "'.'");
+            return (Some(receiver), self.ident_or_error(name_context));
+        }
+
+        let receiver_start = self.tok().span.lo;
+        let first = self.ident_or_error(name_context);
+        if !self.at(TokenKind::Dot) && !self.at(TokenKind::Lt) && !self.at(TokenKind::Question) {
+            return (None, first);
+        }
+
+        let mut receiver_targs = if self.at(TokenKind::Lt) {
+            self.parse_type_args()
+        } else {
+            Vec::new()
+        };
+        let mut nullable = self.eat_type_nullable();
+        let mut receiver_hi = self.t[self.i.saturating_sub(1)].span.hi;
+        self.expect(TokenKind::Dot, "'.'");
+        let mut receiver_name = first;
+
+        let declaration_name = loop {
+            let segment = self.ident_or_error(name_context);
+            if segment == "<error>" {
+                break segment;
+            }
+            let segment_hi = self.t[self.i.saturating_sub(1)].span.hi;
+            if self.at(TokenKind::Lt) || self.at(TokenKind::Question) {
+                let segment_targs = if self.at(TokenKind::Lt) {
+                    self.parse_type_args()
+                } else {
+                    Vec::new()
+                };
+                nullable = self.eat_type_nullable();
+                receiver_name.push('.');
+                receiver_name.push_str(&segment);
+                let mut applied = segment_targs;
+                applied.extend(receiver_targs);
+                receiver_targs = applied;
+                receiver_hi = self.t[self.i.saturating_sub(1)].span.hi;
+                self.expect(TokenKind::Dot, "'.'");
+            } else if self.eat(TokenKind::Dot) {
+                receiver_name.push('.');
+                receiver_name.push_str(&segment);
+                nullable = false;
+                receiver_hi = segment_hi;
+            } else {
+                break segment;
+            }
+        };
+        (
+            Some(TypeRef {
+                name: receiver_name,
+                flags: TrFlags::default()
+                    .with_nullable(nullable)
+                    .with_definitely_non_null(false),
+                arg: None,
+                targs: receiver_targs,
+                span: Span::new(receiver_start, receiver_hi),
+                fun_params: Vec::new(),
+                fun_context_count: 0,
+            }),
+            declaration_name,
+        )
+    }
+
+    // ---- statements ----
+    fn parse_block_expr(&mut self, trailing_is_value: bool) -> ExprId {
+        let start = self.tok().span;
+        self.expect(TokenKind::LBrace, "'{'");
+        let saved_block_value = self.block_trailing_is_value;
+        let classifier_shadow_count = self.lexical_type_parameters.shadow_count();
+        self.block_trailing_is_value = trailing_is_value;
+        let mut stmts = Vec::new();
+        loop {
+            self.skip_newlines();
+            if self.at(TokenKind::RBrace) || self.at(TokenKind::Eof) {
+                break;
+            }
+            stmts.push(self.parse_stmt());
+        }
+        self.block_trailing_is_value = saved_block_value;
+        self.lexical_type_parameters
+            .truncate_shadows(classifier_shadow_count);
+        let end = self.tok().span;
+        self.expect(TokenKind::RBrace, "'}'");
+        // A trailing bare expression is the block's value.
+        let mut trailing = None;
+        if let Some(&last) = stmts.last() {
+            if let Stmt::Expr(e) = self.file.stmt(last) {
+                let e = *e;
+                trailing = Some(e);
+                stmts.pop();
+                // The statement's annotations (`@Suppress("NAME") call()`) annotate the value.
+                if let Some(mut annotations) = self.file.statement_annotations.remove(&last) {
+                    if let Some(own) = self.file.expression_annotations.remove(&e) {
+                        annotations.extend(own);
+                    }
+                    self.file.expression_annotations.insert(e, annotations);
+                }
+            }
+        }
+        self.file
+            .add_expr(Expr::Block { stmts, trailing }, Span::new(start.lo, end.hi))
+    }
+
+    /// The default-value expression for a type (`var x: T` deferred init): `0`/`false`/`'\0'`/`null`.
+    fn default_init_expr(&mut self, ty: &TypeRef, span: Span) -> ExprId {
+        let e = match ty.name.as_str() {
+            _ if ty.nullable() => Expr::NullLit,
+            "Int" | "Byte" | "Short" => Expr::IntLit(0),
+            "Long" => Expr::LongLit(0),
+            "Float" => Expr::FloatLit(0.0),
+            "Double" => Expr::DoubleLit(0.0),
+            "Boolean" => Expr::BoolLit(false),
+            "Char" => Expr::CharLit(0),
+            _ => Expr::NullLit,
+        };
+        self.file.add_expr(e, span)
+    }
+
+    /// Return whether an infix operand follows, allowing newlines after the operator.
+    fn infix_operand_follows(&self) -> bool {
+        self.t
+            .get(self.i + 1..)
+            .and_then(|rest| rest.iter().find(|t| t.kind != TokenKind::Newline))
+            .is_some_and(|t| starts_expr(t.kind))
+    }
+
+    /// Apply trailing infix function calls to a `for`-loop iterable base.
+    fn parse_for_trailing_infix(&mut self, mut recv: ExprId) -> ExprId {
+        while self.at(TokenKind::Ident) {
+            let name = self.text();
+            let next_starts_expr = self.infix_operand_follows();
+            if matches!(name, "is" | "as" | "in") || !next_starts_expr {
+                break;
+            }
+            let name = name.to_string();
+            let lspan = self.file.expr_spans[recv.0 as usize];
+            self.bump(); // infix function name
+            self.skip_newlines();
+            let rhs = self.parse_bp(9);
+            let rspan = self.file.expr_spans[rhs.0 as usize];
+            let callee = self.file.add_expr(
+                Expr::Member {
+                    receiver: recv,
+                    name,
+                },
+                Span::new(lspan.lo, rspan.hi),
+            );
+            recv = self.file.add_expr(
+                Expr::Call {
+                    callee,
+                    args: vec![rhs],
+                },
+                Span::new(lspan.lo, rspan.hi),
+            );
+            self.file.infix_calls.insert(recv.0);
+        }
+        recv
+    }
+
+    /// Parse an optional `@label` reference after `break`/`continue` (`break@outer`). Returns the label
+    /// name, or `None` for an unlabeled `break`/`continue`.
+    fn parse_loop_label_ref(&mut self) -> Option<String> {
+        if self.at(TokenKind::At) {
+            self.bump(); // '@'
+            if self.at(TokenKind::Ident) {
+                let l = self.text().to_string();
+                self.bump();
+                return Some(l);
+            }
+        }
+        None
+    }
+
+    fn finish_stmt(&mut self, s: Stmt, start: Span) -> StmtId {
+        let end = self.t[self.i.saturating_sub(1)].span;
+        self.file.add_stmt(s, Span::new(start.lo, end.hi))
+    }
+
+    fn finish_assignment_stmt(&mut self, statement: Stmt, start: Span, target: Span) -> StmtId {
+        let statement = self.finish_stmt(statement, start);
+        self.file
+            .assignment_target_spans
+            .insert(statement.0, target);
+        statement
+    }
+
+    fn ident_or_error(&mut self, what: &str) -> String {
+        self.declaration_name_span = self.tok().span;
+        if self.at(TokenKind::Ident) {
+            let n = self.text().to_string();
+            self.bump();
+            n
+        } else {
+            self.diags
+                .error(self.tok().span, format!("expected {what}"));
+            "<error>".to_string()
+        }
+    }
+}
+
+// ---- precedence ----
+const BP_CAST: u8 = 12;
+const BP_PREFIX: u8 = 13;
+
+/// Soft modifiers that don't change a declaration's *kind* (so krusty can ignore them). Excludes
+/// `data`/`enum`/`annotation`/`value`/`object`/`companion`/`inner`/`expect`/`actual`,
+/// which would alter parsing/semantics and must remain unsupported. `sealed` is included: it maps
+/// cleanly onto an abstract, open class (see the top-level dispatch), so ignoring its
+/// exhaustiveness aspect never miscompiles.
+/// A parenthesised/bracketed destructuring's variable entries `(name, is_var)` paired with each
+/// entry's optional by-name source property (parallel; `None` = positional `componentN`).
+type DestructureEntries = (
+    Vec<DestructureEntry>,
+    Vec<Option<DestructureProperty>>,
+    Vec<Option<TypeRef>>,
+);
+
+fn is_modifier(text: &str) -> bool {
+    // `tailrec` is recognized: the lowerer rewrites the tail self-calls into a loop
+    // (so deep recursion doesn't overflow); a non-tail-optimizable `tailrec` falls back to plain
+    // recursion (kotlinc warns; same runtime for the shallow cases).
+    matches!(
+        text,
+        "public"
+            | "private"
+            | "internal"
+            | "protected"
+            | "open"
+            | "final"
+            | "abstract"
+            | "inline"
+            | "noinline"
+            | "crossinline"
+            | "operator"
+            | "override"
+            | "suspend"
+            | "tailrec"
+            | "lateinit"
+            | "infix"
+            | "reified"
+            | "vararg"
+            | "const"
+            | "sealed"
+            | "actual"
+            | "expect"
+            | "value"
+            | "inner"
+            | "external"
+    )
+}
+
+fn compound_op(k: TokenKind) -> Option<BinOp> {
+    Some(match k {
+        TokenKind::PlusEq => BinOp::Add,
+        TokenKind::MinusEq => BinOp::Sub,
+        TokenKind::StarEq => BinOp::Mul,
+        TokenKind::SlashEq => BinOp::Div,
+        TokenKind::PercentEq => BinOp::Rem,
+        _ => return None,
+    })
+}
+
+/// Whether `k` can begin an expression — used to decide if `a IDENT …` is an infix function call
+/// (the identifier must be followed by an operand). Conservative: false only stops an infix call.
+fn starts_expr(k: TokenKind) -> bool {
+    matches!(
+        k,
+        TokenKind::Ident
+            | TokenKind::IntLit
+            | TokenKind::LongLit
+            | TokenKind::UIntLit
+            | TokenKind::ULongLit
+            | TokenKind::DoubleLit
+            | TokenKind::FloatLit
+            | TokenKind::StringLit
+            | TokenKind::CharLit
+            | TokenKind::TemplateStart
+            | TokenKind::RawTemplateStart
+            | TokenKind::KwTrue
+            | TokenKind::KwFalse
+            | TokenKind::KwNull
+            | TokenKind::KwIf
+            | TokenKind::KwWhen
+            | TokenKind::LParen
+            | TokenKind::LBrace
+            | TokenKind::Minus
+            | TokenKind::Not
+    )
+}
+
+fn infix_op(k: TokenKind) -> Option<BinOp> {
+    Some(match k {
+        TokenKind::OrOr => BinOp::Or,
+        TokenKind::AndAnd => BinOp::And,
+        TokenKind::EqEq => BinOp::Eq,
+        TokenKind::NotEq => BinOp::Ne,
+        TokenKind::RefEq => BinOp::RefEq,
+        TokenKind::RefNe => BinOp::RefNe,
+        TokenKind::Lt => BinOp::Lt,
+        TokenKind::LtEq => BinOp::Le,
+        TokenKind::Gt => BinOp::Gt,
+        TokenKind::GtEq => BinOp::Ge,
+        TokenKind::Plus => BinOp::Add,
+        TokenKind::Minus => BinOp::Sub,
+        TokenKind::Star => BinOp::Mul,
+        TokenKind::Slash => BinOp::Div,
+        TokenKind::Percent => BinOp::Rem,
+        _ => return None,
+    })
+}
+
+/// (left binding power, right binding power). Left-assoc => rbp = lbp + 1.
+fn infix_bp(op: BinOp) -> (u8, u8) {
+    match op {
+        BinOp::Or => (1, 2),
+        BinOp::And => (3, 4),
+        BinOp::Eq | BinOp::Ne | BinOp::RefEq | BinOp::RefNe => (5, 6),
+        BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => (7, 8),
+        BinOp::Add | BinOp::Sub => (9, 10),
+        BinOp::Mul | BinOp::Div | BinOp::Rem => (11, 12),
+    }
+}
+
+/// Decode a lexer-validated `'x'` token to its UTF-16 code unit.
+///
+/// Validation and decoding deliberately share the token-layer contract. The fallback is parser
+/// recovery only: the lexer has already diagnosed malformed content, but the AST still needs a
+/// deterministic placeholder so later syntax recovery can continue without another escape table.
+fn unquote_char(raw: &str) -> u16 {
+    let inner = raw
+        .strip_prefix('\'')
+        .and_then(|s| s.strip_suffix('\''))
+        .unwrap_or(raw);
+    decode_char_literal_content(inner).unwrap_or(0)
+}
+
+/// Unescape a literal chunk of a string template (no surrounding quotes).
+fn unescape_chunk(inner: &str) -> KtString {
+    let mut out = KtStringBuf::with_capacity(inner.len());
+    unescape_into(inner, &mut out);
+    out.finish()
+}
+
+/// Unescape `inner` (a string body without its quotes) into `out`.
+///
+/// `\uXXXX` denotes one UTF-16 code UNIT and is taken verbatim, including the surrogate range
+/// D800..DFFF: `"😀"` is U+1F600 written as its two halves, and `"\uD800"` is a legal
+/// one-element string. Decoding each escape through `char::from_u32` rejects both, which is why the
+/// accumulator is a [`KtStringBuf`] rather than a `String`.
+fn unescape_into(inner: &str, out: &mut KtStringBuf) {
+    let mut chars = inner.chars();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some('n') => out.push('\n'),
+                Some('t') => out.push('\t'),
+                Some('r') => out.push('\r'),
+                Some('b') => out.push('\u{0008}'),
+                Some('\\') => out.push('\\'),
+                Some('"') => out.push('"'),
+                Some('\'') => out.push('\''),
+                Some('$') => out.push('$'),
+                Some('0') => out.push('\0'),
+                Some('u') => {
+                    let hex: String = chars.by_ref().take(4).collect();
+                    if let Ok(unit) = u32::from_str_radix(&hex, 16) {
+                        out.push_unit(unit as u16);
+                    }
+                }
+                Some(other) => out.push(other),
+                None => {}
+            }
+        } else {
+            out.push(c);
+        }
+    }
+}
+
+/// Parse an integer literal: decimal, `0x`/`0X` hex, or `0b`/`0B` binary, with `_` separators.
+/// Parses into `u64` (so `0xFFFFFFFF`/`0xFFFFFFFFFFFFFFFF` fit) then reinterprets as `i64`.
+fn parse_int_literal(text: &str) -> i64 {
+    // Strip trailing type suffixes (L, u, U, uL, UL) before parsing.
+    let text = text.trim_end_matches(['L', 'l', 'u', 'U']);
+    let t: String = text.chars().filter(|c| *c != '_').collect();
+    let (radix, digits) = if let Some(h) = t.strip_prefix("0x").or_else(|| t.strip_prefix("0X")) {
+        (16, h)
+    } else if let Some(b) = t.strip_prefix("0b").or_else(|| t.strip_prefix("0B")) {
+        (2, b)
+    } else {
+        (10, t.as_str())
+    };
+    if radix == 10 {
+        digits.parse::<i64>().unwrap_or(0)
+    } else {
+        u64::from_str_radix(digits, radix)
+            .map(|v| v as i64)
+            .unwrap_or(0)
+    }
+}
+
+fn parse_unsigned_literal_bits(text: &str) -> u64 {
+    let text = text.trim_end_matches(|c: char| matches!(c, 'L' | 'l' | 'u' | 'U'));
+    let t: String = text.chars().filter(|c| *c != '_').collect();
+    let (radix, digits) = if let Some(h) = t.strip_prefix("0x").or_else(|| t.strip_prefix("0X")) {
+        (16, h)
+    } else if let Some(b) = t.strip_prefix("0b").or_else(|| t.strip_prefix("0B")) {
+        (2, b)
+    } else {
+        (10, t.as_str())
+    };
+    u64::from_str_radix(digits, radix).unwrap_or(0)
+}
+
+fn unquote(raw: &str) -> KtString {
+    // Raw string `"""..."""`: content is verbatim (no escape processing), three quotes each side.
+    if raw.starts_with("\"\"\"") {
+        let inner = raw
+            .strip_prefix("\"\"\"")
+            .and_then(|s| s.strip_suffix("\"\"\""))
+            .unwrap_or(raw);
+        return KtString::from(inner);
+    }
+    let inner = raw
+        .strip_prefix('"')
+        .and_then(|s| s.strip_suffix('"'))
+        .unwrap_or(raw);
+    let mut out = KtStringBuf::with_capacity(inner.len());
+    unescape_into(inner, &mut out);
+    out.finish()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lexer::lex;
+
+    fn tree(src: &str) -> String {
+        let mut d = DiagSink::new();
+        let toks = lex(src, &mut d);
+        let file = parse(src, &toks, &mut d);
+        assert!(
+            !d.has_errors(),
+            "unexpected parse errors: {}",
+            d.render("test", src)
+        );
+        file.debug_tree()
+    }
+
+    fn script(src: &str) -> File {
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(src, &mut diagnostics);
+        let file = parse_script_with_features(src, &tokens, &mut diagnostics, &LangFeatures::new());
+        assert!(
+            !diagnostics.has_errors(),
+            "{}",
+            diagnostics.render("test", src)
+        );
+        file
+    }
+
+    fn anonymous_object_type_parameters(source: &str) -> Vec<String> {
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert_eq!(
+            diagnostics.diags.len(),
+            0,
+            "{}",
+            diagnostics.render("test.kt", source)
+        );
+        let declaration = *file
+            .anonymous_object_classes
+            .values()
+            .next()
+            .expect("anonymous object declaration");
+        let Decl::Class(class) = file.decl(declaration) else {
+            panic!("anonymous object must be a class declaration");
+        };
+        class.lexical_type_parameter_captures.clone()
+    }
+
+    #[test]
+    fn anonymous_object_type_parameters_follow_classifier_boundaries() {
+        assert_eq!(
+            anonymous_object_type_parameters(
+                "class Outer<T> { companion object { val marker = object {} } }"
+            ),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            anonymous_object_type_parameters(
+                "class Outer<T> { class Nested { val marker = object {} } }"
+            ),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            anonymous_object_type_parameters(
+                "class Outer<T> { inner class Nested { val marker = object {} } }"
+            ),
+            vec!["T"]
+        );
+        assert_eq!(
+            anonymous_object_type_parameters("fun <T> build(): Any { class T; return object {} }"),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            anonymous_object_type_parameters(
+                "fun <T> build(): Any { class T; fun <T> nested(): Any = object {}; return nested<String>() }"
+            ),
+            vec!["T"]
+        );
+    }
+
+    #[test]
+    fn visible_interface_members_publish_implicit_override_modality() {
+        let source = "interface Contract {\n\
+                          fun abstractCall(): String\n\
+                          fun defaultCall(): String = \"OK\"\n\
+                          val abstractValue: String\n\
+                          val defaultValue: String get() = \"OK\"\n\
+                          private fun helper(): String = \"OK\"\n\
+                      }";
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(
+            !diagnostics.has_errors(),
+            "{}",
+            diagnostics.render("test", source)
+        );
+        let contract = file
+            .decls
+            .iter()
+            .find_map(|&declaration| match file.decl(declaration) {
+                Decl::Class(class) if class.name == "Contract" => Some(class),
+                _ => None,
+            })
+            .expect("interface declaration");
+
+        let abstract_call = contract
+            .methods
+            .iter()
+            .find(|method| method.name == "abstractCall")
+            .expect("abstract interface method");
+        assert!(abstract_call.is_abstract());
+        assert!(abstract_call.is_open());
+        let default_call = contract
+            .methods
+            .iter()
+            .find(|method| method.name == "defaultCall")
+            .expect("default interface method");
+        assert!(!default_call.is_abstract());
+        assert!(default_call.is_open());
+        let helper = contract
+            .methods
+            .iter()
+            .find(|method| method.name == "helper")
+            .expect("private interface method");
+        assert!(!helper.is_open());
+
+        assert!(contract
+            .body_props
+            .iter()
+            .find(|property| property.name == "abstractValue")
+            .is_some_and(|property| property.is_abstract && property.is_open));
+        assert!(contract
+            .body_props
+            .iter()
+            .find(|property| property.name == "defaultValue")
+            .is_some_and(|property| !property.is_abstract && property.is_open));
+    }
+
+    #[test]
+    fn every_vararg_type_ref_keeps_the_written_element_type() {
+        let source = "fun top(vararg values: String) {}\n\
+                      class C(vararg val primary: String) {\n\
+                          constructor(vararg secondary: Int) : this()\n\
+                      }";
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(
+            !diagnostics.has_errors(),
+            "{}",
+            diagnostics.render("test", source)
+        );
+        let top = file
+            .decls
+            .iter()
+            .find_map(|&declaration| match file.decl(declaration) {
+                Decl::Fun(function) => Some(function),
+                _ => None,
+            })
+            .expect("top-level function");
+        let class = file
+            .decls
+            .iter()
+            .find_map(|&declaration| match file.decl(declaration) {
+                Decl::Class(class) => Some(class),
+                _ => None,
+            })
+            .expect("class");
+
+        assert_eq!(top.params[0].ty.name, "String");
+        assert_eq!(class.props[0].ty.name, "String");
+        assert_eq!(class.secondary_ctors[0].params[0].ty.name, "Int");
+        assert!(top.params[0].is_vararg);
+        assert!(class.props[0].is_vararg);
+        assert!(class.secondary_ctors[0].params[0].is_vararg);
+        for parameter in [&top.params[0], &class.secondary_ctors[0].params[0]] {
+            let span = parameter
+                .vararg_span
+                .expect("vararg parameter modifier span");
+            assert_eq!(&source[span.lo as usize..span.hi as usize], "vararg");
+        }
+    }
+
+    #[test]
+    fn override_function_retains_modifier_span() {
+        let source = "open class Base { open fun present() {} }\n\
+                      class Derived : Base() { override fun present() {} }";
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(
+            !diagnostics.has_errors(),
+            "{}",
+            diagnostics.render("test", source)
+        );
+        let derived = file
+            .decls
+            .iter()
+            .filter_map(|&declaration| match file.decl(declaration) {
+                Decl::Class(class) => Some(class),
+                _ => None,
+            })
+            .find(|class| class.name == "Derived")
+            .expect("derived class");
+        let method = derived.methods.first().expect("override method");
+        assert!(method.is_override());
+        let span = method.override_span.expect("override modifier span");
+        assert_eq!(&source[span.lo as usize..span.hi as usize], "override");
+    }
+
+    #[test]
+    fn script_parses_declarations_and_modifier_shaped_calls_in_order() {
+        let source = "fun context(value: String): String = value\n\
+                      fun suspend(block: () -> Unit) = block()\n\
+                      context(\"first\")\n\
+                      context(\"second\"); fun after(): Unit {}\n\
+                      suspend {}";
+        let file = script(source);
+        let Some(Expr::Block { stmts, .. }) = file.script_body.map(|body| file.expr(body)) else {
+            panic!("script body");
+        };
+        let declaration_names = stmts
+            .iter()
+            .filter_map(|statement| match file.stmt(*statement) {
+                Stmt::LocalFun(function) => Some(function.name.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        assert!(file.decls.is_empty());
+        assert_eq!(declaration_names, ["context", "suspend", "after"]);
+        assert_eq!(stmts.len(), 6);
+    }
+
+    #[test]
+    fn script_parses_prefixed_declarations_as_local_statements() {
+        let source = "@Deprecated(\"test\")\n\
+                      private fun hidden(): Unit {}\n\
+                      context(value: String)\n\
+                      private fun scoped(): String = value\n\
+                      scoped()";
+        let file = script(source);
+
+        let Some(Expr::Block { stmts, .. }) = file.script_body.map(|body| file.expr(body)) else {
+            panic!("script body");
+        };
+        let functions = stmts
+            .iter()
+            .filter_map(|statement| match file.stmt(*statement) {
+                Stmt::LocalFun(function) => Some(function),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        assert!(file.decls.is_empty());
+        assert_eq!(functions.len(), 2);
+        assert_eq!(functions[0].visibility, Visibility::Private);
+        assert_eq!(functions[1].context_count, 1);
+        assert_eq!(stmts.len(), 3);
+    }
+
+    #[test]
+    fn script_distinguishes_context_declarations_from_calls() {
+        let source = "fun context(value: String) = value\n\
+                      context(\"call\")\n\
+                      context(value: String,)\n\
+                      private fun declared() = value\n\
+                      fun () {}";
+        let file = script(source);
+        let Some(Expr::Block { stmts, .. }) = file.script_body.map(|body| file.expr(body)) else {
+            panic!("script body");
+        };
+
+        assert_eq!(stmts.len(), 4);
+        assert!(matches!(file.stmt(stmts[1]), Stmt::Expr(_)));
+        assert!(matches!(
+            file.stmt(stmts[2]),
+            Stmt::LocalFun(function) if function.context_count == 1
+        ));
+        assert!(matches!(file.stmt(stmts[3]), Stmt::Expr(_)));
+    }
+
+    #[test]
+    fn diagnostic_operator_and_named_argument_locations_are_sparse_spans() {
+        let mut diagnostics = DiagSink::new();
+        let source = "fun target(`a`: Int = 0, b: Int) = a + b\n\
+                      fun use(x: String) { var y: String = \"\"; y = 1; \
+                      target<Int> (); target(`a` = 1); x.`missing name`; \
+                      x?.`missing safe` { }; x?.missing { } }\n";
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(
+            !diagnostics.has_errors(),
+            "unexpected: {}",
+            diagnostics.render("test", source)
+        );
+
+        assert_eq!(file.value_operator_spans.len(), 3);
+        for span in file.value_operator_spans.values() {
+            assert_eq!(&source[span.lo as usize..span.hi as usize], "=");
+        }
+        let binary_operators = file
+            .expr_arena
+            .iter()
+            .filter_map(|expression| match expression {
+                Expr::Binary { operator_span, .. } => Some(operator_span),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(binary_operators.len(), 1);
+        assert_eq!(
+            &source[binary_operators[0].lo as usize..binary_operators[0].hi as usize],
+            "+"
+        );
+        let labels = file
+            .call_arg_name_spans
+            .values()
+            .flat_map(|spans| spans.iter().flatten())
+            .collect::<Vec<_>>();
+        assert_eq!(labels.len(), 1);
+        assert_eq!(&source[labels[0].lo as usize..labels[0].hi as usize], "`a`");
+        let open_parens = file
+            .empty_call_open_paren_spans
+            .values()
+            .collect::<Vec<_>>();
+        assert_eq!(open_parens.len(), 1);
+        assert_eq!(
+            &source[open_parens[0].lo as usize..open_parens[0].hi as usize],
+            "("
+        );
+        let mut exact_members = file
+            .exact_member_name_spans
+            .values()
+            .map(|span| &source[span.lo as usize..span.hi as usize])
+            .collect::<Vec<_>>();
+        exact_members.sort_unstable();
+        assert_eq!(
+            exact_members,
+            vec!["`missing name`", "`missing safe`", "missing"],
+            "rebuilt safe calls must each have one live exact-name entry"
+        );
+    }
+
+    #[test]
+    fn unparseable_construct_does_not_poison_siblings() {
+        // An unsupported top-level construct (here a stray `init` block) must produce ONE error and skip
+        // to the next declaration — NOT mis-token keyword-by-keyword and drift into / swallow the
+        // sibling declaration (the reported `unresolved reference 'private'/'suspend'` cascade).
+        let mut d = DiagSink::new();
+        let src = "init { }\nfun f() = 1\nclass Sibling(val n: String)\n";
+        let toks = lex(src, &mut d);
+        let file = parse(src, &toks, &mut d);
+        let sibling_survives = file
+            .decls
+            .iter()
+            .any(|&id| matches!(file.decl(id), Decl::Class(c) if c.name == "Sibling"));
+        assert!(sibling_survives, "recovery swallowed the sibling class");
+        let errors = d
+            .diags
+            .iter()
+            .filter(|x| x.severity == crate::diag::Severity::Error)
+            .count();
+        assert_eq!(errors, 1, "cascade: {}", d.render("t", src));
+    }
+
+    #[test]
+    fn context_receiver_parses_as_leading_params() {
+        // `context(a: A) fun f()` parses: the context parameters become LEADING value parameters and
+        // `context_count` records how many. `context` stays usable as an ordinary identifier elsewhere.
+        let mut d = DiagSink::new();
+        let src = "class A\ncontext(a: A)\nfun f() { }\n";
+        let toks = lex(src, &mut d);
+        let file = parse(src, &toks, &mut d);
+        assert!(!d.has_errors(), "unexpected: {}", d.render("t", src));
+        let f = file
+            .decls
+            .iter()
+            .find_map(|&id| match file.decl(id) {
+                Decl::Fun(f) if f.name == "f" => Some(f),
+                _ => None,
+            })
+            .expect("fun f parsed");
+        assert_eq!(f.context_count, 1);
+        assert_eq!(f.params.len(), 1);
+        assert_eq!(f.params[0].name, "a");
+        assert_eq!(f.params[0].ty.name, "A");
+        // `context` as an ordinary identifier (a function name / value) is unaffected.
+        assert!(!tree("fun context(): Int = 1").is_empty());
+    }
+
+    #[test]
+    fn modified_context_parameter_is_not_misparsed_as_a_legacy_receiver() {
+        let mut diagnostics = DiagSink::new();
+        let source = "// LANGUAGE: +ContextParameters\n\
+                      context(noinline ctx: () -> Unit)\n\
+                      inline fun f() { val value = ctx }\n";
+        let features = LangFeatures::from_source(source);
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse_with_features(source, &tokens, &mut diagnostics, &features);
+        assert!(
+            !diagnostics.has_errors(),
+            "unexpected: {}",
+            diagnostics.render("t", source)
+        );
+        let function = file
+            .decls
+            .iter()
+            .find_map(|&declaration| match file.decl(declaration) {
+                Decl::Fun(function) if function.name == "f" => Some(function),
+                _ => None,
+            })
+            .expect("fun f parsed");
+        assert_eq!(function.context_count, 1);
+        assert_eq!(function.params[0].name, "ctx");
+        assert_eq!(function.params[0].ty.name, "<fun>");
+        assert!(function.params[0].ty.arg.is_some());
+    }
+
+    #[test]
+    fn legacy_context_receivers_parse_as_unnamed_leading_params() {
+        let mut diagnostics = DiagSink::new();
+        let source = "// LANGUAGE: +ContextReceivers\n\
+                      class A\n\
+                      class B\n\
+                      context(A, B)\n\
+                      fun f() {}\n";
+        let features = LangFeatures::from_source(source);
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse_with_features(source, &tokens, &mut diagnostics, &features);
+        assert!(
+            !diagnostics.has_errors(),
+            "unexpected: {}",
+            diagnostics.render("t", source)
+        );
+        let function = file
+            .decls
+            .iter()
+            .find_map(|&declaration| match file.decl(declaration) {
+                Decl::Fun(function) if function.name == "f" => Some(function),
+                _ => None,
+            })
+            .expect("fun f parsed");
+        assert_eq!(function.context_count, 2);
+        assert_eq!(function.params.len(), 2);
+        assert_eq!(function.params[0].name, "_");
+        assert_eq!(function.params[0].ty.name, "A");
+        assert_eq!(function.params[1].name, "_");
+        assert_eq!(function.params[1].ty.name, "B");
+    }
+
+    #[test]
+    fn generic_qualified_nested_type_parses() {
+        // `Outer<A>.Inner<B>.Innermost<C>` — a nested type whose OUTER segments carry type arguments.
+        // The `<A>` breaks the plain dotted-path scan, so the parser must keep consuming `.Nested`
+        // segments (each with its own erased arguments), yielding the dotted name for resolution.
+        let mut d = DiagSink::new();
+        let src =
+            "fun foo(): Outer<Int, Number>.Inner<String, Float>.Innermost<Any, Any?> = null!!\n";
+        let toks = lex(src, &mut d);
+        let file = parse(src, &toks, &mut d);
+        assert!(!d.has_errors(), "unexpected: {}", d.render("t", src));
+        let f = file
+            .decls
+            .iter()
+            .find_map(|&id| match file.decl(id) {
+                Decl::Fun(f) if f.name == "foo" => Some(f),
+                _ => None,
+            })
+            .expect("fun foo parsed");
+        let ret = f.ret.as_ref().expect("return type");
+        assert_eq!(ret.name, "Outer.Inner.Innermost");
+        assert_eq!(
+            ret.targs
+                .iter()
+                .map(|argument| argument.name.as_str())
+                .collect::<Vec<_>>(),
+            ["Any", "Any", "String", "Float", "Int", "Number"]
+        );
+    }
+
+    #[test]
+    fn extension_receivers_keep_type_arguments() {
+        let mut diagnostics = DiagSink::new();
+        let source = "class Entry\n\
+                      class Outer { class Inner<T>; class Array<T> }\n\
+                      fun Collection<Entry>.selected() {}\n\
+                      val Collection<Entry>.counted: Int get() = 0\n\
+                      fun Outer.Inner<Entry>.dottedFunction() {}\n\
+                      val Outer.Inner<Entry>.dottedProperty: Int get() = 0\n\
+                      fun (() -> Unit).parenthesizedFunction() {}\n\
+                      val (() -> Unit).parenthesizedProperty: Int get() = 0\n\
+                      fun Outer.Array<Entry> /* gap */ .qualifiedArray() {}\n\
+                      fun Array<Entry> /* gap */ .builtinArray() {}\n";
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(
+            !diagnostics.has_errors(),
+            "unexpected: {}",
+            diagnostics.render("t", source)
+        );
+        let receivers: Vec<_> = file
+            .decls
+            .iter()
+            .filter_map(|&id| match file.decl(id) {
+                Decl::Fun(function) => function.receiver.as_ref(),
+                Decl::Property(property) => property.receiver.as_ref(),
+                Decl::Class(_) => None,
+            })
+            .collect();
+        assert_eq!(receivers.len(), 8);
+        assert_eq!(
+            receivers
+                .iter()
+                .map(|receiver| { &source[receiver.span.lo as usize..receiver.span.hi as usize] })
+                .collect::<Vec<_>>(),
+            [
+                "Collection<Entry>",
+                "Collection<Entry>",
+                "Outer.Inner<Entry>",
+                "Outer.Inner<Entry>",
+                "(() -> Unit)",
+                "(() -> Unit)",
+                "Outer.Array<Entry>",
+                "Array<Entry>"
+            ]
+        );
+        assert_eq!(receivers[0].name, "Collection");
+        assert_eq!(receivers[0].targs[0].name, "Entry");
+        assert_eq!(receivers[2].name, "Outer.Inner");
+        assert_eq!(receivers[2].targs[0].name, "Entry");
+        assert_eq!(receivers[6].name, "Outer.Array");
+        assert_eq!(receivers[6].targs[0].name, "Entry");
+        assert!(receivers[6].arg.is_none());
+        assert_eq!(receivers[7].name, "Array");
+        assert!(receivers[7].arg.is_none());
+        assert_eq!(receivers[7].targs[0].name, "Entry");
+    }
+
+    #[test]
+    fn use_site_variance_is_preserved_on_type_arguments() {
+        let mut diagnostics = DiagSink::new();
+        let source = "class Context<T>\n\
+                      fun <T> projected(input: Context<in\n\
+                          T>, output: Context<out\n\
+                          T>, array: Array<in T>) {}";
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(
+            !diagnostics.has_errors(),
+            "unexpected: {}",
+            diagnostics.render("t", source)
+        );
+        let function = file
+            .decls
+            .iter()
+            .find_map(|&id| match file.decl(id) {
+                Decl::Fun(function) if function.name == "projected" => Some(function),
+                _ => None,
+            })
+            .expect("projected function");
+        let input = &function.params[0].ty.targs[0];
+        let output = &function.params[1].ty.targs[0];
+        let array = &function.params[2].ty;
+        assert!(input.in_projection());
+        assert!(!input.out_projection());
+        assert!(!output.in_projection());
+        assert!(output.out_projection());
+        assert!(array.arg.is_none());
+        let projected = &array.targs[0];
+        assert!(projected.in_projection());
+        assert_eq!(projected.name, "T");
+    }
+
+    #[test]
+    fn star_projection_keeps_its_source_identity_after_bound_erasure() {
+        // Both arguments resolve as nullable Any for ordinary type reasoning, but only the first was
+        // written as `*`. Runtime `is FunctionN<*, ...>` validation needs that distinction and must
+        // not infer it from the erased name/nullability pair.
+        let mut diagnostics = DiagSink::new();
+        let source = "fun projected(value: Function1<*, Any?>) {}";
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(
+            !diagnostics.has_errors(),
+            "unexpected: {}",
+            diagnostics.render("t", source)
+        );
+        let function = file
+            .decls
+            .iter()
+            .find_map(|&id| match file.decl(id) {
+                Decl::Fun(function) if function.name == "projected" => Some(function),
+                _ => None,
+            })
+            .expect("projected function");
+        let arguments = &function.params[0].ty.targs;
+        assert_eq!(arguments.len(), 2);
+        assert!(arguments.iter().all(|argument| argument.name == "Any"));
+        assert!(arguments.iter().all(TypeRef::nullable));
+        assert!(arguments[0].is_star_projection());
+        assert!(!arguments[1].is_star_projection());
+    }
+
+    #[test]
+    fn context_prefix_keeps_trailing_modifiers() {
+        // A modifier written AFTER the context prefix (`context(a: A) private fun f()`) must still
+        // reach the declaration — visibility is not silently lost.
+        let mut d = DiagSink::new();
+        let src = "class A\ncontext(a: A) private fun f() { }\n";
+        let toks = lex(src, &mut d);
+        let file = parse(src, &toks, &mut d);
+        assert!(!d.has_errors(), "unexpected: {}", d.render("t", src));
+        let f = file
+            .decls
+            .iter()
+            .find_map(|&id| match file.decl(id) {
+                Decl::Fun(f) if f.name == "f" => Some(f),
+                _ => None,
+            })
+            .expect("fun f parsed");
+        assert_eq!(f.context_count, 1);
+        assert_eq!(f.visibility, Visibility::Private);
+    }
+
+    #[test]
+    fn context_params_do_not_leak_to_later_function() {
+        let mut d = DiagSink::new();
+        let src = "class A\n\
+                   context(a: A)\n\
+                   val current: A get() = a\n\
+                   fun g(): Int = 1\n";
+        let toks = lex(src, &mut d);
+        let file = parse(src, &toks, &mut d);
+        let property = file
+            .decls
+            .iter()
+            .find_map(|&id| match file.decl(id) {
+                Decl::Property(property) if property.name == "current" => Some(property),
+                _ => None,
+            })
+            .expect("property parsed");
+        assert_eq!(property.context_params.len(), 1);
+        assert_eq!(property.context_params[0].name, "a");
+        assert_eq!(property.context_params[0].ty.name, "A");
+        let g = file
+            .decls
+            .iter()
+            .find_map(|&id| match file.decl(id) {
+                Decl::Fun(f) if f.name == "g" => Some(f),
+                _ => None,
+            })
+            .expect("fun g parsed");
+        assert_eq!(g.context_count, 0);
+        assert_eq!(g.params.len(), 0);
+    }
+
+    #[test]
+    fn visibility_modifiers_captured() {
+        // The visibility modifier on a top-level declaration is captured onto its AST node (default
+        // `public` when none is written) — the foundation the resolver's access checks read.
+        let mut d = DiagSink::new();
+        let src = "internal fun f() {}\nprivate fun g() {}\nfun p() {}\ninternal class C {}\nprivate val x = 1\n";
+        let toks = lex(src, &mut d);
+        let file = parse(src, &toks, &mut d);
+        assert!(!d.has_errors(), "unexpected: {}", d.render("t", src));
+        let vis = |name: &str| -> Visibility {
+            file.decls
+                .iter()
+                .find_map(|&id| match file.decl(id) {
+                    Decl::Fun(f) if f.name == name => Some(f.visibility),
+                    Decl::Class(c) if c.name == name => Some(c.visibility),
+                    Decl::Property(pr) if pr.name == name => Some(pr.visibility),
+                    _ => None,
+                })
+                .expect("declaration present")
+        };
+        assert_eq!(vis("f"), Visibility::Internal);
+        assert_eq!(vis("g"), Visibility::Private);
+        assert_eq!(vis("p"), Visibility::Public);
+        assert_eq!(vis("C"), Visibility::Internal);
+        assert_eq!(vis("x"), Visibility::Private);
+    }
+
+    #[test]
+    fn nested_classifier_visibility_modifiers_captured() {
+        let mut diagnostics = DiagSink::new();
+        let source = "class Parent {\n\
+                          private class Hidden\n\
+                          protected class DerivedOnly\n\
+                          internal class ModuleOnly\n\
+                          class Visible\n\
+                      }\n";
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(
+            !diagnostics.has_errors(),
+            "unexpected: {}",
+            diagnostics.render("test", source)
+        );
+        let visibility = |name: &str| {
+            file.decls
+                .iter()
+                .find_map(|&declaration| match file.decl(declaration) {
+                    Decl::Class(class) if class.name == name => Some(class.visibility),
+                    _ => None,
+                })
+                .expect("nested classifier")
+        };
+        assert_eq!(visibility("Parent.Hidden"), Visibility::Private);
+        assert_eq!(visibility("Parent.DerivedOnly"), Visibility::Protected);
+        assert_eq!(visibility("Parent.ModuleOnly"), Visibility::Internal);
+        assert_eq!(visibility("Parent.Visible"), Visibility::Public);
+    }
+
+    #[test]
+    fn function_supertype_retains_kotlin_classifier_not_jvm_carrier() {
+        let mut diagnostics = DiagSink::new();
+        let source = "class Transform : (Int) -> String {\n\
+                          override fun invoke(value: Int): String = value.toString()\n\
+                      }\n";
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(
+            !diagnostics.has_errors(),
+            "unexpected: {}",
+            diagnostics.render("test", source)
+        );
+        let class = file
+            .decls
+            .iter()
+            .find_map(|&declaration| match file.decl(declaration) {
+                Decl::Class(class) if class.name == "Transform" => Some(class),
+                _ => None,
+            })
+            .expect("Transform class");
+        let [function] = class.supertypes.as_slice() else {
+            panic!("expected one function supertype: {:?}", class.supertypes)
+        };
+        assert_eq!(function.name, "kotlin/Function1");
+        assert_eq!(function.fun_params.len(), 1);
+        assert_eq!(function.targs.len(), 2);
+    }
+
+    #[test]
+    fn member_property_visibility_modifiers_captured() {
+        // A class body's member PROPERTIES carry their own visibility. (Regular-class member FUNCTION
+        // visibility is deliberately not fed to the AST yet: marking such a method `private` would emit
+        // it non-virtually without the synthetic accessor krusty doesn't generate; see the parser
+        // dispatch. Interface member functions and top-level functions do carry it.)
+        let mut d = DiagSink::new();
+        let src = "class C {\n  internal val mv = 1\n  private var pv = 2\n  val pub = 3\n}\n";
+        let toks = lex(src, &mut d);
+        let file = parse(src, &toks, &mut d);
+        assert!(!d.has_errors(), "unexpected: {}", d.render("t", src));
+        let class = file
+            .decls
+            .iter()
+            .find_map(|&id| match file.decl(id) {
+                Decl::Class(c) if c.name == "C" => Some(c),
+                _ => None,
+            })
+            .expect("class C");
+        let prop = |name: &str| {
+            class
+                .body_props
+                .iter()
+                .find(|p| p.name == name)
+                .expect("property")
+        };
+        assert_eq!(prop("mv").visibility, Visibility::Internal);
+        assert_eq!(prop("pv").visibility, Visibility::Private);
+        assert_eq!(prop("pub").visibility, Visibility::Public);
+    }
+
+    #[test]
+    fn external_accessor_modifiers_mark_the_property_external() {
+        let mut diagnostics = DiagSink::new();
+        let source = "object O {\n\
+                          var prop: String\n\
+                              external get\n\
+                              external set\n\
+                      }\n";
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(
+            diagnostics.diags.is_empty(),
+            "{}",
+            diagnostics.render("test", source)
+        );
+        let property = file
+            .decls
+            .iter()
+            .find_map(|&declaration| match file.decl(declaration) {
+                Decl::Class(class) if class.name == "O" => class
+                    .body_props
+                    .iter()
+                    .find(|property| property.name == "prop"),
+                _ => None,
+            })
+            .expect("object property");
+        assert!(property.is_external);
+        assert!(property.getter_declared);
+        assert!(property.setter.is_some());
+    }
+
+    #[test]
+    fn simple_fun() {
+        assert_eq!(
+            tree("fun add(a: Int, b: Int): Int = a + b"),
+            "(fun add (param a Int) (param b Int) :Int (+ a b))\n"
+        );
+    }
+
+    /// Annotation capture (drives the compiler-extension surface): the parser records applied
+    /// annotation source references on a class, attached to the RIGHT declaration, excluding use-site ones.
+    #[test]
+    fn captures_class_annotations() {
+        let mut d = DiagSink::new();
+        let src = "@Serializable class Foo(val a: Int)\nclass Bar(val b: Int)";
+        let toks = lex(src, &mut d);
+        let file = parse(src, &toks, &mut d);
+        assert!(!d.has_errors(), "{}", d.render("test", src));
+
+        let anns = |name: &str| {
+            file.decl_arena
+                .iter()
+                .find_map(|decl| match decl {
+                    Decl::Class(c) if c.name == name => Some(
+                        c.annotations
+                            .iter()
+                            .map(|annotation| annotation.name.clone())
+                            .collect::<Vec<_>>(),
+                    ),
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("class {name} not found"))
+        };
+        assert_eq!(anns("Foo"), vec!["Serializable".to_string()]);
+        assert!(
+            anns("Bar").is_empty(),
+            "annotation must not leak to the next class"
+        );
+    }
+
+    #[test]
+    fn use_site_annotations_excluded_from_capture() {
+        // A use-site `@file:`/`@get:` target annotation doesn't apply to the declaration.
+        let mut d = DiagSink::new();
+        let src = "@kotlinx.serialization.Serializable\nclass Q(val a: Int)";
+        let toks = lex(src, &mut d);
+        let file = parse(src, &toks, &mut d);
+        assert!(!d.has_errors(), "{}", d.render("test", src));
+        let q = file
+            .decl_arena
+            .iter()
+            .find_map(|decl| match decl {
+                Decl::Class(c) if c.name == "Q" => Some(c.annotations.clone()),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(
+            q.iter()
+                .map(|annotation| annotation.name.as_str())
+                .collect::<Vec<_>>(),
+            ["kotlinx.serialization.Serializable"]
+        );
+    }
+
+    #[test]
+    fn captures_function_annotations() {
+        // Function annotations are captured on FunDecl (mirroring class capture) and don't leak.
+        let mut d = DiagSink::new();
+        let src = "@Composable fun A() {}\nfun B() {}";
+        let toks = lex(src, &mut d);
+        let file = parse(src, &toks, &mut d);
+        assert!(!d.has_errors(), "{}", d.render("test", src));
+
+        let anns = |name: &str| {
+            file.decl_arena
+                .iter()
+                .find_map(|decl| match decl {
+                    Decl::Fun(f) if f.name == name => Some(
+                        f.annotations
+                            .iter()
+                            .map(|annotation| annotation.name.clone())
+                            .collect::<Vec<_>>(),
+                    ),
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("fun {name} not found"))
+        };
+        assert_eq!(anns("A"), vec!["Composable".to_string()]);
+        assert!(
+            anns("B").is_empty(),
+            "annotation must not leak to the next function"
+        );
+    }
+
+    #[test]
+    fn property_annotation_does_not_leak_to_the_next_declaration() {
+        let mut diagnostics = DiagSink::new();
+        let source = "@Deprecated(\"old\")\nval oldProperty = 1\nclass Fresh\n";
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(
+            !diagnostics.has_errors(),
+            "unexpected: {}",
+            diagnostics.render("test.kt", source)
+        );
+        let class = file
+            .decls
+            .iter()
+            .find_map(|&declaration| match file.decl(declaration) {
+                Decl::Class(class) if class.name == "Fresh" => Some(class),
+                _ => None,
+            })
+            .expect("Fresh class");
+        assert!(
+            class.annotations.is_empty(),
+            "property annotation leaked onto the following class"
+        );
+    }
+
+    #[test]
+    fn parses_annotated_explicit_primary_constructor_without_splitting_the_class() {
+        let mut diagnostics = DiagSink::new();
+        let source =
+            "class Injected\n@Deprecated(\"old\") constructor(val value: Int)\nclass Fresh\n";
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(
+            !diagnostics.has_errors(),
+            "unexpected: {}",
+            diagnostics.render("test.kt", source)
+        );
+        assert_eq!(file.decls.len(), 2);
+        let find_class = |name: &str| {
+            file.decls
+                .iter()
+                .find_map(|&declaration| match file.decl(declaration) {
+                    Decl::Class(class) if class.name == name => Some(class),
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("{name} class"))
+        };
+        let class = find_class("Injected");
+        assert_eq!(class.name, "Injected");
+        assert_eq!(class.props.len(), 1);
+        assert_eq!(class.props[0].name, "value");
+        assert!(class.annotations.is_empty());
+        assert!(find_class("Fresh").annotations.is_empty());
+    }
+
+    #[test]
+    fn class_header_lookahead_keeps_sibling_annotation() {
+        let mut diagnostics = DiagSink::new();
+        let source = "class First\n@Deprecated(\"old\") class Second\n";
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(
+            !diagnostics.has_errors(),
+            "unexpected: {}",
+            diagnostics.render("test.kt", source)
+        );
+        assert_eq!(file.decls.len(), 2);
+        let second = file
+            .decls
+            .iter()
+            .find_map(|&declaration| match file.decl(declaration) {
+                Decl::Class(class) if class.name == "Second" => Some(class),
+                _ => None,
+            })
+            .expect("Second class");
+        assert_eq!(
+            second
+                .annotations
+                .iter()
+                .map(|annotation| annotation.name.as_str())
+                .collect::<Vec<_>>(),
+            ["Deprecated"]
+        );
+    }
+
+    #[test]
+    fn class_header_lookahead_stops_at_semicolon() {
+        let mut diagnostics = DiagSink::new();
+        let source =
+            "class First; @Deprecated(\"old\") constructor(val value: Int)\nclass Second\n";
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        let find_class = |name: &str| {
+            file.decls
+                .iter()
+                .find_map(|&declaration| match file.decl(declaration) {
+                    Decl::Class(class) if class.name == name => Some(class),
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("{name} class"))
+        };
+        assert!(
+            find_class("First").props.is_empty(),
+            "constructor after semicolon was attached to First"
+        );
+        assert!(find_class("Second").annotations.is_empty());
+    }
+
+    #[test]
+    fn every_declared_type_header_shares_newline_before_supertype_colon() {
+        let mut diagnostics = DiagSink::new();
+        let source = r#"
+interface HeaderBase
+class HeaderClass
+    : HeaderBase
+interface HeaderInterface
+    : HeaderBase
+object HeaderObject
+    : HeaderBase
+enum class HeaderEnum
+    : HeaderBase { Entry }
+class HeaderHost {
+    companion object
+        : HeaderBase
+}
+"#;
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(
+            !diagnostics.has_errors(),
+            "unexpected: {}",
+            diagnostics.render("test.kt", source)
+        );
+        let find_class = |name: &str| {
+            file.decls
+                .iter()
+                .find_map(|&declaration| match file.decl(declaration) {
+                    Decl::Class(class) if class.name == name => Some(class),
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("{name} declaration"))
+        };
+
+        // All declared-type entry points delegate to `parse_supertypes`; this assertion set guards
+        // against a caller reintroducing its own same-line-only colon check (the enum parser did so
+        // previously) and bypassing the common continuation rule.
+        for name in [
+            "HeaderClass",
+            "HeaderInterface",
+            "HeaderObject",
+            "HeaderEnum",
+        ] {
+            assert_eq!(
+                find_class(name)
+                    .supertypes
+                    .iter()
+                    .map(|supertype| supertype.name.as_str())
+                    .collect::<Vec<_>>(),
+                ["HeaderBase"],
+                "{name} did not retain the continued supertype header"
+            );
+        }
+        let companion = match file.decl(find_class("HeaderHost").companion.expect("companion")) {
+            Decl::Class(companion) => companion,
+            _ => unreachable!("companion edge must target a class"),
+        };
+        assert!(companion.is_singleton());
+        assert_eq!(
+            companion
+                .supertypes
+                .iter()
+                .map(|supertype| supertype.name.as_str())
+                .collect::<Vec<_>>(),
+            ["HeaderBase"]
+        );
+    }
+
+    #[test]
+    fn grouped_file_annotations_precede_package_and_remain_distinct() {
+        let source = r#"@file:[JvmName("Facade") JvmMultifileClass]
+package sample
+
+fun value() = "OK"
+"#;
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+
+        assert!(
+            !diagnostics.has_errors(),
+            "{}",
+            diagnostics.render("test.kt", source)
+        );
+        assert_eq!(file.package.as_deref(), Some("sample"));
+        assert_eq!(
+            file.file_annotations
+                .iter()
+                .map(|(annotation, _)| annotation.name.as_str())
+                .collect::<Vec<_>>(),
+            ["JvmName", "JvmMultifileClass"]
+        );
+        assert_eq!(file.file_annotations[0].1.len(), 1);
+        assert!(file.file_annotations[1].1.is_empty());
+    }
+
+    #[test]
+    fn semicolon_does_not_continue_into_a_supertype_list() {
+        let mut diagnostics = DiagSink::new();
+        let source = "open class Base\nclass Derived; : Base()\n";
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        let derived = file
+            .decls
+            .iter()
+            .find_map(|&declaration| match file.decl(declaration) {
+                Decl::Class(class) if class.name == "Derived" => Some(class),
+                _ => None,
+            })
+            .expect("Derived class");
+
+        assert!(derived.supertypes.is_empty());
+        assert!(diagnostics.diags.iter().any(|diagnostic| {
+            diagnostic.msg == "expected a top-level declaration"
+                && &source[diagnostic.span.lo as usize..diagnostic.span.hi as usize] == ":"
+        }));
+    }
+
+    #[test]
+    fn captures_parameter_annotations() {
+        // Parameter annotations are captured on Param (e.g. Compose's `@IntroducedAt`), arguments
+        // discarded, and don't leak to the next parameter.
+        let mut d = DiagSink::new();
+        let src = "fun f(a: Int, @IntroducedAt(\"1\") b: String = \"x\", c: Boolean) {}";
+        let toks = lex(src, &mut d);
+        let file = parse(src, &toks, &mut d);
+        assert!(!d.has_errors(), "{}", d.render("test", src));
+        let params = file
+            .decl_arena
+            .iter()
+            .find_map(|decl| match decl {
+                Decl::Fun(f) if f.name == "f" => Some(f.params.clone()),
+                _ => None,
+            })
+            .expect("fun f not found");
+        assert!(params[0].annotations.is_empty(), "a: no annotations");
+        assert_eq!(
+            params[1]
+                .annotations
+                .iter()
+                .map(|annotation| annotation.name.as_str())
+                .collect::<Vec<_>>(),
+            ["IntroducedAt"],
+            "b: @IntroducedAt captured (arg discarded)"
+        );
+        assert!(
+            params[2].annotations.is_empty(),
+            "c: annotation must not leak from b"
+        );
+    }
+
+    #[test]
+    fn captures_annotations_on_a_function_type() {
+        // `@Composable () -> Unit` (an annotated function TYPE) parses, and the annotation is recorded
+        // by the type's start offset; an unannotated function-type param has none.
+        let mut d = DiagSink::new();
+        let src = "fun W(content: @Composable () -> Unit, plain: () -> Unit) {}";
+        let toks = lex(src, &mut d);
+        let file = parse(src, &toks, &mut d);
+        assert!(!d.has_errors(), "{}", d.render("test", src));
+
+        let w = file
+            .decl_arena
+            .iter()
+            .find_map(|decl| match decl {
+                Decl::Fun(f) if f.name == "W" => Some(f),
+                _ => None,
+            })
+            .expect("fun W");
+        let ty_of = |name: &str| {
+            &w.params
+                .iter()
+                .find(|p| p.name == name)
+                .unwrap_or_else(|| panic!("param {name}"))
+                .ty
+        };
+        let anns_of = |name: &str| {
+            file.type_annotations
+                .get(&ty_of(name).span.lo)
+                .cloned()
+                .unwrap_or_default()
+        };
+        assert_eq!(
+            anns_of("content")
+                .iter()
+                .map(|annotation| annotation.name.as_str())
+                .collect::<Vec<_>>(),
+            ["Composable"]
+        );
+        assert!(
+            anns_of("plain").is_empty(),
+            "an unannotated function type has no recorded annotations"
+        );
+    }
+
+    #[test]
+    fn parses_annotations_on_declaration_type_parameters() {
+        let mut diagnostics = DiagSink::new();
+        let source = r#"
+package qualified
+
+annotation class Marker(val value: String)
+
+inline fun <
+    @qualified.Marker("function") T,
+    reified @Marker("reified") U : Any,
+> choose(value: T): T = value
+
+class Box<
+    @Marker("class") V,
+>
+"#;
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+
+        assert!(
+            !diagnostics.has_errors(),
+            "declaration type-parameter annotations should parse: {}",
+            diagnostics.render("test.kt", source)
+        );
+        let choose = file
+            .decl_arena
+            .iter()
+            .find_map(|declaration| match declaration {
+                Decl::Fun(function) if function.name == "choose" => Some(function),
+                _ => None,
+            })
+            .expect("choose function");
+        assert_eq!(choose.type_params, ["T", "U"]);
+        assert!(choose.reified_type_params.contains("U"));
+        let class = file
+            .decl_arena
+            .iter()
+            .find_map(|declaration| match declaration {
+                Decl::Class(class) if class.name == "Box" => Some(class),
+                _ => None,
+            })
+            .expect("Box class");
+        assert_eq!(class.type_params(), &["V"]);
+        assert_eq!(
+            file.declaration_type_parameter_annotations[&choose.signature_span.lo]
+                .iter()
+                .chain(file.declaration_type_parameter_annotations[&class.span.lo].iter(),)
+                .map(|parameter| (
+                    parameter.name.as_str(),
+                    &source[parameter.span.lo as usize..parameter.span.hi as usize],
+                    parameter
+                        .annotations
+                        .iter()
+                        .map(|annotation| annotation.name.as_str())
+                        .collect::<Vec<_>>(),
+                    parameter.annotation_args.len(),
+                ))
+                .collect::<Vec<_>>(),
+            [
+                ("T", "T", vec!["qualified.Marker"], 1),
+                ("U", "U", vec!["Marker"], 1),
+                ("V", "V", vec!["Marker"], 1),
+            ]
+        );
+        assert_eq!(
+            file.declaration_type_parameter_annotations[&choose.signature_span.lo]
+                .iter()
+                .chain(file.declaration_type_parameter_annotations[&class.span.lo].iter(),)
+                .map(|parameter| {
+                    file.const_string_value(parameter.annotation_args[0][0])
+                        .expect("string annotation argument")
+                        .to_lossy()
+                })
+                .collect::<Vec<_>>(),
+            ["function", "reified", "class"]
+        );
+    }
+
+    #[test]
+    fn type_parameter_annotation_newlines_are_not_semicolons() {
+        let valid = r#"
+annotation class Marker
+
+class BeforeClose<@Marker T
+>
+
+class BeforeComma<@Marker T
+, U>
+
+class BeforeBound<@Marker T
+: Any>
+
+class AfterBoundColon<@Marker T:
+Any>
+"#;
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(valid, &mut diagnostics);
+        let _ = parse(valid, &tokens, &mut diagnostics);
+        assert!(
+            !diagnostics.has_errors(),
+            "physical newlines in a type-parameter list should parse: {}",
+            diagnostics.render("valid.kt", valid)
+        );
+
+        let invalid = "annotation class Marker\nclass Bad<@Marker; T>";
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(invalid, &mut diagnostics);
+        let _ = parse(invalid, &tokens, &mut diagnostics);
+        assert!(
+            diagnostics.has_errors(),
+            "an explicit semicolon cannot stand for NL inside a type-parameter declaration"
+        );
+    }
+
+    #[test]
+    fn typealias_type_parameter_annotations_have_declaration_ownership() {
+        let mut diagnostics = DiagSink::new();
+        let source = r#"
+annotation class Marker
+typealias Box<@Marker T> = List<T>
+"#;
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(
+            !diagnostics.has_errors(),
+            "{}",
+            diagnostics.render("test.kt", source)
+        );
+
+        let owner = source.find("typealias").expect("typealias offset") as u32;
+        let parameters = file
+            .declaration_type_parameter_annotations
+            .get(&owner)
+            .expect("typealias type-parameter annotations");
+        assert_eq!(parameters.len(), 1);
+        assert_eq!(parameters[0].name, "T");
+        assert_eq!(parameters[0].annotations[0].name, "Marker");
+        assert!(
+            !file.type_annotations.contains_key(&parameters[0].span.lo),
+            "a declaration annotation must not be recorded as a type-use annotation"
+        );
+    }
+
+    #[test]
+    fn receiver_function_type_param() {
+        // A receiver (extension) function type `Recv.() -> R` parses by folding the receiver in as the
+        // first `FunctionN` parameter — no parse error (was "expected ')'" before).
+        let mut d = DiagSink::new();
+        let src = "fun build(instructions: Buildee<T>.(Int) -> Unit) {}";
+        let toks = lex(src, &mut d);
+        let _ = parse(src, &toks, &mut d);
+        assert!(
+            !d.has_errors(),
+            "receiver function type should parse: {}",
+            d.render("test", src)
+        );
+    }
+
+    #[test]
+    fn precedence_mul_over_add() {
+        assert_eq!(
+            tree("fun f(a: Int, b: Int, c: Int): Int = a + b * c"),
+            "(fun f (param a Int) (param b Int) (param c Int) :Int (+ a (* b c)))\n"
+        );
+    }
+
+    #[test]
+    fn prefix_unary_binds_more_tightly_than_cast() {
+        assert_eq!(
+            tree("fun f(): Int? = -10.toInt() as Int?"),
+            "(fun f :Int (as (neg (call (. 10 toInt))) Int))\n"
+        );
+        assert_eq!(
+            tree("fun g(x: Int, y: Int): Int = -x as Int * y"),
+            "(fun g (param x Int) (param y Int) :Int (* (as (neg x) Int) y))\n"
+        );
+    }
+
+    #[test]
+    fn throw_operand_includes_the_elvis_chain() {
+        assert_eq!(
+            tree("fun fail(e: Throwable): Nothing = throw e.cause ?: e"),
+            "(fun fail (param e Throwable) :Nothing (throw (?: (. e cause) e)))\n"
+        );
+    }
+
+    #[test]
+    fn expression_position_return_operand_includes_the_elvis_chain() {
+        assert_eq!(
+            tree(
+                "fun choose(a: String?, b: String?): String { a ?: return b ?: \"fallback\"; return a }"
+            ),
+            "(fun choose (param a String) (param b String) :String (block (?: a (return (?: b \"fallback\"))) (return a)))\n"
+        );
+    }
+
+    #[test]
+    fn precedence_comparison_and_logic() {
+        // a < b && c == d  =>  (&& (< a b) (== c d))
+        assert_eq!(
+            tree("fun f(a: Int, b: Int, c: Int, d: Int): Boolean = a < b && c == d"),
+            "(fun f (param a Int) (param b Int) (param c Int) (param d Int) :Boolean (&& (< a b) (== c d)))\n"
+        );
+    }
+
+    #[test]
+    fn left_assoc_sub() {
+        // a - b - c => ((a - b) - c)
+        assert_eq!(
+            tree("fun f(a: Int, b: Int, c: Int): Int = a - b - c"),
+            "(fun f (param a Int) (param b Int) (param c Int) :Int (- (- a b) c))\n"
+        );
+    }
+
+    #[test]
+    fn paren_overrides() {
+        assert_eq!(
+            tree("fun f(a: Int, b: Int, c: Int): Int = (a + b) * c"),
+            "(fun f (param a Int) (param b Int) (param c Int) :Int (* (+ a b) c))\n"
+        );
+    }
+
+    #[test]
+    fn member_call() {
+        assert_eq!(
+            tree("fun f(a: Int, b: String): String = a.toString() + b"),
+            "(fun f (param a Int) (param b String) :String (+ (call (. a toString)) b))\n"
+        );
+    }
+
+    #[test]
+    fn function_type_as_generic_arg() {
+        // `Foo<() -> Unit>()` — a function type as a generic type argument must be recognized as a
+        // generic call (not parsed as a `<` comparison). `tree` asserts no parse errors.
+        let t = tree("fun f() { val xs = ArrayList<() -> Unit>() }");
+        assert!(t.contains("ArrayList"), "tree: {t}");
+        // Also the two-arg form `Map<String, (Int) -> Int>`.
+        let _ = tree("fun g() { val m = HashMap<String, (Int) -> Int>() }");
+    }
+
+    #[test]
+    fn callable_reference_lhs_preserves_type_arguments_per_classifier_segment() {
+        let mut diagnostics = DiagSink::new();
+        let source = "fun f() { val k = Outer<Int>.Inner<String>::Deep::class }";
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(diagnostics.diags.is_empty(), "{:?}", diagnostics.diags);
+
+        let outer = file
+            .expr_arena
+            .iter()
+            .enumerate()
+            .find_map(|(index, expression)| {
+                matches!(expression, Expr::Name(name) if name == "Outer")
+                    .then_some(ExprId(index as u32))
+            })
+            .expect("Outer classifier segment");
+        let inner = file
+            .expr_arena
+            .iter()
+            .enumerate()
+            .find_map(|(index, expression)| {
+                matches!(expression, Expr::Member { name, .. } if name == "Inner")
+                    .then_some(ExprId(index as u32))
+            })
+            .expect("Inner classifier segment");
+        assert_eq!(file.call_type_args[&outer.0][0].name, "Int");
+        assert_eq!(file.call_type_args[&inner.0][0].name, "String");
+        assert_eq!(file.call_type_args.len(), 2);
+    }
+
+    #[test]
+    fn definitely_non_null_type_inside_explicit_call_arguments() {
+        let mut diagnostics = DiagSink::new();
+        let source = "fun <T> use(value: T) { exact<Box<T & Any>>(value) }";
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(
+            diagnostics.diags.is_empty(),
+            "{:?}",
+            diagnostics
+                .diags
+                .iter()
+                .map(|diagnostic| &diagnostic.msg)
+                .collect::<Vec<_>>()
+        );
+        let arguments = file
+            .call_type_args
+            .values()
+            .next()
+            .expect("explicit call type arguments");
+        assert!(arguments[0].targs[0].definitely_non_null());
+    }
+
+    #[test]
+    fn annotated_type_inside_explicit_call_arguments_is_not_parsed_as_comparisons() {
+        let mut diagnostics = DiagSink::new();
+        let source = "annotation class Mark(val value: String)\n\
+                      fun <T> use(value: T) {}\n\
+                      fun test() { use<@Mark(\"A\" + \"B\") Float>(1.0f) }";
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(diagnostics.diags.is_empty(), "{:?}", diagnostics.diags);
+        let arguments = file
+            .call_type_args
+            .values()
+            .find(|arguments| {
+                arguments
+                    .first()
+                    .is_some_and(|argument| argument.name == "Float")
+            })
+            .expect("annotated explicit call type argument");
+        let argument = &arguments[0];
+        assert!(file
+            .type_annotations
+            .get(&argument.span.lo)
+            .is_some_and(|annotations| annotations
+                .iter()
+                .any(|annotation| annotation.name == "Mark")));
+    }
+
+    #[test]
+    fn qualified_annotation_on_value_parameter_type_uses_parameter_type_anchor() {
+        let mut diagnostics = DiagSink::new();
+        let source = "fun <T> foo(x: @kotlin.internal.NoInfer T): T = x";
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(diagnostics.diags.is_empty(), "{:?}", diagnostics.diags);
+        let function = file
+            .decls
+            .iter()
+            .find_map(|&declaration| match file.decl(declaration) {
+                Decl::Fun(function) => Some(function),
+                _ => None,
+            })
+            .expect("function declaration");
+        assert!(file
+            .type_annotations
+            .get(&function.params[0].ty.span.lo)
+            .is_some_and(|annotations| annotations
+                .iter()
+                .any(|annotation| annotation.name == "kotlin.internal.NoInfer")));
+    }
+
+    #[test]
+    fn unary_neg() {
+        assert_eq!(
+            tree("fun f(a: Int, b: Int): Int = -a * b"),
+            "(fun f (param a Int) (param b Int) :Int (* (neg a) b))\n"
+        );
+    }
+
+    #[test]
+    fn if_expr() {
+        assert_eq!(
+            tree("fun max(a: Int, b: Int): Int = if (a > b) a else b"),
+            "(fun max (param a Int) (param b Int) :Int (if (> a b) a b))\n"
+        );
+    }
+
+    #[test]
+    fn block_body_with_locals_and_while() {
+        let t = tree(
+            "fun fib(n: Int): Int {\n  var a = 0\n  var b = 1\n  var i = 0\n  while (i < n) {\n    val t = a + b\n    a = b\n    b = t\n    i = i + 1\n  }\n  return a\n}",
+        );
+        assert!(t.contains("(var a 0)"), "{t}");
+        assert!(t.contains("(while (< i n)"), "{t}");
+        assert!(t.contains("(set a b)"), "{t}");
+        assert!(t.contains("(return a)"), "{t}");
+    }
+
+    #[test]
+    fn class_with_properties() {
+        assert_eq!(
+            tree("class Point(val x: Int, var y: String)"),
+            "(class Point (val x Int) (var y String))\n"
+        );
+    }
+
+    #[test]
+    fn class_with_empty_body() {
+        assert_eq!(
+            tree("class Box(val v: Int) {\n}"),
+            "(class Box (val v Int))\n"
+        );
+    }
+
+    #[test]
+    fn generic_base_arguments_are_preserved_in_the_class_ast() {
+        let source = "open class Base<T>\nclass Child : Base<Map<String, Int>>()";
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(!diagnostics.has_errors());
+        let child = file
+            .decls
+            .iter()
+            .find_map(|&declaration| match file.decl(declaration) {
+                Decl::Class(class) if class.name == "Child" => Some(class),
+                _ => None,
+            })
+            .unwrap();
+
+        assert_eq!(child.base_class.as_deref(), Some("Base"));
+        assert_eq!(child.base_type_args.len(), 1);
+        assert_eq!(child.base_type_args[0].name, "Map");
+        assert_eq!(
+            child.base_type_args[0]
+                .targs
+                .iter()
+                .map(|argument| argument.name.as_str())
+                .collect::<Vec<_>>(),
+            ["String", "Int"]
+        );
+    }
+
+    #[test]
+    fn where_constraint_must_name_a_declared_type_parameter() {
+        let source = "class C<T> where U : Any";
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(source, &mut diagnostics);
+        let _ = parse(source, &tokens, &mut diagnostics);
+
+        assert_eq!(
+            diagnostics
+                .diags
+                .iter()
+                .map(|diagnostic| diagnostic.msg.as_str())
+                .collect::<Vec<_>>(),
+            ["'U' does not refer to a type parameter of 'C'."]
+        );
+    }
+
+    #[test]
+    fn constructor_property_modifiers_are_preserved_in_the_class_ast() {
+        let source = "annotation class `final`\n\
+                      open class Example(\n\
+                      \u{20}\u{20}@`final`(open = true) override val first: String,\n\
+                      \u{20}\u{20}final override val second: String,\n\
+                      \u{20}\u{20}val third: String,\n\
+                      )";
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(!diagnostics.has_errors());
+        let class = file
+            .decls
+            .iter()
+            .find_map(|&declaration| match file.decl(declaration) {
+                Decl::Class(class) if class.name == "Example" => Some(class),
+                _ => None,
+            })
+            .unwrap();
+
+        assert!(class.props[0].is_override);
+        assert!(class.props[0].is_open);
+        assert!(class.props[1].is_override);
+        assert!(!class.props[1].is_open);
+        assert!(!class.props[2].is_override);
+        assert!(!class.props[2].is_open);
+    }
+
+    #[test]
+    fn modifiers_and_annotations_are_skipped() {
+        // Leading modifiers + annotations are ignored; the declaration parses normally.
+        assert_eq!(tree("public inline fun f(): Int = 1"), "(fun f :Int 1)\n");
+        assert_eq!(tree("@JvmStatic fun g(): Int = 2"), "(fun g :Int 2)\n");
+        assert_eq!(
+            tree("@Anno(1, 2) open class C(private val x: Int)"),
+            "(class C (val x Int))\n"
+        );
+        // `data` is NOT a skippable modifier — it stays a data class.
+        assert_eq!(tree("data class P(val x: Int)"), "(class P (val x Int))\n");
+    }
+
+    #[test]
+    fn companion_extension_modifier_is_retained_on_callable_declarations() {
+        let source = "class C\ncompanion fun C.use() = 1\ncompanion val C.answer = 42\n";
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(!diagnostics.has_errors(), "{:?}", diagnostics.diags);
+        let function = file
+            .decls
+            .iter()
+            .find_map(|&declaration| match file.decl(declaration) {
+                Decl::Fun(function) => Some(function),
+                Decl::Class(_) | Decl::Property(_) => None,
+            })
+            .expect("companion extension function");
+        let property = file
+            .decls
+            .iter()
+            .find_map(|&declaration| match file.decl(declaration) {
+                Decl::Property(property) => Some(property),
+                Decl::Class(_) | Decl::Fun(_) => None,
+            })
+            .expect("companion extension property");
+        assert!(function.is_companion_extension());
+        assert!(property.is_companion_extension);
+    }
+
+    #[test]
+    fn companion_block_declarations_are_associated_without_a_second_companion_object() {
+        let source = "class C {\n\
+                          companion { fun use() = 1; val answer = 42 }\n\
+                          companion object { fun objectUse() = 2 }\n\
+                      }";
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(!diagnostics.has_errors(), "{:?}", diagnostics.diags);
+        let class = file
+            .decls
+            .iter()
+            .find_map(|&declaration| match file.decl(declaration) {
+                Decl::Class(class) if class.name == "C" => Some(class),
+                _ => None,
+            })
+            .expect("containing class");
+        assert!(class.companion.is_some());
+        assert_eq!(
+            file.decls
+                .iter()
+                .filter(|&&declaration| {
+                    matches!(file.decl(declaration), Decl::Class(class) if class.name == "C.Companion")
+                })
+                .count(),
+            1,
+        );
+        assert!(file.decls.iter().any(|&declaration| {
+            matches!(file.decl(declaration), Decl::Fun(function)
+                if function.name == "use"
+                    && function.is_companion_extension()
+                    && function.receiver.as_ref().is_some_and(|receiver| receiver.name == "C"))
+        }));
+        assert!(file.decls.iter().any(|&declaration| {
+            matches!(file.decl(declaration), Decl::Property(property)
+                if property.name == "answer"
+                    && property.is_companion_extension
+                    && property.receiver.as_ref().is_some_and(|receiver| receiver.name == "C"))
+        }));
+    }
+
+    #[test]
+    fn nullable_null_notnull_elvis() {
+        assert_eq!(
+            tree("fun f(s: String?): String = s ?: \"d\""),
+            "(fun f (param s String) :String (?: s \"d\"))\n"
+        );
+        assert_eq!(
+            tree("fun g(s: String?): String = s!!"),
+            "(fun g (param s String) :String (!! s))\n"
+        );
+        assert_eq!(tree("fun h(): String = null"), "(fun h :String null)\n");
+        assert_eq!(
+            tree("fun e(x: Int?): Boolean = x ?: null!! != 1"),
+            "(fun e (param x Int) :Boolean (!= (?: x (!! null)) 1))\n"
+        );
+        // chained prefix `!` must NOT be confused with the postfix `!!` operator.
+        assert_eq!(
+            tree("fun n(p: Boolean): Boolean = !!!p"),
+            "(fun n (param p Boolean) :Boolean (not (not (not p))))\n"
+        );
+    }
+
+    #[test]
+    fn for_loop_and_compound_assign() {
+        let t = tree("fun f(n: Int): Int {\n var s = 0\n for (i in 1..n) s += i\n return s\n}");
+        assert!(t.contains("(for i (1 .. n)"), "{t}");
+        assert!(t.contains("(set s (+ s i))"), "{t}");
+        // A range followed by `step` (an ordinary infix function — not special syntax) is iterated as
+        // the progression VALUE it builds: `n downTo 0 step 2` → `(n.downTo(0)).step(2)`, a `for-each`.
+        let g = tree("fun g(n: Int) {\n for (i in n downTo 0 step 2) {}\n}");
+        assert!(
+            g.contains("(for-each i (call (. (call (. n downTo) 0) step) 2)"),
+            "{g}"
+        );
+        // Chained `step` chains the calls left-to-right (the second `step` is NOT swallowed as `2.step`).
+        let c = tree("fun c(n: Int) {\n for (i in 0..6 step 2 step 3) {}\n}");
+        assert!(
+            c.contains("(call (. (call (. (.. 0 6) step) 2) step) 3)"),
+            "{c}"
+        );
+        let until = tree("fun u(n: Int) {\n for (i in 0 until n step 2) {}\n}");
+        assert!(
+            until.contains("(call (. (call (. 0 until) n) step) 2)"),
+            "{until}"
+        );
+        let open_end = tree("fun o(n: Int) {\n for (i in 0..<n step 2) {}\n}");
+        assert!(
+            open_end.contains("(call (. (..< 0 n) step) 2)"),
+            "{open_end}"
+        );
+        // A bare range keeps the optimized counted `for`.
+        assert!(tree("fun h(n: Int) {\n for (i in 0 until n) {}\n}").contains("(for i (0 until n)"));
+    }
+
+    #[test]
+    fn when_subject_and_subjectless() {
+        assert_eq!(
+            tree("fun f(n: Int): Int = when (n) { 0 -> 1; 1, 2 -> 2; else -> 9 }"),
+            "(fun f (param n Int) :Int (when n (arm 0 => 1) (arm 1 2 => 2) (arm else => 9)))\n"
+        );
+        assert_eq!(
+            tree("fun g(n: Int): Int = when { n < 0 -> 1; else -> 2 }"),
+            "(fun g (param n Int) :Int (when (arm (< n 0) => 1) (arm else => 2)))\n"
+        );
+        assert_eq!(
+            tree("fun h(n: Int): Int = when (n) { 0, -> 1; else -> 2 }"),
+            "(fun h (param n Int) :Int (when n (arm 0 => 1) (arm else => 2)))\n"
+        );
+        assert_eq!(
+            tree(
+                "fun i(n: Int): Int = when (n) {\n\
+                     0,\n\
+                     1,\n\
+                         -> 1\n\
+                     else -> 2\n\
+                 }"
+            ),
+            "(fun i (param n Int) :Int (when n (arm 0 1 => 1) (arm else => 2)))\n"
+        );
+
+        let source = "fun invalid(): Int = when { true, -> 1; else -> 2 }";
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(source, &mut diagnostics);
+        parse(source, &tokens, &mut diagnostics);
+        assert!(
+            diagnostics.has_errors(),
+            "subjectless when accepted a comma-separated condition"
+        );
+    }
+
+    #[test]
+    fn data_class_parses() {
+        // `data` is a soft keyword; the class is otherwise parsed normally.
+        assert_eq!(
+            tree("data class Point(val x: Int, val y: Int)"),
+            "(class Point (val x Int) (val y Int))\n"
+        );
+        // `data` remains usable as an ordinary identifier.
+        assert_eq!(
+            tree("fun f(data: Int): Int = data"),
+            "(fun f (param data Int) :Int data)\n"
+        );
+    }
+
+    #[test]
+    fn class_with_member_function() {
+        assert_eq!(
+            tree("class Calc(val base: Int) {\n  fun addTo(n: Int): Int = base + n\n}"),
+            "(class Calc (val base Int) (method addTo (param n Int) :Int))\n"
+        );
+    }
+
+    #[test]
+    fn enum_companion_is_an_ordinary_nested_singleton() {
+        let mut d = DiagSink::new();
+        let src = "enum class Game { ROCK, PAPER; companion object { fun foo() = ROCK; val bar = PAPER } }\n";
+        let toks = lex(src, &mut d);
+        let file = parse(src, &toks, &mut d);
+        assert!(!d.has_errors(), "unexpected: {}", d.render("t", src));
+        let g = file
+            .decls
+            .iter()
+            .find_map(|&id| match file.decl(id) {
+                Decl::Class(c) if c.name == "Game" => Some(c),
+                _ => None,
+            })
+            .expect("enum Game parsed");
+        assert_eq!(g.enum_entries.len(), 2);
+        let companion = match file.decl(g.companion.expect("companion edge")) {
+            Decl::Class(companion) => companion,
+            _ => unreachable!("companion edge must target a class"),
+        };
+        assert_eq!(companion.name, "Game.Companion");
+        assert!(companion.is_singleton());
+        assert!(companion.methods.iter().any(|method| method.name == "foo"));
+        assert!(companion
+            .body_props
+            .iter()
+            .any(|property| property.name == "bar"));
+    }
+
+    #[test]
+    fn multi_index_subscript_parses() {
+        // `recv[i, j]` (two or more indices) parses as a multi-index `get` operator; a single index
+        // stays the ordinary `Index`. The assignment form `recv[i, j] = v` is a multi-index `set`.
+        assert_eq!(
+            tree("fun f(m: M): Int = m[1, 2]"),
+            "(fun f (param m M) :Int (index-multi m 1 2))\n"
+        );
+        assert_eq!(
+            tree("fun f(m: M) { m[1, 2] = 3 }"),
+            "(fun f (param m M) (block (set-index-multi m 1 2 3)))\n"
+        );
+        // A single index is unchanged.
+        assert_eq!(
+            tree("fun f(a: IntArray): Int = a[0]"),
+            "(fun f (param a IntArray) :Int (index a 0))\n"
+        );
+    }
+
+    #[test]
+    fn package_and_multiple_decls() {
+        let src = "package demo\nfun a(): Int = 1\nfun b(): Int = 2\n";
+        let mut d = DiagSink::new();
+        let toks = lex(src, &mut d);
+        let file = parse(src, &toks, &mut d);
+        assert!(!d.has_errors());
+        assert_eq!(file.package.as_deref(), Some("demo"));
+        assert_eq!(file.decls.len(), 2);
+    }
+
+    #[test]
+    fn multi_dollar_interpolation_honors_feature_overrides() {
+        let source =
+            "// LANGUAGE: -MultiDollarInterpolation\nfun render(value: String) = $$\"$$value\"";
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(source, &mut diagnostics);
+        let features = LangFeatures::from_source(source);
+        let _ = parse_with_features(source, &tokens, &mut diagnostics, &features);
+        assert_eq!(
+            diagnostics
+                .diags
+                .iter()
+                .map(|diagnostic| diagnostic.msg.as_str())
+                .collect::<Vec<_>>(),
+            ["multi-dollar string interpolation is disabled by the language feature set"]
+        );
+    }
+
+    #[test]
+    fn parser_retains_function_supertypes_multiple_bounds_and_property_forms() {
+        let source =
+            "abstract class Holder<T> : (T) -> T where T : () -> Int, T : (String) -> String {\n\
+                          abstract val missing: String\n\
+                          lateinit var later: String\n\
+                          val delegated: String by lazy { \"OK\" }\n\
+                          val defaulted: String\n\
+                              get\n\
+                          typealias Nested<U> = List<U>\n\
+                      }\n\
+                      fun interface Action { fun run(): String }\n";
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert_eq!(
+            diagnostics
+                .diags
+                .iter()
+                .map(|d| d.msg.as_str())
+                .collect::<Vec<_>>(),
+            [] as [&str; 0]
+        );
+
+        let holder = file
+            .decl_arena
+            .iter()
+            .find_map(|declaration| match declaration {
+                Decl::Class(class) if class.name == "Holder" => Some(class),
+                _ => None,
+            })
+            .expect("Holder class");
+        assert_eq!(holder.supertypes.len(), 1);
+        assert_eq!(holder.supertypes[0].fun_params.len(), 1);
+        assert_eq!(holder.type_param_bounds.len(), 2);
+        assert_eq!(holder.body_props.len(), 4);
+        assert!(holder.body_props[0].init.is_none());
+        assert!(holder.body_props[1].init.is_none());
+        assert!(holder.body_props[2].delegate.is_some());
+        assert!(holder.body_props[3].init.is_none());
+        assert!(holder.body_props[3].getter.is_none());
+        assert_eq!(holder.type_aliases.len(), 1);
+        let alias = &holder.type_aliases[0];
+        assert_eq!(alias.name, "Nested");
+        assert_eq!(alias.type_params, ["U"]);
+        assert_eq!(alias.target.name, "List");
+        assert_eq!(
+            &source[alias.span.lo as usize..alias.span.hi as usize],
+            "typealias Nested<U> = List<U>"
+        );
+
+        let action = file
+            .decl_arena
+            .iter()
+            .find_map(|declaration| match declaration {
+                Decl::Class(class) if class.name == "Action" => Some(class),
+                _ => None,
+            })
+            .expect("fun interface");
+        assert!(action.is_fun_interface);
+        assert_eq!(action.methods.len(), 1);
+        assert_eq!(action.methods[0].name, "run");
+        file.validate_integrity(source).expect("valid AST");
+    }
+
+    #[test]
+    fn function_supertype_lookahead_stops_at_the_next_declaration() {
+        let source = "interface A\n\
+                      object O : A\n\
+                      typealias F<T> = (T) -> String\n";
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert_eq!(
+            diagnostics
+                .diags
+                .iter()
+                .map(|diagnostic| diagnostic.msg.as_str())
+                .collect::<Vec<_>>(),
+            [] as [&str; 0]
+        );
+        let singleton = file
+            .decl_arena
+            .iter()
+            .find_map(|declaration| match declaration {
+                Decl::Class(class) if class.name == "O" => Some(class),
+                _ => None,
+            })
+            .expect("O singleton");
+        assert_eq!(
+            singleton
+                .supertypes
+                .iter()
+                .map(|supertype| supertype.name.as_str())
+                .collect::<Vec<_>>(),
+            ["A"]
+        );
+    }
+
+    #[test]
+    fn parser_retains_extension_access_compound_target_and_label_spans() {
+        let source = "fun syntax(receiver: String, callable: () -> Unit, value: Box) {\n\
+                          receiver.(callable)()\n\
+                          makeBox() += value\n\
+                          local@ typealias Alias<T> = List<T>\n\
+                      }\n";
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert_eq!(
+            diagnostics
+                .diags
+                .iter()
+                .map(|d| d.msg.as_str())
+                .collect::<Vec<_>>(),
+            [] as [&str; 0]
+        );
+
+        let extension = file
+            .expr_arena
+            .iter()
+            .enumerate()
+            .find_map(|(index, expression)| match expression {
+                Expr::ExtensionAccess { receiver, callable } => {
+                    Some((ExprId(index as u32), *receiver, *callable))
+                }
+                _ => None,
+            })
+            .expect("extension-function expression access");
+        assert_eq!(
+            &source[file.expr_spans[extension.0 .0 as usize].lo as usize
+                ..file.expr_spans[extension.0 .0 as usize].hi as usize],
+            "receiver.(callable)"
+        );
+        assert!(matches!(file.expr(extension.1), Expr::Name(name) if name == "receiver"));
+        assert!(matches!(file.expr(extension.2), Expr::Name(name) if name == "callable"));
+
+        let compound = file
+            .stmt_arena
+            .iter()
+            .find_map(|statement| match statement {
+                Stmt::CompoundAssign {
+                    target,
+                    value,
+                    op,
+                    operator_span,
+                } => Some((*target, *value, *op, *operator_span)),
+                _ => None,
+            })
+            .expect("compound call target");
+        assert_eq!(compound.2, BinOp::Add);
+        assert_eq!(
+            &source[compound.3.lo as usize..compound.3.hi as usize],
+            "+="
+        );
+        assert!(matches!(file.expr(compound.0), Expr::Call { .. }));
+        assert!(matches!(file.expr(compound.1), Expr::Name(name) if name == "value"));
+
+        let (&label_statement, (label, label_span)) = file
+            .statement_labels
+            .iter()
+            .next()
+            .expect("declaration label");
+        assert_eq!(label, "local");
+        assert_eq!(
+            &source[label_span.lo as usize..label_span.hi as usize],
+            "local"
+        );
+        assert!(
+            matches!(file.stmt(label_statement), Stmt::LocalTypeAlias(alias) if alias.name == "Alias")
+        );
+        file.validate_integrity(source).expect("valid AST");
+    }
+
+    #[test]
+    fn parenthesized_call_followed_by_lambda_invokes_the_call_result() {
+        let source = "fun apply() = (A to B) { key, value -> key == value }";
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(source, &mut diagnostics);
+        let file = parse(source, &tokens, &mut diagnostics);
+        assert!(
+            !diagnostics.has_errors(),
+            "{}",
+            diagnostics.render("test", source)
+        );
+        let function = file
+            .decls
+            .iter()
+            .find_map(|&declaration| match file.decl(declaration) {
+                Decl::Fun(function) if function.name == "apply" => Some(function),
+                _ => None,
+            })
+            .expect("apply function");
+        let FunBody::Expr(root) = function.body else {
+            panic!("expression body")
+        };
+        let Expr::Call {
+            callee: pair_call,
+            args: invoke_arguments,
+        } = file.expr(root)
+        else {
+            panic!("parenthesized result must be invoked")
+        };
+        assert_eq!(invoke_arguments.len(), 1);
+        assert!(matches!(
+            file.expr(invoke_arguments[0]),
+            Expr::Lambda { .. }
+        ));
+        let Expr::Call {
+            callee: to_member,
+            args: to_arguments,
+        } = file.expr(*pair_call)
+        else {
+            panic!("inner infix call")
+        };
+        assert_eq!(to_arguments.len(), 1, "lambda must not be appended to `to`");
+        assert!(matches!(
+            file.expr(*to_member),
+            Expr::Member { receiver, name }
+                if name == "to" && matches!(file.expr(*receiver), Expr::Name(name) if name == "A")
+        ));
+        assert!(file.infix_calls.contains(&pair_call.0));
+        assert!(!file.infix_calls.contains(&root.0));
+        assert!(file.call_has_trailing_lambda.contains(&root.0));
+        file.validate_integrity(source).expect("valid AST");
+    }
+
+    #[test]
+    fn multiline_control_expression_before_down_to_is_one_for_range() {
+        let source = "fun range(flag: Boolean) {\n\
+                          for (i in (if (flag) 3 else 2)\n\
+                              downTo 0) { }\n\
+                      }\n";
+        let file = script(source);
+        assert!(file.stmt_arena.iter().any(|statement| matches!(
+            statement,
+            Stmt::For {
+                range: ForRange {
+                    kind: RangeKind::DownTo,
+                    ..
+                },
+                ..
+            }
+        )));
+        file.validate_integrity(source).expect("valid AST");
+    }
+
+    #[test]
+    fn malformed_nested_typealias_reports_the_complete_exact_diagnostic() {
+        let source = "class Broken { typealias Alias List<Int> }";
+        let mut diagnostics = DiagSink::new();
+        let tokens = lex(source, &mut diagnostics);
+        let _ = parse(source, &tokens, &mut diagnostics);
+        assert_eq!(diagnostics.diags.len(), 1);
+        assert_eq!(diagnostics.diags[0].msg, "expected '='");
+        assert_eq!(
+            &source[diagnostics.diags[0].span.lo as usize..diagnostics.diags[0].span.hi as usize],
+            "List"
+        );
+    }
+}

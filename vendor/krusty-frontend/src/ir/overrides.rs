@@ -1,0 +1,108 @@
+//! Exact override edges selected by the frontend, as common IR carries them to the backends.
+//!
+//! Each edge joins an implementation to the declaration it overrides by stable identity, with the
+//! declaration-side and implementation-side types a target erases for its bridges. A backend
+//! consumes these edges; it never re-derives an override by matching names.
+
+use super::{FunId, IrFile, Ty, TypeName};
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IrPropertyOverride {
+    pub implementation: crate::fir::ResolvedPropertyOverrideTarget,
+    /// Common-IR accessors of a compiler-generated implementation (see `IrFunctionOverride`).
+    pub implementation_getter: Option<FunId>,
+    pub implementation_setter: Option<FunId>,
+    pub implementation_owner: TypeName,
+    pub overridden: crate::fir::ResolvedPropertyOverrideTarget,
+    pub overridden_owner: TypeName,
+    pub overridden_is_interface: bool,
+    pub name: String,
+    pub declared_type: Ty,
+    pub applied_type: Ty,
+    pub implementation_type: Ty,
+    /// Member-extension receivers, as on `ResolvedPropertyOverride`.
+    pub declared_receiver: Option<Ty>,
+    pub implementation_receiver: Option<Ty>,
+    /// As on `ResolvedPropertyOverride`: `None` when the overridden property is a `val`.
+    pub overridden_setter_value: Option<crate::fir::ResolvedParameterIdentity>,
+    pub implementation_mutable: bool,
+    pub has_kotlin_superclass_override: bool,
+    pub depth: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IrFunctionOverride {
+    pub implementation: crate::fir::ResolvedFunctionOverrideTarget,
+    /// Exact common-IR implementation for a compiler-generated declaration such as an interface
+    /// delegation forwarder. Source overrides use their stable callable identity and leave this
+    /// empty; backends consume either edge without matching a method by name.
+    pub implementation_function: Option<FunId>,
+    pub implementation_owner: TypeName,
+    pub overridden: crate::fir::ResolvedFunctionOverrideTarget,
+    pub overridden_owner: TypeName,
+    pub overridden_semantic_role: Option<crate::types::SemanticCallRole>,
+    pub collection_barrier: Option<crate::libraries::CollectionBarrierOutcome>,
+    pub overridden_is_interface: bool,
+    pub name: String,
+    /// The overridden declaration's own parameters and result, before the implementing class's
+    /// type arguments are applied, as the frontend recorded them. A backend erases this shape for
+    /// the supertype side of a bridge; it never reopens the declaration's provider for it.
+    pub declared_parameters: Vec<Ty>,
+    pub declared_result: Ty,
+    pub applied_parameters: Vec<Ty>,
+    pub applied_result: Ty,
+    pub implementation_parameters: Vec<Ty>,
+    pub implementation_parameter_identities: Vec<crate::fir::ResolvedParameterIdentity>,
+    /// Parameter identities of the overridden declaration, parallel to `declared_parameters`.
+    pub overridden_parameter_identities: Vec<crate::fir::ResolvedParameterIdentity>,
+    pub implementation_result: Ty,
+    pub suspend: bool,
+    pub has_kotlin_superclass_override: bool,
+    pub depth: u32,
+}
+
+impl IrFile {
+    /// Whether `function` is the common-IR body of an `interface by` forwarder.
+    ///
+    /// Source overrides leave [`IrFunctionOverride::implementation_function`] empty and keep their
+    /// callable identity. Only a delegation forwarder fills it, and that edge is what class
+    /// metadata publishes as a `Function` with member kind DELEGATION. Property forwarders use
+    /// [`super::IrPropertyOverride`] and stay property records.
+    pub(crate) fn is_interface_delegation_function(&self, function: FunId) -> bool {
+        self.function_overrides
+            .values()
+            .flatten()
+            .any(|edge| edge.implementation_function == Some(function))
+    }
+
+    /// The member functions of `owner` that override one of `Any`'s `equals`/`hashCode`/`toString`,
+    /// each with the `Any` member it overrides, by the frontend's override edges. A value class
+    /// generates exactly the `Any` members its source does not override.
+    pub(crate) fn any_member_overrides(
+        &self,
+        owner: TypeName,
+    ) -> crate::fx_hash::HashMap<FunId, super::IrValueClassAnyMember> {
+        use crate::types::SemanticCallRole;
+        self.function_overrides
+            .get(&owner)
+            .into_iter()
+            .flatten()
+            .filter_map(|edge| {
+                let member = match edge.overridden_semantic_role? {
+                    SemanticCallRole::KotlinAnyEquals => super::IrValueClassAnyMember::Equals,
+                    SemanticCallRole::KotlinAnyHashCode => super::IrValueClassAnyMember::HashCode,
+                    SemanticCallRole::KotlinAnyToString => super::IrValueClassAnyMember::ToString,
+                    _ => return None,
+                };
+                let crate::fir::ResolvedFunctionOverrideTarget::Module(declaration) =
+                    edge.implementation
+                else {
+                    return None;
+                };
+                self.checked_callable_functions
+                    .get(&declaration)
+                    .map(|&function| (function, member))
+            })
+            .collect()
+    }
+}

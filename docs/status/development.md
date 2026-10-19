@@ -5270,3 +5270,21 @@ Merge remains conditional on that exact head's five passing checks, fresh
 exclusive expected-head/base/scope/configuration guards and independent
 OWNER+ROOT original exact-main acceptance.
 
+Clean head `c4190ec7908cb4f07c8388e8925f6e29b02c6972` passed original
+native39220859817, Windows39220859588 and tools39220859664, but macOS
+job117955558469 failed the existing parser snapshot fixture at
+`aggregate-remaining-12: Timeout`. Its cause and cleanup remain UNKNOWN;
+the plain Unix error records neither worker phase nor cleanup confirmation.
+The user then instructed proceeding and merging only if good.
+
+The separately reviewed [#450 macOS capture](https://github.com/anilbeesetti/ktlsp/pull/451#issuecomment-6263967460)
+completed at a2a5cc1 with all five original checks passing. One exact 16724-byte
+fixture yielded all 18 worker markers, 4429 tree elements, 414684 output bytes,
+and observed exit0/Confirmed cleanup. This healthy instrumented sample does
+not diagnose or repair c419. PR451 closed unmerged; every collector remains
+excluded from this clean integration. Post-investigation acceptance requires
+one original cohort for the reviewed clean final head, unchanged production
+Rust/Cargo/tests/workflows, all five checks passing, fresh exclusive guards,
+then independent OWNER+ROOT original exact-main acceptance. Preserve every
+older failure and UNKNOWN classification; no retry-until-green or parity claim.
+

@@ -9,19 +9,42 @@ use std::io::{Read, Write};
 mod worker_allocator;
 use worker_allocator::LimitedAllocator;
 
+#[cfg(windows)]
+#[path = "../windows_phase_worker.rs"]
+mod windows_phase_worker;
+
+macro_rules! phase {
+    ($observer:expr, $stage:expr, $detail:expr) => {
+        #[cfg(windows)]
+        windows_phase_worker::emit($observer, $stage, $detail);
+    };
+}
+
 #[global_allocator]
 static ALLOCATOR: LimitedAllocator = LimitedAllocator;
 
 fn main() {
-    let result = run();
+    #[cfg(windows)]
+    let mut phase = windows_phase_worker::Observer::start();
+    let result = run(
+        #[cfg(windows)]
+        &mut phase,
+    );
+    phase!(&mut phase, 16, u64::from(result.is_ok()));
+    phase!(&mut phase, 17, u64::from(result.is_ok()));
     std::process::exit(worker_allocator::worker_exit_code(result.is_ok()));
 }
-fn run() -> Result<(), Box<dyn std::error::Error>> {
+fn run(
+    #[cfg(windows)] phase: &mut Option<windows_phase_worker::Observer>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
     let kind = match args.next().as_deref() {
         Some("--source") => ktrs_parser::FileKind::Source,
         Some("--script") => ktrs_parser::FileKind::Script,
-        _ => return Err("invalid worker mode".into()),
+        _ => {
+            phase!(phase, 15, 0);
+            return Err("invalid worker mode".into());
+        }
     };
     let observing = match args.next().as_deref() {
         None => 0,
@@ -29,19 +52,35 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         Some("--observe-deadline-eof-v1") => 1,
         #[cfg(unix)]
         Some("--observe-generic-copy-v1") => 2,
-        _ => return Err("unexpected argument".into()),
+        _ => {
+            phase!(phase, 15, 0);
+            return Err("unexpected argument".into());
+        }
     };
     if args.next().is_some() {
+        phase!(phase, 15, 0);
         return Err("unexpected argument".into());
     }
+    phase!(phase, 2, 0);
     let mut source = String::new();
+    phase!(phase, 3, 0);
     std::io::stdin()
         .take(MAX_SOURCE_BYTES as u64 + 1)
-        .read_to_string(&mut source)?;
+        .read_to_string(&mut source)
+        .inspect_err(|_| {
+            phase!(phase, 15, 0);
+        })?;
+    phase!(phase, 4, source.len() as u64);
     if source.len() > MAX_SOURCE_BYTES || source.contains('\r') {
+        phase!(phase, 15, 0);
         return Err("invalid worker input".into());
     }
-    ktlsp_parser::preflight(&source)?;
+    phase!(phase, 5, 0);
+    ktlsp_parser::preflight(&source).inspect_err(|_| {
+        phase!(phase, 15, 0);
+    })?;
+    phase!(phase, 6, 0);
+    phase!(phase, 7, 0);
     #[cfg(unix)]
     let parse = if observing == 1 {
         parse_observing_deadline(&source, kind)
@@ -55,7 +94,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let _ = observing;
         ktrs_parser::parse_file(&source, kind)
     };
+    phase!(phase, 8, parse.tree.len() as u64);
     let tree = &parse.tree;
+    phase!(phase, 9, 0);
     let reply = if !parse.missed_tokens.is_empty() || tree.text() != source {
         Reply::Coverage
     } else if tree.len() > MAX_ELEMENTS || parse.error_messages.len() > MAX_DIAGNOSTICS {
@@ -69,7 +110,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let parent = tree.parent(id).map(|p| p as usize);
             let depth = parent.map_or(1, |p| depths[p] + 1);
             if depth > MAX_NESTING {
-                return write_reply(&Reply::NestingLimit);
+                let result = write_reply(
+                    &Reply::NestingLimit,
+                    #[cfg(windows)]
+                    phase,
+                );
+                phase!(phase, 15, 0);
+                return result;
             }
             depths.push(depth);
             let range = tree.text_range(id);
@@ -77,9 +124,20 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let end = u32::from(range.end()) as usize;
             let kind = tree.kind(id);
             if kind == ktrs_syntax::SyntaxKind::ERROR_ELEMENT {
-                let message = messages.next().ok_or("missing error message")?;
+                let message = messages
+                    .next()
+                    .ok_or("missing error message")
+                    .inspect_err(|_| {
+                        phase!(phase, 15, 0);
+                    })?;
                 if message.len() > 4096 {
-                    return write_reply(&Reply::OutputLimit);
+                    let result = write_reply(
+                        &Reply::OutputLimit,
+                        #[cfg(windows)]
+                        phase,
+                    );
+                    phase!(phase, 15, 0);
+                    return result;
                 }
                 diagnostics.push(Diagnostic {
                     start,
@@ -97,6 +155,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             });
         }
         if messages.next().is_some() {
+            phase!(phase, 15, 0);
             return Err("extra error message".into());
         }
         Reply::Tree {
@@ -104,7 +163,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             diagnostics,
         }
     };
-    write_reply(&reply)
+    phase!(phase, 10, 0);
+    let result = write_reply(
+        &reply,
+        #[cfg(windows)]
+        phase,
+    );
+    phase!(phase, 15, 0);
+    result
 }
 #[cfg(unix)]
 std::thread_local! {
@@ -326,13 +392,20 @@ fn generic_copy_checkpoint(source: &str, boundary: ktrs_parser::GenericCopyBound
     });
 }
 
-fn write_reply(reply: &Reply) -> Result<(), Box<dyn std::error::Error>> {
+fn write_reply(
+    reply: &Reply,
+    #[cfg(windows)] phase: &mut Option<windows_phase_worker::Observer>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    phase!(phase, 11, 0);
     let bytes = serde_json::to_vec(reply)?;
+    phase!(phase, 12, bytes.len() as u64);
+    phase!(phase, 13, 0);
     if bytes.len() > MAX_OUTPUT_BYTES {
         serde_json::to_writer(std::io::stdout().lock(), &Reply::OutputLimit)?;
     } else {
         std::io::stdout().lock().write_all(&bytes)?;
     }
+    phase!(phase, 14, 1);
     Ok(())
 }
 

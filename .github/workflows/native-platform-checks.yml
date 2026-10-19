@@ -143,6 +143,13 @@ jobs:
           $code = $LASTEXITCODE
           "exit_code=$code" | Set-Content "$env:RUNNER_TEMP/native-platform-evidence/clippy-exit.txt"
           exit $code
+      - name: Configure separately authorized Windows synthetic phase capture
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $capture = "$env:RUNNER_TEMP/native-platform-evidence/windows-phase"
+          New-Item -ItemType Directory -Path $capture | Out-Null
+          "KTLSP_WINDOWS_PHASE_CAPTURE_DIR=$capture" | Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8
       - name: Full locked release workspace tests
         env:
           KTLSP_NATIVE_IO_OBSERVE: '1'
@@ -155,6 +162,28 @@ jobs:
           if (Select-String -Path "$env:RUNNER_TEMP/native-platform-evidence/clippy.txt", "$env:RUNNER_TEMP/native-platform-evidence/workspace-tests.txt" -Pattern 'rust-objcopy|libLLVM|SIGABRT|signal: 6|failed to strip|stripping.*failed' -Quiet) {
             throw 'Native build/test child failure requires investigation'
           }
+      - name: Retain original Windows native binary identities after test execution
+        if: ${{ always() && runner.os == 'Windows' }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $records = @()
+          foreach ($name in @('ktlsp', 'ktlsp-parser-worker', 'ktlsp-analysis-worker')) {
+            $path = if ([string]::IsNullOrEmpty($env:CARGO_TARGET_DIR)) { $null } else { Join-Path $env:CARGO_TARGET_DIR "release/$name.exe" }
+            $present = $null -ne $path -and (Test-Path -LiteralPath $path -PathType Leaf)
+            $record = @{ name = $name; present = $present }
+            if ($present) {
+              $record.bytes = (Get-Item -LiteralPath $path).Length
+              $record.sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+            $records += $record
+          }
+          @{
+            source_sha = '${{ github.sha }}'
+            run_id = '${{ github.run_id }}'
+            run_attempt = '${{ github.run_attempt }}'
+            stage = 'after the original full workspace test command; not a worker timing receipt'
+            binaries = $records
+          } | ConvertTo-Json -Depth 6 | Set-Content "$env:RUNNER_TEMP/native-platform-evidence/windows-phase-binaries.json" -Encoding utf8NoBOM
       - name: Preserve native platform evidence, including early failures
         if: ${{ always() }}
         uses: actions/upload-artifact@v4

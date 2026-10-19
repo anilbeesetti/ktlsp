@@ -4,6 +4,9 @@
 mod imported_definition_lifecycle;
 #[path = "imported_definition/protocol.rs"]
 mod imported_definition_protocol;
+#[cfg(windows)]
+#[path = "support/windows_phase_capture.rs"]
+mod windows_phase_capture;
 use ktlsp_server::Session;
 use ktlsp_text::{Range, offset_to_position, position_to_offset};
 use serde_json::{Value, json};
@@ -406,7 +409,9 @@ fn exchange_directory<'a>(
     directory: &Path,
     messages: impl IntoIterator<Item = &'a Value>,
 ) -> Vec<Value> {
-    let mut child = Command::new(directory.join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX)))
+    let mut command =
+        Command::new(directory.join(format!("ktlsp{}", std::env::consts::EXE_SUFFIX)));
+    command
         .arg("--stdio")
         .env("PATH", "")
         .env_remove("JAVA_HOME")
@@ -414,21 +419,42 @@ fn exchange_directory<'a>(
         .current_dir(directory)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
+        .stderr(Stdio::piped());
+    #[cfg(windows)]
+    let capture_directory = windows_phase_capture::Capture::configure(&mut command);
+    let mut child = command.spawn().unwrap();
+    #[cfg(windows)]
+    let mut capture = capture_directory
+        .map(|directory| windows_phase_capture::Capture::new(directory, child.id()));
     let mut input = child.stdin.take().unwrap();
     let mut reader = std::io::BufReader::new(child.stdout.take().unwrap());
     let mut responses: Vec<Value> = Vec::new();
     for message in messages {
         let payload = serde_json::to_vec(message).unwrap();
-        ktlsp_protocol::write_frame(&mut input, &payload).unwrap();
-        input.flush().unwrap();
+        let mut write = |payload: &[u8]| {
+            ktlsp_protocol::write_frame(&mut input, payload).unwrap();
+            input.flush().unwrap();
+        };
+        #[cfg(windows)]
+        if let Some(capture) = &mut capture {
+            capture.sending(message, payload, write);
+        } else {
+            write(&payload);
+        }
+        #[cfg(not(windows))]
+        write(&payload);
         // Requests really finish before later edits/shutdown. Bulk-writing
         // the entire session would now legitimately cancel/stale symbols.
         if let Some(id) = message.get("id") {
             loop {
                 let frame = ktlsp_protocol::read_frame(&mut reader).unwrap().unwrap();
+                #[cfg(windows)]
+                let response: Value = if let Some(capture) = &mut capture {
+                    capture.received(frame, |payload| serde_json::from_slice(payload).unwrap())
+                } else {
+                    serde_json::from_slice(&frame).unwrap()
+                };
+                #[cfg(not(windows))]
                 let response: Value = serde_json::from_slice(&frame).unwrap();
                 let matched = response.get("id") == Some(id);
                 responses.push(response);
@@ -440,9 +466,26 @@ fn exchange_directory<'a>(
     }
     drop(input);
     while let Some(frame) = ktlsp_protocol::read_frame(&mut reader).unwrap() {
-        responses.push(serde_json::from_slice(&frame).unwrap());
+        #[cfg(windows)]
+        let response: Value = if let Some(capture) = &mut capture {
+            capture.received(frame, |payload| serde_json::from_slice(payload).unwrap())
+        } else {
+            serde_json::from_slice(&frame).unwrap()
+        };
+        #[cfg(not(windows))]
+        let response: Value = serde_json::from_slice(&frame).unwrap();
+        responses.push(response);
+    }
+    #[cfg(windows)]
+    if let Some(capture) = &mut capture {
+        capture.mark_stdout_eof();
     }
     let output = child.wait_with_output().unwrap();
+    #[cfg(windows)]
+    if let Some(capture) = capture {
+        // Evidence failure cannot replace the fixture's original outcome.
+        let _ = capture.finish(&output);
+    }
     assert!(output.status.success(), "{:?}", output.status);
     assert!(
         output.stderr.is_empty(),

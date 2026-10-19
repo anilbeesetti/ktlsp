@@ -2618,6 +2618,9 @@ mod unix_io {
 #[cfg(all(test, unix))]
 mod native_io_observation;
 
+#[cfg(windows)]
+mod windows_phase_observation;
+
 #[cfg(not(unix))]
 fn supervise_piped(
     mut command: Command,
@@ -2627,99 +2630,284 @@ fn supervise_piped(
     cleanup_status: &mut bool,
 ) -> Result<Vec<u8>, ParserError> {
     *cleanup_status = false;
-    let child = command
+    command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .env_clear()
-        .spawn()
-        .map_err(|_| ParserError::Io)?;
+        .env_clear();
+    #[cfg(windows)]
+    let mut observation =
+        windows_phase_observation::Observation::requested(&mut command, normalized, deadline);
+    #[cfg(windows)]
+    let writer_progress = windows_phase_observation::IoProgress::default();
+    #[cfg(windows)]
+    let reader_progress = windows_phase_observation::IoProgress::default();
+    #[cfg(windows)]
+    if let Some(observation) = observation.as_mut() {
+        observation.spawn_begin();
+    }
+    let spawned = command.spawn();
+    #[cfg(windows)]
+    if let Some(observation) = observation.as_mut() {
+        observation.spawn_end(&spawned, spawned.as_ref().ok().map(Child::id));
+    }
+    let child = match spawned {
+        Ok(child) => child,
+        Err(_) => {
+            let result = Err(ParserError::Io);
+            #[cfg(windows)]
+            if let Some(mut observation) = observation {
+                observation.selected(&result, &writer_progress, &reader_progress);
+                observation.after_scope(&result, &writer_progress, &reader_progress, false);
+                observation.persist();
+            }
+            return result;
+        }
+    };
     drop(command);
-    thread::scope(|scope| {
+    #[cfg(windows)]
+    let writer_io = observation.as_ref().map(|o| (o.origin(), &writer_progress));
+    #[cfg(windows)]
+    let reader_io = observation.as_ref().map(|o| (o.origin(), &reader_progress));
+    let result = thread::scope(|scope| {
         let mut guard = ChildGuard {
             child,
             reaped: false,
+            #[cfg(windows)]
+            observation: observation.as_mut(),
+            #[cfg(not(windows))]
+            observation: std::marker::PhantomData,
         };
         let result = (|| {
+            #[cfg(windows)]
+            if let Some(observation) = guard.observation.as_deref_mut() {
+                observation.site("supervisor.stdin_take");
+            }
             let mut stdin = guard.child.stdin.take().ok_or(ParserError::Io)?;
+            #[cfg(windows)]
+            if let Some(observation) = guard.observation.as_deref_mut() {
+                observation.site("supervisor.stdout_take");
+            }
             let stdout = guard.child.stdout.take().ok_or(ParserError::Io)?;
             let input = normalized;
+            #[cfg(windows)]
+            if let Some(observation) = guard.observation.as_deref_mut() {
+                observation.site("supervisor.writer_spawn");
+            }
             let writer = thread::Builder::new()
-                .spawn_scoped(scope, move || stdin.write_all(input.as_bytes()))
+                .spawn_scoped(scope, move || {
+                    #[cfg(windows)]
+                    if let Some((origin, progress)) = writer_io {
+                        progress.start(origin);
+                        let result = windows_phase_observation::CountIo(&mut stdin, progress)
+                            .write_all(input.as_bytes());
+                        progress.finish(
+                            origin,
+                            result.is_err(),
+                            result.as_ref().err().and_then(|error| error.raw_os_error()),
+                        );
+                        return result;
+                    }
+                    stdin.write_all(input.as_bytes())
+                })
                 .map_err(|_| ParserError::Io)?;
             let (sender, receiver) = mpsc::sync_channel(1);
+            #[cfg(windows)]
+            if let Some(observation) = guard.observation.as_deref_mut() {
+                observation.site("supervisor.reader_spawn");
+            }
             let reader = thread::Builder::new()
                 .spawn_scoped(scope, move || {
                     let mut bytes = Vec::new();
-                    let result = stdout
+                    #[cfg(windows)]
+                    if let Some((origin, progress)) = reader_io {
+                        progress.start(origin);
+                    }
+                    #[cfg(windows)]
+                    let read = if let Some((_, progress)) = reader_io {
+                        windows_phase_observation::CountIo(stdout, progress)
+                            .take(MAX_OUTPUT_BYTES as u64 + 1)
+                            .read_to_end(&mut bytes)
+                    } else {
+                        stdout
+                            .take(MAX_OUTPUT_BYTES as u64 + 1)
+                            .read_to_end(&mut bytes)
+                    };
+                    #[cfg(not(windows))]
+                    let read = stdout
                         .take(MAX_OUTPUT_BYTES as u64 + 1)
-                        .read_to_end(&mut bytes)
-                        .map_err(|_| ParserError::Io)
-                        .and({
-                            if bytes.len() > MAX_OUTPUT_BYTES {
-                                Err(ParserError::OutputLimit)
-                            } else {
-                                Ok(bytes)
-                            }
-                        });
+                        .read_to_end(&mut bytes);
+                    #[cfg(windows)]
+                    let raw_os_error = read.as_ref().err().and_then(|error| error.raw_os_error());
+                    #[cfg(windows)]
+                    if let Some((origin, progress)) = reader_io {
+                        progress.operation_finished(origin, &read);
+                    }
+                    let result = read.map_err(|_| ParserError::Io).and({
+                        if bytes.len() > MAX_OUTPUT_BYTES {
+                            Err(ParserError::OutputLimit)
+                        } else {
+                            Ok(bytes)
+                        }
+                    });
+                    #[cfg(windows)]
+                    let failed = result.is_err();
                     let _ = sender.send(result);
+                    #[cfg(windows)]
+                    if let Some((origin, progress)) = reader_io {
+                        progress.finish(origin, failed, raw_os_error);
+                    }
                 })
                 .map_err(|_| ParserError::Io)?;
             let mut output = None;
             let status = loop {
+                #[cfg(windows)]
+                if let Some(observation) = guard.observation.as_deref_mut() {
+                    observation.site("supervisor.cancel_check");
+                }
                 if cancelled.load(Ordering::Relaxed) {
                     return Err(ParserError::Cancelled);
                 }
-                if Instant::now() >= deadline {
+                let now = Instant::now();
+                #[cfg(windows)]
+                if let Some(observation) = guard.observation.as_deref_mut() {
+                    observation.deadline_check(now, "supervisor.deadline_check");
+                }
+                if now >= deadline {
                     return Err(ParserError::PipedTimeout(PipedTimeoutSite::SupervisorPoll));
                 }
                 if output.is_none() {
+                    #[cfg(windows)]
+                    if let Some(observation) = guard.observation.as_deref_mut() {
+                        observation.site("supervisor.output_recv");
+                    }
                     match receiver.try_recv() {
                         Ok(result) => output = Some(result?),
                         Err(mpsc::TryRecvError::Empty) => {}
                         Err(mpsc::TryRecvError::Disconnected) => return Err(ParserError::Io),
                     }
                 }
-                if let Some(status) = guard.child.try_wait().map_err(|_| ParserError::Io)? {
+                #[cfg(windows)]
+                if let Some(observation) = guard.observation.as_deref_mut() {
+                    observation.poll_begin();
+                }
+                let polled = guard.child.try_wait();
+                #[cfg(windows)]
+                if let Some(observation) = guard.observation.as_deref_mut() {
+                    observation.poll(&polled);
+                }
+                if let Some(status) = polled.map_err(|_| ParserError::Io)? {
                     guard.reaped = true;
                     break status;
                 }
                 thread::sleep(Duration::from_millis(2));
             };
             if status.code() == Some(WORKER_ALLOCATION_LIMIT_EXIT_CODE) {
+                #[cfg(windows)]
+                if let Some(observation) = guard.observation.as_deref_mut() {
+                    observation.site("supervisor.allocation_exit");
+                }
                 return Err(ParserError::AllocationLimit);
             }
             if !status.success() {
+                #[cfg(windows)]
+                if let Some(observation) = guard.observation.as_deref_mut() {
+                    observation.site("supervisor.unsuccessful_exit");
+                }
                 return Err(ParserError::WorkerFailed);
             }
-            finish_io(writer, reader, receiver, output, deadline, cancelled)
+            finish_io_observed(
+                writer,
+                reader,
+                receiver,
+                output,
+                deadline,
+                cancelled,
+                #[cfg(windows)]
+                guard.observation.as_deref_mut(),
+            )
         })();
+        #[cfg(windows)]
+        if let Some(observation) = guard.observation.as_deref_mut() {
+            observation.selected(&result, &writer_progress, &reader_progress);
+        }
         // Check cleanup before the scope joins potentially blocked I/O threads.
         guard.finish()?;
         *cleanup_status = true;
         result
-    })
+    });
+    #[cfg(windows)]
+    if let Some(mut observation) = observation {
+        observation.after_scope(&result, &writer_progress, &reader_progress, true);
+        observation.persist();
+    }
+    result
 }
-#[cfg(any(not(unix), test))]
+#[cfg(test)]
 fn join_io<T>(
     handle: thread::ScopedJoinHandle<'_, T>,
     deadline: Instant,
     cancelled: &AtomicBool,
     site: PipedTimeoutSite,
 ) -> Result<T, ParserError> {
+    join_io_observed(
+        handle,
+        deadline,
+        cancelled,
+        site,
+        #[cfg(windows)]
+        None,
+    )
+}
+#[cfg(any(not(unix), test))]
+fn join_io_observed<T>(
+    handle: thread::ScopedJoinHandle<'_, T>,
+    deadline: Instant,
+    cancelled: &AtomicBool,
+    site: PipedTimeoutSite,
+    #[cfg(windows)] mut observation: Option<&mut windows_phase_observation::Observation>,
+) -> Result<T, ParserError> {
     loop {
+        #[cfg(windows)]
+        if let Some(observation) = observation.as_deref_mut() {
+            observation.site(match site {
+                PipedTimeoutSite::WriterJoin => "writer_join.cancel_check",
+                PipedTimeoutSite::ReaderJoin => "reader_join.cancel_check",
+                PipedTimeoutSite::SupervisorPoll => "supervisor_join.cancel_check",
+            });
+        }
         if cancelled.load(Ordering::Relaxed) {
             return Err(ParserError::Cancelled);
         }
-        if Instant::now() >= deadline {
+        let now = Instant::now();
+        #[cfg(windows)]
+        if let Some(observation) = observation.as_deref_mut() {
+            observation.deadline_check(
+                now,
+                match site {
+                    PipedTimeoutSite::WriterJoin => "writer_join.deadline_check",
+                    PipedTimeoutSite::ReaderJoin => "reader_join.deadline_check",
+                    PipedTimeoutSite::SupervisorPoll => "supervisor_join.deadline_check",
+                },
+            );
+        }
+        if now >= deadline {
             return Err(ParserError::PipedTimeout(site));
         }
         if handle.is_finished() {
+            #[cfg(windows)]
+            if let Some(observation) = observation.as_deref_mut() {
+                observation.site(match site {
+                    PipedTimeoutSite::WriterJoin => "writer_join.join",
+                    PipedTimeoutSite::ReaderJoin => "reader_join.join",
+                    PipedTimeoutSite::SupervisorPoll => "supervisor_join.join",
+                });
+            }
             return handle.join().map_err(|_| ParserError::Io);
         }
         thread::sleep(Duration::from_millis(2));
     }
 }
-#[cfg(any(not(unix), test))]
+#[cfg(test)]
 fn finish_io(
     writer: thread::ScopedJoinHandle<'_, std::io::Result<()>>,
     reader: thread::ScopedJoinHandle<'_, ()>,
@@ -2728,35 +2916,131 @@ fn finish_io(
     deadline: Instant,
     cancelled: &AtomicBool,
 ) -> Result<Vec<u8>, ParserError> {
-    join_io(writer, deadline, cancelled, PipedTimeoutSite::WriterJoin)?
-        .map_err(|_| ParserError::Io)?;
-    join_io(reader, deadline, cancelled, PipedTimeoutSite::ReaderJoin)?;
+    finish_io_observed(
+        writer,
+        reader,
+        receiver,
+        output,
+        deadline,
+        cancelled,
+        #[cfg(windows)]
+        None,
+    )
+}
+#[cfg(any(not(unix), test))]
+fn finish_io_observed(
+    writer: thread::ScopedJoinHandle<'_, std::io::Result<()>>,
+    reader: thread::ScopedJoinHandle<'_, ()>,
+    receiver: mpsc::Receiver<Result<Vec<u8>, ParserError>>,
+    output: Option<Vec<u8>>,
+    deadline: Instant,
+    cancelled: &AtomicBool,
+    #[cfg(windows)] mut observation: Option<&mut windows_phase_observation::Observation>,
+) -> Result<Vec<u8>, ParserError> {
+    let written = join_io_observed(
+        writer,
+        deadline,
+        cancelled,
+        PipedTimeoutSite::WriterJoin,
+        #[cfg(windows)]
+        observation.as_deref_mut(),
+    )?;
+    #[cfg(windows)]
+    if let Some(observation) = observation.as_deref_mut() {
+        observation.site("writer_join.io_result");
+    }
+    written.map_err(|_| ParserError::Io)?;
+    join_io_observed(
+        reader,
+        deadline,
+        cancelled,
+        PipedTimeoutSite::ReaderJoin,
+        #[cfg(windows)]
+        observation.as_deref_mut(),
+    )?;
+    #[cfg(windows)]
+    if let Some(observation) = observation {
+        observation.site("reader_join.output_result");
+    }
     output
         .map(Ok)
         .unwrap_or_else(|| receiver.try_recv().map_err(|_| ParserError::Io)?)
 }
 #[cfg(not(unix))]
-struct ChildGuard {
+struct ChildGuard<'a> {
     child: Child,
     reaped: bool,
+    #[cfg(windows)]
+    observation: Option<&'a mut windows_phase_observation::Observation>,
+    #[cfg(not(windows))]
+    observation: std::marker::PhantomData<&'a ()>,
 }
 #[cfg(not(unix))]
-impl ChildGuard {
+impl ChildGuard<'_> {
     fn finish(&mut self) -> Result<(), ParserError> {
+        #[cfg(windows)]
+        if let Some(observation) = self.observation.as_deref_mut() {
+            observation.cleanup_begin();
+        }
         if !self.reaped {
-            let _ = self.child.kill();
-            self.child.wait().map_err(|_| ParserError::Io)?;
+            #[cfg(windows)]
+            if let Some(observation) = self.observation.as_deref_mut() {
+                observation.kill_begin(false);
+            }
+            let killed = self.child.kill();
+            #[cfg(windows)]
+            if let Some(observation) = self.observation.as_deref_mut() {
+                observation.kill_end(false, &killed);
+                observation.wait_begin(false);
+            }
+            drop(killed);
+            let waited = self.child.wait();
+            #[cfg(windows)]
+            if let Some(observation) = self.observation.as_deref_mut() {
+                observation.wait_end(false, &waited);
+                if waited.is_err() {
+                    observation.cleanup_end(false);
+                }
+            }
+            waited.map_err(|_| ParserError::Io)?;
             self.reaped = true;
+        }
+        #[cfg(windows)]
+        if let Some(observation) = self.observation.as_deref_mut() {
+            observation.cleanup_end(true);
         }
         Ok(())
     }
 }
 #[cfg(not(unix))]
-impl Drop for ChildGuard {
+impl Drop for ChildGuard<'_> {
     fn drop(&mut self) {
+        #[cfg(windows)]
+        if let Some(observation) = self.observation.as_deref_mut() {
+            observation.drop_begin();
+        }
         if !self.reaped {
-            let _ = self.child.kill();
-            let _ = self.child.wait();
+            #[cfg(windows)]
+            if let Some(observation) = self.observation.as_deref_mut() {
+                observation.kill_begin(true);
+            }
+            let killed = self.child.kill();
+            #[cfg(windows)]
+            if let Some(observation) = self.observation.as_deref_mut() {
+                observation.kill_end(true, &killed);
+                observation.wait_begin(true);
+            }
+            drop(killed);
+            let waited = self.child.wait();
+            #[cfg(windows)]
+            if let Some(observation) = self.observation.as_deref_mut() {
+                observation.wait_end(true, &waited);
+            }
+            drop(waited);
+        }
+        #[cfg(windows)]
+        if let Some(observation) = self.observation.as_deref_mut() {
+            observation.drop_end();
         }
     }
 }

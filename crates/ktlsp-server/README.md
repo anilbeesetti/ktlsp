@@ -2,18 +2,56 @@
 
 `ktlsp` supports bounded stdio lifecycle, document synchronization, folding, one negotiated authoritative structural quickfix, negotiated lexical semantic-token full/range transport, parser-backed syntactic symbols, finite local and explicitly imported definition/hover, local references/highlights, eager local-value completion, and guarded local-val prepare/rename. Initialization advertises only the implemented negotiated providers.
 
-Parser-backed capabilities require the trusted matching worker. Hover also requires a compatible content format; rename requires versioned `documentChanges`, with preparation advertised only when supported by the client. Lexical tokens need compatible token capabilities but no worker. The structural quickfix also needs no worker, but requires code-action literal support and versioned `documentChanges`. Clients advertising `textDocument.diagnostic` negotiate lexical/structural pull reports instead of legacy push diagnostics. Neither diagnostics, structural quickfix nor lexical token categories provide Kotlin compiler analysis or full semantic coloring.
+Parser-backed capabilities require the trusted matching worker. Hover also requires a compatible content format; rename requires versioned `documentChanges`, with preparation advertised only when supported by the client. Lexical tokens need compatible token capabilities but no worker. The structural quickfix also needs no worker, but requires code-action literal support and versioned `documentChanges`. By default, clients advertising `textDocument.diagnostic` negotiate lexical/structural pull reports instead of legacy push diagnostics; these lexical providers do not provide compiler analysis or full semantic coloring. Standalone compiler diagnostics require the separate explicit mode below.
 
-## Build and distribute both executables
+## Build and distribute matching executables
 
 ```sh
-cargo build --locked --release -p ktlsp-server -p ktlsp-parser --bins
+cargo build --locked --release -p ktlsp-server -p ktlsp-parser -p ktlsp-analysis --bins
 ./target/release/ktlsp
 ```
 
-Install **both** `ktlsp` and `ktlsp-parser-worker` from that same build into the same trusted directory (with `.exe` suffixes on Windows). The default CLI discovers the worker only beside its own executable, checking that the sibling is a regular executable file on Unix. There is no PATH, current-directory or environment-selected worker fallback. Installation trust and matching build identity are the distributor's responsibility; this is not a sandbox, signature check or version-authentication protocol.
+Install `ktlsp` and `ktlsp-parser-worker` from that same build into the same trusted directory, plus `ktlsp-analysis-worker` for standalone compiler diagnostics (with `.exe` suffixes on Windows). The default CLI discovers workers only beside its own executable, checking that each sibling is a regular executable file on Unix. There is no PATH, current-directory or environment-selected worker fallback. Installation trust and matching build identity are the distributor's responsibility; this is not a sandbox, signature check or version-authentication protocol.
 
-Without that sibling, synchronization/folding/lexical diagnostics, compatible lexical semantic tokens and the negotiated structural quickfix remain available, `documentSymbolProvider`/`workspaceSymbolProvider`/`definitionProvider`/`hoverProvider`/`referencesProvider`/`documentHighlightProvider`/`completionProvider`/`signatureHelpProvider`/`renameProvider` are omitted and their requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. A configured worker that subsequently fails is a request failure, not a fabricated outline or binding. No JVM/JDK, Kotlin compiler or C parser is required.
+Without the parser sibling, synchronization/folding/lexical diagnostics, compatible lexical semantic tokens and the negotiated structural quickfix remain available, `documentSymbolProvider`/`workspaceSymbolProvider`/`definitionProvider`/`hoverProvider`/`referencesProvider`/`documentHighlightProvider`/`completionProvider`/`signatureHelpProvider`/`renameProvider` are omitted and their requests return MethodNotFound (`-32601`), never empty success. Library callers retain parser-free `Session::new()`/`Default`, or explicitly use `Session::with_parser(trusted_absolute_worker_path)`, which rejects a missing/non-file/non-executable Unix path. `Session::with_workers(parser_path, analysis_path)` configures both trusted matching sibling workers. A configured worker that subsequently fails is a request failure, not a fabricated outline, binding or empty compiler report. No JVM/JDK, JVM Kotlin compiler or C/C++ analysis dependency is required.
+
+## Standalone compiler pull diagnostics (#446)
+
+Build and install all three matching binaries above. Set these `initialize`
+parameters in a generic LSP client:
+
+```json
+{
+  "capabilities": {"textDocument": {"diagnostic": {}}},
+  "initializationOptions": {"nativeAnalysis": "standalone"}
+}
+```
+
+After `initialized` and `didOpen`, request `textDocument/diagnostic` normally.
+The always-full report merges authoritative lexical/structural diagnostics with
+real Krusty errors/warnings (`source: "krusty"`). Original UTF-8 spans become
+UTF-16 coordinates; an endpoint at LF inside CRLF maps to the preceding line end.
+Jobs share the existing owned cancellation, request-ID, incarnation, revision,
+exact-content and confirmed-cleanup publication rules. Failures, stale results,
+resource refusal and worker disappearance never become empty successful analysis.
+
+This mode analyzes only the requested open non-script document with the frontend's
+core builtins. Nonempty `initializationOptions.projects` and nonempty reload
+projects are rejected, as are script queries. It does not connect imported project
+models, unopened sources, JDK/stdlib/JAR dependencies or Java semantics.
+Other providers are unchanged; compiler types do not replace declaration hover.
+Without explicit activation, even an installation with all three binaries retains
+the default lexical diagnostic mode. Missing required workers reject activation.
+
+Limits include a 64 KiB encoded worker request, 256 combined diagnostics, a 1 MiB
+rendered report and the unchanged 500 ms supervisor deadline/4 MiB worker output.
+The native worker uses 64 MiB cumulative allocation and guarded work/depth limits;
+its fixed 64 MiB thread stack is capacity, not an arbitrary-recursion/RSS guarantee.
+An uninstrumented overflow or abort remains a failed isolated query.
+The separate `ktlsp-analysis` API supports up to 16 original snapshots in one
+bounded source set; that is not inter-file LSP diagnostics. Its expression-type
+strings are frontend debug spellings, not a stable Kotlin pretty-printer.
+See [source provenance and extraction limits](../../vendor/krusty-frontend/PROVENANCE.md).
 
 ## Basic native candidate setup (#430)
 
@@ -55,7 +93,7 @@ Timeout has no piped-site annotation. No new observer stream, retry or timer.
    SHA-256 before extraction and its inner inventory/checksums/provenance against
    the trusted run; checksums alone do not authenticate a distributor. Keep the
    matching `ktlsp` and `ktlsp-parser-worker` together in one trusted directory.
-   Do not mix builds. See [installation trust](#build-and-distribute-both-executables).
+   Do not mix builds. See [installation trust](#build-and-distribute-matching-executables).
 2. Create a small local project, for example `/absolute/demo`, containing
    `workspace.json` and a `src` directory. Save this **unversioned importer model**
    as `workspace.json` (not the separate versioned T004 manifest):

@@ -16,6 +16,15 @@ PR174 remains unconsumed preparation; G2 is unverified with publication HOLD. PR
 
 Research precedes specification and implementation. Target full official Kotlin LSP parity while retaining a Rust-only server/build with no bundled Java; optional existing JDK/build tools are user-authorized. Preserve the completed research and specifications. Admit dependency-ready work against discovered environment capacity, reserving two independent reviewers per owner. Reported collaboration slots are not measured project-chat throughput; current admission, ownership and evidence are recorded in [the development ledger](status/development.md). More ticket count does not remove the semantic engine dependency chain.
 
+**Acceleration decision (#446):** keep the existing native LSP transport, source
+ownership and publication lifecycle; reuse the pinned Rust Krusty frontend rather
+than build another general Kotlin type checker from finite syntax cases.
+The first integrated consumer is explicit standalone compiler pull diagnostics.
+Project/classpath integration and remaining semantic providers still need real
+frontend-backed contracts and validation; neither reuse nor a 2–3 day target
+establishes full official parity.
+
+
 1. Pin sources/releases, audit feature contracts and compiler/project dependencies, and record unknowns. Review the research/specification before coding.
 2. Establish repository, Cargo workspace, native-only CI and small foundational tickets: UTF-16 text, framed transport, lossless lexer, explicit project model. These are delivered at checkpoint `0d54973`; retain their native regression coverage.
 3. Integrate a runnable stdio server with lifecycle/document synchronization and honest capabilities (delivered T005). T006 is delivered in PR73: token-aware folding and explicitly lexical/structural push diagnostics over real stdio. PR177 adds whole-line comment groups as a lexical subset, with no official line-comment observation. Full folding remains partial; the recorded official fixture has deliberate field differences. Document symbols require declaration support in T008/T027; folding does not establish symbol or semantic support.

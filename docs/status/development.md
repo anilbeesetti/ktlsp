@@ -5222,3 +5222,32 @@ are complete: do not restart, retry unchanged code, add probes, raise limits,
 reorder readiness before deadline or weaken healthy assertions. All historical
 FAILED/UNKNOWN and native-only/T004/#96/B3/oracle holds remain unchanged.
 
+## Original446 Rust-only Krusty adoption and standalone diagnostics
+
+Reviewed implementation head `41fc1f8b02cb4c2b4845f59898f70cc9c613cabd`
+reuses Krusty `3b0d3b926857564d3fdc65b66d7003564ef6a9ad` without JVM,
+backend/codegen or C/native stack helpers. Two independent source reviews and
+finding rechecks covered extraction/resource boundaries and the standard-LSP bridge.
+Original attempt-1 [Linux native39204512022](https://github.com/anilbeesetti/ktlsp/actions/runs/39204512022)
+and [macOS/Windows platform39204511983](https://github.com/anilbeesetti/ktlsp/actions/runs/39204511983)
+passed full workspace checks; separate Rust synthetic tools39204512026 passed.
+Local checks were compiler-only; #96 local runtime admission is unchanged.
+
+Linux's actual CLI recording (artifact12164969034, test merge
+`99a659ebe69c7f50a99bcb2738586b71640ddc0b`) returned a real Krusty Int/String
+return mismatch at UTF-16 `(3,8)..(3,15)`, then an empty full report after the
+recorded ranged replacement of `"bad😀"` with `value`. Shutdown returned null,
+exit0 was observed, stderr was empty and capture completed. This is synthetic
+native-server execution, not official oracle acceptance. The first original head
+`53353aa` failed two unsupported `"Int"` debug-format expectations on all hosts;
+tests now check genuine cross-file type equality and Boolean inequality instead,
+without formatter changes or relaxed resource bounds.
+
+This adds opt-in standalone diagnostics and a bounded multi-source analysis API,
+not full Kotlin LSP parity, project/stdlib/JDK linkage or native inferred hover.
+Default providers and historical UNKNOWN/HOLD records remain unchanged.
+Current packaging source includes all three matching executables and frontend
+notices; old exact66676 archives do not contain the new worker. Final documentation
+head reviews, its OWN original CI, guarded merge and independent OWNER+ROOT
+original exact-main acceptance remain separate gates in [PR447](https://github.com/anilbeesetti/ktlsp/pull/447).
+

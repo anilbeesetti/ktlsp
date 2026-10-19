@@ -7,11 +7,11 @@ A Rust-only Kotlin language server under development, targeting feature parity w
 The repository pins Rust 1.99.0. With Rust/rustup and the platform linker installed:
 
 ```sh
-cargo build --locked --release -p ktlsp-server -p ktlsp-parser --bins
+cargo build --locked --release -p ktlsp-server -p ktlsp-parser -p ktlsp-analysis --bins
 ./target/release/ktlsp
 ```
 
-Install `ktlsp` and `ktlsp-parser-worker` from the same build together in one trusted directory. With no arguments or explicit `--stdio`, `ktlsp` reads and writes Content-Length-framed LSP on stdio. Configure an editor's server command to that executable with either launch form. Without the matching sibling worker, syntactic symbols, finite navigation, local completion and local-val rename are unavailable; synchronization, folding, lexical diagnostics, negotiated lexical tokens and the negotiated structural quickfix remain available. Use `--help` or `--version` for CLI output. Core operation needs no JVM or JDK. See [distribution trust and provider limits](crates/ktlsp-server/README.md).
+Install `ktlsp`, `ktlsp-parser-worker` and `ktlsp-analysis-worker` from the same build together in one trusted directory. The analysis worker is needed only for explicitly opted-in compiler diagnostics. With no arguments or explicit `--stdio`, `ktlsp` reads and writes Content-Length-framed LSP on stdio. Configure an editor's server command to that executable with either launch form. Without the matching parser worker, syntactic symbols, finite navigation, local completion and local-val rename are unavailable; synchronization, folding, lexical diagnostics, negotiated lexical tokens and the negotiated structural quickfix remain available. Use `--help` or `--version` for CLI output. Core operation needs no JVM or JDK. See [distribution trust and provider limits](crates/ktlsp-server/README.md).
 
 For an explicit tiny source project and generic LSP client configuration, see
 [basic native candidate setup (#430)](crates/ktlsp-server/README.md#basic-native-candidate-setup-430).
@@ -29,6 +29,18 @@ native CLI/protocol/editing proof, not IDE/UI, signing/notarization, installer,
 general-platform/reliability or full-parity certification. No first-party
 license grant is present. Earlier failed deadlines remain cause UNKNOWN.
 
+## Standalone compiler diagnostics (#446)
+
+The pinned [Krusty Rust frontend](vendor/krusty-frontend/PROVENANCE.md) now provides
+opt-in compiler pull diagnostics for an open, standalone non-script source.
+It handles inferred types, mutable locals, arithmetic and generic source analysis
+without a JVM/JDK or C stack helpers. Existing transport and providers are retained;
+this is not full official Kotlin LSP parity or project/classpath/stdlib analysis.
+See [activation, installation and limits](crates/ktlsp-server/README.md#standalone-compiler-pull-diagnostics-446)
+and [original runtime proof](https://github.com/anilbeesetti/ktlsp/pull/447).
+The older exact66676 archives above do **not** contain this feature.
+
+
 ## Current behavior
 
 **Assessed source/status cutoff: `28ff42d743b6290b9a1e587e36eced80cebd6438`** (PR231, 2026-10-14T15:38:28Z), tree `f989c624b58fead0144ebe197967e6ff2291444d`, sole parent `9b4cf49e817d0bb30cbd2f09b674f91afb1aa5fd`. [Original exact-cutoff Linux CI](https://github.com/anilbeesetti/ktlsp/actions/runs/38591101400/job/115945900463) attempt 1/push passed unchanged pinned format, locked Clippy and workspace tests: **597 passes = 584 ordinary + 13 compile-fail, zero failures, two exercised ignored helpers, plus 22 separate protocol fault cases**. Counts describe this integration, never a sum, parity percentage or present-day main validation. T008/T008a HOLD, broader C13/B3/B4 GAP, full B11 UNVERIFIED, #7/#83 OPEN and #96 OPEN/UNKNOWN remain.
@@ -37,7 +49,7 @@ Since historical `048c344`/572, [PR219](https://github.com/anilbeesetti/ktlsp/pu
 
 Historical cutoffs and per-delivery receipts remain in [the development ledger](docs/status/development.md).
 
-The server implements initialization/shutdown/exit, bounded versioned UTF-16 document synchronization with atomic multi-edit rollback, and token-aware folding for multiline delimiters, block comments, raw strings and contiguous whole-line `//` comment groups (PR177/#175). UTF-16 remains the mandatory fallback even when a client lists only other encodings. Legacy clients receive replacement lexical/structural push diagnostics; close clears them. Clients advertising `textDocument.diagnostic` instead negotiate always-full lexical/structural pull reports without duplicate push notifications. With the trusted matching parser worker, bounded syntactic symbols support hierarchical/flat profiles. Definition/negotiated hover expose authenticated same-function ordinary parameters and preceding local `val` bindings in finite top-level block functions; references/highlights retain their original same-body occurrences and distinct local-shadow sets, optionally including the declaration. Simple parameter/local annotations bind to a matching original same-function type parameter only in the restricted generic-header lane; other type names remain retained syntax, not resolved identity. Hover shows the original declaration, not an inferred type; unsupported or ambiguous contexts fail explicitly without claiming global unresolvedness. Full navigation, compiler diagnostics and the remaining semantic providers are not implemented. See the [pull diagnostic contract](docs/specs/server-foundation.md#lexical-pull-diagnostics) and [provider contracts](crates/ktlsp-server/README.md).
+By default, the server implements initialization/shutdown/exit, bounded versioned UTF-16 document synchronization with atomic multi-edit rollback, and token-aware folding for multiline delimiters, block comments, raw strings and contiguous whole-line `//` comment groups (PR177/#175). UTF-16 remains the mandatory fallback even when a client lists only other encodings. Legacy clients receive replacement lexical/structural push diagnostics; close clears them. Clients advertising `textDocument.diagnostic` instead negotiate always-full lexical/structural pull reports without duplicate push notifications. With the trusted matching parser worker, bounded syntactic symbols support hierarchical/flat profiles. Definition/negotiated hover expose authenticated same-function ordinary parameters and preceding local `val` bindings in finite top-level block functions; references/highlights retain their original same-body occurrences and distinct local-shadow sets, optionally including the declaration. Simple parameter/local annotations bind to a matching original same-function type parameter only in the restricted generic-header lane; other type names remain retained syntax, not resolved identity. Hover shows the original declaration, not an inferred type; unsupported or ambiguous contexts fail explicitly without claiming global unresolvedness. Full navigation, project-aware compiler diagnostics and the remaining semantic providers are not implemented. The standalone compiler diagnostics above require explicit activation. See the [default pull diagnostic contract](docs/specs/server-foundation.md#lexical-pull-diagnostics) and [provider contracts](crates/ktlsp-server/README.md).
 
 Folding respects `lineFoldingOnly` and `rangeLimit`, with explicit resource limits. It covers a lexical subset; import/declaration folds and full official folding parity remain pending. See [server behavior and bounds](crates/ktlsp-server/README.md).
 The finite parser consumers (#350/#363/#364/#369/#372/#379/#382/#386/#389) reuse one bounded asynchronous pipeline, strict UTF-16 positions, cancellation and incarnation/version/content publication guards. Declaration-name hover retains original source rather than inferred types. Eager local completion replaces an authenticated existing whole-initializer token with an original visible parameter/local spelling; it supplies no resolve/import/snippet command. Versioned local-val rename preserves bound occurrences and refuses parameters, capture/conflicts and unsupported forms; it is not full Kotlin/workspace rename. Source observations, final composition and official parity remain separate gates.

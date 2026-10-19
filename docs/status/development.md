@@ -5251,3 +5251,22 @@ notices; old exact66676 archives do not contain the new worker. Final documentat
 head reviews, its OWN original CI, guarded merge and independent OWNER+ROOT
 original exact-main acceptance remain separate gates in [PR447](https://github.com/anilbeesetti/ktlsp/pull/447).
 
+Final documentation head `6fa3eecdd14acddfa0013c07fa3237729cd095e9`
+passed original Linux39205865563 and macOS39205865525 checks, but Windows
+job117908448148 failed the existing declaration-hover fixture with
+`parserTimeoutSite=supervisor_poll`. That fixture uses the default parser,
+not the standalone compiler worker. The original failure and its cause remain
+UNKNOWN; no production fix or deadline/assertion change was established.
+
+The separately authorized [#448 capture and independent raw-data audits](https://github.com/anilbeesetti/ktlsp/pull/449#issuecomment-6262528709)
+completed at reviewed8352625: all five original checks passed, with 16 complete
+18-stage worker streams and actual successful wire replies. Those instrumented
+healthy samples do not diagnose the earlier failure. The observation-only PR449
+closed unmerged; none of its temporary collector enters this integration.
+The user explicitly authorized one original CI cohort for a new reviewed clean
+integration head with unchanged production Rust, Cargo, tests and workflows.
+This is acceptance validation, not an incident fix; preserve all old results.
+Merge remains conditional on that exact head's five passing checks, fresh
+exclusive expected-head/base/scope/configuration guards and independent
+OWNER+ROOT original exact-main acceptance.
+
